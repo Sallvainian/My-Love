@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { moodService } from '@/services/moodService';
+import { moodSyncFingerprint } from '@/services/moodSyncPayload';
 
 describe('moodService', () => {
   const userId = '123e4567-e89b-42d3-a456-426614174000';
@@ -163,15 +164,23 @@ describe('moodService', () => {
   describe('markAsSynced', () => {
     it('marks a mood entry as synced with supabaseId', async () => {
       const created = await moodService.create(userId, ['happy']);
-      await moodService.markAsSynced(created.id!, 'supa-123');
+      const outcome = await moodService.markAsSynced(
+        created.id!,
+        'supa-123',
+        moodSyncFingerprint(created)
+      );
 
+      expect(outcome).toBe('cleared');
       const fetched = await moodService.getMoodForDate(new Date());
       expect(fetched!.synced).toBe(true);
       expect(fetched!.supabaseId).toBe('supa-123');
     });
 
-    it('throws if entry not found', async () => {
-      await expect(moodService.markAsSynced(99999, 'supa-123')).rejects.toThrow();
+    it('reports a vanished entry instead of throwing', async () => {
+      // A record deleted while its write was in flight is not a failure: the
+      // row is on the server and nothing local references it. Throwing would
+      // fail the batch into a retry that can never succeed.
+      await expect(moodService.markAsSynced(99999, 'supa-123', 'any')).resolves.toBe('missing');
     });
   });
 

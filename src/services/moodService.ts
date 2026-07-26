@@ -7,6 +7,10 @@ import { createValidationError, isZodError } from '../validation/errorMessages';
 import { MoodEntrySchema } from '../validation/schemas';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
 import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
+import type { MarkSyncedOutcome } from './moodSyncPayload';
+import { moodSyncFingerprint } from './moodSyncPayload';
+
+export type { MarkSyncedOutcome };
 
 /**
  * Mood Service - IndexedDB CRUD operations for mood tracking
@@ -230,25 +234,64 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
   }
 
   /**
-   * Mark a mood entry as synced
-   * Story 6.4: Will be used after successful Supabase upload
+   * Record the outcome of a sync against a mood entry
+   * Story 6.4: Used after a successful Supabase upload
+   *
+   * Clears the dirty flag ONLY if the record still transmits what the caller
+   * sent. A sync snapshots a record, spends up to ~7s in `syncMoodWithRetry`'s
+   * 1s/2s/4s backoff, and returns to a record the user may have edited in the
+   * meantime; clearing unconditionally would strand that edit locally, flagged
+   * clean, invisible to `getUnsyncedMoods()` forever.
+   *
+   * `supabaseId` is recorded either way — the server row exists now, so the
+   * follow-up sync must PATCH it rather than insert a second one.
+   *
+   * The read and the write share ONE readwrite transaction. `super.update()`
+   * does `get` then `put` in two auto-commit transactions with an `await`
+   * between them, which is the same defect in a one-microtask-wide window.
+   * IndexedDB serialises overlapping readwrite transactions across
+   * connections, so this also holds against the service worker and other tabs.
    *
    * @param id - Mood entry ID
    * @param supabaseId - Supabase record ID
+   * @param sentFingerprint - `moodSyncFingerprint` of the record as transmitted
+   * @returns `cleared` when the flag was cleared, `deferred` when a concurrent
+   *          edit was detected, `missing` when the record no longer exists
    */
-  async markAsSynced(id: number, supabaseId: string): Promise<void> {
+  async markAsSynced(
+    id: number,
+    supabaseId: string,
+    sentFingerprint: string
+  ): Promise<MarkSyncedOutcome> {
     try {
-      const existing = await this.get(id);
-      if (!existing) {
-        throw new Error(`Mood entry with id ${id} not found`);
+      await this.init();
+
+      const tx = this.getTypedDB().transaction('moods', 'readwrite');
+      const current = await tx.store.get(id);
+
+      if (!current) {
+        await tx.done;
+        // Deleted while the write was in flight. The row is on the server and
+        // nothing local references it; treat as done rather than failing the
+        // batch into a retry that can never succeed.
+        logger.debug(`[MoodService] Mood entry ${id} vanished before it could be marked`);
+        return 'missing';
       }
 
-      await super.update(id, {
-        synced: true,
-        supabaseId,
-      });
+      const unchanged = moodSyncFingerprint(current) === sentFingerprint;
+
+      await tx.store.put({ ...current, supabaseId, synced: unchanged });
+      await tx.done;
+
+      if (!unchanged) {
+        logger.debug(
+          `[MoodService] Mood entry ${id} changed during sync - staying unsynced for the next pass`
+        );
+        return 'deferred';
+      }
 
       logger.debug(`[MoodService] Marked mood entry ${id} as synced (supabaseId: ${supabaseId})`);
+      return 'cleared';
     } catch (error) {
       this.handleError('markAsSynced', error as Error);
     }

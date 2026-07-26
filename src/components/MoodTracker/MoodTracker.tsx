@@ -246,7 +246,18 @@ export function MoodTracker() {
 
     setIsRetrying(true);
     try {
-      await syncPendingMoods();
+      const result = await syncPendingMoods();
+
+      // A skipped batch attempted nothing — another tab or the service worker
+      // holds the lock. Clearing the banner and flashing success here would
+      // tell the user their moods are safely uploaded when they are still
+      // pending. Leave the banner up; the context that owns the batch is
+      // already syncing them.
+      if (result.skipped) {
+        logger.debug('[MoodTracker] Retry skipped - another context is syncing');
+        return;
+      }
+
       setOfflineError(false);
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);

@@ -18,6 +18,7 @@
 import { moodSyncService } from '../../api/moodSyncService';
 import { getPartnerId } from '../../api/supabaseClient';
 import { moodService } from '../../services/moodService';
+import { MOOD_SYNC_LOCK, withSyncLock } from '../../services/syncLock';
 import type { MoodEntry } from '../../types';
 import { formatDateISO } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
@@ -40,7 +41,8 @@ export interface MoodSlice {
   updateMoodEntry: (date: string, moods: MoodEntry['mood'][], note?: string) => Promise<void>;
   loadMoods: () => Promise<void>;
   updateSyncStatus: () => Promise<void>;
-  syncPendingMoods: () => Promise<{ synced: number; failed: number }>;
+  /** `skipped` means another context held the sync lock and nothing was attempted */
+  syncPendingMoods: () => Promise<{ synced: number; failed: number; skipped: boolean }>;
   fetchPartnerMoods: (limit?: number) => Promise<void>;
   getPartnerMoodForDate: (date: string) => MoodEntry | undefined;
 }
@@ -205,7 +207,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
     // Concurrency guard: skip if already syncing to prevent duplicate DB rows
     if (get().syncStatus.isSyncing) {
       logger.debug('[MoodSlice] Skipping sync - already in progress');
-      return { synced: 0, failed: 0 };
+      return { synced: 0, failed: 0, skipped: true };
     }
 
     try {
@@ -219,8 +221,45 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
       logger.debug('[MoodSlice] Starting pending moods sync...');
 
-      // Call moodSyncService to sync all pending moods
-      const result = await moodSyncService.syncPendingMoods();
+      // `isSyncing` above only guards this tab. The lock guards against the
+      // service worker and other tabs, which cannot see that flag at all.
+      const locked = await withSyncLock(MOOD_SYNC_LOCK, async () => {
+        const first = await moodSyncService.syncPendingMoods();
+
+        // A deferral means the write landed but the user edited the record
+        // while it was in flight, so it stayed dirty on purpose. Run one more
+        // pass while we still hold the lock so the newer value reaches the
+        // server now rather than waiting for an unrelated trigger. Exactly one
+        // extra pass: unbounded retries would spin for as long as the user
+        // keeps typing.
+        if (first.deferred > 0) {
+          logger.debug(`[MoodSlice] ${first.deferred} mood(s) edited mid-sync - one more pass`);
+          const second = await moodSyncService.syncPendingMoods();
+          return {
+            synced: first.synced + second.synced,
+            // NOT first.failed + second.failed: the second pass re-reads every
+            // unsynced mood, so a record that failed in pass one fails again
+            // and would be counted twice for a single broken record.
+            failed: second.failed,
+          };
+        }
+
+        return { synced: first.synced, failed: first.failed };
+      });
+
+      // Another context owns this batch. Nothing was written, so do not reload,
+      // do not stamp lastSyncAt, and tell the caller it was skipped — reporting
+      // {synced: 0, failed: 0} is indistinguishable from "nothing to sync" and
+      // makes the retry button claim success for a sync that never ran.
+      if (!locked.ran) {
+        logger.debug('[MoodSlice] Another context holds the sync lock - skipping');
+        set((state) => ({
+          syncStatus: { ...state.syncStatus, isSyncing: false },
+        }));
+        return { synced: 0, failed: 0, skipped: true };
+      }
+
+      const result = locked.result;
 
       // Reload moods from IndexedDB to reflect synced status
       // This ensures the UI shows the correct sync state after successful sync
@@ -251,7 +290,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
       logger.debug(`[MoodSlice] Sync complete: ${result.synced} synced, ${result.failed} failed`);
 
-      return { synced: result.synced, failed: result.failed };
+      return { synced: result.synced, failed: result.failed, skipped: false };
     } catch (error) {
       console.error('[MoodSlice] Error syncing pending moods:', error);
 
