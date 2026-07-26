@@ -24,7 +24,10 @@ import { ExpirationPlugin } from 'workbox-expiration';
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { CacheFirst, NetworkFirst } from 'workbox-strategies';
-import { getAuthToken, getPendingMoods, markMoodSynced, type StoredMoodEntry } from './sw-db';
+import type { MoodSyncPayload } from './services/moodSyncPayload';
+import { moodSyncFingerprint, moodSyncPayload } from './services/moodSyncPayload';
+import { MOOD_SYNC_LOCK, withSyncLock } from './services/syncLock';
+import { getAuthToken, getPendingMoods, markMoodSynced } from './sw-db';
 
 // Background Sync API types
 interface SyncEvent extends ExtendableEvent {
@@ -115,29 +118,6 @@ self.addEventListener('sync', ((event: SyncEvent) => {
   }
 }) as EventListener);
 
-/**
- * Transform local mood format to Supabase REST API format
- *
- * Handles both single-mood (legacy) and multi-mood entries:
- * - mood_type: Always the primary mood (first in array or single mood)
- * - mood_types: Array of all selected moods (includes primary)
- */
-function transformMoodForSupabase(mood: StoredMoodEntry, userId: string): Record<string, unknown> {
-  // Determine mood_types array: use stored moods array, or create single-element array
-  const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];
-
-  return {
-    user_id: userId,
-    mood_type: mood.mood,
-    mood_types: moodTypes,
-    note: mood.note || null,
-    created_at:
-      mood.timestamp instanceof Date
-        ? mood.timestamp.toISOString()
-        : new Date(mood.timestamp).toISOString(),
-  };
-}
-
 const MOODS_ENDPOINT = `${SUPABASE_URL}/rest/v1/moods`;
 
 /**
@@ -160,7 +140,7 @@ function moodRequestHeaders(accessToken: string, prefer: string): HeadersInit {
  * the main thread — resolves to that row instead of adding another one.
  */
 async function upsertMood(
-  supabaseMood: Record<string, unknown>,
+  supabaseMood: MoodSyncPayload,
   accessToken: string
 ): Promise<Response> {
   return fetch(`${MOODS_ENDPOINT}?on_conflict=user_id,created_at`, {
@@ -177,7 +157,7 @@ async function upsertMood(
  * omitted from the body so the original log time survives the edit.
  */
 async function patchMood(
-  supabaseMood: Record<string, unknown>,
+  supabaseMood: MoodSyncPayload,
   accessToken: string,
   supabaseId: string
 ): Promise<Response> {
@@ -193,6 +173,27 @@ async function patchMood(
 }
 
 /**
+ * Sync pending moods, but only if no open tab is already doing it
+ *
+ * The app's own guard is `syncStatus.isSyncing` in the Zustand store, which
+ * this worker cannot see. Without the lock, this batch and a tab's batch can
+ * write the same record concurrently, and each then concludes its own write
+ * was the current one — clearing the dirty flag over the other's edit.
+ */
+async function syncPendingMoods(): Promise<void> {
+  const outcome = await withSyncLock(MOOD_SYNC_LOCK, runPendingMoodSync);
+
+  if (!outcome.ran) {
+    console.log('[ServiceWorker] A tab is already syncing moods - deferring this batch');
+    // Throw so the `waitUntil` promise rejects. Background Sync only re-fires a
+    // tag when its work rejects; resolving here would retire the registration
+    // on a batch that did nothing, spending the one-shot retry guarantee the
+    // offline path depends on.
+    throw new Error('mood sync lock held by another context');
+  }
+}
+
+/**
  * Sync pending moods from IndexedDB to Supabase
  *
  * This is the REAL background sync implementation:
@@ -200,9 +201,9 @@ async function patchMood(
  * 2. Gets pending moods
  * 3. Gets stored auth token
  * 4. Calls Supabase REST API with fetch
- * 5. Marks moods as synced on success
+ * 5. Records the outcome against each mood
  */
-async function syncPendingMoods(): Promise<void> {
+async function runPendingMoodSync(): Promise<void> {
   try {
     // 1. Get pending moods from IndexedDB
     const pendingMoods = await getPendingMoods();
@@ -234,6 +235,7 @@ async function syncPendingMoods(): Promise<void> {
     // 3. Sync each mood to Supabase via REST API
     let successCount = 0;
     let failCount = 0;
+    let deferredCount = 0;
 
     for (const mood of pendingMoods) {
       if (!mood.id) {
@@ -243,7 +245,11 @@ async function syncPendingMoods(): Promise<void> {
       }
 
       try {
-        const supabaseMood = transformMoodForSupabase(mood, authToken.userId);
+        const supabaseMood = moodSyncPayload(mood, authToken.userId);
+
+        // Fingerprint BEFORE the fetch: an open tab can edit this record while
+        // the request is in flight, and markMoodSynced must be able to tell.
+        const sentFingerprint = moodSyncFingerprint(mood);
 
         // Call Supabase REST API directly. A record that already has a server
         // row is edited in place; everything else upserts, so this worker can
@@ -289,17 +295,31 @@ async function syncPendingMoods(): Promise<void> {
           continue;
         }
 
-        // 4. Mark as synced in IndexedDB
-        await markMoodSynced(mood.id, created.id);
-        successCount++;
-        console.log(`[ServiceWorker] Synced mood ${mood.id} → ${created.id}`);
+        // 4. Record the outcome in IndexedDB
+        const outcome = await markMoodSynced(mood.id, created.id, sentFingerprint);
+
+        if (outcome === 'deferred') {
+          // Written, but a tab edited it mid-flight. Not a failure: the record
+          // stays pending so the newer value reaches the server next pass.
+          deferredCount++;
+          console.log(`[ServiceWorker] Mood ${mood.id} edited during sync - left pending`);
+        } else if (outcome === 'missing') {
+          // Deleted locally while in flight. Nothing to report to the user as
+          // synced — there is no local record left for the count to describe.
+          console.log(`[ServiceWorker] Mood ${mood.id} was deleted during sync`);
+        } else {
+          successCount++;
+          console.log(`[ServiceWorker] Synced mood ${mood.id} → ${created.id}`);
+        }
       } catch (moodError) {
         console.error(`[ServiceWorker] Error syncing mood ${mood.id}:`, moodError);
         failCount++;
       }
     }
 
-    console.log(`[ServiceWorker] Sync complete: ${successCount} succeeded, ${failCount} failed`);
+    console.log(
+      `[ServiceWorker] Sync complete: ${successCount} succeeded, ${failCount} failed, ${deferredCount} deferred`
+    );
 
     // 5. Notify open clients that sync completed
     const clients = await self.clients.matchAll({ type: 'window' });
@@ -311,9 +331,13 @@ async function syncPendingMoods(): Promise<void> {
       });
     }
 
-    // If all failed, throw to trigger retry
-    if (successCount === 0 && failCount > 0) {
-      throw new Error(`All ${failCount} moods failed to sync`);
+    // Throw to trigger a Background Sync retry when nothing landed cleanly.
+    // A deferred record was written but is still pending a newer value, and
+    // unlike the main thread this worker has no second pass — so a deferral
+    // must also re-fire, or the newer value is stranded until some unrelated
+    // trigger fires.
+    if (successCount === 0 && (failCount > 0 || deferredCount > 0)) {
+      throw new Error(`No moods synced: ${failCount} failed, ${deferredCount} deferred`);
     }
   } catch (error) {
     console.error('[ServiceWorker] Background sync failed:', error);
