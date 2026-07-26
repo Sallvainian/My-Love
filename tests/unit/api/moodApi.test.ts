@@ -41,6 +41,48 @@ describe('moodApi', () => {
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   });
 
+  describe('fake fidelity — the constraint these tests assume', () => {
+    // Without these, every test below passes whether or not the unique index
+    // exists, and the fake models the real 42P10 failure as silent success.
+    it('a plain insert of an existing key is rejected the way Postgres rejects it', async () => {
+      backend.seed({ user_id: USER_ID, created_at: LOG_TIME });
+
+      const { error } = await backend
+        .client()
+        .from('moods')
+        .insert(moodInsert() as unknown as Record<string, unknown>);
+
+      expect((error as { code?: string } | null)?.code).toBe('23505');
+      expect(backend.rows).toHaveLength(1);
+    });
+
+    it('an ON CONFLICT target no index covers is a hard error, not a silent success', async () => {
+      const { error } = await backend
+        .client()
+        .from('moods')
+        .upsert(moodInsert() as unknown as Record<string, unknown>, { onConflict: 'note' });
+
+      expect((error as { code?: string } | null)?.code).toBe('42P10');
+    });
+
+    it('ON CONFLICT DO UPDATE overwrites with null rather than preserving', async () => {
+      // Real Postgres writes excluded.note even when it is NULL. The service
+      // worker sends `mood.note || null` (sw.ts), so an upsert from a record
+      // whose local note is empty clears a note already on the server.
+      backend.seed({ user_id: USER_ID, created_at: LOG_TIME, note: 'rough day' });
+
+      await backend
+        .client()
+        .from('moods')
+        .upsert(moodInsert({ note: null }) as unknown as Record<string, unknown>, {
+          onConflict: 'user_id,created_at',
+        });
+
+      expect(backend.rows).toHaveLength(1);
+      expect(backend.rows[0].note).toBeNull();
+    });
+  });
+
   describe('create — Goal A idempotency', () => {
     it('[A: first sync of a new mood] writes exactly one row and returns it', async () => {
       const created = await moodApi.create(moodInsert());
