@@ -201,15 +201,24 @@ tests/                  # 85 external test files
 
 ## Planning Artifacts
 
-| Document                                                                           | Description                                                    |
-| ---------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| [Architecture](../_bmad-output/planning-artifacts/architecture.md)                 | Feature architecture for Scripture Reading                     |
-| [UX Design Spec](../_bmad-output/planning-artifacts/ux-design-specification.md)    | UX design specification                                        |
-| [UX Design Directions](../_bmad-output/planning-artifacts/ux-design-directions.html) | UX direction explorations (HTML)                             |
-| [Project Context](../_bmad-output/project-context.md)                              | Condensed AI-agent rule file (~120 rules)                      |
-| [Deferred Work](../_bmad-output/implementation-artifacts/deferred-work.md)         | Ledger of deferred items                                       |
-| `_bmad-output/implementation-artifacts/tech-spec-*.md`                             | Per-change technical specs                                     |
-| `_bmad-output/test-artifacts/`, `_bmad-output/tea-docs/`                           | Test reviews, NFR assessments, traceability, TEA reference docs |
+Only phase-agnostic artifacts remain live. Everything tied to a finished planning phase now sits under `_bmad-output/.archive/`.
+
+| Document                                                                   | Description                                                    |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [Project Context](../_bmad-output/project-context.md)                      | Condensed AI-agent rule file (regenerated per scan)            |
+| [Deferred Work](../_bmad-output/implementation-artifacts/deferred-work.md) | Ledger of deferred items                                       |
+| `_bmad-output/handoff-documents/`                                          | Cross-session handoff documents                                |
+| `_bmad-output/bmad-workflow-reference.md`, `_bmad-output/tea-docs/`        | BMAD workflow reference and TEA test-architecture docs         |
+
+**Archived** (`_bmad-output/.archive/`, retained for history):
+
+| Document                                                                              | Description                                        |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [Architecture](../_bmad-output/.archive/planning-artifacts/architecture.md)           | Feature architecture for Scripture Reading         |
+| [UX Design Spec](../_bmad-output/.archive/planning-artifacts/ux-design-specification.md) | UX design specification                         |
+| [UX Design Directions](../_bmad-output/.archive/planning-artifacts/ux-design-directions.html) | UX direction explorations (HTML)           |
+| `_bmad-output/.archive/implementation-artifacts/tech-spec-*.md`                       | Completed per-change technical specs               |
+| `_bmad-output/.archive/reports/`                                                      | Dead-code analysis and skill quality scans         |
 
 > The sharded `planning-artifacts/prd/` and `planning-artifacts/epics/` directories, plus `implementation-artifacts/sprint-status.yaml` and the two `test-design-*.md` files, were retired after all four Scripture Reading epics shipped. See [Active Development Epics](./project-overview/active-development-epics.md) for the epic history.
 
