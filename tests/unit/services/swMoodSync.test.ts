@@ -25,6 +25,7 @@ vi.mock('@/sw-db', () => ({
   markMoodSynced: vi.fn(),
 }));
 
+import { moodSyncFingerprint } from '@/services/moodSyncPayload';
 import { getAuthToken, getPendingMoods, markMoodSynced } from '@/sw-db';
 
 const mockedGetAuthToken = vi.mocked(getAuthToken);
@@ -79,8 +80,14 @@ function pendingMood(overrides: Partial<MoodEntry> = {}): MoodEntry {
   };
 }
 
-/** Dispatch the Background Sync event sw.ts listens for and await its work */
-async function fireBackgroundSync(): Promise<void> {
+/**
+ * Dispatch the Background Sync event sw.ts listens for and await its work.
+ *
+ * `swallow: false` surfaces the rejection instead of absorbing it — the browser
+ * treats a rejected `waitUntil` as "retry this tag", so whether the work
+ * rejects is itself behaviour worth asserting.
+ */
+async function fireBackgroundSync({ swallow = true }: { swallow?: boolean } = {}): Promise<void> {
   const event = new Event('sync') as Event & {
     tag: string;
     waitUntil: (promise: Promise<unknown>) => void;
@@ -93,10 +100,77 @@ async function fireBackgroundSync(): Promise<void> {
   };
 
   self.dispatchEvent(event);
-  await work.catch(() => undefined);
+  if (swallow) {
+    await work.catch(() => undefined);
+    return;
+  }
+  await work;
 }
 
 describe('service worker mood background sync', () => {
+  describe('cross-context lock', () => {
+    afterEach(() => {
+      Reflect.deleteProperty(navigator, 'locks');
+    });
+
+    it('[a tab is already syncing] performs no write at all', async () => {
+      // The worker cannot see the app's `syncStatus.isSyncing` flag. Without
+      // the lock it writes the same records a tab is mid-way through writing,
+      // and both then clear the dirty flag over each other's edit.
+      Object.defineProperty(navigator, 'locks', {
+        configurable: true,
+        value: {
+          request: async (
+            _name: string,
+            _options: { ifAvailable?: boolean },
+            callback: (lock: null) => Promise<unknown>
+          ) => callback(null),
+        },
+      });
+      mockedGetPendingMoods.mockResolvedValue([pendingMood()]);
+
+      await fireBackgroundSync();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(mockedMarkMoodSynced).not.toHaveBeenCalled();
+    });
+
+    it('[a tab is already syncing] rejects so Background Sync re-fires the tag', async () => {
+      // Background Sync only re-queues a tag when its waitUntil promise
+      // rejects. Resolving on a skip would retire the registration on a batch
+      // that did nothing, spending the offline path's one retry guarantee.
+      Object.defineProperty(navigator, 'locks', {
+        configurable: true,
+        value: {
+          request: async (
+            _name: string,
+            _options: { ifAvailable?: boolean },
+            callback: (lock: null) => Promise<unknown>
+          ) => callback(null),
+        },
+      });
+      mockedGetPendingMoods.mockResolvedValue([pendingMood()]);
+
+      await expect(fireBackgroundSync({ swallow: false })).rejects.toThrow(/lock held/);
+    });
+  });
+
+  describe('deferred outcome', () => {
+    it('[a tab edited the record mid-flight] is not counted as a success', async () => {
+      mockedGetPendingMoods.mockResolvedValue([pendingMood({ supabaseId: SERVER_ROW_ID })]);
+      fetchMock.mockResolvedValue(jsonResponse(200, [{ id: SERVER_ROW_ID }]));
+      mockedMarkMoodSynced.mockResolvedValue('deferred');
+
+      // Nothing landed cleanly, so this must reject: unlike the main thread the
+      // worker has no second pass, and the newer value would otherwise sit
+      // unsynced until an unrelated trigger fired.
+      await expect(fireBackgroundSync({ swallow: false })).rejects.toThrow(/1 deferred/);
+
+      // The write did land — the record is pending a newer value, not unwritten.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   beforeAll(async () => {
     globalScope.skipWaiting = vi.fn();
     globalScope.clients = { matchAll: vi.fn(async () => []) };
@@ -113,7 +187,7 @@ describe('service worker mood background sync', () => {
       refreshToken: 'test-refresh-token',
       expiresAt: Math.floor(Date.now() / 1000) + 3600,
     });
-    mockedMarkMoodSynced.mockResolvedValue(undefined);
+    mockedMarkMoodSynced.mockResolvedValue('cleared');
   });
 
   afterEach(() => {
@@ -136,7 +210,7 @@ describe('service worker mood background sync', () => {
       mood_types: ['happy'],
       note: 'a note',
     });
-    expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, SERVER_ROW_ID);
+    expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, SERVER_ROW_ID, moodSyncFingerprint(pendingMood()));
   });
 
   it('[A: SW syncs an edited record] falls back to the upsert on a 404', async () => {
@@ -152,7 +226,7 @@ describe('service worker mood background sync', () => {
     expect(fallback.method).toBe('POST');
     expect(fallback.url).toBe(`${MOODS_URL}?on_conflict=user_id,created_at`);
     expect(fallback.headers.Prefer).toBe('resolution=merge-duplicates,return=representation');
-    expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, 'recreated-row');
+    expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, 'recreated-row', moodSyncFingerprint(pendingMood()));
   });
 
   it('[A: SW syncs an edited record] falls back to the upsert when the PATCH matches no row', async () => {
@@ -166,7 +240,7 @@ describe('service worker mood background sync', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchCall(1).method).toBe('POST');
     expect(fetchCall(1).url).toBe(`${MOODS_URL}?on_conflict=user_id,created_at`);
-    expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, 'recreated-row');
+    expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, 'recreated-row', moodSyncFingerprint(pendingMood()));
   });
 
   it('[A: two writers race] a never-synced mood is upserted on user_id,created_at', async () => {
@@ -182,7 +256,7 @@ describe('service worker mood background sync', () => {
     expect(call.headers.Prefer).toBe('resolution=merge-duplicates,return=representation');
     // The idempotency key: client-supplied, reproduced identically on every resend.
     expect(call.body).toMatchObject({ user_id: USER_ID, created_at: LOG_TIME });
-    expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, SERVER_ROW_ID);
+    expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, SERVER_ROW_ID, moodSyncFingerprint(pendingMood()));
   });
 
   // The tests above assert request SHAPE against canned responses, which cannot
@@ -234,7 +308,7 @@ describe('service worker mood background sync', () => {
       expect(backend.rows).toHaveLength(1);
       // The pre-existing id, not a freshly minted one — this is what stops the
       // local record from being re-synced as a second row later.
-      expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, existing.id);
+      expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, existing.id, moodSyncFingerprint(pendingMood()));
     });
 
     it('[A: SW syncs an edited record] edits in place without adding a row', async () => {
@@ -256,7 +330,7 @@ describe('service worker mood background sync', () => {
       expect(backend.rows[0].mood_type).toBe('sad');
       // created_at is the row's identity and must survive the edit.
       expect(backend.rows[0].created_at).toBe(LOG_TIME);
-      expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, existing.id);
+      expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, existing.id, moodSyncFingerprint(pendingMood({ note: 'edited', mood: 'sad', moods: ['sad'] })));
     });
   });
 });

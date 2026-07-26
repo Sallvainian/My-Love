@@ -26,6 +26,7 @@ vi.mock('@/services/moodService', () => ({
 
 import { moodSyncService } from '@/api/moodSyncService';
 import { getPartnerId } from '@/api/supabaseClient';
+import { moodSyncFingerprint } from '@/services/moodSyncPayload';
 import { moodService } from '@/services/moodService';
 import type { MoodEntry } from '@/types';
 
@@ -50,7 +51,12 @@ function pendingMood(overrides: Partial<MoodEntry> = {}): MoodEntry {
 }
 
 /** Run syncPendingMoods to completion, driving the retry backoff timers */
-async function runSync(): Promise<{ synced: number; failed: number; errors: string[] }> {
+async function runSync(): Promise<{
+  synced: number;
+  failed: number;
+  deferred: number;
+  errors: string[];
+}> {
   const pending = moodSyncService.syncPendingMoods();
   await vi.advanceTimersByTimeAsync(30_000);
   return pending;
@@ -63,7 +69,7 @@ describe('moodSyncService.syncPendingMoods', () => {
     backend.reset();
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     mockedGetPartnerId.mockResolvedValue(null);
-    mockedMoodService.markAsSynced.mockResolvedValue(undefined);
+    mockedMoodService.markAsSynced.mockResolvedValue('cleared');
   });
 
   afterEach(() => {
@@ -77,7 +83,7 @@ describe('moodSyncService.syncPendingMoods', () => {
 
     expect(result).toMatchObject({ synced: 1, failed: 0 });
     expect(backend.rows).toHaveLength(1);
-    expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(1, backend.rows[0].id);
+    expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(1, backend.rows[0].id, moodSyncFingerprint(pendingMood()));
   });
 
   it('[A: retry after partial success] the retry resolves to the committed row, not a second one', async () => {
@@ -91,7 +97,7 @@ describe('moodSyncService.syncPendingMoods', () => {
     expect(result).toMatchObject({ synced: 1, failed: 0 });
     expect(backend.rows).toHaveLength(1);
     expect(mockedMoodService.markAsSynced).toHaveBeenCalledTimes(1);
-    expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(1, backend.rows[0].id);
+    expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(1, backend.rows[0].id, moodSyncFingerprint(pendingMood()));
   });
 
   it('[A: two writers race] a row another writer already committed is adopted, not duplicated', async () => {
@@ -104,7 +110,7 @@ describe('moodSyncService.syncPendingMoods', () => {
 
     expect(result).toMatchObject({ synced: 1, failed: 0 });
     expect(backend.rows).toHaveLength(1);
-    expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(1, alreadyWritten.id);
+    expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(1, alreadyWritten.id, moodSyncFingerprint(pendingMood()));
   });
 
   it('[A: edit an already-synced mood] PATCHes the existing row and leaves created_at alone', async () => {
@@ -142,7 +148,34 @@ describe('moodSyncService.syncPendingMoods', () => {
     expect(backend.rows[0].id).toBe(orphaned.id);
     expect(backend.rows[0].note).toBe('edited');
     expect(backend.rows[0].created_at).toBe(LOG_TIME);
-    expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(1, orphaned.id);
+    expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(
+      1,
+      orphaned.id,
+      moodSyncFingerprint(pendingMood({ note: 'edited' }))
+    );
+  });
+
+  it('[deferred] counts a mid-flight edit as deferred, not synced', async () => {
+    // The counter this produces is what moodSlice keys its second pass on.
+    // Without a test, dropping the branch so a deferral falls through to
+    // result.synced++ leaves every other test green while the edit is stranded.
+    mockedMoodService.getUnsyncedMoods.mockResolvedValue([pendingMood()]);
+    mockedMoodService.markAsSynced.mockResolvedValue('deferred');
+
+    const result = await runSync();
+
+    expect(result).toMatchObject({ synced: 0, failed: 0, deferred: 1 });
+  });
+
+  it('[missing] a record deleted mid-sync is neither synced nor failed', async () => {
+    mockedMoodService.getUnsyncedMoods.mockResolvedValue([pendingMood()]);
+    mockedMoodService.markAsSynced.mockResolvedValue('missing');
+
+    const result = await runSync();
+
+    // Counting it as synced would report an upload for a record that no longer
+    // exists locally; counting it as failed would retry forever.
+    expect(result).toMatchObject({ synced: 0, failed: 0, deferred: 0 });
   });
 
   it('[A: offline] attempts no write, keeps the record pending and does not throw', async () => {

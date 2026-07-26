@@ -12,6 +12,7 @@
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { moodService } from '../services/moodService';
+import { moodSyncFingerprint, moodSyncPayload } from '../services/moodSyncPayload';
 import type { MoodEntry } from '../types';
 import { logger } from '../utils/logger';
 import { handleNetworkError, isOnline } from './errorHandlers';
@@ -30,6 +31,12 @@ export type SupabaseMoodRecord = SupabaseMood;
 interface SyncResult {
   synced: number;
   failed: number;
+  /**
+   * Records whose write succeeded but whose dirty flag was deliberately left
+   * set because the user edited them mid-flight. Not a failure — the server
+   * took the older value and the newer one is still queued locally.
+   */
+  deferred: number;
   errors: string[];
 }
 
@@ -78,16 +85,9 @@ class MoodSyncService {
       throw handleNetworkError(new Error('Device is offline'), 'MoodSyncService.syncMood');
     }
 
-    // Transform local mood to Supabase insert format
-    // Include mood_types array for multi-mood support
-    const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];
-    const moodInsert: MoodInsert = {
-      user_id: mood.userId,
-      mood_type: mood.mood,
-      mood_types: moodTypes,
-      note: mood.note || null,
-      created_at: mood.timestamp.toISOString(),
-    };
+    // Transform local mood to Supabase insert format via the shared projection,
+    // so what is sent here and what markAsSynced compares against cannot drift.
+    const moodInsert: MoodInsert = moodSyncPayload(mood, mood.userId);
 
     // Update in place when this local mood already has a server row, so editing
     // today's mood does not append a second "today" entry for the partner.
@@ -211,6 +211,7 @@ class MoodSyncService {
     const result: SyncResult = {
       synced: 0,
       failed: 0,
+      deferred: 0,
       errors: [],
     };
 
@@ -236,17 +237,34 @@ class MoodSyncService {
       // Sync each mood with retry logic
       for (const mood of unsyncedMoods) {
         try {
-          // Attempt to sync mood with retry logic
+          // Fingerprint BEFORE the write. syncMoodWithRetry can spend ~7s in
+          // backoff, and the record we compare against afterwards is whatever
+          // the user left behind in that window — not this snapshot.
+          const sentFingerprint = moodSyncFingerprint(mood);
+
           const syncedMood = await this.syncMoodWithRetry(mood);
 
-          // On success: Mark mood as synced in IndexedDB
+          // On success: record the outcome against the local record
           if (mood.id) {
-            await moodService.markAsSynced(mood.id, syncedMood.id);
-            result.synced++;
-
-            logger.debug(
-              `[MoodSyncService] Synced mood ${mood.id} → Supabase ID: ${syncedMood.id}`
+            const outcome = await moodService.markAsSynced(
+              mood.id,
+              syncedMood.id,
+              sentFingerprint
             );
+
+            if (outcome === 'deferred') {
+              result.deferred++;
+              logger.debug(
+                `[MoodSyncService] Mood ${mood.id} was edited mid-sync - re-queued for the next pass`
+              );
+            } else if (outcome === 'missing') {
+              logger.debug(`[MoodSyncService] Mood ${mood.id} was deleted during its sync`);
+            } else {
+              result.synced++;
+              logger.debug(
+                `[MoodSyncService] Synced mood ${mood.id} → Supabase ID: ${syncedMood.id}`
+              );
+            }
           }
         } catch (error) {
           // On failure: Log error and continue with next mood
@@ -259,7 +277,7 @@ class MoodSyncService {
       }
 
       logger.debug(
-        `[MoodSyncService] Sync complete: ${result.synced} synced, ${result.failed} failed`
+        `[MoodSyncService] Sync complete: ${result.synced} synced, ${result.failed} failed, ${result.deferred} deferred`
       );
 
       return result;
