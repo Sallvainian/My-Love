@@ -10,12 +10,7 @@
  * TDD Phase: GREEN — implementation complete (migration 20260220000001)
  */
 import { test, expect } from '../support/merged-fixtures';
-import {
-  createTestSession,
-  cleanupTestSession,
-  linkTestPartners,
-  unlinkTestPartners,
-} from '../support/factories';
+import { createTestSession, cleanupTestSession } from '../support/factories';
 import { getUserAccessToken } from '../support/helpers/supabase';
 
 // Type cast helper for new lobby columns not yet in database.types.ts
@@ -40,13 +35,14 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       supabaseAdmin,
       apiRequest,
     }) => {
-      // GIVEN: A session and two linked partners exist
+      // GIVEN: A session and two linked partners exist.
+      // The linkage comes from global-setup, which links every worker pair once
+      // per run — createTestSession seeds for this worker's own pair, so there is
+      // nothing to link here and nothing to unlink afterwards. Tearing it down
+      // would strip hasPartner from every later test in this worker.
       const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
       const sessionId = seedResult.session_ids[0];
       const user1Id = seedResult.test_user1_id;
-      const user2Id = seedResult.test_user2_id!;
-
-      await linkTestPartners(supabaseAdmin, user1Id, user2Id);
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
 
@@ -83,7 +79,6 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         // AND: user2_role is not affected by this call
         expect(dbRow!.user2_role).toBeNull();
       } finally {
-        await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
       }
     });
@@ -92,13 +87,14 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       supabaseAdmin,
       apiRequest,
     }) => {
-      // GIVEN: A session and two linked partners exist
+      // GIVEN: A session and two linked partners exist.
+      // The linkage comes from global-setup, which links every worker pair once
+      // per run — createTestSession seeds for this worker's own pair, so there is
+      // nothing to link here and nothing to unlink afterwards. Tearing it down
+      // would strip hasPartner from every later test in this worker.
       const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
       const sessionId = seedResult.session_ids[0];
       const user1Id = seedResult.test_user1_id;
-      const user2Id = seedResult.test_user2_id!;
-
-      await linkTestPartners(supabaseAdmin, user1Id, user2Id);
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
 
@@ -130,7 +126,6 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         expect(dbRow).toBeTruthy();
         expect(dbRow!.user1_role).toBe('responder');
       } finally {
-        await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
       }
     });
@@ -139,13 +134,15 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       supabaseAdmin,
       apiRequest,
     }) => {
-      // GIVEN: A session and two linked partners exist
+      // GIVEN: A session and two linked partners exist.
+      // The linkage comes from global-setup, which links every worker pair once
+      // per run — createTestSession seeds for this worker's own pair, so there is
+      // nothing to link here and nothing to unlink afterwards. Tearing it down
+      // would strip hasPartner from every later test in this worker.
       const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
       const sessionId = seedResult.session_ids[0];
       const user1Id = seedResult.test_user1_id;
       const user2Id = seedResult.test_user2_id!;
-
-      await linkTestPartners(supabaseAdmin, user1Id, user2Id);
 
       // Use user2's token — exercises the user2_id code path in the RPC
       const user2Token = await getUserAccessToken(supabaseAdmin, user2Id);
@@ -181,7 +178,6 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         // AND: user1_role is not affected by this call
         expect(dbRow!.user1_role).toBeNull();
       } finally {
-        await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
       }
     });
@@ -198,13 +194,15 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
     }) => {
       test.setTimeout(30_000);
 
-      // GIVEN: A session and two linked partners exist
+      // GIVEN: A session and two linked partners exist.
+      // The linkage comes from global-setup, which links every worker pair once
+      // per run — createTestSession seeds for this worker's own pair, so there is
+      // nothing to link here and nothing to unlink afterwards. Tearing it down
+      // would strip hasPartner from every later test in this worker.
       const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
       const sessionId = seedResult.session_ids[0];
       const user1Id = seedResult.test_user1_id;
       const user2Id = seedResult.test_user2_id!;
-
-      await linkTestPartners(supabaseAdmin, user1Id, user2Id);
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
       const user2Token = await getUserAccessToken(supabaseAdmin, user2Id);
@@ -273,7 +271,6 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         expect(countdownTs.getTime()).toBeGreaterThanOrEqual(beforeCountdown.getTime() - 1000);
         expect(countdownTs.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
       } finally {
-        await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
       }
     });
