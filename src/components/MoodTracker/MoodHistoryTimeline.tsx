@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo } from 'react';
+import type { ReactElement } from 'react';
 import { List } from 'react-window';
 import { useInfiniteLoader } from 'react-window-infinite-loader';
 import type { SupabaseMood } from '../../api/validation/supabaseSchemas';
@@ -93,6 +94,47 @@ function flattenMoodGroups(groups: MoodGroup[]): TimelineItem[] {
   });
 
   return items;
+}
+
+/**
+ * Props react-window passes through `rowProps` to every row
+ */
+interface TimelineRowProps {
+  timelineItems: TimelineItem[];
+  isPartnerView: boolean;
+}
+
+/**
+ * Row renderer for the virtualized list
+ *
+ * Declared at module scope on purpose: defined inside MoodHistoryTimeline its
+ * identity changed on every render, which remounted every visible row.
+ */
+export function TimelineRow({
+  index,
+  style,
+  timelineItems,
+  isPartnerView,
+}: {
+  ariaAttributes: { 'aria-posinset': number; 'aria-setsize': number; role: 'listitem' };
+  index: number;
+  style: React.CSSProperties;
+} & TimelineRowProps): ReactElement {
+  const item = timelineItems[index];
+
+  if (!item) {
+    return <div style={style} />;
+  }
+
+  return (
+    <div style={style}>
+      {item.type === 'date-header' ? (
+        <DateHeader date={item.dateLabel} />
+      ) : (
+        <MoodHistoryItem mood={item.mood} isPartnerView={isPartnerView} />
+      )}
+    </div>
+  );
 }
 
 /**
@@ -187,32 +229,6 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
     return <EmptyMoodHistoryState />;
   }
 
-  // Row component for List
-  const RowComponent = ({
-    index,
-    style,
-  }: {
-    ariaAttributes: { 'aria-posinset': number; 'aria-setsize': number; role: 'listitem' };
-    index: number;
-    style: React.CSSProperties;
-  }) => {
-    const item = timelineItems[index];
-
-    if (!item) {
-      return <div style={style} />;
-    }
-
-    return (
-      <div style={style}>
-        {item.type === 'date-header' ? (
-          <DateHeader date={item.dateLabel} />
-        ) : (
-          <MoodHistoryItem mood={item.mood} isPartnerView={isPartnerView} />
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="h-full w-full" data-testid="mood-history-timeline">
       <List
@@ -220,8 +236,8 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
         rowHeight={getRowHeight}
         onRowsRendered={onRowsRendered}
         defaultHeight={600}
-        rowComponent={RowComponent}
-        rowProps={{}}
+        rowComponent={TimelineRow}
+        rowProps={{ timelineItems, isPartnerView }}
       />
 
       {isLoading && (
