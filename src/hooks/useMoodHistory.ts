@@ -81,7 +81,15 @@ export function useMoodHistory(userId: string): UseMoodHistoryReturn {
     try {
       const data = await moodApi.getMoodHistory(userId, offset, PAGE_SIZE);
 
-      setMoods((prev) => [...prev, ...data]);
+      // Dedupe on id only — never on date, since two genuine moods can share a
+      // calendar day. Offset pagination against a table taking concurrent
+      // inserts can still hand back a row that is already in state.
+      setMoods((prev) => {
+        const seen = new Set(prev.map((mood) => mood.id));
+        return [...prev, ...data.filter((mood) => !seen.has(mood.id))];
+      });
+      // hasMore comes from the raw page length, not the deduped one: a single
+      // overlapping row would otherwise end pagination early.
       setHasMore(data.length === PAGE_SIZE);
       setOffset((prev) => prev + PAGE_SIZE);
     } catch (err) {
