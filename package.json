@@ -44,7 +44,7 @@
     "eventsource": "^4.1.0",
     "framer-motion": "^12.42.2",
     "idb": "^8.0.3",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.27.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-window": "^2.3.0",
