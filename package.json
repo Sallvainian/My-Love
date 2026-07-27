@@ -58,7 +58,7 @@
     "@faker-js/faker": "^10.5.0",
     "@playwright/test": "^1.62.0",
     "@sentry/vite-plugin": "^5.4.0",
-    "@seontechnologies/playwright-utils": "^3.14.0",
+    "@seontechnologies/playwright-utils": "^4.4.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
