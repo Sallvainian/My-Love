@@ -15,7 +15,53 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Schema before frontend. The build below generates its types from the live
+  # database and ships code that assumes the current schema, so a frontend that
+  # deploys ahead of its migration runs against a database it does not match --
+  # exactly the failure that shipped the moods upsert against a table with no
+  # (user_id, created_at) key.
+  migrate:
+    name: Apply Migrations
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.77.1
+
+      - name: Link to production project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase link --project-ref ${{ vars.SUPABASE_PROJECT_ID }}
+
+      - name: Show pending migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          echo "::group::Remote migration history"
+          supabase migration list --linked
+          echo "::endgroup::"
+
+          # Print what would run before anything writes, so a failed apply has a
+          # readable record of what it was attempting.
+          echo "::group::Dry run"
+          supabase db push --dry-run
+          echo "::endgroup::"
+
+      - name: Apply migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push
+
   build:
+    needs: migrate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
