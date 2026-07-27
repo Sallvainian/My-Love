@@ -214,7 +214,9 @@ describe('dbSchema', () => {
     });
 
     it('should export correct database version', () => {
-      expect(DB_VERSION).toBe(5);
+      // v6 adds no stores — it re-fires upgradeDb so profiles stranded at v5
+      // by storage.ts's old callback get their missing stores created.
+      expect(DB_VERSION).toBe(6);
     });
   });
 });
