@@ -185,10 +185,10 @@ describe('dbSchema', () => {
       const photosStore = photosTx.objectStore('photos');
       expect(photosStore.indexNames.contains('by-date')).toBe(true);
 
-      // moods index (unique)
+      // moods index (compound, unique on [userId, date])
       const moodsTx = db.transaction('moods', 'readonly');
       const moodsStore = moodsTx.objectStore('moods');
-      expect(moodsStore.indexNames.contains('by-date')).toBe(true);
+      expect(moodsStore.indexNames.contains('by-user-date')).toBe(true);
     });
   });
 
@@ -214,9 +214,9 @@ describe('dbSchema', () => {
     });
 
     it('should export correct database version', () => {
-      // v6 adds no stores — it re-fires upgradeDb so profiles stranded at v5
-      // by storage.ts's old callback get their missing stores created.
-      expect(DB_VERSION).toBe(6);
+      // v6 re-fires upgradeDb so profiles stranded at v5 by storage.ts's old
+      // callback get their missing stores created; v7 swaps the moods index.
+      expect(DB_VERSION).toBe(7);
     });
   });
 });

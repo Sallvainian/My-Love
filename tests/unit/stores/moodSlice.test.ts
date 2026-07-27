@@ -7,6 +7,7 @@ vi.mock('@/services/moodService', () => ({
     create: vi.fn(),
     updateMood: vi.fn(),
     getAll: vi.fn(),
+    getAllForUser: vi.fn(),
     getUnsyncedMoods: vi.fn(),
   },
 }));
@@ -73,6 +74,9 @@ function makeMoodEntry(overrides: Partial<MoodEntry> = {}): MoodEntry {
 describe('moodSlice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // loadMoods runs as a side effect of several actions under test, so give
+    // the scoped read a default rather than letting it resolve undefined.
+    mockedMoodService.getAllForUser.mockResolvedValue([]);
     // Default: online
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   });
@@ -107,7 +111,9 @@ describe('moodSlice', () => {
         deferred: 0,
         errors: [],
       });
-      mockedMoodService.getAll.mockResolvedValue([entry]);
+      // addMoodEntry syncs, and the sync path reloads from IndexedDB — where
+      // the entry it just created really would be.
+      mockedMoodService.getAllForUser.mockResolvedValue([entry]);
 
       const { get } = createTestStore({ userId: 'user-123' });
       await get().addMoodEntry(['happy']);
@@ -163,34 +169,70 @@ describe('moodSlice', () => {
     it('returns mood for matching date', () => {
       const today = new Date().toISOString().split('T')[0];
       const entry = makeMoodEntry({ date: today });
-      const { get, set } = createTestStore();
+      const { get, set } = createTestStore({ userId: 'user-123' });
       set({ moods: [entry] } as Partial<MoodSlice>);
 
       expect(get().getMoodForDate(today)).toBe(entry);
     });
 
     it('returns undefined when no mood for date', () => {
-      const { get } = createTestStore();
+      const { get } = createTestStore({ userId: 'user-123' });
       expect(get().getMoodForDate('2020-01-01')).toBeUndefined();
+    });
+
+    it('does not return another account\'s entry for the same date', () => {
+      // The device is shared. A signed out, B signed in; A's row can still be
+      // in state, and MoodTracker pre-fills its note straight into B's form.
+      const today = new Date().toISOString().split('T')[0];
+      const partnersEntry = makeMoodEntry({ date: today, userId: 'user-A', note: 'private' });
+      const { get, set } = createTestStore({ userId: 'user-B' });
+      set({ moods: [partnersEntry] } as Partial<MoodSlice>);
+
+      expect(get().getMoodForDate(today)).toBeUndefined();
     });
   });
 
   describe('loadMoods', () => {
     it('loads moods from IndexedDB into state', async () => {
       const moods = [makeMoodEntry({ id: 1 }), makeMoodEntry({ id: 2, mood: 'sad' })];
-      mockedMoodService.getAll.mockResolvedValue(moods);
+      mockedMoodService.getAllForUser.mockResolvedValue(moods);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
 
-      const { get } = createTestStore();
+      const { get } = createTestStore({ userId: 'user-123' });
       await get().loadMoods();
 
       expect(get().moods).toEqual(moods);
     });
 
-    it('handles error gracefully without throwing', async () => {
-      mockedMoodService.getAll.mockRejectedValue(new Error('DB error'));
+    it('asks the service only for the signed-in user\'s rows', async () => {
+      // The IndexedDB store holds every account that has used this device, so
+      // the scoping has to happen in the query rather than after it. An
+      // unfiltered getAll() here is what put one partner's notes in the
+      // other's session.
+      mockedMoodService.getAllForUser.mockResolvedValue([]);
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
 
-      const { get } = createTestStore();
+      const { get } = createTestStore({ userId: 'user-B' });
+      await get().loadMoods();
+
+      expect(mockedMoodService.getAllForUser).toHaveBeenCalledWith('user-B');
+      expect(mockedMoodService.getAll).not.toHaveBeenCalled();
+    });
+
+    it('loads nothing when no one is signed in', async () => {
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
+
+      const { get } = createTestStore({ userId: null });
+      await get().loadMoods();
+
+      expect(get().moods).toEqual([]);
+      expect(mockedMoodService.getAllForUser).not.toHaveBeenCalled();
+    });
+
+    it('handles error gracefully without throwing', async () => {
+      mockedMoodService.getAllForUser.mockRejectedValue(new Error('DB error'));
+
+      const { get } = createTestStore({ userId: 'user-123' });
       // Should not throw
       await get().loadMoods();
       expect(get().moods).toEqual([]);

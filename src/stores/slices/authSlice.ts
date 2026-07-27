@@ -45,6 +45,12 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set) => ({
       userId: null,
       userEmail: null,
       isAuthenticated: false,
+      // Drop the cached moods with the identity that owns them. They are a
+      // read cache of IndexedDB, so nothing is lost — unsynced entries stay in
+      // IndexedDB and are still picked up once their owner signs back in.
+      // Leaving them in memory let the next account to sign in on this device
+      // read the previous one's notes.
+      moods: [],
     });
   },
 });

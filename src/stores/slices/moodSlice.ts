@@ -67,9 +67,12 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
         throw new Error('User not authenticated');
       }
 
-      // Check if mood already exists for today
+      // Check if mood already exists for today.
+      // Matched on owner AND date: the store is shared by every account that
+      // has signed in on this device, so a date-only match let one partner's
+      // entry be found and overwritten by the other.
       const today = formatDateISO(new Date());
-      const existingMood = get().moods.find((m) => m.date === today);
+      const existingMood = get().moods.find((m) => m.date === today && m.userId === userId);
 
       if (existingMood && existingMood.id) {
         // Update existing mood
@@ -110,12 +113,14 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
   },
 
   getMoodForDate: (date) => {
-    return get().moods.find((m) => m.date === date);
+    const userId = get().userId;
+    return get().moods.find((m) => m.date === date && m.userId === userId);
   },
 
   updateMoodEntry: async (date, moods, note) => {
     try {
-      const existingMood = get().moods.find((m) => m.date === date);
+      const userId = get().userId;
+      const existingMood = get().moods.find((m) => m.date === date && m.userId === userId);
       if (!existingMood || !existingMood.id) {
         throw new Error(`Mood entry for ${date} not found`);
       }
@@ -125,7 +130,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
       // Update state
       set((state) => ({
-        moods: state.moods.map((m) => (m.date === date ? updated : m)),
+        moods: state.moods.map((m) => (m.id === existingMood.id ? updated : m)),
       }));
 
       // Update sync status
@@ -154,8 +159,16 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
   loadMoods: async () => {
     try {
-      // Load all moods from IndexedDB
-      const allMoods = await moodService.getAll();
+      // Only this user's rows. The IndexedDB store holds every account that has
+      // signed in on this device, so getAll() here put one partner's private
+      // notes straight into the other's UI state.
+      const userId = get().userId;
+      if (!userId) {
+        set({ moods: [] });
+        return;
+      }
+
+      const allMoods = await moodService.getAllForUser(userId);
 
       set({ moods: allMoods });
 
@@ -171,7 +184,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
   updateSyncStatus: async () => {
     try {
-      const unsyncedMoods = await moodService.getUnsyncedMoods();
+      const unsyncedMoods = await moodService.getUnsyncedMoods(get().userId ?? undefined);
       const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
       set((state) => ({

@@ -109,15 +109,15 @@ describe('storageService schema', () => {
 
   it('leaves a moods store the rest of the app can actually open', async () => {
     // `contains('moods')` alone would still pass if the store existed without
-    // its index; moodService reads through by-date, so the index is the part
-    // that has to survive.
+    // its index; moodService reads through by-user-date, so the index is the
+    // part that has to survive.
     const storageService = await freshStorageService();
     await storageService.init();
 
     const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
     try {
       const store = db.transaction('moods', 'readonly').objectStore('moods');
-      expect(store.indexNames.contains('by-date')).toBe(true);
+      expect(store.indexNames.contains('by-user-date')).toBe(true);
     } finally {
       db.close();
     }
