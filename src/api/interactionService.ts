@@ -8,7 +8,6 @@
  * @module api/interactionService
  */
 
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import { logger } from '../utils/logger';
 import {
   handleNetworkError,
@@ -52,7 +51,6 @@ export interface Interaction {
  * - Mark interactions as viewed
  */
 export class InteractionService {
-  private realtimeChannel: RealtimeChannel | null = null;
 
   /**
    * Send a poke to partner
@@ -178,9 +176,10 @@ export class InteractionService {
     userId: string,
     callback: (interaction: SupabaseInteractionRecord) => void
   ): Promise<() => void> {
-    // Create Realtime channel for incoming interactions
-    this.realtimeChannel = supabase
-      .channel('incoming-interactions')
+    // Each subscription owns its own channel so racing subscribe/unsubscribe
+    // cycles can be torn down independently.
+    const channel = supabase
+      .channel(`incoming-interactions:${userId}`)
       .on(
         'postgres_changes',
         {
@@ -198,13 +197,12 @@ export class InteractionService {
         logger.info('[InteractionService] Realtime subscription status:', status);
       });
 
-    // Return unsubscribe function
+    let removed = false;
     return () => {
-      if (this.realtimeChannel) {
-        supabase.removeChannel(this.realtimeChannel);
-        this.realtimeChannel = null;
-        logger.info('[InteractionService] Unsubscribed from interactions');
-      }
+      if (removed) return;
+      removed = true;
+      supabase.removeChannel(channel);
+      logger.info('[InteractionService] Unsubscribed from interactions');
     };
   }
 

@@ -7,6 +7,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../../src/types/database.types';
 import type { TypedSupabaseClient } from '../factories';
+import { TEST_USER_PASSWORD } from '../test-credentials';
 
 /**
  * Create a Supabase admin client with service role key.
@@ -31,8 +32,14 @@ export function createSupabaseAdminClient(
 /**
  * Get an access token for a specific user using admin API.
  *
- * Uses admin client to look up user email, then resets password to a known value
- * and signs in to get a valid access token.
+ * Looks the user up with the admin client, then signs in with the shared test
+ * password to get a valid access token.
+ *
+ * This used to reset the user's password first. That made every call a write to
+ * state shared with other Playwright projects running concurrently, and because
+ * it reset to a different literal than the rest of the suite uses, it left the
+ * user unable to sign in anywhere else. Read-only is the point — do not
+ * reintroduce a password write here.
  *
  * @param supabaseAdmin - Admin client with service role
  * @param userId - User UUID to get token for
@@ -50,24 +57,14 @@ export async function getUserAccessToken(
     throw new Error(`Failed to get user ${userId}: ${getUserError?.message}`);
   }
 
-  // Update user password to a known test password
-  const testPassword = 'test-password-123';
-  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    password: testPassword,
-  });
-
-  if (updateError) {
-    throw new Error(`Failed to set password for user ${userId}: ${updateError.message}`);
-  }
-
-  // Now sign in with the known password
+  // Sign in with the shared test password every test user is provisioned with
   const url = process.env.SUPABASE_URL!;
   const anonKey = process.env.SUPABASE_ANON_KEY!;
   const userClient = createClient(url, anonKey);
 
   const { data: signInData, error: signInError } = await userClient.auth.signInWithPassword({
     email: user.user.email!,
-    password: testPassword,
+    password: TEST_USER_PASSWORD,
   });
 
   if (signInError || !signInData.session) {

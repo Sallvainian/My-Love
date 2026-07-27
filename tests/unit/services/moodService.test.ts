@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { moodService } from '@/services/moodService';
+import { moodSyncFingerprint } from '@/services/moodSyncPayload';
 
 describe('moodService', () => {
   const userId = '123e4567-e89b-42d3-a456-426614174000';
@@ -12,6 +13,10 @@ describe('moodService', () => {
     } catch {
       // Ignore if db not initialized yet
     }
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('create', () => {
@@ -76,6 +81,33 @@ describe('moodService', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await expect(moodService.updateMood(created.id!, ['bad' as any])).rejects.toThrow();
     });
+
+    it('[A: edit after failed first sync] leaves timestamp untouched', async () => {
+      // `timestamp` is sent as created_at and (user_id, created_at) is the row's
+      // identity. Moving it on edit would let an edit of a never-synced mood
+      // insert a second row instead of resolving to the orphaned one.
+      //
+      // Moving the clock between the two calls is load-bearing: they otherwise
+      // run in the same millisecond, so `new Date()` on both sides yields an
+      // equal value and this assertion holds even with the regression present.
+      //
+      // Only `Date` is faked. Faking the timer functions too hangs
+      // fake-indexeddb, which drives its request callbacks off real setTimeout,
+      // and every later test in this file times out.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        vi.setSystemTime(new Date('2026-07-26T06:00:00.000Z'));
+        const created = await moodService.create(userId, ['happy'], 'first');
+        vi.setSystemTime(new Date('2026-07-26T06:00:05.000Z'));
+        const updated = await moodService.updateMood(created.id!, ['sad'], 'edited');
+
+        expect(updated.timestamp.getTime()).toBe(created.timestamp.getTime());
+        expect(updated.note).toBe('edited');
+        expect(updated.synced).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('getMoodForDate', () => {
@@ -132,15 +164,23 @@ describe('moodService', () => {
   describe('markAsSynced', () => {
     it('marks a mood entry as synced with supabaseId', async () => {
       const created = await moodService.create(userId, ['happy']);
-      await moodService.markAsSynced(created.id!, 'supa-123');
+      const outcome = await moodService.markAsSynced(
+        created.id!,
+        'supa-123',
+        moodSyncFingerprint(created)
+      );
 
+      expect(outcome).toBe('cleared');
       const fetched = await moodService.getMoodForDate(new Date());
       expect(fetched!.synced).toBe(true);
       expect(fetched!.supabaseId).toBe('supa-123');
     });
 
-    it('throws if entry not found', async () => {
-      await expect(moodService.markAsSynced(99999, 'supa-123')).rejects.toThrow();
+    it('reports a vanished entry instead of throwing', async () => {
+      // A record deleted while its write was in flight is not a failure: the
+      // row is on the server and nothing local references it. Throwing would
+      // fail the batch into a retry that can never succeed.
+      await expect(moodService.markAsSynced(99999, 'supa-123', 'any')).resolves.toBe('missing');
     });
   });
 

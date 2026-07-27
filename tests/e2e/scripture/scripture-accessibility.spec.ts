@@ -82,21 +82,36 @@ test.describe('Scripture Accessibility', () => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
-      // WHEN: User tabs through all elements multiple times
-      const _startFocus = await page.evaluate(() => document.activeElement?.tagName);
+      // WHEN: User tabs through the screen repeatedly.
+      // Record where focus lands after every press. A trap is only detectable
+      // from the sequence — inspecting the final element tells you nothing,
+      // because trapped focus sits on an ordinary element and reports an
+      // ordinary testid, which is indistinguishable from the healthy case.
+      const readFocus = () =>
+        page.evaluate(() => {
+          const el = document.activeElement;
+          if (!el || el === document.body) return 'body';
+          return el.getAttribute('data-testid') || el.tagName;
+        });
 
-      // Tab 20 times
+      const focusSequence: string[] = [];
       for (let i = 0; i < 20; i++) {
         await page.keyboard.press('Tab');
+        focusSequence.push(await readFocus());
       }
 
-      // THEN: Focus should cycle (not get trapped)
-      // Shift+Tab should move backwards
+      // THEN: Tab actually moved focus — more than one element was reached
+      const distinctFocused = new Set(focusSequence);
+      expect(distinctFocused.size).toBeGreaterThan(1);
+
+      // AND: The tab ring cycled rather than dead-ending. 20 presses over this
+      // screen's handful of focusables must revisit at least one element; a
+      // sequence with no repeat means focus escaped or kept walking away.
+      expect(focusSequence.length).toBeGreaterThan(distinctFocused.size);
+
+      // AND: Shift+Tab reverses out of wherever the last Tab landed
       await page.keyboard.press('Shift+Tab');
-      const afterShiftTab = await page.evaluate(
-        () => document.activeElement?.getAttribute('data-testid') || 'body'
-      );
-      expect(afterShiftTab).not.toBe('unknown');
+      expect(await readFocus()).not.toBe(focusSequence[focusSequence.length - 1]);
     });
   });
 
@@ -150,10 +165,16 @@ test.describe('Scripture Accessibility', () => {
       });
 
       await page.getByTestId('scripture-next-verse-button').click();
-      await stepAdvance;
 
-      // THEN: Live region announces the transition
+      // THEN: Live region announces the transition.
+      // Assert BEFORE awaiting the PATCH. The announcement is driven by the
+      // optimistic store update in scriptureReadingSlice.advanceStep, which runs
+      // before the network call, and useSoloReadingFlow clears it 1s later. Waiting
+      // on the round trip first lets a slow PATCH wipe the text before we look.
       await expect(liveRegion).toContainText(/verse 2/i);
+
+      // Settle the in-flight write so teardown doesn't race it.
+      await stepAdvance;
     });
   });
 
@@ -191,15 +212,11 @@ test.describe('Scripture Accessibility', () => {
       await page.getByTestId('scripture-next-verse-button').click();
       await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
 
-      // THEN: Focus has moved to an element within the verse screen
-      const focusedElement = await page.evaluate(
-        () =>
-          document.activeElement?.getAttribute('data-testid') ||
-          document.activeElement?.closest('[data-testid]')?.getAttribute('data-testid') ||
-          document.activeElement?.tagName
-      );
-      // Focus should be on or within the verse screen (not stuck on a hidden button)
-      expect(focusedElement).toBeTruthy();
+      // THEN: Focus moves to the verse heading, which is what
+      // useReadingNavigation focuses on a step change (useReadingNavigation.ts:64).
+      // toBeFocused() is web-first and retries, which it must: the app focuses
+      // inside a requestAnimationFrame, so a one-shot page.evaluate races it.
+      await expect(page.getByTestId('scripture-verse-reference')).toBeFocused();
     });
 
     test('should focus navigation button after transition to response screen', async ({ page }) => {
@@ -262,7 +279,17 @@ test.describe('Scripture Accessibility', () => {
 
   test.describe('P2-014: WCAG AA color contrast', () => {
     test('should pass automated accessibility audit', async ({ page }) => {
-      // GIVEN: User is in a solo session
+      // GIVEN: User is in a solo session, with motion reduced.
+      //
+      // This is not cosmetic. The verse content fades in, and axe computes the
+      // colour it sees at scan time — so a scan that lands mid-fade measures the
+      // text blended toward the background and reports whatever the blend
+      // happened to be (observed: 1.94 #ca93ec, 2.09 #bc9bcf, 4.47 #9a30e0), or
+      // skips the element entirely and reports no violation at all. The audit
+      // has to measure settled colours to mean anything. useMotionConfig maps
+      // prefers-reduced-motion to duration 0 (useMotionConfig.ts:15-16), so this
+      // removes the transition rather than racing it.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
       await startSoloSession(page);
 
       // WHEN: axe-core scans the page
