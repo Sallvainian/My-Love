@@ -1,4 +1,5 @@
-import type { DBSchema, IDBPDatabase } from 'idb';
+import type { DBSchema, IDBPDatabase, IDBPTransaction, StoreNames } from 'idb';
+import { unwrap } from 'idb';
 import type { Message, MoodEntry, Photo } from '../types';
 import { logger } from '../utils/logger';
 
@@ -129,7 +130,16 @@ export interface MyLoveDBSchema extends DBSchema {
     key: number;
     value: MoodEntry;
     indexes: {
-      'by-date': string;
+      /**
+       * Compound and unique on [userId, date].
+       *
+       * Was unique on `date` alone, which made the store physically unable to
+       * hold two accounts' entries for the same day: on a shared device the
+       * second user's mood collided with the first user's row. Uniqueness is
+       * still wanted -- one mood per day per person -- so it moves to the pair
+       * rather than being dropped.
+       */
+      'by-user-date': [string, string];
     };
   };
   'sw-auth': {
@@ -170,11 +180,14 @@ export interface MyLoveDBSchema extends DBSchema {
  * Database configuration constants
  */
 export const DB_NAME = 'my-love-db';
-// v6 adds no stores. It exists to re-fire upgradeDb on profiles that reached
+// v6 added no stores. It existed to re-fire upgradeDb on profiles that reached
 // v5 through storage.ts's old callback and are missing moods, sw-auth and the
 // scripture stores; upgradeDb's existence checks then create what is absent.
 // A healthy database takes a no-op upgrade.
-export const DB_VERSION = 6;
+//
+// v7 replaces the moods `by-date` unique index with `by-user-date`, unique on
+// [userId, date], so two accounts on one device can each hold today's mood.
+export const DB_VERSION = 7;
 
 /**
  * Store name constants for consistent access across services
@@ -204,7 +217,8 @@ export const STORE_NAMES = {
 export function upgradeDb(
   db: IDBPDatabase<MyLoveDBSchema>,
   oldVersion: number,
-  _newVersion: number | null
+  _newVersion: number | null,
+  tx?: IDBPTransaction<MyLoveDBSchema, ArrayLike<StoreNames<MyLoveDBSchema>>, 'versionchange'>
 ): void {
   logger.debug(`[dbSchema] Upgrading database from v${oldVersion} to v${DB_VERSION}`);
 
@@ -264,8 +278,32 @@ export function upgradeDb(
       keyPath: 'id',
       autoIncrement: true,
     });
-    moodsStore.createIndex('by-date', 'date', { unique: true });
-    logger.debug('[dbSchema] Created moods store with by-date unique index (v3)');
+    moodsStore.createIndex('by-user-date', ['userId', 'date'], { unique: true });
+    logger.debug('[dbSchema] Created moods store with by-user-date unique index (v7)');
+  } else if (tx) {
+    // v7: swap the old date-only unique index for the compound one. Altering an
+    // index on an existing store needs the versionchange transaction, which is
+    // why `tx` is threaded in; callers that cannot supply it leave the index
+    // alone rather than half-migrating.
+    const moodsStore = tx.objectStore('moods');
+
+    // 'by-date' is deliberately absent from MyLoveDBSchema now, so the typed
+    // wrapper cannot name it. The index still exists on disk for every profile
+    // created before v7, so it is dropped through the unwrapped IDB handle.
+    const legacyStore = unwrap(moodsStore);
+
+    if (legacyStore.indexNames.contains('by-date')) {
+      legacyStore.deleteIndex('by-date');
+      logger.debug('[dbSchema] Dropped moods by-date index (v7)');
+    }
+
+    if (!moodsStore.indexNames.contains('by-user-date')) {
+      // Safe to build as unique over existing rows: the index it replaces was
+      // unique on `date` alone, which is strictly stricter than [userId, date],
+      // so no surviving pair can already collide.
+      moodsStore.createIndex('by-user-date', ['userId', 'date'], { unique: true });
+      logger.debug('[dbSchema] Created moods by-user-date unique index (v7)');
+    }
   }
 
   // v4: sw-auth store for Background Sync

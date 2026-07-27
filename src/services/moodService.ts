@@ -42,8 +42,8 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
       logger.debug(`[MoodService] Initializing IndexedDB (version ${DB_VERSION})...`);
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion) {
-          upgradeDb(db, oldVersion, newVersion);
+        upgrade(db, oldVersion, newVersion, transaction) {
+          upgradeDb(db, oldVersion, newVersion, transaction);
         },
       });
 
@@ -164,14 +164,14 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
    * @param date - ISO date string (YYYY-MM-DD)
    * @returns MoodEntry or null if not found
    */
-  async getMoodForDate(date: Date): Promise<MoodEntry | null> {
+  async getMoodForDate(date: Date, userId: string): Promise<MoodEntry | null> {
     try {
       await this.init();
 
       const dateString = formatDateISO(date);
       const tx = this.db!.transaction('moods', 'readonly');
-      const index = tx.store.index('by-date');
-      const mood = await index.get(dateString);
+      const index = tx.store.index('by-user-date');
+      const mood = await index.get([userId, dateString]);
 
       logger.debug(`[MoodService] getMoodForDate(${dateString}):`, mood || 'not found');
 
@@ -190,7 +190,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
    * @param end - End date
    * @returns Array of MoodEntry objects in the range
    */
-  async getMoodsInRange(start: Date, end: Date): Promise<MoodEntry[]> {
+  async getMoodsInRange(start: Date, end: Date, userId: string): Promise<MoodEntry[]> {
     try {
       await this.init();
 
@@ -198,8 +198,10 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
       const endString = formatDateISO(end);
 
       const tx = this.db!.transaction('moods', 'readonly');
-      const index = tx.store.index('by-date');
-      const range = IDBKeyRange.bound(startString, endString);
+      const index = tx.store.index('by-user-date');
+      // Bounding both components keeps the scan inside this user's slice of the
+      // index rather than filtering another account's rows out afterwards.
+      const range = IDBKeyRange.bound([userId, startString], [userId, endString]);
       const moods = await index.getAll(range);
 
       logger.debug(`[MoodService] getMoodsInRange(${startString} to ${endString}):`, moods.length);
@@ -217,18 +219,47 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
    *
    * @returns Array of MoodEntry objects where synced = false
    */
-  async getUnsyncedMoods(): Promise<MoodEntry[]> {
+  async getUnsyncedMoods(userId?: string): Promise<MoodEntry[]> {
     try {
       await this.init();
 
       const allMoods = await this.getAll();
-      const unsynced = allMoods.filter((mood) => !mood.synced);
+      const unsynced = allMoods.filter(
+        (mood) => !mood.synced && (userId === undefined || mood.userId === userId)
+      );
 
       logger.debug(`[MoodService] Found ${unsynced.length} unsynced mood entries`);
 
       return unsynced;
     } catch (error) {
       console.error('[MoodService] Error getting unsynced moods:', error);
+      return []; // Graceful degradation for read operations
+    }
+  }
+
+  /**
+   * Get every mood entry belonging to one user
+   *
+   * The store holds every account that has signed in on this device, and the
+   * inherited `getAll()` returns all of them. Callers that put results into UI
+   * state must go through this instead, or one partner's private notes surface
+   * in the other's session.
+   *
+   * @param userId - Authenticated user's UUID
+   * @returns That user's mood entries, oldest-first by insertion
+   */
+  async getAllForUser(userId: string): Promise<MoodEntry[]> {
+    try {
+      await this.init();
+
+      const allMoods = await this.getAll();
+      const mine = allMoods.filter((mood) => mood.userId === userId);
+
+      logger.debug(`[MoodService] Found ${mine.length} mood entries for the current user`);
+
+      return mine;
+    } catch (error) {
+      console.error('[MoodService] Error getting moods for user:', error);
       return []; // Graceful degradation for read operations
     }
   }
