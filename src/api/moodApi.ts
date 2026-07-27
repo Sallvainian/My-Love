@@ -74,8 +74,15 @@ class MoodApi {
     }
 
     try {
-      // Insert mood into Supabase
-      const { data, error } = await supabase.from('moods').insert(moodData).select().single();
+      // Upsert rather than insert: (user_id, created_at) is unique, and created_at
+      // is the client-supplied log time, so a re-send of the same record — a retry
+      // after a partial success, a second tab, or the service worker — resolves to
+      // the row that is already there instead of adding another one.
+      const { data, error } = await supabase
+        .from('moods')
+        .upsert(moodData, { onConflict: 'user_id,created_at' })
+        .select()
+        .single();
 
       if (error) {
         throw error;
@@ -437,6 +444,9 @@ class MoodApi {
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
+        // Tiebreak on id: created_at ties have no stable order in Postgres, so
+        // without this a tied row can land on two .range() pages or on none.
+        .order('id', { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (error) {

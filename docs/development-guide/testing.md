@@ -357,7 +357,7 @@ npm run test:p1    # P0 + P1
 
 For Epic 2 and beyond, acceptance tests are written before implementation. Each story's acceptance criteria from the epic breakdown maps to specific E2E test cases. The workflow is:
 
-1. Read acceptance criteria from the relevant tech spec in `_bmad-output/implementation-artifacts/` (the sharded `planning-artifacts/epics/` directory was retired once all four Scripture Reading epics shipped)
+1. Read acceptance criteria from the relevant tech spec in `_bmad-output/.archive/implementation-artifacts/` (the sharded `planning-artifacts/epics/` directory was retired once all four Scripture Reading epics shipped, and the completed tech specs were archived on 2026-07-25)
 2. Write failing E2E tests that encode each criterion
 3. Implement the feature until tests pass
 4. Review coverage against all acceptance criteria

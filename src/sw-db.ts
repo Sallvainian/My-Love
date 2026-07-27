@@ -13,6 +13,8 @@
 import { openDB } from 'idb';
 import type { MyLoveDBSchema, StoredAuthToken, StoredMoodEntry } from './services/dbSchema';
 import { DB_NAME, DB_VERSION, STORE_NAMES } from './services/dbSchema';
+import type { MarkSyncedOutcome } from './services/moodSyncPayload';
+import { moodSyncFingerprint } from './services/moodSyncPayload';
 
 // Re-export types for consumers (sw.ts imports StoredMoodEntry)
 export type { StoredMoodEntry } from './services/dbSchema';
@@ -95,23 +97,42 @@ export async function getPendingMoods(): Promise<StoredMoodEntry[]> {
 }
 
 /**
- * Mark a mood as synced in IndexedDB
+ * Record the outcome of a background sync against a mood record
+ *
+ * Mirrors moodService.markAsSynced exactly — same comparison, same single
+ * readwrite transaction. The worker must not clear the dirty flag on a record
+ * an open tab edited while this PATCH was in flight, or that edit is stranded
+ * locally and flagged clean, and `getPendingMoods()` never returns it again.
+ *
+ * The read and the write share one transaction so nothing can commit between
+ * them; a `get`/`await`/`put` pair is the same defect in a narrower window.
+ *
+ * @returns `cleared`, `deferred` (edited mid-flight), or `missing` (deleted)
  */
-export async function markMoodSynced(localId: number, supabaseId: string): Promise<void> {
+export async function markMoodSynced(
+  localId: number,
+  supabaseId: string,
+  sentFingerprint: string
+): Promise<MarkSyncedOutcome> {
   const db = await openDatabase();
   try {
-    const mood = await db.get(STORE_NAMES.MOODS, localId);
-    if (!mood) {
-      throw new Error(`Mood ${localId} not found`);
+    const tx = db.transaction(STORE_NAMES.MOODS, 'readwrite');
+    const current = await tx.store.get(localId);
+
+    if (!current) {
+      await tx.done;
+      return 'missing';
     }
 
-    mood.synced = true;
-    mood.supabaseId = supabaseId;
-    await db.put(STORE_NAMES.MOODS, mood);
+    const unchanged = moodSyncFingerprint(current) === sentFingerprint;
+
+    // supabaseId is recorded either way: the server row exists, so the next
+    // pass must PATCH it rather than insert a second one.
+    await tx.store.put({ ...current, supabaseId, synced: unchanged });
+    await tx.done;
+
+    return unchanged ? 'cleared' : 'deferred';
   } catch (error) {
-    if (error instanceof Error && error.message.includes('not found')) {
-      throw error; // Re-throw "not found" errors as-is
-    }
     throw new Error(
       `Failed to mark mood ${localId} as synced: ${error instanceof Error ? error.message : String(error)}`
     );

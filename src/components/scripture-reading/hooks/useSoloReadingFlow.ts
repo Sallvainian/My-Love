@@ -132,6 +132,7 @@ export function useSoloReadingFlow() {
     reportSubPhase: report.reportSubPhase,
     reportData: report.reportData,
     isSubmittingSummary: report.isSubmittingSummary,
+    summarySubmitError: report.summarySubmitError,
     isSendingMessage: report.isSendingMessage,
     isRetryingCompletion: report.isRetryingCompletion,
     completionError: report.completionError,

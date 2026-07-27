@@ -13,6 +13,9 @@ const JUST_NOW_THRESHOLD_MS = 5 * 60 * 1000;
 
 /**
  * Convert a timestamp to relative time display (e.g., "2h ago", "Yesterday")
+ *
+ * Day boundaries are calendar-based, not wall-clock-based, so this agrees with
+ * the date headers rendered by getDateLabel.
  */
 export function getRelativeTime(timestamp: string): string {
   const now = new Date();
@@ -20,11 +23,13 @@ export function getRelativeTime(timestamp: string): string {
   const diffMs = now.getTime() - past.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+  const diffDays = getDaysSince(past);
 
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 0) {
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    return `${diffHours}h ago`;
+  }
   if (diffDays === 1) return 'Yesterday';
 
   return formatShortDate(past);

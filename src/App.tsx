@@ -5,6 +5,7 @@ import { BottomNavigation } from './components/Navigation/BottomNavigation';
 import { BirthdayCountdown, EventCountdown, TimeTogether } from './components/RelationshipTimers';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { RELATIONSHIP_DATES } from './config/relationshipDates';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from './stores/useAppStore';
 // PokeKissInterface moved to PartnerMoodView
 import type { Session } from '@supabase/supabase-js';
@@ -66,16 +67,18 @@ const WELCOME_DISPLAY_INTERVAL = 3600000; // 60 minutes in milliseconds
 const LAST_WELCOME_VIEW_KEY = 'lastWelcomeView';
 
 function App() {
-  const {
-    settings,
-    initializeApp,
-    isLoading,
-    currentView,
-    setView,
-    syncPendingMoods,
-    updateSyncStatus,
-    syncStatus,
-  } = useAppStore();
+  const { settings, isLoading, currentView, isOnline } = useAppStore(
+    useShallow((s) => ({
+      settings: s.settings,
+      isLoading: s.isLoading,
+      currentView: s.currentView,
+      isOnline: s.syncStatus.isOnline,
+    }))
+  );
+  const initializeApp = useAppStore((s) => s.initializeApp);
+  const setView = useAppStore((s) => s.setView);
+  const syncPendingMoods = useAppStore((s) => s.syncPendingMoods);
+  const updateSyncStatus = useAppStore((s) => s.updateSyncStatus);
   const hasInitialized = useRef(false);
 
   // Story 6.7: Authentication state
@@ -107,6 +110,7 @@ function App() {
   };
 
   const [showSplash, setShowSplash] = useState(shouldShowWelcome);
+  const [splashSource, setSplashSource] = useState<'auto' | 'manual'>('auto');
   const [showAdmin, setShowAdmin] = useState(false);
   const [isPhotoUploadOpen, setIsPhotoUploadOpen] = useState(false);
 
@@ -141,10 +145,10 @@ function App() {
 
   // Story 4.5: Initial route detection and popstate listener (AC-4.5.5, AC-4.5.6)
   useEffect(() => {
-    // Check admin route
+    // Check admin route (does not short-circuit: routing must still be wired up
+    // so Back/Forward keeps working after the user exits the admin panel)
     if (window.location.pathname.includes('/admin')) {
       setShowAdmin(true);
-      return; // Don't set up navigation listeners for admin panel
     }
 
     // AC-4.5.5: Initial route detection - set view based on URL
@@ -349,7 +353,7 @@ function App() {
   // Hybrid Sync Solution: Periodic background sync + immediate sync on mount
   useEffect(() => {
     // Part 1: Immediate sync on app mount (if online and authenticated)
-    if (syncStatus.isOnline && session) {
+    if (isOnline && session) {
       logger.debug('[App] Initial sync on mount - checking for pending moods');
       syncPendingMoods().catch((error) => {
         console.error('[App] Initial sync on mount failed:', error);
@@ -359,7 +363,7 @@ function App() {
     // Part 2: Periodic sync every 5 minutes while app is open
     const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
     const syncInterval = setInterval(() => {
-      if (syncStatus.isOnline && session) {
+      if (isOnline && session) {
         logger.debug('[App] Periodic sync triggered (5-minute interval)');
         syncPendingMoods().catch((error) => {
           console.error('[App] Periodic sync failed:', error);
@@ -372,7 +376,7 @@ function App() {
       clearInterval(syncInterval);
       logger.debug('[App] Periodic sync interval cleared');
     };
-  }, [syncPendingMoods, syncStatus.isOnline, session]);
+  }, [syncPendingMoods, isOnline, session]);
 
   // Part 3: Service Worker Background Sync listener
   // Story 1.5: Enhanced to show sync completion feedback (AC-1.5.4)
@@ -473,13 +477,17 @@ function App() {
 
   // Handle splash screen continuation (automatic display)
   const handleContinue = () => {
-    // Save current timestamp to localStorage (resets the 60-minute timer)
-    localStorage.setItem(LAST_WELCOME_VIEW_KEY, Date.now().toString());
+    // Only the automatic splash resets the 60-minute timer
+    if (splashSource === 'auto') {
+      localStorage.setItem(LAST_WELCOME_VIEW_KEY, Date.now().toString());
+    }
+    setSplashSource('auto');
     setShowSplash(false);
   };
 
   // Handle manual trigger from button (does NOT reset timer)
   const showWelcomeManually = () => {
+    setSplashSource('manual');
     setShowSplash(true);
   };
 
@@ -514,96 +522,98 @@ function App() {
 
   // Story 1.4 & 4.1/4.2 & 6.2 & 6.4: Render home, photos, mood, or partner view based on navigation
   return (
-    <div className="min-h-screen pb-16" data-testid="app-container">
-      {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
-      <NetworkStatusIndicator showOnlyWhenOffline />
+    <ErrorBoundary>
+      <div className="min-h-screen pb-16" data-testid="app-container">
+        {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
+        <NetworkStatusIndicator showOnlyWhenOffline />
 
-      {/* Story 1.5: Sync Completion Toast - Shows feedback after reconnection sync (AC-1.5.4) */}
-      <SyncToast syncResult={syncResult} onDismiss={() => setSyncResult(null)} />
+        {/* Story 1.5: Sync Completion Toast - Shows feedback after reconnection sync (AC-1.5.4) */}
+        <SyncToast syncResult={syncResult} onDismiss={() => setSyncResult(null)} />
 
-      {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
+        {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
 
-      <main id="main-content">
-        {/* Home view - inline, not lazy-loaded, always works offline */}
-        {currentView === 'home' && (
-          <div className="mx-auto max-w-4xl space-y-6 px-4 py-4">
-            {/* Time Together - replaces Day 37 Together header */}
-            <TimeTogether />
+        <main id="main-content">
+          {/* Home view - inline, not lazy-loaded, always works offline */}
+          {currentView === 'home' && (
+            <div className="mx-auto max-w-4xl space-y-6 px-4 py-4">
+              {/* Time Together - replaces Day 37 Together header */}
+              <TimeTogether />
 
-            {/* Countdown timers grid: Birthdays (left) | Wedding+Visits (right) */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Left column - Birthdays */}
-              <div className="space-y-4">
-                <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.frank} />
-                <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.gracie} />
-              </div>
+              {/* Countdown timers grid: Birthdays (left) | Wedding+Visits (right) */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* Left column - Birthdays */}
+                <div className="space-y-4">
+                  <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.frank} />
+                  <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.gracie} />
+                </div>
 
-              {/* Right column - Wedding & Visits */}
-              <div className="space-y-4">
-                <EventCountdown
-                  label="Wedding"
-                  icon="ring"
-                  date={RELATIONSHIP_DATES.wedding}
-                  placeholderText="Date TBD"
-                />
-                {RELATIONSHIP_DATES.visits.map((visit) => (
+                {/* Right column - Wedding & Visits */}
+                <div className="space-y-4">
                   <EventCountdown
-                    key={visit.id}
-                    label={visit.label}
-                    icon="plane"
-                    date={visit.date}
-                    description={visit.description}
+                    label="Wedding"
+                    icon="ring"
+                    date={RELATIONSHIP_DATES.wedding}
+                    placeholderText="Date TBD"
                   />
-                ))}
+                  {RELATIONSHIP_DATES.visits.map((visit) => (
+                    <EventCountdown
+                      key={visit.id}
+                      label={visit.label}
+                      icon="plane"
+                      date={visit.date}
+                      description={visit.description}
+                    />
+                  ))}
+                </div>
               </div>
+
+              {/* Daily Message */}
+              <DailyMessage onShowWelcome={showWelcomeManually} />
             </div>
+          )}
 
-            {/* Daily Message */}
-            <DailyMessage onShowWelcome={showWelcomeManually} />
-          </div>
-        )}
+          {/* Lazy-loaded views wrapped in ViewErrorBoundary to keep navigation visible on errors */}
+          {currentView !== 'home' && (
+            <ViewErrorBoundary viewName={currentView} onNavigateHome={() => setView('home')}>
+              <Suspense fallback={<LoadingSpinner />}>
+                {currentView === 'photos' && (
+                  <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
+                )}
 
-        {/* Lazy-loaded views wrapped in ViewErrorBoundary to keep navigation visible on errors */}
-        {currentView !== 'home' && (
-          <ViewErrorBoundary viewName={currentView} onNavigateHome={() => setView('home')}>
-            <Suspense fallback={<LoadingSpinner />}>
-              {currentView === 'photos' && (
-                <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
-              )}
+                {currentView === 'mood' && <MoodTracker />}
 
-              {currentView === 'mood' && <MoodTracker />}
+                {currentView === 'partner' && <PartnerMoodView />}
 
-              {currentView === 'partner' && <PartnerMoodView />}
+                {currentView === 'notes' && <LoveNotes />}
 
-              {currentView === 'notes' && <LoveNotes />}
+                {/* Story 1.1: Scripture Reading Entry Point */}
+                {currentView === 'scripture' && <ScriptureOverview />}
+              </Suspense>
+            </ViewErrorBoundary>
+          )}
+        </main>
 
-              {/* Story 1.1: Scripture Reading Entry Point */}
-              {currentView === 'scripture' && <ScriptureOverview />}
-            </Suspense>
-          </ViewErrorBoundary>
-        )}
-      </main>
+        {/* Bottom navigation - always visible, outside error boundary */}
+        <BottomNavigation
+          currentView={currentView}
+          onViewChange={setView}
+          onSignOut={() => {
+            void handleSignOut();
+          }}
+          signOutDisabled={isSigningOut}
+        />
 
-      {/* Bottom navigation - always visible, outside error boundary */}
-      <BottomNavigation
-        currentView={currentView}
-        onViewChange={setView}
-        onSignOut={() => {
-          void handleSignOut();
-        }}
-        signOutDisabled={isSigningOut}
-      />
+        {/* Photo upload modal - Story 4.1 (lazy loaded) */}
+        <Suspense fallback={null}>
+          <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
+        </Suspense>
 
-      {/* Photo upload modal - Story 4.1 (lazy loaded) */}
-      <Suspense fallback={null}>
-        <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
-      </Suspense>
-
-      {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected (lazy loaded) */}
-      <Suspense fallback={null}>
-        <PhotoCarousel />
-      </Suspense>
-    </div>
+        {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected (lazy loaded) */}
+        <Suspense fallback={null}>
+          <PhotoCarousel />
+        </Suspense>
+      </div>
+    </ErrorBoundary>
   );
 }
 
