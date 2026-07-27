@@ -719,69 +719,83 @@ class ScriptureReadingService extends BaseIndexedDBService<
     }
   }
 
+  // Throwing variants — used by getSessionReportData so a failed report fetch
+  // surfaces the error banner instead of rendering a blank report.
+  private async fetchReflectionsOrThrow(sessionId: string): Promise<ScriptureReflection[]> {
+    const { data, error } = await supabase
+      .from('scripture_reflections')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('step_index', { ascending: true });
+
+    if (error) throw error;
+
+    const validated = z.array(SupabaseReflectionSchema).parse(data ?? []);
+    const locals = validated.map(toLocalReflection);
+
+    for (const reflection of locals) {
+      await this.cacheReflection(reflection);
+    }
+    return locals;
+  }
+
   private async fetchAndCacheReflections(sessionId: string): Promise<ScriptureReflection[]> {
     try {
-      const { data, error } = await supabase
-        .from('scripture_reflections')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('step_index', { ascending: true });
-
-      if (error) throw error;
-
-      const validated = z.array(SupabaseReflectionSchema).parse(data ?? []);
-      const locals = validated.map(toLocalReflection);
-
-      for (const reflection of locals) {
-        await this.cacheReflection(reflection);
-      }
-      return locals;
+      return await this.fetchReflectionsOrThrow(sessionId);
     } catch (error) {
       console.error('[ScriptureService] Failed to fetch reflections from server:', error);
       return [];
     }
   }
 
+  private async fetchBookmarksOrThrow(sessionId: string): Promise<ScriptureBookmark[]> {
+    const { data, error } = await supabase
+      .from('scripture_bookmarks')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('step_index', { ascending: true });
+
+    if (error) throw error;
+
+    const validated = z.array(SupabaseBookmarkSchema).parse(data ?? []);
+    const locals = validated.map(toLocalBookmark);
+
+    for (const bookmark of locals) {
+      await this.cacheBookmark(bookmark);
+    }
+    return locals;
+  }
+
   private async fetchAndCacheBookmarks(sessionId: string): Promise<ScriptureBookmark[]> {
     try {
-      const { data, error } = await supabase
-        .from('scripture_bookmarks')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('step_index', { ascending: true });
-
-      if (error) throw error;
-
-      const validated = z.array(SupabaseBookmarkSchema).parse(data ?? []);
-      const locals = validated.map(toLocalBookmark);
-
-      for (const bookmark of locals) {
-        await this.cacheBookmark(bookmark);
-      }
-      return locals;
+      return await this.fetchBookmarksOrThrow(sessionId);
     } catch (error) {
       console.error('[ScriptureService] Failed to fetch bookmarks from server:', error);
       return [];
     }
   }
 
+  private async fetchMessagesOrThrow(sessionId: string): Promise<ScriptureMessage[]> {
+    const { data, error } = await supabase
+      .from('scripture_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    const validated = z.array(SupabaseMessageSchema).parse(data ?? []);
+    const locals = validated.map(toLocalMessage);
+
+    for (const msg of locals) {
+      await this.cacheMessage(msg);
+    }
+    return locals;
+  }
+
   private async fetchAndCacheMessages(sessionId: string): Promise<ScriptureMessage[]> {
     try {
-      const { data, error } = await supabase
-        .from('scripture_messages')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      const validated = z.array(SupabaseMessageSchema).parse(data ?? []);
-      const locals = validated.map(toLocalMessage);
-
-      for (const msg of locals) {
-        await this.cacheMessage(msg);
-      }
-      return locals;
+      return await this.fetchMessagesOrThrow(sessionId);
     } catch (error) {
       console.error('[ScriptureService] Failed to fetch messages from server:', error);
       return [];
@@ -937,9 +951,9 @@ class ScriptureReadingService extends BaseIndexedDBService<
     messages: ScriptureMessage[];
   }> {
     const [reflections, bookmarks, messages] = await Promise.all([
-      this.fetchAndCacheReflections(sessionId),
-      this.fetchAndCacheBookmarks(sessionId),
-      this.fetchAndCacheMessages(sessionId),
+      this.fetchReflectionsOrThrow(sessionId),
+      this.fetchBookmarksOrThrow(sessionId),
+      this.fetchMessagesOrThrow(sessionId),
     ]);
     return { reflections, bookmarks, messages };
   }

@@ -69,6 +69,7 @@ export function useReportPhase({
     isPartnerComplete: false,
   });
   const [isSubmittingSummary, setIsSubmittingSummary] = useState(false);
+  const [summarySubmitError, setSummarySubmitError] = useState<string | null>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isRetryingCompletion, setIsRetryingCompletion] = useState(false);
   const [completionError, setCompletionError] = useState<string | null>(null);
@@ -87,6 +88,7 @@ export function useReportPhase({
     (data: ReflectionSummarySubmission) => {
       if (!session || isSubmittingSummary) return;
       setIsSubmittingSummary(true);
+      setSummarySubmitError(null);
 
       void (async () => {
         try {
@@ -126,6 +128,9 @@ export function useReportPhase({
               message: 'Reflection saved but failed to advance to report phase',
               details: phaseError,
             });
+            setSummarySubmitError(
+              'Your reflection was saved, but we could not open your report. Tap Continue to try again.'
+            );
           }
         } catch (error) {
           handleScriptureError({
@@ -133,6 +138,7 @@ export function useReportPhase({
             message: 'Failed to save reflection summary',
             details: error,
           });
+          setSummarySubmitError('We could not save your reflection. Tap Continue to try again.');
         } finally {
           setIsSubmittingSummary(false);
         }
@@ -484,6 +490,7 @@ export function useReportPhase({
     reportSubPhase,
     reportData,
     isSubmittingSummary,
+    summarySubmitError,
     isSendingMessage,
     isRetryingCompletion,
     completionError,

@@ -3,7 +3,8 @@
  *
  * Encapsulates the full together-mode setup/teardown lifecycle:
  * seed → link partners → mark seeded sessions complete → navigate both
- * users to role selection → cleanup (unlink + session cleanup).
+ * users to role selection → cleanup (session data only; partner linkage is
+ * shared across workers and is deliberately left in place).
  *
  * Tests receive both users already at the role selection screen and only
  * need to handle role clicks, state assertions, and mid-test DB work.
@@ -11,20 +12,15 @@
 import { mergeTests } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
-import {
-  createTestSession,
-  cleanupTestSession,
-  linkTestPartners,
-  unlinkTestPartners,
-} from '../factories';
+import { createTestSession, cleanupTestSession, linkTestPartners } from '../factories';
 import type { SeedResult } from '../factories';
 import { navigateToTogetherRoleSelection } from '../helpers/scripture-lobby';
 
 // Import the fixture files that provide our deps so TypeScript knows the types
 import { test as customFixtures } from './index';
 import { test as authFixture } from './auth';
+import { TEST_USER_PASSWORD } from '../test-credentials';
 
-const TEST_USER_PASSWORD = 'testpassword123';
 
 /** Map worker-N-partner → email. */
 function partnerEmail(identifier: string): string {
@@ -160,10 +156,13 @@ export const test = togetherModeBase.extend<TogetherModeFixtures>({
     try {
       await use({ seed, partnerContext, partnerPage, sessionIdsToClean, uiSessionId: uiSessionA });
     } finally {
-      // 10. Auto cleanup — always runs regardless of test pass/fail
+      // 10. Auto cleanup — always runs regardless of test pass/fail.
+      //     Only session data is removed, NOT partner linkage. scripture_seed_test_data
+      //     resolves its users with `ORDER BY created_at LIMIT 1`, so every worker is
+      //     handed the same pair; clearing partner_id here would strip hasPartner from
+      //     under any worker mid-test. Same rule as tests/support/fixtures/index.ts:61-63.
       await partnerContext.close().catch(() => {});
       await cleanupTestSession(supabaseAdmin, sessionIdsToClean);
-      await unlinkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
     }
   },
 });

@@ -2,6 +2,7 @@ import { LazyMotion, domAnimation } from 'framer-motion';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { initSentry } from './config/sentry';
 import './index.css';
 import { logger } from './utils/logger';
@@ -41,7 +42,9 @@ if (import.meta.env.PROD) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LazyMotion features={domAnimation}>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </LazyMotion>
   </StrictMode>
 );

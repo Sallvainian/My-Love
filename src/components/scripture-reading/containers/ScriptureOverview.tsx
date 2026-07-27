@@ -25,7 +25,7 @@
  */
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { MAX_STEPS } from '../../../data/scriptureSteps';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
@@ -220,6 +220,16 @@ export function ScriptureOverview() {
       void loadCoupleStats();
     }
   }, [isLoadingPartner, isOnline, loadCoupleStats]);
+
+  // Refresh stats when a session ends so the overview reflects the session just completed
+  const prevSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prevSessionId = prevSessionIdRef.current;
+    prevSessionIdRef.current = session?.id ?? null;
+    if (prevSessionId && !session && isOnline) {
+      void loadCoupleStats();
+    }
+  }, [session, isOnline, loadCoupleStats]);
 
   // Check for incomplete solo session on mount (AC #6)
   // Re-check when session becomes null (e.g., after save-and-exit)

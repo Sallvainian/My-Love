@@ -13,8 +13,8 @@ import {
   saveStorageState,
 } from '@seontechnologies/playwright-utils/auth-session';
 import fs from 'fs';
+import { TEST_USER_PASSWORD } from '../test-credentials';
 
-const TEST_USER_PASSWORD = 'testpassword123';
 
 /**
  * Maps a user identifier to an email address.

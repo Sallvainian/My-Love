@@ -32,6 +32,8 @@ export interface PartnerPresenceInfo {
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const STALE_TTL_MS = 20_000;
+/** Mirrors MAX_BROADCAST_RETRIES in useScriptureBroadcast. */
+const MAX_PRESENCE_RETRIES = 5;
 
 interface PresencePayload {
   user_id: string;
@@ -94,6 +96,11 @@ export function useScripturePresence(
     // Guard: prevent duplicate subscription
     if (channelRef.current !== null) return;
 
+    // Set when this effect run is superseded (re-run) or unmounted. The async
+    // setAuth/getUser below can still be in flight at that point, and must not
+    // go on to subscribe — see the note at the `cancelled` check.
+    let cancelled = false;
+
     const channelName = `scripture-presence:${sessionId}`;
 
     const channel = supabase.channel(channelName, {
@@ -136,6 +143,16 @@ export function useScripturePresence(
         const { data: authData, error: authError } = await supabase.auth.getUser();
         if (authError) throw authError;
 
+        // This effect run was superseded (StrictMode double-mount, or a retryCount
+        // bump) while auth was in flight. Subscribing anyway is not harmless:
+        // supabase.channel() dedupes by topic, so the later run was handed back this
+        // very object, and both runs would call subscribe() on it. That sends two
+        // phx_join frames for one channel, the server answers the duplicate with
+        // phx_close, and the rejoin timer then fights _leaveOpenTopic indefinitely.
+        // While the channel sits kicked-off, every send() silently falls back to the
+        // REST broadcast endpoint instead of the socket.
+        if (cancelled) return;
+
         userIdRef.current = authData.user?.id ?? '';
 
         channel.subscribe((status, err) => {
@@ -160,14 +177,34 @@ export function useScripturePresence(
                 view: null,
               }));
             }, STALE_TTL_MS);
-          } else if (status === 'CHANNEL_ERROR') {
-            const scriptureError: ScriptureError = {
-              code: ScriptureErrorCode.SYNC_FAILED,
-              message: 'Presence channel subscription error',
-              details: err,
-            };
-            handleScriptureError(scriptureError);
-            if (channelRef.current === channel && sessionId) {
+          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+            if (status === 'CHANNEL_ERROR') {
+              const scriptureError: ScriptureError = {
+                code: ScriptureErrorCode.SYNC_FAILED,
+                message: 'Presence channel subscription error',
+                details: err,
+              };
+              handleScriptureError(scriptureError);
+            }
+
+            // CLOSED has to be handled here, not just CHANNEL_ERROR: Realtime closes a
+            // channel when a duplicate phx_join lands on its topic, and this hook used
+            // to have no CLOSED branch at all. The channel then stayed closed for good
+            // while the heartbeat below kept calling send() every 10s — and realtime-js
+            // silently routes a send() on a non-joined channel over the deprecated REST
+            // broadcast endpoint instead of the socket. Bounded like the broadcast hook
+            // so a channel that keeps closing cannot become a re-subscribe storm.
+            if (
+              channelRef.current === channel &&
+              sessionId &&
+              retryCount < MAX_PRESENCE_RETRIES
+            ) {
+              // Release ownership BEFORE removeChannel. unsubscribe() fires this same
+              // CLOSED callback synchronously, and while channelRef still pointed at
+              // this channel that re-entered the branch and issued another phx_leave,
+              // hundreds of times over.
+              channelRef.current = null;
+
               if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
@@ -183,13 +220,16 @@ export function useScripturePresence(
                 view: null,
               }));
               void supabase.removeChannel(channel);
-              channelRef.current = null;
               setRetryCount((c) => c + 1);
             }
           }
         });
       })
       .catch((err: unknown) => {
+        // Superseded run: cleanup already tore this channel down, and the ref
+        // clearing below would otherwise clobber the live run's channel.
+        if (cancelled) return;
+
         const scriptureError: ScriptureError = {
           code: ScriptureErrorCode.SYNC_FAILED,
           message: err instanceof Error ? err.message : 'Failed to authenticate presence channel',
@@ -218,6 +258,7 @@ export function useScripturePresence(
       });
 
     return () => {
+      cancelled = true;
       if (staleTimerRef.current) {
         clearTimeout(staleTimerRef.current);
         staleTimerRef.current = null;

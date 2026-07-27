@@ -11,7 +11,8 @@ interface MessageListProps {
 }
 
 export function MessageList({ onEdit, onDelete }: MessageListProps) {
-  const { messages, customMessages } = useAppStore();
+  const messages = useAppStore((s) => s.messages);
+  const customMessages = useAppStore((s) => s.customMessages);
   const [filterCategory, setFilterCategory] = useState<MessageCategory | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
 

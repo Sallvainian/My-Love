@@ -11,7 +11,29 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { createTestSession, cleanupTestSession } from '../../support/factories';
+import type { TypedSupabaseClient } from '../../support/factories';
 import { createUserClient, createOutsiderClient } from '../../support/helpers/rls-security';
+
+/**
+ * Outsider users created during a test, drained by the afterEach below.
+ *
+ * Cleanup cannot be an inline call at the end of the test body: a failing
+ * assertion aborts before it runs, and the account then leaks into auth.users
+ * permanently — playwright.config.ts has no globalTeardown and the
+ * supabaseAdmin fixture has no teardown phase.
+ */
+const pendingOutsiders: Awaited<ReturnType<typeof createOutsiderClient>>[] = [];
+
+async function createTrackedOutsider(supabaseAdmin: TypedSupabaseClient, emailPrefix?: string) {
+  const outsider = await createOutsiderClient(supabaseAdmin, emailPrefix);
+  pendingOutsiders.push(outsider);
+  return outsider;
+}
+
+test.afterEach(async () => {
+  const outsiders = pendingOutsiders.splice(0);
+  await Promise.all(outsiders.map((outsider) => outsider.cleanup()));
+});
 
 test.describe('Scripture RLS Security', () => {
   test.describe('P0-001: SELECT scripture_sessions - members only', () => {
@@ -45,7 +67,7 @@ test.describe('Scripture RLS Security', () => {
       const sessionId = testSession.session_ids[0];
 
       // Create a third user who is NOT a session member
-      const outsider = await createOutsiderClient(supabaseAdmin);
+      const outsider = await createTrackedOutsider(supabaseAdmin);
 
       // WHEN: A non-member queries the session
       const { data, error } = await outsider.client
@@ -56,9 +78,6 @@ test.describe('Scripture RLS Security', () => {
       // THEN: No data is returned (RLS blocks access)
       expect(error).toBeNull();
       expect(data).toEqual([]);
-
-      // Cleanup outsider user
-      await outsider.cleanup();
     });
   });
 
@@ -95,7 +114,7 @@ test.describe('Scripture RLS Security', () => {
       });
 
       // Create outsider
-      const outsider = await createOutsiderClient(supabaseAdmin, 'outsider-refl');
+      const outsider = await createTrackedOutsider(supabaseAdmin, 'outsider-refl');
 
       // WHEN: Non-member queries reflections
       const { data, error } = await outsider.client
@@ -109,7 +128,6 @@ test.describe('Scripture RLS Security', () => {
 
       // Cleanup
       await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
-      await outsider.cleanup();
     });
   });
 
@@ -120,7 +138,7 @@ test.describe('Scripture RLS Security', () => {
     }) => {
       // GIVEN: A session exists and a non-member user
       const sessionId = testSession.session_ids[0];
-      const outsider = await createOutsiderClient(supabaseAdmin, 'outsider-ins');
+      const outsider = await createTrackedOutsider(supabaseAdmin, 'outsider-ins');
 
       // WHEN: Non-member tries to INSERT a reflection
       const { error } = await outsider.client.from('scripture_reflections').insert({
@@ -134,9 +152,6 @@ test.describe('Scripture RLS Security', () => {
 
       // THEN: Insert is rejected by RLS
       expect(error).toBeTruthy();
-
-      // Cleanup
-      await outsider.cleanup();
     });
 
     test('should reject non-member INSERT into scripture_bookmarks', async ({
@@ -145,7 +160,7 @@ test.describe('Scripture RLS Security', () => {
     }) => {
       // GIVEN: A session exists and a non-member user
       const sessionId = testSession.session_ids[0];
-      const outsider = await createOutsiderClient(supabaseAdmin, 'outsider-bm');
+      const outsider = await createTrackedOutsider(supabaseAdmin, 'outsider-bm');
 
       // WHEN: Non-member tries to INSERT a bookmark
       const { error } = await outsider.client.from('scripture_bookmarks').insert({
@@ -157,9 +172,6 @@ test.describe('Scripture RLS Security', () => {
 
       // THEN: Insert is rejected by RLS
       expect(error).toBeTruthy();
-
-      // Cleanup
-      await outsider.cleanup();
     });
   });
 
@@ -168,24 +180,36 @@ test.describe('Scripture RLS Security', () => {
       supabaseAdmin,
       testSession,
     }) => {
-      // GIVEN: A session member tries to impersonate another user
+      // GIVEN: A session member tries to impersonate their partner.
+      //
+      // The impersonated id must be a REAL auth.users row, because
+      // scripture_reflections.user_id carries an FK to it
+      // (20260128000001_scripture_reading.sql:64). Anything else fails before
+      // RLS is ever consulted:
+      //   'fake-user-id...'  -> 22P02 invalid input syntax for type uuid
+      //   an unused UUID     -> 23503 foreign key violation
+      // Both satisfy a bare toBeTruthy(), so the old form of this test passed
+      // with the policy dropped. Verified against local PostgREST.
       const sessionId = testSession.session_ids[0];
       const userId = testSession.test_user1_id;
-      const fakeUserId = 'fake-user-id-that-does-not-match-auth';
+      const partnerId = testSession.test_user2_id;
+      expect(partnerId, 'seed must provide a partner to impersonate').toBeTruthy();
 
       // WHEN: Member inserts reflection with mismatched user_id
       const userClient = await createUserClient(supabaseAdmin, userId);
       const { error } = await userClient.from('scripture_reflections').insert({
         session_id: sessionId,
         step_index: 0,
-        user_id: fakeUserId, // Impersonation attempt
+        user_id: partnerId!, // Impersonation attempt: real user, not auth.uid()
         rating: 5,
         notes: 'Impersonated reflection',
         is_shared: false,
       });
 
-      // THEN: Insert is rejected (user_id must match auth.uid())
-      expect(error).toBeTruthy();
+      // THEN: Rejected by RLS specifically. The acting user IS a session member,
+      // so is_scripture_session_member(session_id) passes and 42501 is
+      // attributable to the user_id = auth.uid() conjunct alone.
+      expect(error?.code).toBe('42501');
     });
   });
 

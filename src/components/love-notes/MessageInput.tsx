@@ -45,7 +45,9 @@ export function MessageInput() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { sendNote } = useLoveNotes();
+  // autoFetch=false: the LoveNotes container owns the initial fetch and the
+  // realtime subscription (useLoveNotes gates both on this flag).
+  const { sendNote } = useLoveNotes(false);
   const { vibrate } = useVibration();
 
   // Auto-resize textarea as content grows

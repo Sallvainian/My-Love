@@ -6,16 +6,26 @@ The project uses the BMAD method for planning. Planning documents live in `_bmad
 
 > **Layout changed since the 2026-03 scan.** The sharded `planning-artifacts/prd/` and `planning-artifacts/epics/` directories and `implementation-artifacts/sprint-status.yaml` no longer exist. All four Scripture Reading epics shipped and merged, so the sprint tracker was retired along with the shards. The epic and story history below is retained as a record of what was built; it is no longer backed by a live status file.
 
-Current contents:
+> **Phase artifacts archived (2026-07-25).** The remaining Scripture Reading planning documents and all completed `tech-spec-*.md` files moved to `_bmad-output/.archive/`. Only phase-agnostic outputs stay live at the top level: `project-context.md`, the `deferred-work.md` ledger, pending handoff documents, and the BMAD/TEA reference docs.
+
+Live contents:
 
 | Path                                                          | Contents                                                                        |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `_bmad-output/planning-artifacts/architecture.md`             | Feature architecture for Scripture Reading                                       |
-| `_bmad-output/planning-artifacts/ux-design-specification.md`  | UX design specification                                                          |
-| `_bmad-output/planning-artifacts/ux-design-directions.html`   | UX design direction explorations                                                 |
-| `_bmad-output/implementation-artifacts/`                      | Per-change tech specs (`tech-spec-*.md`) plus the `deferred-work.md` ledger       |
-| `_bmad-output/test-artifacts/`, `tea-docs/`                   | Test reviews, NFR assessments, traceability, test-architecture reference docs     |
-| `_bmad-output/project-context.md`                             | Condensed AI-agent rule file (~120 rules)                                         |
+| `_bmad-output/project-context.md`                             | Condensed AI-agent rule file, regenerated per documentation scan                  |
+| `_bmad-output/implementation-artifacts/deferred-work.md`      | Ledger of deferred items                                                          |
+| `_bmad-output/handoff-documents/`                             | Cross-session handoff documents                                                   |
+| `_bmad-output/bmad-workflow-reference.md`, `tea-docs/`        | BMAD workflow reference and TEA test-architecture reference docs                  |
+
+Archived contents (`_bmad-output/.archive/`):
+
+| Path                                                             | Contents                                                                     |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `.archive/planning-artifacts/architecture.md`                    | Feature architecture for Scripture Reading                                    |
+| `.archive/planning-artifacts/ux-design-specification.md`         | UX design specification                                                       |
+| `.archive/planning-artifacts/ux-design-directions.html`          | UX design direction explorations                                              |
+| `.archive/implementation-artifacts/tech-spec-*.md`               | Completed per-change tech specs (5 files, all `status: done`)                 |
+| `.archive/reports/`                                              | Dead-code analysis (2026-03-21) and `bmad-handoff` skill quality scans        |
 
 ## Epic Status
 

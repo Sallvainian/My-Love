@@ -5,6 +5,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import type { TypedSupabaseClient } from '../factories';
+import { TEST_USER_PASSWORD } from '../test-credentials';
 
 /**
  * Create a Supabase client authenticated as a specific user.
@@ -25,7 +26,7 @@ export async function createUserClient(supabaseAdmin: TypedSupabaseClient, userI
 
   const { error: signInError } = await userClient.auth.signInWithPassword({
     email: sessionData.user.email!,
-    password: 'testpassword123',
+    password: TEST_USER_PASSWORD,
   });
 
   if (signInError) {
@@ -43,18 +44,27 @@ export async function createOutsiderClient(
   supabaseAdmin: TypedSupabaseClient,
   emailPrefix = 'outsider'
 ) {
-  const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
+  const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
     email: `${emailPrefix}-${Date.now()}@test.example.com`,
-    password: 'testpassword123',
+    password: TEST_USER_PASSWORD,
     email_confirm: true,
   });
 
-  const userId = newUser!.user!.id;
-  const client = await createUserClient(supabaseAdmin, userId);
+  if (createError || !newUser?.user) {
+    throw new Error(
+      `Failed to create outsider user: ${createError?.message ?? 'no user in response'}`
+    );
+  }
 
-  return {
-    client,
-    userId,
-    cleanup: () => supabaseAdmin.auth.admin.deleteUser(userId),
-  };
+  const userId = newUser.user.id;
+  const cleanup = () => supabaseAdmin.auth.admin.deleteUser(userId);
+
+  // The account already exists at this point, so a sign-in failure below would
+  // leave the caller with no cleanup handle and leak the user into auth.users.
+  const client = await createUserClient(supabaseAdmin, userId).catch(async (error) => {
+    await cleanup();
+    throw error;
+  });
+
+  return { client, userId, cleanup };
 }

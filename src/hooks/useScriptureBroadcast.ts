@@ -63,6 +63,7 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     currentUserId,
     sessionUserId,
     sessionIdFromStore,
+    sessionStepIndex,
   } = useAppStore(
     useShallow((state) => ({
       onPartnerJoined: state.onPartnerJoined,
@@ -75,6 +76,7 @@ export function useScriptureBroadcast(sessionId: string | null): void {
       currentUserId: state.userId,
       sessionUserId: state.session?.userId ?? null, // user1_id
       sessionIdFromStore: state.session?.id ?? null,
+      sessionStepIndex: state.session?.currentStepIndex ?? null,
     }))
   );
 
@@ -82,15 +84,17 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     currentUserId: string | null;
     sessionUserId: string | null;
     sessionIdFromStore: string | null;
+    sessionStepIndex: number | null;
   }>({
     currentUserId,
     sessionUserId,
     sessionIdFromStore,
+    sessionStepIndex,
   });
 
   useEffect(() => {
-    identityRef.current = { currentUserId, sessionUserId, sessionIdFromStore };
-  }, [currentUserId, sessionUserId, sessionIdFromStore]);
+    identityRef.current = { currentUserId, sessionUserId, sessionIdFromStore, sessionStepIndex };
+  }, [currentUserId, sessionUserId, sessionIdFromStore, sessionStepIndex]);
 
   // Story 4.3: Track whether channel has errored to know when re-subscribe succeeds
   const hasErroredRef = useRef(false);
@@ -103,6 +107,11 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     // Guard: prevent duplicate subscription on React StrictMode double-mount.
     // channelRef.current is null only after cleanup, non-null means a subscription exists.
     if (channelRef.current !== null) return;
+
+    // Set when this effect run is superseded (re-run) or unmounted, so the async
+    // setAuth/getUser below does not go on to subscribe a channel this run no
+    // longer owns. See the note at the `cancelled` check.
+    let cancelled = false;
 
     const channelName = `scripture-session:${sessionId}`;
 
@@ -139,8 +148,16 @@ export function useScriptureBroadcast(sessionId: string | null): void {
         { event: 'lock_in_status_changed' },
         (msg: { payload: LockInStatusChangedPayload }) => {
           // Story 4.2: Determine which lock field represents the partner
-          const { currentUserId: latestCurrentUserId, sessionUserId: latestSessionUserId } =
-            identityRef.current;
+          const {
+            currentUserId: latestCurrentUserId,
+            sessionUserId: latestSessionUserId,
+            sessionStepIndex: liveStepIndex,
+          } = identityRef.current;
+
+          // Drop superseded locks: a lock broadcast for a step we have already left
+          // would show a false "partner is ready" on the new verse.
+          if (liveStepIndex === null || msg.payload.step_index !== liveStepIndex) return;
+
           const isUser1 =
             latestCurrentUserId !== null && latestCurrentUserId === latestSessionUserId;
           const partnerLocked = isUser1 ? msg.payload.user2_locked : msg.payload.user1_locked;
@@ -161,6 +178,14 @@ export function useScriptureBroadcast(sessionId: string | null): void {
         if (authError) {
           throw authError;
         }
+
+        // Same hazard as useScripturePresence: supabase.channel() dedupes by topic,
+        // so a superseded run and its replacement share one channel object. Letting
+        // both call subscribe() sends duplicate phx_join frames, which the server
+        // answers with phx_close, and the channel then loops rejoining. This hook is
+        // not currently observed to hit it, but the shape is identical.
+        if (cancelled) return;
+
         const userId = authData.user?.id ?? '';
 
         channel.subscribe((status, err) => {
@@ -235,6 +260,10 @@ export function useScriptureBroadcast(sessionId: string | null): void {
         });
       })
       .catch((err: unknown) => {
+        // Superseded run: cleanup already tore this channel down, and the ref
+        // clearing below would otherwise clobber the live run's channel.
+        if (cancelled) return;
+
         const scriptureError: ScriptureError = {
           code: ScriptureErrorCode.SYNC_FAILED,
           message: err instanceof Error ? err.message : 'Failed to authenticate broadcast channel',
@@ -251,6 +280,7 @@ export function useScriptureBroadcast(sessionId: string | null): void {
       });
 
     return () => {
+      cancelled = true;
       // Clear broadcast function so slice actions don't try to broadcast on a dead channel
       setBroadcastFn?.(null);
       if (channelRef.current) {

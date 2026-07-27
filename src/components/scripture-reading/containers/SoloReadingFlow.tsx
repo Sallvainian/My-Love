@@ -53,6 +53,15 @@ export function SoloReadingFlow() {
             {flow.announcement}
           </div>
           <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
+            {flow.summarySubmitError && (
+              <div
+                role="alert"
+                data-testid="scripture-reflection-submit-error"
+                className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+              >
+                {flow.summarySubmitError}
+              </div>
+            )}
             <ReflectionSummary
               bookmarkedVerses={bookmarkedVerses}
               onSubmit={flow.handleReflectionSummarySubmit}

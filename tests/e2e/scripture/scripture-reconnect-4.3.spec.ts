@@ -215,18 +215,10 @@ test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
       })
       .eq('id', uiSessionId);
 
-    // Inject the new step into User A's Zustand store so their UI
-    // reflects the advanced state
-    await page.evaluate(
-      ({ step }) => {
-        const store = window.__APP_STORE__;
-        if (!store) throw new Error('__APP_STORE__ not found');
-        const session = store.getState().session;
-        if (!session) throw new Error('session is null in store');
-        store.setState({ session: { ...session, currentStepIndex: step } });
-      },
-      { step: newStepIndex }
-    );
+    // The DB row above is the canonical state the reconnecting client must sync to.
+    // User A's client is deliberately NOT pre-seeded with it: injecting the step into
+    // their Zustand store would make any later assertion about User A a check on what
+    // this test just wrote, not on what the app did.
 
     // Dismiss the disconnect overlay so User A can continue
     await waitForDisconnectionTimeout(page);
@@ -244,8 +236,11 @@ test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
     // -----------------------------------------------------------------------
     await waitForReadingStep(reconnectedPartnerPage, newStepIndex, 17);
 
-    // User A should also be on the advanced step
-    await waitForReadingStep(page, newStepIndex, 17);
+    // NOTE: User A's step is deliberately not asserted here. The step advance was written
+    // straight to the DB, so no broadcast ever reached User A and the app has no defined
+    // behaviour for converging them. Whether User A should also resync is untested — see
+    // AC#6. The previous assertion here only passed because the test had injected the step
+    // into User A's store itself.
 
     // Disconnect overlay should dismiss when partner comes back online
     await waitForPartnerReconnected(page);

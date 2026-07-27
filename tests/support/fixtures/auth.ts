@@ -8,29 +8,12 @@
 import { test as base } from '@playwright/test';
 import type { AuthOptions } from '@seontechnologies/playwright-utils/auth-session';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
-import { cpus } from 'os';
 import { initializeAuthSystem } from '../auth/setup';
 import { SupabaseAuthProvider } from '../auth/supabase-auth-provider';
+import { getAuthPoolSize, normalizeWorkerIndex } from '../auth/worker-pool';
 
 // Must run before any auth operations
 initializeAuthSystem();
-
-const MIN_AUTH_POOL_SIZE = 8;
-
-function getAuthPoolSize(): number {
-  const cpuCount = cpus().length;
-  const defaultAuthPoolSize = Number.isFinite(cpuCount)
-    ? Math.max(MIN_AUTH_POOL_SIZE, cpuCount)
-    : MIN_AUTH_POOL_SIZE;
-
-  const raw = process.env.PLAYWRIGHT_AUTH_POOL_SIZE;
-  if (!raw) return defaultAuthPoolSize;
-
-  const parsed = Number.parseInt(raw, 10);
-  if (Number.isNaN(parsed) || parsed < 1) return defaultAuthPoolSize;
-
-  return parsed;
-}
 
 const provider = new SupabaseAuthProvider();
 
@@ -48,8 +31,7 @@ export const test = base.extend<AuthTestFixtures, AuthWorkerFixtures>({
   // Worker-scoped: map workerIndex → user identifier
   authOptions: [
     async ({}, use, workerInfo) => {
-      const poolSize = getAuthPoolSize();
-      const normalizedIndex = ((workerInfo.workerIndex % poolSize) + poolSize) % poolSize;
+      const normalizedIndex = normalizeWorkerIndex(workerInfo.workerIndex, getAuthPoolSize());
       await use({
         environment: 'local',
         userIdentifier: `worker-${normalizedIndex}`,
@@ -94,8 +76,7 @@ export const test = base.extend<AuthTestFixtures, AuthWorkerFixtures>({
   // Worker-scoped: partner user identifier for together-mode tests
   partnerUserIdentifier: [
     async ({}, use, workerInfo) => {
-      const poolSize = getAuthPoolSize();
-      const normalizedIndex = ((workerInfo.workerIndex % poolSize) + poolSize) % poolSize;
+      const normalizedIndex = normalizeWorkerIndex(workerInfo.workerIndex, getAuthPoolSize());
       await use(`worker-${normalizedIndex}-partner`);
     },
     { scope: 'worker' },

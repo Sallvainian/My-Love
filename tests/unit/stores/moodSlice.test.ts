@@ -104,6 +104,7 @@ describe('moodSlice', () => {
       mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
         synced: 1,
         failed: 0,
+        deferred: 0,
         errors: [],
       });
       mockedMoodService.getAll.mockResolvedValue([entry]);
@@ -133,6 +134,7 @@ describe('moodSlice', () => {
       mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
         synced: 0,
         failed: 0,
+        deferred: 0,
         errors: [],
       });
       mockedMoodService.getAll.mockResolvedValue([updated]);
@@ -211,6 +213,7 @@ describe('moodSlice', () => {
       mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
         synced: 1,
         failed: 0,
+        deferred: 0,
         errors: [],
       });
       mockedMoodService.getAll.mockResolvedValue([]);
@@ -228,6 +231,7 @@ describe('moodSlice', () => {
       mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
         synced: 3,
         failed: 1,
+        deferred: 0,
         errors: [],
       });
       mockedMoodService.getAll.mockResolvedValue([]);
@@ -237,7 +241,7 @@ describe('moodSlice', () => {
       const { get } = createTestStore();
       const result = await get().syncPendingMoods();
 
-      expect(result).toEqual({ synced: 3, failed: 1 });
+      expect(result).toEqual({ synced: 3, failed: 1, skipped: false });
     });
 
     it('resets isSyncing on error and re-throws', async () => {
@@ -246,6 +250,108 @@ describe('moodSlice', () => {
       const { get } = createTestStore();
       await expect(get().syncPendingMoods()).rejects.toThrow('sync failed');
       expect(get().syncStatus.isSyncing).toBe(false);
+    });
+
+    it('runs a second pass when a record was edited mid-sync', async () => {
+      // A deferral means the write landed but the record stayed dirty on
+      // purpose. Without a second pass the newer value sits unsynced until some
+      // unrelated trigger fires, and the partner sees the stale mood meanwhile.
+      mockedMoodSyncService.syncPendingMoods
+        .mockResolvedValueOnce({ synced: 0, failed: 0, deferred: 1, errors: [] })
+        .mockResolvedValueOnce({ synced: 1, failed: 0, deferred: 0, errors: [] });
+      mockedMoodService.getAll.mockResolvedValue([]);
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
+      mockedGetPartnerId.mockResolvedValue(null);
+
+      const { get } = createTestStore();
+      const result = await get().syncPendingMoods();
+
+      expect(mockedMoodSyncService.syncPendingMoods).toHaveBeenCalledTimes(2);
+      expect(result).toEqual({ synced: 1, failed: 0, skipped: false });
+    });
+
+    it('runs no second pass when nothing was deferred', async () => {
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
+        synced: 1,
+        failed: 0,
+        deferred: 0,
+        errors: [],
+      });
+      mockedMoodService.getAll.mockResolvedValue([]);
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
+      mockedGetPartnerId.mockResolvedValue(null);
+
+      const { get } = createTestStore();
+      await get().syncPendingMoods();
+
+      expect(mockedMoodSyncService.syncPendingMoods).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops at two passes even if the second also defers', async () => {
+      // Bounded on purpose: a user typing continuously would otherwise keep
+      // producing deferrals and spin this loop for as long as they type.
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
+        synced: 0,
+        failed: 0,
+        deferred: 1,
+        errors: [],
+      });
+      mockedMoodService.getAll.mockResolvedValue([]);
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
+      mockedGetPartnerId.mockResolvedValue(null);
+
+      const { get } = createTestStore();
+      await get().syncPendingMoods();
+
+      expect(mockedMoodSyncService.syncPendingMoods).toHaveBeenCalledTimes(2);
+    });
+
+    describe('when another context holds the sync lock', () => {
+      beforeEach(() => {
+        // Models the service worker, or a second tab, mid-batch. `isSyncing` is
+        // per-context so it cannot see that; the lock can.
+        Object.defineProperty(navigator, 'locks', {
+          configurable: true,
+          value: {
+            request: async (
+              _name: string,
+              _options: { ifAvailable?: boolean },
+              callback: (lock: null) => Promise<unknown>
+            ) => callback(null),
+          },
+        });
+      });
+
+      // Cleanup in afterEach, not inline: an assertion failure above would
+      // otherwise leak the always-null lock fake into every later describe.
+      afterEach(() => {
+        Reflect.deleteProperty(navigator, 'locks');
+      });
+
+      it('attempts nothing and reports the batch as skipped', async () => {
+        const { get } = createTestStore();
+        const result = await get().syncPendingMoods();
+
+        expect(mockedMoodSyncService.syncPendingMoods).not.toHaveBeenCalled();
+        // `skipped` matters: {synced: 0, failed: 0} alone is indistinguishable
+        // from "nothing to sync", and the retry button treats that as success.
+        expect(result).toEqual({ synced: 0, failed: 0, skipped: true });
+        expect(get().syncStatus.isSyncing).toBe(false);
+      });
+
+      it('does not stamp lastSyncAt for a sync that never ran', async () => {
+        const { get } = createTestStore();
+        await get().syncPendingMoods();
+
+        expect(get().syncStatus.lastSyncAt).toBeUndefined();
+      });
+
+      it('does not reload moods or overwrite the pending count', async () => {
+        const { get } = createTestStore();
+        await get().syncPendingMoods();
+
+        expect(mockedMoodService.getAll).not.toHaveBeenCalled();
+      });
     });
   });
 

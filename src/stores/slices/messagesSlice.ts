@@ -121,9 +121,6 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
             : [...state.messageHistory.favoriteIds, messageId],
         },
       }));
-
-      // Update current message if it's the one being favorited
-      get().updateCurrentMessage();
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }
@@ -290,19 +287,31 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     targetDate.setDate(today.getDate() - newIndex);
     const dateString = formatDateISO(targetDate);
 
-    // Load message for target date (should be cached)
-    const messageId = messageHistory.shownMessages.get(dateString);
-    const targetMessage = messages.find((m) => m.id === messageId);
+    // Load message for target date (compute + cache on miss, mirroring navigateToPreviousMessage)
+    const updatedShownMessages = new Map(messageHistory.shownMessages);
+    let messageId = updatedShownMessages.get(dateString);
+
+    if (!messageId) {
+      const message = getDailyMessage(rotationPool, targetDate);
+      messageId = message.id;
+      updatedShownMessages.set(dateString, messageId);
+    }
 
     // Update state
     set({
       messageHistory: {
         ...messageHistory,
         currentIndex: newIndex,
+        shownMessages: updatedShownMessages,
       },
       currentDayOffset: newIndex, // Keep for backward compatibility
-      currentMessage: targetMessage || null,
     });
+
+    // Update currentMessage to trigger UI re-render
+    const targetMessage = messages.find((m) => m.id === messageId);
+    if (targetMessage) {
+      set({ currentMessage: targetMessage });
+    }
 
     logger.debug(`[MessageHistory] Navigated to ${dateString}, message ID: ${messageId}`);
   },

@@ -8,40 +8,15 @@
  * lazily per-worker on first test.
  */
 import { createClient } from '@supabase/supabase-js';
-import { cpus } from 'os';
 import { initializeAuthSystem } from './setup';
 import { authStorageInit } from '@seontechnologies/playwright-utils/auth-session';
-
-const TEST_USER_PASSWORD = 'testpassword123';
-const MIN_AUTH_POOL_SIZE = 8;
+import { TEST_USER_PASSWORD } from '../test-credentials';
+import { getAuthPoolSize, getWorkerEmail, getWorkerPartnerEmail } from './worker-pool';
 
 const LEGACY_TEST_USERS = [
   { email: 'testuser1@test.example.com', displayName: 'Test User 1' },
   { email: 'testuser2@test.example.com', displayName: 'Test User 2' },
 ];
-
-function getAuthPoolSize(): number {
-  const cpuCount = cpus().length;
-  const defaultAuthPoolSize = Number.isFinite(cpuCount)
-    ? Math.max(MIN_AUTH_POOL_SIZE, cpuCount)
-    : MIN_AUTH_POOL_SIZE;
-
-  const raw = process.env.PLAYWRIGHT_AUTH_POOL_SIZE;
-  if (!raw) return defaultAuthPoolSize;
-
-  const parsed = Number.parseInt(raw, 10);
-  if (Number.isNaN(parsed) || parsed < 1) return defaultAuthPoolSize;
-
-  return parsed;
-}
-
-function getWorkerEmail(workerIndex: number): string {
-  return `testworker${workerIndex}@test.example.com`;
-}
-
-function getWorkerPartnerEmail(workerIndex: number): string {
-  return `testworker${workerIndex}-partner@test.example.com`;
-}
 
 async function ensureUser(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

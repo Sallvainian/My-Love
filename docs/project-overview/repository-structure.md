@@ -23,10 +23,12 @@ My-Love/
 |   +-- dependabot.yml                # Weekly npm + GitHub Actions dependency updates
 |
 |-- _bmad-output/
-|   |-- implementation-artifacts/     # Per-change tech specs + deferred-work.md ledger
-|   |-- planning-artifacts/           # architecture.md, ux-design-specification.md, ux-design-directions.html
+|   |-- .archive/                     # Retired phase artifacts: planning docs, completed tech specs, reports
+|   |-- implementation-artifacts/     # deferred-work.md ledger
+|   |-- handoff-documents/            # Cross-session handoff documents
+|   |-- skills/                       # Project-local BMAD skill definitions (bmad-handoff)
 |   |-- tea-docs/                     # Test-architecture reference docs
-|   |-- test-artifacts/               # Test reviews, NFR assessments, traceability
+|   |-- bmad-workflow-reference.md    # BMAD epic lifecycle command reference
 |   +-- project-context.md            # AI-agent rule file (see also CLAUDE.md, AGENTS.md)
 |
 |-- docs/                             # Project documentation (9 sections)

@@ -150,8 +150,10 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
   },
 
   getUnviewedInteractions: () => {
-    const interactions = get().interactions;
-    return interactions.filter((interaction) => !interaction.viewed);
+    const { interactions, userId } = get();
+    return interactions.filter(
+      (interaction) => !interaction.viewed && interaction.toUserId === userId
+    );
   },
 
   getInteractionHistory: (days = 7) => {
@@ -177,8 +179,10 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
       // Update state
       set({ interactions });
 
-      // Calculate unviewed count (all unviewed received interactions)
-      const unviewedCount = interactions.filter((i) => !i.viewed).length;
+      // Calculate unviewed count (received-and-unviewed only — outgoing rows are never notifications)
+      const unviewedCount = interactions.filter(
+        (i) => !i.viewed && i.toUserId === currentUserId
+      ).length;
 
       set({ unviewedCount });
 
