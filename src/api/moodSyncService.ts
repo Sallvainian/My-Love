@@ -10,7 +10,6 @@
  * @module api/moodSyncService
  */
 
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import { moodService } from '../services/moodService';
 import { moodSyncFingerprint, moodSyncPayload } from '../services/moodSyncPayload';
 import type { MoodEntry } from '../types';
@@ -50,8 +49,6 @@ interface SyncResult {
  * - Handle network errors and retry logic
  */
 class MoodSyncService {
-  private realtimeChannel: RealtimeChannel | null = null;
-
   /**
    * Upload a single mood entry to Supabase
    *
@@ -396,7 +393,14 @@ class MoodSyncService {
 
     // Create Broadcast channel for receiving mood updates
     // Each user subscribes to their OWN channel; partner broadcasts TO this channel
-    this.realtimeChannel = supabase
+    //
+    // Held in a local, not on the instance. This service is a singleton with
+    // two live consumers -- usePartnerMood (Mood tab) and PartnerMoodView
+    // (Partner tab) -- and the two views are mutually exclusive, so navigating
+    // between them mounts one while unmounting the other. A shared field means
+    // whichever call resolves last owns it, and the earlier call's unsubscribe
+    // then removes the LATER call's channel out from under a mounted component.
+    const channel = supabase
       .channel(`mood-updates:${currentUserId}`, {
         config: {
           broadcast: { self: false }, // Don't receive own broadcasts
@@ -426,12 +430,17 @@ class MoodSyncService {
       });
 
     // Return unsubscribe function
+    //
+    // `removed` makes a second call a no-op rather than removing an
+    // already-removed channel, matching interactionService.subscribeInteractions.
+    // usePartnerMood can invoke this twice: once from its own `!isMounted`
+    // branch and again from the effect cleanup.
+    let removed = false;
     return () => {
-      if (this.realtimeChannel) {
-        supabase.removeChannel(this.realtimeChannel);
-        this.realtimeChannel = null;
-        logger.debug('[MoodSyncService] Unsubscribed from mood broadcasts');
-      }
+      if (removed) return;
+      removed = true;
+      supabase.removeChannel(channel);
+      logger.debug('[MoodSyncService] Unsubscribed from mood broadcasts');
     };
   }
 
