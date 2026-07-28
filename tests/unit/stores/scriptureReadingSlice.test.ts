@@ -1038,4 +1038,118 @@ describe('scriptureReadingSlice', () => {
       expect(store.getState().activeSession).toBeNull();
     });
   });
+  describe('concurrent writes to the same session row (isSyncing as a write lock)', () => {
+    // useAutoSave calls saveSession from raw visibilitychange/beforeunload
+    // listeners, which bypass every disabled-button guard in the UI. Without a
+    // lock, backgrounding the tab mid-advance started a second write to the
+    // same row. endSession and lockIn already guarded; the solo flow's own
+    // persistence actions did not.
+    async function storeMidWrite() {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      let release: () => void = () => {};
+      vi.mocked(scriptureReadingService.updateSession).mockReturnValue(
+        new Promise<void>((resolve) => {
+          release = resolve;
+        })
+      );
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+      vi.mocked(scriptureReadingService.updateSession).mockClear();
+
+      return { store, release, updateSession: vi.mocked(scriptureReadingService.updateSession) };
+    }
+
+    it('saveSession does not start a second write while advanceStep is in flight', async () => {
+      const { store, release, updateSession } = await storeMidWrite();
+
+      const advancing = store.getState().advanceStep();
+      expect(store.getState().isSyncing).toBe(true);
+      expect(updateSession).toHaveBeenCalledTimes(1);
+
+      // The tab is backgrounded mid-advance.
+      await store.getState().saveSession();
+
+      expect(updateSession).toHaveBeenCalledTimes(1);
+
+      release();
+      await advancing;
+    });
+
+    it('advanceStep does not start a second write while a save is in flight', async () => {
+      const { store, release, updateSession } = await storeMidWrite();
+
+      const saving = store.getState().saveSession();
+      expect(updateSession).toHaveBeenCalledTimes(1);
+
+      await store.getState().advanceStep();
+
+      expect(updateSession).toHaveBeenCalledTimes(1);
+      // The optimistic step bump must not have happened either, or local state
+      // would claim progress the server was never told about.
+      expect(store.getState().session!.currentStepIndex).toBe(0);
+
+      release();
+      await saving;
+    });
+
+    it('saveAndExit does not tear down the session while a write is in flight', async () => {
+      const { store, release, updateSession } = await storeMidWrite();
+
+      const advancing = store.getState().advanceStep();
+      await store.getState().saveAndExit();
+
+      expect(updateSession).toHaveBeenCalledTimes(1);
+      expect(store.getState().session).not.toBeNull();
+
+      release();
+      await advancing;
+    });
+
+    it('a failed autosave leaves a retryable pendingRetry, not just an error', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+
+      vi.mocked(scriptureReadingService.updateSession).mockRejectedValue(new Error('offline'));
+
+      await store.getState().saveSession();
+
+      // useSessionPersistence's reconnect effect fires on pendingRetry alone,
+      // so a failure recorded without one could never be recovered.
+      const { pendingRetry } = store.getState();
+      expect(pendingRetry).not.toBeNull();
+      expect(pendingRetry!.type).toBe('saveSession');
+      expect(pendingRetry!.sessionData?.sessionId).toBe('session-1');
+      expect(store.getState().isSyncing).toBe(false);
+    });
+  });
 });
