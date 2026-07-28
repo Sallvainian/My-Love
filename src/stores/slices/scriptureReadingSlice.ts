@@ -324,7 +324,13 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   advanceStep: async () => {
     const state = get();
     const { session } = state;
-    if (!session) return;
+    // isSyncing is a write lock, not just a spinner flag: endSession and lockIn
+    // already refuse to start on top of an in-flight write, and the solo read
+    // flow's own persistence actions must too. Without it a tab backgrounded
+    // mid-advance fires saveSession through useAutoSave's visibilitychange
+    // handler -- which bypasses every disabled-button guard in the UI -- and
+    // two writes race for the same session row.
+    if (!session || state.isSyncing) return;
 
     const nextStep = session.currentStepIndex + 1;
     const isLastStep = nextStep >= MAX_STEPS;
@@ -414,7 +420,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   saveAndExit: async () => {
     const state = get();
     const { session } = state;
-    if (!session) return;
+    if (!session || state.isSyncing) return;
 
     set({ isSyncing: true, scriptureError: null });
 
@@ -446,7 +452,10 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   saveSession: async () => {
     const state = get();
     const { session } = state;
-    if (!session) return;
+    // Skipping while another write is in flight is safe rather than lossy: this
+    // persists currentStepIndex/currentPhase off the same session object the
+    // in-flight write already carries, so there is nothing newer to lose.
+    if (!session || state.isSyncing) return;
 
     set({ isSyncing: true });
 
@@ -455,7 +464,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         currentStepIndex: session.currentStepIndex,
         currentPhase: session.currentPhase,
       });
-      set({ isSyncing: false });
+      set({ isSyncing: false, pendingRetry: null });
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)
         ? error
@@ -465,7 +474,25 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
             details: error,
           };
       handleScriptureError(scriptureError);
-      set({ scriptureError, isSyncing: false });
+      // Queue a retry rather than only setting scriptureError. The reconnect
+      // effect in useSessionPersistence fires on pendingRetry alone, so a
+      // failure recorded without one had no recovery path at all -- and this
+      // action is driven by visibilitychange/beforeunload, exactly when the
+      // network is most likely to be gone.
+      set({
+        scriptureError,
+        isSyncing: false,
+        pendingRetry: {
+          type: 'saveSession',
+          attempts: 1,
+          maxAttempts: 3,
+          sessionData: {
+            sessionId: session.id,
+            currentStepIndex: session.currentStepIndex,
+            currentPhase: session.currentPhase,
+          },
+        },
+      });
     }
   },
 
@@ -495,7 +522,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   retryFailedWrite: async () => {
     const state = get();
     const { pendingRetry, session } = state;
-    if (!pendingRetry || !session) return;
+    if (!pendingRetry || !session || state.isSyncing) return;
 
     set({ isSyncing: true, scriptureError: null });
 
