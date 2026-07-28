@@ -75,6 +75,51 @@ async function discardOrphanedImage(storagePath: string | null): Promise<void> {
   }
 }
 
+/**
+ * Helper: send a note at most once, however many times this is called.
+ *
+ * A bare INSERT duplicated the note whenever the row committed but the response
+ * was lost — the client saw a failure, offered Retry, and the retry inserted a
+ * second identical row. `idempotency_key` is the composed message's `tempId`,
+ * which survives retries, so the second attempt collides with the first.
+ *
+ * ON CONFLICT DO NOTHING (`ignoreDuplicates`), not merge-duplicates: a resend
+ * must resolve to what is already stored rather than rewrite it, and
+ * love_notes deliberately has no UPDATE policy — granting one to support a
+ * merge would also let a user edit notes they had already sent.
+ *
+ * A conflict returns no row, so the stored one is read back; otherwise the
+ * caller would leave its optimistic note stuck in the sending state.
+ */
+async function insertNoteOnce(payload: {
+  from_user_id: string;
+  to_user_id: string;
+  content: string;
+  image_url: string | null;
+  idempotency_key: string;
+}): Promise<{ data: LoveNote | null; error: unknown }> {
+  const { data, error } = await supabase
+    .from('love_notes')
+    .upsert(payload, {
+      onConflict: 'from_user_id,idempotency_key',
+      ignoreDuplicates: true,
+    })
+    .select()
+    .maybeSingle();
+
+  if (error) return { data: null, error };
+  if (data) return { data: data as LoveNote, error: null };
+
+  const existing = await supabase
+    .from('love_notes')
+    .select()
+    .eq('from_user_id', payload.from_user_id)
+    .eq('idempotency_key', payload.idempotency_key)
+    .single();
+
+  return { data: (existing.data as LoveNote) ?? null, error: existing.error };
+}
+
 export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) => ({
   // Initial state
   notes: [],
@@ -379,19 +424,16 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         }
       }
 
-      // Background insert to Supabase
-      const { data, error } = await supabase
-        .from('love_notes')
-        .insert({
-          from_user_id: userId,
-          to_user_id: partnerId,
-          content,
-          image_url: storagePath,
-        })
-        .select()
-        .single();
+      // Background insert to Supabase, keyed so a retry cannot post twice
+      const { data, error } = await insertNoteOnce({
+        from_user_id: userId,
+        to_user_id: partnerId,
+        content,
+        image_url: storagePath,
+        idempotency_key: tempId,
+      });
 
-      if (error) {
+      if (error || !data) {
         await discardOrphanedImage(storagePath);
 
         // Mark message as failed (preserve imageBlob for retry)
@@ -534,19 +576,18 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         }
       }
 
-      // Attempt to send again
-      const { data, error } = await supabase
-        .from('love_notes')
-        .insert({
-          from_user_id: userId,
-          to_user_id: partnerId,
-          content: failedNote.content,
-          image_url: storagePath,
-        })
-        .select()
-        .single();
+      // Attempt to send again under the SAME key as the original attempt, so
+      // if that attempt actually committed this resolves to it instead of
+      // adding a second copy.
+      const { data, error } = await insertNoteOnce({
+        from_user_id: userId,
+        to_user_id: partnerId,
+        content: failedNote.content,
+        image_url: storagePath,
+        idempotency_key: tempId,
+      });
 
-      if (error) {
+      if (error || !data) {
         await discardOrphanedImage(storagePath);
 
         // Mark as failed again
