@@ -77,6 +77,51 @@ async function discardOrphanedImage(storagePath: string | null): Promise<void> {
 }
 
 /**
+ * Helper: discard an uploaded image only once nothing is known to reference it.
+ *
+ * A failed insert does not mean nothing was written. The defining vector here is
+ * the lost response -- the row commits and the reply never arrives -- and in
+ * that case the committed note already points at this object, so deleting it
+ * leaves a note whose image is permanently broken. The idempotency key is what
+ * makes the difference observable: it identifies the row this attempt would
+ * have written, whether or not the client got to see it.
+ *
+ * A lookup that fails counts as "keep". The insert most likely failed because
+ * the network did, which is exactly when this check fails too, and the
+ * asymmetry matters: an orphaned object costs storage quota, a wrong delete
+ * costs the picture.
+ */
+async function discardUnreferencedImage(
+  storagePath: string | null,
+  fromUserId: string,
+  idempotencyKey: string
+): Promise<void> {
+  if (!storagePath) return;
+
+  const { data, error } = await supabase
+    .from('love_notes')
+    .select('image_url')
+    .eq('from_user_id', fromUserId)
+    .eq('idempotency_key', idempotencyKey)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(
+      '[NotesSlice] Keeping uploaded image: could not check whether a note references it',
+      error
+    );
+    return;
+  }
+
+  if (data && (data as { image_url: string | null }).image_url === storagePath) {
+    logger.debug('[NotesSlice] Keeping uploaded image: a stored note references it', storagePath);
+    return;
+  }
+
+  await discardOrphanedImage(storagePath);
+}
+
+/**
  * Helper: send a note at most once, however many times this is called.
  *
  * A bare INSERT duplicated the note whenever the row committed but the response
@@ -435,7 +480,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       });
 
       if (error || !data) {
-        await discardOrphanedImage(storagePath);
+        // Not unconditional: the row may have committed and only the response
+        // been lost, in which case the stored note points at this very object.
+        await discardUnreferencedImage(storagePath, userId, tempId);
 
         // Mark message as failed (preserve imageBlob for retry)
         set((state) => ({
@@ -569,7 +616,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       });
 
       if (error || !data) {
-        await discardOrphanedImage(storagePath);
+        // Not unconditional: the row may have committed and only the response
+        // been lost, in which case the stored note points at this very object.
+        await discardUnreferencedImage(storagePath, userId, tempId);
 
         // Mark as failed again
         set((state) => ({
@@ -583,6 +632,21 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         logger.debug('[NotesSlice] Retry failed:', error);
 
         return;
+      }
+
+      // The retry re-uploaded the image before it knew whether the note needed
+      // resending, and the Edge Function mints a fresh storage path every time
+      // -- it derives the name server-side and takes no idempotency key. So when
+      // insertNoteOnce resolves to a row the first attempt had already
+      // committed, that row still points at the ORIGINAL object and the one just
+      // uploaded is referenced by nothing.
+      //
+      // Only the failure path used to clean up, which was right while a retry
+      // inserted a second row pointing at the new object. Now that the resend
+      // deduplicates, each retry of an image note would otherwise leave one
+      // stranded object behind against the user's storage quota.
+      if (storagePath && data.image_url !== storagePath) {
+        await discardOrphanedImage(storagePath);
       }
 
       // Success - replace with server response and update rate limit timestamps
