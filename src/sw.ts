@@ -198,24 +198,20 @@ async function syncPendingMoods(): Promise<void> {
  *
  * This is the REAL background sync implementation:
  * 1. Opens IndexedDB directly (works without window)
- * 2. Gets pending moods
- * 3. Gets stored auth token
+ * 2. Gets the stored auth token
+ * 3. Gets that token owner's pending moods
  * 4. Calls Supabase REST API with fetch
  * 5. Records the outcome against each mood
  */
 async function runPendingMoodSync(): Promise<void> {
   try {
-    // 1. Get pending moods from IndexedDB
-    const pendingMoods = await getPendingMoods();
-
-    if (pendingMoods.length === 0) {
-      console.log('[ServiceWorker] No pending moods to sync');
-      return;
-    }
-
-    console.log(`[ServiceWorker] Found ${pendingMoods.length} pending moods to sync`);
-
-    // 2. Get auth token from IndexedDB
+    // 1. Get auth token from IndexedDB
+    //
+    // Read before the moods, not after: the token names the account this pass
+    // is allowed to act for, and every row below is stamped with its user id.
+    // Reading the moods first meant the worker picked up whatever was pending
+    // for any account that had ever signed in on this device and uploaded it
+    // under whoever happened to be signed in now.
     const authToken = await getAuthToken();
 
     if (!authToken) {
@@ -231,6 +227,16 @@ async function runPendingMoodSync(): Promise<void> {
       // Don't throw - let the app refresh the token on next open
       return;
     }
+
+    // 2. Get that user's pending moods from IndexedDB
+    const pendingMoods = await getPendingMoods(authToken.userId);
+
+    if (pendingMoods.length === 0) {
+      console.log('[ServiceWorker] No pending moods to sync');
+      return;
+    }
+
+    console.log(`[ServiceWorker] Found ${pendingMoods.length} pending moods to sync`);
 
     // 3. Sync each mood to Supabase via REST API
     let successCount = 0;
