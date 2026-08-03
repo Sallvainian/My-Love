@@ -43,6 +43,20 @@ let gateSends = false;
 /** Status the next subscribe reports instead of SUBSCRIBED, consumed once */
 let nextSubscribeStatus: string | null = null;
 
+/**
+ * The shared socket, modelled the way RealtimeClient actually behaves:
+ * removing the LAST channel calls disconnect(), which parks the socket in
+ * 'disconnecting' until onclose or a 100ms fallback timer, and every connect()
+ * inside that window is a silent no-op — so a channel opened there never joins.
+ */
+const socket = {
+  state: 'connected' as 'connected' | 'disconnecting',
+  /** How long the disconnecting window lasts, in ms */
+  windowMs: 40,
+  /** Set false to model the pre-fix library assumption (no window at all) */
+  modelDisconnectWindow: true,
+};
+
 vi.mock('@/api/supabaseClient', () => ({
   supabase: {
     channel: (topic: string) => {
@@ -59,6 +73,14 @@ vi.mock('@/api/supabaseClient', () => ({
           // 'closed'. Subscribing to a channel that is joined or leaving is a
           // silent no-op.
           if (chan.state !== 'closed') return chan;
+          // RealtimeChannel.subscribe calls socket.connect(), and
+          // RealtimeClient.js:117-122 returns early while isDisconnecting().
+          // The join is never sent, so the status callback never fires and the
+          // channel just sits in 'joining' until its own 10s timeout.
+          if (socket.state === 'disconnecting') {
+            chan.state = 'joining';
+            return chan;
+          }
           chan.state = 'joined';
           chan.statusHandler = handler;
           const status = nextSubscribeStatus ?? 'SUBSCRIBED';
@@ -78,12 +100,24 @@ vi.mock('@/api/supabaseClient', () => ({
       constructedChannels.push(chan);
       return chan;
     },
+    realtime: {
+      isDisconnecting: () => socket.state === 'disconnecting',
+    },
     removeChannel: (chan: FakeChannel) => {
       chan.state = 'leaving';
       return new Promise<string>((resolve) => {
         leaveQueue.push(() => {
           chan.state = 'closed';
           openChannels.delete(chan.topic);
+          // RealtimeClient.js:217 — `if (this.channels.length === 0) { this.disconnect(); }`
+          // Removing the LAST channel tears the socket down, and it stays
+          // 'disconnecting' until onclose or a 100ms fallback timer.
+          if (socket.modelDisconnectWindow && openChannels.size === 0) {
+            socket.state = 'disconnecting';
+            setTimeout(() => {
+              socket.state = 'connected';
+            }, socket.windowMs);
+          }
           resolve('ok');
         });
       });
@@ -102,11 +136,13 @@ function flush(): Promise<void> {
 
 /** Ack every queued leave, repeatedly, until the queue stays empty */
 async function settle(): Promise<void> {
-  for (let i = 0; i < 12; i++) {
+  // Generous: a send parked on the socket's disconnecting window resumes only
+  // after that window closes, so draining has to outlast it.
+  for (let i = 0; i < 60; i++) {
     while (sendGate.length > 0) sendGate.shift()!();
     while (leaveQueue.length > 0) leaveQueue.shift()!();
-    await flush();
-    if (leaveQueue.length === 0 && sendGate.length === 0) break;
+    await new Promise((r) => setTimeout(r, 5));
+    if (leaveQueue.length === 0 && sendGate.length === 0 && socket.state === 'connected') break;
   }
 }
 
@@ -118,6 +154,9 @@ describe('sendEphemeralBroadcast', () => {
     sendGate = [];
     gateSends = false;
     nextSubscribeStatus = null;
+    socket.state = 'connected';
+    socket.windowMs = 40;
+    socket.modelDisconnectWindow = true;
   });
 
   afterEach(async () => {
@@ -175,6 +214,14 @@ describe('sendEphemeralBroadcast', () => {
 
     leaveQueue.shift()!();
     await flush();
+
+    // Still one. That leave removed the last open channel, so the socket is now
+    // mid-disconnect and opening here would produce a channel that never joins.
+    expect(socket.state).toBe('disconnecting');
+    expect(constructedChannels).toHaveLength(1);
+
+    // Once the socket settles the queue moves on.
+    await new Promise((r) => setTimeout(r, socket.windowMs + 20));
     expect(constructedChannels).toHaveLength(2);
 
     gateSends = false;
@@ -215,6 +262,28 @@ describe('sendEphemeralBroadcast', () => {
     gateSends = false;
     await settle();
     await Promise.all([toPartner, toNotes]);
+  });
+
+  it('still delivers the second send after the first closed the last channel', async () => {
+    // The queue's own teardown is what breaks it. `removeChannel` on the LAST
+    // open channel calls disconnect(), the socket sits in 'disconnecting' for
+    // ~100ms, and every connect() in that window is a silent no-op — so the
+    // next send's channel never joins, its status callback never fires, and it
+    // dies on the 15s timeout. Two moods in one syncPendingMoods pass is enough,
+    // which is the exact case this queue was added to fix.
+    const first = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const second = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-2' });
+    const third = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-3' });
+
+    await settle();
+    await expect(first).resolves.toBeUndefined();
+    await expect(second).resolves.toBeUndefined();
+    await expect(third).resolves.toBeUndefined();
+
+    const delivered = constructedChannels.flatMap((c) => c.sent.map((s) => s.payload.id));
+    expect(delivered).toEqual(['mood-1', 'mood-2', 'mood-3']);
+    // None left stranded mid-join.
+    expect(constructedChannels.every((c) => c.state === 'closed')).toBe(true);
   });
 
   it('rejects rather than hanging when the channel never reports a status', async () => {

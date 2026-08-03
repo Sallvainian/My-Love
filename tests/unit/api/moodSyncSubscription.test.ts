@@ -45,6 +45,18 @@ const removeChannel = vi.fn();
 /** Resolvers for in-flight leaves, so the server's ack can be timed by a test */
 let leaveQueue: Array<() => void> = [];
 
+/**
+ * The shared socket. Removing the LAST channel calls `disconnect()`
+ * (RealtimeClient.js:217), which parks the socket in 'disconnecting' until
+ * onclose or a 100ms fallback timer, and every `connect()` in that window is a
+ * silent no-op (RealtimeClient.js:117-122) — so a channel opened there never
+ * joins and dies on its own 10s timeout.
+ */
+const socket = {
+  state: 'connected' as 'connected' | 'disconnecting',
+  windowMs: 40,
+};
+
 /** Resolvers for pending getSession calls, so resolution order is controllable */
 let sessionQueue: Array<(value: unknown) => void> = [];
 
@@ -80,6 +92,12 @@ vi.mock('@/api/supabaseClient', () => ({
         // channel that is still leaving silently does nothing.
         subscribe: vi.fn((handler: StatusHandler) => {
           if (chan.state !== 'closed') return chan;
+          // subscribe() calls socket.connect(), which returns early while the
+          // socket is disconnecting, so the join is never sent.
+          if (socket.state === 'disconnecting') {
+            chan.state = 'joining';
+            return chan;
+          }
           chan.state = 'joined';
           chan.statusHandlers.push(handler);
           return chan;
@@ -101,9 +119,19 @@ vi.mock('@/api/supabaseClient', () => ({
         leaveQueue.push(() => {
           chan.state = 'closed';
           openChannels.delete(chan.topic);
+          // RealtimeClient.js:217 — the last channel out takes the socket with it.
+          if (openChannels.size === 0) {
+            socket.state = 'disconnecting';
+            setTimeout(() => {
+              socket.state = 'connected';
+            }, socket.windowMs);
+          }
           resolve('ok');
         });
       });
+    },
+    realtime: {
+      isDisconnecting: () => socket.state === 'disconnecting',
     },
   },
   getPartnerId: vi.fn(),
@@ -154,9 +182,15 @@ function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** Ack every in-flight leave and let the continuations run */
+/** Ack every in-flight leave, then wait out the socket's disconnect window */
 async function settleLeaves(): Promise<void> {
   while (leaveQueue.length > 0) ackNextLeave();
+  await flush();
+  // The last leave takes the socket down for windowMs; a resubscribe parked on
+  // that window only resumes once it closes.
+  if (socket.state === 'disconnecting') {
+    await new Promise((r) => setTimeout(r, socket.windowMs + 20));
+  }
   await flush();
 }
 
@@ -167,6 +201,8 @@ describe('subscribeMoodUpdates channel ownership', () => {
     sessionQueue = [];
     leaveQueue = [];
     removeChannel.mockClear();
+    socket.state = 'connected';
+    socket.windowMs = 40;
   });
 
   afterEach(async () => {
