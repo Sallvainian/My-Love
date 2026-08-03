@@ -1151,5 +1151,73 @@ describe('scriptureReadingSlice', () => {
       expect(pendingRetry!.sessionData?.sessionId).toBe('session-1');
       expect(store.getState().isSyncing).toBe(false);
     });
+
+    it('retryFailedWrite does not start a second write while one is in flight', async () => {
+      const { store, release, updateSession } = await storeMidWrite();
+
+      // Get a pendingRetry on the board without disturbing the mock that is
+      // about to hold a write open.
+      store.setState({
+        pendingRetry: {
+          type: 'saveSession',
+          attempts: 1,
+          maxAttempts: 3,
+          sessionData: {
+            sessionId: 'session-1',
+            currentStepIndex: 0,
+            currentPhase: 'reading',
+          },
+        },
+      });
+
+      const advancing = store.getState().advanceStep();
+      expect(store.getState().isSyncing).toBe(true);
+      expect(updateSession).toHaveBeenCalledTimes(1);
+
+      // The reconnect effect fires while the advance is still in flight — the
+      // fourth guard. Without it the retry writes the row a second time and
+      // clears pendingRetry, so the recovery is reported done before it landed.
+      await store.getState().retryFailedWrite();
+
+      expect(updateSession).toHaveBeenCalledTimes(1);
+      expect(store.getState().pendingRetry).not.toBeNull();
+
+      release();
+      await advancing;
+    });
+
+    it('a successful autosave clears a stale pendingRetry', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+
+      // First autosave fails and queues the retry.
+      vi.mocked(scriptureReadingService.updateSession).mockRejectedValueOnce(new Error('offline'));
+      await store.getState().saveSession();
+      expect(store.getState().pendingRetry).not.toBeNull();
+
+      // Network comes back and the next autosave lands.
+      vi.mocked(scriptureReadingService.updateSession).mockResolvedValue(undefined);
+      await store.getState().saveSession();
+
+      // The user-visible symptom: a "tap to retry" banner left hanging over
+      // data that had in fact already been saved.
+      expect(store.getState().pendingRetry).toBeNull();
+      expect(store.getState().isSyncing).toBe(false);
+    });
   });
 });
