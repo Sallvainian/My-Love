@@ -194,6 +194,56 @@ describe('service worker mood background sync', () => {
     fetchMock.mockReset();
   });
 
+  describe('account scoping', () => {
+    // The moods store holds every account that has signed in on this device.
+    // The worker stamps whatever it is handed with the stored token's owner
+    // (`moodSyncPayload(mood, authToken.userId)`), so an unscoped read uploads
+    // the previous user's private mood notes into the current user's account —
+    // the same cross-account leak the main thread closed at DB_VERSION 7.
+
+    it('asks only for the token owner’s pending moods', async () => {
+      mockedGetPendingMoods.mockResolvedValue([]);
+
+      await fireBackgroundSync();
+
+      expect(mockedGetPendingMoods).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('reads the token before the moods, so the scope is never guessed', async () => {
+      mockedGetPendingMoods.mockResolvedValue([]);
+
+      await fireBackgroundSync();
+
+      const tokenOrder = mockedGetAuthToken.mock.invocationCallOrder[0];
+      const moodsOrder = mockedGetPendingMoods.mock.invocationCallOrder[0];
+      expect(tokenOrder).toBeLessThan(moodsOrder);
+    });
+
+    it('[no token] never reads the moods store at all', async () => {
+      mockedGetAuthToken.mockResolvedValue(null);
+
+      await fireBackgroundSync();
+
+      expect(mockedGetPendingMoods).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('[expired token] never reads the moods store at all', async () => {
+      mockedGetAuthToken.mockResolvedValue({
+        id: 'current',
+        userId: USER_ID,
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Math.floor(Date.now() / 1000) - 1,
+      });
+
+      await fireBackgroundSync();
+
+      expect(mockedGetPendingMoods).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   it('[A: SW syncs an edited record] PATCHes the existing row and never POSTs', async () => {
     mockedGetPendingMoods.mockResolvedValue([pendingMood({ supabaseId: SERVER_ROW_ID })]);
     fetchMock.mockResolvedValue(jsonResponse(200, [{ id: SERVER_ROW_ID }]));

@@ -41,13 +41,27 @@ async function openDatabase() {
 }
 
 /**
- * Get pending (unsynced) mood entries
+ * Get pending (unsynced) mood entries belonging to one user
+ *
+ * The moods store holds every account that has signed in on this device, so an
+ * unfiltered read returns the previous user's rows too. The worker then stamps
+ * whatever it is handed with the stored token's owner
+ * (`moodSyncPayload(mood, authToken.userId)` in sw.ts), which uploads one
+ * person's private mood notes into the other's account. Mirrors
+ * moodService.getUnsyncedMoods, including its treatment of a row whose
+ * `userId` is absent: pre-v7 records have no owner, so a scoped read must not
+ * claim them.
+ *
+ * @param userId - Owner to scope to. Omitted returns every user's rows and must
+ *                 only be used where no account context exists.
  */
-export async function getPendingMoods(): Promise<StoredMoodEntry[]> {
+export async function getPendingMoods(userId?: string): Promise<StoredMoodEntry[]> {
   const db = await openDatabase();
   try {
     const allMoods = await db.getAll(STORE_NAMES.MOODS);
-    return allMoods.filter((mood) => !mood.synced);
+    return allMoods.filter(
+      (mood) => !mood.synced && (userId === undefined || mood.userId === userId)
+    );
   } catch (error) {
     throw new Error(
       `Failed to get pending moods: ${error instanceof Error ? error.message : String(error)}`
