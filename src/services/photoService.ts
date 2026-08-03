@@ -318,7 +318,10 @@ class PhotoService {
       const fileExt = input.mimeType.split('/')[1]; // jpeg, png, webp
       // Falls back to a fresh id so a caller that does not track retries keeps
       // the old one-path-per-call behaviour rather than silently colliding.
-      const uniqueId = input.idempotencyKey ?? crypto.randomUUID();
+      // `||`, not `??`: an empty key is absent, not a key. PhotoUpload clears
+      // its ref to '' on reset, and treating that as valid would give every
+      // upload by this user the single path `${userId}/.${fileExt}`.
+      const uniqueId = input.idempotencyKey || crypto.randomUUID();
       const storagePath = `${userId}/${uniqueId}.${fileExt}`;
 
       // Upload to Supabase Storage (AC 6.2.2, 6.2.3)
@@ -378,9 +381,37 @@ class PhotoService {
         .maybeSingle();
 
       if (insertError) {
-        // Rollback: delete the uploaded file if DB insert fails
         console.error('[PhotoService] Database insert error:', insertError);
-        await supabase.storage.from(BUCKET_NAME).remove([storagePath]);
+
+        // Roll the object back only once nothing is known to point at it.
+        //
+        // The rollback was safe while every attempt uploaded to its own random
+        // path. With a stable path a retry overwrites the object the first
+        // attempt wrote, and that attempt may have committed its photos row
+        // before its response was lost -- so deleting here would strand a
+        // gallery entry whose image is gone for good.
+        //
+        // A lookup that fails counts as "do not delete", not "nothing found".
+        // The insert most likely failed because the network did, which is
+        // exactly when this check fails too, and the asymmetry matters: an
+        // orphaned object costs quota, a wrong delete costs the photo.
+        const { data: committedRow, error: lookupError } = await supabase
+          .from('photos')
+          .select('id')
+          .eq('storage_path', storagePath)
+          .maybeSingle();
+
+        if (lookupError) {
+          console.warn(
+            '[PhotoService] Keeping uploaded object: could not check whether a row references it',
+            lookupError
+          );
+        } else if (!committedRow) {
+          await supabase.storage.from(BUCKET_NAME).remove([storagePath]);
+        } else {
+          logger.debug('[PhotoService] Keeping uploaded object: photo row already references it');
+        }
+
         throw insertError;
       }
 
