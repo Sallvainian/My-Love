@@ -14,6 +14,7 @@ import { moodService } from '../services/moodService';
 import { moodSyncFingerprint, moodSyncPayload } from '../services/moodSyncPayload';
 import type { MoodEntry } from '../types';
 import { logger } from '../utils/logger';
+import { sendEphemeralBroadcast } from './ephemeralBroadcast';
 import { handleNetworkError, isOnline } from './errorHandlers';
 import { moodApi } from './moodApi';
 import { getPartnerId, supabase } from './supabaseClient';
@@ -199,42 +200,22 @@ class MoodSyncService {
         return;
       }
 
-      // Create ephemeral channel to partner's mood-updates channel
-      const channel = supabase.channel(`mood-updates:${partnerId}`);
-
-      // Subscribe briefly to send the broadcast
-      await new Promise<void>((resolve, reject) => {
-        channel.subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            try {
-              // Send broadcast to partner (includes mood_types for multi-mood support)
-              const result = await channel.send({
-                type: 'broadcast',
-                event: 'new_mood',
-                payload: {
-                  id: mood.id,
-                  user_id: mood.user_id,
-                  mood_type: mood.mood_type,
-                  mood_types: mood.mood_types,
-                  note: mood.note,
-                  created_at: mood.created_at,
-                },
-              });
-
-              logger.debug('[MoodSyncService] Broadcast sent to partner:', result);
-              resolve();
-            } catch (sendError) {
-              reject(sendError);
-            } finally {
-              // Always cleanup: unsubscribe and remove channel
-              await supabase.removeChannel(channel);
-            }
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            await supabase.removeChannel(channel);
-            reject(new Error(`Channel subscription failed: ${status}`));
-          }
-        });
+      // Queued per topic rather than opened inline. syncPendingMoods loops over
+      // every unsynced mood and fires this without awaiting it (see the call in
+      // syncMoodWithRetry), so two moods in one pass used to race for the same
+      // `mood-updates:<partnerId>` channel -- and because supabase.channel()
+      // hands back the object the first send is still using, the second one's
+      // subscribe callback never fired and the partner never got that mood.
+      await sendEphemeralBroadcast(`mood-updates:${partnerId}`, 'new_mood', {
+        id: mood.id,
+        user_id: mood.user_id,
+        mood_type: mood.mood_type,
+        mood_types: mood.mood_types,
+        note: mood.note,
+        created_at: mood.created_at,
       });
+
+      logger.debug('[MoodSyncService] Broadcast sent to partner:', mood.id);
     } catch (error) {
       // Fire-and-forget: log error but don't throw
       console.error('[MoodSyncService] Failed to broadcast mood to partner:', error);

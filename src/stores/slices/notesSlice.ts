@@ -16,6 +16,7 @@
  * Story 2.1: Foundation - UI and state management only
  */
 
+import { sendEphemeralBroadcast } from '../../api/ephemeralBroadcast';
 import { getPartnerId, supabase } from '../../api/supabaseClient';
 import { NOTES_CONFIG } from '../../config/images';
 import { imageCompressionService } from '../../services/imageCompressionService';
@@ -467,34 +468,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       logger.debug('[NotesSlice] Note sent successfully:', data.id);
 
       // Story 2.3: Broadcast message to partner's channel for realtime delivery
-      // Must subscribe before sending to avoid REST fallback deprecation warning
+      //
+      // Queued per topic. Opening the channel inline here meant that a second
+      // note sent before the first one's channel had finished closing was handed
+      // that same channel back by supabase.channel(), its subscribe callback
+      // never fired, and the note never reached the partner in realtime.
       try {
-        const channel = supabase.channel(`love-notes:${partnerId}`);
-
-        await new Promise<void>((resolve, reject) => {
-          channel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-              try {
-                await channel.send({
-                  type: 'broadcast',
-                  event: 'new_message',
-                  payload: { message: data },
-                });
-
-                logger.debug('[NotesSlice] Broadcast sent to partner:', partnerId);
-                resolve();
-              } catch (sendError) {
-                reject(sendError);
-              } finally {
-                // Cleanup: unsubscribe and remove channel
-                await supabase.removeChannel(channel);
-              }
-            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              await supabase.removeChannel(channel);
-              reject(new Error(`Channel subscription failed: ${status}`));
-            }
-          });
-        });
+        await sendEphemeralBroadcast(`love-notes:${partnerId}`, 'new_message', { message: data });
+        logger.debug('[NotesSlice] Broadcast sent to partner:', partnerId);
       } catch (broadcastError) {
         // Non-fatal - message is saved, just realtime failed
         console.warn('[NotesSlice] Broadcast failed (non-fatal):', broadcastError);
