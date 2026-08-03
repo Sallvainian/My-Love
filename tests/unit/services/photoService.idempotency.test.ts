@@ -34,19 +34,33 @@ const backend = {
   rows: [] as PhotoRow[],
   objects: new Map<string, { size: number }>(),
   seq: 0,
+  /** Fail the next photos write, committing nothing */
+  failNextInsert: false,
+  /** Fail the next plain read, as a dead network would */
+  failNextLookup: false,
   reset() {
     this.rows = [];
     this.objects = new Map();
     this.seq = 0;
+    this.failNextInsert = false;
+    this.failNextLookup = false;
   },
 };
 
 function photosQuery() {
   const filters: Array<{ column: string; value: unknown }> = [];
   let pending: PhotoRow | null = null;
+  let isInsert = false;
+  let writeRejected = false;
 
   const api = {
     upsert(values: Omit<PhotoRow, 'id'>, options?: { ignoreDuplicates?: boolean }) {
+      isInsert = true;
+      if (backend.failNextInsert) {
+        backend.failNextInsert = false;
+        writeRejected = true;
+        return api;
+      }
       const clash = backend.rows.find((r) => r.storage_path === values.storage_path);
       if (clash) {
         if (!options?.ignoreDuplicates) throw new Error('expected ignoreDuplicates');
@@ -63,7 +77,17 @@ function photosQuery() {
       return api;
     },
     async maybeSingle() {
-      return { data: pending, error: null };
+      if (writeRejected) return { data: null, error: { message: 'insert rejected' } };
+      if (isInsert) return { data: pending, error: null };
+
+      if (backend.failNextLookup) {
+        backend.failNextLookup = false;
+        return { data: null, error: { message: 'network error' } };
+      }
+      const match = backend.rows.find((r) =>
+        filters.every((f) => (r as unknown as Record<string, unknown>)[f.column] === f.value)
+      );
+      return { data: match ?? null, error: null };
     },
     async single() {
       const match = backend.rows.find((r) =>
@@ -170,5 +194,68 @@ describe('photoService upload idempotency', () => {
     await photoService.uploadPhoto(uploadInput());
 
     expect(backend.rows).toHaveLength(2);
+  });
+
+  it('treats an empty idempotency key as no key at all', async () => {
+    // PhotoUpload clears its ref to '' on reset. Taken literally that yields
+    // `${userId}/.jpeg` — one path shared by every upload this user makes.
+    await photoService.uploadPhoto(uploadInput({ idempotencyKey: '' }));
+    await photoService.uploadPhoto(uploadInput({ idempotencyKey: '' }));
+
+    expect(backend.rows).toHaveLength(2);
+    expect(backend.objects.size).toBe(2);
+    expect([...backend.objects.keys()]).not.toContain(`${USER_ID}/.jpeg`);
+  });
+
+  describe('rollback after a failed photos write', () => {
+    // The rollback was safe while every attempt uploaded to its own random
+    // path. With a stable path a retry overwrites the object the first attempt
+    // wrote, and that attempt may have committed its row before its response
+    // was lost — so a blind delete strands a gallery entry with no image.
+
+    it('keeps the object when a stored row already references it', async () => {
+      const key = 'shared-key';
+      const path = `${USER_ID}/${key}.jpeg`;
+
+      // First attempt lands completely.
+      await photoService.uploadPhoto(uploadInput({ idempotencyKey: key }));
+      expect(backend.rows).toHaveLength(1);
+
+      // The retry re-uploads to the same path, then its write fails outright.
+      backend.failNextInsert = true;
+      // uploadPhoto swallows its error and reports the failure as a null result.
+      await expect(photoService.uploadPhoto(uploadInput({ idempotencyKey: key }))).resolves.toBeNull();
+
+      // Deleting here would leave the committed row pointing at nothing.
+      expect(backend.rows).toHaveLength(1);
+      expect(backend.objects.has(path)).toBe(true);
+    });
+
+    it('deletes the object when no row references it', async () => {
+      const key = 'lonely-key';
+      const path = `${USER_ID}/${key}.jpeg`;
+
+      backend.failNextInsert = true;
+      // uploadPhoto swallows its error and reports the failure as a null result.
+      await expect(photoService.uploadPhoto(uploadInput({ idempotencyKey: key }))).resolves.toBeNull();
+
+      // Nothing points at it, so it must not linger against the user's quota.
+      expect(backend.rows).toHaveLength(0);
+      expect(backend.objects.has(path)).toBe(false);
+    });
+
+    it('keeps the object when the reference check itself fails', async () => {
+      const key = 'unknowable-key';
+      const path = `${USER_ID}/${key}.jpeg`;
+
+      // The write failed because the network did; the check fails for the same
+      // reason. An orphan costs quota, a wrong delete costs the photo.
+      backend.failNextInsert = true;
+      backend.failNextLookup = true;
+      // uploadPhoto swallows its error and reports the failure as a null result.
+      await expect(photoService.uploadPhoto(uploadInput({ idempotencyKey: key }))).resolves.toBeNull();
+
+      expect(backend.objects.has(path)).toBe(true);
+    });
   });
 });
