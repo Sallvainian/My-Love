@@ -229,8 +229,9 @@ export function upgradeDb(
   // photos, so those databases reached v5 missing moods, sw-auth and the four
   // scripture stores, and no `oldVersion < N` branch could ever fire again to
   // create them. Existence checks make this function repair such a database
-  // instead of skipping past it. DB_VERSION was bumped to 6 so those profiles
-  // re-enter the upgrade at all — the checks alone would never run.
+  // instead of skipping past it. The v6 bump is what makes those profiles
+  // re-enter the upgrade at all — the checks alone would never run. (v7 has
+  // since superseded it; see DB_VERSION.)
 
   // v1: messages store
   if (!db.objectStoreNames.contains('messages')) {

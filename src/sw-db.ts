@@ -47,10 +47,13 @@ async function openDatabase() {
  * unfiltered read returns the previous user's rows too. The worker then stamps
  * whatever it is handed with the stored token's owner
  * (`moodSyncPayload(mood, authToken.userId)` in sw.ts), which uploads one
- * person's private mood notes into the other's account. Mirrors
- * moodService.getUnsyncedMoods, including its treatment of a row whose
- * `userId` is absent: pre-v7 records have no owner, so a scoped read must not
- * claim them.
+ * person's private mood notes into the other's account.
+ *
+ * Mirrors moodService.getUnsyncedMoods, comparison included: a row whose
+ * `userId` does not match is skipped, and a row carrying no `userId` at all
+ * therefore belongs to nobody and is never claimed. No such row should exist --
+ * `moodService.create` has required a `userId` since the file was written -- so
+ * that is a guard against a malformed record, not a migration path.
  *
  * @param userId - Owner to scope to. Omitted returns every user's rows and must
  *                 only be used where no account context exists.
