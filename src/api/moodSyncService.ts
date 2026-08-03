@@ -16,6 +16,7 @@ import type { MoodEntry } from '../types';
 import { logger } from '../utils/logger';
 import { sendEphemeralBroadcast } from './ephemeralBroadcast';
 import { handleNetworkError, isOnline } from './errorHandlers';
+import { waitForSocketReady } from './realtimeSocket';
 import { moodApi } from './moodApi';
 import { getPartnerId, supabase } from './supabaseClient';
 import type { MoodInsert, SupabaseMood } from './validation/supabaseSchemas';
@@ -473,6 +474,14 @@ class MoodSyncService {
         // Another subscriber may have opened the replacement while we waited.
         entry = this.moodChannels.get(topic);
       }
+
+      // Closing that channel may have been what removed the LAST channel in the
+      // app, which tears the socket down for ~100ms. Subscribing inside that
+      // window silently never joins -- see realtimeSocket.
+      if (!entry) {
+        await waitForSocketReady();
+        entry = this.moodChannels.get(topic);
+      }
     }
 
     if (!entry) {
@@ -513,8 +522,11 @@ class MoodSyncService {
         });
 
       entry = { channel, subscribers, lastStatus: null };
-      // Nothing is awaited between the lookup above and this insert, so two
-      // concurrent subscribers cannot both miss and both open a channel.
+      // Nothing is awaited between the LAST read of `entry` above and this
+      // insert, so two concurrent subscribers cannot both miss and both open a
+      // channel. The earlier awaits are why that re-read exists: whoever
+      // resumes first creates the entry synchronously, and the other then finds
+      // it rather than opening a second one.
       this.moodChannels.set(topic, entry);
     }
 
