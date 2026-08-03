@@ -7,14 +7,14 @@ The application uses three complementary storage layers, each serving a distinct
 ### 1. IndexedDB (Primary Local Store)
 
 **Library**: `idb` v8.0.3
-**Database**: `my-love-db` (version 5)
+**Database**: `my-love-db` (version 7)
 **Schema**: Defined in `src/services/dbSchema.ts`
 
 | Object Store            | Key Type | Key Path | Auto-Increment | Indexes                                         | Purpose                                |
 | ----------------------- | -------- | -------- | -------------- | ----------------------------------------------- | -------------------------------------- |
 | `messages`              | `number` | `id`     | Yes            | `by-category` (category), `by-date` (createdAt) | Daily love messages (default + custom) |
 | `photos`                | `number` | `id`     | Yes            | `by-date` (uploadDate)                          | Photo blobs with compression metadata  |
-| `moods`                 | `number` | `id`     | Yes            | `by-date` (date, unique)                        | Mood entries with sync tracking        |
+| `moods`                 | `number` | `id`     | Yes            | `by-user-date` ([userId, date], unique)         | Mood entries with sync tracking        |
 | `sw-auth`               | `string` | `id`     | No             | None                                            | Auth token cache for service worker    |
 | `scripture-sessions`    | `string` | `id`     | No             | `by-user` (userId)                              | Scripture reading session cache        |
 | `scripture-reflections` | `string` | `id`     | No             | `by-session` (sessionId)                        | Per-step reflection data cache         |
@@ -68,7 +68,7 @@ export interface MyLoveDBSchema extends DBSchema {
 }
 
 export const DB_NAME = 'my-love-db';
-export const DB_VERSION = 5;
+export const DB_VERSION = 7;
 ```
 
 ### Migration History
