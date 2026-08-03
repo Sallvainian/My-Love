@@ -33,6 +33,7 @@
  */
 
 import { logger } from '../utils/logger';
+import { waitForSocketReady } from './realtimeSocket';
 import { supabase } from './supabaseClient';
 
 /**
@@ -54,6 +55,11 @@ async function openSendClose(
   event: string,
   payload: Record<string, unknown>
 ): Promise<void> {
+  // The previous send in this queue closed its channel, and if it was the last
+  // one open anywhere in the app that also tore down the socket. Opening now
+  // would hand back a channel whose join is never sent -- see realtimeSocket.
+  await waitForSocketReady();
+
   const channel = supabase.channel(topic);
 
   try {
