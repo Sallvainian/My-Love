@@ -54,14 +54,28 @@ function photosQuery() {
   let writeRejected = false;
 
   const api = {
-    upsert(values: Omit<PhotoRow, 'id'>, options?: { ignoreDuplicates?: boolean }) {
+    upsert(
+      values: Omit<PhotoRow, 'id'>,
+      options?: { ignoreDuplicates?: boolean; onConflict?: string }
+    ) {
       isInsert = true;
       if (backend.failNextInsert) {
         backend.failNextInsert = false;
         writeRejected = true;
         return api;
       }
-      const clash = backend.rows.find((r) => r.storage_path === values.storage_path);
+      // Dedup on the column the CALLER named. Postgres sends `on_conflict`
+      // verbatim, so a fake that hardcodes the key green-lights a source that
+      // asks the server to dedup on the wrong one.
+      if (!options?.onConflict) throw new Error('upsert without onConflict');
+      const conflictColumns = options.onConflict.split(',').map((c) => c.trim());
+      const clash = backend.rows.find((r) =>
+        conflictColumns.every(
+          (col) =>
+            (r as unknown as Record<string, unknown>)[col] ===
+            (values as unknown as Record<string, unknown>)[col]
+        )
+      );
       if (clash) {
         if (!options?.ignoreDuplicates) throw new Error('expected ignoreDuplicates');
         pending = null; // ON CONFLICT DO NOTHING

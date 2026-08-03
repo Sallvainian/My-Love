@@ -38,11 +38,14 @@ const backend = {
   loseNextResponse: false,
   /** Reject the next write outright — nothing is committed */
   failNextWrite: false,
+  /** Fail the next plain read, as a dead network would */
+  failNextLookup: false,
   reset() {
     this.rows = [];
     this.seq = 0;
     this.loseNextResponse = false;
     this.failNextWrite = false;
+    this.failNextLookup = false;
   },
 };
 
@@ -56,16 +59,28 @@ function fakeFrom(table: string) {
   let writeRejected = false;
 
   const api = {
-    upsert(values: Omit<FakeRow, 'id' | 'created_at'>, options?: { ignoreDuplicates?: boolean }) {
+    upsert(
+      values: Omit<FakeRow, 'id' | 'created_at'>,
+      options?: { ignoreDuplicates?: boolean; onConflict?: string }
+    ) {
       isInsert = true;
       if (backend.failNextWrite) {
         backend.failNextWrite = false;
         writeRejected = true;
         return api;
       }
-      const clash = backend.rows.find(
-        (r) =>
-          r.from_user_id === values.from_user_id && r.idempotency_key === values.idempotency_key
+      // Dedup on the columns the CALLER asked for, not on a hardcoded key.
+      // Postgres uses `on_conflict` verbatim, so a fake that ignores it passes
+      // no matter which column the source names — and the conflict target is
+      // the entire mechanism these tests exist to protect.
+      if (!options?.onConflict) throw new Error('upsert without onConflict');
+      const conflictColumns = options.onConflict.split(',').map((c) => c.trim());
+      const clash = backend.rows.find((r) =>
+        conflictColumns.every(
+          (col) =>
+            (r as unknown as Record<string, unknown>)[col] ===
+            (values as unknown as Record<string, unknown>)[col]
+        )
       );
 
       if (clash) {
@@ -100,6 +115,11 @@ function fakeFrom(table: string) {
         return { data: null, error: { message: 'network error' } };
       }
       if (isInsert) return { data: pending, error: null };
+
+      if (backend.failNextLookup) {
+        backend.failNextLookup = false;
+        return { data: null, error: { message: 'network error' } };
+      }
 
       // A plain read: apply the filters, and report "no such row" as an absence
       // rather than an error — that is what maybeSingle is for.
@@ -300,6 +320,23 @@ describe('notesSlice send idempotency', () => {
       // Nothing references it, so it must not sit against the user's quota.
       expect(backend.rows).toHaveLength(0);
       expect(mockedDeleteLoveNoteImage).toHaveBeenCalledWith(`${USER_ID}/upload-1.jpg`);
+    });
+
+    it('keeps the image when the reference check itself fails', async () => {
+      // The insert most likely failed because the network did, which is exactly
+      // when the lookup fails too. An orphaned object costs quota; a wrong
+      // delete costs the picture, so an unreadable answer must mean "keep".
+      // The photoService twin has covered this since it was written; this fake
+      // could not previously produce a failing read at all.
+      uploadsDistinctPaths();
+      const store = createTestStore();
+
+      backend.failNextWrite = true;
+      backend.failNextLookup = true;
+      await store.getState().sendNote('look at this', imageFile());
+
+      expect(backend.rows).toHaveLength(0);
+      expect(mockedDeleteLoveNoteImage).not.toHaveBeenCalled();
     });
 
     it('deletes nothing when the retried note had no image', async () => {
