@@ -338,6 +338,11 @@ class PhotoService {
           // silent duplicate into a hard conflict on every retry. The path is
           // namespaced by user id, so this can only overwrite the caller's own
           // in-flight upload.
+          //
+          // Requires UPDATE on storage.objects for this bucket — an overwrite is
+          // an UPDATE, not an INSERT. Granted by
+          // 20260803000000_photos_storage_update_policy.sql; without it RLS
+          // rejects every retry, which is the one case this path exists for.
           upsert: true,
         });
 
