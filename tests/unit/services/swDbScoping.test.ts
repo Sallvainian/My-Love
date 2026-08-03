@@ -102,10 +102,12 @@ describe('sw-db against a real database', () => {
       expect(pending[0].date).toBe('2026-08-02');
     });
 
-    it('does not claim pre-v7 rows that carry no owner', async () => {
-      // Records written before the userId was recorded belong to nobody in
-      // particular. Mirrors moodService.getUnsyncedMoods, which compares
-      // strictly and so skips them too.
+    it('does not claim a malformed row that carries no owner', async () => {
+      // Defensive, not a migration path: `moodService.create` has required a
+      // userId since the file was written, so no such row should exist. If one
+      // ever did, it belongs to nobody and must not be uploaded under whoever
+      // happens to be signed in. Mirrors moodService.getUnsyncedMoods, which
+      // compares strictly and so skips it too.
       await seed([
         mood({ userId: undefined as unknown as string, date: '2026-07-01' }),
         mood({ userId: USER_A, date: '2026-08-01' }),
