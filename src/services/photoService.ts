@@ -374,6 +374,13 @@ class PhotoService {
       // target -- no new column needed. DO NOTHING rather than merge-duplicates:
       // photos grants SELECT/INSERT/DELETE and no UPDATE, and a retry should
       // resolve to the row already stored rather than rewrite it.
+      //
+      // KNOWN LIMIT: DO NOTHING discards this payload wholesale, so if the first
+      // attempt committed and the user then edited the caption on the error
+      // screen before tapping Retry, that edit is silently dropped and the
+      // stored caption is returned instead. Applying it would need an UPDATE
+      // policy on public.photos, which would also let a user rewrite photos they
+      // had already shared -- a deliberate trade, not an oversight.
       const { data: inserted, error: insertError } = await supabase
         .from('photos')
         .upsert(photoData, { onConflict: 'storage_path', ignoreDuplicates: true })
