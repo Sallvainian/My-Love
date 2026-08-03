@@ -51,6 +51,17 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set) => ({
       // Leaving them in memory let the next account to sign in on this device
       // read the previous one's notes.
       moods: [],
+      // The partner's moods carry the partner's free-text notes and are exactly
+      // as private, so clearing only `moods` closed half the hole. Nothing
+      // remounts this: signing out unmounts the React tree but the Zustand
+      // store survives, and PartnerMoodView renders `partnerMoods` before its
+      // own fetch resolves — so the next account saw the previous couple's
+      // notes until a round-trip replaced them, or indefinitely while offline,
+      // since that fetch is gated on connectivity.
+      partnerMoods: [],
+      // Same reasoning for the partner's identity: the header reads
+      // "Connected with {partner.displayName}" straight from this.
+      partner: null,
     });
   },
 });
