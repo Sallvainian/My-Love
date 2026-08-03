@@ -36,10 +36,13 @@ const backend = {
   seq: 0,
   /** Commit the next write, then fail the client's response path */
   loseNextResponse: false,
+  /** Reject the next write outright — nothing is committed */
+  failNextWrite: false,
   reset() {
     this.rows = [];
     this.seq = 0;
     this.loseNextResponse = false;
+    this.failNextWrite = false;
   },
 };
 
@@ -50,10 +53,16 @@ function fakeFrom(table: string) {
   const filters: Array<{ column: string; value: unknown }> = [];
   let pending: FakeRow | null = null;
   let isInsert = false;
+  let writeRejected = false;
 
   const api = {
     upsert(values: Omit<FakeRow, 'id' | 'created_at'>, options?: { ignoreDuplicates?: boolean }) {
       isInsert = true;
+      if (backend.failNextWrite) {
+        backend.failNextWrite = false;
+        writeRejected = true;
+        return api;
+      }
       const clash = backend.rows.find(
         (r) =>
           r.from_user_id === values.from_user_id && r.idempotency_key === values.idempotency_key
@@ -82,12 +91,22 @@ function fakeFrom(table: string) {
       return api;
     },
     async maybeSingle() {
+      if (writeRejected) {
+        return { data: null, error: { message: 'insert rejected' } };
+      }
       if (isInsert && backend.loseNextResponse) {
         backend.loseNextResponse = false;
         // Row is committed; only the response is lost.
         return { data: null, error: { message: 'network error' } };
       }
-      return { data: pending, error: null };
+      if (isInsert) return { data: pending, error: null };
+
+      // A plain read: apply the filters, and report "no such row" as an absence
+      // rather than an error — that is what maybeSingle is for.
+      const match = backend.rows.find((r) =>
+        filters.every((f) => (r as unknown as Record<string, unknown>)[f.column] === f.value)
+      );
+      return { data: match ?? null, error: null };
     },
     async single() {
       const match = backend.rows.find((r) =>
@@ -112,10 +131,17 @@ vi.mock('../../../src/services/loveNoteImageService', () => ({
 }));
 
 vi.mock('../../../src/services/imageCompressionService', () => ({
-  imageCompressionService: { validateImageFile: vi.fn(() => ({ valid: true })) },
+  imageCompressionService: {
+    validateImageFile: vi.fn(() => ({ valid: true })),
+    compressImage: vi.fn(async (file: Blob) => ({ blob: file, originalSize: 3, compressedSize: 3 })),
+  },
 }));
 
+import { deleteLoveNoteImage, uploadCompressedBlob } from '../../../src/services/loveNoteImageService';
 import { createNotesSlice, type NotesSlice } from '../../../src/stores/slices/notesSlice';
+
+const mockedUploadCompressedBlob = vi.mocked(uploadCompressedBlob);
+const mockedDeleteLoveNoteImage = vi.mocked(deleteLoveNoteImage);
 
 type TestStore = NotesSlice & { userId: string | null };
 
@@ -181,5 +207,112 @@ describe('notesSlice send idempotency', () => {
     await store.getState().sendNote('i love you');
 
     expect(backend.rows).toHaveLength(2);
+  });
+
+  describe('image attached to a retried note', () => {
+    // The upload Edge Function names the object server-side and takes no
+    // idempotency key, so every retry produces a NEW storage path while the
+    // note itself deduplicates on tempId. Whichever object the resolved row
+    // does not point at is referenced by nothing.
+
+    function imageFile(): File {
+      return new File([new Uint8Array([1, 2, 3])], 'photo.jpg', { type: 'image/jpeg' });
+    }
+
+    /** Hand out a distinct storage path per upload, like the Edge Function */
+    function uploadsDistinctPaths(): void {
+      let n = 0;
+      mockedUploadCompressedBlob.mockImplementation(async () => ({
+        storagePath: `${USER_ID}/upload-${++n}.jpg`,
+        compressedSize: 3,
+      }));
+    }
+
+    it('deletes the object the resolved row does not reference', async () => {
+      uploadsDistinctPaths();
+      const store = createTestStore();
+
+      backend.loseNextResponse = true;
+      await store.getState().sendNote('look at this', imageFile());
+
+      const failed = store.getState().notes.find((n) => n.error);
+      expect(failed).toBeDefined();
+      // The committed row points at the first upload.
+      expect(backend.rows).toHaveLength(1);
+      expect(backend.rows[0].image_url).toBe(`${USER_ID}/upload-1.jpg`);
+
+      await store.getState().retryFailedMessage(failed!.tempId as string);
+
+      // Still one note, and the second object — which nothing references — was
+      // cleaned up rather than left to sit against the user's quota.
+      expect(backend.rows).toHaveLength(1);
+      expect(backend.rows[0].image_url).toBe(`${USER_ID}/upload-1.jpg`);
+      expect(mockedDeleteLoveNoteImage).toHaveBeenCalledWith(`${USER_ID}/upload-2.jpg`);
+      expect(mockedDeleteLoveNoteImage).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the object when the retry is the attempt that lands', async () => {
+      uploadsDistinctPaths();
+      const store = createTestStore();
+
+      // Nothing committed the first time, so the retry writes the row and its
+      // own upload is the one the row points at.
+      backend.failNextWrite = true;
+      await store.getState().sendNote('look at this', imageFile());
+
+      const failed = store.getState().notes.find((n) => n.error);
+      expect(failed).toBeDefined();
+      expect(backend.rows).toHaveLength(0);
+      // The first attempt's own object was discarded on its failure path.
+      expect(mockedDeleteLoveNoteImage).toHaveBeenCalledWith(`${USER_ID}/upload-1.jpg`);
+      mockedDeleteLoveNoteImage.mockClear();
+
+      await store.getState().retryFailedMessage(failed!.tempId as string);
+
+      expect(backend.rows).toHaveLength(1);
+      expect(backend.rows[0].image_url).toBe(`${USER_ID}/upload-2.jpg`);
+      // Deleting this one would break the note that just landed.
+      expect(mockedDeleteLoveNoteImage).not.toHaveBeenCalled();
+    });
+
+    it('keeps the image when the first attempt committed but its response was lost', async () => {
+      uploadsDistinctPaths();
+      const store = createTestStore();
+
+      backend.loseNextResponse = true;
+      await store.getState().sendNote('look at this', imageFile());
+
+      // A failed insert is not proof that nothing was written. Here the row did
+      // land and points at this object, so the failure path must leave it
+      // alone -- deleting it leaves a delivered note with no picture.
+      expect(backend.rows).toHaveLength(1);
+      expect(backend.rows[0].image_url).toBe(`${USER_ID}/upload-1.jpg`);
+      expect(mockedDeleteLoveNoteImage).not.toHaveBeenCalled();
+    });
+
+    it('deletes the image when the insert genuinely wrote nothing', async () => {
+      uploadsDistinctPaths();
+      const store = createTestStore();
+
+      backend.failNextWrite = true;
+      await store.getState().sendNote('look at this', imageFile());
+
+      // Nothing references it, so it must not sit against the user's quota.
+      expect(backend.rows).toHaveLength(0);
+      expect(mockedDeleteLoveNoteImage).toHaveBeenCalledWith(`${USER_ID}/upload-1.jpg`);
+    });
+
+    it('deletes nothing when the retried note had no image', async () => {
+      const store = createTestStore();
+
+      backend.loseNextResponse = true;
+      await store.getState().sendNote('no picture');
+      const failed = store.getState().notes.find((n) => n.error);
+
+      await store.getState().retryFailedMessage(failed!.tempId as string);
+
+      expect(backend.rows).toHaveLength(1);
+      expect(mockedDeleteLoveNoteImage).not.toHaveBeenCalled();
+    });
   });
 });
