@@ -151,9 +151,10 @@ describe('storageService schema', () => {
   });
 
   it('does not discard rows already in a healthy database', async () => {
-    // The repair path runs on every existing install, so it has to be additive.
-    // The v1→v2 photos migration is deliberately destructive; it must stay
-    // gated on oldVersion and not fire for a v5 database holding good rows.
+    // NOTE: this asserts that reopening at the SAME version preserves rows. It
+    // deliberately does NOT exercise `upgradeDb` — opening twice at DB_VERSION
+    // runs no versionchange transaction at all, so the upgrade path is not
+    // under test here. The migration cases below are what cover that.
     const storageService = await freshStorageService();
     await storageService.init();
     const messageId = await storageService.addMessage({
@@ -168,5 +169,72 @@ describe('storageService schema', () => {
     await reopened.init();
 
     expect(await reopened.getMessage(messageId)).toMatchObject({ text: 'keep me' });
+  });
+
+  describe('upgrading an existing database', () => {
+    /**
+     * Seed a database at `version` with the stores a profile of that vintage
+     * would have, so that opening at DB_VERSION genuinely runs `upgradeDb` with
+     * a non-zero `oldVersion`.
+     *
+     * Without this every test in this file created the database from scratch,
+     * where `oldVersion` is 0 and the version-gated branches cannot be observed
+     * at all.
+     */
+    async function seedLegacy(version: number, photosKeyPath: string): Promise<void> {
+      const db = await openDB(DB_NAME, version, {
+        upgrade(database) {
+          database.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+          database.createObjectStore('photos', { keyPath: photosKeyPath, autoIncrement: true });
+        },
+      });
+      const tx = db.transaction(['messages', 'photos'], 'readwrite');
+      await tx.objectStore('messages').add({ text: 'keep me' });
+      await tx.objectStore('photos').add({ caption: 'a photo' });
+      await tx.done;
+      db.close();
+    }
+
+    it('[from v1] drops the incompatible photos store, as designed', async () => {
+      // The v1 photos store used a different shape, so the upgrade is
+      // deliberately destructive for it. This is the assertion that pins the
+      // branch `if (oldVersion < 2 && db.objectStoreNames.contains('photos'))`
+      // as still firing — deleting that line leaves this failing.
+      await seedLegacy(1, 'localId');
+
+      const storageService = await freshStorageService();
+      await storageService.init();
+
+      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+      try {
+        expect(await db.getAll('photos')).toHaveLength(0);
+        // Everything else is additive, so the message survives the same upgrade.
+        expect(await db.getAll('messages')).toHaveLength(1);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('[from v5] keeps photos rows, because the drop is version-gated', async () => {
+      // This is the case the repair path must not damage: a healthy modern
+      // database that merely needs the missing stores added. Ungating the drop
+      // — `contains('photos')` alone — leaves this failing.
+      await seedLegacy(5, 'id');
+
+      const storageService = await freshStorageService();
+      await storageService.init();
+
+      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+      try {
+        expect(await db.getAll('photos')).toHaveLength(1);
+        expect(await db.getAll('messages')).toHaveLength(1);
+        // And the repair still happened: the stores that were missing exist.
+        for (const store of ALL_STORES) {
+          expect(db.objectStoreNames.contains(store)).toBe(true);
+        }
+      } finally {
+        db.close();
+      }
+    });
   });
 });
