@@ -184,7 +184,15 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
   updateSyncStatus: async () => {
     try {
-      const unsyncedMoods = await moodService.getUnsyncedMoods(get().userId ?? undefined);
+      // Same rule as loadMoods: no signed-in user means nothing to count, not
+      // "count everyone". App.tsx runs this once on mount, unconditionally, and
+      // authSlice is not persisted -- so on a fresh load userId is still null
+      // and `?? undefined` fell through to the unscoped read, badging the
+      // previous account's pending moods until a later call corrected it.
+      const currentUserId = get().userId;
+      const unsyncedMoods = currentUserId
+        ? await moodService.getUnsyncedMoods(currentUserId)
+        : [];
       const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
       set((state) => ({

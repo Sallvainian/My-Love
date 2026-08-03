@@ -243,10 +243,33 @@ describe('moodSlice', () => {
     it('updates pendingMoods count from service', async () => {
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([makeMoodEntry(), makeMoodEntry()]);
 
-      const { get } = createTestStore();
+      const { get } = createTestStore({ userId: 'user-123' });
       await get().updateSyncStatus();
 
       expect(get().syncStatus.pendingMoods).toBe(2);
+    });
+
+    it('counts only the signed-in user’s moods', async () => {
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([makeMoodEntry()]);
+
+      const { get } = createTestStore({ userId: 'user-123' });
+      await get().updateSyncStatus();
+
+      expect(mockedMoodService.getUnsyncedMoods).toHaveBeenCalledWith('user-123');
+    });
+
+    it('[no signed-in user] counts nothing rather than everyone', async () => {
+      // App.tsx runs this once on mount, unconditionally, and authSlice is not
+      // persisted — so on a fresh load userId is still null here. Falling back
+      // to the unscoped read badged the previous account's pending moods on a
+      // shared device.
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([makeMoodEntry(), makeMoodEntry()]);
+
+      const { get } = createTestStore({ userId: null });
+      await get().updateSyncStatus();
+
+      expect(mockedMoodService.getUnsyncedMoods).not.toHaveBeenCalled();
+      expect(get().syncStatus.pendingMoods).toBe(0);
     });
   });
 
