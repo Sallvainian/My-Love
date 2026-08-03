@@ -263,8 +263,30 @@ class MoodSyncService {
         return result;
       }
 
-      // Fetch all unsynced moods from IndexedDB
-      const unsyncedMoods = await moodService.getUnsyncedMoods();
+      // Scope the read to the signed-in user.
+      //
+      // The moods store keeps every account that has signed in on this device.
+      // Reading it unscoped did not mislabel anything -- each row is uploaded
+      // under its own owner (`moodSyncPayload(mood, mood.userId)`) -- but after
+      // an account switch it meant repeatedly POSTing the other account's rows
+      // under this JWT, where RLS rejects every one and syncMoodWithRetry spends
+      // its full 1s/2s/4s backoff before counting it into `failed`. The pending
+      // badge reads through the scoped moodSlice path, so the user saw "nothing
+      // pending" while sync reported failures forever.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id;
+
+      if (!currentUserId) {
+        const error = 'Not authenticated - cannot sync moods';
+        result.errors.push(error);
+        logger.debug('[MoodSyncService] ' + error);
+        return result;
+      }
+
+      // Fetch this user's unsynced moods from IndexedDB
+      const unsyncedMoods = await moodService.getUnsyncedMoods(currentUserId);
 
       if (unsyncedMoods.length === 0) {
         logger.debug('[MoodSyncService] No pending moods to sync');
