@@ -2,7 +2,7 @@
 
 **Source:** `src/services/dbSchema.ts`
 
-Database name: `my-love-db` | Current version: **5**
+Database name: `my-love-db` | Current version: **7**
 
 ## Store Definitions
 
@@ -23,7 +23,10 @@ Database name: `my-love-db` | Current version: **5**
 
 - **Key:** `number` (auto-increment)
 - **Value:** `MoodEntry` (userId, mood, moods[], note, date, timestamp, synced, supabaseId)
-- **Indexes:** `by-date` (string, **unique**) -- one mood per date
+- **Indexes:** `by-user-date` (`[userId, date]`, **unique**) -- one mood per user per date.
+  Replaced the old `by-date` index at v7: unique on the date alone, it collided
+  across accounts, so on a shared device the second person to log a mood that
+  day was rejected.
 
 ### `sw-auth` (v4)
 
@@ -68,4 +71,6 @@ Database name: `my-love-db` | Current version: **5**
 
 ## Upgrade Function
 
-`upgradeDb(db, oldVersion, newVersion)` in `dbSchema.ts` handles all migrations centrally. Each service calls this during `_doInit()`. Exception: `PhotoStorageService` handles v1->v2 photo migration with data preservation (requires transaction access).
+`upgradeDb(db, oldVersion, newVersion, tx)` in `dbSchema.ts` handles all migrations centrally. The
+fourth argument is the versionchange transaction, needed to alter an index on an existing store; a
+caller that cannot supply it leaves the index alone rather than half-migrating. Each service calls this during `_doInit()`. Exception: `PhotoStorageService` handles v1->v2 photo migration with data preservation (requires transaction access).

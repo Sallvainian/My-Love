@@ -5,7 +5,7 @@ Complete documentation of all data models, database schemas, validation rules, a
 ## Scope
 
 - **Supabase PostgreSQL**: 10 tables, 4 enums, 13 RPC functions, 2 storage buckets, 1 edge function
-- **IndexedDB**: 8 object stores across database version 5
+- **IndexedDB**: 8 object stores across database version 7
 - **TypeScript types**: Generated database types + app-level interfaces
 - **Zod schemas**: 25+ validation schemas at service boundaries
 - **SQL migrations**: 24 migration files covering schema evolution from Dec 2025 to Mar 2026

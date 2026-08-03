@@ -50,7 +50,7 @@ Also provided: `getTypedDB()` (centralizes the `IDBPDatabase<DBTypes>` assertion
 - **Current version:** 5
 - **Stores:** messages, photos, moods, sw-auth, scripture-sessions, scripture-reflections, scripture-bookmarks, scripture-messages
 
-`upgradeDb(db, oldVersion, newVersion)` is the centralized upgrade function that every service passes to `openDB`, so store creation is not duplicated per service:
+`upgradeDb(db, oldVersion, newVersion, tx)` is the centralized upgrade function that every service passes to `openDB`, so store creation is not duplicated per service:
 
 | Version | Change                                                                                       |
 | ------- | -------------------------------------------------------------------------------------------- |
