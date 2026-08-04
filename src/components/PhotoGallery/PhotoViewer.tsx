@@ -1,7 +1,7 @@
 import type { PanInfo } from 'framer-motion';
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Loader2, Trash2, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { useAppStore } from '../../stores/useAppStore';
@@ -59,9 +59,6 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   const x = useMotionValue(0);
   const y = useMotionValue(0);
 
-  // Ref for image to calculate pan boundaries
-  const imageRef = useRef<HTMLImageElement>(null);
-
   // AC 6.4.12 & WCAG 2.4.3: Focus trap for modal
   const containerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(containerRef, true, { onEscape: onClose });
@@ -70,18 +67,30 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   const canNavigatePrev = currentIndex > 0;
   const canNavigateNext = currentIndex < photos.length - 1;
 
+  // The image's intrinsic size is not a layout measurement — the browser hands it to us on
+  // the load event, so we record it there instead of reading it back off an element ref
+  // afterwards. Reading the ref during render was the original bug: on the first render the
+  // <img> is not mounted, so the pan boundaries came back as the zero box and the photo
+  // could not be panned until some unrelated re-render recomputed them. With the size in
+  // state the boundaries become a pure function of (intrinsic size, zoom) and can be derived
+  // during render — no measure-then-setState round trip, and no render where a zoomed photo
+  // is stuck with the previous photo's box.
+  const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
+
   // AC 6.4.6: Calculate dynamic pan boundaries based on zoom level
-  const calculateDragConstraints = useCallback(() => {
-    if (!imageRef.current || scale <= MIN_ZOOM) {
+  const dragConstraints = useMemo(() => {
+    // A zero size means the image has not reported its dimensions yet — never loaded, or the
+    // load failed — so there is nothing to pan inside. Same no-pan box the old unmounted-ref
+    // guard returned.
+    if (naturalSize.width === 0 || naturalSize.height === 0 || scale <= MIN_ZOOM) {
       return { left: 0, right: 0, top: 0, bottom: 0 };
     }
 
-    const img = imageRef.current;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight - 200; // Account for controls and overlays
 
     // Calculate rendered image size using object-contain logic
-    const imgAspect = img.naturalWidth / img.naturalHeight;
+    const imgAspect = naturalSize.width / naturalSize.height;
     const viewportAspect = viewportWidth / viewportHeight;
 
     let renderedWidth: number;
@@ -111,24 +120,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
       top: -maxY,
       bottom: maxY,
     };
-  }, [scale]);
-
-  // Measured, not computed during render. Calling calculateDragConstraints()
-  // inline in JSX read imageRef.current while rendering, and on the first render
-  // the <img> is not mounted yet — so it returned the zero box and the image
-  // could not be panned until an unrelated re-render happened to recompute it.
-  // isLoading flips in the image's onLoad handler, which is exactly when
-  // naturalWidth/naturalHeight become readable.
-  const [dragConstraints, setDragConstraints] = useState({
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-  });
-
-  useEffect(() => {
-    setDragConstraints(calculateDragConstraints());
-  }, [calculateDragConstraints, currentIndex, isLoading]);
+  }, [naturalSize, scale]);
 
   // AC 6.4.11: Photo preloading
   useEffect(() => {
@@ -332,12 +324,20 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   }, [photos, currentIndex, canNavigateNext, onClose, deletePhoto, resetTransform]);
 
   // AC 6.4.15: Image loading handlers
-  const handleImageLoad = useCallback(() => {
+  const handleImageLoad = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = event.currentTarget;
+    setNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
     setIsLoading(false);
     setImageError(false);
   }, []);
 
   const handleImageError = useCallback(() => {
+    // Clearing the size is what keeps the failure state un-pannable. The <img> unmounts on
+    // error, but the outer motion.div keeps its drag and double-tap handlers, so a stale
+    // size from the previous photo would hand a zoomed error card a real drag box — and
+    // handleDragEnd returns early while zoomed, before it recentres, so the offset would
+    // survive a retry with nothing to spring it back.
+    setNaturalSize({ width: 0, height: 0 });
     setIsLoading(false);
     setImageError(true);
   }, []);
@@ -452,7 +452,6 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
             {/* AC 6.4.1: Photo display */}
             {!imageError && (
               <motion.img
-                ref={imageRef}
                 key={currentPhoto.id} // Force remount on photo change
                 src={currentPhoto.signedUrl || ''}
                 alt={currentPhoto.caption || 'Photo'}
