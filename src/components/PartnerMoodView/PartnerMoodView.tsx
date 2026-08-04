@@ -140,14 +140,24 @@ export function PartnerMoodView() {
   // still showed the moods fetched before going offline.
   useEffect(() => {
     if (syncStatus.isOnline && partner) {
+      // handleRefresh raises isRefreshing before it awaits, and that ordering is the point:
+      // the spinner and the "Loading partner moods..." panel are the only signal that a
+      // fetch is in flight, so deferring the flag past the await would leave the view
+      // looking idle for the whole Supabase round trip. There is nothing to derive it from
+      // either — the fetch lifecycle lives outside React.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch lifecycle
       handleRefresh();
     }
   }, [syncStatus.isOnline, partner, handleRefresh]);
 
   // Story 6.4: Task 6 & 7 - Real-time subscription with connection status (AC #4)
   useEffect(() => {
+    // The offline branch deliberately does not reset connectionStatus. This effect's own
+    // cleanup already sets 'disconnected', and React runs it before the body re-runs on the
+    // online -> offline flip; a first render that is already offline starts at 'disconnected'
+    // from useState. The reset that used to sit here only ever rewrote the value it was about
+    // to read, and charged a cascading render for it.
     if (!syncStatus.isOnline) {
-      setConnectionStatus('disconnected');
       return; // Don't subscribe when offline
     }
 
