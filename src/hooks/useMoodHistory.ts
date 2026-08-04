@@ -44,7 +44,10 @@ interface UseMoodHistoryReturn {
  */
 export function useMoodHistory(userId: string): UseMoodHistoryReturn {
   const [moods, setMoods] = useState<SupabaseMood[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // Starts true because the mount effect below fetches unconditionally. Initialising it
+  // false meant the first commit reported "settled with zero results" for a load that had
+  // not been issued yet, since the effect is passive and runs after that commit.
+  const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -69,12 +72,13 @@ export function useMoodHistory(userId: string): UseMoodHistoryReturn {
   }, [userId]);
 
   useEffect(() => {
-    // The synchronous setIsLoading(true)/setError(null) inside loadInitialMoods is the point,
-    // not an oversight: the timeline has to paint its skeleton on the render right after mount
-    // instead of sitting on a stale empty state for a network round trip. loadInitialMoods is
-    // also the exposed `retry`, so the kickoff cannot move out of it, and a paginated fetch
-    // accumulating pages in local state has nothing to derive during render and no external
-    // store to subscribe to.
+    // The synchronous setIsLoading(true)/setError(null) inside loadInitialMoods does nothing
+    // for the mount path — isLoading already starts true, and the effect runs after paint, so
+    // it could never have beaten the first commit to the screen. It earns its place on the
+    // retry path instead: loadInitialMoods is the exposed `retry`, where it clears the failure
+    // banner and re-enters the spinner from a settled state. The suppression stands because a
+    // paginated fetch accumulating pages in local state has nothing to derive during render
+    // and no external store to subscribe to.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch-on-mount lifecycle
     loadInitialMoods();
   }, [loadInitialMoods]);
