@@ -84,7 +84,7 @@ describe('stale mood sync must not discard an edit', () => {
       const stored = await moodService.get(created.id!);
       expect(stored!.synced).toBe(true);
       expect(stored!.supabaseId).toBe('server-1');
-      expect(await moodService.getUnsyncedMoods()).toHaveLength(0);
+      expect(await moodService.getUnsyncedMoods(USER_ID)).toHaveLength(0);
     });
 
     it('[note edited mid-flight] keeps the record dirty and still records the server id', async () => {
@@ -104,7 +104,7 @@ describe('stale mood sync must not discard an edit', () => {
       // than insert a second one.
       expect(stored!.supabaseId).toBe('server-1');
 
-      const pending = await moodService.getUnsyncedMoods();
+      const pending = await moodService.getUnsyncedMoods(USER_ID);
       expect(pending.map((m) => m.id)).toEqual([created.id]);
     });
 

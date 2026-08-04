@@ -25,11 +25,18 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 }));
 
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { SIGNED_OUT_STATE } from '../../../src/stores/slices/authSlice';
+import { signedOutState } from '../../../src/stores/slices/authSlice';
 
 const EXPECTED_RESET: Record<string, unknown> = {
   moods: [],
   partnerMoods: [],
+  syncStatus: {
+    pendingMoods: 0,
+    // Device state, not account state — carried across rather than reset.
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    lastSyncAt: undefined,
+    isSyncing: false,
+  },
   partner: null,
   isLoadingPartner: false,
   sentRequests: [],
@@ -207,7 +214,7 @@ describe('clearAuth on sign-out', () => {
 
   it('resets every field the reset is supposed to cover', () => {
     // Deliberately duplicated from the source rather than derived from it.
-    // Iterating SIGNED_OUT_STATE itself is circular — deleting a field removes
+    // Iterating signedOutState() itself is circular — deleting a field removes
     // its own assertion, which is why the first attempt at this test still let
     // 24 of 36 deletions through. An independent list is the whole point.
     const distinguishable = (resetValue: unknown): unknown => {
@@ -229,6 +236,31 @@ describe('clearAuth on sign-out', () => {
     for (const [key, resetValue] of Object.entries(EXPECTED_RESET)) {
       expect(after[key], `${key} was not reset by clearAuth`).toEqual(resetValue);
     }
+  });
+
+  it("drops the previous account's pending count but keeps the device's network state", () => {
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+    useAppStore.setState({
+      syncStatus: {
+        pendingMoods: 7,
+        isOnline: false,
+        lastSyncAt: new Date('2026-08-03T06:00:00.000Z'),
+        isSyncing: true,
+      },
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+
+    useAppStore.getState().clearAuth();
+
+    const { syncStatus } = useAppStore.getState();
+    // Whose moods are pending, and when they last synced, belong to the account.
+    expect(syncStatus.pendingMoods).toBe(0);
+    expect(syncStatus.lastSyncAt).toBeUndefined();
+    expect(syncStatus.isSyncing).toBe(false);
+    // Whether the device has a network does not — resetting it to true would
+    // put the badge on "Online" while the phone is in a tunnel.
+    expect(syncStatus.isOnline).toBe(false);
+
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   });
 
   it('releases the scripture write lock so the next account is not wedged', () => {
@@ -277,9 +309,9 @@ describe('clearAuth on sign-out', () => {
     revoke.mockRestore();
   });
 
-  it('SIGNED_OUT_STATE and this test agree on which fields exist', () => {
+  it('signedOutState() and this test agree on which fields exist', () => {
     // Catches drift in the other direction: a field ADDED to the source without
     // being added here would otherwise go unasserted forever.
-    expect(Object.keys(SIGNED_OUT_STATE).sort()).toEqual(Object.keys(EXPECTED_RESET).sort());
+    expect(Object.keys(signedOutState()).sort()).toEqual(Object.keys(EXPECTED_RESET).sort());
   });
 });
