@@ -67,9 +67,12 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
         throw new Error('User not authenticated');
       }
 
-      // Check if mood already exists for today
+      // Check if mood already exists for today.
+      // Matched on owner AND date: the store is shared by every account that
+      // has signed in on this device, so a date-only match let one partner's
+      // entry be found and overwritten by the other.
       const today = formatDateISO(new Date());
-      const existingMood = get().moods.find((m) => m.date === today);
+      const existingMood = get().moods.find((m) => m.date === today && m.userId === userId);
 
       if (existingMood && existingMood.id) {
         // Update existing mood
@@ -110,12 +113,14 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
   },
 
   getMoodForDate: (date) => {
-    return get().moods.find((m) => m.date === date);
+    const userId = get().userId;
+    return get().moods.find((m) => m.date === date && m.userId === userId);
   },
 
   updateMoodEntry: async (date, moods, note) => {
     try {
-      const existingMood = get().moods.find((m) => m.date === date);
+      const userId = get().userId;
+      const existingMood = get().moods.find((m) => m.date === date && m.userId === userId);
       if (!existingMood || !existingMood.id) {
         throw new Error(`Mood entry for ${date} not found`);
       }
@@ -125,7 +130,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
       // Update state
       set((state) => ({
-        moods: state.moods.map((m) => (m.date === date ? updated : m)),
+        moods: state.moods.map((m) => (m.id === existingMood.id ? updated : m)),
       }));
 
       // Update sync status
@@ -154,8 +159,21 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
   loadMoods: async () => {
     try {
-      // Load all moods from IndexedDB
-      const allMoods = await moodService.getAll();
+      // Only this user's rows. The IndexedDB store holds every account that has
+      // signed in on this device, so getAll() here put one partner's private
+      // notes straight into the other's UI state.
+      const userId = get().userId;
+      if (!userId) {
+        set({ moods: [] });
+        return;
+      }
+
+      const allMoods = await moodService.getAllForUser(userId);
+
+      // Identity guard, same as fetchPartnerMoods below: Sign Out sits on the
+      // same screen that fires this, so the read can land after clearAuth and
+      // write this user's own mood notes back over the reset.
+      if (get().userId !== userId) return;
 
       set({ moods: allMoods });
 
@@ -171,8 +189,22 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
   updateSyncStatus: async () => {
     try {
-      const unsyncedMoods = await moodService.getUnsyncedMoods();
+      // Same rule as loadMoods: no signed-in user means nothing to count, not
+      // "count everyone". App.tsx runs this once on mount, unconditionally, and
+      // authSlice is not persisted -- so on a fresh load userId is still null
+      // and `?? undefined` fell through to the unscoped read, badging the
+      // previous account's pending moods until a later call corrected it.
+      const currentUserId = get().userId;
+      const unsyncedMoods = currentUserId
+        ? await moodService.getUnsyncedMoods(currentUserId)
+        : [];
       const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+      // Identity guard, same as loadMoods above. Only a count rather than free
+      // text, so this is well below the disclosures the other guards close —
+      // but it is the same shape, and the badge it feeds is read straight off
+      // the store with no re-derivation.
+      if (get().userId !== currentUserId) return;
 
       set((state) => ({
         syncStatus: {
@@ -322,6 +354,8 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
    * Story 6.4: Task 3 - AC #3 - Partner mood visibility
    */
   fetchPartnerMoods: async (limit = 30) => {
+    // Whose data this is, captured before any await.
+    const requestedBy = get().userId;
     try {
       // Check network status first
       if (!navigator.onLine) {
@@ -364,6 +398,11 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       });
 
       // Update state
+      // Identity guard: the Sign Out control is on the same screen that fires
+      // this, and the request went out with a still-valid token. Landing after
+      // clearAuth would write the previous couple's mood notes — free text —
+      // straight back over the reset.
+      if (get().userId !== requestedBy) return;
       set({ partnerMoods: transformedMoods });
 
       logger.debug(`[MoodSlice] Fetched ${transformedMoods.length} partner moods`);

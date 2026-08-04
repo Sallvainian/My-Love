@@ -176,8 +176,15 @@ export class InteractionService {
     userId: string,
     callback: (interaction: SupabaseInteractionRecord) => void
   ): Promise<() => void> {
-    // Each subscription owns its own channel so racing subscribe/unsubscribe
-    // cycles can be torn down independently.
+    // NOTE: this does NOT give each subscription its own channel, despite the
+    // per-call shape. `supabase.channel(topic)` returns whatever is already
+    // registered under the topic (RealtimeClient.js:277-288), and the topic here
+    // keys on the user, so two overlapping subscriptions for one user share an
+    // object and the first teardown closes it under the second. Only
+    // PokeKissInterface mounts this, and only once, so today the overlap is
+    // confined to StrictMode's double-invoked effects in dev. See
+    // moodSyncService.subscribeMoodUpdates for the per-topic tracking this
+    // needs if a second consumer is ever added.
     const channel = supabase
       .channel(`incoming-interactions:${userId}`)
       .on(

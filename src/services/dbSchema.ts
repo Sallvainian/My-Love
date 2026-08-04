@@ -1,4 +1,5 @@
-import type { DBSchema, IDBPDatabase } from 'idb';
+import type { DBSchema, IDBPDatabase, IDBPTransaction, StoreNames } from 'idb';
+import { unwrap } from 'idb';
 import type { Message, MoodEntry, Photo } from '../types';
 import { logger } from '../utils/logger';
 
@@ -129,7 +130,16 @@ export interface MyLoveDBSchema extends DBSchema {
     key: number;
     value: MoodEntry;
     indexes: {
-      'by-date': string;
+      /**
+       * Compound and unique on [userId, date].
+       *
+       * Was unique on `date` alone, which made the store physically unable to
+       * hold two accounts' entries for the same day: on a shared device the
+       * second user's mood collided with the first user's row. Uniqueness is
+       * still wanted -- one mood per day per person -- so it moves to the pair
+       * rather than being dropped.
+       */
+      'by-user-date': [string, string];
     };
   };
   'sw-auth': {
@@ -170,7 +180,14 @@ export interface MyLoveDBSchema extends DBSchema {
  * Database configuration constants
  */
 export const DB_NAME = 'my-love-db';
-export const DB_VERSION = 5; // v5: Added scripture stores for offline support
+// v6 added no stores. It existed to re-fire upgradeDb on profiles that reached
+// v5 through storage.ts's old callback and are missing moods, sw-auth and the
+// scripture stores; upgradeDb's existence checks then create what is absent.
+// A healthy database takes a no-op upgrade.
+//
+// v7 replaces the moods `by-date` unique index with `by-user-date`, unique on
+// [userId, date], so two accounts on one device can each hold today's mood.
+export const DB_VERSION = 7;
 
 /**
  * Store name constants for consistent access across services
@@ -200,12 +217,24 @@ export const STORE_NAMES = {
 export function upgradeDb(
   db: IDBPDatabase<MyLoveDBSchema>,
   oldVersion: number,
-  _newVersion: number | null
+  _newVersion: number | null,
+  tx?: IDBPTransaction<MyLoveDBSchema, ArrayLike<StoreNames<MyLoveDBSchema>>, 'versionchange'>
 ): void {
   logger.debug(`[dbSchema] Upgrading database from v${oldVersion} to v${DB_VERSION}`);
 
+  // Every branch below keys off whether the store EXISTS, not off oldVersion
+  // alone. A version guard assumes the store was created at the version that
+  // introduced it, which was not true for any profile that upgraded through
+  // storage.ts's own (now deleted) callback: it created only messages and
+  // photos, so those databases reached v5 missing moods, sw-auth and the four
+  // scripture stores, and no `oldVersion < N` branch could ever fire again to
+  // create them. Existence checks make this function repair such a database
+  // instead of skipping past it. The v6 bump is what makes those profiles
+  // re-enter the upgrade at all — the checks alone would never run. (v7 has
+  // since superseded it; see DB_VERSION.)
+
   // v1: messages store
-  if (oldVersion < 1) {
+  if (!db.objectStoreNames.contains('messages')) {
     const messageStore = db.createObjectStore('messages', {
       keyPath: 'id',
       autoIncrement: true,
@@ -227,14 +256,15 @@ export function upgradeDb(
   // also predates the current schema by a wide margin. Restoring preservation
   // would mean reintroducing an async migration step for a cache that costs
   // nothing to rebuild.
-  if (oldVersion < 2) {
-    // Delete old v1 store if it exists (had 'blob' instead of 'imageBlob')
-    if (db.objectStoreNames.contains('photos')) {
-      db.deleteObjectStore('photos');
-      logger.debug('[dbSchema] Deleted old photos store from v1');
-    }
+  // The drop stays gated on oldVersion: it exists to discard the INCOMPATIBLE
+  // v1 schema, so it must fire for a genuine v1 database and never for a v2+
+  // one that already holds good rows.
+  if (oldVersion < 2 && db.objectStoreNames.contains('photos')) {
+    db.deleteObjectStore('photos');
+    logger.debug('[dbSchema] Deleted old photos store from v1');
+  }
 
-    // Create new v2 photos store with enhanced schema
+  if (!db.objectStoreNames.contains('photos')) {
     const photosStore = db.createObjectStore('photos', {
       keyPath: 'id',
       autoIncrement: true,
@@ -244,35 +274,69 @@ export function upgradeDb(
   }
 
   // v3: moods store
-  if (oldVersion < 3) {
+  if (!db.objectStoreNames.contains('moods')) {
     const moodsStore = db.createObjectStore('moods', {
       keyPath: 'id',
       autoIncrement: true,
     });
-    moodsStore.createIndex('by-date', 'date', { unique: true });
-    logger.debug('[dbSchema] Created moods store with by-date unique index (v3)');
+    moodsStore.createIndex('by-user-date', ['userId', 'date'], { unique: true });
+    logger.debug('[dbSchema] Created moods store with by-user-date unique index (v7)');
+  } else if (tx) {
+    // v7: swap the old date-only unique index for the compound one. Altering an
+    // index on an existing store needs the versionchange transaction, which is
+    // why `tx` is threaded in; callers that cannot supply it leave the index
+    // alone rather than half-migrating.
+    const moodsStore = tx.objectStore('moods');
+
+    // 'by-date' is deliberately absent from MyLoveDBSchema now, so the typed
+    // wrapper cannot name it. The index still exists on disk for every profile
+    // created before v7, so it is dropped through the unwrapped IDB handle.
+    const legacyStore = unwrap(moodsStore);
+
+    if (legacyStore.indexNames.contains('by-date')) {
+      legacyStore.deleteIndex('by-date');
+      logger.debug('[dbSchema] Dropped moods by-date index (v7)');
+    }
+
+    if (!moodsStore.indexNames.contains('by-user-date')) {
+      // Safe to build as unique over existing rows: the index it replaces was
+      // unique on `date` alone, which is strictly stricter than [userId, date],
+      // so no surviving pair can already collide.
+      moodsStore.createIndex('by-user-date', ['userId', 'date'], { unique: true });
+      logger.debug('[dbSchema] Created moods by-user-date unique index (v7)');
+    }
   }
 
   // v4: sw-auth store for Background Sync
-  if (oldVersion < 4) {
+  if (!db.objectStoreNames.contains('sw-auth')) {
     db.createObjectStore('sw-auth', { keyPath: 'id' });
     logger.debug('[dbSchema] Created sw-auth store for Background Sync (v4)');
   }
 
   // v5: scripture stores for offline support
-  if (oldVersion < 5) {
+  //
+  // Checked one store at a time rather than behind a single guard: a database
+  // can be missing some of these and not others, and a combined check would
+  // skip the whole group as soon as one existed.
+  if (!db.objectStoreNames.contains('scripture-sessions')) {
     const sessionsStore = db.createObjectStore('scripture-sessions', { keyPath: 'id' });
     sessionsStore.createIndex('by-user', 'userId');
     logger.debug('[dbSchema] Created scripture-sessions store with by-user index (v5)');
+  }
 
+  if (!db.objectStoreNames.contains('scripture-reflections')) {
     const reflectionsStore = db.createObjectStore('scripture-reflections', { keyPath: 'id' });
     reflectionsStore.createIndex('by-session', 'sessionId');
     logger.debug('[dbSchema] Created scripture-reflections store with by-session index (v5)');
+  }
 
+  if (!db.objectStoreNames.contains('scripture-bookmarks')) {
     const bookmarksStore = db.createObjectStore('scripture-bookmarks', { keyPath: 'id' });
     bookmarksStore.createIndex('by-session', 'sessionId');
     logger.debug('[dbSchema] Created scripture-bookmarks store with by-session index (v5)');
+  }
 
+  if (!db.objectStoreNames.contains('scripture-messages')) {
     const messagesStore = db.createObjectStore('scripture-messages', { keyPath: 'id' });
     messagesStore.createIndex('by-session', 'sessionId');
     logger.debug('[dbSchema] Created scripture-messages store with by-session index (v5)');

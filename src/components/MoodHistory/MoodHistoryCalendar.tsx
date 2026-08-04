@@ -2,6 +2,7 @@ import { m as motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { moodService } from '../../services/moodService';
+import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
 import {
   formatDateKey,
@@ -37,6 +38,10 @@ const MONTH_NAV_DEBOUNCE_MS = 300;
  * - Performance: <200ms render for 30-day month (AC-6)
  */
 export function MoodHistoryCalendar() {
+  // The moods store is shared by every account that has signed in on this
+  // device, so the range query has to be scoped to the current user.
+  const userId = useAppStore((s) => s.userId);
+
   // Current month/year state
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
@@ -59,13 +64,21 @@ export function MoodHistoryCalendar() {
    * Task 9: Performance measurement and caching
    * Performance: <100ms query time (validated in Story 6.2)
    */
-  const loadMoodsForMonth = useCallback(async (year: number, month: number) => {
+  const loadMoodsForMonth = useCallback(
+    async (year: number, month: number) => {
+    if (!userId) {
+      setMoods([]);
+      setMoodMap(new Map());
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     const queryStart = performance.now();
 
     try {
       const { startOfMonth, endOfMonth } = getMonthBoundaries(year, month);
-      const fetchedMoods = await moodService.getMoodsInRange(startOfMonth, endOfMonth);
+      const fetchedMoods = await moodService.getMoodsInRange(startOfMonth, endOfMonth, userId);
 
       const queryTime = performance.now() - queryStart;
 
@@ -87,7 +100,9 @@ export function MoodHistoryCalendar() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+    },
+    [userId]
+  );
 
   // Load moods when month changes
   useEffect(() => {

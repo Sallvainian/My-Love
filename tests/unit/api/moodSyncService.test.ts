@@ -10,9 +10,15 @@ import { FakeMoodsBackend, fakeUuid } from './fakeMoodsBackend';
 
 const backend = new FakeMoodsBackend();
 
+/** Session the service scopes its IndexedDB read by. Overridden per test. */
+let currentSession: { user: { id: string } } | null = null;
+
 vi.mock('@/api/supabaseClient', () => ({
   supabase: {
     from: (table: string) => backend.client().from(table),
+    auth: {
+      getSession: async () => ({ data: { session: currentSession } }),
+    },
   },
   getPartnerId: vi.fn(),
 }));
@@ -68,6 +74,7 @@ describe('moodSyncService.syncPendingMoods', () => {
     vi.useFakeTimers();
     backend.reset();
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    currentSession = { user: { id: USER_ID } };
     mockedGetPartnerId.mockResolvedValue(null);
     mockedMoodService.markAsSynced.mockResolvedValue('cleared');
   });
@@ -190,5 +197,47 @@ describe('moodSyncService.syncPendingMoods', () => {
     expect(backend.rows).toHaveLength(0);
     expect(backend.operations).toHaveLength(0);
     expect(mockedMoodService.markAsSynced).not.toHaveBeenCalled();
+  });
+
+  describe('account scoping', () => {
+    // The moods store keeps every account that has signed in on this device.
+    // An unscoped read did not mislabel anything — each row is uploaded under
+    // its own owner — but after an account switch it re-POSTed the other
+    // account's rows under this JWT on every pass, burning the full
+    // 1s/2s/4s backoff on each before RLS rejected it, and counting them
+    // into `failed` forever while the (scoped) pending badge said zero.
+
+    it('reads only the signed-in user’s pending moods', async () => {
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([pendingMood()]);
+
+      await runSync();
+
+      expect(mockedMoodService.getUnsyncedMoods).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('scopes to the user who is signed in now, not the one who was', async () => {
+      const OTHER_USER = fakeUuid(910002);
+      currentSession = { user: { id: OTHER_USER } };
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
+
+      await runSync();
+
+      expect(mockedMoodService.getUnsyncedMoods).toHaveBeenCalledWith(OTHER_USER);
+      expect(mockedMoodService.getUnsyncedMoods).not.toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('[no session] reads nothing and writes nothing', async () => {
+      currentSession = null;
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([pendingMood()]);
+
+      const result = await runSync();
+
+      expect(mockedMoodService.getUnsyncedMoods).not.toHaveBeenCalled();
+      expect(result.errors).toContain('Not authenticated - cannot sync moods');
+      expect(backend.operations).toHaveLength(0);
+      // Not counted as a failure: the records are still pending and the next
+      // pass with a real session will take them.
+      expect(result).toMatchObject({ synced: 0, failed: 0, deferred: 0 });
+    });
   });
 });

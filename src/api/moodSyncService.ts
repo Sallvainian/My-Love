@@ -10,12 +10,13 @@
  * @module api/moodSyncService
  */
 
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import { moodService } from '../services/moodService';
 import { moodSyncFingerprint, moodSyncPayload } from '../services/moodSyncPayload';
 import type { MoodEntry } from '../types';
 import { logger } from '../utils/logger';
+import { sendEphemeralBroadcast } from './ephemeralBroadcast';
 import { handleNetworkError, isOnline } from './errorHandlers';
+import { waitForSocketReady } from './realtimeSocket';
 import { moodApi } from './moodApi';
 import { getPartnerId, supabase } from './supabaseClient';
 import type { MoodInsert, SupabaseMood } from './validation/supabaseSchemas';
@@ -24,6 +25,31 @@ import type { MoodInsert, SupabaseMood } from './validation/supabaseSchemas';
  * Supabase mood record type (using validated schema)
  */
 export type SupabaseMoodRecord = SupabaseMood;
+
+/**
+ * One live consumer of a mood broadcast channel.
+ *
+ * A fresh object per subscribe call, so identity is unique even when two
+ * consumers happen to pass the same callback reference — the set that tracks
+ * them is what decides when the channel may be torn down.
+ */
+interface MoodSubscriber {
+  onMood: (mood: SupabaseMoodRecord) => void;
+  onStatus?: (status: string) => void;
+}
+
+/**
+ * A broadcast channel plus every consumer currently attached to it.
+ */
+interface MoodChannelEntry {
+  channel: ReturnType<typeof supabase.channel>;
+  subscribers: Set<MoodSubscriber>;
+  /**
+   * Last status `subscribe()` reported. Replayed to consumers that attach after
+   * the channel is already open — their callback would otherwise never fire.
+   */
+  lastStatus: string | null;
+}
 
 /**
  * Sync result summary
@@ -50,7 +76,41 @@ interface SyncResult {
  * - Handle network errors and retry logic
  */
 class MoodSyncService {
-  private realtimeChannel: RealtimeChannel | null = null;
+  /**
+   * Live broadcast channels, keyed by topic.
+   *
+   * `supabase.channel(topic)` does not mint a new object per call. RealtimeClient
+   * looks the topic up first and returns the channel already open under it, so
+   * both consumers of this service — usePartnerMood on the Mood tab and
+   * PartnerMoodView on the Partner tab — receive the *same* object, because both
+   * build the identical topic from the signed-in user id. A per-call
+   * `removeChannel` therefore closes the channel out from under whichever
+   * consumer is still mounted, no matter whether the reference to it was held on
+   * the instance or in a local.
+   *
+   * Consumers are tracked per topic instead, and the channel is removed only
+   * when the last one detaches.
+   */
+  private moodChannels = new Map<string, MoodChannelEntry>();
+
+  /**
+   * Topics whose channel is mid-leave, keyed to the promise that settles when
+   * the server acks it.
+   *
+   * `removeChannel` does not deregister the channel — it only awaits
+   * `channel.unsubscribe()` (RealtimeClient.js:213-219), which flips the state
+   * to `leaving` and resolves on the server's ack; the client's registry entry
+   * is dropped later, from the `_onClose` hook (RealtimeChannel.js:81-86).
+   * Until that lands, `supabase.channel(topic)` still hands back the dying
+   * object, and calling `.subscribe()` on it does nothing at all because the
+   * whole join is gated on `state == closed` (RealtimeChannel.js:127).
+   *
+   * So the replacement subscriber would silently receive no broadcasts and no
+   * status callback, for the life of the page. Waiting the leave out is what
+   * makes reopening a topic work — which is exactly what happens every time the
+   * user moves between the Mood tab and the Partner tab.
+   */
+  private closingMoodChannels = new Map<string, Promise<unknown>>();
 
   /**
    * Upload a single mood entry to Supabase
@@ -141,42 +201,22 @@ class MoodSyncService {
         return;
       }
 
-      // Create ephemeral channel to partner's mood-updates channel
-      const channel = supabase.channel(`mood-updates:${partnerId}`);
-
-      // Subscribe briefly to send the broadcast
-      await new Promise<void>((resolve, reject) => {
-        channel.subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            try {
-              // Send broadcast to partner (includes mood_types for multi-mood support)
-              const result = await channel.send({
-                type: 'broadcast',
-                event: 'new_mood',
-                payload: {
-                  id: mood.id,
-                  user_id: mood.user_id,
-                  mood_type: mood.mood_type,
-                  mood_types: mood.mood_types,
-                  note: mood.note,
-                  created_at: mood.created_at,
-                },
-              });
-
-              logger.debug('[MoodSyncService] Broadcast sent to partner:', result);
-              resolve();
-            } catch (sendError) {
-              reject(sendError);
-            } finally {
-              // Always cleanup: unsubscribe and remove channel
-              await supabase.removeChannel(channel);
-            }
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            await supabase.removeChannel(channel);
-            reject(new Error(`Channel subscription failed: ${status}`));
-          }
-        });
+      // Queued per topic rather than opened inline. syncPendingMoods loops over
+      // every unsynced mood and fires this without awaiting it (see the call in
+      // syncMoodWithRetry), so two moods in one pass used to race for the same
+      // `mood-updates:<partnerId>` channel -- and because supabase.channel()
+      // hands back the object the first send is still using, the second one's
+      // subscribe callback never fired and the partner never got that mood.
+      await sendEphemeralBroadcast(`mood-updates:${partnerId}`, 'new_mood', {
+        id: mood.id,
+        user_id: mood.user_id,
+        mood_type: mood.mood_type,
+        mood_types: mood.mood_types,
+        note: mood.note,
+        created_at: mood.created_at,
       });
+
+      logger.debug('[MoodSyncService] Broadcast sent to partner:', mood.id);
     } catch (error) {
       // Fire-and-forget: log error but don't throw
       console.error('[MoodSyncService] Failed to broadcast mood to partner:', error);
@@ -224,8 +264,30 @@ class MoodSyncService {
         return result;
       }
 
-      // Fetch all unsynced moods from IndexedDB
-      const unsyncedMoods = await moodService.getUnsyncedMoods();
+      // Scope the read to the signed-in user.
+      //
+      // The moods store keeps every account that has signed in on this device.
+      // Reading it unscoped did not mislabel anything -- each row is uploaded
+      // under its own owner (`moodSyncPayload(mood, mood.userId)`) -- but after
+      // an account switch it meant repeatedly POSTing the other account's rows
+      // under this JWT, where RLS rejects every one and syncMoodWithRetry spends
+      // its full 1s/2s/4s backoff before counting it into `failed`. The pending
+      // badge reads through the scoped moodSlice path, so the user saw "nothing
+      // pending" while sync reported failures forever.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id;
+
+      if (!currentUserId) {
+        const error = 'Not authenticated - cannot sync moods';
+        result.errors.push(error);
+        logger.debug('[MoodSyncService] ' + error);
+        return result;
+      }
+
+      // Fetch this user's unsynced moods from IndexedDB
+      const unsyncedMoods = await moodService.getUnsyncedMoods(currentUserId);
 
       if (unsyncedMoods.length === 0) {
         logger.debug('[MoodSyncService] No pending moods to sync');
@@ -392,46 +454,146 @@ class MoodSyncService {
       return () => {};
     }
 
-    logger.debug(`[MoodSyncService] Subscribing to mood-updates:${currentUserId}`);
+    // Each user subscribes to their OWN channel; partner broadcasts TO this
+    // channel. The topic is derived from the signed-in user, so every consumer
+    // on this device resolves to the same one.
+    const topic = `mood-updates:${currentUserId}`;
+    logger.debug(`[MoodSyncService] Subscribing to ${topic}`);
 
-    // Create Broadcast channel for receiving mood updates
-    // Each user subscribes to their OWN channel; partner broadcasts TO this channel
-    this.realtimeChannel = supabase
-      .channel(`mood-updates:${currentUserId}`, {
-        config: {
-          broadcast: { self: false }, // Don't receive own broadcasts
-        },
-      })
-      .on('broadcast', { event: 'new_mood' }, (payload) => {
-        logger.debug('[MoodSyncService] Received partner mood broadcast:', payload);
+    const subscriber: MoodSubscriber = { onMood: callback, onStatus: onStatusChange };
 
-        // Transform broadcast payload to SupabaseMoodRecord format
-        const mood: SupabaseMoodRecord = {
-          id: payload.payload.id,
-          user_id: payload.payload.user_id,
-          mood_type: payload.payload.mood_type,
-          mood_types: payload.payload.mood_types,
-          note: payload.payload.note,
-          created_at: payload.payload.created_at,
-          updated_at: payload.payload.created_at, // Use created_at as fallback
-        };
+    let entry = this.moodChannels.get(topic);
 
-        callback(mood);
-      })
-      .subscribe((status) => {
-        logger.debug('[MoodSyncService] Broadcast subscription status:', status);
-        if (onStatusChange) {
-          onStatusChange(status);
+    if (!entry) {
+      // A leave for this topic may still be in flight. Opening the replacement
+      // now would just retrieve the dying channel and join nothing.
+      const closing = this.closingMoodChannels.get(topic);
+      if (closing) {
+        logger.debug(`[MoodSyncService] Waiting for the previous ${topic} channel to close`);
+        await closing;
+        // Another subscriber may have opened the replacement while we waited.
+        entry = this.moodChannels.get(topic);
+      }
+
+      // Closing that channel may have been what removed the LAST channel in the
+      // app, which tears the socket down for ~100ms. Subscribing inside that
+      // window silently never joins -- see realtimeSocket.
+      if (!entry) {
+        await waitForSocketReady();
+        entry = this.moodChannels.get(topic);
+      }
+    }
+
+    if (!entry) {
+      const subscribers = new Set<MoodSubscriber>();
+
+      // Built before `subscribe()` so the status callback can close over THIS
+      // entry instead of looking the topic up. A terminal CLOSED from a channel
+      // that has since been replaced under the same topic would otherwise be
+      // written onto its REPLACEMENT, and then replayed by the block below to
+      // the next consumer that attaches — pinning a live channel's connection
+      // indicator to disconnected. `channel` is filled in immediately after and
+      // is never read by the callback.
+      const newEntry: MoodChannelEntry = {
+        channel: undefined as unknown as MoodChannelEntry['channel'],
+        subscribers,
+        lastStatus: null,
+      };
+
+      const channel = supabase
+        .channel(topic, {
+          config: {
+            broadcast: { self: false }, // Don't receive own broadcasts
+          },
+        })
+        .on('broadcast', { event: 'new_mood' }, (payload) => {
+          logger.debug('[MoodSyncService] Received partner mood broadcast:', payload);
+
+          // Transform broadcast payload to SupabaseMoodRecord format
+          const mood: SupabaseMoodRecord = {
+            id: payload.payload.id,
+            user_id: payload.payload.user_id,
+            mood_type: payload.payload.mood_type,
+            mood_types: payload.payload.mood_types,
+            note: payload.payload.note,
+            created_at: payload.payload.created_at,
+            updated_at: payload.payload.created_at, // Use created_at as fallback
+          };
+
+          // Snapshot first: a consumer may unsubscribe from inside its own
+          // handler, and that mutates the set being iterated.
+          Array.from(subscribers).forEach((s) => s.onMood(mood));
+        })
+        .subscribe((status) => {
+          logger.debug('[MoodSyncService] Broadcast subscription status:', status);
+
+          newEntry.lastStatus = status;
+          Array.from(subscribers).forEach((s) => s.onStatus?.(status));
+        });
+
+      newEntry.channel = channel;
+      entry = newEntry;
+      // Nothing is awaited between the LAST read of `entry` above and this
+      // insert, so two concurrent subscribers cannot both miss and both open a
+      // channel. The earlier awaits are why that re-read exists: whoever
+      // resumes first creates the entry synchronously, and the other then finds
+      // it rather than opening a second one.
+      this.moodChannels.set(topic, entry);
+    }
+
+    entry.subscribers.add(subscriber);
+
+    // A consumer that attaches to an already-open channel missed the
+    // `subscribe()` callback, so replay the last status it reported. Without
+    // this its connection indicator sits on its initial value for the lifetime
+    // of the channel.
+    if (onStatusChange && entry.lastStatus !== null) {
+      onStatusChange(entry.lastStatus);
+    }
+
+    // Return unsubscribe function
+    //
+    // `detached` makes a second call a no-op rather than dropping a subscriber
+    // some later call registered, matching interactionService.subscribeInteractions.
+    // usePartnerMood can invoke this twice: once from its own `!isMounted`
+    // branch and again from the effect cleanup.
+    let detached = false;
+    return () => {
+      if (detached) return;
+      detached = true;
+
+      const live = this.moodChannels.get(topic);
+      if (!live) return;
+
+      live.subscribers.delete(subscriber);
+
+      if (live.subscribers.size > 0) {
+        logger.debug(
+          `[MoodSyncService] Released a mood subscriber; ${live.subscribers.size} still attached`
+        );
+        return;
+      }
+
+      this.moodChannels.delete(topic);
+
+      // Record the leave so the next subscriber for this topic waits it out
+      // instead of being handed the channel that is still going away. The
+      // catch is what makes that wait safe to await: a leave can resolve
+      // 'error' (RealtimeChannel.js:382), and a rejection here must not
+      // propagate into an unrelated subscribe call.
+      const leaving = supabase.removeChannel(live.channel).catch((err) => {
+        logger.debug('[MoodSyncService] Mood channel leave failed:', err);
+      });
+      this.closingMoodChannels.set(topic, leaving);
+      void leaving.finally(() => {
+        // Only clear our own entry — a later teardown may already have
+        // replaced it.
+        if (this.closingMoodChannels.get(topic) === leaving) {
+          this.closingMoodChannels.delete(topic);
         }
       });
 
-    // Return unsubscribe function
-    return () => {
-      if (this.realtimeChannel) {
-        supabase.removeChannel(this.realtimeChannel);
-        this.realtimeChannel = null;
-        logger.debug('[MoodSyncService] Unsubscribed from mood broadcasts');
-      }
+      logger.debug('[MoodSyncService] Unsubscribed from mood broadcasts');
     };
   }
 
