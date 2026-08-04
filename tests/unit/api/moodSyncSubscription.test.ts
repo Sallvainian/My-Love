@@ -184,14 +184,21 @@ function flush(): Promise<void> {
 
 /** Ack every in-flight leave, then wait out the socket's disconnect window */
 async function settleLeaves(): Promise<void> {
-  while (leaveQueue.length > 0) ackNextLeave();
-  await flush();
-  // The last leave takes the socket down for windowMs; a resubscribe parked on
-  // that window only resumes once it closes.
-  if (socket.state === 'disconnecting') {
-    await new Promise((r) => setTimeout(r, socket.windowMs + 20));
+  // Sustained quiescence, not a single bounded wait. Its sibling in
+  // ephemeralBroadcast.test.ts used the one-shot form and failed 11 of 12 runs:
+  // a subscriber parked in waitForSocketReady wakes on its own poll tick, up to
+  // POLL_MS after the socket settles, and can queue another leave after the
+  // wait has already returned.
+  let quiet = 0;
+  for (let i = 0; i < 400; i++) {
+    while (leaveQueue.length > 0) ackNextLeave();
+    await new Promise((r) => setTimeout(r, 5));
+    quiet = leaveQueue.length === 0 && socket.state === 'connected' ? quiet + 1 : 0;
+    if (quiet >= 6) return;
   }
-  await flush();
+  throw new Error(
+    `settleLeaves() never reached quiescence: leaveQueue=${leaveQueue.length} socket=${socket.state}`
+  );
 }
 
 describe('subscribeMoodUpdates channel ownership', () => {

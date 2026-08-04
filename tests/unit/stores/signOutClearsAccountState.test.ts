@@ -25,6 +25,46 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 }));
 
 import { useAppStore } from '../../../src/stores/useAppStore';
+import { SIGNED_OUT_STATE } from '../../../src/stores/slices/authSlice';
+
+const EXPECTED_RESET: Record<string, unknown> = {
+  moods: [],
+  partnerMoods: [],
+  partner: null,
+  isLoadingPartner: false,
+  sentRequests: [],
+  receivedRequests: [],
+  isLoadingRequests: false,
+  searchResults: [],
+  isSearching: false,
+  notes: [],
+  notesIsLoading: false,
+  notesError: null,
+  notesHasMore: true,
+  sentMessageTimestamps: [],
+  photos: [],
+  selectedPhotoId: null,
+  isUploading: false,
+  uploadProgress: 0,
+  storageWarning: null,
+  interactions: [],
+  unviewedCount: 0,
+  isSubscribed: false,
+  session: null,
+  activeSession: null,
+  coupleStats: null,
+  myRole: null,
+  partnerJoined: false,
+  myReady: false,
+  partnerReady: false,
+  partnerLocked: false,
+  partnerDisconnected: false,
+  partnerDisconnectedAt: null,
+  countdownStartedAt: null,
+  pendingRetry: null,
+  scriptureError: null,
+  isInitialized: false,
+};
 
 /** Identifiers that must not survive a sign-out */
 const SECRETS = {
@@ -148,18 +188,46 @@ describe('clearAuth on sign-out', () => {
     expect(state.interactions).toEqual([]);
     expect(state.unviewedCount).toBe(0);
     expect(state.activeSession).toBeNull();
-    expect(state.session).toBeNull();
   });
 
-  it('leaves no trace of either account anywhere in the store', () => {
+  it('leaves no trace of the seeded identifiers anywhere in the store', () => {
     useAppStore.getState().clearAuth();
 
-    // The sweep. Because this runs against the composed store, a field added to
-    // ANY slice and forgotten in SIGNED_OUT_STATE fails here — which is the
-    // whole point, and what the single-slice version of this test could not do.
     const remaining = JSON.stringify(useAppStore.getState());
     for (const [label, secret] of Object.entries(SECRETS)) {
       expect(remaining, `${label} survived sign-out`).not.toContain(secret);
     }
+  });
+
+  it('resets every field the reset is supposed to cover', () => {
+    // Deliberately duplicated from the source rather than derived from it.
+    // Iterating SIGNED_OUT_STATE itself is circular — deleting a field removes
+    // its own assertion, which is why the first attempt at this test still let
+    // 24 of 36 deletions through. An independent list is the whole point.
+    const distinguishable = (resetValue: unknown): unknown => {
+      if (Array.isArray(resetValue)) return ['NOT-RESET'];
+      if (typeof resetValue === 'boolean') return !resetValue;
+      if (typeof resetValue === 'number') return resetValue + 99;
+      return 'NOT-RESET';
+    };
+
+    const dirty: Record<string, unknown> = {};
+    for (const [key, resetValue] of Object.entries(EXPECTED_RESET)) {
+      dirty[key] = distinguishable(resetValue);
+    }
+    useAppStore.setState(dirty as unknown as Parameters<typeof useAppStore.setState>[0]);
+
+    useAppStore.getState().clearAuth();
+
+    const after = useAppStore.getState() as unknown as Record<string, unknown>;
+    for (const [key, resetValue] of Object.entries(EXPECTED_RESET)) {
+      expect(after[key], `${key} was not reset by clearAuth`).toEqual(resetValue);
+    }
+  });
+
+  it('SIGNED_OUT_STATE and this test agree on which fields exist', () => {
+    // Catches drift in the other direction: a field ADDED to the source without
+    // being added here would otherwise go unasserted forever.
+    expect(Object.keys(SIGNED_OUT_STATE).sort()).toEqual(Object.keys(EXPECTED_RESET).sort());
   });
 });

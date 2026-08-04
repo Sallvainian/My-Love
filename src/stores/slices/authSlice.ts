@@ -12,6 +12,7 @@
  */
 
 import type { AppState, AppStateCreator } from '../types';
+import { revokePreviewUrlsFromNotes } from './notesSlice';
 
 /**
  * Every field that belongs to one account and must not outlive its session.
@@ -32,10 +33,15 @@ import type { AppState, AppStateCreator } from '../types';
  * loaders are gated on connectivity, and offline there is no correction at all.
  *
  * ADDING STATE? If it is derived from the signed-in user or their partner, add
- * it here. `signOutClearsAccountState.test.ts` seeds the composed store and
- * fails on any identifier that survives, so an omission shows up there.
+ * it here. `signOutClearsAccountState.test.ts` asserts that every key in this
+ * object is reset, so DELETING or renaming one fails there.
+ *
+ * It cannot catch a field that was never added — no test can know about state
+ * nobody declared. That gap is real; the compensating control is that a loader
+ * writing account data after an await needs an identity guard anyway, and those
+ * are covered by `loaderIdentityGuards.test.ts`.
  */
-const SIGNED_OUT_STATE = {
+export const SIGNED_OUT_STATE = {
   // moodSlice
   moods: [],
   partnerMoods: [],
@@ -99,7 +105,7 @@ export interface AuthSlice {
   clearAuth: () => void;
 }
 
-export const createAuthSlice: AppStateCreator<AuthSlice> = (set) => ({
+export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get) => ({
   userId: null,
   userEmail: null,
   isAuthenticated: false,
@@ -113,6 +119,12 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set) => ({
   },
 
   clearAuth: () => {
+    // Release the object URLs first. Every other writer of `notes` goes through
+    // this helper; assigning `[]` directly would strand them, because the
+    // unmount cleanup that would otherwise revoke reads the live array and
+    // clearAuth has already emptied it by the time React unmounts.
+    revokePreviewUrlsFromNotes(get().notes);
+
     // Everything account-scoped goes at once. Nothing is lost that is not
     // re-derivable: these are read caches of Supabase and IndexedDB, and
     // unsynced local entries stay in IndexedDB for their owner to pick up.

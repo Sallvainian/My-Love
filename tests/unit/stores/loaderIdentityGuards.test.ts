@@ -18,10 +18,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const getPartner = vi.fn();
 const getPendingRequests = vi.fn();
+const fetchMoods = vi.fn();
 
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
   getPartnerId: vi.fn(),
+}));
+
+vi.mock('../../../src/api/moodSyncService', () => ({
+  moodSyncService: { fetchMoods: () => fetchMoods() },
 }));
 
 vi.mock('../../../src/api/partnerService', () => ({
@@ -107,6 +112,35 @@ describe('loader identity guards', () => {
     expect(state.sentRequests).toEqual([]);
     expect(state.isLoadingRequests).toBe(false);
     expect(JSON.stringify(state)).not.toContain('THIRD-PARTY-EMAIL');
+  });
+
+  it('fetchPartnerMoods discards the partner mood notes after sign-out', async () => {
+    // Deleting this guard passed the entire 1047-test suite, so it had no
+    // coverage at all — on a branch whose whole subject is this class of leak.
+    const { getPartnerId } = await import('../../../src/api/supabaseClient');
+    vi.mocked(getPartnerId).mockResolvedValue('USER-B-ID');
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+    const pending = deferred<unknown[]>();
+    fetchMoods.mockReturnValue(pending.promise);
+
+    const inFlight = useAppStore.getState().fetchPartnerMoods();
+    useAppStore.getState().clearAuth();
+
+    pending.settle([
+      {
+        id: 'm1',
+        user_id: 'USER-B-ID',
+        mood_type: 'sad',
+        mood_types: ['sad'],
+        note: 'PARTNERS-PRIVATE-NOTE',
+        created_at: '2026-08-03T06:00:00.000Z',
+      },
+    ]);
+    await inFlight;
+
+    expect(useAppStore.getState().partnerMoods).toEqual([]);
+    expect(JSON.stringify(useAppStore.getState())).not.toContain('PARTNERS-PRIVATE-NOTE');
   });
 
   it('writes normally when the identity has not changed', async () => {

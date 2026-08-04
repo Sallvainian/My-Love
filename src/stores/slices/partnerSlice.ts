@@ -116,12 +116,24 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       return;
     }
 
+    // Search hits name third parties, so they get the same guard as the loaders
+    // above: discard the result if the signed-in user changed mid-flight, but
+    // release the flag rather than stranding it.
+    const requestedBy = get().userId;
     set({ isSearching: true });
     try {
       const results = await partnerService.searchUsers(query);
+      if (get().userId !== requestedBy) {
+        set({ isSearching: false });
+        return;
+      }
       set({ searchResults: results, isSearching: false });
     } catch (error) {
       console.error('[PartnerSlice] Error searching users:', error);
+      if (get().userId !== requestedBy) {
+        set({ isSearching: false });
+        return;
+      }
       set({ searchResults: [], isSearching: false });
     }
   },
