@@ -487,6 +487,19 @@ class MoodSyncService {
     if (!entry) {
       const subscribers = new Set<MoodSubscriber>();
 
+      // Built before `subscribe()` so the status callback can close over THIS
+      // entry instead of looking the topic up. A terminal CLOSED from a channel
+      // that has since been replaced under the same topic would otherwise be
+      // written onto its REPLACEMENT, and then replayed by the block below to
+      // the next consumer that attaches — pinning a live channel's connection
+      // indicator to disconnected. `channel` is filled in immediately after and
+      // is never read by the callback.
+      const newEntry: MoodChannelEntry = {
+        channel: undefined as unknown as MoodChannelEntry['channel'],
+        subscribers,
+        lastStatus: null,
+      };
+
       const channel = supabase
         .channel(topic, {
           config: {
@@ -514,14 +527,12 @@ class MoodSyncService {
         .subscribe((status) => {
           logger.debug('[MoodSyncService] Broadcast subscription status:', status);
 
-          const live = this.moodChannels.get(topic);
-          if (live) {
-            live.lastStatus = status;
-          }
+          newEntry.lastStatus = status;
           Array.from(subscribers).forEach((s) => s.onStatus?.(status));
         });
 
-      entry = { channel, subscribers, lastStatus: null };
+      newEntry.channel = channel;
+      entry = newEntry;
       // Nothing is awaited between the LAST read of `entry` above and this
       // insert, so two concurrent subscribers cannot both miss and both open a
       // channel. The earlier awaits are why that re-read exists: whoever
