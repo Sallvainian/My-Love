@@ -141,7 +141,6 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       // would strip hasPartner from every later test in this worker.
       const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
       const sessionId = seedResult.session_ids[0];
-      const user1Id = seedResult.test_user1_id;
       const user2Id = seedResult.test_user2_id!;
 
       // Use user2's token — exercises the user2_id code path in the RPC
