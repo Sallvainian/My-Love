@@ -44,12 +44,14 @@ If you deploy to a different URL, change the production base path accordingly.
 ### Manual Chunks (Code Splitting)
 
 ```typescript
-manualChunks: {
-  'vendor-react': ['react', 'react-dom'],
-  'vendor-supabase': ['@supabase/supabase-js'],
-  'vendor-state': ['zustand', 'idb', 'zod'],
-  'vendor-animation': ['framer-motion'],
-  'vendor-icons': ['lucide-react'],
+codeSplitting: {
+  groups: [
+    { name: 'vendor-react', test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/ },
+    { name: 'vendor-supabase', test: /[\\/]node_modules[\\/]@supabase[\\/]supabase-js[\\/]/ },
+    { name: 'vendor-state', test: /[\\/]node_modules[\\/](zustand|idb|zod)[\\/]/ },
+    { name: 'vendor-animation', test: /[\\/]node_modules[\\/]framer-motion[\\/]/ },
+    { name: 'vendor-icons', test: /[\\/]node_modules[\\/]lucide-react[\\/]/ },
+  ],
 },
 ```
 

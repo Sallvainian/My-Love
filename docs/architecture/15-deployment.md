@@ -136,12 +136,14 @@ When `SENTRY_AUTH_TOKEN` is absent (e.g., local development), source maps are di
 Manual chunk splitting in `vite.config.ts` creates predictable cache keys:
 
 ```typescript
-manualChunks: {
-  'vendor-react': ['react', 'react-dom'],
-  'vendor-supabase': ['@supabase/supabase-js'],
-  'vendor-state': ['zustand', 'idb', 'zod'],
-  'vendor-animation': ['framer-motion'],
-  'vendor-icons': ['lucide-react'],
+codeSplitting: {
+  groups: [
+    { name: 'vendor-react', test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/ },
+    { name: 'vendor-supabase', test: /[\\/]node_modules[\\/]@supabase[\\/]supabase-js[\\/]/ },
+    { name: 'vendor-state', test: /[\\/]node_modules[\\/](zustand|idb|zod)[\\/]/ },
+    { name: 'vendor-animation', test: /[\\/]node_modules[\\/]framer-motion[\\/]/ },
+    { name: 'vendor-icons', test: /[\\/]node_modules[\\/]lucide-react[\\/]/ },
+  ],
 },
 ```
 

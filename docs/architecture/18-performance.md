@@ -167,12 +167,14 @@ This avoids `Math.random()` in render paths, preventing hydration mismatches and
 Manual chunk splitting in `vite.config.ts` creates predictable, stable cache keys for vendor libraries:
 
 ```typescript
-manualChunks: {
-  'vendor-react': ['react', 'react-dom'],
-  'vendor-supabase': ['@supabase/supabase-js'],
-  'vendor-state': ['zustand', 'idb', 'zod'],
-  'vendor-animation': ['framer-motion'],
-  'vendor-icons': ['lucide-react'],
+codeSplitting: {
+  groups: [
+    { name: 'vendor-react', test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/ },
+    { name: 'vendor-supabase', test: /[\\/]node_modules[\\/]@supabase[\\/]supabase-js[\\/]/ },
+    { name: 'vendor-state', test: /[\\/]node_modules[\\/](zustand|idb|zod)[\\/]/ },
+    { name: 'vendor-animation', test: /[\\/]node_modules[\\/]framer-motion[\\/]/ },
+    { name: 'vendor-icons', test: /[\\/]node_modules[\\/]lucide-react[\\/]/ },
+  ],
 },
 ```
 
