@@ -110,7 +110,6 @@ export function ReadingContainer(): ReactElement | null {
         void loadSession(session.id);
       }
       // Story 4.3: Show "Reconnected" toast (green tint, 2s auto-dismiss)
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- presence transition drives toast
       setShowReconnectedToast(true);
       if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);
       reconnectedToastTimerRef.current = setTimeout(() => setShowReconnectedToast(false), 2000);
@@ -172,7 +171,6 @@ export function ReadingContainer(): ReactElement | null {
   useEffect(() => {
     if (session && session.currentStepIndex !== prevStepRef.current) {
       prevStepRef.current = session.currentStepIndex;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- view reset on step navigation
       setLocalView('verse');
     }
   }, [session?.currentStepIndex, session]);
