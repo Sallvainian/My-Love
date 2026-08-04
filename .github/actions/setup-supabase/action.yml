@@ -11,7 +11,11 @@ runs:
   using: 'composite'
   steps:
     - name: Setup Supabase CLI
-      uses: supabase/setup-cli@v1
+      # Pinned to a commit, not a tag: `@v1` resolved to a mutable *branch* (supabase
+      # never cut a floating `v1` tag), which is the unpinned-3rd-party-action risk
+      # CodeQL flags. Kept in lockstep with the workflows, which dependabot moved to v3 —
+      # dependabot only scans .github/workflows, so this file drifts unless bumped by hand.
+      uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
       with:
         version: ${{ inputs.supabase-version }}
 

@@ -136,7 +136,7 @@ export interface AuthSlice {
   clearAuth: () => void;
 }
 
-export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get) => ({
+export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => ({
   userId: null,
   userEmail: null,
   isAuthenticated: false,
