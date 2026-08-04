@@ -51,8 +51,11 @@ const EXPECTED_RESET: Record<string, unknown> = {
   unviewedCount: 0,
   isSubscribed: false,
   session: null,
+  scriptureLoading: false,
   activeSession: null,
+  isCheckingSession: false,
   coupleStats: null,
+  isStatsLoading: false,
   myRole: null,
   partnerJoined: false,
   myReady: false,
@@ -223,6 +226,35 @@ describe('clearAuth on sign-out', () => {
     for (const [key, resetValue] of Object.entries(EXPECTED_RESET)) {
       expect(after[key], `${key} was not reset by clearAuth`).toEqual(resetValue);
     }
+  });
+
+  it('revokes the preview URLs of the notes it is about to drop', () => {
+    // A failed image send keeps its blob URL on the note. Every other writer of
+    // `notes` revokes through the shared helper, and the unmount cleanup that
+    // would otherwise catch these reads the live array — which clearAuth has
+    // already emptied by the time React unmounts. Assigning `[]` without
+    // revoking first pins the compressed image in memory for the lifetime of
+    // the document, and nothing later can reach the URL to free it.
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    useAppStore.setState({
+      notes: [
+        {
+          id: 'note-failed',
+          from_user_id: SECRETS.userId,
+          to_user_id: 'USER-B-ID',
+          content: SECRETS.chatMessage,
+          created_at: '2026-08-03T06:00:00.000Z',
+          imagePreviewUrl: 'blob:http://localhost/ORPHANED-BLOB',
+        },
+      ],
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+
+    useAppStore.getState().clearAuth();
+
+    expect(revoke).toHaveBeenCalledWith('blob:http://localhost/ORPHANED-BLOB');
+    expect(useAppStore.getState().notes).toEqual([]);
+    revoke.mockRestore();
   });
 
   it('SIGNED_OUT_STATE and this test agree on which fields exist', () => {

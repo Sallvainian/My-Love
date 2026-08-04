@@ -76,8 +76,11 @@ export const SIGNED_OUT_STATE = {
 
   // scriptureReadingSlice
   session: null,
+  scriptureLoading: false,
   activeSession: null,
+  isCheckingSession: false,
   coupleStats: null,
+  isStatsLoading: false,
   myRole: null,
   partnerJoined: false,
   myReady: false,
