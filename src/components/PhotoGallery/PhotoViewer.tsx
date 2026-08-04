@@ -155,7 +155,8 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     };
   }, [currentIndex, photos, canNavigateNext, canNavigatePrev]);
 
-  // Reset zoom and pan when navigating to different photo
+  // Return the viewer to an untransformed state waiting on a load. Used when navigating to a
+  // different photo and when retrying a failed one — both arrive at the same place.
   const resetTransform = useCallback(() => {
     setScale(MIN_ZOOM);
     x.set(0);
@@ -349,10 +350,25 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     setImageError(true);
   }, []);
 
-  const handleRetryLoad = useCallback(() => {
-    setIsLoading(true);
-    setImageError(false);
-  }, []);
+  // Retry wants exactly what navigation wants: an untransformed viewer waiting on a load. It
+  // shares resetTransform rather than restating it, because these two paths silently drifting
+  // is the whole bug.
+  //
+  // Why the tap is stopped here. onClick={handleDoubleTap} is on the outer motion.div, which
+  // stays mounted while the image is errored — only the <img> is behind the !imageError
+  // guard — and the Retry button is inside it. So one tap on Retry runs both handlers, and
+  // handleDoubleTap's setScale lands second. Tap the error card, then tap Retry a moment
+  // later, and the second tap reads as a double-tap: the reset is immediately undone and the
+  // photo returns at 2x with a live drag box on a card nobody deliberately zoomed. Stopping
+  // propagation also keeps this tap from seeding lastTap for the next tap on the photo that
+  // is about to load.
+  const handleRetryLoad = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      resetTransform();
+    },
+    [resetTransform]
+  );
 
   if (!currentPhoto) {
     return null;
