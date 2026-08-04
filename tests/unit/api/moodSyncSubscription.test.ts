@@ -444,6 +444,48 @@ describe('subscribeMoodUpdates channel ownership', () => {
     expect(removeChannel).toHaveBeenCalledTimes(2);
   });
 
+  it("a dead channel's late CLOSED does not pin its replacement to disconnected", async () => {
+    // The status callback used to look the entry up by topic when stashing
+    // `lastStatus`. A terminal status from a channel that has since been
+    // replaced under the same topic therefore landed on its REPLACEMENT, and
+    // the replay below handed that stale CLOSED to the next consumer to
+    // attach — a live channel reporting itself disconnected, permanently.
+    const pendingA = moodSyncService.subscribeMoodUpdates(vi.fn());
+    resolveNextSession();
+    const unsubscribeA = await pendingA;
+
+    const dead = constructedChannels[0];
+    emitStatus(dead, 'SUBSCRIBED');
+
+    unsubscribeA();
+    await settleLeaves();
+
+    // A replacement opens under the same topic.
+    const pendingB = moodSyncService.subscribeMoodUpdates(vi.fn());
+    resolveNextSession();
+    const unsubscribeB = await pendingB;
+
+    const live = constructedChannels[1];
+    expect(live).not.toBe(dead);
+    emitStatus(live, 'SUBSCRIBED');
+
+    // The old channel's terminal callback finally fires, after its replacement
+    // is already registered under the topic.
+    emitStatus(dead, 'CLOSED');
+
+    // A third consumer attaches to the LIVE channel and gets the replay.
+    const onStatusC = vi.fn();
+    const pendingC = moodSyncService.subscribeMoodUpdates(vi.fn(), onStatusC);
+    resolveNextSession();
+    const unsubscribeC = await pendingC;
+
+    expect(onStatusC).toHaveBeenCalledWith('SUBSCRIBED');
+    expect(onStatusC).not.toHaveBeenCalledWith('CLOSED');
+
+    unsubscribeB();
+    unsubscribeC();
+  });
+
   it('returns a no-op unsubscribe when there is no session', async () => {
     const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
     const resolve = sessionQueue.shift();

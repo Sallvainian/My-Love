@@ -285,7 +285,9 @@ class StorageService {
       await this.init();
       logger.debug('[StorageService] Clearing all data from IndexedDB...');
       await Promise.all(
-        [...this.db!.objectStoreNames].map((storeName) => this.db!.clear(storeName))
+        // Array.from, not spread: DOMStringList is array-like but is not
+        // specified as iterable, so the spread is not portable.
+        Array.from(this.db!.objectStoreNames).map((storeName) => this.db!.clear(storeName))
       );
       logger.debug('[StorageService] All data cleared successfully');
     } catch (error) {
