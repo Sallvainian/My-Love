@@ -45,67 +45,82 @@ import { revokePreviewUrlsFromNotes } from './notesSlice';
  * nobody declared. That gap is real; the compensating control is that a loader
  * writing account data after an await needs an identity guard anyway, and those
  * are covered by `loaderIdentityGuards.test.ts`.
+ *
+ * A FUNCTION, not a constant, for two reasons: `syncStatus.isOnline` is device
+ * state rather than account state and has to be read at sign-out rather than at
+ * module load, and building fresh arrays each time removes the standing
+ * requirement that no slice ever mutate a store array in place.
  */
-export const SIGNED_OUT_STATE = {
-  // moodSlice
-  moods: [],
-  partnerMoods: [],
+export function signedOutState() {
+  return {
+    // moodSlice
+    moods: [],
+    partnerMoods: [],
+    syncStatus: {
+      pendingMoods: 0,
+      // Whose moods are pending is account state; whether the device has a
+      // network is not, so it is carried across rather than reset.
+      isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      lastSyncAt: undefined,
+      isSyncing: false,
+    },
 
-  // partnerSlice — identity, pending requests and search hits all name real people
-  partner: null,
-  isLoadingPartner: false,
-  sentRequests: [],
-  receivedRequests: [],
-  isLoadingRequests: false,
-  searchResults: [],
-  isSearching: false,
+    // partnerSlice — identity, pending requests and search hits all name real people
+    partner: null,
+    isLoadingPartner: false,
+    sentRequests: [],
+    receivedRequests: [],
+    isLoadingRequests: false,
+    searchResults: [],
+    isSearching: false,
 
-  // notesSlice — the love-notes chat is the largest private disclosure here
-  notes: [],
-  notesIsLoading: false,
-  notesError: null,
-  notesHasMore: true,
-  sentMessageTimestamps: [],
+    // notesSlice — the love-notes chat is the largest private disclosure here
+    notes: [],
+    notesIsLoading: false,
+    notesError: null,
+    notesHasMore: true,
+    sentMessageTimestamps: [],
 
-  // photosSlice
-  photos: [],
-  selectedPhotoId: null,
-  isUploading: false,
-  uploadProgress: 0,
-  storageWarning: null,
+    // photosSlice
+    photos: [],
+    selectedPhotoId: null,
+    isUploading: false,
+    uploadProgress: 0,
+    storageWarning: null,
 
-  // interactionsSlice
-  interactions: [],
-  unviewedCount: 0,
-  isSubscribed: false,
+    // interactionsSlice
+    interactions: [],
+    unviewedCount: 0,
+    isSubscribed: false,
 
-  // scriptureReadingSlice
-  session: null,
-  scriptureLoading: false,
-  // Write locks, not spinners: advanceStep, saveAndExit, saveSession,
-  // retryFailedWrite and endSession all early-return while isSyncing is true,
-  // and lockIn does the same on isPendingLockIn. A sign-out landing mid-write
-  // leaves the lock held — createSession does not clear it — so the next
-  // account starts a reading session with every Next tap silently dropped.
-  isSyncing: false,
-  isPendingLockIn: false,
-  isPendingReflection: false,
-  activeSession: null,
-  isCheckingSession: false,
-  coupleStats: null,
-  isStatsLoading: false,
-  myRole: null,
-  partnerJoined: false,
-  myReady: false,
-  partnerReady: false,
-  partnerLocked: false,
-  partnerDisconnected: false,
-  partnerDisconnectedAt: null,
-  countdownStartedAt: null,
-  pendingRetry: null,
-  scriptureError: null,
-  isInitialized: false,
-} satisfies Partial<AppState>;
+    // scriptureReadingSlice
+    session: null,
+    scriptureLoading: false,
+    // Write locks, not spinners: advanceStep, saveAndExit, saveSession,
+    // retryFailedWrite and endSession all early-return while isSyncing is true,
+    // and lockIn does the same on isPendingLockIn. A sign-out landing mid-write
+    // leaves the lock held — createSession does not clear it — so the next
+    // account starts a reading session with every Next tap silently dropped.
+    isSyncing: false,
+    isPendingLockIn: false,
+    isPendingReflection: false,
+    activeSession: null,
+    isCheckingSession: false,
+    coupleStats: null,
+    isStatsLoading: false,
+    myRole: null,
+    partnerJoined: false,
+    myReady: false,
+    partnerReady: false,
+    partnerLocked: false,
+    partnerDisconnected: false,
+    partnerDisconnectedAt: null,
+    countdownStartedAt: null,
+    pendingRetry: null,
+    scriptureError: null,
+    isInitialized: false,
+  } satisfies Partial<AppState>;
+}
 
 export interface AuthSlice {
   /** Logged-in user's auth ID — null when signed out */
@@ -148,7 +163,7 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get) => ({
       userId: null,
       userEmail: null,
       isAuthenticated: false,
-      ...SIGNED_OUT_STATE,
+      ...signedOutState(),
     });
   },
 });

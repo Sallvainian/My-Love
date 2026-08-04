@@ -119,15 +119,21 @@ describe('sw-db against a real database', () => {
       expect(pending[0].userId).toBe(USER_A);
     });
 
-    it('returns every user’s rows when no owner is given', async () => {
-      // The unscoped read is still reachable and must keep its old meaning;
-      // sw.ts simply no longer uses it.
+    it('fails closed rather than open when the owner is missing', async () => {
+      // `userId` is a required parameter now. It used to be optional, and
+      // omitting it returned EVERY account's rows — the same cross-account read
+      // this scoping exists to remove, still reachable by leaving an argument
+      // off. TypeScript rejects that at the call site; this pins the runtime
+      // direction too, for a caller that reaches it through an `any` or a
+      // value that is undefined at runtime.
       await seed([
         mood({ userId: USER_A, date: '2026-08-01' }),
         mood({ userId: USER_B, date: '2026-08-01' }),
       ]);
 
-      expect(await getPendingMoods()).toHaveLength(2);
+      const pending = await getPendingMoods(undefined as unknown as string);
+
+      expect(pending).toEqual([]);
     });
 
     it('returns an empty list when the user has nothing pending', async () => {

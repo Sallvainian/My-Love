@@ -150,13 +150,13 @@ describe('moodService', () => {
   describe('getUnsyncedMoods', () => {
     it('returns newly created moods (unsynced by default)', async () => {
       await moodService.create(userId, ['happy']);
-      const unsynced = await moodService.getUnsyncedMoods();
+      const unsynced = await moodService.getUnsyncedMoods(userId);
       expect(unsynced.length).toBe(1);
       expect(unsynced[0].synced).toBe(false);
     });
 
     it('returns empty array when no moods exist', async () => {
-      const result = await moodService.getUnsyncedMoods();
+      const result = await moodService.getUnsyncedMoods(userId);
       expect(result).toEqual([]);
     });
   });
@@ -260,7 +260,6 @@ describe('moodService', () => {
 
       expect(await moodService.getUnsyncedMoods(userId)).toHaveLength(1);
       expect(await moodService.getUnsyncedMoods(partnerId)).toHaveLength(1);
-      expect(await moodService.getUnsyncedMoods()).toHaveLength(2);
     });
   });
 });
