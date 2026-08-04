@@ -201,10 +201,21 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   ...initialScriptureState,
 
   createSession: async (mode, partnerId) => {
+    const requestedBy = get().userId;
     set({ scriptureLoading: true, scriptureError: null });
 
     try {
       const session = await scriptureReadingService.createSession(mode, partnerId);
+
+      // Identity guard, as in loadSession below. A tap rather than an auto-fired
+      // loader, so the window is narrower — but the row is created server-side
+      // either way, and writing it here hands the next account a session it is
+      // not a participant in.
+      if (get().userId !== requestedBy) {
+        set({ scriptureLoading: false });
+        return;
+      }
+
       set({ session, scriptureLoading: false, isInitialized: true });
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)

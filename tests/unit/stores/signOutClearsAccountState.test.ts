@@ -52,6 +52,9 @@ const EXPECTED_RESET: Record<string, unknown> = {
   isSubscribed: false,
   session: null,
   scriptureLoading: false,
+  isSyncing: false,
+  isPendingLockIn: false,
+  isPendingReflection: false,
   activeSession: null,
   isCheckingSession: false,
   coupleStats: null,
@@ -226,6 +229,23 @@ describe('clearAuth on sign-out', () => {
     for (const [key, resetValue] of Object.entries(EXPECTED_RESET)) {
       expect(after[key], `${key} was not reset by clearAuth`).toEqual(resetValue);
     }
+  });
+
+  it('releases the scripture write lock so the next account is not wedged', () => {
+    // `isSyncing` is a lock, not a spinner: advanceStep, saveAndExit,
+    // saveSession, retryFailedWrite and endSession all early-return while it is
+    // held, and `createSession` does not clear it. Sign out with a scripture
+    // write in flight (a hung fetch has no timeout) and the next account starts
+    // a reading session in which every Next tap is silently dropped.
+    useAppStore.setState({
+      isSyncing: true,
+      isPendingLockIn: true,
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+
+    useAppStore.getState().clearAuth();
+
+    expect(useAppStore.getState().isSyncing).toBe(false);
+    expect(useAppStore.getState().isPendingLockIn).toBe(false);
   });
 
   it('revokes the preview URLs of the notes it is about to drop', () => {

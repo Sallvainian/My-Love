@@ -200,6 +200,12 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
         : [];
       const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
+      // Identity guard, same as loadMoods above. Only a count rather than free
+      // text, so this is well below the disclosures the other guards close —
+      // but it is the same shape, and the badge it feeds is read straight off
+      // the store with no re-derivation.
+      if (get().userId !== currentUserId) return;
+
       set((state) => ({
         syncStatus: {
           ...state.syncStatus,
