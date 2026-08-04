@@ -197,7 +197,11 @@ function resetSessionState(
 // Slice creator (Subtask 3.4)
 // ============================================
 
-export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set, get) => ({
+export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (
+  set,
+  get,
+  _api
+) => ({
   ...initialScriptureState,
 
   createSession: async (mode, partnerId) => {
