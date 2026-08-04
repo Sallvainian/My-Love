@@ -41,6 +41,7 @@ const getInteractionHistory = vi.fn();
 const getUserSessions = vi.fn();
 const getCoupleStats = vi.fn();
 const getSession = vi.fn();
+const createSession = vi.fn();
 const loveNotesQuery = vi.fn();
 
 vi.mock('../../../src/api/supabaseClient', () => ({
@@ -94,6 +95,7 @@ vi.mock('../../../src/services/scriptureReadingService', async (importOriginal) 
       getCoupleStats: () => getCoupleStats(),
       getSession: (sessionId: string, onRefresh: (s: unknown) => void) =>
         getSession(sessionId, onRefresh),
+      createSession: (mode: string, partnerId?: string) => createSession(mode, partnerId),
     },
   };
 });
@@ -689,6 +691,46 @@ describe('loader identity guards', () => {
       expect(JSON.stringify(useAppStore.getState())).not.toContain(
         'A-REFLECTION-PUSHED-AFTER-SWITCH'
       );
+    });
+  });
+
+  describe('createSession', () => {
+    it("does not hand the new account a session it is not a participant in", async () => {
+      const pending = deferred<unknown>();
+      createSession.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().createSession('solo');
+      switchToUserC({ session: null });
+
+      pending.settle({
+        id: 'A-CREATED-SESSION-ID',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        status: 'in_progress',
+        version: 1,
+        startedAt: new Date('2026-08-03T06:00:00.000Z'),
+      });
+      await inFlight;
+
+      expect(useAppStore.getState().session).toBeNull();
+      expect(useAppStore.getState().scriptureLoading).toBe(false);
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-CREATED-SESSION-ID');
+    });
+  });
+
+  describe('updateSyncStatus', () => {
+    it("does not badge the new account with the previous one's pending count", async () => {
+      const pending = deferred<unknown[]>();
+      getUnsyncedMoods.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().updateSyncStatus();
+      switchToUserC();
+
+      pending.settle([{ id: 1 }, { id: 2 }, { id: 3 }]);
+      await inFlight;
+
+      expect(useAppStore.getState().syncStatus.pendingMoods).toBe(0);
     });
   });
 

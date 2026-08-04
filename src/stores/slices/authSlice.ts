@@ -36,6 +36,11 @@ import { revokePreviewUrlsFromNotes } from './notesSlice';
  * it here. `signOutClearsAccountState.test.ts` asserts that every key in this
  * object is reset, so DELETING or renaming one fails there.
  *
+ * Loading flags and write locks belong here too, even though they disclose
+ * nothing. A stranded flag is a dead screen for the next account: the partner
+ * tab renders neither branch while `isLoadingPartner` is true, and a held
+ * `isSyncing` makes every Next tap in a reading session a no-op.
+ *
  * It cannot catch a field that was never added — no test can know about state
  * nobody declared. That gap is real; the compensating control is that a loader
  * writing account data after an await needs an identity guard anyway, and those
@@ -77,6 +82,14 @@ export const SIGNED_OUT_STATE = {
   // scriptureReadingSlice
   session: null,
   scriptureLoading: false,
+  // Write locks, not spinners: advanceStep, saveAndExit, saveSession,
+  // retryFailedWrite and endSession all early-return while isSyncing is true,
+  // and lockIn does the same on isPendingLockIn. A sign-out landing mid-write
+  // leaves the lock held — createSession does not clear it — so the next
+  // account starts a reading session with every Next tap silently dropped.
+  isSyncing: false,
+  isPendingLockIn: false,
+  isPendingReflection: false,
   activeSession: null,
   isCheckingSession: false,
   coupleStats: null,
