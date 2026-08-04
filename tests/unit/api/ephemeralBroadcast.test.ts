@@ -237,18 +237,77 @@ describe('sendEphemeralBroadcast', () => {
     leaveQueue.shift()!();
     await flush();
 
-    // Still one. That leave removed the last open channel, so the socket is now
-    // mid-disconnect and opening here would produce a channel that never joins.
+    // That leave removed the last open channel, so the socket is now
+    // mid-disconnect. The second send claims the topic straight away — that is
+    // deliberate, and it is what stops a send on a DIFFERENT topic being the
+    // last channel out and disconnecting from under this one. What it must NOT
+    // do is join: subscribing here calls socket.connect(), which returns early
+    // while disconnecting, and the channel would sit in 'joining' until its own
+    // 10s timeout.
     expect(socket.state).toBe('disconnecting');
-    expect(constructedChannels).toHaveLength(1);
+    expect(constructedChannels).toHaveLength(2);
+    // A fresh object, not the dying one handed back by topic lookup.
+    expect(constructedChannels[1]).not.toBe(constructedChannels[0]);
+    expect(constructedChannels[1].state).toBe('closed');
+    expect(constructedChannels[1].statusHandler).toBeNull();
 
-    // Once the socket settles the queue moves on.
+    // Once the socket settles it joins.
     await new Promise((r) => setTimeout(r, socket.windowMs + 20));
     expect(constructedChannels).toHaveLength(2);
+    expect(constructedChannels[1].state).toBe('joined');
 
     gateSends = false;
     await settle();
     await Promise.all([first, second]);
+  });
+
+  it('a send on another topic does not disconnect the socket under this one', async () => {
+    // The queues are per-topic; the socket is global. So a send on
+    // `love-notes:<partner>` can be between its socket check and its join at
+    // the exact moment a send on `mood-updates:<partner>` finishes its
+    // `finally` — and if that leave finds an empty registry it disconnects,
+    // leaving the first channel joined to nothing and reporting TIMED_OUT ten
+    // seconds later. Claiming the topic before waiting is what prevents it:
+    // once this channel is in the registry, no other teardown can be the last
+    // one out.
+    gateSends = true;
+
+    const other = sendEphemeralBroadcast('love-notes:partner-1', 'new_note', { id: 'note-1' });
+    await flush();
+    expect(constructedChannels).toHaveLength(1);
+
+    sendGate.shift()!();
+    await flush();
+    // Its channel is leaving, and it is currently the only one registered.
+    expect(leaveQueue).toHaveLength(1);
+
+    // The gate stays up, so the second send parks at 'joined' after subscribing
+    // instead of racing through to 'leaving' before this test can look at it.
+
+    // The interleaving that matters, forced rather than hoped for. The chain
+    // runs openSendClose one microtask after this call, and this test's own
+    // continuation was queued before that microtask queued its next — so the
+    // ack below lands exactly between the send's socket check and its join.
+    const mine = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    await Promise.resolve();
+    leaveQueue.shift()!();
+    await flush();
+
+    // Claiming the topic before the wait is what makes this hold: the ack found
+    // this channel already registered, so it was not the last one out and the
+    // socket stayed up. Check the state first — under the other order `mine`
+    // sits in 'joining' and never settles until its own 15s timeout, so
+    // awaiting it here would hang instead of failing.
+    expect(socket.state).toBe('connected');
+    expect(constructedChannels[1].state).toBe('joined');
+
+    gateSends = false;
+    await settle();
+    await Promise.all([other, mine]);
+
+    // Both actually delivered — neither joined a socket that had gone away.
+    const delivered = constructedChannels.flatMap((c) => c.sent.map((s) => s.payload.id));
+    expect(delivered).toEqual(['note-1', 'mood-1']);
   });
 
   it('a failed send does not strand the next one', async () => {

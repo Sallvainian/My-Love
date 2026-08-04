@@ -55,12 +55,23 @@ async function openSendClose(
   event: string,
   payload: Record<string, unknown>
 ): Promise<void> {
-  // The previous send in this queue closed its channel, and if it was the last
-  // one open anywhere in the app that also tore down the socket. Opening now
-  // would hand back a channel whose join is never sent -- see realtimeSocket.
-  await waitForSocketReady();
-
+  // Claim the topic BEFORE waiting on the socket, not after. `channel()` pushes
+  // into the client's registry synchronously (RealtimeClient.js:277-288), and
+  // `removeChannel` only tears the socket down when that registry is empty
+  // (:215-217) -- so once we are in it, no other topic's teardown can be the
+  // last channel out and disconnect from under us.
+  //
+  // The queues are per-topic but the socket is global, which is what made the
+  // other order wrong: awaiting first left a microtask in which a send on a
+  // DIFFERENT topic could finish its `finally`, drop the last channel and
+  // disconnect. This channel would then join nothing and report TIMED_OUT ten
+  // seconds later.
   const channel = supabase.channel(topic);
+
+  // Now wait out any disconnect already in flight. Subscribing inside that
+  // window calls socket.connect(), which returns early while disconnecting, so
+  // the join is never sent -- see realtimeSocket.
+  await waitForSocketReady();
 
   try {
     await new Promise<void>((resolve, reject) => {
