@@ -25,6 +25,15 @@ export default tseslint.config(
   // Base configs
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  // A disable directive is a written exemption, so a dead one is a false claim about the
+  // code. ESLint reports these as warnings by default and `npm run lint` passes no
+  // --max-warnings, which is how the stale suppressions cleaned up in 2226cc01 and
+  // e9d41bad survived in the first place. Error makes CI reject them.
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: 'error',
+    },
+  },
   {
     files: ['**/*.{ts,tsx}'],
     plugins: {
@@ -39,11 +48,14 @@ export default tseslint.config(
       // React Hooks rules
       ...reactHooks.configs.recommended.rules,
 
-      // React 19 strict rules - downgraded to warn for legitimate patterns
-      // These patterns are valid: blob URL lifecycle, timer setup, animation randomization
-      // See: https://react.dev/learn/you-might-not-need-an-effect (these are recommendations, not errors)
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/purity': 'warn',
+      // React 19 strict rules. Every site in the tree is either fixed or carries a
+      // file-local disable directive with a written rationale, so these are errors: a new
+      // violation is a mistake until someone justifies it in place. The legitimate patterns
+      // (blob URL lifecycle, async fetch-on-mount, subscription bridges) stay opted out one
+      // line at a time rather than blanket-downgraded for the whole codebase.
+      // See: https://react.dev/learn/you-might-not-need-an-effect
+      'react-hooks/set-state-in-effect': 'error',
+      'react-hooks/purity': 'error',
 
       // React Refresh rules
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
