@@ -301,8 +301,19 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       // Reverse to maintain chat order (oldest first) and prepend to existing notes
       const olderNotes = (data || []).reverse() as LoveNote[];
 
+      // Identity guard, as in fetchNotes above — but this one is worse than the
+      // plain case. `notes` was destructured before both awaits, so writing it
+      // back restores the messages that were on screen at sign-out as well as
+      // the page just fetched: the whole conversation, not one page of it.
+      if (get().userId !== userId) {
+        set({ notesIsLoading: false });
+        return;
+      }
+
+      // Re-read rather than reusing the pre-await capture, so a note that
+      // arrived over realtime while the page was in flight is not dropped.
       set({
-        notes: [...olderNotes, ...notes],
+        notes: [...olderNotes, ...get().notes],
         notesIsLoading: false,
         notesHasMore: (data?.length || 0) === limit,
       });
