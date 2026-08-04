@@ -186,11 +186,22 @@ describe('storageService schema', () => {
         upgrade(database) {
           database.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
           database.createObjectStore('photos', { keyPath: photosKeyPath, autoIncrement: true });
+          // Pre-v7 moods: unique on `date` ALONE. This is the index the branch
+          // exists to replace, and without seeding it here the v7 migration
+          // branch is never reached with a non-zero oldVersion through
+          // storageService — which is the open that wins the race on a real
+          // profile.
+          const moods = database.createObjectStore('moods', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          moods.createIndex('by-date', 'date', { unique: true });
         },
       });
-      const tx = db.transaction(['messages', 'photos'], 'readwrite');
+      const tx = db.transaction(['messages', 'photos', 'moods'], 'readwrite');
       await tx.objectStore('messages').add({ text: 'keep me' });
       await tx.objectStore('photos').add({ caption: 'a photo' });
+      await tx.objectStore('moods').add({ userId: 'user-A', date: '2026-08-01', synced: true });
       await tx.done;
       db.close();
     }
@@ -210,6 +221,51 @@ describe('storageService schema', () => {
         expect(await db.getAll('photos')).toHaveLength(0);
         // Everything else is additive, so the message survives the same upgrade.
         expect(await db.getAll('messages')).toHaveLength(1);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('[from v5] migrates the moods index to by-user-date', async () => {
+      // The branch's headline migration, reached through storageService rather
+      // than by calling upgradeDb directly — storage.ts has to thread the
+      // versionchange transaction through for this to happen at all, and
+      // dropping that argument silently skips the whole branch.
+      await seedLegacy(5, 'id');
+
+      const storageService = await freshStorageService();
+      await storageService.init();
+
+      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+      try {
+        const tx = db.transaction('moods', 'readonly');
+        const indexNames = Array.from(tx.store.indexNames);
+        await tx.done;
+
+        expect(indexNames).toContain('by-user-date');
+        // Unique on the date alone collided across accounts: on a shared
+        // device the second partner to log a mood that day was rejected.
+        expect(indexNames).not.toContain('by-date');
+        // And the seeded row survived the index swap.
+        expect(await db.getAll('moods')).toHaveLength(1);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('[from v2] keeps photos rows — the drop boundary is below v2', async () => {
+      // Pins WHERE the boundary sits, not merely that it exists. v2 already
+      // holds the modern photos schema, so widening the gate to `oldVersion < 3`
+      // would start destroying good rows, and the v1/v5 cases alone cannot see
+      // that.
+      await seedLegacy(2, 'id');
+
+      const storageService = await freshStorageService();
+      await storageService.init();
+
+      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+      try {
+        expect(await db.getAll('photos')).toHaveLength(1);
       } finally {
         db.close();
       }

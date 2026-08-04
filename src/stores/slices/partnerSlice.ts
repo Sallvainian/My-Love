@@ -51,20 +51,30 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
 
   // Actions
   loadPartner: async () => {
+    // Whose data this is, captured before the await. The Sign Out control sits
+    // in the bottom nav on the same screen that fires this, and the request
+    // went out with a still-valid token — so it can land AFTER clearAuth and
+    // write the previous account's partner straight back over the reset.
+    const requestedBy = get().userId;
     set({ isLoadingPartner: true });
     try {
       const partner = await partnerService.getPartner();
+      if (get().userId !== requestedBy) return;
       set({ partner, isLoadingPartner: false });
     } catch (error) {
       console.error('[PartnerSlice] Error loading partner:', error);
+      if (get().userId !== requestedBy) return;
       set({ partner: null, isLoadingPartner: false });
     }
   },
 
   loadPendingRequests: async () => {
+    // Same identity guard as loadPartner: these name real third parties.
+    const requestedBy = get().userId;
     set({ isLoadingRequests: true });
     try {
       const { sent, received } = await partnerService.getPendingRequests();
+      if (get().userId !== requestedBy) return;
       set({
         sentRequests: sent,
         receivedRequests: received,
@@ -72,6 +82,7 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       });
     } catch (error) {
       console.error('[PartnerSlice] Error loading requests:', error);
+      if (get().userId !== requestedBy) return;
       set({
         sentRequests: [],
         receivedRequests: [],

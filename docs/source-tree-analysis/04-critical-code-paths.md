@@ -158,7 +158,7 @@ Any service calls init():
 upgradeDb(db, oldVersion, newVersion):
   |-- v1: Create messages store (by-category, by-date indexes)
   |-- v2: Delete old photos store, recreate with imageBlob field
-  |-- v3: Create moods store (by-date unique index)
+  |-- v3: Create moods store (by-user-date unique index as of v7)
   |-- v4: Create sw-auth store
   |-- v5: Create 4 scripture stores (sessions, reflections, bookmarks, messages)
 ```
