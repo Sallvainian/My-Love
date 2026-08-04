@@ -111,7 +111,11 @@ function App() {
 
   const [showSplash, setShowSplash] = useState(shouldShowWelcome);
   const [splashSource, setSplashSource] = useState<'auto' | 'manual'>('auto');
-  const [showAdmin, setShowAdmin] = useState(false);
+  // Decided once, by the URL the page was loaded with, so it belongs in the initializer
+  // rather than in a mount effect that needs a second render to correct itself. Nothing
+  // re-derives this from the URL later: after mount the flag belongs entirely to
+  // handleAdminExit, whose pushState is URL bookkeeping and never reads back into state.
+  const [showAdmin, setShowAdmin] = useState(() => window.location.pathname.includes('/admin'));
   const [isPhotoUploadOpen, setIsPhotoUploadOpen] = useState(false);
 
   // Story 1.5: Sync completion feedback state (AC-1.5.4)
@@ -145,12 +149,6 @@ function App() {
 
   // Story 4.5: Initial route detection and popstate listener (AC-4.5.5, AC-4.5.6)
   useEffect(() => {
-    // Check admin route (does not short-circuit: routing must still be wired up
-    // so Back/Forward keeps working after the user exits the admin panel)
-    if (window.location.pathname.includes('/admin')) {
-      setShowAdmin(true);
-    }
-
     // AC-4.5.5: Initial route detection - set view based on URL
     const routePath = getRoutePath(window.location.pathname);
     const initialView =

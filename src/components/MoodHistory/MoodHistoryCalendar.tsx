@@ -106,6 +106,14 @@ export function MoodHistoryCalendar() {
 
   // Load moods when month changes
   useEffect(() => {
+    // loadMoodsForMonth flips isLoading before it awaits Supabase, and clears the mood state
+    // outright when nobody is signed in. Both are the synchronous setState the rule objects
+    // to, but they are the begin-fetch and no-session transitions of an external data
+    // lifecycle rather than anything derivable at render time. Removing them means collapsing
+    // moods/moodMap/isLoading into one month-keyed state and deriving loading during render,
+    // which changes the first frame signed-out users see and the render count on every month
+    // change — and this component has no test coverage that would catch the regression.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch lifecycle, see above
     loadMoodsForMonth(currentYear, currentMonth);
   }, [currentYear, currentMonth, loadMoodsForMonth]);
 

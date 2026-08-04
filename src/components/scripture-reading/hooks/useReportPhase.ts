@@ -288,6 +288,12 @@ export function useReportPhase({
     let isActive = true;
 
     if (!hasPartner) {
+      // The unlinked screen has to be on screen while the completion RPC below is still in
+      // flight; deferring this into that async block would leave 'compose' rendered for a
+      // full round trip. reportSubPhase is control state, not a derivation — handleMessageSend,
+      // handleMessageSkip and handleRetrySessionCompletion write it too, including
+      // 'completion-error', which no combination of session and partner props can express.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- unlinked screen must render before the completion RPC resolves
       setReportSubPhase('complete-unlinked');
       if (session.currentPhase === 'complete' || session.status === 'complete') {
         setCompletionError(null);
@@ -323,6 +329,11 @@ export function useReportPhase({
   // Story 2.3: Load report data when report view is actually displayed
   useEffect(() => {
     if ((reportSubPhase !== 'report' && reportSubPhase !== 'complete-unlinked') || !session) return;
+    // Clearing the previous failure here, rather than only in handleRetryReportLoad, is what
+    // stops a stale error banner outliving its request when a changed session object
+    // re-triggers this load on its own. Hiding it inside the async block below would run at
+    // the same moment and only move it out of the linter's view.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the stale failure banner for the load starting below
     setReportLoadError(null);
 
     let isActive = true;
