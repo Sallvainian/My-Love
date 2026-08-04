@@ -162,6 +162,13 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     y.set(0);
     setImageError(false);
     setIsLoading(true);
+    // The incoming photo has not reported its size yet, and the outgoing one's is no longer
+    // true of anything on screen. Zeroing here holds the same invariant handleImageError
+    // does — no image reporting a size means no pan — and closes the window where a
+    // double-tap during the new photo's load would size its drag box from the old aspect
+    // ratio. The ref-reading effect this replaced got the clearing for free, because
+    // key={photo.id} remounts the <img> and naturalWidth is 0 until decode.
+    setNaturalSize({ width: 0, height: 0 });
   }, [x, y]);
 
   // Navigate to next/previous photo
