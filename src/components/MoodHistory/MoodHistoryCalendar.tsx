@@ -106,6 +106,21 @@ export function MoodHistoryCalendar() {
 
   // Load moods when month changes
   useEffect(() => {
+    // loadMoodsForMonth flips isLoading before its first await, and clears the mood state
+    // outright when nobody is signed in. Both are the synchronous setState the rule objects
+    // to, but they are the begin-read and no-session transitions of a store lifecycle that
+    // lives outside React, not values derivable at render time.
+    //
+    // To be accurate about what is being awaited: getMoodsInRange is a local IndexedDB
+    // range scan, not a network call — so the skeleton this flag drives is usually on
+    // screen for a frame at most. The exception is the first read of a session, where
+    // BaseIndexedDBService.init() may be opening the database and running a schema upgrade.
+    //
+    // Removing the flag means collapsing moods/moodMap/isLoading into one month-keyed state
+    // and deriving loading during render. That changes the first frame signed-out users see
+    // and the render count on every month change, and this component has no test coverage
+    // that would catch a regression, so it is not a change to make in a lint sweep.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- store read lifecycle, see above
     loadMoodsForMonth(currentYear, currentMonth);
   }, [currentYear, currentMonth, loadMoodsForMonth]);
 

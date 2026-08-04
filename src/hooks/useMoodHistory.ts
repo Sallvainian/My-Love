@@ -69,6 +69,13 @@ export function useMoodHistory(userId: string): UseMoodHistoryReturn {
   }, [userId]);
 
   useEffect(() => {
+    // The synchronous setIsLoading(true)/setError(null) inside loadInitialMoods is the point,
+    // not an oversight: the timeline has to paint its skeleton on the render right after mount
+    // instead of sitting on a stale empty state for a network round trip. loadInitialMoods is
+    // also the exposed `retry`, so the kickoff cannot move out of it, and a paginated fetch
+    // accumulating pages in local state has nothing to derive during render and no external
+    // store to subscribe to.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch-on-mount lifecycle
     loadInitialMoods();
   }, [loadInitialMoods]);
 

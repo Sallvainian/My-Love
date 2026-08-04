@@ -48,6 +48,18 @@ const getCooldownRemaining = (type: 'poke' | 'kiss' | 'fart'): number => {
   return Math.max(0, RATE_LIMIT_MS - elapsed);
 };
 
+// Stamp the moment an interaction was sent, for getCooldownRemaining to measure against.
+//
+// Module scope here is load-bearing rather than tidiness. react-hooks/purity treats a
+// Date.now() call reached from a component body as an impure read during render, and it
+// flagged exactly the two senders that reach theirs after an `await` -- handleFart, whose
+// identical write is never awaited past, went unreported. Reading the clock beside the
+// helper that interprets it puts all three senders on the same footing and keeps the rule
+// from re-firing the next time one of them grows an await.
+const recordInteractionTime = (type: 'poke' | 'kiss' | 'fart'): void => {
+  localStorage.setItem(RATE_LIMIT_KEYS[type], Date.now().toString());
+};
+
 // Format cooldown as minutes:seconds
 const formatCooldown = (ms: number): string => {
   const minutes = Math.floor(ms / 60000);
@@ -164,7 +176,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
 
     try {
       await sendPoke(partnerId);
-      localStorage.setItem(RATE_LIMIT_KEYS.poke, Date.now().toString());
+      recordInteractionTime('poke');
       setPokeCooldown(RATE_LIMIT_MS);
       setShowToast('Poke sent! 👆');
       setTimeout(() => setShowToast(null), 2000);
@@ -198,7 +210,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
 
     try {
       await sendKiss(partnerId);
-      localStorage.setItem(RATE_LIMIT_KEYS.kiss, Date.now().toString());
+      recordInteractionTime('kiss');
       setKissCooldown(RATE_LIMIT_MS);
       setShowToast('Kiss sent! 💋');
       setTimeout(() => setShowToast(null), 2000);
@@ -223,7 +235,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
     setIsExpanded(false);
 
     try {
-      localStorage.setItem(RATE_LIMIT_KEYS.fart, Date.now().toString());
+      recordInteractionTime('fart');
       setFartCooldown(RATE_LIMIT_MS);
       setShowAnimation('fart');
       setShowToast('💨 Fart sent!');

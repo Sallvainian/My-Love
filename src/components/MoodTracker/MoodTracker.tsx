@@ -23,7 +23,7 @@ import { useEffect, useState } from 'react';
 import { getPartnerId } from '../../api/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 import { useAppStore } from '../../stores/useAppStore';
-import type { MoodType } from '../../types';
+import type { MoodEntry, MoodType } from '../../types';
 import { registerBackgroundSync } from '../../utils/backgroundSync';
 import { formatDateISO } from '../../utils/dateUtils';
 import { triggerErrorHaptic, triggerMoodSaveHaptic } from '../../utils/haptics';
@@ -141,8 +141,27 @@ export function MoodTracker() {
     };
   }, []);
 
-  // Check if mood already exists for today (AC-5)
-  useEffect(() => {
+  // Seed the form from today's saved entry (AC-5). This used to be an effect keyed on
+  // `moods`, which cost a second commit every time it fired — the store outlives this view,
+  // so returning to the Mood tab could paint an empty form for a frame before the saved
+  // entry landed in it. Adjusting state during render collapses that into one commit.
+  //
+  // The trigger is deliberately unchanged: first render, then any render where `moods` is a
+  // different array than the one already seeded from. That fires more often than the
+  // contents actually change, since loadMoods hands back a fresh array after every sync,
+  // and reseeding overwrites whatever is in the form — exactly what the effect did. The
+  // `null` sentinel is what makes the first render count; seeding it from `moods` would skip
+  // a remount where the store is already populated.
+  //
+  // The `new Date()` below is an impure read that has moved into the render path. It runs
+  // only inside this branch, and only to pick which saved entry to seed from, so the worst
+  // it can do is straddle a midnight rollover — the same exposure the effect had. Note that
+  // react-hooks/purity does not flag `new Date()` (it flags `Date.now()`), so the linter
+  // will not catch it if this block is ever widened to run on every render.
+  const [seededFrom, setSeededFrom] = useState<MoodEntry[] | null>(null);
+  if (moods !== seededFrom) {
+    setSeededFrom(moods);
+
     const today = formatDateISO(new Date());
     const existingMood = getMoodForDate(today);
 
@@ -160,7 +179,7 @@ export function MoodTracker() {
         setShowNoteField(true);
       }
     }
-  }, [getMoodForDate, moods]);
+  }
 
   const handleMoodSelect = (mood: MoodType) => {
     setSelectedMoods((prev) => {
