@@ -59,11 +59,23 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
     set({ isLoadingPartner: true });
     try {
       const partner = await partnerService.getPartner();
-      if (get().userId !== requestedBy) return;
+      // Drop the DATA, but release the spinner: the flag was raised before the
+      // await and would otherwise stay true forever. Not cosmetic —
+      // PartnerMoodView gates BOTH branches on it (the partner view at :505 and
+      // the "Connect with Your Partner" branch at :358), so a stuck flag renders
+      // neither, and ScriptureOverview reports 'loading' indefinitely. Cutting
+      // short the new user's own spinner is a flicker; a blank tab is not.
+      if (get().userId !== requestedBy) {
+        set({ isLoadingPartner: false });
+        return;
+      }
       set({ partner, isLoadingPartner: false });
     } catch (error) {
       console.error('[PartnerSlice] Error loading partner:', error);
-      if (get().userId !== requestedBy) return;
+      if (get().userId !== requestedBy) {
+        set({ isLoadingPartner: false });
+        return;
+      }
       set({ partner: null, isLoadingPartner: false });
     }
   },
@@ -74,7 +86,11 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
     set({ isLoadingRequests: true });
     try {
       const { sent, received } = await partnerService.getPendingRequests();
-      if (get().userId !== requestedBy) return;
+      // Same reasoning as loadPartner: release the flag, discard the data.
+      if (get().userId !== requestedBy) {
+        set({ isLoadingRequests: false });
+        return;
+      }
       set({
         sentRequests: sent,
         receivedRequests: received,
@@ -82,7 +98,10 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       });
     } catch (error) {
       console.error('[PartnerSlice] Error loading requests:', error);
-      if (get().userId !== requestedBy) return;
+      if (get().userId !== requestedBy) {
+        set({ isLoadingRequests: false });
+        return;
+      }
       set({
         sentRequests: [],
         receivedRequests: [],
