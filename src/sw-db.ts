@@ -55,16 +55,15 @@ async function openDatabase() {
  * `moodService.create` has required a `userId` since the file was written -- so
  * that is a guard against a malformed record, not a migration path.
  *
- * @param userId - Owner to scope to. Omitted returns every user's rows and must
- *                 only be used where no account context exists.
+ * @param userId - Owner to scope to. REQUIRED: an optional parameter left the
+ *                 cross-account read reachable by omission, which is the exact
+ *                 behaviour this scoping exists to remove.
  */
-export async function getPendingMoods(userId?: string): Promise<StoredMoodEntry[]> {
+export async function getPendingMoods(userId: string): Promise<StoredMoodEntry[]> {
   const db = await openDatabase();
   try {
     const allMoods = await db.getAll(STORE_NAMES.MOODS);
-    return allMoods.filter(
-      (mood) => !mood.synced && (userId === undefined || mood.userId === userId)
-    );
+    return allMoods.filter((mood) => !mood.synced && mood.userId === userId);
   } catch (error) {
     throw new Error(
       `Failed to get pending moods: ${error instanceof Error ? error.message : String(error)}`

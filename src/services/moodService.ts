@@ -214,19 +214,23 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
   }
 
   /**
-   * Get all unsynced mood entries
-   * Story 6.4: Will be used for background sync
+   * Get one user's unsynced mood entries
    *
-   * @returns Array of MoodEntry objects where synced = false
+   * `userId` is REQUIRED. The IndexedDB store holds every account that has
+   * signed in on this device, so an unscoped read returns one partner's private
+   * mood notes to the other — which is exactly what this method used to do when
+   * the argument was omitted. Callers with no signed-in user must handle that
+   * case themselves rather than delegating it here; `moodSlice.updateSyncStatus`
+   * is the one that does.
+   *
+   * @returns Array of this user's MoodEntry objects where synced = false
    */
-  async getUnsyncedMoods(userId?: string): Promise<MoodEntry[]> {
+  async getUnsyncedMoods(userId: string): Promise<MoodEntry[]> {
     try {
       await this.init();
 
       const allMoods = await this.getAll();
-      const unsynced = allMoods.filter(
-        (mood) => !mood.synced && (userId === undefined || mood.userId === userId)
-      );
+      const unsynced = allMoods.filter((mood) => !mood.synced && mood.userId === userId);
 
       logger.debug(`[MoodService] Found ${unsynced.length} unsynced mood entries`);
 
