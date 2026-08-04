@@ -12,19 +12,30 @@ export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? '/My-Love/' : '/',
   build: {
     sourcemap: process.env.SENTRY_AUTH_TOKEN ? 'hidden' : false,
-    rollupOptions: {
+    // Vite 8 bundles with Rolldown, which dropped the object form of
+    // `output.manualChunks` and deprecated `rollupOptions` in favour of
+    // `rolldownOptions`. `codeSplitting.groups` is the replacement: each group
+    // keeps the chunk name the object form produced, and `includeDependenciesRecursively`
+    // (on by default) still drags each package's own dependency subtree along with it.
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          // React core
-          'vendor-react': ['react', 'react-dom'],
-          // Supabase (heavy, used mostly in settings/admin)
-          'vendor-supabase': ['@supabase/supabase-js'],
-          // State management + storage
-          'vendor-state': ['zustand', 'idb', 'zod'],
-          // Animations (optional, can be lazy loaded)
-          'vendor-animation': ['framer-motion'],
-          // Icons - tree-shakeable, but benefit from caching as separate chunk
-          'vendor-icons': ['lucide-react'],
+        codeSplitting: {
+          groups: [
+            // React core. The trailing separator in the alternation is load-bearing —
+            // a bare `react` would also swallow react-window and react-window-infinite-loader.
+            { name: 'vendor-react', test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/ },
+            // Supabase (heavy, used mostly in settings/admin)
+            {
+              name: 'vendor-supabase',
+              test: /[\\/]node_modules[\\/]@supabase[\\/]supabase-js[\\/]/,
+            },
+            // State management + storage
+            { name: 'vendor-state', test: /[\\/]node_modules[\\/](zustand|idb|zod)[\\/]/ },
+            // Animations (optional, can be lazy loaded)
+            { name: 'vendor-animation', test: /[\\/]node_modules[\\/]framer-motion[\\/]/ },
+            // Icons - tree-shakeable, but benefit from caching as separate chunk
+            { name: 'vendor-icons', test: /[\\/]node_modules[\\/]lucide-react[\\/]/ },
+          ],
         },
       },
     },
