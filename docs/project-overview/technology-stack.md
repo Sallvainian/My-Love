@@ -110,7 +110,7 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 
 ## Vendor Chunk Strategy
 
-Production builds split dependencies into independently cacheable chunks via `manualChunks` in `vite.config.ts`:
+Production builds split dependencies into independently cacheable chunks via `codeSplitting.groups` in `vite.config.ts`:
 
 | Chunk Name         | Libraries               |
 | ------------------ | ----------------------- |

@@ -46,7 +46,7 @@ The production base path is set to `/My-Love/` for GitHub Pages deployment.
 
 ## Manual Chunks (Code Splitting)
 
-Configured in `vite.config.ts` under `build.rollupOptions.output.manualChunks`:
+Configured in `vite.config.ts` under `build.rolldownOptions.output.codeSplitting.groups`:
 
 | Chunk Name         | Libraries               | Purpose                                                      |
 | ------------------ | ----------------------- | ------------------------------------------------------------ |
