@@ -56,9 +56,9 @@ If love notes volume grows significantly:
 
 ### IndexedDB Indexes
 
-The `moods` store has a `by-date` unique index for efficient queries:
+The `moods` store has a `by-user-date` unique index for efficient queries:
 
-- `by-date` -- Unique index on the ISO date string field; enables O(1) lookups via `getMoodForDate()` and range scans via `getMoodsInRange()` using `IDBKeyRange.bound()`
+- `by-user-date` -- Unique on `[userId, date]`; enables O(1) lookups via `getMoodForDate()` and range scans via `getMoodsInRange()` using `IDBKeyRange.bound()`. Keyed on the owner as well as the date so that two accounts on one device can each hold a mood for the same day
 
 Note: Unsynced entries are identified by iterating all entries and filtering `synced === false` in JavaScript rather than via a dedicated index. At the expected data volume (~730 entries/year), this approach is adequate.
 
