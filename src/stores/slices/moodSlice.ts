@@ -343,6 +343,8 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
    * Story 6.4: Task 3 - AC #3 - Partner mood visibility
    */
   fetchPartnerMoods: async (limit = 30) => {
+    // Whose data this is, captured before any await.
+    const requestedBy = get().userId;
     try {
       // Check network status first
       if (!navigator.onLine) {
@@ -385,6 +387,11 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       });
 
       // Update state
+      // Identity guard: the Sign Out control is on the same screen that fires
+      // this, and the request went out with a still-valid token. Landing after
+      // clearAuth would write the previous couple's mood notes — free text —
+      // straight back over the reset.
+      if (get().userId !== requestedBy) return;
       set({ partnerMoods: transformedMoods });
 
       logger.debug(`[MoodSlice] Fetched ${transformedMoods.length} partner moods`);

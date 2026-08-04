@@ -134,15 +134,30 @@ function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** Ack every queued leave, repeatedly, until the queue stays empty */
+/**
+ * Ack every queued leave until the queue stays empty.
+ *
+ * "Stays" is the load-bearing word. A send parked inside `waitForSocketReady`
+ * wakes on its own poll tick, up to POLL_MS after the socket settles, so at the
+ * instant the socket flips back to 'connected' there is a window in which both
+ * queues are empty and yet a send is about to open a channel and queue another
+ * leave. Breaking on a single quiet iteration returned before that send had
+ * run, left its leave unacked, and the test then died on its 5s timeout —
+ * which made this file fail 11 of 12 runs.
+ */
+const QUIET_ITERATIONS_REQUIRED = 6;
+
 async function settle(): Promise<void> {
-  // Generous: a send parked on the socket's disconnecting window resumes only
-  // after that window closes, so draining has to outlast it.
-  for (let i = 0; i < 60; i++) {
+  let quiet = 0;
+
+  for (let i = 0; i < 400; i++) {
     while (sendGate.length > 0) sendGate.shift()!();
     while (leaveQueue.length > 0) leaveQueue.shift()!();
     await new Promise((r) => setTimeout(r, 5));
-    if (leaveQueue.length === 0 && sendGate.length === 0 && socket.state === 'connected') break;
+
+    const idle = leaveQueue.length === 0 && sendGate.length === 0 && socket.state === 'connected';
+    quiet = idle ? quiet + 1 : 0;
+    if (quiet >= QUIET_ITERATIONS_REQUIRED) return;
   }
 }
 

@@ -101,11 +101,13 @@ async getPage(page: number, pageSize: number): Promise<T[]> {
 
 ### Indexed Queries
 
-The `moods` store has a `by-date` index (unique on the `date` field) for efficient queries:
+The `moods` store has a `by-user-date` index (unique on `[userId, date]`) for efficient queries. It
+replaced a `by-date` index unique on the date alone, which collided across accounts: on a shared
+device the second partner to log a mood that day was rejected outright.
 
-- `getMoodForDate(date)` -- Uses `by-date` index for O(1) lookup by ISO date string
-- `getMoodsInRange(start, end)` -- Uses `IDBKeyRange.bound()` on the `by-date` index for range scans
-- `getUnsyncedMoods()` -- Iterates all entries and filters `synced === false` in JavaScript (no dedicated index for sync status)
+- `getMoodForDate(userId, date)` -- Uses `by-user-date` for O(1) lookup by owner + ISO date string
+- `getMoodsInRange(userId, start, end)` -- Uses `IDBKeyRange.bound()` on `by-user-date` for range scans
+- `getUnsyncedMoods(userId?)` -- Iterates all entries and filters `synced === false` (and owner, when given) in JavaScript; there is no index for sync status
 
 ## Performance Monitoring
 

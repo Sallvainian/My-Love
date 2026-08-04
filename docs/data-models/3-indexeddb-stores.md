@@ -68,9 +68,11 @@ Database name: `my-love-db` | Current version: **7**
 | 3       | `moods` store with unique by-date index                         |
 | 4       | `sw-auth` store for Background Sync auth token                  |
 | 5       | 4 scripture stores (sessions, reflections, bookmarks, messages) |
+| 6       | No new stores; re-fires the upgrade to repair profiles stranded at v5 |
+| 7       | moods `by-date` unique index replaced by `by-user-date` (`[userId, date]`) |
 
 ## Upgrade Function
 
 `upgradeDb(db, oldVersion, newVersion, tx)` in `dbSchema.ts` handles all migrations centrally. The
 fourth argument is the versionchange transaction, needed to alter an index on an existing store; a
-caller that cannot supply it leaves the index alone rather than half-migrating. Each service calls this during `_doInit()`. Exception: `PhotoStorageService` handles v1->v2 photo migration with data preservation (requires transaction access).
+caller that cannot supply it leaves the index alone rather than half-migrating. Each service calls this during `_doInit()`. The v1->v2 photos migration is deliberately destructive: the v1 store used an incompatible shape, so it is dropped and recreated. (An earlier `PhotoStorageService` preserved that data; it no longer exists.)

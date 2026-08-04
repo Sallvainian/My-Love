@@ -47,7 +47,7 @@ Also provided: `getTypedDB()` (centralizes the `IDBPDatabase<DBTypes>` assertion
 ## Database Schema (`dbSchema.ts`)
 
 - **Database name:** `my-love-db`
-- **Current version:** 5
+- **Current version:** 7
 - **Stores:** messages, photos, moods, sw-auth, scripture-sessions, scripture-reflections, scripture-bookmarks, scripture-messages
 
 `upgradeDb(db, oldVersion, newVersion, tx)` is the centralized upgrade function that every service passes to `openDB`, so store creation is not duplicated per service:
@@ -59,6 +59,8 @@ Also provided: `getTypedDB()` (centralizes the `IDBPDatabase<DBTypes>` assertion
 | v3      | `moods` store with a **unique** `by-date` index                                                |
 | v4      | `sw-auth` store for Background Sync token handoff                                              |
 | v5      | Four scripture stores: sessions (`by-user`), reflections / bookmarks / messages (`by-session`) |
+| v6      | No new stores. Re-fires the upgrade so profiles stranded at v5 by the old per-service callbacks get the stores they are missing |
+| v7      | Replaces the moods `by-date` unique index with `by-user-date`, unique on `[userId, date]`      |
 
 See [IndexedDB Stores](../data-models/3-indexeddb-stores.md) for full store definitions.
 

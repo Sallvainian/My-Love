@@ -39,7 +39,7 @@ export interface MyLoveDBSchema extends DBSchema {
   moods: {
     key: number;
     value: MoodEntry;
-    indexes: { 'by-date': string }; // unique index on date (YYYY-MM-DD)
+    indexes: { 'by-user-date': [string, string] }; // unique on [userId, date]
   };
   'sw-auth': {
     key: 'current';
@@ -82,6 +82,8 @@ The `upgradeDb()` function in `dbSchema.ts` handles all schema migrations centra
 | v3      | Create `moods` store with `by-date` unique index                                                  | `moods`                                                                                    |
 | v4      | Create `sw-auth` store for Background Sync auth token storage                                     | `sw-auth`                                                                                  |
 | v5      | Create four scripture stores with `by-user` and `by-session` indexes                              | `scripture-sessions`, `scripture-reflections`, `scripture-bookmarks`, `scripture-messages` |
+| v6      | No new stores; re-fires the upgrade so profiles stranded at v5 gain the stores they are missing    | (repair only)                                                                              |
+| v7      | Replace the moods `by-date` unique index with `by-user-date`, unique on `[userId, date]`           | `moods`                                                                                    |
 
 **Special migration note**: the v1-to-v2 photos step is **destructive**. `upgradeDb()` deletes the old `photos` store (which used a `blob` field) and recreates it with the `imageBlob` schema. The data-preserving path that previously ran in `photoStorageService._doInit()` no longer exists -- that service was deleted in the dead-code sweep -- so any v1-era locally cached photos are dropped on upgrade. This is acceptable because photos now live in Supabase Storage and the IndexedDB `photos` store is only a legacy cache. The comment in `dbSchema.ts` still refers to `photoStorageService` and is stale.
 

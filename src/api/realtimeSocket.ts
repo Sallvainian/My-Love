@@ -27,8 +27,11 @@
  *
  * So closing the last channel and immediately opening another gives a channel
  * whose join is never sent. It reports TIMED_OUT ten seconds later and never
- * rejoins -- `_rejoinUntilConnected` only reschedules while the socket is
- * connected, so nothing brings it back.
+ * recovers -- not because the rejoin loop stops, but because nothing on it ever
+ * reconnects the socket: `_rejoinUntilConnected` reschedules itself forever and
+ * gates only `_rejoin()` on the connection, and no path from there calls
+ * `socket.connect()`. Reconnecting the socket is the missing piece, not
+ * restarting the loop.
  *
  * The leave itself does NOT wait for the server, which makes this deterministic
  * rather than a race: with the socket already gone `_canPush()` is false and the
