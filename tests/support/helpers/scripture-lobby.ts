@@ -49,7 +49,8 @@ async function waitForScriptureResponse(
     throw new Error(
       `[waitForScriptureResponse] ${label} did not resolve: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`,
+      { cause: error }
     );
   }
 }

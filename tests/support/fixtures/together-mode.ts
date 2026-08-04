@@ -144,7 +144,8 @@ export const test = togetherModeBase.extend<TogetherModeFixtures>({
           throw new Error(
             `[togetherMode] Partner navigation failed after ${maxPartnerAuthAttempts} attempts: ${
               err instanceof Error ? err.message : String(err)
-            }`
+            }`,
+            { cause: err }
           );
         }
         // Retry with a fresh signInWithPassword (no cache involved)

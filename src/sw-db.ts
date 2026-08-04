@@ -66,7 +66,8 @@ export async function getPendingMoods(userId: string): Promise<StoredMoodEntry[]
     return allMoods.filter((mood) => !mood.synced && mood.userId === userId);
   } catch (error) {
     throw new Error(
-      `Failed to get pending moods: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to get pending moods: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   } finally {
     db.close();
@@ -111,7 +112,8 @@ export async function markMoodSynced(
     return unchanged ? 'cleared' : 'deferred';
   } catch (error) {
     throw new Error(
-      `Failed to mark mood ${localId} as synced: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to mark mood ${localId} as synced: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   } finally {
     db.close();
@@ -128,7 +130,8 @@ export async function storeAuthToken(token: Omit<StoredAuthToken, 'id'>): Promis
     await db.put(STORE_NAMES.SW_AUTH, { id: 'current', ...token });
   } catch (error) {
     throw new Error(
-      `Failed to store auth token: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to store auth token: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   } finally {
     db.close();
@@ -146,7 +149,8 @@ export async function getAuthToken(): Promise<StoredAuthToken | null> {
     return token ?? null;
   } catch (error) {
     throw new Error(
-      `Failed to get auth token: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to get auth token: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   } finally {
     db.close();
@@ -163,7 +167,8 @@ export async function clearAuthToken(): Promise<void> {
     await db.delete(STORE_NAMES.SW_AUTH, 'current');
   } catch (error) {
     throw new Error(
-      `Failed to clear auth token: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to clear auth token: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   } finally {
     db.close();
