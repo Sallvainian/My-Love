@@ -159,6 +159,13 @@ async function settle(): Promise<void> {
     quiet = idle ? quiet + 1 : 0;
     if (quiet >= QUIET_ITERATIONS_REQUIRED) return;
   }
+
+  // Falling off the end used to return normally, so a genuine hang looked like
+  // a drained queue and surfaced later as a confusing assertion failure.
+  throw new Error(
+    `settle() never reached quiescence: leaveQueue=${leaveQueue.length} ` +
+      `sendGate=${sendGate.length} socket=${socket.state}`
+  );
 }
 
 describe('sendEphemeralBroadcast', () => {
@@ -326,7 +333,14 @@ describe('sendEphemeralBroadcast', () => {
 
       await assertion;
     } finally {
+      // The socket's "disconnecting -> connected" restore was scheduled under
+      // fake timers and is discarded with them, so the socket would stay stuck
+      // and afterEach's settle() would never reach quiescence. Previously that
+      // was invisible because settle() gave up silently; now it throws, which
+      // is how this surfaced.
       vi.useRealTimers();
+      socket.state = 'connected';
+      while (leaveQueue.length > 0) leaveQueue.shift()!();
     }
   });
 });

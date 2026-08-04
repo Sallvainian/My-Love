@@ -170,6 +170,11 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
       const allMoods = await moodService.getAllForUser(userId);
 
+      // Identity guard, same as fetchPartnerMoods below: Sign Out sits on the
+      // same screen that fires this, so the read can land after clearAuth and
+      // write this user's own mood notes back over the reset.
+      if (get().userId !== userId) return;
+
       set({ moods: allMoods });
 
       // Update sync status

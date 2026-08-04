@@ -143,12 +143,18 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
    * Photos sorted by created_at DESC (newest first)
    */
   loadPhotos: async () => {
+    const requestedBy = get().userId;
     try {
       set({ error: null });
       const photos = await photoService.getPhotos();
+      // Identity guard: Sign Out sits on the same screen that fires this, and the
+      // request goes out with a still-valid token — so it succeeds and its write
+      // lands after clearAuth, putting the previous account's data back.
+      if (get().userId !== requestedBy) return;
       set({ photos });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to load photos';
+      if (get().userId !== requestedBy) return;
       set({ error: errorMsg, photos: [] });
     }
   },

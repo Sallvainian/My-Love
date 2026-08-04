@@ -53,7 +53,7 @@ const { PAGE_SIZE: NOTES_PAGE_SIZE, RATE_LIMIT_MAX_MESSAGES, RATE_LIMIT_WINDOW_M
  * Helper: Revoke blob URLs from notes to prevent memory leaks
  * Only revokes URLs that start with 'blob:' (not server URLs)
  */
-function revokePreviewUrlsFromNotes(notes: LoveNote[]): void {
+export function revokePreviewUrlsFromNotes(notes: LoveNote[]): void {
   notes.forEach((note) => {
     if (note.imagePreviewUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(note.imagePreviewUrl);
@@ -221,6 +221,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       // Reverse to show oldest first in UI (chat order)
       const notesInChatOrder = (data || []).reverse() as LoveNote[];
+
+      // Identity guard: Sign Out sits on the same screen that fires this, and the
+      // request goes out with a still-valid token — so it succeeds and its write
+      // lands after clearAuth, putting the previous account's data back.
+      if (get().userId !== userId) {
+        set({ notesIsLoading: false });
+        return;
+      }
 
       set({
         notes: notesInChatOrder,
