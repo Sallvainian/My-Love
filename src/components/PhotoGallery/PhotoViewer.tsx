@@ -170,6 +170,14 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     // ratio. The ref-reading effect this replaced got the clearing for free, because
     // key={photo.id} remounts the <img> and naturalWidth is 0 until decode.
     setNaturalSize({ width: 0, height: 0 });
+    // A tap that landed before the reset must not pair with one that lands after it.
+    // handleDoubleTap only compares `now - lastTap` against DOUBLE_TAP_DELAY, so a stale
+    // timestamp makes the next single tap zoom: tap the error card, tap Retry ~200ms later,
+    // and a single tap on the freshly loaded photo is still inside the 300ms window. Same
+    // shape when navigating — tap photo A, advance, tap photo B quickly. Zero is safe rather
+    // than arbitrary: `now` is epoch milliseconds, so the first comparison after a reset is
+    // never under the threshold.
+    setLastTap(0);
   }, [x, y]);
 
   // Navigate to next/previous photo
