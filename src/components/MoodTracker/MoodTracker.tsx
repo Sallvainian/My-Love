@@ -152,6 +152,12 @@ export function MoodTracker() {
   // and reseeding overwrites whatever is in the form — exactly what the effect did. The
   // `null` sentinel is what makes the first render count; seeding it from `moods` would skip
   // a remount where the store is already populated.
+  //
+  // The `new Date()` below is an impure read that has moved into the render path. It runs
+  // only inside this branch, and only to pick which saved entry to seed from, so the worst
+  // it can do is straddle a midnight rollover — the same exposure the effect had. Note that
+  // react-hooks/purity does not flag `new Date()` (it flags `Date.now()`), so the linter
+  // will not catch it if this block is ever widened to run on every render.
   const [seededFrom, setSeededFrom] = useState<MoodEntry[] | null>(null);
   if (moods !== seededFrom) {
     setSeededFrom(moods);
