@@ -236,9 +236,23 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         return;
       }
 
-      const session = await scriptureReadingService.getSession(sessionId, (refreshed) =>
-        set({ session: refreshed })
-      );
+      const session = await scriptureReadingService.getSession(sessionId, (refreshed) => {
+        // This callback outlives the call — it is wired to the session's
+        // realtime subscription, so it can fire long after sign-out and write
+        // the previous account's reflections back over the reset.
+        if (get().userId !== currentUserId) return;
+        set({ session: refreshed });
+      });
+
+      // Identity guard. Unlike the session mutators, this one is not always a
+      // user tap: ReadingContainer re-fires it when a partner reconnects
+      // (ReadingContainer.tsx:110) and useScriptureBroadcast re-fires it on
+      // channel recovery (useScriptureBroadcast.ts:198), so it can be in flight
+      // with nobody touching the screen. `session` carries the reflection text.
+      if (get().userId !== currentUserId) {
+        set({ scriptureLoading: false });
+        return;
+      }
 
       if (!session) {
         const scriptureError: ScriptureError = {
@@ -299,6 +313,19 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       }
 
       const sessions = await scriptureReadingService.getUserSessions(userId);
+
+      // Identity guard: Sign Out sits in the bottom nav of the Scripture tab
+      // that fires this, so the read lands after clearAuth and restores the
+      // previous account's unfinished session. Releasing the flag matters as
+      // much as discarding the data — ScriptureOverview renders its checking
+      // branch while `isCheckingSession` is true and suppresses the mode picker
+      // (ScriptureOverview.tsx:449, :462), so a stranded flag leaves the tab
+      // showing nothing but a spinner.
+      if (get().userId !== userId) {
+        set({ isCheckingSession: false });
+        return;
+      }
+
       const incomplete = sessions
         .filter((s) => s.status === 'in_progress' && s.mode === 'solo')
         .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
@@ -570,10 +597,22 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
   // Story 3.1: Load couple-aggregate stats from server
   loadCoupleStats: async () => {
+    // Unlike the other loaders this one never read the identity at all, so the
+    // guard below needs it captured up front.
+    const requestedBy = get().userId;
     set({ isStatsLoading: true });
 
     try {
       const stats = await scriptureReadingService.getCoupleStats();
+
+      // Identity guard: these are the previous pairing's aggregate reading
+      // stats, and `coupleStats` is in the sign-out reset. `isStatsLoading`
+      // drives StatsSection's skeleton, so the discard has to release it.
+      if (get().userId !== requestedBy) {
+        set({ isStatsLoading: false });
+        return;
+      }
+
       if (stats) {
         set({ coupleStats: stats, isStatsLoading: false });
       } else {
