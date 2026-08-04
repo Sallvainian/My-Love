@@ -156,11 +156,17 @@ export function PartnerMoodView() {
     // Track notification timeout IDs for cleanup (Task 11: prevent memory leaks)
     const timeoutIds: NodeJS.Timeout[] = [];
     let unsubscribe: (() => void) | null = null;
+    // subscribeMoodUpdates is async, so the effect can be torn down before it
+    // resolves -- a fast tab switch, or the two renders StrictMode does in dev.
+    // The cleanup below would then find `unsubscribe` still null and the
+    // subscriber would stay attached for the life of the page, holding the
+    // shared channel open. Mirrors the guard in usePartnerMood.
+    let isMounted = true;
 
     // Setup async subscription
     const setupSubscription = async () => {
       // Subscribe to partner mood INSERT events with status tracking
-      unsubscribe = await moodSyncService.subscribeMoodUpdates(
+      const unsubscribeFn = await moodSyncService.subscribeMoodUpdates(
         (newMood) => {
           logger.debug('[PartnerMoodView] Received partner mood update:', newMood);
 
@@ -196,16 +202,24 @@ export function PartnerMoodView() {
           }
         }
       );
+
+      if (!isMounted) {
+        unsubscribeFn();
+        return;
+      }
+      unsubscribe = unsubscribeFn;
     };
 
     setupSubscription().catch((err) => {
       console.error('[PartnerMoodView] Failed to setup subscription:', err);
+      if (!isMounted) return;
       setConnectionStatus('disconnected');
     });
 
     // Cleanup subscription on unmount (Task 11: prevent memory leaks)
     return () => {
       logger.debug('[PartnerMoodView] Unsubscribing from partner mood updates');
+      isMounted = false;
 
       // Clear all pending notification timeouts
       timeoutIds.forEach((id) => clearTimeout(id));

@@ -100,6 +100,7 @@ export type Database = {
           created_at: string
           from_user_id: string
           id: string
+          idempotency_key: string
           image_url: string | null
           to_user_id: string
         }
@@ -108,6 +109,7 @@ export type Database = {
           created_at?: string
           from_user_id: string
           id?: string
+          idempotency_key?: string
           image_url?: string | null
           to_user_id: string
         }
@@ -116,6 +118,7 @@ export type Database = {
           created_at?: string
           from_user_id?: string
           id?: string
+          idempotency_key?: string
           image_url?: string | null
           to_user_id?: string
         }

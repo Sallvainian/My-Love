@@ -18,6 +18,13 @@
 | Users can read own photos                | SELECT    | Same as above                                                     |
 | Partners can read partner photos         | SELECT    | `EXISTS (users WHERE partner_id::text = foldername(name)[1])`     |
 | Users can delete own photos from storage | DELETE    | Same as upload rule                                               |
+| Users can update own photos in storage   | UPDATE    | Same as upload rule (USING and WITH CHECK)                        |
+
+`uploadPhoto` sends `upsert: true` so that a retry overwrites the object its own
+earlier attempt wrote rather than colliding with it. Storage-api implements that
+as `INSERT ... ON CONFLICT (name, bucket_id) DO UPDATE`, so the UPDATE policy is
+what makes a retry possible at all — without it the first upload succeeds and
+every retry is rejected by RLS.
 
 ### Client Access
 

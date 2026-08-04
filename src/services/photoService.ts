@@ -67,6 +67,19 @@ export interface PhotoUploadInput {
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
   width: number;
   height: number;
+  /**
+   * Stable identifier for one logical upload, reused across every retry of it.
+   *
+   * Without it each attempt minted a fresh UUID, so a retry after an ambiguous
+   * failure wrote a second storage object and a second photos row -- the same
+   * picture twice in the shared gallery, both counting against the quota.
+   *
+   * Caller-generated rather than derived from the bytes: the retry path
+   * re-runs compressImage() from scratch, and compression is not guaranteed to
+   * be byte-identical, so a content hash would not survive the retry it exists
+   * to cover.
+   */
+  idempotencyKey?: string;
 }
 
 // Storage bucket name
@@ -303,7 +316,12 @@ class PhotoService {
 
       const userId = currentUser.user.id;
       const fileExt = input.mimeType.split('/')[1]; // jpeg, png, webp
-      const uniqueId = crypto.randomUUID();
+      // Falls back to a fresh id so a caller that does not track retries keeps
+      // the old one-path-per-call behaviour rather than silently colliding.
+      // `||`, not `??`: an empty key is absent, not a key. PhotoUpload clears
+      // its ref to '' on reset, and treating that as valid would give every
+      // upload by this user the single path `${userId}/.${fileExt}`.
+      const uniqueId = input.idempotencyKey || crypto.randomUUID();
       const storagePath = `${userId}/${uniqueId}.${fileExt}`;
 
       // Upload to Supabase Storage (AC 6.2.2, 6.2.3)
@@ -318,7 +336,17 @@ class PhotoService {
         .from(BUCKET_NAME)
         .upload(storagePath, input.file, {
           contentType: input.mimeType,
-          upsert: false, // Don't overwrite existing
+          // Overwrite permitted: with a stable path a retry targets the object
+          // its own earlier attempt wrote, and `upsert: false` would turn a
+          // silent duplicate into a hard conflict on every retry. The path is
+          // namespaced by user id, so this can only overwrite the caller's own
+          // in-flight upload.
+          //
+          // Requires UPDATE on storage.objects for this bucket — an overwrite is
+          // an UPDATE, not an INSERT. Granted by
+          // 20260803000000_photos_storage_update_policy.sql; without it RLS
+          // rejects every retry, which is the one case this path exists for.
+          upsert: true,
         });
 
       if (onProgress) {
@@ -342,17 +370,74 @@ class PhotoService {
         height: input.height,
       };
 
-      const { data: photo, error: insertError } = await supabase
+      // storage_path already carries a UNIQUE constraint, so it is the conflict
+      // target -- no new column needed. DO NOTHING rather than merge-duplicates:
+      // photos grants SELECT/INSERT/DELETE and no UPDATE, and a retry should
+      // resolve to the row already stored rather than rewrite it.
+      //
+      // KNOWN LIMIT: DO NOTHING discards this payload wholesale, so if the first
+      // attempt committed and the user then edited the caption on the error
+      // screen before tapping Retry, that edit is silently dropped and the
+      // stored caption is returned instead. Applying it would need an UPDATE
+      // policy on public.photos, which would also let a user rewrite photos they
+      // had already shared -- a deliberate trade, not an oversight.
+      const { data: inserted, error: insertError } = await supabase
         .from('photos')
-        .insert(photoData)
+        .upsert(photoData, { onConflict: 'storage_path', ignoreDuplicates: true })
         .select()
-        .single();
+        .maybeSingle();
 
       if (insertError) {
-        // Rollback: delete the uploaded file if DB insert fails
         console.error('[PhotoService] Database insert error:', insertError);
-        await supabase.storage.from(BUCKET_NAME).remove([storagePath]);
+
+        // Roll the object back only once nothing is known to point at it.
+        //
+        // The rollback was safe while every attempt uploaded to its own random
+        // path. With a stable path a retry overwrites the object the first
+        // attempt wrote, and that attempt may have committed its photos row
+        // before its response was lost -- so deleting here would strand a
+        // gallery entry whose image is gone for good.
+        //
+        // A lookup that fails counts as "do not delete", not "nothing found".
+        // The insert most likely failed because the network did, which is
+        // exactly when this check fails too, and the asymmetry matters: an
+        // orphaned object costs quota, a wrong delete costs the photo.
+        const { data: committedRow, error: lookupError } = await supabase
+          .from('photos')
+          .select('id')
+          .eq('storage_path', storagePath)
+          .maybeSingle();
+
+        if (lookupError) {
+          console.warn(
+            '[PhotoService] Keeping uploaded object: could not check whether a row references it',
+            lookupError
+          );
+        } else if (!committedRow) {
+          await supabase.storage.from(BUCKET_NAME).remove([storagePath]);
+        } else {
+          logger.debug('[PhotoService] Keeping uploaded object: photo row already references it');
+        }
+
         throw insertError;
+      }
+
+      // No row back means this path was already recorded -- the earlier attempt
+      // did commit. Read that row instead of inserting a second one, and do NOT
+      // remove the storage object: it is the one that row points at.
+      let photo = inserted;
+      if (!photo) {
+        const existing = await supabase
+          .from('photos')
+          .select()
+          .eq('storage_path', storagePath)
+          .single();
+
+        if (existing.error) {
+          console.error('[PhotoService] Failed to resolve existing photo:', existing.error);
+          throw existing.error;
+        }
+        photo = existing.data;
       }
 
       logger.debug('[PhotoService] Photo uploaded:', photo?.id);

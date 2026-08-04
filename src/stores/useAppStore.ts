@@ -106,6 +106,22 @@ export const useAppStore = create<AppState>()(
               return null;
             }
 
+            // Drop any previously-persisted moods.
+            //
+            // `partialize` stops NEW writes, but it does not govern reads: the
+            // blob already in localStorage still carries a `moods` array, and
+            // Zustand merges whatever it finds. Without this, the first load
+            // after upgrading rehydrates the previous account's entries --
+            // and MoodTracker's mount effect pre-fills that note into the
+            // textarea before loadMoods() can replace the array. Stripping it
+            // here rather than bumping the persist version keeps `version: 0`,
+            // which the E2E auth fixtures pin.
+            let mutated = false;
+            if (data.state && 'moods' in data.state) {
+              delete data.state.moods;
+              mutated = true;
+            }
+
             // Schema-validate persisted settings; drop just `settings` on failure
             // so Zustand's shallow merge falls back to the settingsSlice defaults.
             if (data.state?.settings) {
@@ -117,12 +133,12 @@ export const useAppStore = create<AppState>()(
                 );
                 console.warn('[Storage] Dropping persisted settings - defaults will be used');
                 delete data.state.settings;
-                return JSON.stringify(data);
+                mutated = true;
               }
             }
 
             // Validation passed - return data for Zustand to deserialize
-            return str;
+            return mutated ? JSON.stringify(data) : str;
           } catch (parseError) {
             console.error('[Storage] Failed to parse localStorage data:', parseError);
             localStorage.removeItem(name);
@@ -145,7 +161,11 @@ export const useAppStore = create<AppState>()(
               ? Array.from(state.messageHistory.shownMessages.entries())
               : [],
         },
-        moods: state.moods,
+        // moods: NOT persisted. IndexedDB is the source of truth and
+        // loadMoods() repopulates from it on every start. Persisting the array
+        // under this single global key meant one account's mood notes were
+        // rehydrated into the next account's session on a shared device,
+        // before any fetch could correct them.
         // Story 3.5: Custom messages now in IndexedDB (not LocalStorage)
         // customMessages: NOT persisted (loaded from IndexedDB via loadCustomMessages)
         // customMessagesLoaded: NOT persisted (runtime state)

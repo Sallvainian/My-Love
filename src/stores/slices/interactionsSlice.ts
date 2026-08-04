@@ -176,6 +176,11 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
       // Note: getInteractionHistory already returns Interaction[] (converted format)
       const interactions = await interactionService.getInteractionHistory(currentUserId, limit);
 
+      // Identity guard: Sign Out sits on the same screen that fires this, and the
+      // request goes out with a still-valid token — so it succeeds and its write
+      // lands after clearAuth, putting the previous account's data back.
+      if (get().userId !== currentUserId) return;
+
       // Update state
       set({ interactions });
 

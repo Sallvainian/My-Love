@@ -75,7 +75,8 @@ type MoodTabType = 'tracker' | 'history' | 'timeline';
  * - Tab navigation: Log Mood / History (Story 6.3)
  */
 export function MoodTracker() {
-  const { addMoodEntry, getMoodForDate, syncStatus, loadMoods, syncPendingMoods } = useAppStore();
+  const { addMoodEntry, getMoodForDate, syncStatus, loadMoods, syncPendingMoods, updateSyncStatus } =
+    useAppStore();
   const moods = useAppStore((s) => s.moods);
   const { user } = useAuth();
 
@@ -112,7 +113,15 @@ export function MoodTracker() {
   // Load moods on mount
   useEffect(() => {
     loadMoods();
-  }, [loadMoods]);
+    // The pending-sync badge below is the only signal an offline user has that
+    // their moods have not left the device. `updateSyncStatus` counts nothing
+    // when `userId` is null, and App.tsx's unconditional call runs once on
+    // mount before auth resolves — authSlice is deliberately not persisted, so
+    // that is every cold start. Every other trigger needs a connectivity
+    // transition or the network. This effect runs post-auth, which is the only
+    // place the count is knowable offline.
+    updateSyncStatus();
+  }, [loadMoods, updateSyncStatus]);
 
   // Load partner ID for partner mood display (Story 5.3) - only once on mount
   useEffect(() => {

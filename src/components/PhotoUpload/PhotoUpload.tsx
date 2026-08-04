@@ -14,6 +14,17 @@ type UploadStep = 'select' | 'preview' | 'uploading' | 'success' | 'error';
 export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
   const { uploadPhoto, storageWarning } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /**
+   * Stable key for the currently selected file, held across retries.
+   *
+   * Retry sends the user back to the preview step and re-runs handleUpload,
+   * which previously produced a brand-new storage path each time -- so an
+   * upload that had actually committed before the response was lost got
+   * duplicated in the gallery. Reusing the key makes the retry resolve to the
+   * row and object the first attempt wrote. Reset whenever the selection
+   * changes, so a genuinely new file is never mistaken for a retry.
+   */
+  const uploadKeyRef = useRef<string>('');
 
   // Form state
   const [step, setStep] = useState<UploadStep>('select');
@@ -46,6 +57,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
     }
 
     setSelectedFile(file);
+    uploadKeyRef.current = crypto.randomUUID();
 
     // Create preview URL - safe from XSS as it's a browser-generated blob URL
     const url = URL.createObjectURL(file);
@@ -80,6 +92,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
         mimeType: result.blob.type as 'image/jpeg' | 'image/png' | 'image/webp',
         width: result.width || img.naturalWidth,
         height: result.height || img.naturalHeight,
+        idempotencyKey: uploadKeyRef.current,
       };
 
       URL.revokeObjectURL(imageUrl);
@@ -112,6 +125,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
     }
 
     // Reset all state
+    uploadKeyRef.current = '';
     setStep('select');
     setSelectedFile(null);
     setPreviewUrl('');

@@ -201,10 +201,21 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   ...initialScriptureState,
 
   createSession: async (mode, partnerId) => {
+    const requestedBy = get().userId;
     set({ scriptureLoading: true, scriptureError: null });
 
     try {
       const session = await scriptureReadingService.createSession(mode, partnerId);
+
+      // Identity guard, as in loadSession below. A tap rather than an auto-fired
+      // loader, so the window is narrower — but the row is created server-side
+      // either way, and writing it here hands the next account a session it is
+      // not a participant in.
+      if (get().userId !== requestedBy) {
+        set({ scriptureLoading: false });
+        return;
+      }
+
       set({ session, scriptureLoading: false, isInitialized: true });
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)
@@ -236,9 +247,23 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         return;
       }
 
-      const session = await scriptureReadingService.getSession(sessionId, (refreshed) =>
-        set({ session: refreshed })
-      );
+      const session = await scriptureReadingService.getSession(sessionId, (refreshed) => {
+        // This callback outlives the call — it is wired to the session's
+        // realtime subscription, so it can fire long after sign-out and write
+        // the previous account's reflections back over the reset.
+        if (get().userId !== currentUserId) return;
+        set({ session: refreshed });
+      });
+
+      // Identity guard. Unlike the session mutators, this one is not always a
+      // user tap: ReadingContainer re-fires it when a partner reconnects
+      // (ReadingContainer.tsx:110) and useScriptureBroadcast re-fires it on
+      // channel recovery (useScriptureBroadcast.ts:198), so it can be in flight
+      // with nobody touching the screen. `session` carries the reflection text.
+      if (get().userId !== currentUserId) {
+        set({ scriptureLoading: false });
+        return;
+      }
 
       if (!session) {
         const scriptureError: ScriptureError = {
@@ -299,6 +324,19 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       }
 
       const sessions = await scriptureReadingService.getUserSessions(userId);
+
+      // Identity guard: Sign Out sits in the bottom nav of the Scripture tab
+      // that fires this, so the read lands after clearAuth and restores the
+      // previous account's unfinished session. Releasing the flag matters as
+      // much as discarding the data — ScriptureOverview renders its checking
+      // branch while `isCheckingSession` is true and suppresses the mode picker
+      // (ScriptureOverview.tsx:449, :462), so a stranded flag leaves the tab
+      // showing nothing but a spinner.
+      if (get().userId !== userId) {
+        set({ isCheckingSession: false });
+        return;
+      }
+
       const incomplete = sessions
         .filter((s) => s.status === 'in_progress' && s.mode === 'solo')
         .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
@@ -324,7 +362,13 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   advanceStep: async () => {
     const state = get();
     const { session } = state;
-    if (!session) return;
+    // isSyncing is a write lock, not just a spinner flag: endSession and lockIn
+    // already refuse to start on top of an in-flight write, and the solo read
+    // flow's own persistence actions must too. Without it a tab backgrounded
+    // mid-advance fires saveSession through useAutoSave's visibilitychange
+    // handler -- which bypasses every disabled-button guard in the UI -- and
+    // two writes race for the same session row.
+    if (!session || state.isSyncing) return;
 
     const nextStep = session.currentStepIndex + 1;
     const isLastStep = nextStep >= MAX_STEPS;
@@ -414,7 +458,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   saveAndExit: async () => {
     const state = get();
     const { session } = state;
-    if (!session) return;
+    if (!session || state.isSyncing) return;
 
     set({ isSyncing: true, scriptureError: null });
 
@@ -446,7 +490,10 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   saveSession: async () => {
     const state = get();
     const { session } = state;
-    if (!session) return;
+    // Skipping while another write is in flight is safe rather than lossy: this
+    // persists currentStepIndex/currentPhase off the same session object the
+    // in-flight write already carries, so there is nothing newer to lose.
+    if (!session || state.isSyncing) return;
 
     set({ isSyncing: true });
 
@@ -455,7 +502,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         currentStepIndex: session.currentStepIndex,
         currentPhase: session.currentPhase,
       });
-      set({ isSyncing: false });
+      set({ isSyncing: false, pendingRetry: null });
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)
         ? error
@@ -465,7 +512,25 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
             details: error,
           };
       handleScriptureError(scriptureError);
-      set({ scriptureError, isSyncing: false });
+      // Queue a retry rather than only setting scriptureError. The reconnect
+      // effect in useSessionPersistence fires on pendingRetry alone, so a
+      // failure recorded without one had no recovery path at all -- and this
+      // action is driven by visibilitychange/beforeunload, exactly when the
+      // network is most likely to be gone.
+      set({
+        scriptureError,
+        isSyncing: false,
+        pendingRetry: {
+          type: 'saveSession',
+          attempts: 1,
+          maxAttempts: 3,
+          sessionData: {
+            sessionId: session.id,
+            currentStepIndex: session.currentStepIndex,
+            currentPhase: session.currentPhase,
+          },
+        },
+      });
     }
   },
 
@@ -495,7 +560,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   retryFailedWrite: async () => {
     const state = get();
     const { pendingRetry, session } = state;
-    if (!pendingRetry || !session) return;
+    if (!pendingRetry || !session || state.isSyncing) return;
 
     set({ isSyncing: true, scriptureError: null });
 
@@ -543,10 +608,22 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
   // Story 3.1: Load couple-aggregate stats from server
   loadCoupleStats: async () => {
+    // Unlike the other loaders this one never read the identity at all, so the
+    // guard below needs it captured up front.
+    const requestedBy = get().userId;
     set({ isStatsLoading: true });
 
     try {
       const stats = await scriptureReadingService.getCoupleStats();
+
+      // Identity guard: these are the previous pairing's aggregate reading
+      // stats, and `coupleStats` is in the sign-out reset. `isStatsLoading`
+      // drives StatsSection's skeleton, so the discard has to release it.
+      if (get().userId !== requestedBy) {
+        set({ isStatsLoading: false });
+        return;
+      }
+
       if (stats) {
         set({ coupleStats: stats, isStatsLoading: false });
       } else {

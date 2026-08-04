@@ -63,7 +63,7 @@ describe('dbSchema - Index Integrity', () => {
     }
   });
 
-  it('[P0] should have unique by-date index on moods store', async () => {
+  it('[P0] should have unique by-user-date index on moods store', async () => {
     // GIVEN: Fresh database install
     const db = await openTestDb();
 
@@ -71,7 +71,15 @@ describe('dbSchema - Index Integrity', () => {
     const tx = db.transaction('moods', 'readonly');
     const store = tx.objectStore('moods');
 
-    // THEN: by-date index exists
-    expect(store.indexNames.contains('by-date')).toBe(true);
+    // THEN: the compound index exists, is unique, and is keyed on the pair.
+    // Uniqueness on `date` alone made the store unable to hold two accounts'
+    // entries for the same day, so the keyPath is the point of the assertion.
+    expect(store.indexNames.contains('by-user-date')).toBe(true);
+    const index = store.index('by-user-date');
+    expect(index.unique).toBe(true);
+    expect(Array.from(index.keyPath as string[])).toEqual(['userId', 'date']);
+    // Cast: 'by-date' is no longer part of the typed schema for moods, but it
+    // still exists on disk for pre-v7 profiles and must be gone after upgrade.
+    expect((store.indexNames as DOMStringList).contains('by-date')).toBe(false);
   });
 });

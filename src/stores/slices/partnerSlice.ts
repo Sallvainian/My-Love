@@ -51,20 +51,46 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
 
   // Actions
   loadPartner: async () => {
+    // Whose data this is, captured before the await. The Sign Out control sits
+    // in the bottom nav on the same screen that fires this, and the request
+    // went out with a still-valid token — so it can land AFTER clearAuth and
+    // write the previous account's partner straight back over the reset.
+    const requestedBy = get().userId;
     set({ isLoadingPartner: true });
     try {
       const partner = await partnerService.getPartner();
+      // Drop the DATA, but release the spinner: the flag was raised before the
+      // await and would otherwise stay true forever. Not cosmetic —
+      // PartnerMoodView gates BOTH branches on it (the partner view at :505 and
+      // the "Connect with Your Partner" branch at :358), so a stuck flag renders
+      // neither, and ScriptureOverview reports 'loading' indefinitely. Cutting
+      // short the new user's own spinner is a flicker; a blank tab is not.
+      if (get().userId !== requestedBy) {
+        set({ isLoadingPartner: false });
+        return;
+      }
       set({ partner, isLoadingPartner: false });
     } catch (error) {
       console.error('[PartnerSlice] Error loading partner:', error);
+      if (get().userId !== requestedBy) {
+        set({ isLoadingPartner: false });
+        return;
+      }
       set({ partner: null, isLoadingPartner: false });
     }
   },
 
   loadPendingRequests: async () => {
+    // Same identity guard as loadPartner: these name real third parties.
+    const requestedBy = get().userId;
     set({ isLoadingRequests: true });
     try {
       const { sent, received } = await partnerService.getPendingRequests();
+      // Same reasoning as loadPartner: release the flag, discard the data.
+      if (get().userId !== requestedBy) {
+        set({ isLoadingRequests: false });
+        return;
+      }
       set({
         sentRequests: sent,
         receivedRequests: received,
@@ -72,6 +98,10 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       });
     } catch (error) {
       console.error('[PartnerSlice] Error loading requests:', error);
+      if (get().userId !== requestedBy) {
+        set({ isLoadingRequests: false });
+        return;
+      }
       set({
         sentRequests: [],
         receivedRequests: [],
@@ -86,12 +116,24 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       return;
     }
 
+    // Search hits name third parties, so they get the same guard as the loaders
+    // above: discard the result if the signed-in user changed mid-flight, but
+    // release the flag rather than stranding it.
+    const requestedBy = get().userId;
     set({ isSearching: true });
     try {
       const results = await partnerService.searchUsers(query);
+      if (get().userId !== requestedBy) {
+        set({ isSearching: false });
+        return;
+      }
       set({ searchResults: results, isSearching: false });
     } catch (error) {
       console.error('[PartnerSlice] Error searching users:', error);
+      if (get().userId !== requestedBy) {
+        set({ isSearching: false });
+        return;
+      }
       set({ searchResults: [], isSearching: false });
     }
   },
