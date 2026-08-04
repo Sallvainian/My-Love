@@ -12,7 +12,7 @@
 
 import { openDB } from 'idb';
 import type { MyLoveDBSchema, StoredAuthToken, StoredMoodEntry } from './services/dbSchema';
-import { DB_NAME, DB_VERSION, STORE_NAMES } from './services/dbSchema';
+import { DB_NAME, DB_VERSION, STORE_NAMES, upgradeDb } from './services/dbSchema';
 import type { MarkSyncedOutcome } from './services/moodSyncPayload';
 import { moodSyncFingerprint } from './services/moodSyncPayload';
 
@@ -25,68 +25,45 @@ export type { StoredMoodEntry } from './services/dbSchema';
  */
 async function openDatabase() {
   return openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion, newVersion) {
-      if (import.meta.env.DEV) {
-        console.log(
-          `[SW-DB] Upgrading database from v${oldVersion} to v${newVersion ?? 'unknown'}`
-        );
-      }
-
-      // Migration: v0 → v1 - Add messages store
-      if (oldVersion < 1) {
-        if (!db.objectStoreNames.contains(STORE_NAMES.MESSAGES)) {
-          const messageStore = db.createObjectStore(STORE_NAMES.MESSAGES, {
-            keyPath: 'id',
-            autoIncrement: true,
-          });
-          messageStore.createIndex('by-category', 'category');
-          messageStore.createIndex('by-date', 'createdAt');
-        }
-      }
-
-      // Migration: v1 → v2 - Add photos store
-      if (oldVersion < 2) {
-        if (!db.objectStoreNames.contains(STORE_NAMES.PHOTOS)) {
-          const photoStore = db.createObjectStore(STORE_NAMES.PHOTOS, {
-            keyPath: 'id',
-            autoIncrement: true,
-          });
-          photoStore.createIndex('by-date', 'uploadDate', { unique: false });
-        }
-      }
-
-      // Migration: v2 → v3 - Add moods store
-      if (oldVersion < 3) {
-        if (!db.objectStoreNames.contains(STORE_NAMES.MOODS)) {
-          const moodsStore = db.createObjectStore(STORE_NAMES.MOODS, {
-            keyPath: 'id',
-            autoIncrement: true,
-          });
-          moodsStore.createIndex('by-date', 'date', { unique: true });
-        }
-      }
-
-      // Migration: v3 → v4 - Add sw-auth store for Background Sync
-      if (oldVersion < 4) {
-        if (!db.objectStoreNames.contains(STORE_NAMES.SW_AUTH)) {
-          db.createObjectStore(STORE_NAMES.SW_AUTH, { keyPath: 'id' });
-          if (import.meta.env.DEV) {
-            console.log('[SW-DB] Created sw-auth store for Background Sync');
-          }
-        }
-      }
+    upgrade(db, oldVersion, newVersion, transaction) {
+      // Delegates to the shared upgradeDb rather than carrying its own copy.
+      //
+      // This was a third hand-written implementation of the schema, alongside
+      // storage.ts's. It created messages, photos, moods and sw-auth and had no
+      // branch for the scripture stores, so if the worker's open() happened to
+      // be the one performing the version-change transaction, those stores were
+      // never created. It also built the moods index as unique on `date` alone,
+      // which is the cross-account collision v7 exists to remove -- a stale copy
+      // here would silently reintroduce it.
+      upgradeDb(db, oldVersion, newVersion, transaction);
     },
   });
 }
 
 /**
- * Get pending (unsynced) mood entries
+ * Get pending (unsynced) mood entries belonging to one user
+ *
+ * The moods store holds every account that has signed in on this device, so an
+ * unfiltered read returns the previous user's rows too. The worker then stamps
+ * whatever it is handed with the stored token's owner
+ * (`moodSyncPayload(mood, authToken.userId)` in sw.ts), which uploads one
+ * person's private mood notes into the other's account.
+ *
+ * Mirrors moodService.getUnsyncedMoods, comparison included: a row whose
+ * `userId` does not match is skipped, and a row carrying no `userId` at all
+ * therefore belongs to nobody and is never claimed. No such row should exist --
+ * `moodService.create` has required a `userId` since the file was written -- so
+ * that is a guard against a malformed record, not a migration path.
+ *
+ * @param userId - Owner to scope to. REQUIRED: an optional parameter left the
+ *                 cross-account read reachable by omission, which is the exact
+ *                 behaviour this scoping exists to remove.
  */
-export async function getPendingMoods(): Promise<StoredMoodEntry[]> {
+export async function getPendingMoods(userId: string): Promise<StoredMoodEntry[]> {
   const db = await openDatabase();
   try {
     const allMoods = await db.getAll(STORE_NAMES.MOODS);
-    return allMoods.filter((mood) => !mood.synced);
+    return allMoods.filter((mood) => !mood.synced && mood.userId === userId);
   } catch (error) {
     throw new Error(
       `Failed to get pending moods: ${error instanceof Error ? error.message : String(error)}`

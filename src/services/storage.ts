@@ -2,7 +2,7 @@ import type { IDBPDatabase } from 'idb';
 import { openDB } from 'idb';
 import type { Message, Photo } from '../types';
 import { logger } from '../utils/logger';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
 
 class StorageService {
   private db: IDBPDatabase<MyLoveDBSchema> | null = null;
@@ -34,54 +34,22 @@ class StorageService {
   private async _doInit(): Promise<void> {
     try {
       logger.debug('[StorageService] Initializing IndexedDB...');
+      // Delegates to the shared upgradeDb, exactly as moodService,
+      // customMessageService and scriptureReadingService do.
+      //
+      // This used to be a hand-written callback that created only `messages`
+      // and `photos`, on the assumption that whichever service owned a store
+      // would create it. That assumption does not hold: IndexedDB runs the
+      // upgrade callback of only the ONE open() that performs the
+      // version-change transaction, and every other concurrent open() for the
+      // same version just connects. On a fresh profile this open() is reached
+      // first — initializeApp() calls it from the effect at App.tsx:275,
+      // before the mood-sync effects — so its callback was the one that ran,
+      // and `moods`, `sw-auth` and the four scripture stores were never
+      // created at all.
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion) {
-          logger.debug(`[StorageService] Upgrading database from v${oldVersion} to v${newVersion}`);
-
-          // Ensure messages store exists (should have been created in v1)
-          if (!db.objectStoreNames.contains('messages')) {
-            const messageStore = db.createObjectStore('messages', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            messageStore.createIndex('by-category', 'category');
-            messageStore.createIndex('by-date', 'createdAt');
-            logger.debug('[StorageService] Created messages store (fallback)');
-          }
-
-          // Migration: v1 → v2 (Story 4.1)
-          // Recreate photos store with enhanced schema
-          if (oldVersion < 2) {
-            // Delete old photos store if it exists from v1
-            if (db.objectStoreNames.contains('photos')) {
-              db.deleteObjectStore('photos');
-              logger.debug('[StorageService] Deleted old photos store from v1');
-            }
-
-            // Create new photos store with enhanced schema
-            const photoStore = db.createObjectStore('photos', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            photoStore.createIndex('by-date', 'uploadDate', { unique: false });
-            logger.debug('[StorageService] Created photos store with by-date index (v2)');
-          }
-
-          // Migration: v2 → v3 (Story 6.2)
-          // Moods store is handled by MoodService
-          if (oldVersion < 3 && oldVersion >= 2) {
-            logger.debug(
-              '[StorageService] Acknowledged v2→v3 upgrade (moods store handled by MoodService)'
-            );
-          }
-
-          // Migration: v3 → v4 (Background Sync)
-          // sw-auth store is handled by MoodService
-          if (oldVersion < 4 && oldVersion >= 3) {
-            logger.debug(
-              '[StorageService] Acknowledged v3→v4 upgrade (sw-auth store handled by MoodService)'
-            );
-          }
+        upgrade(db, oldVersion, newVersion, transaction) {
+          upgradeDb(db, oldVersion, newVersion, transaction);
         },
       });
       logger.debug('[StorageService] IndexedDB initialized successfully');
@@ -299,13 +267,28 @@ class StorageService {
     }
   }
 
-  // Clear all data (for reset)
+  /**
+   * Clear every store (for reset)
+   *
+   * Named "all data" but only ever cleared photos and messages, so anything
+   * calling it to wipe the device left moods, the background-sync auth token
+   * and the scripture cache in place. It has no callers today; a sign-out
+   * cleanup reaching for it would have looked complete and still leaked.
+   *
+   * NOTE: this deletes unsynced moods along with everything else. It is a
+   * destructive reset, not a sign-out hook — sign-out clears in-memory state
+   * (authSlice.clearAuth) and leaves IndexedDB intact so a user's offline
+   * entries survive until they sync.
+   */
   async clearAllData(): Promise<void> {
     try {
       await this.init();
       logger.debug('[StorageService] Clearing all data from IndexedDB...');
-      await this.db!.clear('photos');
-      await this.db!.clear('messages');
+      await Promise.all(
+        // Array.from, not spread: DOMStringList is array-like but is not
+        // specified as iterable, so the spread is not portable.
+        Array.from(this.db!.objectStoreNames).map((storeName) => this.db!.clear(storeName))
+      );
       logger.debug('[StorageService] All data cleared successfully');
     } catch (error) {
       console.error('[StorageService] Failed to clear all data:', error);

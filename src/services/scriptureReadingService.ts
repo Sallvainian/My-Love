@@ -164,8 +164,8 @@ class ScriptureReadingService extends BaseIndexedDBService<
       logger.debug(`[ScriptureService] Initializing IndexedDB (version ${DB_VERSION})...`);
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion) {
-          upgradeDb(db, oldVersion, newVersion);
+        upgrade(db, oldVersion, newVersion, transaction) {
+          upgradeDb(db, oldVersion, newVersion, transaction);
         },
       });
 

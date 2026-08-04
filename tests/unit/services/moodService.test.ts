@@ -114,14 +114,14 @@ describe('moodService', () => {
     it('returns mood entry for matching date', async () => {
       await moodService.create(userId, ['happy']);
       const today = new Date();
-      const result = await moodService.getMoodForDate(today);
+      const result = await moodService.getMoodForDate(today, userId);
       expect(result).not.toBeNull();
       expect(result!.mood).toBe('happy');
     });
 
     it('returns null for date with no entry', async () => {
       const longAgo = new Date(2020, 0, 1);
-      const result = await moodService.getMoodForDate(longAgo);
+      const result = await moodService.getMoodForDate(longAgo, userId);
       expect(result).toBeNull();
     });
   });
@@ -135,14 +135,14 @@ describe('moodService', () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      const result = await moodService.getMoodsInRange(yesterday, tomorrow);
+      const result = await moodService.getMoodsInRange(yesterday, tomorrow, userId);
       expect(result.length).toBeGreaterThanOrEqual(1);
     });
 
     it('returns empty array for range with no moods', async () => {
       const start = new Date(2020, 0, 1);
       const end = new Date(2020, 0, 31);
-      const result = await moodService.getMoodsInRange(start, end);
+      const result = await moodService.getMoodsInRange(start, end, userId);
       expect(result).toEqual([]);
     });
   });
@@ -150,13 +150,13 @@ describe('moodService', () => {
   describe('getUnsyncedMoods', () => {
     it('returns newly created moods (unsynced by default)', async () => {
       await moodService.create(userId, ['happy']);
-      const unsynced = await moodService.getUnsyncedMoods();
+      const unsynced = await moodService.getUnsyncedMoods(userId);
       expect(unsynced.length).toBe(1);
       expect(unsynced[0].synced).toBe(false);
     });
 
     it('returns empty array when no moods exist', async () => {
-      const result = await moodService.getUnsyncedMoods();
+      const result = await moodService.getUnsyncedMoods(userId);
       expect(result).toEqual([]);
     });
   });
@@ -171,7 +171,7 @@ describe('moodService', () => {
       );
 
       expect(outcome).toBe('cleared');
-      const fetched = await moodService.getMoodForDate(new Date());
+      const fetched = await moodService.getMoodForDate(new Date(), userId);
       expect(fetched!.synced).toBe(true);
       expect(fetched!.supabaseId).toBe('supa-123');
     });
@@ -190,6 +190,76 @@ describe('moodService', () => {
       const all = await moodService.getAll();
       expect(all.length).toBe(1);
       expect(all[0].mood).toBe('happy');
+    });
+  });
+  describe('multi-account isolation on one device', () => {
+    // The moods store is shared by every account that has signed in on this
+    // browser profile. Its index was unique on `date` alone, so the store was
+    // physically unable to hold two people's entries for the same day: the
+    // second write collided with the first user's row. These drive two users
+    // through one store, which nothing in the suite previously did.
+    const partnerId = '223e4567-e89b-42d3-a456-426614174111';
+
+    it('lets two accounts each log a mood on the same day', async () => {
+      const mine = await moodService.create(userId, ['happy'], 'my note');
+      const theirs = await moodService.create(partnerId, ['sad'], 'their note');
+
+      expect(mine.id).not.toBe(theirs.id);
+      expect(await moodService.getAll()).toHaveLength(2);
+    });
+
+    it('still allows only one mood per day per account', async () => {
+      // Uniqueness was not dropped, only moved to the pair. A second entry for
+      // the same person on the same day must still be rejected.
+      await moodService.create(userId, ['happy']);
+
+      await expect(moodService.create(userId, ['sad'])).rejects.toThrow();
+    });
+
+    it('getAllForUser returns only the caller\'s entries', async () => {
+      await moodService.create(userId, ['happy'], 'mine');
+      await moodService.create(partnerId, ['sad'], 'theirs');
+
+      const mine = await moodService.getAllForUser(userId);
+
+      expect(mine).toHaveLength(1);
+      expect(mine[0].note).toBe('mine');
+      expect(mine[0].userId).toBe(userId);
+    });
+
+    it('getMoodForDate does not return the other account\'s note', async () => {
+      // This is the disclosure path: MoodTracker pre-fills the returned note
+      // straight into the textarea on mount.
+      await moodService.create(partnerId, ['sad'], 'their private note');
+
+      const mine = await moodService.getMoodForDate(new Date(), userId);
+
+      expect(mine).toBeNull();
+    });
+
+    it('getMoodsInRange stays inside the caller\'s slice of the index', async () => {
+      await moodService.create(userId, ['happy'], 'mine');
+      await moodService.create(partnerId, ['sad'], 'theirs');
+
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const mine = await moodService.getMoodsInRange(yesterday, tomorrow, userId);
+
+      expect(mine).toHaveLength(1);
+      expect(mine[0].userId).toBe(userId);
+    });
+
+    it('getUnsyncedMoods scoped to a user leaves the other account queued', async () => {
+      // The other account's entry is still unsynced and must stay that way --
+      // scoping the read must not drop it, or their offline mood is stranded.
+      await moodService.create(userId, ['happy']);
+      await moodService.create(partnerId, ['sad']);
+
+      expect(await moodService.getUnsyncedMoods(userId)).toHaveLength(1);
+      expect(await moodService.getUnsyncedMoods(partnerId)).toHaveLength(1);
     });
   });
 });

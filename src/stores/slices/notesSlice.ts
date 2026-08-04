@@ -16,6 +16,7 @@
  * Story 2.1: Foundation - UI and state management only
  */
 
+import { sendEphemeralBroadcast } from '../../api/ephemeralBroadcast';
 import { getPartnerId, supabase } from '../../api/supabaseClient';
 import { NOTES_CONFIG } from '../../config/images';
 import { imageCompressionService } from '../../services/imageCompressionService';
@@ -52,7 +53,7 @@ const { PAGE_SIZE: NOTES_PAGE_SIZE, RATE_LIMIT_MAX_MESSAGES, RATE_LIMIT_WINDOW_M
  * Helper: Revoke blob URLs from notes to prevent memory leaks
  * Only revokes URLs that start with 'blob:' (not server URLs)
  */
-function revokePreviewUrlsFromNotes(notes: LoveNote[]): void {
+export function revokePreviewUrlsFromNotes(notes: LoveNote[]): void {
   notes.forEach((note) => {
     if (note.imagePreviewUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(note.imagePreviewUrl);
@@ -73,6 +74,96 @@ async function discardOrphanedImage(storagePath: string | null): Promise<void> {
   } catch (deleteError) {
     console.warn('[NotesSlice] Failed to delete orphaned image:', storagePath, deleteError);
   }
+}
+
+/**
+ * Helper: discard an uploaded image only once nothing is known to reference it.
+ *
+ * A failed insert does not mean nothing was written. The defining vector here is
+ * the lost response -- the row commits and the reply never arrives -- and in
+ * that case the committed note already points at this object, so deleting it
+ * leaves a note whose image is permanently broken. The idempotency key is what
+ * makes the difference observable: it identifies the row this attempt would
+ * have written, whether or not the client got to see it.
+ *
+ * A lookup that fails counts as "keep". The insert most likely failed because
+ * the network did, which is exactly when this check fails too, and the
+ * asymmetry matters: an orphaned object costs storage quota, a wrong delete
+ * costs the picture.
+ */
+async function discardUnreferencedImage(
+  storagePath: string | null,
+  fromUserId: string,
+  idempotencyKey: string
+): Promise<void> {
+  if (!storagePath) return;
+
+  const { data, error } = await supabase
+    .from('love_notes')
+    .select('image_url')
+    .eq('from_user_id', fromUserId)
+    .eq('idempotency_key', idempotencyKey)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(
+      '[NotesSlice] Keeping uploaded image: could not check whether a note references it',
+      error
+    );
+    return;
+  }
+
+  if (data && (data as { image_url: string | null }).image_url === storagePath) {
+    logger.debug('[NotesSlice] Keeping uploaded image: a stored note references it', storagePath);
+    return;
+  }
+
+  await discardOrphanedImage(storagePath);
+}
+
+/**
+ * Helper: send a note at most once, however many times this is called.
+ *
+ * A bare INSERT duplicated the note whenever the row committed but the response
+ * was lost — the client saw a failure, offered Retry, and the retry inserted a
+ * second identical row. `idempotency_key` is the composed message's `tempId`,
+ * which survives retries, so the second attempt collides with the first.
+ *
+ * ON CONFLICT DO NOTHING (`ignoreDuplicates`), not merge-duplicates: a resend
+ * must resolve to what is already stored rather than rewrite it, and
+ * love_notes deliberately has no UPDATE policy — granting one to support a
+ * merge would also let a user edit notes they had already sent.
+ *
+ * A conflict returns no row, so the stored one is read back; otherwise the
+ * caller would leave its optimistic note stuck in the sending state.
+ */
+async function insertNoteOnce(payload: {
+  from_user_id: string;
+  to_user_id: string;
+  content: string;
+  image_url: string | null;
+  idempotency_key: string;
+}): Promise<{ data: LoveNote | null; error: unknown }> {
+  const { data, error } = await supabase
+    .from('love_notes')
+    .upsert(payload, {
+      onConflict: 'from_user_id,idempotency_key',
+      ignoreDuplicates: true,
+    })
+    .select()
+    .maybeSingle();
+
+  if (error) return { data: null, error };
+  if (data) return { data: data as LoveNote, error: null };
+
+  const existing = await supabase
+    .from('love_notes')
+    .select()
+    .eq('from_user_id', payload.from_user_id)
+    .eq('idempotency_key', payload.idempotency_key)
+    .single();
+
+  return { data: (existing.data as LoveNote) ?? null, error: existing.error };
 }
 
 export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) => ({
@@ -130,6 +221,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       // Reverse to show oldest first in UI (chat order)
       const notesInChatOrder = (data || []).reverse() as LoveNote[];
+
+      // Identity guard: Sign Out sits on the same screen that fires this, and the
+      // request goes out with a still-valid token — so it succeeds and its write
+      // lands after clearAuth, putting the previous account's data back.
+      if (get().userId !== userId) {
+        set({ notesIsLoading: false });
+        return;
+      }
 
       set({
         notes: notesInChatOrder,
@@ -202,8 +301,19 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       // Reverse to maintain chat order (oldest first) and prepend to existing notes
       const olderNotes = (data || []).reverse() as LoveNote[];
 
+      // Identity guard, as in fetchNotes above — but this one is worse than the
+      // plain case. `notes` was destructured before both awaits, so writing it
+      // back restores the messages that were on screen at sign-out as well as
+      // the page just fetched: the whole conversation, not one page of it.
+      if (get().userId !== userId) {
+        set({ notesIsLoading: false });
+        return;
+      }
+
+      // Re-read rather than reusing the pre-await capture, so a note that
+      // arrived over realtime while the page was in flight is not dropped.
       set({
-        notes: [...olderNotes, ...notes],
+        notes: [...olderNotes, ...get().notes],
         notesIsLoading: false,
         notesHasMore: (data?.length || 0) === limit,
       });
@@ -379,20 +489,19 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         }
       }
 
-      // Background insert to Supabase
-      const { data, error } = await supabase
-        .from('love_notes')
-        .insert({
-          from_user_id: userId,
-          to_user_id: partnerId,
-          content,
-          image_url: storagePath,
-        })
-        .select()
-        .single();
+      // Background insert to Supabase, keyed so a retry cannot post twice
+      const { data, error } = await insertNoteOnce({
+        from_user_id: userId,
+        to_user_id: partnerId,
+        content,
+        image_url: storagePath,
+        idempotency_key: tempId,
+      });
 
-      if (error) {
-        await discardOrphanedImage(storagePath);
+      if (error || !data) {
+        // Not unconditional: the row may have committed and only the response
+        // been lost, in which case the stored note points at this very object.
+        await discardUnreferencedImage(storagePath, userId, tempId);
 
         // Mark message as failed (preserve imageBlob for retry)
         set((state) => ({
@@ -425,34 +534,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       logger.debug('[NotesSlice] Note sent successfully:', data.id);
 
       // Story 2.3: Broadcast message to partner's channel for realtime delivery
-      // Must subscribe before sending to avoid REST fallback deprecation warning
+      //
+      // Queued per topic. Opening the channel inline here meant that a second
+      // note sent before the first one's channel had finished closing was handed
+      // that same channel back by supabase.channel(), its subscribe callback
+      // never fired, and the note never reached the partner in realtime.
       try {
-        const channel = supabase.channel(`love-notes:${partnerId}`);
-
-        await new Promise<void>((resolve, reject) => {
-          channel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-              try {
-                await channel.send({
-                  type: 'broadcast',
-                  event: 'new_message',
-                  payload: { message: data },
-                });
-
-                logger.debug('[NotesSlice] Broadcast sent to partner:', partnerId);
-                resolve();
-              } catch (sendError) {
-                reject(sendError);
-              } finally {
-                // Cleanup: unsubscribe and remove channel
-                await supabase.removeChannel(channel);
-              }
-            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              await supabase.removeChannel(channel);
-              reject(new Error(`Channel subscription failed: ${status}`));
-            }
-          });
-        });
+        await sendEphemeralBroadcast(`love-notes:${partnerId}`, 'new_message', { message: data });
+        logger.debug('[NotesSlice] Broadcast sent to partner:', partnerId);
       } catch (broadcastError) {
         // Non-fatal - message is saved, just realtime failed
         console.warn('[NotesSlice] Broadcast failed (non-fatal):', broadcastError);
@@ -534,20 +623,21 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         }
       }
 
-      // Attempt to send again
-      const { data, error } = await supabase
-        .from('love_notes')
-        .insert({
-          from_user_id: userId,
-          to_user_id: partnerId,
-          content: failedNote.content,
-          image_url: storagePath,
-        })
-        .select()
-        .single();
+      // Attempt to send again under the SAME key as the original attempt, so
+      // if that attempt actually committed this resolves to it instead of
+      // adding a second copy.
+      const { data, error } = await insertNoteOnce({
+        from_user_id: userId,
+        to_user_id: partnerId,
+        content: failedNote.content,
+        image_url: storagePath,
+        idempotency_key: tempId,
+      });
 
-      if (error) {
-        await discardOrphanedImage(storagePath);
+      if (error || !data) {
+        // Not unconditional: the row may have committed and only the response
+        // been lost, in which case the stored note points at this very object.
+        await discardUnreferencedImage(storagePath, userId, tempId);
 
         // Mark as failed again
         set((state) => ({
@@ -561,6 +651,21 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         logger.debug('[NotesSlice] Retry failed:', error);
 
         return;
+      }
+
+      // The retry re-uploaded the image before it knew whether the note needed
+      // resending, and the Edge Function mints a fresh storage path every time
+      // -- it derives the name server-side and takes no idempotency key. So when
+      // insertNoteOnce resolves to a row the first attempt had already
+      // committed, that row still points at the ORIGINAL object and the one just
+      // uploaded is referenced by nothing.
+      //
+      // Only the failure path used to clean up, which was right while a retry
+      // inserted a second row pointing at the new object. Now that the resend
+      // deduplicates, each retry of an image note would otherwise leave one
+      // stranded object behind against the user's storage quota.
+      if (storagePath && data.image_url !== storagePath) {
+        await discardOrphanedImage(storagePath);
       }
 
       // Success - replace with server response and update rate limit timestamps

@@ -1038,4 +1038,186 @@ describe('scriptureReadingSlice', () => {
       expect(store.getState().activeSession).toBeNull();
     });
   });
+  describe('concurrent writes to the same session row (isSyncing as a write lock)', () => {
+    // useAutoSave calls saveSession from raw visibilitychange/beforeunload
+    // listeners, which bypass every disabled-button guard in the UI. Without a
+    // lock, backgrounding the tab mid-advance started a second write to the
+    // same row. endSession and lockIn already guarded; the solo flow's own
+    // persistence actions did not.
+    async function storeMidWrite() {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      let release: () => void = () => {};
+      vi.mocked(scriptureReadingService.updateSession).mockReturnValue(
+        new Promise<void>((resolve) => {
+          release = resolve;
+        })
+      );
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+      vi.mocked(scriptureReadingService.updateSession).mockClear();
+
+      return { store, release, updateSession: vi.mocked(scriptureReadingService.updateSession) };
+    }
+
+    it('saveSession does not start a second write while advanceStep is in flight', async () => {
+      const { store, release, updateSession } = await storeMidWrite();
+
+      const advancing = store.getState().advanceStep();
+      expect(store.getState().isSyncing).toBe(true);
+      expect(updateSession).toHaveBeenCalledTimes(1);
+
+      // The tab is backgrounded mid-advance.
+      await store.getState().saveSession();
+
+      expect(updateSession).toHaveBeenCalledTimes(1);
+
+      release();
+      await advancing;
+    });
+
+    it('advanceStep does not start a second write while a save is in flight', async () => {
+      const { store, release, updateSession } = await storeMidWrite();
+
+      const saving = store.getState().saveSession();
+      expect(updateSession).toHaveBeenCalledTimes(1);
+
+      await store.getState().advanceStep();
+
+      expect(updateSession).toHaveBeenCalledTimes(1);
+      // The optimistic step bump must not have happened either, or local state
+      // would claim progress the server was never told about.
+      expect(store.getState().session!.currentStepIndex).toBe(0);
+
+      release();
+      await saving;
+    });
+
+    it('saveAndExit does not tear down the session while a write is in flight', async () => {
+      const { store, release, updateSession } = await storeMidWrite();
+
+      const advancing = store.getState().advanceStep();
+      await store.getState().saveAndExit();
+
+      expect(updateSession).toHaveBeenCalledTimes(1);
+      expect(store.getState().session).not.toBeNull();
+
+      release();
+      await advancing;
+    });
+
+    it('a failed autosave leaves a retryable pendingRetry, not just an error', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+
+      vi.mocked(scriptureReadingService.updateSession).mockRejectedValue(new Error('offline'));
+
+      await store.getState().saveSession();
+
+      // useSessionPersistence's reconnect effect fires on pendingRetry alone,
+      // so a failure recorded without one could never be recovered.
+      const { pendingRetry } = store.getState();
+      expect(pendingRetry).not.toBeNull();
+      expect(pendingRetry!.type).toBe('saveSession');
+      expect(pendingRetry!.sessionData?.sessionId).toBe('session-1');
+      expect(store.getState().isSyncing).toBe(false);
+    });
+
+    it('retryFailedWrite does not start a second write while one is in flight', async () => {
+      const { store, release, updateSession } = await storeMidWrite();
+
+      // Get a pendingRetry on the board without disturbing the mock that is
+      // about to hold a write open.
+      store.setState({
+        pendingRetry: {
+          type: 'saveSession',
+          attempts: 1,
+          maxAttempts: 3,
+          sessionData: {
+            sessionId: 'session-1',
+            currentStepIndex: 0,
+            currentPhase: 'reading',
+          },
+        },
+      });
+
+      const advancing = store.getState().advanceStep();
+      expect(store.getState().isSyncing).toBe(true);
+      expect(updateSession).toHaveBeenCalledTimes(1);
+
+      // The reconnect effect fires while the advance is still in flight — the
+      // fourth guard. Without it the retry writes the row a second time and
+      // clears pendingRetry, so the recovery is reported done before it landed.
+      await store.getState().retryFailedWrite();
+
+      expect(updateSession).toHaveBeenCalledTimes(1);
+      expect(store.getState().pendingRetry).not.toBeNull();
+
+      release();
+      await advancing;
+    });
+
+    it('a successful autosave clears a stale pendingRetry', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+
+      // First autosave fails and queues the retry.
+      vi.mocked(scriptureReadingService.updateSession).mockRejectedValueOnce(new Error('offline'));
+      await store.getState().saveSession();
+      expect(store.getState().pendingRetry).not.toBeNull();
+
+      // Network comes back and the next autosave lands.
+      vi.mocked(scriptureReadingService.updateSession).mockResolvedValue(undefined);
+      await store.getState().saveSession();
+
+      // The user-visible symptom: a "tap to retry" banner left hanging over
+      // data that had in fact already been saved.
+      expect(store.getState().pendingRetry).toBeNull();
+      expect(store.getState().isSyncing).toBe(false);
+    });
+  });
 });
