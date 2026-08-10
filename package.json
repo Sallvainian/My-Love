@@ -38,13 +38,13 @@
     "deadcode": "bash scripts/deadcode.sh"
   },
   "dependencies": {
-    "@sentry/react": "^10.68.0",
-    "@supabase/supabase-js": "^2.110.8",
-    "dompurify": "^3.4.12",
-    "eventsource": "^4.1.0",
+    "@sentry/react": "^10.69.0",
+    "@supabase/supabase-js": "^2.112.2",
+    "dompurify": "^3.4.13",
+    "eventsource": "^4.1.1",
     "framer-motion": "^12.42.2",
     "idb": "^8.0.3",
-    "lucide-react": "^1.27.0",
+    "lucide-react": "^1.29.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-window": "^2.3.0",
