@@ -136,7 +136,7 @@ The only remaining performance utility. Exports exactly one function:
 
 - `measureScrollPerformance()` -- Creates a `PerformanceObserver` that warns when frame drops occur (> 16.67ms per frame)
 
-> **Removed:** `src/services/performanceMonitor.ts` (the singleton with `measureAsync`, `recordMetric`, `getMetrics`, `getReport` and the `[PerfMonitor]` dev logging) and `measureMemoryUsage()` were both deleted. Production performance signal now comes from Sentry, the Lighthouse PWA audit workflow, and the `bundle-size` CI check.
+> **Removed:** `src/services/performanceMonitor.ts` (the singleton with `measureAsync`, `recordMetric`, `getMetrics`, `getReport` and the `[PerfMonitor]` dev logging) and `measureMemoryUsage()` were both deleted. Production performance signal now comes from the Lighthouse PWA audit workflow and the `bundle-size` CI check -- nothing measures real user sessions.
 
 ### Performance Constants (`src/config/performance.ts`)
 

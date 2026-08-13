@@ -14,7 +14,6 @@
 | `react-window`                 | ^2.3.0   | Virtualized list rendering for performance           |
 | `react-window-infinite-loader` | ^2.0.1   | Infinite scroll integration with react-window        |
 | `dompurify`                    | ^3.4.12   | XSS sanitization for user-generated content          |
-| `@sentry/react`                | ^10.68.0 | Error tracking and performance monitoring            |
 | `workbox-window`               | ^7.4.1   | Service worker lifecycle management                  |
 | `eventsource`                  | ^4.1.0   | SSE polyfill for Supabase realtime                   |
 
@@ -29,7 +28,6 @@
 | `typescript`               | ~5.9.3  | Type checking and compilation         |
 | `vite-plugin-pwa`          | ^1.3.0  | PWA support (InjectManifest strategy) |
 | `vite-plugin-checker`      | ^0.12.0 | In-editor type checking overlay       |
-| `@sentry/vite-plugin`      | ^5.0.0  | Sentry source map upload during build |
 | `rollup-plugin-visualizer` | ^6.0.5  | Bundle size analysis                  |
 | `tsx`                      | ^4.21.0 | TypeScript script execution           |
 
@@ -94,7 +92,7 @@
 
 ## Version Constraints
 
-- **Node.js**: v24.13.0 (defined in `.mise.toml`)
+- **Node.js**: v24.x (defined in `.mise.toml`)
 - **Package Manager**: npm (lock file: `package-lock.json`)
 - **Browser Target**: `defaults and supports es6-module` (defined in `browserslist`)
 - **Module System**: ESM (`"type": "module"` in `package.json`)
@@ -112,7 +110,7 @@
 
 | File                   | Purpose                                                 |
 | ---------------------- | ------------------------------------------------------- |
-| `vite.config.ts`       | Vite build configuration, PWA plugin, Sentry, base path |
+| `vite.config.ts`       | Vite build configuration, PWA plugin, base path         |
 | `tsconfig.json`        | TypeScript project references root (3 sub-configs)      |
 | `vitest.config.ts`     | Unit test configuration (path alias `@/` -> `src/`)     |
 | `playwright.config.ts` | E2E test configuration (chromium, api, integration)     |

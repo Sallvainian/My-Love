@@ -19,7 +19,7 @@ Every push to `main` triggers the `.github/workflows/deploy.yml` pipeline with t
      | grep -v '^Connecting to' \
      > src/types/database.types.ts
    ```
-5. `npm run build` with GitHub Secrets injected as environment variables (Supabase URL, anon key, Sentry credentials)
+5. `npm run build` with GitHub Secrets injected as environment variables (Supabase URL, anon key)
 6. `npm run test:smoke` (validates `dist/` directory structure, `index.html`, manifest, icons, JS bundles, service worker)
 7. Upload `dist/` as GitHub Pages artifact
 
@@ -122,10 +122,6 @@ Two structural changes since the 2026-03 scan:
 | ------------------------- | --------------------------------------------------------------------- |
 | `VITE_SUPABASE_URL`       | Supabase project URL for production builds                            |
 | `VITE_SUPABASE_ANON_KEY`  | Supabase anon key (mapped to `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`) |
-| `VITE_SENTRY_DSN`         | Sentry DSN for error tracking                                         |
-| `SENTRY_AUTH_TOKEN`       | Sentry auth token for source map uploads                              |
-| `SENTRY_ORG`              | Sentry organization slug                                              |
-| `SENTRY_PROJECT`          | Sentry project slug                                                   |
 | `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation                |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                      |
 

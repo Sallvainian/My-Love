@@ -182,7 +182,6 @@ src/
     performance.ts                 # Pagination, storage quotas, validation limits
     images.ts                      # Image compression/validation/storage config
     relationshipDates.ts           # Birthdays, wedding, visit dates
-    sentry.ts                      # initSentry, setSentryUser, clearSentryUser
 
   constants/                       # UI constants
     animations.ts                  # Animation timing and values

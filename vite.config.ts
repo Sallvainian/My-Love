@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
 import checker from 'vite-plugin-checker';
-import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -11,7 +10,7 @@ export default defineConfig(({ mode }) => ({
   // Use base path only in production, root path in development
   base: mode === 'production' ? '/My-Love/' : '/',
   build: {
-    sourcemap: process.env.SENTRY_AUTH_TOKEN ? 'hidden' : false,
+    sourcemap: false,
     // Vite 8 bundles with Rolldown, which dropped the object form of
     // `output.manualChunks` and deprecated `rollupOptions` in favour of
     // `rolldownOptions`. `codeSplitting.groups` is the replacement: each group
@@ -97,17 +96,5 @@ export default defineConfig(({ mode }) => ({
       gzipSize: true,
       brotliSize: true,
     }),
-    ...(process.env.SENTRY_AUTH_TOKEN
-      ? [
-          sentryVitePlugin({
-            org: process.env.SENTRY_ORG,
-            project: process.env.SENTRY_PROJECT,
-            authToken: process.env.SENTRY_AUTH_TOKEN,
-            release: { name: process.env.SENTRY_RELEASE },
-            sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
-            telemetry: false,
-          }),
-        ]
-      : []),
   ],
 }));

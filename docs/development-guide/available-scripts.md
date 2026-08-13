@@ -17,7 +17,7 @@ All 32 npm scripts defined in `package.json`, organized by category.
 
 | Script              | Command                                  | Description                                                                                                                                                                                             |
 | ------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run build`     | `tsc -p tsconfig.app.json && vite build` | Full production build: TypeScript type-check against `tsconfig.app.json`, then Vite build with code splitting, PWA generation, and optional Sentry source map upload. Output: `dist/`.                  |
+| `npm run build`     | `tsc -p tsconfig.app.json && vite build` | Full production build: TypeScript type-check against `tsconfig.app.json`, then Vite build with code splitting and PWA generation. Output: `dist/`.                                                      |
 | `npm run typecheck` | `tsc -b --force`                         | TypeScript type check using project references (`-b` flag). Validates types across all three tsconfig files (app, node, test). The `--force` flag ensures a complete rebuild of all project references. |
 
 ## Code Quality

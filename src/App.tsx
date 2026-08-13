@@ -11,11 +11,9 @@ import { useAppStore } from './stores/useAppStore';
 import type { Session } from '@supabase/supabase-js';
 import { signOut } from './api/auth/actionService';
 import { getSession, onAuthStateChange } from './api/auth/sessionService';
-import { getPartnerId } from './api/supabaseClient';
 import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
-import { clearSentryUser, setSentryUser } from './config/sentry';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { logger } from './utils/logger';
@@ -206,8 +204,6 @@ function App() {
           const { setAuthUser, clearAuth } = useAppStore.getState();
           if (currentSession?.user) {
             setAuthUser(currentSession.user.id, currentSession.user.email);
-            const partnerId = await getPartnerId();
-            setSentryUser(currentSession.user.id, partnerId);
           } else {
             clearAuth();
           }
@@ -238,10 +234,6 @@ function App() {
           const hasDisplayName = newSession.user.user_metadata?.display_name;
           setNeedsDisplayName(!hasDisplayName);
 
-          getPartnerId().then((partnerId) => {
-            setSentryUser(newSession.user.id, partnerId);
-          });
-
           logger.debug('[App] Auth state changed:', {
             authenticated: true,
             hasDisplayName,
@@ -250,7 +242,6 @@ function App() {
         } else {
           clearStoreAuth();
           setNeedsDisplayName(false);
-          clearSentryUser();
           logger.debug('[App] Auth state changed: signed out');
         }
       }
