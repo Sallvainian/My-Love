@@ -9,11 +9,10 @@ Analysis of the highest-impact code paths in the application -- the flows where 
 This is the critical startup sequence. A failure here prevents the entire app from loading.
 
 ```
-main.tsx: initSentry() -> createRoot -> render(<App />)
+main.tsx: createRoot -> render(<App />)
   |
 App.tsx: checkAuth() -> getSession() + onAuthStateChange()
   |-- Stores auth tokens in IndexedDB for SW background sync
-  |-- Sets Sentry user context
   |
 App.tsx: initializeApp() (via settingsSlice)
   |-- Guard: isInitializing / isInitialized (module-level flags for StrictMode)
@@ -126,7 +125,6 @@ Sign-in flow:
   |-- supabase.auth.signInWithPassword()
   |-- onAuthStateChange fires with SIGNED_IN
   |-- storeAuthToken() -> IndexedDB sw-auth store
-  |-- setSentryUser() with UUID only
 
 Token refresh:
   |-- Supabase auto-refreshes JWT before expiry
@@ -136,7 +134,6 @@ Token refresh:
 Sign-out flow:
   |-- actionService.signOut()
   |-- clearAuthToken() -> IndexedDB sw-auth store
-  |-- clearSentryUser()
 
 SW background sync:
   |-- getAuthToken() from IndexedDB

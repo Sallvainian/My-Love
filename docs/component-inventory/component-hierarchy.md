@@ -5,7 +5,7 @@
 ```
 App (root) -- src/App.tsx
 |
-|-- ErrorBoundary (class component, global, Sentry integration)
+|-- ErrorBoundary (class component, global, logs to console)
 |   |
 |   |-- [Auth Gate: not authenticated]
 |   |   |-- LoginScreen (email/password + Google OAuth)

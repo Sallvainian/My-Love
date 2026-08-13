@@ -14,7 +14,7 @@ Every push to `main` triggers `.github/workflows/deploy.yml`:
 2. Setup Node.js (version from `.mise.toml`) with npm cache
 3. `npm ci`
 4. Generate TypeScript types from remote Supabase schema: `supabase gen types typescript --project-id xojempkrugifnaveqtqc > src/types/database.types.ts`
-5. `npm run build` with environment variables injected via GitHub Secrets (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY, Sentry config)
+5. `npm run build` with environment variables injected via GitHub Secrets (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
 6. `npm run test:smoke` (validates dist/ directory structure, index.html, manifest, icons, JS bundles, service worker)
 7. Upload `dist/` as GitHub Pages artifact
 
@@ -40,10 +40,6 @@ Runs after deployment:
 | `VITE_SUPABASE_URL`       | Supabase project URL (injected at build time)                              |
 | `VITE_SUPABASE_ANON_KEY`  | Supabase anon/public key (mapped to VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY) |
 | `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation                     |
-| `VITE_SENTRY_DSN`         | Sentry DSN for error tracking                                              |
-| `SENTRY_AUTH_TOKEN`       | Sentry auth token for source map upload                                    |
-| `SENTRY_ORG`              | Sentry organization slug                                                   |
-| `SENTRY_PROJECT`          | Sentry project slug                                                        |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                           |
 
 ## GitHub Pages Configuration
@@ -85,7 +81,7 @@ base: mode === 'production' ? '/My-Love/' : '/',
 
 ### Source Maps
 
-Source maps are generated as `hidden` when `SENTRY_AUTH_TOKEN` is present (uploaded to Sentry, then deleted from dist/). Otherwise source maps are disabled.
+Source maps are disabled (`sourcemap: false`), so no `.map` files are emitted to `dist/`.
 
 ### Manual Chunks (Code Splitting)
 
@@ -122,7 +118,6 @@ Source maps are generated as `hidden` when `SENTRY_AUTH_TOKEN` is present (uploa
 | `vite-plugin-checker`      | In-browser TypeScript error overlay       |
 | `vite-plugin-pwa`          | PWA service worker (InjectManifest)       |
 | `rollup-plugin-visualizer` | Bundle analysis (`dist/stats.html`)       |
-| `@sentry/vite-plugin`      | Source map upload to Sentry (conditional) |
 
 ### Bundle Analysis
 

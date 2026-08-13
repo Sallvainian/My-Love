@@ -9,7 +9,7 @@
 | **Framework**        | React 19.2.8 + TypeScript 5.9.3 + Vite 7.3.6                        |
 | **State Management** | Zustand 5.0.14 (11 slices)                                          |
 | **Backend**          | Supabase 2.110.8 (Auth, Postgres, Storage, Realtime, Edge Functions) |
-| **Monitoring**       | Sentry 10.68.0 (error tracking + sourcemaps)                        |
+| **Monitoring**       | None -- React error boundaries and console logging only             |
 | **Styling**          | Tailwind CSS 4.1.17 + Framer Motion 12.42.2                         |
 | **Validation**       | Zod 4.4.3                                                           |
 | **Testing**          | Vitest 4.1.10 + Playwright 1.62.0                                   |
@@ -167,7 +167,7 @@ src/                    # 168 non-test files (197 total), ~43,133 lines
   hooks/                # 14 files: 1 barrel + 13 custom React hooks
   utils/                # 15 modules: date helpers, formatters, logger, validation
   types/                # TypeScript type definitions (incl. generated database.types.ts)
-  config/               # Constants, images, performance, relationship dates, Sentry
+  config/               # Constants, images, performance, relationship dates
   data/                 # Default messages + 17 scripture steps
   sw.ts                 # Service Worker (Background Sync)
   sw-db.ts              # SW IndexedDB helpers

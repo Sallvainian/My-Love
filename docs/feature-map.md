@@ -96,7 +96,7 @@ Paths are repo-relative. Line numbers were correct at the commit noted at the bo
 - [Local Data Layer: IndexedDB schema, versioning & migrations](#local-data-layer-indexeddb-schema-versioning-migrations) — `src/services/dbSchema.ts`
 - [Supabase Data Layer (client, API services, error handling)](#supabase-data-layer-client-api-services-error-handling) — `src/api/supabaseClient.ts`
 - [Zod Runtime Validation Layer](#zod-runtime-validation-layer) — `src/validation/schemas.ts`
-- [Observability (logger, Sentry, performance monitoring)](#observability-logger-sentry-performance-monitoring) — `src/utils/logger.ts`
+- [Observability (logger, performance monitoring)](#observability-logger-performance-monitoring) — `src/utils/logger.ts`
 - [Database Schema, Migrations & pgTAP Suite](#database-schema-migrations-pgtap-suite) — `supabase/migrations/20251203000001_create_base_schema.sql`
 - [Shared Types, App Constants & Date Utilities](#shared-types-app-constants-date-utilities) — `src/types/index.ts`
 
@@ -2956,7 +2956,7 @@ _None found for this feature._
       window.location.pathname = window.location.pathname.replace('/admin', '');
 ```
 
-**9. Import and export report their results through native blocking alert() calls (lines 45, 60-62, 65) rather than the SyncToast/error-banner patterns used elsewhere in the app. These block the event loop and are invisible to the app's Sentry/error-boundary reporting.**
+**9. Import and export report their results through native blocking alert() calls (lines 45, 60-62, 65) rather than the SyncToast/error-banner patterns used elsewhere in the app. These block the event loop and are invisible to the app's error-boundary handling.**
 
 `src/components/AdminPanel/AdminPanel.tsx:45`
 
@@ -3077,7 +3077,6 @@ Users sign in with email/password or "Continue with Google" on a full-screen Log
 | `src/sw-db.ts` | 173 | storeAuthToken / getAuthToken / clearAuthToken against the IndexedDB 'sw-auth' object store used by Background Sync |
 | `src/components/Navigation/BottomNavigation.tsx` | 119 | Renders the data-testid="nav-logout" button wired to App.handleSignOut via onSignOut/signOutDisabled props |
 | `src/components/Settings/Settings.tsx` | 172 | Second (currently unreferenced) sign-out surface using the authService facade |
-| `src/config/sentry.ts` | 55 | setSentryUser(userId, partnerId) / clearSentryUser() called from the auth effect in App.tsx |
 | `supabase/migrations/20251203000001_create_base_schema.sql` | 249 | Creates public.users (PK references auth.users) and the initial self/partner RLS policies |
 | `supabase/migrations/20251206124803_fix_users_rls_policy.sql` | 25 | Replaces the read-all users SELECT policy with a self-or-partner scoped one |
 | `supabase/migrations/20251206200000_fix_users_update_privilege_escalation.sql` | 41 | Blocks partner_id self-assignment in the users UPDATE policy (privilege-escalation fix) |
@@ -3345,10 +3344,10 @@ function App() {
 | File | Lines | Role |
 |---|---:|---|
 | `src/App.tsx` | 610 | Root shell: auth gating, splash gating, admin gating, initial route detection, popstate listener, view switch, theme effect, network/sync effects |
-| `src/main.tsx` | 47 | React root: Sentry init, PWA service-worker register (prod) / unregister-all (dev), StrictMode + LazyMotion wrappers |
+| `src/main.tsx` | 47 | React root: PWA service-worker register (prod) / unregister-all (dev), StrictMode + LazyMotion wrappers |
 | `src/components/Navigation/BottomNavigation.tsx` | 119 | Fixed bottom tab bar: Home/Mood/Notes/Partner/Photos/Scripture buttons plus a Logout button |
 | `src/stores/slices/navigationSlice.ts` | 85 | currentView state, setView (with history pushState), and per-view convenience navigate* actions |
-| `src/components/ViewErrorBoundary/ViewErrorBoundary.tsx` | 152 | Per-view error boundary: inline fallback, offline/chunk-error detection, auto-reset on viewName change, Sentry capture tagged with the view |
+| `src/components/ViewErrorBoundary/ViewErrorBoundary.tsx` | 152 | Per-view error boundary: inline fallback, offline/chunk-error detection, auto-reset on viewName change, console logging tagged with the view |
 | `src/components/ViewErrorBoundary/index.ts` | 1 | Barrel re-export of ViewErrorBoundary |
 | `src/components/ErrorBoundary/ErrorBoundary.tsx` | 94 | Full-screen error boundary with validation-error detection and a 'Clear Storage & Reload' button |
 | `src/components/shared/NetworkStatusIndicator.tsx` | 151 | Offline/connecting banner rendered at the top of the authenticated shell |
@@ -4344,9 +4343,9 @@ import { z } from 'zod/v4';
 
 ---
 
-## Observability (logger, Sentry, performance monitoring)
+## Observability (logger, performance monitoring)
 
-A 13-line logger with exactly two levels, Sentry error tracking that is gated twice over, and a scroll-frame PerformanceObserver used by the mood history timeline. Nothing here is user-facing; it determines what shows up in the console, what reaches Sentry, and what PII is stripped on the way. Sentry is initialised once in main.tsx and the user context is set/cleared from App.tsx on auth transitions.
+A 13-line logger with exactly two levels and a scroll-frame PerformanceObserver used by the mood history timeline. That is the whole of it — there is no error-reporting service, so nothing leaves the device. Nothing here is user-facing; it only determines what shows up in the console.
 
 **Start here:** `src/utils/logger.ts:4`
 
@@ -4359,10 +4358,7 @@ export const logger = {
 | File | Lines | Role |
 |---|---:|---|
 | `src/utils/logger.ts` | 13 | The whole logger: debug() is DEV-only, info() always logs. There is no warn or error method |
-| `src/config/sentry.ts` | 55 | initSentry (DSN gate + PROD gate + ignoreErrors + PII-stripping beforeSend), setSentryUser, clearSentryUser |
 | `src/utils/performanceMonitoring.ts` | 46 | measureScrollPerformance — PerformanceObserver on 'measure' entries, warns above 16.67ms |
-| `src/main.tsx` | — | Calls initSentry() at startup |
-| `src/App.tsx` | — | Calls setSentryUser on session/auth-change and clearSentryUser on sign-out |
 | `src/components/MoodTracker/MoodHistoryTimeline.tsx` | — | Only consumer of measureScrollPerformance |
 | `eslint.config.js` | — | Enforces the logger contract: no-console error with warn/error allowed, disabled for src/sw.ts, src/sw-db.ts and test files |
 
@@ -4394,31 +4390,15 @@ _None found for this feature._
       'no-console': ['error', { allow: ['warn', 'error'] }],
 ```
 
-**3. Sentry is gated twice. Missing DSN short-circuits before Sentry.init runs at all — which means setSentryUser/clearSentryUser then call into an uninitialised SDK (harmless no-ops, but no error is raised to tell you tracking is off).**
+**3. There is no error-reporting service at all. Nothing captures a production exception beyond `console.error` in the two error boundaries, so a crash that only a user hits leaves no trace you can read. Reproducing locally is the only diagnostic path.**
 
-`src/config/sentry.ts:8`
-
-```ts
-  if (!dsn) {
-```
-
-**4. Second gate: even with a DSN present, `enabled` is import.meta.env.PROD, so a dev build initialises Sentry but transmits nothing. Testing Sentry locally requires a production-mode build, not just setting VITE_SENTRY_DSN.**
-
-`src/config/sentry.ts:15`
+`src/components/ErrorBoundary/ErrorBoundary.tsx`
 
 ```ts
-    enabled: import.meta.env.PROD,
+    console.error('[ErrorBoundary]:', error, errorInfo);
 ```
 
-**5. beforeSend strips only event.user.email and event.user.ip_address. The partner_id tag set by setSentryUser is a UUID and survives; anything PII-bearing placed in breadcrumbs, extra, or an exception message is NOT scrubbed.**
-
-`src/config/sentry.ts:36`
-
-```ts
-      // Strip PII — only UUIDs should reach Sentry
-```
-
-**6. measureScrollPerformance observes entryTypes: ['measure'] globally — it fires for every performance.measure() anywhere in the app, not just mood-timeline scrolling, and the console.warn is unconditional (not DEV-gated) even though the surrounding logger.debug is. The caller is responsible for disconnect(); the function returns the observer and registers no cleanup itself.**
+**4. measureScrollPerformance observes entryTypes: ['measure'] globally — it fires for every performance.measure() anywhere in the app, not just mood-timeline scrolling, and the console.warn is unconditional (not DEV-gated) even though the surrounding logger.debug is. The caller is responsible for disconnect(); the function returns the observer and registers no cleanup itself.**
 
 `src/utils/performanceMonitoring.ts:38`
 

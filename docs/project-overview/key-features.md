@@ -205,15 +205,14 @@ A welcome screen displayed on first visit and after every 60 minutes of inactivi
 
 Accessible via the `/admin` route. Lazy-loaded as `AdminPanel` component. Provides administrative controls including custom message management (create, edit, delete with confirmation dialog). The admin route is detected on initial load in `App.tsx` and renders outside the normal navigation flow.
 
-## Error Tracking
+## Error Handling
 
-Sentry (`@sentry/react` 10.68.0) provides production error tracking:
+There is no remote error-tracking service. Runtime failures are contained in the browser:
 
-- Initialized in `src/config/sentry.ts` with 20% trace sample rate
-- PII stripping: only UUIDs reach Sentry (email and IP address removed)
-- Filtered errors: chunk load failures, network errors, ResizeObserver noise
-- Source maps uploaded during CI build via `@sentry/vite-plugin`, then deleted from dist/
-- User context set with user ID and partner ID only
+- `ErrorBoundary` wraps the whole app, logs the error and component stack to the console, and shows a retry screen
+- `ViewErrorBoundary` wraps each view so a crash keeps the bottom navigation usable, and distinguishes offline and chunk-load failures
+- User-facing validation messages come from `src/validation/errorMessages.ts`
+- Diagnosing a production issue means reproducing it locally -- nothing is reported off-device
 
 ## Privacy and Security
 

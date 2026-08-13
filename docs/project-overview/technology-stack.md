@@ -6,7 +6,7 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 | Technology   | Version | Purpose                                                   |
 | ------------ | ------- | --------------------------------------------------------- |
-| Node.js      | 24.13.0 | Runtime (pinned via `.mise.toml`)                         |
+| Node.js      | 24.x | Runtime (pinned via `.mise.toml`)                         |
 | React        | 19.2.8  | UI framework                                              |
 | React DOM    | 19.2.8  | DOM rendering                                             |
 | TypeScript   | ~5.9.3  | Static type checking (strict mode enabled)                |
@@ -53,11 +53,7 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 ## Error Tracking
 
-| Technology    | Version | Purpose                                                     |
-| ------------- | ------- | ----------------------------------------------------------- |
-| @sentry/react | 10.68.0 | Error tracking and performance monitoring (20% sample rate) |
-
-Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs reach Sentry). Source maps are uploaded during CI builds via `@sentry/vite-plugin` and deleted from the `dist/` directory after upload.
+The project uses no error-tracking or APM service. Runtime failures surface through the React error boundaries (`ErrorBoundary`, `ViewErrorBoundary`) and console logging only, and builds emit no source maps (`sourcemap: false`).
 
 ## Testing
 
@@ -91,7 +87,6 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 | gh-pages                    | 6.3.0   | GitHub Pages deployment                                                               |
 | tsx                         | 4.21.0  | TypeScript script execution                                                           |
 | Supabase CLI                | 2.77.1  | Local Supabase development, migrations, type generation                               |
-| @sentry/vite-plugin         | 5.0.0   | Sentry source map upload during builds                                                |
 | mise                        | --      | Tool version management (Node.js version pinned in `.mise.toml`)                      |
 
 ## Build Targets

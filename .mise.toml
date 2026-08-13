@@ -1,5 +1,12 @@
 [tools]
-node = "24.13.0"
+# Track the latest 24.x rather than an exact patch. mise.lock pins the exact
+# resolved version so every machine and CI still install the same build;
+# run `mise upgrade node` to move the lock to a newer 24.x.
+node = "24"
 
 [env]
 CODEX_HOME = "{{config_root}}/.codex"
+
+[settings]
+# Read and update mise.lock alongside this file.
+lockfile = true

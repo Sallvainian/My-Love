@@ -18,7 +18,6 @@
 
 | Library                      | Version | Purpose                                   |
 | ---------------------------- | ------- | ----------------------------------------- |
-| @sentry/react                | 10.68.0 | Error tracking and performance monitoring |
 | lucide-react                 | 0.577.0 | Tree-shakeable SVG icons                  |
 | react-window                 | 2.3.0   | Virtualized list rendering                |
 | react-window-infinite-loader | 2.0.1   | Infinite scroll for virtualized lists     |
@@ -34,7 +33,6 @@
 | @vitejs/plugin-react     | 5.1.4   | React Fast Refresh           |
 | vite-plugin-pwa          | 1.2.0   | PWA support (InjectManifest) |
 | vite-plugin-checker      | 0.12.0  | In-editor type checking      |
-| @sentry/vite-plugin      | 5.0.0   | Sentry source map upload     |
 | rollup-plugin-visualizer | 6.0.5   | Bundle analysis              |
 | gh-pages                 | 6.3.0   | GitHub Pages deployment      |
 | tsx                      | 4.21.0  | TypeScript script execution  |
@@ -77,7 +75,7 @@
 | Tool           | Version   | Purpose                                |
 | -------------- | --------- | -------------------------------------- |
 | supabase (CLI) | 2.77.1    | Local dev, migrations, type generation |
-| Node.js        | 24.13.0   | Runtime (see `.mise.toml`)             |
+| Node.js        | 24.x   | Runtime (see `.mise.toml`)             |
 | npm            | (bundled) | Package manager                        |
 
 ## Module System

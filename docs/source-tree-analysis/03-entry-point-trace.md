@@ -7,20 +7,16 @@ The application boots from `src/main.tsx`, which is referenced by `index.html`.
 ### Boot Sequence
 
 ```typescript
-// 1. Initialize Sentry error tracking (no-ops if VITE_SENTRY_DSN is absent)
-// 2. React StrictMode (double-mounts in development)
-// 3. LazyMotion with domAnimation features (Framer Motion tree-shaking)
-// 4. Render <App /> into DOM root
+// 1. React StrictMode (double-mounts in development)
+// 2. LazyMotion with domAnimation features (Framer Motion tree-shaking)
+// 3. Render <App /> into DOM root
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LazyMotion, domAnimation } from 'framer-motion';
-import { initSentry } from './config/sentry';
 import { logger } from './utils/logger';
 import App from './App.tsx';
 import './index.css';
-
-initSentry();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -72,7 +68,7 @@ if (import.meta.env.DEV && 'serviceWorker' in navigator) {
   |-- useAppStore(): settings, initializeApp, isLoading, currentView, setView, syncPendingMoods
   |
   |-- useEffect: detectViewFromURL()     // Parse URL to set initial view + popstate listener
-  |-- useEffect: checkAuth()             // getSession + onAuthStateChange + Sentry user context
+  |-- useEffect: checkAuth()             // getSession + onAuthStateChange
   |-- useEffect: initializeApp()         // Initialize when session established
   |-- useEffect: applyTheme()            // Apply CSS variables for current theme
   |-- useEffect: online/offline listeners // Auto-sync on reconnect
@@ -106,7 +102,7 @@ if (import.meta.env.DEV && 'serviceWorker' in navigator) {
 ### Initialization Effects (in order)
 
 1. **Route detection**: Reads `window.location.pathname` to determine initial view, sets up `popstate` listener
-2. **Auth check**: Calls `getSession()`, subscribes to `onAuthStateChange`, sets Sentry user context
+2. **Auth check**: Calls `getSession()` and subscribes to `onAuthStateChange`
 3. **App init** (`initializeApp`): Opens IndexedDB, loads/seeds messages, sets `isLoading = false`. Migration from localStorage to IndexedDB runs in background via `requestIdleCallback`.
 4. **Theme application**: Applies CSS variables via `applyTheme(settings.themeName)`
 5. **Network listeners**: Sets up online/offline event listeners, triggers sync on reconnect

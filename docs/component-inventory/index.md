@@ -29,7 +29,6 @@
 - **Styling**: Tailwind CSS 4.1.17 (utility-first, dark mode via class)
 - **Sanitization**: DOMPurify (XSS prevention in LoveNoteMessage)
 - **Image Processing**: imageCompressionService (client-side compression before upload)
-- **Error Tracking**: Sentry (`@sentry/react`)
 
 ## Documentation Files
 

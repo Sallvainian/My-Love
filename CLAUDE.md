@@ -106,7 +106,7 @@ Uses [fnox](https://fnox.jdx.dev) with the `age` provider for local secrets (enc
 | `.env.example` | Yes | Template with placeholder values |
 | `.env.test` | Yes | Local Supabase test values |
 
-**Project secrets (in `fnox.toml`):** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `SUPABASE_SERVICE_KEY`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `VITE_SENTRY_DSN`, `SUPABASE_PAT`
+**Project secrets (in `fnox.toml`):** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `SUPABASE_SERVICE_KEY`, `SUPABASE_PAT`
 
 ### Base Path
 
@@ -115,7 +115,7 @@ Production builds use `/My-Love/` base path for GitHub Pages deployment. Develop
 ## Key Conventions
 
 - Package manager: **npm** (see `package-lock.json`)
-- Node version: **v24.13.0** (see `.mise.toml`)
+- Node version: **v24.x** (see `.mise.toml`)
 - Path alias: `@/` maps to `src/` (configured in vitest.config.ts, not in vite.config.ts)
 - Generated types: `src/types/database.types.ts` is auto-generated from Supabase schema - do not edit manually
 - ESLint enforces `no-explicit-any` as error

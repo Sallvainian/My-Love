@@ -62,7 +62,7 @@ Fixed positioned at top center (`z-[100]`), min width 280px. Dismiss button (X i
 Global error boundary wrapping the entire application. Features:
 
 - Catches all React rendering errors
-- Reports errors to Sentry (`@sentry/react`)
+- Logs the error and component stack to the console (there is no remote error reporting)
 - Displays fallback UI with error message
 - "Try Again" button to reset error state
 

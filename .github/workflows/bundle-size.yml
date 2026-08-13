@@ -31,7 +31,6 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         # Pinned to v2 deliberately. `v3` is an unreleased development BRANCH, not a
         # release tag — the newest actual release is 2.10.0 and there is no v3 tag.
         # Dependabot mistook the branch for a version in dee216f, and the v3 code

@@ -29,7 +29,6 @@ import { test as togetherModeFixture } from './fixtures/together-mode';
 const networkMonitorFixture = base.extend(
   createNetworkErrorMonitorFixture({
     excludePatterns: [
-      /sentry\.io/,
       /analytics/,
       /supabase\.co\/rest\/v1\/rpc\/log/, // Exclude Supabase logging RPC
       /\/rest\/v1\/users\?select=partner/, // Partner queries fail without partner data in test env

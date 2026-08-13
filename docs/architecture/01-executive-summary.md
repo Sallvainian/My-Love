@@ -22,7 +22,6 @@ The application serves exactly two users (a couple) and is scoped for personal u
 | Icons            | Lucide React        | 0.577.0 | Tree-shakeable SVG icons                                         |
 | Virtualization   | react-window        | 2.3.0   | Windowed rendering for large lists                               |
 | Sanitization     | DOMPurify           | 3.4.12   | XSS protection for user-generated content                        |
-| Error Tracking   | Sentry              | 10.68.0 | Error reporting with PII stripping                               |
 
 ## Architecture Philosophy
 
@@ -79,7 +78,6 @@ The app builds via `tsc -p tsconfig.app.json && vite build` and deploys to GitHu
 ```
 index.html
   -> src/main.tsx
-       -> Sentry.init() (production only)
        -> React.StrictMode > LazyMotion > App
             -> App.tsx (~610 lines)
                  -> Auth check (getSession + onAuthStateChange)

@@ -5,7 +5,7 @@
 | Component         | Path                                                     | Type           | Store Connections                                | Key Features                                                                  |
 | ----------------- | -------------------------------------------------------- | -------------- | ------------------------------------------------ | ----------------------------------------------------------------------------- |
 | App               | `src/App.tsx`                                            | Container      | Auth state, settings, navigation, messages, sync | Auth flow gates, lazy loading, network sync, service worker listener          |
-| ErrorBoundary     | `src/components/ErrorBoundary/ErrorBoundary.tsx`         | Class          | None                                             | Global error boundary, Sentry integration, fallback UI                        |
+| ErrorBoundary     | `src/components/ErrorBoundary/ErrorBoundary.tsx`         | Class          | None                                             | Global error boundary, console logging, fallback UI                           |
 | ViewErrorBoundary | `src/components/ViewErrorBoundary/ViewErrorBoundary.tsx` | Class          | None                                             | Per-view error boundary, keeps nav visible, detects offline/chunk load errors |
 | BottomNavigation  | `src/components/Navigation/BottomNavigation.tsx`         | Presentational | `setView`, `currentView`                         | 7 tabs with Lucide icons, active tab highlighting                             |
 

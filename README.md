@@ -222,7 +222,6 @@ On push to `main`: build → smoke test → deploy to GitHub Pages → health ch
 - [Supabase](https://supabase.com/) — Backend, auth, realtime
 - [Playwright](https://playwright.dev/) — E2E and integration testing
 - [Vitest](https://vitest.dev/) — Unit testing
-- [Sentry](https://sentry.io/) — Error monitoring
 - [mise](https://mise.jdx.dev/) — Tool version management
 - [fnox](https://fnox.jdx.dev/) — Secrets management
 

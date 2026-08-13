@@ -42,7 +42,6 @@ Module-level dependency relationships across the codebase. Arrows indicate "impo
 
 ```
 main.tsx
-  -> config/sentry.ts
   -> App.tsx
 
 App.tsx
@@ -50,7 +49,6 @@ App.tsx
   -> api/auth/actionService.ts
   -> api/auth/sessionService.ts
   -> api/supabaseClient.ts
-  -> config/sentry.ts
   -> config/relationshipDates.ts
   -> utils/themes.ts
   -> utils/storageMonitor.ts
@@ -305,7 +303,6 @@ Key third-party imports by module category:
 | Validation     | `zod`                                                                                    |
 | Components     | `react`, `framer-motion`, `lucide-react`, `react-window`, `react-window-infinite-loader` |
 | Sanitization   | `dompurify`                                                                              |
-| Monitoring     | `@sentry/react`                                                                          |
 | Service Worker | `workbox-precaching`, `workbox-routing`, `workbox-strategies`, `workbox-expiration`      |
 
 ## Related Documentation

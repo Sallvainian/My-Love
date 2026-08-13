@@ -5,11 +5,11 @@
 ```bash
 git clone https://github.com/Sallvainian/My-Love.git
 cd My-Love
-mise install          # Install Node v24.13.0 (reads .mise.toml)
+mise install          # Install Node v24.x (reads .mise.toml)
 npm install           # Install all dependencies
 ```
 
-If you do not use mise, manually install Node.js v24.13.0 and run `npm install`.
+If you do not use mise, manually install Node.js v24.x and run `npm install`.
 
 ## Install Playwright Browsers (for E2E Tests)
 
@@ -66,7 +66,7 @@ The app will start but Supabase features (auth, database, realtime) will not wor
 ## Full Setup Checklist
 
 1. Clone the repository
-2. Run `mise install` (or manually install Node.js v24.13.0)
+2. Run `mise install` (or manually install Node.js v24.x)
 3. Run `npm install` to install dependencies
 4. Set up fnox with age encryption (see [Environment Setup](./environment-setup.md))
 5. Run `fnox exec -- npm run dev` to start the development server with secrets

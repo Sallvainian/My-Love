@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Node.js v24.13.0** (pinned in `.mise.toml` -- install via [mise](https://mise.jdx.dev): `mise install`)
+- **Node.js v24.x** (pinned in `.mise.toml` -- install via [mise](https://mise.jdx.dev): `mise install`)
 - **npm** (package manager)
 - **fnox** (for secrets: `mise install fnox` or see [fnox docs](https://fnox.jdx.dev))
 - **Supabase CLI** (for E2E tests and database work: `npm install -g supabase`)
@@ -94,7 +94,7 @@ npx playwright test --grep "mood tracker"
 ## Key Conventions
 
 - **Package manager**: npm (lock file: `package-lock.json`)
-- **Node version**: v24.13.0 (see `.mise.toml`)
+- **Node version**: v24.x (see `.mise.toml`)
 - **Path alias**: `@/` maps to `src/` (configured in `vitest.config.ts`, not in `vite.config.ts`)
 - **Generated types**: `src/types/database.types.ts` is auto-generated from Supabase schema -- do not edit manually
 - **ESLint**: `no-explicit-any` is enforced as an error; ESLint is the only automated style gate

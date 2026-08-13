@@ -113,7 +113,7 @@ device the second partner to log a mood that day was rejected outright.
 
 > **Removed (2026-07).** `src/services/performanceMonitor.ts` -- the singleton with `measureAsync()`, `recordMetric()`, `getReport()`, and per-operation count/avg/min/max tracking -- was deleted in the dead-code sweep, as was `measureMemoryUsage()`. `src/utils/performanceMonitoring.ts` is the only performance utility that remains, and it exports exactly one function.
 >
-> Production performance signal now comes from Sentry (`src/config/sentry.ts`), the Lighthouse PWA audit workflow, and the `bundle-size` CI check.
+> Production performance signal now comes from the Lighthouse PWA audit workflow and the `bundle-size` CI check. Nothing reports runtime metrics from real sessions.
 
 ### Scroll Performance (`src/utils/performanceMonitoring.ts`)
 

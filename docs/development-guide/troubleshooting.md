@@ -45,7 +45,7 @@ location.reload();
 **Fix**:
 
 ```bash
-mise install              # Switch to Node v24.13.0 (reads .mise.toml)
+mise install              # Switch to Node v24.x (reads .mise.toml)
 rm -rf node_modules
 npm install
 fnox exec -- npm run dev

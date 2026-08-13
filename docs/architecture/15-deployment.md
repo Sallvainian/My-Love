@@ -83,10 +83,6 @@ GitHub Secrets are used directly in workflow environment variables:
 | --------------------------------------- | --------------------------------------------- |
 | `VITE_SUPABASE_URL`                     | Supabase project URL                          |
 | `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon/public key                      |
-| `VITE_SENTRY_DSN`                       | Sentry error tracking DSN                     |
-| `SENTRY_AUTH_TOKEN`                     | Sentry auth token (enables sourcemaps upload) |
-| `SENTRY_ORG`                            | Sentry organization slug                      |
-| `SENTRY_PROJECT`                        | Sentry project slug                           |
 | `SUPABASE_ACCESS_TOKEN`                 | Supabase CLI token for type generation        |
 
 ### Test Variables
@@ -108,28 +104,9 @@ Located in `.github/workflows/` (19 total):
 | `bundle-size.yml`         | PR                | Bundle size tracking                    |
 | `lighthouse.yml`          | Scheduled/manual  | Lighthouse performance auditing         |
 
-### Source Maps and Sentry
+### Source Maps
 
-When `SENTRY_AUTH_TOKEN` is set in the environment, the build enables two additional features:
-
-1. **Hidden source maps**: `sourcemap: 'hidden'` in `build` config generates source maps that are not referenced in the output bundles (invisible to browsers).
-2. **Sentry upload**: `@sentry/vite-plugin` uploads the source maps to Sentry, then deletes the `.map` files from `dist/` to prevent public exposure.
-
-```typescript
-// vite.config.ts (conditional Sentry plugin)
-...(process.env.SENTRY_AUTH_TOKEN
-  ? [sentryVitePlugin({
-      org: process.env.SENTRY_ORG,
-      project: process.env.SENTRY_PROJECT,
-      authToken: process.env.SENTRY_AUTH_TOKEN,
-      release: { name: process.env.SENTRY_RELEASE },
-      sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
-      telemetry: false,
-    })]
-  : []),
-```
-
-When `SENTRY_AUTH_TOKEN` is absent (e.g., local development), source maps are disabled entirely (`sourcemap: false`).
+Source maps are disabled for every build (`sourcemap: false` in the `build` config of `vite.config.ts`), so no `.map` files are emitted to `dist/` and nothing maps the deployed bundles back to source. Production stack traces are therefore minified; reproduce failures locally against a dev build when debugging.
 
 ## Bundle Splitting
 

@@ -39,8 +39,7 @@ Key TypeScript settings for the build:
 4. **Bundle analysis** output at `dist/stats.html`
 5. **CSS extraction** and minification via PostCSS (Tailwind CSS v4 + autoprefixer)
 6. **Tree shaking** via Rollup
-7. **Source maps** (hidden) when `SENTRY_AUTH_TOKEN` is present, uploaded to Sentry and then deleted from `dist/`
-8. **Sentry release** creation when Sentry credentials are configured
+7. **No source maps** -- `sourcemap: false`, so no `.map` files are emitted to `dist/`
 
 The production base path is set to `/My-Love/` for GitHub Pages deployment.
 
@@ -97,17 +96,9 @@ The service worker is compiled from `src/sw.ts` using the InjectManifest strateg
 
 The `workbox` section in VitePWA config is intentionally omitted because InjectManifest ignores it. All runtime caching behavior is controlled in `src/sw.ts`.
 
-## Sentry Integration
+## Source Maps
 
-When `SENTRY_AUTH_TOKEN` is present in the environment:
-
-- Source maps are generated as `hidden` (not referenced in the output JS files)
-- The `@sentry/vite-plugin` uploads source maps to Sentry for error tracking
-- Source map files are deleted from `dist/` after upload (via `filesToDeleteAfterUpload`)
-- A Sentry release is created with the name from `SENTRY_RELEASE` (typically `my-love@<commit-sha>`)
-- Plugin telemetry is disabled
-
-When `SENTRY_AUTH_TOKEN` is absent (e.g., local development), source maps are not generated and Sentry integration is completely disabled.
+Source maps are disabled for every build (`sourcemap: false` in `vite.config.ts`). No `.map` files reach `dist/`, and the project has no error-tracking service to upload them to, so production stack traces stay minified. Reproduce failures against `npm run dev` when a readable trace is needed.
 
 ## Bundle Analysis
 

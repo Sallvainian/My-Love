@@ -45,7 +45,7 @@ Sorted by total lines (excluding test files colocated in `src/`):
 | `src/components/RelationshipTimers/`           | 5     | 493   | Time together, birthday, event countdowns                  |
 | `src/components/photos/`                       | 1     | 482   | Photo uploader component                                   |
 | `src/components/PhotoUpload/`                  | 1     | 456   | Photo upload modal                                         |
-| `src/config/`                                  | 5     | 448   | Performance, images, sentry, constants, dates              |
+| `src/config/`                                  | 4     | 393   | Performance, images, constants, dates                      |
 | `src/components/DailyMessage/`                 | 1     | 376   | Daily love message display                                 |
 | `src/components/scripture-reading/session/`    | 3     | 373   | Countdown, disconnect overlay, lock-in                     |
 | `src/components/shared/`                       | 3     | 366   | Network indicator, sync toast                              |

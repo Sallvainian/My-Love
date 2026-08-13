@@ -4,7 +4,7 @@
 
 | Tool         | Version                            | Purpose                                          | Installation                             |
 | ------------ | ---------------------------------- | ------------------------------------------------ | ---------------------------------------- |
-| Node.js      | v24.13.0 (pinned in `.mise.toml`)  | JavaScript runtime                               | [mise](https://mise.jdx.dev) recommended |
+| Node.js      | v24.x (pinned in `.mise.toml`)  | JavaScript runtime                               | [mise](https://mise.jdx.dev) recommended |
 | npm          | Bundled with Node.js               | Package manager (lock file: `package-lock.json`) | Included with Node.js                    |
 | Git          | Latest stable                      | Version control                                  | [git-scm.com](https://git-scm.com/)      |
 | Supabase CLI | Latest (`npm install -g supabase`) | Local database, E2E tests, migrations            | `npm install -g supabase`                |
@@ -20,27 +20,34 @@
 
 ## Node Version Management
 
-The project pins Node.js v24.13.0 via `.mise.toml` in the repository root. If you use [mise](https://mise.jdx.dev), the correct version is activated automatically when you enter the project directory:
+The project tracks the latest Node.js 24.x via `.mise.toml` in the repository root. If you use [mise](https://mise.jdx.dev), the correct version is activated automatically when you enter the project directory:
 
 ```bash
 mise install    # Install the pinned Node version
 ```
 
+`.mise.toml` holds the loose range; `mise.lock` records the exact version
+that was resolved, so every machine and CI install the same build. Run
+`mise upgrade node` to move the lock forward to a newer 24.x release.
+
 The `.mise.toml` file:
 
 ```toml
 [tools]
-node = "24.13.0"
+node = "24"
 
 [env]
 CODEX_HOME = "{{config_root}}/.codex"
+
+[settings]
+lockfile = true
 ```
 
 If you prefer [nvm](https://github.com/nvm-sh/nvm), manually install the correct version:
 
 ```bash
-nvm install 24.13.0
-nvm use 24.13.0
+nvm install 24
+nvm use 24
 ```
 
 ## Supabase CLI
@@ -118,7 +125,7 @@ npx playwright install --with-deps chromium
 Run these commands to verify your environment is ready:
 
 ```bash
-node --version          # Should output v24.13.0
+node --version          # Should output v24.x
 npm --version           # Should output a compatible version
 git --version           # Any recent version
 supabase --version      # Any recent version

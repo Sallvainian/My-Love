@@ -106,12 +106,6 @@ Trimmed to two exports in the dead-code sweep:
 
 **Consumers**: `imageCompressionService.ts`, `loveNoteImageService.ts`, `notesSlice.ts`, `PhotoUpload.tsx`
 
-### `src/config/sentry.ts` -- Error Tracking
-
-`initSentry()`, `setSentryUser()`, `clearSentryUser()`. PII stripping, error filtering, 20% trace sample rate.
-
-**Consumers**: `main.tsx`, `App.tsx`
-
 ## Utility Modules
 
 ### `src/utils/themes.ts` -- Theme System
