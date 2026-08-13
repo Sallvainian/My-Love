@@ -1,0 +1,9 @@
+# Normalize line endings across macOS, Linux, and Windows checkouts.
+# Without this, moving the repo through Windows rewrites every text file to
+# CRLF and git reports whole-file diffs on otherwise unchanged code.
+# LF is the project standard (see CLAUDE.md).
+* text=auto eol=lf
+
+# Binary assets: never apply line-ending conversion.
+*.png binary
+*.db binary
