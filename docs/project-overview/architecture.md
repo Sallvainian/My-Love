@@ -93,7 +93,6 @@ Auth flow in `App.tsx`:
 3. If no session: render `LoginScreen`
 4. If session but no display name (OAuth signup): render `DisplayNameSetup`
 5. If authenticated: initialize app and render main content
-6. Sentry user context is set with user ID and partner ID (UUIDs only, no PII)
 
 Auth services are split into two modules:
 
@@ -168,8 +167,6 @@ Key variables:
 
 - `VITE_SUPABASE_URL` -- Supabase project URL
 - `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` -- Supabase anon/public key
-- `VITE_SENTRY_DSN` -- Sentry error tracking DSN
-- `SENTRY_AUTH_TOKEN` -- Sentry source map upload token
 
 For E2E tests, `.env.test` provides plain-text local Supabase values. The Playwright config auto-detects local Supabase credentials via `supabase status -o env` and re-signs JWT tokens for ES256 compatibility.
 

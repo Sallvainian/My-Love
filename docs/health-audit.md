@@ -26,9 +26,9 @@ Eight readers each took one feature area and read the implementation directly �
 Each finding was then re-checked by an independent verifier instructed to refute by default: confirm
 the quote byte-for-byte, trace callers, and try to prove the code path unreachable or already handled.
 
-- 91 findings proposed, **89 survived** verification, 2 refuted.
-- 89/89 surviving quotes confirmed byte-exact at the cited line.
-- 40 findings had their severity **lowered** by the verifier, 0 raised, 49 left unchanged.
+- 90 findings proposed, **88 survived** verification, 2 refuted.
+- 88/88 surviving quotes confirmed byte-exact at the cited line.
+- 40 findings had their severity **lowered** by the verifier, 0 raised, 48 left unchanged.
 
 I then independently re-verified every Critical and the highest-impact High findings against source,
 by execution, and against the live production database. One finding was materially corrected as a
@@ -40,9 +40,9 @@ result (see `photos-missing-update-policy`), and two findings below are my own.
 | --- | --- |
 | Critical | 3 |
 | High | 23 |
-| Medium | 46 |
+| Medium | 45 |
 | Low | 18 |
-| **Total** | **90** |
+| **Total** | **89** |
 
 ### Fix these first
 
@@ -60,7 +60,7 @@ the mechanism, a concrete reproduction, and a proposed fix with a rough size (S/
 
 ### Infrastructure & data — offline, service worker, IndexedDB, Supabase, RLS
 
-**11 findings** — 2 critical, 4 high, 3 medium, 2 low
+**10 findings** — 2 critical, 4 high, 2 medium, 2 low
 
 > The Supabase side is mostly well-built: every table in `public` has RLS enabled, no policy uses a bare `true`, the users-table privilege-escalation and RLS-recursion bugs were found and properly fixed, and the scripture RPC surface is `security invoker` with pgTAP coverage. What worries me most is the IndexedDB layer: five call sites all call `openDB(DB_NAME, DB_VERSION=5)` with *different* upgrade callbacks, so whichever one opens the database first on a fresh browser permanently decides which object stores exist. I reproduced this with fake-indexeddb: after `storageService.init()` opens first, saving a mood throws `NotFoundError: No objectStore named moods in this database`. Second concern is a test-seeding RPC (`scripture_seed_test_data`) whose only production guard reads a Postgres setting that nothing in the repo ever sets, leaving it callable against the live database. Third, several client↔policy contradictions have drifted: `partnerService.searchUsers` still assumes the old `USING (true)` users policy that was replaced in Dec 2025, and `photoService.updatePhoto` reports success even when an UPDATE matches zero rows.
 
@@ -126,7 +126,7 @@ the mechanism, a concrete reproduction, and a proposed fix with a rough size (S/
 
 **Why:** Both the sender (`supabase.channel(\`mood-updates:${partnerId}\`)`, line 124) and the receiver (line 361, config `{ broadcast: { self: false } }`) create the channel **without** `private: true`. Supabase only enforces the `realtime.messages` RLS policies on private channels; public channel topics are open to any connection with a valid JWT, and the publishable anon key in `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` is embedded in the production bundle served from GitHub Pages. The scripture feature already does this correctly — `useScriptureBroadcast.ts:112` sets `private: true` and 20260220000001_scripture_lobby_and_roles.sql:70/85 add matching `realtime.messages` SELECT/INSERT policies — so the pattern exists and mood sync simply did not adopt it. On receive, the handler at line 366 copies `payload.payload` straight into a `SupabaseMoodRecord` and calls `callback(mood)` (line 379) with no verification that `user_id` is actually the partner.
 
-**Reproduce:** Take the anon key from the production JS bundle and a target user UUID (partner UUIDs are also exposed as the `partner_id` Sentry tag and in `mood-updates:{partnerId}` sends). From any browser console: `createClient(URL, ANON).channel('mood-updates:<victim-uuid>').on('broadcast', {event:'new_mood'}, console.log).subscribe()`. Every mood the victim's partner logs, note text included, prints. Sending `channel.send({type:'broadcast', event:'new_mood', payload:{...}})` makes a fabricated mood appear in the victim's partner-mood UI.
+**Reproduce:** Take the anon key from the production JS bundle and a target user UUID (partner UUIDs are also exposed in `mood-updates:{partnerId}` sends). From any browser console: `createClient(URL, ANON).channel('mood-updates:<victim-uuid>').on('broadcast', {event:'new_mood'}, console.log).subscribe()`. Every mood the victim's partner logs, note text included, prints. Sending `channel.send({type:'broadcast', event:'new_mood', payload:{...}})` makes a fabricated mood appear in the victim's partner-mood UI.
 
 **Fix:** Add `private: true` to the channel config at both `moodSyncService.ts:124` and `moodSyncService.ts:361`, then add `realtime.messages` RLS policies modelled on 20260220000001_scripture_lobby_and_roles.sql:70-97: SELECT allowed when `topic like 'mood-updates:%'` and `split_part(topic,':',2)::uuid = auth.uid()` (you may only listen on your own channel), INSERT allowed when the topic UUID equals `public.get_my_partner_id()` (you may only publish to your partner's channel). Additionally, validate the received payload in the handler at line 366 — reject it unless `payload.user_id` matches the known partner id — so a forged message cannot reach state even if the channel config regresses.
 
@@ -176,22 +176,6 @@ the mechanism, a concrete reproduction, and a proposed fix with a rough size (S/
 
 **Fix:** In `src/sw.ts:syncPendingMoods`, skip any mood whose `mood.userId` does not equal `authToken.userId` (leave it pending) and pass `mood.userId` into `transformMoodForSupabase` so the SW and in-app paths agree — an ownership mismatch should then fail RLS loudly rather than silently re-attribute. Better still, filter at the source: give `getPendingMoods` a `userId` argument in `src/sw-db.ts`. Independently, clear the local moods store on sign-out in `actionService.signOut` so one user's offline data cannot outlive their session on a shared device.
 
-#### Medium · Sentry beforeSend strips only user.email/ip, while default console breadcrumbs carry love-message and photo content
-
-**risk** · `src/config/sentry.ts`:36 · effort **S**
-
-```ts
-      // Strip PII — only UUIDs should reach Sentry
-```
-
-**What you see:** When any error is reported to Sentry, the attached breadcrumb trail can contain the full text of the user's custom love messages (or, on an export/import failure, every custom message they have written) and photo metadata including captions — despite the code asserting that only UUIDs reach Sentry.
-
-**Why:** `beforeSend` deletes `event.user.email` and `event.user.ip_address` (sentry.ts:38-39) and nothing else. `@sentry/react` 10.42.0's default `breadcrumbsIntegration` has `console: true` (confirmed in `node_modules/@sentry/browser/build/npm/cjs/prod/integrations/breadcrumbs.js:15`), so every `console.error/warn` in the app becomes a breadcrumb serialized into the next event. `src/services/storage.ts:184` logs `console.error('[StorageService] Message data:', message)` where `message.text` is user-authored content; `storage.ts:111` logs the whole photo object including `caption`; `customMessageService.ts:293` logs the entire export payload. No `beforeBreadcrumb` hook is configured to scrub any of it.
-
-**Reproduce:** In production with `VITE_SENTRY_DSN` set, fill IndexedDB to its quota (or otherwise make a write fail) and add a custom message. `storageService.addMessage` throws, `console.error('[StorageService] Message data:', message)` runs, and the next error event sent to Sentry carries a console breadcrumb containing the message text.
-
-**Fix:** Add a `beforeBreadcrumb(breadcrumb)` to `Sentry.init` that drops or redacts console breadcrumbs — the cheapest correct version returns `null` for `breadcrumb.category === 'console'`, or strips `breadcrumb.data.arguments` for them. Separately, stop logging whole entities at the three call sites: log an id and a length instead of `photo`/`message`/`exportData` at `storage.ts:111`, `storage.ts:184` and `customMessageService.ts:293`.
-
 #### Medium · scripture_sessions UPDATE policy has USING but no WITH CHECK, letting a member attach an arbitrary third party as user2
 
 **risk** · `supabase/migrations/20260128000001_scripture_reading.sql`:147 · effort **S**
@@ -240,7 +224,7 @@ export const SupabaseInteractionSchema = z.object({
 
 **Fix:** Pick one direction and make it consistent. Either wire the schemas up — `InteractionArraySchema.parse(data)` in `interactionService`'s fetch and realtime handlers, `UserArraySchema.parse(data)` in `partnerService.searchUsers`/`getPendingRequests`, `SupabasePhotoSchema` in `photoService`'s reads — or delete the unused exports so the file reflects reality. Regardless, rename one of the two `SupabaseMessageSchema` exports (e.g. `ScriptureMessageRowSchema` in `src/validation/schemas.ts:257`) to remove the collision.
 
-**Test coverage in this area.** The pgTAP suite (`supabase/tests/database/02_rls_policies.sql`, `select plan(14)`) tests RLS only for the five `scripture_*` tables. There is zero RLS test coverage for `users`, `moods`, `love_notes`, `photos`, `interactions`, or `partner_requests` — which is exactly why the users-SELECT policy could be tightened out from under `partnerService.searchUsers` and the missing photos UPDATE policy could go unnoticed. On the client side there is no test that opens the shared IndexedDB through more than one service in a single process, so the divergent-upgrade bug is invisible to the suite (each existing db test opens through one code path only). `src/sw.ts`, `src/sw-db.ts`, `src/utils/backgroundSync.ts`, `src/utils/storageMonitor.ts`, `src/config/sentry.ts`, and `src/api/errorHandlers.ts` have no unit tests at all; `tests/unit/utils/` contains only `offlineErrorHandler.test.ts` from this area. There is also no test asserting that a Supabase write actually persisted (read-back), which is what would have caught the silent photo-caption update.
+**Test coverage in this area.** The pgTAP suite (`supabase/tests/database/02_rls_policies.sql`, `select plan(14)`) tests RLS only for the five `scripture_*` tables. There is zero RLS test coverage for `users`, `moods`, `love_notes`, `photos`, `interactions`, or `partner_requests` — which is exactly why the users-SELECT policy could be tightened out from under `partnerService.searchUsers` and the missing photos UPDATE policy could go unnoticed. On the client side there is no test that opens the shared IndexedDB through more than one service in a single process, so the divergent-upgrade bug is invisible to the suite (each existing db test opens through one code path only). `src/sw.ts`, `src/sw-db.ts`, `src/utils/backgroundSync.ts`, `src/utils/storageMonitor.ts`, and `src/api/errorHandlers.ts` have no unit tests at all; `tests/unit/utils/` contains only `offlineErrorHandler.test.ts` from this area. There is also no test asserting that a Supabase write actually persisted (read-back), which is what would have caught the silent photo-caption update.
 
 ### Partner — linking, interactions, display name
 

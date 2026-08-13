@@ -3,11 +3,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
-import { initSentry } from './config/sentry';
 import './index.css';
 import { logger } from './utils/logger';
-
-initSentry();
 
 // PWA auto-update: Register service worker with aggressive update strategy
 // Only register in production to prevent stale code issues in development

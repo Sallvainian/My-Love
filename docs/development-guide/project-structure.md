@@ -69,7 +69,6 @@ src/
     images.ts                       # Image asset configuration
     performance.ts                  # Pagination, storage quotas, validation limits
     relationshipDates.ts            # Relationship date configuration for timers
-    sentry.ts                       # Sentry error tracking initialization
 
   constants/
     animations.ts                   # Animation constant values
@@ -276,11 +275,13 @@ scripts/
 ## Configuration Files (Root)
 
 ```
-fnox.toml                           # Age-encrypted secrets (Supabase, Sentry) -- safe to commit
-.mise.toml                          # Tool versions (Node 24.13.0) + env vars
-.node-version                       # Node version file for CI (24.13.0)
+fnox.toml                           # Age-encrypted secrets (Supabase) -- safe to commit
+.mise.toml                          # Tool versions (Node 24.x) + env vars
+mise.lock                           # Exact resolved tool versions (auto-generated)
+.node-version                       # Node version file for CI (24)
 .env.example                        # Template showing required variables
 .env.test                           # Plain-text local Supabase values for E2E testing
+.gitattributes                      # Line-ending normalization (LF for all text files)
 .gitignore                          # Git ignore (node_modules, dist, .env, test artifacts)
 CLAUDE.md                           # Claude Code guidance (architecture, commands, conventions)
 AGENTS.md                           # AI coding agent guidance (architecture, E2E patterns, conventions)
@@ -294,6 +295,6 @@ tsconfig.json                       # TypeScript project references root
 tsconfig.app.json                   # App TypeScript config (ES2022, strict, react-jsx, path aliases)
 tsconfig.node.json                  # Node TypeScript config (vite.config.ts, vitest.config.ts)
 tsconfig.test.json                  # Test TypeScript config (extends app, adds vitest/jest-dom types)
-vite.config.ts                      # Vite: base path, manual chunks, PWA, visualizer, checker, Sentry
+vite.config.ts                      # Vite: base path, manual chunks, PWA, visualizer, checker
 vitest.config.ts                    # Vitest: happy-dom, @/ alias, coverage thresholds, JUnit
 ```

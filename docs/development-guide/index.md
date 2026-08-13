@@ -40,7 +40,7 @@ Last updated: 2026-03-20
   - [Manual Chunks (Code Splitting)](./build-process.md#manual-chunks-code-splitting)
   - [PWA Manifest Generation](./build-process.md#pwa-manifest-generation)
   - [Service Worker](./build-process.md#service-worker)
-  - [Sentry Source Maps](./build-process.md#sentry-source-maps)
+  - [Source Maps](./build-process.md#source-maps)
   - [Bundle Analysis](./build-process.md#bundle-analysis)
 - [Project Structure](./project-structure.md) -- Annotated directory layout
   - [Source Code (src/)](./project-structure.md#source-code-src)
@@ -85,7 +85,7 @@ Last updated: 2026-03-20
 | Stack           | React 19.2.8, TypeScript 5.9.3, Vite 7.3.6, Tailwind CSS 4.1.17 |
 | Backend         | Supabase 2.110.8 (Auth, Database, Realtime, Storage)            |
 | Testing         | Vitest 4.1.10, Playwright 1.62.0, pgTAP                        |
-| Node            | v24.13.0 (managed by mise, pinned in `.node-version`)          |
+| Node            | v24.x (managed by mise, pinned in `.node-version`)          |
 | Package manager | npm                                                            |
 | Secrets         | fnox with age provider (`fnox.toml`)                           |
 | Source files    | ~177                                                           |

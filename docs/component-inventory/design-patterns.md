@@ -42,7 +42,7 @@ All lazy imports are defined at the top of `App.tsx`.
 
 Two class components exist because React's `componentDidCatch` lifecycle requires class components:
 
-- `ErrorBoundary` -- Global, with Sentry integration
+- `ErrorBoundary` -- Global, logs the caught error to the console
 - `ViewErrorBoundary` -- Per-view, keeps navigation visible, detects offline/chunk errors
 
 ## Optimistic UI Updates

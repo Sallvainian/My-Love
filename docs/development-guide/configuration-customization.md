@@ -57,13 +57,13 @@ codeSplitting: {
 
 This produces separate cached chunks for major dependencies, improving cache hit rates on repeat visits.
 
-### Source Maps and Sentry
+### Source Maps
 
 ```typescript
-sourcemap: process.env.SENTRY_AUTH_TOKEN ? 'hidden' : false,
+sourcemap: false,
 ```
 
-Source maps are only generated when `SENTRY_AUTH_TOKEN` is present. When generated, they are uploaded to Sentry and deleted from the build output.
+Source maps are never generated, so the build output contains no `.map` files. Flip this to `'hidden'` (or `true`) if you need to debug a production bundle locally -- but note that a plain `true` publishes the maps alongside the deployed JS.
 
 ### Plugins
 
@@ -73,7 +73,6 @@ Source maps are only generated when `SENTRY_AUTH_TOKEN` is present. When generat
 | `vite-plugin-checker`       | TypeScript type checking overlay in the browser during development     |
 | `vite-plugin-pwa` (VitePWA) | PWA manifest generation, service worker compilation via InjectManifest |
 | `rollup-plugin-visualizer`  | Bundle size analysis output at `dist/stats.html`                       |
-| `@sentry/vite-plugin`       | Source map upload to Sentry (conditional on `SENTRY_AUTH_TOKEN`)       |
 
 ### PWA Configuration
 

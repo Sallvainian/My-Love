@@ -1,15 +1,15 @@
 # Fix Plan
 
-_Generated 2026-07-25. Triage of the 90 findings in [health-audit.md](./health-audit.md)._
+_Generated 2026-07-25. Triage of the 89 findings in [health-audit.md](./health-audit.md)._
 
 ## How this was categorized
 
 The audit says what is wrong. This says **how we work on it** — sorted by what each item needs from you,
 not by how bad it is. Severity is still shown on every row.
 
-43 findings that looked like easy fixes were re-checked against the source before being called easy: each
+42 findings that looked like easy fixes were re-checked against the source before being called easy: each
 was opened, its callers grepped, its covering tests located, and its proposed fix tested for hidden
-alternatives. **24 held up. 16 were demoted to "needs a decision"** — almost always because the audit's fix
+alternatives. **24 held up. 15 were demoted to "needs a decision"** — almost always because the audit's fix
 text said "either X or Y" and the two options are not interchangeable. **3 were demoted to "bigger code work".**
 
 The remaining 47 are categorized from the audit's own fix text, not re-verified. Entries that were
@@ -17,7 +17,7 @@ re-checked against source are marked _(verified)_; everything else was not.
 
 ## Duplicates merged
 
-Five pairs describe the same defect twice, so **90 findings are 85 distinct work items**.
+Five pairs describe the same defect twice, so **89 findings are 84 distinct work items**.
 One pair the audit itself missed.
 
 | Folded away | Into | Why |
@@ -33,13 +33,13 @@ One pair the audit itself missed.
 | Category | Items | What it needs |
 | --- | --- | --- |
 | **1 · Easy fixes** | 24 | One obvious implementation, at most a few files, no SQL, nothing for you to decide. Each was checked against the real source before landing here. |
-| **2 · Needs a decision from you** | 34 | The fix has two or more implementations that produce materially different behaviour. Someone has to choose; an implementer guessing is how features end up half-built. |
+| **2 · Needs a decision from you** | 33 | The fix has two or more implementations that produce materially different behaviour. Someone has to choose; an implementer guessing is how features end up half-built. |
 | **3 · Database migrations** | 11 | Requires SQL applied to the production database. Different deploy path, larger blast radius, and several are security fixes. |
 | **4 · Bigger code work** | 14 | Fully specified — nothing to decide — but touches shared architecture or many files. Not a one-sitting job. |
 | **5 · Action only you can take** | 1 | Not a code change. |
 | **6 · Test coverage** | 1 | No behaviour change; closes the gap that let other defects ship. |
 | _Merged duplicates_ | 5 | — |
-| **Total** | **90** | |
+| **Total** | **89** | |
 
 ## 1 · Easy fixes
 
@@ -187,7 +187,7 @@ Context worth knowing: the `photos` storage bucket has a hard 10MB cap (supabase
 
 **What you see:** Any uncaught error in the home view, the bottom navigation, the photo modals, or in one of App's own effects blanks the entire page. No message, no Try Again, no Clear Storage button — the only escape is for the user to know to clear site data manually.
 
-**Do this:** 1) src/main.tsx — add `import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';` to the import block (after line 5, `import { initSentry } from './config/sentry';`). Then change the render call at lines 41-47 to:
+**Do this:** 1) src/main.tsx — add `import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';` to the import block at the top of the file. Then change the render call at lines 41-47 to:
 ```tsx
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -850,7 +850,7 @@ Add one regression test next to the existing one at line 238: fire `broadcastHan
 
 The fix has two or more implementations that produce materially different behaviour. Someone has to choose; an implementer guessing is how features end up half-built.
 
-The 15 marked **(verified)** come with the exact question and its options, worked out against the source.
+The 14 marked **(verified)** come with the exact question and its options, worked out against the source.
 The rest are flagged by the audit's own fix text.
 
 ### B1. Five modules open the same IndexedDB at version 5; two use bespoke upgrade callbacks, and the first opener permanently decides which stores exist _(verified)_
@@ -1027,17 +1027,7 @@ The rest are flagged by the audit's own fix text.
 
 **Why it can't be decided for you:** The bug and the SW-side guard are unambiguous (src/sw.ts:192 passes `authToken.userId` while the in-app path at src/api/moodSyncService.ts:84 uses `user_id: mood.userId`), but the fix text bundles "Independently, clear the local moods store on sign-out in actionService.signOut" — that permanently destroys user A's unsynced offline moods, and src/services/moodService.ts exposes no clear/deleteAll method (only create, updateMood, getMoodForDate, getMoodsInRange, getUnsyncedMoods, markAsSynced), so it also requires new API surface.
 
-### B20. Sentry beforeSend strips only user.email/ip, while default console breadcrumbs carry love-message and photo content _(verified)_
-
-**Medium** · `src/config/sentry.ts:36` · `sentry-console-breadcrumb-pii`
-
-**What you see:** When any error is reported to Sentry, the attached breadcrumb trail can contain the full text of the user's custom love messages (or, on an export/import failure, every custom message they have written) and photo metadata including captions — despite the code asserting that only UUIDs reach Sentry.
-
-**The question:** For console breadcrumbs in Sentry, should `beforeBreadcrumb` (a) drop them entirely by returning `null` for `breadcrumb.category === 'console'` — maximum privacy, but Sentry events lose the console trail leading up to an error; or (b) keep the breadcrumb and its message text but delete `breadcrumb.data.arguments` — keeps '[StorageService] Failed to add photo:' visible while removing the logged entity?
-
-**Why it can't be decided for you:** The fix text offers two materially different observability outcomes: "returns `null` for `breadcrumb.category === 'console'`, or strips `breadcrumb.data.arguments` for them". Dropping console breadcrumbs entirely removes all console context from every Sentry event; stripping arguments keeps the message line (e.g. '[StorageService] Failed to add photo:') but not the payload. Both are correct privacy-wise, so an implementer cannot pick without knowing how much debugging context the owner wants to keep.
-
-### B21. Debounced month navigation reads stale year/month, so two quick taps still move only one month _(verified)_
+### B20. Debounced month navigation reads stale year/month, so two quick taps still move only one month _(verified)_
 
 **Medium** · `src/components/MoodHistory/MoodHistoryCalendar.tsx:107` · `calendar-month-nav-debounce-stale`
 
@@ -1047,7 +1037,7 @@ The rest are flagged by the audit's own fix text.
 
 **Why it can't be decided for you:** The fix text's primary suggestion does not actually fix the reported symptom: `handlePreviousMonth` (src/components/MoodHistory/MoodHistoryCalendar.tsx:102-112) calls `clearTimeout(navDebounceRef.current)` on every tap, so three quick taps cancel the first two timeouts and only one callback ever runs — making the update functional still moves exactly one month. Only the second, explicitly optional suggestion ("the debounce can also be dropped entirely") fixes it, and that changes visible behaviour during the debounce window.
 
-### B22. Photo caption/tag editing has no entry point — PhotoCarousel, PhotoEditModal and PhotoDeleteConfirmation are unreachable
+### B21. Photo caption/tag editing has no entry point — PhotoCarousel, PhotoEditModal and PhotoDeleteConfirmation are unreachable
 
 **Medium** · `src/components/PhotoCarousel/PhotoCarousel.tsx:132` · `photo-editor-unreachable`
 
@@ -1055,7 +1045,7 @@ The rest are flagged by the audit's own fix text.
 
 **Options in the audit:** Pick one viewer. Either point PhotoGallery's tap handler at `selectPhoto(photo.id)` and delete PhotoViewer, or add an edit button to PhotoViewer that mounts PhotoEditModal and delete PhotoCarousel/PhotoCarouselControls. Whichever survives, wire the caption save through `photosSlice.updatePhoto` — and land the missing UPDATE RLS policy first, or the edit will save nothing.
 
-### B23. The Fart button reports 'Fart sent!' but transmits nothing to the partner
+### B22. The Fart button reports 'Fart sent!' but transmits nothing to the partner
 
 **Medium** · `src/components/PokeKissInterface/PokeKissInterface.tsx:234` · `fart-never-sent`
 
@@ -1063,7 +1053,7 @@ The rest are flagged by the audit's own fix text.
 
 **Options in the audit:** Decide and make it honest. Either (a) extend the feature: migration to widen interactions_type_check to include 'fart', widen InteractionType and the FartAnimation dispatch in the incoming path, and route handleFart through a new sendFart store action mirroring sendPoke — or (b) drop the pretence: change the toast to something local ('💨 Nice one'), remove the 30-minute cooldown from the fart path since nothing is transmitted, and note in the component doc that fart is device-local.
 
-### B24. A failed partner message is logged and discarded; messageSendFailed is computed but never reaches the UI _(verified)_
+### B23. A failed partner message is logged and discarded; messageSendFailed is computed but never reaches the UI _(verified)_
 
 **Medium** · `src/components/scripture-reading/hooks/useReportPhase.ts:194` · `message-send-failure-swallowed`
 
@@ -1073,7 +1063,7 @@ The rest are flagged by the audit's own fix text.
 
 **Why it can't be decided for you:** `messageSendFailed` is set at useReportPhase.ts:196 and returned at line 491, but useSoloReadingFlow.ts (lines 131-147) never re-exports it — confirmed dead. The plumbing is trivial; the proposed *resend* is not. The message text lives only in MessageCompose's local state, which unmounts on the transition to `report`, so a resend requires retaining the text in the hook, and after a successful resend the already-loaded `reportData` still omits `userMessage` unless the report is refetched (`reportReloadKey`, line 77). "Dismissible" adds another state. Those are user-visible product choices, not plumbing.
 
-### B25. loadSession's background-refresh callback has no staleness guard and can revert a step or resurrect an exited session _(verified)_
+### B24. loadSession's background-refresh callback has no staleness guard and can revert a step or resurrect an exited session _(verified)_
 
 **Medium** · `src/stores/slices/scriptureReadingSlice.ts:240` · `stale-session-refresh-clobber`
 
@@ -1083,7 +1073,7 @@ The rest are flagged by the audit's own fix text.
 
 **Why it can't be decided for you:** The staleness guard half is unambiguous, but the second half — "merge rather than replace (preserve the locally-advanced currentStepIndex/currentPhase when they are ahead of the server)" — has no single implementation: `ScriptureSessionPhase` is `'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete'` (src/services/dbSchema.ts:26-33) with no ordering helper anywhere in the repo, so "ahead" for a phase has to be invented, and the service header explicitly documents the opposite policy: "Cache pattern (Solo Mode — Server is Source of Truth)" (src/services/scriptureReadingService.ts:145). Version-based merging is not available as a tiebreak either, because solo `advanceStep` calls `updateSession` with only `currentStepIndex` and never bumps `version` (src/stores/slices/scriptureReadingSlice.ts:382-384).
 
-### B26. The report's "Your Reflections" ratings are always empty — the only reflection write uses stepIndex 17, the report reads stepIndex < 17
+### B25. The report's "Your Reflections" ratings are always empty — the only reflection write uses stepIndex 17, the report reads stepIndex < 17
 
 **Medium** · `src/components/scripture-reading/hooks/useReportPhase.ts:330` · `report-ratings-never-populated`
 
@@ -1091,7 +1081,7 @@ The rest are flagged by the audit's own fix text.
 
 **Options in the audit:** Decide which behaviour is intended. If per-step ratings are wanted, add a rating control to the reading phase that calls `scriptureReadingService.addReflection(sessionId, stepIndex, ...)` for each step. If only the session-level rating exists, change `useReportPhase` to read the `stepIndex === MAX_STEPS` reflection's rating and render it as a single "Session rating" row in `DailyPrayerReport`, and drop the dead `stepIndex < MAX_STEPS` filters.
 
-### B27. Both partners can pick the same role; nothing on the client or server prevents it, so roles never alternate complementarily
+### B26. Both partners can pick the same role; nothing on the client or server prevents it, so roles never alternate complementarily
 
 **Medium** · `supabase/migrations/20260301000200_remove_server_side_broadcasts.sql:72` · `duplicate-role-selection-allowed`
 
@@ -1099,7 +1089,7 @@ The rest are flagged by the audit's own fix text.
 
 **Options in the audit:** In scripture_select_role, raise when the partner's role column already equals p_role (or auto-assign the complement and return it in the snapshot), and add the partner's role to the returned snapshot. On the client, disable/annotate the role card the partner already took in LobbyContainer using the user1Role/user2Role already present in StateUpdatePayload, and show 'Partner is the Reader' next to the partner status block.
 
-### B28. persist has version 0 and no migrate function — any future schema bump silently wipes user data _(verified)_
+### B27. persist has version 0 and no migrate function — any future schema bump silently wipes user data _(verified)_
 
 **Low** · `src/stores/useAppStore.ts:84` · `persist-no-migrate`
 
@@ -1109,7 +1099,7 @@ The rest are flagged by the audit's own fix text.
 
 **Why it can't be decided for you:** Confirmed unfixed — `version: 0, // State schema version (matches test fixtures)` at src/stores/useAppStore.ts:84 with no `migrate` key anywhere in the persist options (lines 82-273). But the fix is not implementable as written. A `migrate` only runs on a version mismatch, and with only version 0 existing it is dead code until someone bumps the version — at which point what it must do depends entirely on the schema change being made. Also, "re-runs the Map deserialization logic" is redundant: `onRehydrateStorage` (lines 160-228) already rebuilds `shownMessages` into a Map after migrate. And the second clause — "Decouple `version` from the test fixtures" — has no target: grepping `version: 0` / `"version": 0` across src, tests, and scripts returns only useAppStore.ts:84 and an unrelated `SupabaseSessionSchema` assertion at tests/unit/validation/schemas.test.ts:150. No persist fixture exists to decouple.
 
-### B29. Favorites are written to IndexedDB and localStorage independently and never reconciled _(verified)_
+### B28. Favorites are written to IndexedDB and localStorage independently and never reconciled _(verified)_
 
 **Low** · `src/stores/slices/messagesSlice.ts:119` · `favorites-two-sources-of-truth`
 
@@ -1119,7 +1109,7 @@ The rest are flagged by the audit's own fix text.
 
 **Why it can't be decided for you:** The divergence is real and unfixed: the heart icon renders from localStorage (`messageHistory.favoriteIds.includes(currentMessage.id)`, DailyMessage.tsx:59) while the write and the add/remove branch both come from IndexedDB's `isFavorite` (messagesSlice.ts:111 and :119). But the fix text opens with "Pick one store" — a directional choice with materially different user-visible outcomes — and its concrete recipe is wrong about where to hook in: `loadMessages` (messagesSlice.ts:79) is only ever called from the custom-message CRUD paths (messagesSlice.ts:373, 407, 427, 514). App startup never calls it — `initializeApp` sets `messages` directly via `set({ messages: storedMessages })` at settingsSlice.ts:141 and :144. Rebuilding favoriteIds "after loadMessages" therefore leaves the exact reported cold-start symptom unfixed.
 
-### B30. IndexedDB quota handling is specified and stubbed but never wired up; only localStorage is monitored, with a hardcoded 5MB estimate
+### B29. IndexedDB quota handling is specified and stubbed but never wired up; only localStorage is monitored, with a hardcoded 5MB estimate
 
 **Low** · `src/services/BaseIndexedDBService.ts:302` · `indexeddb-quota-never-checked`
 
@@ -1127,7 +1117,7 @@ The rest are flagged by the audit's own fix text.
 
 **Options in the audit:** Replace `logStorageQuota`'s hardcoded 5MB accounting with `await navigator.storage.estimate()` (usage/quota covers IndexedDB, Cache Storage and localStorage together), expose it as an async `getStorageEstimate()`, and call it on a schedule rather than once at init. In `BaseIndexedDBService.add/update`, detect `error.name === 'QuotaExceededError'` and route to `handleQuotaExceeded()` so callers get a distinguishable error, then surface a user-facing "storage full" message in the mood/message write paths. If the 80%/95% thresholds from AC-4.1.9 are no longer wanted, delete the stub and the comment instead of leaving a specified behaviour unimplemented.
 
-### B31. Two-thirds of supabaseSchemas.ts is unreferenced; the interactions and users Supabase boundaries have no runtime validation at all
+### B30. Two-thirds of supabaseSchemas.ts is unreferenced; the interactions and users Supabase boundaries have no runtime validation at all
 
 **Low** · `src/api/validation/supabaseSchemas.ts:159` · `dead-supabase-zod-schemas`
 
@@ -1135,7 +1125,7 @@ The rest are flagged by the audit's own fix text.
 
 **Options in the audit:** Pick one direction and make it consistent. Either wire the schemas up — `InteractionArraySchema.parse(data)` in `interactionService`'s fetch and realtime handlers, `UserArraySchema.parse(data)` in `partnerService.searchUsers`/`getPendingRequests`, `SupabasePhotoSchema` in `photoService`'s reads — or delete the unused exports so the file reflects reality. Regardless, rename one of the two `SupabaseMessageSchema` exports (e.g. `ScriptureMessageRowSchema` in `src/validation/schemas.ts:257`) to remove the collision.
 
-### B32. photos/PhotoUploader.tsx is 482 lines of unreferenced upload code that has drifted from the live implementation
+### B31. photos/PhotoUploader.tsx is 482 lines of unreferenced upload code that has drifted from the live implementation
 
 **Low** · `src/components/photos/PhotoUploader.tsx:45` · `dead-photouploader-drifted`
 
@@ -1145,7 +1135,7 @@ The rest are flagged by the audit's own fix text.
 
 > **Order:** decide/do `gallery-upload-skips-compression` first. dead-photouploader-drifted deletes src/components/photos/PhotoUploader.tsx and src/hooks/usePhotos.ts. gallery-upload-skips-compression's fix says to copy the compression call out of that very file — 'exactly as photos/PhotoUploader.tsx:171-181 already does' — into PhotoUpload.handleUpload. Delete first and the reference implementation is gone from the working tree. Port the compression (and the uploadProgress binding dead-photouploader-drifted also wants preserved) into PhotoUpload, verify it, then delete.
 
-### B33. PokeKissInterface and InteractionHistory subscribe to the entire Zustand store _(verified)_
+### B32. PokeKissInterface and InteractionHistory subscribe to the entire Zustand store _(verified)_
 
 **Low** · `src/components/PokeKissInterface/PokeKissInterface.tsx:70` · `pokekiss-unsliced-store-subscription`
 
@@ -1155,7 +1145,7 @@ The rest are flagged by the audit's own fix text.
 
 **Why it can't be decided for you:** The PokeKissInterface half is clean, but the InteractionHistory half has two blockers. (a) The fix text itself offers "early-return `null` when `!isOpen` ... or move the `getInteractionHistory(7)` call inside the open branch" — these are NOT equivalent: the component's entire body is `<AnimatePresence>{isOpen && ...}</AnimatePresence>` (InteractionHistory.tsx:79-203), so returning `null` unmounts AnimatePresence and destroys the modal's close/exit animation (`exit={{ opacity: 0, scale: 0.95, y: 20 }}`, line 97). (b) `getInteractionHistory` is a non-reactive getter reading `get().interactions` (interactionsSlice.ts:157-165). Today the modal stays live only because the bare `useAppStore()` re-renders it on every store write; narrowing to actions + `userId` would silently stop the open list from updating when `handleIncoming` pushes a new interaction (interactionsSlice.ts:243-244).
 
-### B34. Presence heartbeat interval is replaced without being cleared, and the presence re-subscribe loop has no retry cap _(verified)_
+### B33. Presence heartbeat interval is replaced without being cleared, and the presence re-subscribe loop has no retry cap _(verified)_
 
 **Low** · `src/hooks/useScripturePresence.ts:150` · `presence-interval-leak-and-unbounded-retry`
 
