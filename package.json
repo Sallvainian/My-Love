@@ -41,7 +41,7 @@
     "@supabase/supabase-js": "^2.110.8",
     "dompurify": "^3.4.12",
     "eventsource": "^4.1.0",
-    "framer-motion": "^12.42.2",
+    "framer-motion": "^13.0.0",
     "idb": "^8.0.3",
     "lucide-react": "^1.27.0",
     "react": "^19.2.8",
