@@ -114,10 +114,9 @@ jobs:
             5. **Error contract.** Assuming IndexedDB semantics (reads return
                `null`/`[]`, writes throw) of a Supabase API function or the reverse.
                The Supabase layer is inconsistent — check the specific function called.
-            6. **Imports and aliases.** Bare `'zod'` instead of `zod/v4`. The `@/` alias
-               inside `src/` — it typechecks and then fails the production build.
-               `@playwright/test` imported in a spec instead of
-               `tests/support/merged-fixtures.ts`.
+            6. **Imports and aliases.** The `@/` alias inside `src/` — it typechecks and
+               then fails the production build. `@playwright/test` imported in a spec
+               instead of `tests/support/merged-fixtures.ts`.
             7. **Generated and frozen files.** Hand edits to
                `src/types/database.types.ts` or `mise.lock`. New or repaired specs
                under `tests/e2e-archive/`.
