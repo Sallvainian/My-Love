@@ -33,8 +33,8 @@ dev-dist
 coverage/
 .nyc_output/
 
-# fnox — secrets stored in macOS Keychain, not files
-# fnox.toml is safe to commit (declarations only, no values)
+# fnox — secrets are age-encrypted inline in fnox.toml, which is committed.
+# The ciphertext is safe to commit; the age private key never is.
 fnox.local.toml
 .env
 .env.keys
