@@ -60,7 +60,12 @@ jobs:
       - name: Check for security advisories
         run: |
           echo "🛡️ Running security check..."
-          supabase db lint --level error || true
+          # --fail-on is load-bearing: without it db lint exits 0 no matter what
+          # it finds (the old `|| true` here doubly guaranteed that, so this step
+          # could never fail). --schema public because the pgTAP extension the
+          # migrations install lints with 8 false errors in `extensions`, and
+          # every app function lives in public.
+          supabase db lint --schema public --level error --fail-on error
 
       - name: Stop Supabase
         if: always()
