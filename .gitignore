@@ -12,6 +12,12 @@ failures-ai.md
 playwright-results.json
 _bmad-output/
 
+# Build-analysis output. `npm run perf:build` recreates docs/performance/ and
+# writes perf-build.log there; perf-bundle-report.mjs writes bundle-report.md.
+# The .md is not covered by *.log above, so without this it would land back in
+# a docs/ tree that is deliberately no longer tracked.
+docs/performance/
+
 # Logs
 logs
 *.log
