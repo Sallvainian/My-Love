@@ -205,7 +205,7 @@ Only phase-agnostic artifacts remain live. Everything tied to a finished plannin
 
 | Document                                                                   | Description                                                    |
 | ---------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| [Project Context](../_bmad-output/project-context.md)                      | Condensed AI-agent rule file (regenerated per scan)            |
+| [Agent Instructions](../AGENTS.md)                                         | AI-agent rule file, managed by `bmad-project-context`          |
 | [Deferred Work](../_bmad-output/implementation-artifacts/deferred-work.md) | Ledger of deferred items                                       |
 | `_bmad-output/handoff-documents/`                                          | Cross-session handoff documents                                |
 | `_bmad-output/bmad-workflow-reference.md`, `_bmad-output/tea-docs/`        | BMAD workflow reference and TEA test-architecture docs         |

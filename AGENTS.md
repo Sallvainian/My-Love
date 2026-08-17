@@ -1,186 +1,53 @@
-# AGENTS.md
+<!-- bmad:context -->
+<!-- Verified 2026-08-17 against b2d0dcc1. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
 
-This file provides guidance to AI coding agents when working with code in this repository.
+## My Love
 
-## Project Overview
+PWA for couples — daily messages, mood tracking, photos, love-notes chat, scripture reading, partner interactions. React 19, TypeScript, Vite, Tailwind v4, Zustand, Supabase; npm, Node 24. Deployed to GitHub Pages at https://sallvainian.github.io/My-Love/. Generated docs in `docs/`, BMAD planning output in `_bmad-output/`.
 
-My Love is a PWA (Progressive Web App) for couples to exchange daily love messages, mood tracking, photo sharing, love notes chat, scripture reading, and partner interactions. Built with React 19, TypeScript, Vite, Tailwind CSS v4, Framer Motion, Zustand, and Supabase.
+## Policy
 
-Live URL: https://sallvainian.github.io/My-Love/
+- Never hand-edit `src/types/database.types.ts` or `mise.lock` — both generated. Regenerate types with `supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts`.
+- Never add or repair specs in `tests/e2e-archive/` — frozen documentation, excluded from `tsconfig.test.json` and `tsconfig.tsr.json` and matched by no Playwright project. New E2E goes in `tests/e2e/`.
+- Secrets are age-encrypted inline in the committed `fnox.toml`; never write a secret into `.env` or source. Local runs need `fnox exec -- <cmd>`; CI uses GitHub Secrets, not fnox.
+- Branch as `<type>/<description>` (`feature/`, `fix/`, `chore/`, `docs/`, `ci/`). Commit as `type(scope): description` — feat, fix, test, docs, chore, refactor, revert, deps, ci, perf, style. Documentation-only changes get their own commit.
+- Answer the question asked — "should I do X?" is a question, not a request to do X.
+- Fix the cause rather than the symptom, and do not expand scope past it.
+- For migrations, mass renames and restructures: propose a config-level alternative first, get approval, then execute step by step. Never delete a source file before its replacement is confirmed working.
+- When fixing CI, check every failure mode — lint, typecheck, coverage, tests — before pushing.
 
-## Commands
+## Where things are
 
-### Development
+- State: `src/stores/useAppStore.ts` composes 11 slices from `src/stores/slices/`; `appSlice` is composed first and owns `isLoading`/`error`/`__isHydrated`; `authSlice` owns `userId` and is not persisted.
+- E2E fixtures: import `{ test, expect }` from `tests/support/merged-fixtures.ts`, never from `@playwright/test`.
 
-```bash
-npm run dev              # Start dev server (runs cleanup script wrapper)
-npm run dev:raw          # Start Vite dev server directly
-npm run preview          # Preview production build
-npm run build            # Production build (tsc + vite)
-npm run typecheck        # tsc -b --force (checks all project references)
-npm run lint             # ESLint (src, tests, scripts)
-npm run lint:fix         # ESLint --fix
-```
+## Running and verifying
 
-### Testing
+- Build and dev need decrypted secrets: `fnox exec -- npm run build`. A bare `npm run build` still exits 0 and writes `dist/`, but Vite inlines the env vars at build time and never evaluates the guard, so the artifact throws "Supabase configuration missing" in the browser.
+- E2E needs `supabase start` running first.
+- `npm run typecheck` is `tsc -b --force`; no test script covers it, and CI runs it inside the `lint` job.
+- `npm run lint` is passed `src tests scripts`, but `scripts/**` sits in `eslint.config.js` `ignores` — a green lint says nothing about `scripts/`.
+- `npm run test:p1` runs P0 **and** P1, not P1 alone.
+- Playwright sets `trace`, `screenshot` and `video` to `'on'`, so a large `test-results/` tree is normal and not evidence of failure.
 
-```bash
-# Unit tests (Vitest + happy-dom)
-npm run test:unit              # Run all unit tests
-npm run test:unit:watch        # Watch mode
-npm run test:unit:ui           # Vitest UI
-npm run test:unit:coverage     # With coverage (25% threshold)
+## Conventions that differ from defaults
 
-# E2E tests (Playwright, requires local Supabase running)
-npm run test:e2e               # All E2E tests (cleanup wrapper)
-npm run test:e2e:raw           # Playwright directly
-npm run test:e2e:ui            # Playwright UI mode
-npm run test:e2e:debug         # Debug mode
-npm run test:p0                # Priority 0 tests only
-npm run test:p1                # Priority 0+1 tests
+- Import Zod from `zod/v4`, never bare `'zod'` — bare resolves to the v3-compatibility surface.
+- Do not use the `@/` alias inside `src/` — `vite.config.ts` configures no alias, so it typechecks and then fails to resolve in a production build. Use relative paths; `@/` is for tests only.
+- Navigation is `navigationSlice.currentView`; do not add react-router.
+- Vite chunking lives in `rolldownOptions.output.codeSplitting.groups`, not `manualChunks`.
+- There is no formatter — match surrounding style by hand and do not re-add Prettier.
+- In IndexedDB services, reads return `null`/`[]` on failure and writes throw. The Supabase API layer is not consistent about this — `moodApi.fetchByUser` throws on a read while `photoService.getPhotos` returns `[]` — so check the function you are calling.
+- After a mutation that changes both server and client state, wait on all three layers: the RPC response, then the Zustand store, then the UI assertion.
 
-# Run a single unit test file
-npx vitest run tests/unit/services/moodService.test.ts --silent
+## Known pitfalls
 
-# Run a single E2E test file
-npx playwright test tests/e2e/mood/mood-tracker.spec.ts
+- Any async store action that `set()`s after an `await` must first re-check `if (get().userId !== capturedUserId) return`. The guard is copy-pasted at 19 sites with no shared helper and covers the loaders only — mutators such as `addMoodEntry`, `sendNote`, `uploadPhoto` and `selectRole` still lack it.
+- `BaseIndexedDBService.getAll()` returns every account's rows. Scope by `userId` in the service, as `moodService.getAllForUser` does, before anything reaches UI state.
+- Route new Realtime work through `moodSyncService`'s refcounted registry or `sendEphemeralBroadcast()`; never call `supabase.channel()` directly. `useScriptureBroadcast`, `useScripturePresence`, `useRealtimeMessages` and `interactionService` still do, and carry the teardown bugs those two modules fixed.
+- A retryable INSERT must reuse one client-generated key across attempts, backed by a DB `UNIQUE` constraint plus `.upsert(..., { onConflict, ignoreDuplicates: true })`. Copy `notesSlice.ts` or `photoService.ts`; there is no shared helper.
+- Do not remove the `nodeName` shim from `tests/setup.ts` — without it DOMPurify sees every tag as `''` under happy-dom and text inside `<script>`/`<style>` survives sanitization. It must stay in `setupFiles`.
+- Do not rewrite the shell idioms in `playwright.config.ts` to POSIX — the `stdio` stderr suppression and the double-quoted `docker inspect --format` are required by `cmd.exe`, and every E2E test 401s without them. Its Supabase env block must stay unguarded.
+- Three data models, so check which one a feature uses before writing data-layer code: scripture reading is online-first (Supabase RPC is the source of truth, IndexedDB a read cache), photos is Supabase-only (`photoService` never touches IndexedDB), and the rest are offline-first with IndexedDB primary.
 
-# Run E2E tests matching a pattern
-npx playwright test --grep "mood tracker"
-
-# Database tests (pgTAP via Supabase CLI)
-npm run test:db                # supabase test db
-
-# Failure analysis (AI-friendly Markdown summary of failed tests)
-npm run test:failures          # Groups by root cause, extracts test IDs/priority/API paths
-npm run test:failures > failures-ai.md  # Save to file
-
-# Smoke tests (post-build verification)
-npm run test:smoke
-```
-
-### Supabase
-
-```bash
-supabase start           # Start local Supabase (required for E2E tests)
-supabase stop            # Stop local Supabase
-supabase status          # Show connection URLs and keys
-supabase db reset        # Reset DB and re-run all migrations
-supabase migration new <name>  # Create new migration file
-supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts  # Regenerate types
-```
-
-## Architecture
-
-### State Management: Zustand Sliced Store
-
-Single Zustand store (`src/stores/useAppStore.ts`) composed from 11 slices via the slice pattern:
-
-- `appSlice` - initialization, loading states (composed FIRST, owns `isLoading`/`error`/`__isHydrated`)
-- `authSlice` - single source of truth for `userId`/`userEmail`/`isAuthenticated` (not persisted)
-- `settingsSlice` - theme, relationship config
-- `navigationSlice` - current view routing
-- `messagesSlice` - daily love messages, favorites
-- `moodSlice` - mood tracking, partner mood sync
-- `interactionsSlice` - poke/kiss/fart interactions
-- `partnerSlice` - partner data, display name
-- `notesSlice` - love notes chat messages
-- `photosSlice` - photo gallery
-- `scriptureReadingSlice` - scripture reading sessions
-
-### Environment Variables & Secrets
-
-Uses [fnox](https://fnox.jdx.dev) with the `age` provider for local secrets (encrypted inline in `fnox.toml`) and GitHub Secrets for CI. Tool versions managed by [mise](https://mise.jdx.dev) via `.mise.toml`.
-
-**Local development:**
-- `fnox exec -- npm run dev` — decrypts secrets via age, starts dev server
-- `fnox exec -- npm run build` — local production build with secrets
-- `fnox check` — verify all secrets resolve
-- `fnox set KEY value` — encrypt and store a secret
-
-**Files:**
-| File | Committed | Contents |
-|------|-----------|----------|
-| `.mise.toml` | Yes | Tool versions (Node) + env vars (CODEX_HOME) |
-| `fnox.toml` | Yes | Age-encrypted secret ciphertext + recipient public keys |
-| `.env.example` | Yes | Template with placeholder values |
-| `.env.test` | Yes | Local Supabase test values |
-
-**Project secrets (in `fnox.toml`):** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `SUPABASE_SERVICE_KEY`, `SUPABASE_PAT`
-
-### Base Path
-
-Production builds use `/My-Love/` base path for GitHub Pages deployment. Development uses `/`. Configured in `vite.config.ts` via `mode === 'production'` check.
-
-## E2E Test Architecture
-
-### Fixtures (`tests/support/`)
-
-Tests import `{ test, expect }` from `tests/support/merged-fixtures.ts`, which merges:
-
-- **@seontechnologies/playwright-utils** — `apiRequest`, `recurse`, `log`, `interceptNetworkCall`, `networkErrorMonitor`
-- **Custom fixtures** (`tests/support/fixtures/`) — `supabaseAdmin`, `testSession`, `togetherMode`, auth/storage state
-
-### Shared Helpers (`tests/support/helpers.ts`)
-
-Reusable functions for E2E tests that only receive `page: Page` (no fixture access):
-
-- `ensureScriptureOverview(page)` — navigate to /scripture, handle stale sessions
-- `startSoloSession(page)` — full solo session startup with auth readiness check
-- `advanceOneStep(page)` — click Next Verse with hybrid sync
-- `completeAllStepsToReflectionSummary(page)` — run through all 17 verses
-- `submitReflectionSummary(page)` — fill + submit reflection form
-- `skipMessageAndCompleteSession(page)` — skip message compose, complete session
-- `waitForScriptureRpc(page, rpcName)` — wait for a successful RPC response
-- `waitForScriptureStore(page, label, predicate)` — poll Zustand store via `expect.poll()`
-
-### Hybrid Sync Pattern (3-layer wait)
-
-After any mutation that changes server + client state, use all three layers:
-
-1. **NETWORK**: `waitForScriptureRpc` / `interceptNetworkCall` — confirms server processed the request
-2. **STORE**: `waitForScriptureStore` — confirms Zustand ingested the response
-3. **UI**: `expect(locator).toBeVisible()` — confirms React re-rendered
-
-**Polling approach guide:**
-- `waitForScriptureStore` — scripture store state (well-typed, diagnostic snapshots)
-- `expect.poll()` — simple boolean conditions in helpers (no fixture access needed)
-- `recurse` fixture — complex polling in test bodies needing Playwright report logging
-
-### Network Interception
-
-- **In test bodies**: Use `interceptNetworkCall` fixture (spy mode or `fulfillResponse` for injection)
-- **In helpers**: Use vanilla `page.waitForResponse()` (helpers don't have fixture access)
-- **Error injection**: Annotate describe blocks with `{ annotation: [{ type: 'skipNetworkMonitoring' }] }` to suppress the network error monitor
-
-### Together Mode Tests
-
-Together-mode tests use the `togetherMode` fixture which provides:
-- `partnerPage` — a second authenticated browser page
-- `uiSessionId` — the shared session ID
-- Helpers in `tests/support/helpers/scripture-lobby.ts` and `scripture-together.ts`
-
-### Test Domains
-
-```
-tests/e2e/
-├── auth/          # Login, logout
-├── home/          # Home view
-├── mood/          # Mood tracking
-├── navigation/    # View routing
-├── notes/         # Love notes chat
-├── offline/       # Offline handling
-├── partner/       # Partner interactions
-├── photos/        # Photo gallery
-└── scripture/     # Scripture reading (solo + together mode)
-```
-
-## Key Conventions
-
-- Package manager: **npm** (see `package-lock.json`)
-- Node version: **v24.x** (see `.mise.toml`)
-- Path alias: `@/` maps to `src/` (configured in vitest.config.ts, not in vite.config.ts)
-- Generated types: `src/types/database.types.ts` is auto-generated from Supabase schema - do not edit manually
-- ESLint enforces `no-explicit-any` as error
-- No automated formatter. Match the existing style by hand: 2-space indent, single quotes (double in JSX), semicolons, 100-char lines, `es5` trailing commas, always-parenthesized arrow params, LF endings
-- CI workflows in `.github/workflows/`: deploy, test, migrations, code review
+<!-- /bmad:context -->
