@@ -29,7 +29,8 @@ origin: migrated from legacy ledger ("From: Mood Duplicate Entries (2026-07-26)"
 location: .github/workflows/supabase-migrations.yml
 source_spec: _bmad-output/implementation-artifacts/spec-mood-duplicate-log-entries.md
 reason: Migrations are never applied to production by CI — `.github/workflows/supabase-migrations.yml` only validates them against a throwaway local Supabase, so any schema change the app depends on must be applied by hand or the deployed frontend breaks against an unmigrated database.
-status: open
+status: done 2026-08-17
+resolution: already resolved: .github/workflows/deploy.yml:23 adds a `migrate:` job (environment: production) that runs `supabase link --project-ref` (:40) and `supabase db push` (:61) on push to main (:4-5), with `build` gated behind `needs: migrate` (:64) — added by commit 67f73791 "ci: apply Supabase migrations before deploying the frontend" (2026-07-26); supabase-migrations.yml is still PR-only validation, but it is no longer the only path to production.
 
 The workflow is named "Supabase Migration Validation"; its steps are checkout, Setup
 Supabase CLI, Start Supabase local, Apply migrations, Validate RLS policies, Check for
@@ -48,7 +49,8 @@ origin: migrated from legacy ledger ("From: Mood Stale Sync Discards Edit (2026-
 location: src/sw.ts
 source_spec: _bmad-output/implementation-artifacts/spec-mood-stale-sync-discards-edit.md
 reason: Pending moods are not scoped to the signed-in user, so after a sign-out/sign-in on a shared device the service worker uploads the previous user's unsynced moods into the new user's account.
-status: open
+status: done 2026-08-17
+resolution: already resolved: src/sw-db.ts:62 `export async function getPendingMoods(userId: string)` filters at :66 `return allMoods.filter((mood) => !mood.synced && mood.userId === userId);` and src/sw.ts:232 calls `getPendingMoods(authToken.userId)` — commit 1b37a76c scoped the worker's read, ebaf370e (2026-08-03) made the param required (closing the omit-to-read-everyone trapdoor) and reset syncStatus on sign-out; regression tests at tests/unit/services/swDbScoping.test.ts:77 "returns only the named user's unsynced rows" and :122 "fails closed rather than open when the owner is missing".
 
 `src/sw.ts` builds its request as `moodSyncPayload(mood, authToken.userId)` — the owner comes
 from the stored auth token, not from `mood.userId`. `src/api/auth/actionService.ts` clears the
