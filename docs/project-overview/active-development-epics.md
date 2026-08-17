@@ -6,13 +6,13 @@ The project uses the BMAD method for planning. Planning documents live in `_bmad
 
 > **Layout changed since the 2026-03 scan.** The sharded `planning-artifacts/prd/` and `planning-artifacts/epics/` directories and `implementation-artifacts/sprint-status.yaml` no longer exist. All four Scripture Reading epics shipped and merged, so the sprint tracker was retired along with the shards. The epic and story history below is retained as a record of what was built; it is no longer backed by a live status file.
 
-> **Phase artifacts archived (2026-07-25).** The remaining Scripture Reading planning documents and all completed `tech-spec-*.md` files moved to `_bmad-output/.archive/`. Only phase-agnostic outputs stay live at the top level: `project-context.md`, the `deferred-work.md` ledger, pending handoff documents, and the BMAD/TEA reference docs.
+> **Phase artifacts archived (2026-07-25).** The remaining Scripture Reading planning documents and all completed `tech-spec-*.md` files moved to `_bmad-output/.archive/`. Only phase-agnostic outputs stay live at the top level: the `deferred-work.md` ledger, pending handoff documents, and the BMAD/TEA reference docs.
 
 Live contents:
 
 | Path                                                          | Contents                                                                        |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `_bmad-output/project-context.md`                             | Condensed AI-agent rule file, regenerated per documentation scan                  |
+| `AGENTS.md` (repo root)                                       | AI-agent rule file, managed by `bmad-project-context`                             |
 | `_bmad-output/implementation-artifacts/deferred-work.md`      | Ledger of deferred items                                                          |
 | `_bmad-output/handoff-documents/`                             | Cross-session handoff documents                                                   |
 | `_bmad-output/bmad-workflow-reference.md`, `tea-docs/`        | BMAD workflow reference and TEA test-architecture reference docs                  |
