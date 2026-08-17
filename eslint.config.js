@@ -156,10 +156,31 @@ export default tseslint.config(
       'no-console': 'off', // Test output and diagnostics use console.log intentionally
     },
   },
+  // src/ standardizes on the explicit zod/v4 path. Bare 'zod' resolves to the
+  // same v4 classic surface under zod 4, so this is consistency, not correctness.
+  // tests/ is exempt: three tests/api specs import bare 'zod'.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'zod',
+              message: "Import from 'zod/v4' instead of bare 'zod'.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Scripture containers must not import Supabase clients directly
   {
     files: ['src/components/scripture-reading/containers/**/*.{ts,tsx}'],
     rules: {
+      // Flat config replaces a rule key rather than merging it, so the zod entry
+      // from the src/ block above is repeated here to survive this override.
       'no-restricted-imports': [
         'error',
         {
@@ -168,6 +189,10 @@ export default tseslint.config(
               name: '@supabase/supabase-js',
               message:
                 'Container components must use Zustand slice actions instead of direct Supabase imports.',
+            },
+            {
+              name: 'zod',
+              message: "Import from 'zod/v4' instead of bare 'zod'.",
             },
           ],
           patterns: [
