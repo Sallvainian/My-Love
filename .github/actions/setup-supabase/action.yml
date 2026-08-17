@@ -14,15 +14,17 @@ runs:
     # tarball with no cache, no retry and no timeout — that single download
     # produced the ECONNRESET failures on PRs #252 and #254 and a 15-minute
     # silent hang that timed out PR #262's Backend Tests (api) job. Cache the
-    # binary keyed on the version so most runs skip the network entirely, and
-    # make the cold-path download retried, time-bounded and checksum-verified.
+    # binary keyed on the version, and make the cold-path download retried,
+    # time-bounded and checksum-verified. Cache scoping means a new PR branch
+    # takes the cold path once (it can only read caches from its own ref or
+    # main), so a cold download on a fresh branch is normal, not a broken cache.
     # deploy.yml:32,80 and supabase-migrations.yml:22 still use setup-cli.
     - name: Cache Supabase CLI
       id: cli-cache
       uses: actions/cache@v5
       with:
         path: ~/.local/bin/supabase
-        key: ${{ runner.os }}-supabase-cli-${{ inputs.supabase-version }}
+        key: ${{ runner.os }}-${{ runner.arch }}-supabase-cli-${{ inputs.supabase-version }}
 
     - name: Install Supabase CLI
       if: steps.cli-cache.outputs.cache-hit != 'true'
@@ -30,9 +32,14 @@ runs:
       run: |
         set -euo pipefail
         base="https://github.com/supabase/cli/releases/download/v${{ inputs.supabase-version }}"
-        curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 180 \
+        # --max-time bounds a single attempt; --retry-max-time bounds the
+        # whole retry loop. Without the latter, 5 retries of a hanging
+        # endpoint could outlast the 15-minute job timeout this defends.
+        curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
+          --max-time 60 --retry-max-time 180 \
           -o /tmp/supabase_linux_amd64.tar.gz "$base/supabase_linux_amd64.tar.gz"
-        curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 60 \
+        curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
+          --max-time 20 --retry-max-time 60 \
           -o /tmp/supabase_checksums.txt "$base/supabase_${{ inputs.supabase-version }}_checksums.txt"
         (cd /tmp && grep 'supabase_linux_amd64.tar.gz$' supabase_checksums.txt | sha256sum -c -)
         mkdir -p ~/.local/bin
