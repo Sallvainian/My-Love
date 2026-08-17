@@ -4,8 +4,11 @@
  * Story 4.1: AC #2, #3, #4, #5
  *
  * Manages subscription to the private broadcast channel `scripture-session:{sessionId}`.
- * This is the ONLY place in the codebase that imports supabase for Broadcast —
- * do NOT import supabase for broadcast in components or other hooks.
+ * This hook calls `supabase.channel()` directly instead of going through the shared
+ * managers (`moodSyncService`'s refcounted registry, `sendEphemeralBroadcast()`), so it
+ * carries its own retry state and does not wait on `waitForSocketReady()`. Prefer those
+ * managers for new Realtime work; see also `useScripturePresence` and `interactionService`,
+ * which are on the same unmigrated path.
  *
  * Event flow:
  *   partner_joined        → onPartnerJoined() slice action

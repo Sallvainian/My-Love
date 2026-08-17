@@ -296,11 +296,11 @@ test('user flow', async ({ page, log }) => {
 
 Tests run in GitHub Actions with:
 
-- Single worker (`workers: 1` in CI)
+- Two workers (`workers: 2` in CI)
 - Retries enabled (`retries: 2` in CI)
 - JUnit report for CI integration
 - HTML report for debugging
-- Secrets injected via dotenvx
+- Secrets injected as GitHub Secrets in CI; `fnox exec -- <cmd>` locally
 
 ## Debugging
 
