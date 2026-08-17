@@ -28,8 +28,7 @@ My-Love/
 |   |-- handoff-documents/            # Cross-session handoff documents
 |   |-- skills/                       # Project-local BMAD skill definitions (bmad-handoff)
 |   |-- tea-docs/                     # Test-architecture reference docs
-|   |-- bmad-workflow-reference.md    # BMAD epic lifecycle command reference
-|   +-- project-context.md            # AI-agent rule file (see also CLAUDE.md, AGENTS.md)
+|   +-- bmad-workflow-reference.md    # BMAD epic lifecycle command reference
 |
 |-- docs/                             # Project documentation (9 sections)
 |   |-- api-reference/               # Supabase client, auth, services, validation, SW, realtime
