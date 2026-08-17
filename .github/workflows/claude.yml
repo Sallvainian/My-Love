@@ -21,8 +21,12 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
+      # write (not read) on both: this workflow answers by posting a comment, on
+      # issues as well as PRs, which the read-only defaults silently forbid. The
+      # action's own docs/setup.md shows write for each. Left at `contents: read`
+      # deliberately — that is the grant Claude would need to push a branch.
+      pull-requests: write
+      issues: write
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:
@@ -30,6 +34,15 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
+
+      # Without these the prompt's verify commands below cannot run — this job
+      # otherwise checks out the repo and nothing else.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - run: npm ci
 
       - name: Run Claude Code
         id: claude
@@ -42,10 +55,38 @@ jobs:
           additional_permissions: |
             actions: read
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
+          # Project rules are NOT duplicated here. The action's injected system
+          # prompt already says "Always check for and follow the repository's
+          # CLAUDE.md file(s)", and CLAUDE.md imports AGENTS.md, so this prompt
+          # points at them instead. Inlining a copy means two places to keep in
+          # sync and one of them silently going stale.
+          prompt: |
+            ## My Love
 
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr:*)'
+            Read `AGENTS.md` before changing behavior it covers. It is the single
+            source for this repo's policy, layout, conventions and known pitfalls,
+            and `CLAUDE.md` imports it.
+
+            ### Before you claim it works
+
+            Dependencies are installed already. Run what your change touches:
+
+            - `npm run typecheck` — `tsc -b --force`
+            - `npm run lint` — note AGENTS.md: `scripts/**` is in the eslint
+              `ignores`, so a green lint says nothing about `scripts/`
+            - `npm run test:unit` — `vitest run`
+
+            Do NOT run `npm run build` in this job and do not treat it as passing.
+            This workflow sets no Supabase env vars, and per AGENTS.md a bare
+            build still exits 0 and writes `dist/` while producing an artifact
+            that throws "Supabase configuration missing" in the browser.
+
+            Do NOT claim E2E coverage. `npm run test:e2e` needs `supabase start`,
+            which this job does not run.
+
+            If you could not verify something, say so plainly rather than
+            implying it passed.
+
+            ---
+
+            Now execute the task from the comment that tagged you.
