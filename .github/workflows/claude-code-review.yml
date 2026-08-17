@@ -6,7 +6,21 @@ on:
 
 jobs:
   claude-review:
-    if: ${{ !github.event.pull_request.draft && !github.event.pull_request.merged }}
+    # Bot-authored PRs are skipped. The action hard-fails (exit 1) on one rather
+    # than skipping — "Action failed with error: Workflow initiated by non-human
+    # actor: dependabot (type: Bot)" — so every dependabot PR carried a red X for
+    # a review nobody wanted: 51 of the last 100 runs. Adding dependabot to
+    # `allowed_bots` would run the review instead of suppressing it.
+    #
+    # claude[bot] is the deliberate exception. 53c93ee6 added `allowed_bots:
+    # 'claude'` below so its PRs still get reviewed, and a blanket type check
+    # would undo that. Matching on `user.type` covers copilot-swe-agent and
+    # ecc-tools too, without maintaining a login denylist.
+    if: |
+      !github.event.pull_request.draft &&
+      !github.event.pull_request.merged &&
+      (github.event.pull_request.user.type != 'Bot' ||
+       github.event.pull_request.user.login == 'claude[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -41,13 +55,22 @@ jobs:
             containing the complete review — never a running commentary spread
             across several. Be terse: report what matters and nothing else.
 
+            Review only what this PR changes; read surrounding code only to judge
+            impact. You have `git commit` and `git push` in your default tool set:
+            do not use them. Do not edit files, approve the PR, or request changes.
+            Your only output is the one comment.
+
             ## Before reviewing
 
-            1. Run `gh pr diff ${{ github.event.pull_request.number }}` to get the full diff.
-            2. Check if the diff ONLY contains lockfiles, markdown, version bumps, auto-generated files,
+            1. Read `AGENTS.md`. It is the authoritative statement of this repo's
+               policy, layout, conventions and known pitfalls. The checklist below
+               is an index into it, not a replacement — where the two disagree,
+               `AGENTS.md` wins.
+            2. Run `gh pr diff ${{ github.event.pull_request.number }}` to get the full diff.
+            3. Check if the diff ONLY contains lockfiles, markdown, version bumps, auto-generated files,
                or `database.types.ts`. If so, skip the review entirely and make your comment
                read exactly: "No reviewable changes."
-            3. This workflow re-runs on every push. Your comment is reused and rewritten
+            4. This workflow re-runs on every push. Your comment is reused and rewritten
                in place, so write it as a complete standalone review of the CURRENT diff —
                not a delta against your last one. If something you previously flagged is
                now fixed, simply drop it rather than narrating the change.
@@ -55,20 +78,66 @@ jobs:
             ## Filter gate (2-of-4 rule)
 
             Only report an issue if AT LEAST TWO of these criteria are met:
-            - You can quote the exact rule or convention being violated (from CLAUDE.md or project standards)
+            - You can quote the exact violated line from `AGENTS.md`, naming its section
             - The issue is introduced in THIS PR's diff (not pre-existing code)
             - It will cause incorrect runtime behavior, a bug, or a security vulnerability
             - It is objectively wrong (not a style preference)
 
             If fewer than two criteria are met, do not comment.
 
-            ## Review focus
+            `AGENTS.md` deliberately names code that ALREADY violates its own rules —
+            the four modules still calling `supabase.channel()` directly, the mutators
+            still missing the userId guard. That is documentation of known debt, not a
+            work list. Report it only if THIS diff touches that code and leaves it
+            worse. Opening a review by relisting it is a failed review.
 
-            When the filter gate is passed, focus on:
+            ## Project-specific checks
+
+            Run these first — they are where real bugs in this repo live. Each line
+            indexes a rule in `AGENTS.md`; read the full statement there before
+            reporting against it.
+
+            1. **Cross-account leakage.** An async store action that `set()`s after an
+               `await` without first re-checking `get().userId` against the captured
+               id. A new `BaseIndexedDBService.getAll()` call not scoped by `userId`
+               in the service layer.
+            2. **Realtime teardown.** Any new direct `supabase.channel()` call. New
+               Realtime work belongs in `moodSyncService`'s refcounted registry or
+               `sendEphemeralBroadcast()`.
+            3. **Retry idempotency.** A retryable INSERT that mints a fresh key per
+               attempt, or lacks the DB `UNIQUE` constraint plus
+               `.upsert(..., { onConflict, ignoreDuplicates: true })`. Compare against
+               `notesSlice.ts` or `photoService.ts`.
+            4. **Wrong data model.** Data-layer code written for the wrong one of the
+               three: scripture reading is online-first, photos is Supabase-only, the
+               rest are offline-first with IndexedDB primary.
+            5. **Error contract.** Assuming IndexedDB semantics (reads return
+               `null`/`[]`, writes throw) of a Supabase API function or the reverse.
+               The Supabase layer is inconsistent — check the specific function called.
+            6. **Imports and aliases.** Bare `'zod'` instead of `zod/v4`. The `@/` alias
+               inside `src/` — it typechecks and then fails the production build.
+               `@playwright/test` imported in a spec instead of
+               `tests/support/merged-fixtures.ts`.
+            7. **Generated and frozen files.** Hand edits to
+               `src/types/database.types.ts` or `mise.lock`. New or repaired specs
+               under `tests/e2e-archive/`.
+            8. **Load-bearing test config.** Removal of the `nodeName` shim from
+               `tests/setup.ts`. POSIX rewrites of the shell idioms in
+               `playwright.config.ts`, or guarding its Supabase env block.
+            9. **Secrets.** Anything written into `.env` or source instead of
+               age-encrypted in `fnox.toml`.
+            10. **Architecture drift.** react-router added instead of
+                `navigationSlice.currentView`. Vite chunking moved to `manualChunks`
+                instead of `rolldownOptions.output.codeSplitting.groups`. Prettier
+                re-added.
+
+            ## General checks
+
+            Then, subject to the same filter gate:
             - **Bugs**: Logic errors, race conditions, null/undefined access, off-by-one errors
             - **Security**: XSS, injection, auth bypasses, exposed secrets, missing input validation
             - **Supabase**: Missing RLS policies, unvalidated queries, incorrect schema usage
-            - **React/State**: Stale closures, missing deps in useEffect, Zustand misuse
+            - **React/State**: Stale closures, missing `useEffect` deps or cleanup, hooks after early returns, Zustand misuse
             - **API misuse**: New endpoints missing auth checks, Zod schemas not updated
 
             ## Output Format
@@ -104,6 +173,8 @@ jobs:
             - Commenting on code outside the PR diff
             - Suggesting tests unless a bug is found that tests would catch
             - Documentation suggestions unless a public API changed
+            - Relisting the pre-existing violations `AGENTS.md` already documents
+            - Editing files, committing, pushing, approving, or requesting changes
 
           claude_args: |
             --model claude-opus-5
