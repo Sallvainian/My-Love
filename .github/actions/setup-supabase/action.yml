@@ -10,14 +10,45 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Setup Supabase CLI
-      # Pinned to a commit, not a tag: `@v1` resolved to a mutable *branch* (supabase
-      # never cut a floating `v1` tag), which is the unpinned-3rd-party-action risk
-      # CodeQL flags. Kept in lockstep with the workflows, which dependabot moved to v3 —
-      # dependabot only scans .github/workflows, so this file drifts unless bumped by hand.
-      uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+    # Replaces supabase/setup-cli, whose npm postinstall fetches the release
+    # tarball with no cache, no retry and no timeout — that single download
+    # produced the ECONNRESET failures on PRs #252 and #254 and a 15-minute
+    # silent hang that timed out PR #262's Backend Tests (api) job. Cache the
+    # binary keyed on the version, and make the cold-path download retried,
+    # time-bounded and checksum-verified. Cache scoping means a new PR branch
+    # takes the cold path once (it can only read caches from its own ref or
+    # main), so a cold download on a fresh branch is normal, not a broken cache.
+    # deploy.yml:32,80 and supabase-migrations.yml:22 still use setup-cli.
+    - name: Cache Supabase CLI
+      id: cli-cache
+      uses: actions/cache@v5
       with:
-        version: ${{ inputs.supabase-version }}
+        path: ~/.local/bin/supabase
+        key: ${{ runner.os }}-${{ runner.arch }}-supabase-cli-${{ inputs.supabase-version }}
+
+    - name: Install Supabase CLI
+      if: steps.cli-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        base="https://github.com/supabase/cli/releases/download/v${{ inputs.supabase-version }}"
+        # --max-time bounds a single attempt; --retry-max-time bounds the
+        # whole retry loop. Without the latter, 5 retries of a hanging
+        # endpoint could outlast the 15-minute job timeout this defends.
+        curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
+          --max-time 60 --retry-max-time 180 \
+          -o /tmp/supabase_linux_amd64.tar.gz "$base/supabase_linux_amd64.tar.gz"
+        curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
+          --max-time 20 --retry-max-time 60 \
+          -o /tmp/supabase_checksums.txt "$base/supabase_${{ inputs.supabase-version }}_checksums.txt"
+        (cd /tmp && grep 'supabase_linux_amd64.tar.gz$' supabase_checksums.txt | sha256sum -c -)
+        mkdir -p ~/.local/bin
+        tar -xzf /tmp/supabase_linux_amd64.tar.gz -C ~/.local/bin supabase
+        chmod +x ~/.local/bin/supabase
+
+    - name: Add Supabase CLI to PATH
+      shell: bash
+      run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
     - name: Start Supabase Local
       shell: bash
