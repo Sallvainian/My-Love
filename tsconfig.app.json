@@ -18,9 +18,12 @@
     "jsx": "react-jsx",
 
     /* Path aliases */
-    "baseUrl": ".",
+    /* No baseUrl: TypeScript 6 deprecates it (TS5101) and 7.0 drops it. The
+       catch-all below is its documented replacement and resolves relative to
+       this file, so bare specifiers still fall back to the repo root. */
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"],
+      "*": ["./*"]
     },
 
     /* Linting */
