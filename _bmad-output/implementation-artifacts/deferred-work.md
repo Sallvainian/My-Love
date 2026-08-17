@@ -1,26 +1,79 @@
 # Deferred Work
 
-## From: Mood Tracker State Issues (2026-03-20)
+### DW-1: Calendar vs Timeline date grouping mismatch (UTC vs local)
 
-- ~~**Calendar vs Timeline date grouping mismatch (UTC vs local)**~~ — Picked up in A+B patch
-- ~~**Stale visit events on Home dashboard**~~ — Superseded by dynamic events feature (Goal C)
+origin: migrated from legacy ledger ("From: Mood Tracker State Issues (2026-03-20)"), 2026-08-17
+location: mood Calendar and Timeline views
+reason: The Calendar and Timeline groupings disagreed about which day a mood belongs to because one grouped by UTC date and the other by local date, so the same mood could appear on different days in the two views.
+status: done 2026-03-20
+resolution: Picked up in A+B patch
 
-## From: A+B Patch (2026-03-20)
+### DW-2: Stale visit events on Home dashboard
 
-- **Dynamic events system** — Replace hardcoded home dashboard event cards with user-managed events. New Supabase table, CRUD UI for adding/editing/deleting events, dynamic timer cards that auto-hide when passed. Full feature build: DB migration → service → store slice → UI components.
+origin: migrated from legacy ledger ("From: Mood Tracker State Issues (2026-03-20)"), 2026-08-17
+location: Home dashboard event cards
+reason: The Home dashboard showed visit events that had already passed, because the event cards were hardcoded and had no expiry; the fix was folded into the dynamic events feature rather than patched in place.
+status: done 2026-03-20
+resolution: Superseded by dynamic events feature (Goal C), tracked as DW-3
 
-## From: Mood Duplicate Entries (2026-07-26)
+### DW-3: Dynamic events system
 
-- source_spec: `_bmad-output/implementation-artifacts/spec-mood-duplicate-log-entries.md`
-  summary: Migrations are never applied to production by CI — `.github/workflows/supabase-migrations.yml` only validates them against a throwaway local Supabase, so any schema change the app depends on must be applied by hand or the deployed frontend breaks against an unmigrated database.
-  evidence: The workflow is named "Supabase Migration Validation"; its steps are checkout → Setup Supabase CLI → Start Supabase local → Apply migrations → Validate RLS policies → Check for security advisories → Stop Supabase → Migration Summary. There is no `supabase link` and no `supabase db push`, and it triggers only on `pull_request` (paths `supabase/migrations/**`, `supabase/config.toml`) and `workflow_dispatch` — never on push to main. Confirmed impact: with the frontend's new `on_conflict=user_id,created_at` upsert, a production database lacking `moods_user_id_created_at_key` rejects every insert with `ERROR: there is no unique or exclusion constraint matching the ON CONFLICT specification` (reproduced against the local database by dropping the constraint). Pre-existing condition, not caused by this story; the constraint was applied to production manually to unblock it.
+origin: migrated from legacy ledger ("From: A+B Patch (2026-03-20)"), 2026-08-17
+location: Home dashboard event cards
+reason: Replace hardcoded home dashboard event cards with user-managed events: new Supabase table, CRUD UI for adding, editing and deleting events, and dynamic timer cards that auto-hide once the event has passed. Full feature build spanning DB migration, service, store slice and UI components, so it was deferred as its own piece of work rather than done inside the A+B patch.
+status: open
 
-## From: Mood Stale Sync Discards Edit (2026-07-26)
+### DW-4: CI never applies migrations to production
 
-- source_spec: `_bmad-output/implementation-artifacts/spec-mood-stale-sync-discards-edit.md`
-  summary: Pending moods are not scoped to the signed-in user, so after a sign-out/sign-in on a shared device the service worker uploads the previous user's unsynced moods into the new user's account.
-  evidence: `src/sw.ts` builds its request as `moodSyncPayload(mood, authToken.userId)` — the owner comes from the stored auth token, not from `mood.userId`. `src/api/auth/actionService.ts` clears the auth token on sign-out but nothing clears the `moods` object store, and `getPendingMoods()` (`src/sw-db.ts`) filters only on `!mood.synced`, never on user. So user A's pending mood text and note are written under user B's `user_id`, and B's partner sees them. Change detection cannot catch it: `moodSyncFingerprint` deliberately excludes `user_id` (`src/services/moodSyncPayload.ts`), so the record fingerprints as unchanged and is flagged clean. Pre-existing — the SW read `authToken.userId` before this story too; this story only moved the payload construction into a shared module. Likely fix: skip records whose `mood.userId` does not match the token's user, and clear or reassign the store on sign-out.
+origin: migrated from legacy ledger ("From: Mood Duplicate Entries (2026-07-26)"), 2026-07-26
+location: .github/workflows/supabase-migrations.yml
+source_spec: _bmad-output/implementation-artifacts/spec-mood-duplicate-log-entries.md
+reason: Migrations are never applied to production by CI — `.github/workflows/supabase-migrations.yml` only validates them against a throwaway local Supabase, so any schema change the app depends on must be applied by hand or the deployed frontend breaks against an unmigrated database.
+status: open
 
-- source_spec: `_bmad-output/implementation-artifacts/spec-mood-stale-sync-discards-edit.md`
-  summary: `moodService.updateMood` still reads and writes across two IndexedDB transactions, so a UI edit landing mid-sync can overwrite the `supabaseId` that `markAsSynced` just recorded.
-  evidence: `markAsSynced` is now a single `readwrite` transaction, but `updateMood` still calls `super.update`, which is `db.get` at `src/services/BaseIndexedDBService.ts:181` and `db.put` at `:188` with an `await` between them. If `markAsSynced` commits in that gap, `updateMood` writes back `{...staleItem, ...updates}` carrying the pre-sync `supabaseId: undefined`, discarding the server id. The sync lock does not cover this — it serialises sync *batches*, not a plain UI edit against the service worker's batch. Consequence is a lost server id, not lost data or a duplicate row: the next pass takes the upsert path and `(user_id, created_at)` resolves it to the same row. Fix would be giving `updateMood` the same single-transaction shape.
+The workflow is named "Supabase Migration Validation"; its steps are checkout, Setup
+Supabase CLI, Start Supabase local, Apply migrations, Validate RLS policies, Check for
+security advisories, Stop Supabase, Migration Summary. There is no `supabase link` and no
+`supabase db push`, and it triggers only on `pull_request` (paths `supabase/migrations/**`,
+`supabase/config.toml`) and `workflow_dispatch` — never on push to main. Confirmed impact:
+with the frontend's `on_conflict=user_id,created_at` upsert, a production database lacking
+`moods_user_id_created_at_key` rejects every insert with `ERROR: there is no unique or
+exclusion constraint matching the ON CONFLICT specification` (reproduced against the local
+database by dropping the constraint). Pre-existing condition, not caused by the mood
+duplicate-entries story; the constraint was applied to production manually to unblock it.
+
+### DW-5: Pending moods are not scoped to the signed-in user
+
+origin: migrated from legacy ledger ("From: Mood Stale Sync Discards Edit (2026-07-26)"), 2026-07-26
+location: src/sw.ts
+source_spec: _bmad-output/implementation-artifacts/spec-mood-stale-sync-discards-edit.md
+reason: Pending moods are not scoped to the signed-in user, so after a sign-out/sign-in on a shared device the service worker uploads the previous user's unsynced moods into the new user's account.
+status: open
+
+`src/sw.ts` builds its request as `moodSyncPayload(mood, authToken.userId)` — the owner comes
+from the stored auth token, not from `mood.userId`. `src/api/auth/actionService.ts` clears the
+auth token on sign-out but nothing clears the `moods` object store, and `getPendingMoods()`
+(`src/sw-db.ts`) filters only on `!mood.synced`, never on user. So user A's pending mood text
+and note are written under user B's `user_id`, and B's partner sees them. Change detection
+cannot catch it: `moodSyncFingerprint` deliberately excludes `user_id`
+(`src/services/moodSyncPayload.ts`), so the record fingerprints as unchanged and is flagged
+clean. Pre-existing — the SW read `authToken.userId` before that story too; the story only
+moved the payload construction into a shared module. Likely fix: skip records whose
+`mood.userId` does not match the token's user, and clear or reassign the store on sign-out.
+
+### DW-6: updateMood's split-transaction read/write can clobber a freshly synced supabaseId
+
+origin: migrated from legacy ledger ("From: Mood Stale Sync Discards Edit (2026-07-26)"), 2026-07-26
+location: src/services/BaseIndexedDBService.ts:181
+source_spec: _bmad-output/implementation-artifacts/spec-mood-stale-sync-discards-edit.md
+reason: `moodService.updateMood` still reads and writes across two IndexedDB transactions, so a UI edit landing mid-sync can overwrite the `supabaseId` that `markAsSynced` just recorded.
+status: open
+
+`markAsSynced` is now a single `readwrite` transaction, but `updateMood` still calls
+`super.update`, which is `db.get` at `src/services/BaseIndexedDBService.ts:181` and `db.put` at
+`:188` with an `await` between them. If `markAsSynced` commits in that gap, `updateMood` writes
+back `{...staleItem, ...updates}` carrying the pre-sync `supabaseId: undefined`, discarding the
+server id. The sync lock does not cover this — it serialises sync *batches*, not a plain UI
+edit against the service worker's batch. Consequence is a lost server id, not lost data or a
+duplicate row: the next pass takes the upsert path and `(user_id, created_at)` resolves it to
+the same row. Fix would be giving `updateMood` the same single-transaction shape.
