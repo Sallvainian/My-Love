@@ -3,7 +3,7 @@
 
 ## My Love
 
-PWA for couples — daily messages, mood tracking, photos, love-notes chat, scripture reading, partner interactions. React 19, TypeScript, Vite, Tailwind v4, Zustand, Supabase; npm, Node 24. Deployed to GitHub Pages at https://sallvainian.github.io/My-Love/. Generated docs in `docs/`, BMAD planning output in `_bmad-output/`.
+PWA for couples — daily messages, mood tracking, photos, love-notes chat, scripture reading, partner interactions. React 19, TypeScript, Vite, Tailwind v4, Zustand, Supabase; npm, Node 24. Deployed to GitHub Pages at https://sallvainian.github.io/My-Love/. There is no generated documentation tree: this file is the only prose description of the project, and the code is the only other source. `_bmad-output/` holds one file, `implementation-artifacts/deferred-work.md`.
 
 ## Policy
 
