@@ -20,10 +20,19 @@
 -- A view keeps the client's query shape -- .or()/.lt()/.order()/.limit() are
 -- unchanged, only the relation name moves -- which also keeps the four E2E
 -- interceptors on '**/rest/v1/love_notes**' (tests/e2e/notes/love-notes.spec.ts:
--- 18,39,54,67) matching, where an RPC at /rest/v1/rpc/ would not. And
--- security_definer_view is an ERROR-level lint in the CI gate
--- (.github/workflows/supabase-migrations.yml:68), so the security property below
--- is enforced forever; there is no equivalent lint for a function.
+-- 18,39,54,67) matching, where an RPC at /rest/v1/rpc/ would not.
+--
+-- The security property below -- security_invoker on the view -- is what keeps
+-- this from becoming a read-everything backdoor, and it is held by LNR-DB-008 in
+-- supabase/tests/database/17_love_note_removals.sql, which reads the view as an
+-- unrelated third party and requires 0 rows. Measured: drop security_invoker and
+-- that same query returns the other couple's notes, so the assertion fails.
+-- `supabase test db` runs it on every PR that touches a non-documentation file.
+--
+-- Not, as an earlier version of this comment claimed, by a CI lint. The gate in
+-- .github/workflows/supabase-migrations.yml is `supabase db lint`, which is
+-- plpgsql_check and emits no advisor lint of any kind; security_definer_view is
+-- reachable only from the dashboard and the management API.
 
 begin;
 
