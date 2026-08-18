@@ -1,5 +1,5 @@
 <!-- bmad:context -->
-<!-- Verified 2026-08-17 against dddff725. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
+<!-- Verified 2026-08-17 against d32973db. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
 
 ## My Love
 
@@ -17,6 +17,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, scri
 - Fix the cause rather than the symptom, and do not expand scope past it.
 - For migrations, mass renames and restructures: propose a config-level alternative first, get approval, then execute step by step. Never delete a source file before its replacement is confirmed working.
 - When fixing CI, check every failure mode — lint, typecheck, coverage, tests — before pushing.
+- After opening a PR or pushing to one, arm the Claude-review waiter under **Running and verifying** before starting other work, then triage each finding against the actual code and report which hold; never edit or push in response to a review without approval.
 
 ## Where things are
 
@@ -35,6 +36,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, scri
 - `npm run lint` is passed `src tests scripts`, but `scripts/**` sits in `eslint.config.js` `ignores` — a green lint says nothing about `scripts/`.
 - `npm run test:p1` runs P0 **and** P1, not P1 alone.
 - Playwright sets `trace`, `screenshot` and `video` to `'on'`, so a large `test-results/` tree is normal and not evidence of failure.
+- Wait for the Claude review with `gh pr checks <n> --json name,bucket --jq '.[]|select(.name=="claude-review")|.bucket'`, polled until non-empty and not `pending`, and treat every terminal bucket as done rather than only `pass`. The emptiness guard is load-bearing — the check is unregistered for the first seconds after a push, and an empty result passes a bare `!= pending` test. Never trigger on a new `claude[bot]` comment instead: `claude-code-review.yml` sets `track_progress: true` and `use_sticky_comment: true`, so the comment is created within seconds reading "Review in progress" and rewritten in place when the review actually finishes.
 
 ## Conventions that differ from defaults
 
