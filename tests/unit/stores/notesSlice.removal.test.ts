@@ -64,12 +64,32 @@ const backend = {
 function fakeFrom(table: string) {
   if (table === 'love_note_removals') {
     return {
-      upsert(values: { user_id: string; note_id: string }) {
+      upsert(
+        values: { user_id: string; note_id: string },
+        options?: { onConflict?: string; ignoreDuplicates?: boolean }
+      ) {
         return (async () => {
           backend.duringRemoval?.();
           if (backend.failNextRemoval) {
             backend.failNextRemoval = false;
             return { data: null, error: { message: 'removal rejected' } };
+          }
+          // Postgres uses the conflict target verbatim, and PostgREST turns a
+          // missing ignoreDuplicates into ON CONFLICT DO UPDATE — which needs an
+          // UPDATE privilege the authenticated role does not hold, so the write
+          // fails 42501 rather than degrading. A fake that ignored these options
+          // would stay green with the flag deleted.
+          if (options?.ignoreDuplicates !== true) {
+            return {
+              data: null,
+              error: { code: '42501', message: 'permission denied for table love_note_removals' },
+            };
+          }
+          if (options?.onConflict !== 'user_id,note_id') {
+            return {
+              data: null,
+              error: { code: '42P10', message: 'no unique constraint matching the ON CONFLICT' },
+            };
           }
           // Set semantics == the primary key: a second identical write is a no-op.
           backend.removals.add(`${values.user_id}|${values.note_id}`);
@@ -245,7 +265,10 @@ describe('notesSlice removeNote', () => {
     await store.getState().fetchNotes();
 
     backend.failNextRemoval = true;
-    await store.getState().removeNote('note-1');
+    // It has to reject, not resolve: the confirmation dialog closes on a
+    // resolved promise, so swallowing the error would dismiss it as though the
+    // removal had worked while the message reappeared behind it.
+    await expect(store.getState().removeNote('note-1')).rejects.toThrow();
 
     expect(store.getState().notes.map((n) => n.id)).toEqual(['note-0', 'note-1', 'note-2']);
     expect(store.getState().notesError).toBe('Failed to remove message');
@@ -281,6 +304,49 @@ describe('notesSlice removeNote', () => {
     // unread messages still behind it.
     expect(store.getState().notes.length).toBeGreaterThan(0);
     expect(store.getState().notes.map((n) => n.id)).not.toContain('note-2');
+  });
+
+  it('keeps notesHasMore honest when a removal falls inside the page', async () => {
+    backend.seed(5);
+    const store = createTestStore();
+    backend.removals.add(`${USER_ID}|note-3`);
+
+    await store.getState().fetchNotes(2);
+
+    // A full page of VISIBLE notes, and more genuinely behind it. Excluding
+    // after the response would give one row here and flip notesHasMore to false,
+    // ending the thread early with three messages still unread.
+    expect(store.getState().notes).toHaveLength(2);
+    expect(store.getState().notes.map((n) => n.id)).toEqual(['note-2', 'note-4']);
+    expect(store.getState().notesHasMore).toBe(true);
+  });
+
+  it('does not resurrect a note when a read lands mid-removal', async () => {
+    backend.seed(3);
+    const store = createTestStore();
+    await store.getState().fetchNotes();
+
+    // The mount fetch in useLoveNotes is already in flight when the user
+    // confirms; its SELECT was issued before the removal committed, so it comes
+    // back with the note still in it.
+    backend.duringRemoval = () => {
+      void store.getState().fetchNotes();
+    };
+    await store.getState().removeNote('note-1');
+    await Promise.resolve();
+
+    expect(store.getState().notes.map((n) => n.id)).not.toContain('note-1');
+  });
+
+  it('clears the pending-removal marker once the write commits', async () => {
+    backend.seed(3);
+    const store = createTestStore();
+    await store.getState().fetchNotes();
+
+    await store.getState().removeNote('note-1');
+
+    // Left behind, it would silently filter a future note that reused the id.
+    expect(store.getState().notesPendingRemoval).toEqual([]);
   });
 
   it('keeps removed notes out of the older-notes page too', async () => {

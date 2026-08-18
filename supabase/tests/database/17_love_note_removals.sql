@@ -11,7 +11,7 @@
 
 begin;
 
-select plan(13);
+select plan(19);
 
 create schema if not exists tests;
 
@@ -61,41 +61,44 @@ $$;
 
 do $$
 declare
-  v_a uuid; v_b uuid; v_c uuid; v_n1 uuid; v_n2 uuid; v_bc uuid;
+  v_a uuid; v_b uuid; v_c uuid;
+  v_n uuid[] := '{}';
+  v_id uuid; v_bc uuid; i int;
 begin
   v_a := tests.create_test_user('lnr-a@test.local');
   v_b := tests.create_test_user('lnr-b@test.local');
   v_c := tests.create_test_user('lnr-c@test.local');
 
-  -- Five notes between A and B, oldest first, with distinct timestamps so the
-  -- keyset ordering under test is deterministic. Note 1 carries an image so the
-  -- partner's attachment can be asserted intact after A removes it.
-  insert into public.love_notes (from_user_id, to_user_id, content, image_url,
-                                 idempotency_key, created_at)
-  values (v_a, v_b, 'note one',   'lnr/a/one.jpg', 'lnr-k1', now() - interval '5 min')
-  returning id into v_n1;
-
-  insert into public.love_notes (from_user_id, to_user_id, content, idempotency_key, created_at)
-  values (v_b, v_a, 'note two',   'lnr-k2', now() - interval '4 min')
-  returning id into v_n2;
-
-  insert into public.love_notes (from_user_id, to_user_id, content, idempotency_key, created_at)
-  values (v_a, v_b, 'note three', 'lnr-k3', now() - interval '3 min');
-  insert into public.love_notes (from_user_id, to_user_id, content, idempotency_key, created_at)
-  values (v_b, v_a, 'note four',  'lnr-k4', now() - interval '2 min');
-  insert into public.love_notes (from_user_id, to_user_id, content, idempotency_key, created_at)
-  values (v_a, v_b, 'note five',  'lnr-k5', now() - interval '1 min');
+  -- Eight notes between A and B, oldest first, alternating direction so a
+  -- message A *received* is available to remove. Distinct timestamps keep the
+  -- keyset ordering deterministic. Note 1 carries an image so the partner's
+  -- attachment can be asserted intact after A removes it.
+  for i in 1..8 loop
+    insert into public.love_notes (from_user_id, to_user_id, content, image_url,
+                                   idempotency_key, created_at)
+    values (
+      case when i % 2 = 1 then v_a else v_b end,
+      case when i % 2 = 1 then v_b else v_a end,
+      'note ' || i,
+      case when i = 1 then 'lnr/a/one.jpg' else null end,
+      'lnr-k' || i,
+      now() - make_interval(mins => 9 - i)
+    )
+    returning id into v_id;
+    v_n := v_n || v_id;
+  end loop;
 
   -- A note A is not a party to.
   insert into public.love_notes (from_user_id, to_user_id, content, idempotency_key)
-  values (v_b, v_c, 'not for a', 'lnr-k6')
+  values (v_b, v_c, 'not for a', 'lnr-k-bc')
   returning id into v_bc;
 
   perform set_config('tests.a',  v_a::text,  false);
   perform set_config('tests.b',  v_b::text,  false);
   perform set_config('tests.c',  v_c::text,  false);
-  perform set_config('tests.n1', v_n1::text, false);
-  perform set_config('tests.n2', v_n2::text, false);
+  perform set_config('tests.n1', v_n[1]::text, false);
+  perform set_config('tests.n2', v_n[2]::text, false);
+  perform set_config('tests.n7', v_n[7]::text, false);
   perform set_config('tests.bc', v_bc::text, false);
 end
 $$;
@@ -156,13 +159,13 @@ select is(
   (select content || '|' || coalesce(image_url, '')
      from public.love_notes_visible
     where id = current_setting('tests.n1')::uuid),
-  'note one|lnr/a/one.jpg',
+  'note 1|lnr/a/one.jpg',
   'LNR-DB-007: the partner still reads the note, content and image intact');
-
-select tests.authenticate_as(current_setting('tests.c')::uuid);
 
 -- Scoped to A and B's conversation: C legitimately sees their own note with B,
 -- so a bare count over the view would be 1 and would prove nothing.
+select tests.authenticate_as(current_setting('tests.c')::uuid);
+
 select is(
   (select count(*)::int from public.love_notes_visible
     where (from_user_id = current_setting('tests.a')::uuid
@@ -173,10 +176,81 @@ select is(
   'LNR-DB-008: a third party reads none of someone else''s conversation through the view');
 
 -- ---------------------------------------------------------------------------
--- Behaviour: what a user may not do
+-- The removal LIST is private too, not just its effect on the thread.
+--
+-- policies_are above only compares policy names, and love_notes_visible scopes
+-- its anti-join to auth.uid() independently -- so widening the SELECT policy on
+-- love_note_removals would leave every other assertion in this file green while
+-- handing the partner the exact list of what was removed and when. These two are
+-- the only cases that fail if that policy widens.
+-- ---------------------------------------------------------------------------
+
+select tests.authenticate_as(current_setting('tests.b')::uuid);
+
+select is(
+  (select count(*)::int from public.love_note_removals
+    where user_id = current_setting('tests.a')::uuid),
+  0,
+  'LNR-DB-009: the partner cannot read which messages were removed');
+
+select tests.authenticate_as(current_setting('tests.c')::uuid);
+
+select is(
+  (select count(*)::int from public.love_note_removals),
+  0,
+  'LNR-DB-010: a third party reads no removal rows at all');
+
+-- ---------------------------------------------------------------------------
+-- Removing a message the user RECEIVED
 -- ---------------------------------------------------------------------------
 
 select tests.authenticate_as(current_setting('tests.a')::uuid);
+
+-- note 2 was sent by B to A. Without this the insert policy could be narrowed to
+-- `auth.uid() = n.from_user_id` -- "you may only remove your own messages" -- and
+-- every other case here would still pass.
+select lives_ok(
+  format($$insert into public.love_note_removals (user_id, note_id)
+           values (%L, %L)$$,
+         current_setting('tests.a'), current_setting('tests.n2')),
+  'LNR-DB-011: a user can remove a message their partner sent them');
+
+-- ---------------------------------------------------------------------------
+-- Idempotency, in the exact shape the client sends
+-- ---------------------------------------------------------------------------
+
+-- The client writes .upsert(..., { onConflict: 'user_id,note_id',
+-- ignoreDuplicates: true }), which PostgREST renders as ON CONFLICT DO NOTHING.
+select lives_ok(
+  format($$insert into public.love_note_removals (user_id, note_id)
+           values (%L, %L)
+           on conflict (user_id, note_id) do nothing$$,
+         current_setting('tests.a'), current_setting('tests.n1')),
+  'LNR-DB-012: re-removing the same note is accepted rather than erroring');
+
+select is(
+  (select count(*)::int from public.love_note_removals
+    where user_id = current_setting('tests.a')::uuid
+      and note_id = current_setting('tests.n1')::uuid),
+  1,
+  'LNR-DB-013: and it converges on a single removal row');
+
+-- Dropping ignoreDuplicates would make PostgREST send merge-duplicates, i.e.
+-- ON CONFLICT DO UPDATE, which needs an UPDATE privilege this role does not have
+-- -- so the removal would fail outright rather than degrade. Pinned here because
+-- nothing else in the suite would catch that flag going missing.
+select throws_ok(
+  format($$insert into public.love_note_removals (user_id, note_id)
+           values (%L, %L)
+           on conflict (user_id, note_id) do update set removed_at = now()$$,
+         current_setting('tests.a'), current_setting('tests.n1')),
+  '42501',
+  null,
+  'LNR-DB-014: a merge-duplicates upsert is refused, so ignoreDuplicates is required');
+
+-- ---------------------------------------------------------------------------
+-- What a user may not do
+-- ---------------------------------------------------------------------------
 
 select throws_ok(
   format($$insert into public.love_note_removals (user_id, note_id)
@@ -184,7 +258,7 @@ select throws_ok(
          current_setting('tests.b'), current_setting('tests.n2')),
   '42501',
   null,
-  'LNR-DB-009: a user cannot record a removal on their partner''s behalf');
+  'LNR-DB-015: a user cannot record a removal on their partner''s behalf');
 
 select throws_ok(
   format($$insert into public.love_note_removals (user_id, note_id)
@@ -192,32 +266,36 @@ select throws_ok(
          current_setting('tests.a'), current_setting('tests.bc')),
   '42501',
   null,
-  'LNR-DB-010: a user cannot remove a note they are not a party to');
+  'LNR-DB-016: a user cannot remove a note they are not a party to');
 
--- No DELETE policy and no DELETE privilege: removal is one-way.
 select throws_ok(
   format($$delete from public.love_note_removals where user_id = %L$$,
          current_setting('tests.a')),
   '42501',
   null,
-  'LNR-DB-011: a user cannot delete a removal, so there is no undo');
+  'LNR-DB-017: a user cannot delete a removal, so there is no undo');
 
 -- ---------------------------------------------------------------------------
--- Behaviour: the underlying message is untouched, and pages still fill
+-- The underlying message is untouched, and pages still fill
 -- ---------------------------------------------------------------------------
 
 select tests.be_postgres();
 
 select is(
   (select content from public.love_notes where id = current_setting('tests.n1')::uuid),
-  'note one',
-  'LNR-DB-012: the love_notes row itself survives the removal unchanged');
+  'note 1',
+  'LNR-DB-018: the love_notes row itself survives the removal unchanged');
 
 select tests.authenticate_as(current_setting('tests.a')::uuid);
 
--- A has five notes with B and has removed one. A limit of 4 must still come back
--- with 4 rows; if the exclusion ran after the limit it would return 3 and
--- notesHasMore would lie.
+-- Remove note 7, which sits INSIDE the first page. The raw newest-4 is
+-- {n8, n7, n6, n5}; excluding after the LIMIT would return 3 of them and
+-- notesHasMore would claim the history had ended. Excluding first returns
+-- {n8, n6, n5, n4} -- a full page. Removing a note outside the window (n1, n2)
+-- could not tell the two implementations apart, which is why this one is n7.
+insert into public.love_note_removals (user_id, note_id)
+values (current_setting('tests.a')::uuid, current_setting('tests.n7')::uuid);
+
 select is(
   (select count(*)::int from (
      select id from public.love_notes_visible
@@ -228,7 +306,7 @@ select is(
       order by created_at desc
       limit 4) page),
   4,
-  'LNR-DB-013: a page still fills to its limit when a removal falls inside it');
+  'LNR-DB-019: a page still fills to its limit when a removal falls inside it');
 
 select tests.be_postgres();
 

@@ -80,6 +80,7 @@ export function signedOutState() {
     notesError: null,
     notesHasMore: true,
     sentMessageTimestamps: [],
+    notesPendingRemoval: [],
 
     // photosSlice
     photos: [],
