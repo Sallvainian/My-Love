@@ -795,23 +795,29 @@ describe('loader identity guards', () => {
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-EVENT-LABEL');
     });
 
-    it('still releases the spinner when it discards', async () => {
-      // The flag is raised before the await, so an early return that only skips
-      // the write leaves the new account looking at a permanent spinner.
+    it('leaves a successor account’s live spinner alone when it discards', async () => {
+      // The real account transition resets eventsIsLoading via signedOutState()
+      // (pinned by signOutClearsAccountState.test.ts), so the guard has nothing
+      // to release. C is seeded mid-load: a stale resolution that wrote the
+      // flag would clear C's own live spinner and flash an empty list while
+      // C's request is still open.
       const pending = deferred<unknown[]>();
       getEvents.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().loadEvents();
       expect(useAppStore.getState().eventsIsLoading).toBe(true);
 
-      switchToUserC({ events: [{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }], eventsError: null });
+      switchToUserC({
+        events: [{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }],
+        eventsError: null,
+        eventsIsLoading: true,
+      });
       pending.fail(new Error('A-REQUEST-FAILURE'));
       await inFlight;
 
-      expect(useAppStore.getState().eventsIsLoading).toBe(false);
-      // The catch path writes `eventsError` (the list itself survives a failed
-      // refresh) — the error must not land on the account that did not make
-      // the request, and C's own list must stay intact.
+      expect(useAppStore.getState().eventsIsLoading).toBe(true);
+      // The error must not land on the account that did not make the request,
+      // and C's own list must stay intact.
       expect(useAppStore.getState().eventsError).toBeNull();
       expect(useAppStore.getState().events).toEqual([{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }]);
     });

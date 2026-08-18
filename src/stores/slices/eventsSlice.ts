@@ -91,20 +91,17 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
 
     try {
       const events = await eventsService.getEvents();
-      // Drop the DATA, but release the spinner: the flag was raised before the
-      // await and would otherwise stay true forever for the new account.
-      if (get().userId !== requestedBy) {
-        set({ eventsIsLoading: false });
-        return;
-      }
+      // Touch nothing: the account transition itself went through
+      // discardAccountState -> signedOutState(), which already reset every
+      // events key, flag included. Writing the flag here instead would clear a
+      // successor account's own live spinner mid-load.
+      if (get().userId !== requestedBy) return;
       set({ events, eventsIsLoading: false });
     } catch (error) {
       const errorMsg = messageOf(error, 'Failed to load events');
       console.error('[EventsSlice] Error loading events:', error);
-      if (get().userId !== requestedBy) {
-        set({ eventsIsLoading: false });
-        return;
-      }
+      // Touch nothing here either — same reasoning as the success branch.
+      if (get().userId !== requestedBy) return;
       // The last-good list survives a failed refresh: events are Supabase-only
       // with no mirror to repopulate from, so blanking here would erase data
       // the user is looking at. Matches notesSlice and moodSlice.
