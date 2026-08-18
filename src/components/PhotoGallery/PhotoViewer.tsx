@@ -1,7 +1,7 @@
 import type { PanInfo } from 'framer-motion';
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Loader2, Trash2, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { useAppStore } from '../../stores/useAppStore';
@@ -94,14 +94,27 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   // onEscape re-runs useFocusTrap's arming effect, and that re-run moves focus
   // back to the container's first focusable -- the trash button -- stealing it
   // from the Cancel button the confirmation just auto-focused.
+  const [isDeleting, setIsDeleting] = useState(false);
+  const isDeletingRef = useRef(false);
   const showDeleteDialogRef = useRef(showDeleteDialog);
   const onCloseRef = useRef(onClose);
-  useEffect(() => {
+  // Layout effect, not passive: handleEscape reads these from a native keydown
+  // listener, which can fire in the window between commit and passive flush.
+  useLayoutEffect(() => {
     showDeleteDialogRef.current = showDeleteDialog;
     onCloseRef.current = onClose;
   }, [showDeleteDialog, onClose]);
+  const handleCancelDialog = useCallback(() => {
+    if (isDeletingRef.current) return;
+    closeDeleteDialog();
+  }, [closeDeleteDialog]);
+
   const handleEscape = useCallback(() => {
     if (showDeleteDialogRef.current) {
+      // Suppressed mid-delete: dismissing while the request is in flight leaves
+      // isDeletingRef set, so the next Delete would be silently swallowed and
+      // the pending finally would close whatever confirmation is open by then.
+      if (isDeletingRef.current) return;
       closeDeleteDialog();
       return;
     }
@@ -365,9 +378,8 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   // has already applied when the request is in flight, so a second tap on
   // Delete would resolve photos[currentIndex] to a DIFFERENT photo and delete
   // it too. The ref is the guard (state lags a render); the state disables the
-  // buttons so a double-tap has nothing to land on.
-  const [isDeleting, setIsDeleting] = useState(false);
-  const isDeletingRef = useRef(false);
+  // Delete button so a double-tap has nothing to land on. Cancel stays enabled
+  // as the trap's one focusable, guarded in its handler instead.
   const handleDeleteConfirm = useCallback(async () => {
     if (isDeletingRef.current) return;
     isDeletingRef.current = true;
@@ -642,10 +654,13 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                     without it a keyboard user is left on the trash button
                     behind the overlay, inside a subtree the confirmation
                     visually covers. Cancel, because delete is irreversible. */}
+                {/* Cancel stays enabled mid-delete -- with every other control
+                    disabled the trap would have zero focusables and Tab walks
+                    out of the modal -- but its handler is guarded like Escape:
+                    dismissing mid-flight would orphan the pending finally. */}
                 <button
                   autoFocus
-                  onClick={closeDeleteDialog}
-                  disabled={isDeleting}
+                  onClick={handleCancelDialog}
                   className="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
                 >
                   Cancel
