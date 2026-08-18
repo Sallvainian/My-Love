@@ -15,7 +15,7 @@
  * child resolve against the row instead of the viewport.
  */
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { LoveNote } from '../../types/models';
 
@@ -74,6 +74,34 @@ export function NoteRemoveConfirmation({
       cancelButtonRef.current?.focus();
     }
   }, [error, isRemoving]);
+
+  // Give focus back when this dialog goes away. useFocusTrap deliberately does
+  // not do this -- it is shared with four other components that nothing in this
+  // change exercises -- so it is handled here, where it is tested.
+  //
+  // Two destinations, because the obvious one does not always survive. On cancel
+  // and Escape the control that opened this is still mounted and takes focus
+  // back. On success the note is gone, so its row and that control unmount with
+  // it; focus then goes to the thread container, which persists. Without the
+  // fallback a successful removal -- the common path -- drops focus on <body>
+  // and a keyboard user loses their place entirely.
+  // useLayoutEffect, not useEffect: useFocusTrap is called above and its passive
+  // effect moves focus to Cancel on mount. A passive effect here would run after
+  // that and capture Cancel as the opener -- an element that unmounts with this
+  // dialog, so the restore would aim at nothing. Layout effects run first.
+  useLayoutEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const thread = opener?.closest('[data-testid="virtualized-list"]') as HTMLElement | null;
+
+    return () => {
+      // Only the fallback lives here. useFocusTrap restores the opener itself;
+      // this covers the case unique to a removal — the opener was the control on
+      // the row that just went away, so there is nothing to go back to.
+      if (!opener?.isConnected && thread?.isConnected) {
+        thread.focus();
+      }
+    };
+  }, []);
 
   const handleRemove = async () => {
     try {
