@@ -359,8 +359,19 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     [lastTap, scale]
   );
 
-  // AC 6.4.10: Delete photo handler
+  // AC 6.4.10: Delete photo handler.
+  //
+  // Re-entry is the wrong-photo hazard again: the optimistic setCurrentIndex
+  // has already applied when the request is in flight, so a second tap on
+  // Delete would resolve photos[currentIndex] to a DIFFERENT photo and delete
+  // it too. The ref is the guard (state lags a render); the state disables the
+  // buttons so a double-tap has nothing to land on.
+  const [isDeleting, setIsDeleting] = useState(false);
+  const isDeletingRef = useRef(false);
   const handleDeleteConfirm = useCallback(async () => {
+    if (isDeletingRef.current) return;
+    isDeletingRef.current = true;
+    setIsDeleting(true);
     const photoToDelete = photos[currentIndex];
 
     try {
@@ -396,6 +407,8 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
       // Note: UI already updated optimistically. In production, may want to revert navigation
       // or show error toast to user. For now, logging is sufficient as RLS prevents unauthorized deletion.
     } finally {
+      isDeletingRef.current = false;
+      setIsDeleting(false);
       // Routed through closeDeleteDialog so the post-commit effect places
       // focus: the trash button if the next photo is the user's own, the
       // container otherwise. By then unmounts and re-enables have committed.
@@ -632,12 +645,14 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 <button
                   autoFocus
                   onClick={closeDeleteDialog}
+                  disabled={isDeleting}
                   className="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
+                  disabled={isDeleting}
                   className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-white transition hover:bg-red-600"
                 >
                   Delete

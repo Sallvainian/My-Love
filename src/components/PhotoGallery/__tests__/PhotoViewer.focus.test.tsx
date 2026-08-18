@@ -26,8 +26,9 @@ vi.mock('framer-motion', () => ({
   useMotionValue: () => ({ get: () => 0, set: () => {}, on: () => () => {} }),
 }));
 
+const deletePhotoMock = vi.hoisted(() => vi.fn());
 vi.mock('../../../stores/useAppStore', () => ({
-  useAppStore: () => ({ deletePhoto: vi.fn() }),
+  useAppStore: () => ({ deletePhoto: deletePhotoMock }),
 }));
 
 const photo = {
@@ -171,6 +172,37 @@ describe('PhotoViewer focus', () => {
 
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletes exactly one photo on a double-tap of Delete', async () => {
+    // The optimistic setCurrentIndex has already applied while the request is
+    // in flight, so a re-entered handleDeleteConfirm would resolve
+    // photos[currentIndex] to a DIFFERENT photo and delete it too.
+    deletePhotoMock.mockClear();
+    let resolveDelete!: () => void;
+    deletePhotoMock.mockReturnValue(new Promise<void>((r) => (resolveDelete = r)));
+    const two = [
+      photo,
+      { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
+    ];
+    render(<PhotoViewer photos={two} selectedPhotoId="photo-2" onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    const deleteButton = await screen.findByRole('button', { name: 'Delete' });
+    fireEvent.click(deleteButton);
+    fireEvent.click(deleteButton);
+
+    expect(deletePhotoMock).toHaveBeenCalledTimes(1);
+    expect(deletePhotoMock).toHaveBeenCalledWith('photo-2');
+    // And the second tap had nothing to land on anyway.
+    expect(deleteButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+
+    resolveDelete();
+    await waitFor(() => {
+      expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    });
+    deletePhotoMock.mockReset();
   });
 
   it('keeps focus inside the container after confirming a delete', async () => {
