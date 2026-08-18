@@ -1,8 +1,35 @@
 name: Deploy to GitHub Pages
 
 on:
+  # A denylist, not an allowlist. The migrate job below is the only path
+  # migrations take to the production database -- supabase-migrations.yml runs
+  # `db reset` against a local instance on pull_request and never deploys -- so
+  # a `paths:` list that forgot an entry would strand a schema change with a
+  # green checkmark. A database-only merge like #265's anon-execute lockdown
+  # touches no frontend input at all. Listing what provably cannot reach the
+  # site instead means anything added later deploys by default, and the worst
+  # case is a redundant build rather than a fix that never shipped.
   push:
     branches: [main]
+    paths-ignore:
+      - 'tests/**'
+      - '**/*.md'
+      - 'playwright.config.ts'
+      - 'vitest.config.ts'
+      - 'tsconfig.test.json'
+      - 'tsconfig.tsr.json'
+      - 'eslint.config.js'
+      - '_bmad-output/**'
+      - '.bmad-loop/**'
+      # Every workflow except this one, which stays deployable so a repair to it
+      # ships by being pushed.
+      - '.github/workflows/claude*.yml'
+      - '.github/workflows/test.yml'
+      - '.github/workflows/codeql.yml'
+      - '.github/workflows/lighthouse.yml'
+      - '.github/workflows/bundle-size.yml'
+      - '.github/workflows/dependency-review.yml'
+      - '.github/workflows/supabase-migrations.yml'
   workflow_dispatch:
 
 permissions:
