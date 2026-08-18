@@ -390,6 +390,14 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         // AC 6.4.1: Full-screen modal overlay with black background
         className="fixed inset-0 z-50 flex items-center justify-center bg-black"
         data-testid="photo-viewer-overlay"
+        // tabIndex -1 keeps this container reachable by focus without adding a
+        // tab stop. useFocusTrap binds Escape and the Tab cycle to this element,
+        // and everything the user is most likely to click -- the photo, the
+        // backdrop, the caption bar -- is non-focusable, so a click would
+        // otherwise blur to <body>. <body> is an ancestor, and keydown bubbles
+        // upward, so the listener here would never see the event again and both
+        // Escape and the trap would go dead for the rest of the session.
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Photo viewer"
