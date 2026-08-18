@@ -56,6 +56,12 @@ begin
   v_user1 := tests.create_test_user('create_session_pair_user1@test.com');
   v_user2 := tests.create_test_user('create_session_pair_user2@test.com');
 
+  -- scripture_create_session now requires p_partner_id to be the caller's real
+  -- partner. Both directions are needed: 4.3-DB-006 calls the RPC as user2 with
+  -- user1 as the partner. Same pattern as 10_scripture_lobby.sql:92-93.
+  update public.users set partner_id = v_user2 where id = v_user1;
+  update public.users set partner_id = v_user1 where id = v_user2;
+
   perform set_config('test.user1_id', v_user1::text, true);
   perform set_config('test.user2_id', v_user2::text, true);
 end; $$;
