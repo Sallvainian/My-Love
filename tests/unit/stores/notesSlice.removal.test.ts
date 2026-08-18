@@ -270,10 +270,11 @@ describe('notesSlice removeNote', () => {
       ],
     });
 
-    await store.getState().removeNote('temp-123-abc');
-
     // A failed send keeps its temp id, so this is the state that would have
-    // posted `temp-…` into a uuid column.
+    // posted `temp-…` into a uuid column. It must reject rather than resolve:
+    // the dialog closes on a resolved promise.
+    await expect(store.getState().removeNote('temp-123-abc')).rejects.toThrow();
+
     expect(backend.removals.size).toBe(0);
     expect(store.getState().notes).toHaveLength(1);
   });
@@ -409,5 +410,20 @@ describe('notesSlice removeNote', () => {
     await store.getState().fetchOlderNotes(2);
 
     expect(store.getState().notes.map((n) => n.id)).toEqual(['note-0', 'note-2', 'note-3', 'note-4']);
+  });
+
+  it('signals rather than reporting success when the note is no longer loaded', async () => {
+    backend.seed(3);
+    const store = createTestStore();
+    await store.getState().fetchNotes();
+
+    // The dialog is open on a note the window no longer holds — the refill path
+    // inside this same action can replace it. A resolved promise here is the
+    // dialog's success signal, so it would close as though the message had been
+    // removed while nothing was recorded.
+    await expect(store.getState().removeNote('note-does-not-exist')).rejects.toThrow();
+
+    expect(backend.removals.size).toBe(0);
+    expect(store.getState().notes).toHaveLength(3);
   });
 });
