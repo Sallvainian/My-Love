@@ -203,6 +203,11 @@ describe('eventsService', () => {
 
   describe('parseEventDate', () => {
     it('reads "YYYY-MM-DD" as LOCAL midnight in every timezone', () => {
+      // The TZ pin in vitest.config.ts is what gives the assertions below their
+      // failure power; under UTC the broken new Date('2026-09-12') form passes
+      // all of them. This asserts the pin actually took effect.
+      expect(new Date(2026, 8, 12).getTimezoneOffset()).not.toBe(0);
+
       const parsed = parseEventDate('2026-09-12');
       if (!parsed) throw new Error('expected a parsed date');
 
