@@ -308,9 +308,10 @@ describe('eventsService', () => {
     });
 
     it('drops a row whose date cannot be read, and still orders the rest', async () => {
-      // One Invalid Date makes the comparator return NaN, and a comparator that
-      // returns NaN leaves EVERY element unsorted — so the bad row is dropped
-      // rather than carried into the sort.
+      // One Invalid Date makes the comparator return NaN, which leaves the bad
+      // row and its immediate neighbor unpredictably placed (measured; see the
+      // parseEventDate doc) — so the row is dropped rather than carried into
+      // the sort.
       backend.rows = [
         row({ id: 'later', event_date: '2026-12-25' }),
         row({ id: 'unreadable', event_date: 'infinity' }),
