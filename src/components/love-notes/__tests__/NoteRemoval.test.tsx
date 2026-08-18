@@ -268,6 +268,10 @@ describe('remove confirmation dialog', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(onClose).not.toHaveBeenCalled();
+
+    // The catch intends to hand focus back to Cancel so the user can leave.
+    await waitFor(() => expect(screen.getByText('Cancel')).not.toBeDisabled());
+    expect(document.activeElement).toBe(screen.getByText('Cancel'));
   });
 });
 

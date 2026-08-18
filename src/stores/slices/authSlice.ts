@@ -143,7 +143,18 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => (
   isAuthenticated: false,
 
   setAuthUser: (userId, email) => {
+    // An account switch that never passes through a null session -- signing in
+    // over a live one -- reaches here without clearAuth ever running, and would
+    // otherwise carry the previous account's data into the new one. Route it
+    // through signedOutState() rather than listing fields here, so this stays
+    // correct as slices grow: that helper is the single place account state is
+    // cleared. A repeat call for the SAME user (TOKEN_REFRESHED,
+    // INITIAL_SESSION, USER_UPDATED) must not reset anything.
+    const previous = get().userId;
+    const switchedAccount = previous !== null && userId !== null && previous !== userId;
+
     set({
+      ...(switchedAccount ? signedOutState() : {}),
       userId,
       userEmail: email ?? null,
       isAuthenticated: !!userId,
