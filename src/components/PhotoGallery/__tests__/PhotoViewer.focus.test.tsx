@@ -194,9 +194,17 @@ describe('PhotoViewer focus', () => {
 
     expect(deletePhotoMock).toHaveBeenCalledTimes(1);
     expect(deletePhotoMock).toHaveBeenCalledWith('photo-2');
-    // And the second tap had nothing to land on anyway.
+    // And the second tap had nothing to land on anyway. Cancel stays enabled
+    // as the trap's one focusable, but is inert mid-flight -- clicking it (or
+    // Escape) must not dismiss the dialog while the request is pending, or the
+    // stuck isDeletingRef swallows the next Delete and the pending finally
+    // closes whatever confirmation is open by then.
     expect(deleteButton).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    expect(cancel).not.toBeDisabled();
+    fireEvent.click(cancel);
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.getByText('Delete Photo?')).toBeInTheDocument();
 
     resolveDelete();
     await waitFor(() => {
