@@ -80,3 +80,115 @@ server id. The sync lock does not cover this — it serialises sync *batches*, n
 edit against the service worker's batch. Consequence is a lost server id, not lost data or a
 duplicate row: the next pass takes the upsert path and `(user_id, created_at)` resolves it to
 the same row. Fix would be giving `updateMood` the same single-transaction shape.
+
+### DW-7: handleNetworkError promises "Your changes will be synced when you're back online", which is false for events — there is no offline queue, IndexedDB mirror or retry.
+origin: spec-deferred 67d2bdb34631
+location: src/api/errorHandlers.ts:94
+source_spec: `2-events-service-and-store-slice.md`
+severity: medium
+reason: src/api/errorHandlers.ts:94-95 composes that sentence for every offline throw. Pre-existing and repo-wide, not caused by this story: interactionService.ts:111 emits the same text for partner interactions, which are equally Supabase-only (AGENTS.md:65). eventsService's module header already routes EventWriteError around the helper for exactly this reason; the offline guards still use it because the story's Boundaries mandate moodApi's idiom verbatim.
+status: open
+
+### DW-8: A CHECK-constraint violation (23514) is unmapped, so an over-length label or description reaches the user as raw Postgres constraint text.
+origin: spec-deferred d44dacbe0efd
+location: src/api/errorHandlers.ts:62
+source_spec: `2-events-service-and-store-slice.md`
+severity: medium
+reason: The errorMessages map in src/api/errorHandlers.ts:62-70 covers 23505, 23503, 23502, 42501, 42P01, PGRST116 and PGRST301 — no 23514 — so the fallback `Database error: ${error.message}` applies. The table enforces char_length(label) <= 100 and char_length(description) <= 500, and nothing rejects a blank label (char_length('') = 0 passes). Input validation belongs to story 5's form; story 1's triage log already carried the blank-label observation forward to that story.
+status: open
+
+### DW-9: eventsService.getEvents applies no limit or pagination.
+origin: spec-deferred 25448caba914
+location: src/services/eventsService.ts
+source_spec: `2-events-service-and-store-slice.md`
+severity: low
+reason: integration-points.md section 1 names photoService.getPhotos(limit = 50, offset = 0) as the signature shape to mirror, and moodApi caps its reads. The read grows with the couple's whole event history. Harmless at a couple's scale today, and a limit would interact with the soonest-first ordering.
+status: open
+
+### DW-10: Two events on the same date have no deterministic order.
+origin: spec-deferred 3c6d3601f0c8
+location: src/services/eventsService.ts
+source_spec: `2-events-service-and-store-slice.md`
+severity: low
+reason: The read orders on event_date alone, and Postgres leaves ties unspecified, so same-day cards can swap position between reloads. A secondary key such as created_at would fix it.
+status: open
+
+### DW-11: Overlapping loadEvents calls are last-writer-wins; the guard compares userId only.
+origin: spec-deferred 27d87ebc0b13
+location: src/stores/slices/eventsSlice.ts
+source_spec: `2-events-service-and-store-slice.md`
+severity: low
+reason: The identity guard catches an account switch but not two in-flight loads for the same account, where an older response can overwrite a newer list. No caller triggers this yet — nothing mounts loadEvents until story 3 — so the state is currently unreachable.
+status: open
+
+### DW-12: A double-submitted addEvent creates two rows.
+origin: spec-deferred 3ef25a69c45f
+location: src/stores/slices/eventsSlice.ts
+source_spec: `2-events-service-and-store-slice.md`
+severity: low
+reason: Deliberate at the data layer: public.events carries no idempotency_key column and no UNIQUE constraint, so AGENTS.md:59's retryable-INSERT rule has nothing to key on and the story forbids automatic retry. Guarding a double submit is story 5's form (disable the button while the write is open).
+status: open
+
+### DW-13: EventWriteError is unexported and EventWriteResult carries no machine-readable code, so callers must string-match English prose to tell "not yours" from a transport failure.
+origin: spec-deferred 87c45d388242
+location: src/services/eventsService.ts
+source_spec: `2-events-service-and-store-slice.md`
+severity: low
+reason: Story 5's UI needs different affordances for the two outcomes (refresh the list vs retry the write). The shape mirrors photosSlice's PhotoUploadResult, which has the same limitation, so changing it is a cross-slice decision.
+status: open
+
+### DW-14: A persisted blob that already contained an events key would be rehydrated; only moods is stripped on read.
+origin: spec-deferred 09851f20d430
+location: src/stores/useAppStore.ts:120
+source_spec: `2-events-service-and-store-slice.md`
+severity: low
+reason: useAppStore.ts:111 records that partialize "stops NEW writes, but it does not govern reads", which is why the adapter deletes data.state.moods at :120-123. Verified by writing the assertion: it fails today. Not fixed here because the state is unreachable — no build has ever written events to localStorage, so unlike moods there is no installed base of bad blobs. It would become real only if a later story added events to partialize and then removed it again.
+status: open
+
+### DW-15: A row with an unparseable event_date is silently dropped from the list with only a console.error; nothing surfaces to eventsError or any user-visible state.
+origin: spec-deferred 27703d86d257
+location: src/services/eventsService.ts
+source_spec: `2-events-service-and-store-slice.md`
+severity: low
+reason: toCoupleEvent (src/services/eventsService.ts) logs '[EventsService] Skipping event with unreadable event_date' and returns null on an unparseable date, and getEvents filters those nulls out with no further signal. Verified unreachable via any app-originated write today: createEvent and updateEvent both call parseEventDate on the input and throw EventWriteError before issuing any request, so only a direct SQL write (e.g. a literal 'infinity', which a Postgres date column accepts) could produce such a row.
+status: open
+
+### DW-16: A CHECK-constraint violation (23514) — including a blank or over-length label/description — is unmapped, so it reaches the user as raw Postgres text.
+origin: spec-deferred f5a93068dc47
+location: src/api/errorHandlers.ts:62
+source_spec: `2-events-service-and-store-slice.md`
+severity: medium
+reason: Re-surfaced by this review pass's edge-case and blind-hunter layers; re-verified unchanged since the prior pass. The errorMessages map in src/api/errorHandlers.ts has no entry for 23514, so the generic 'Database error: ${message}' fallback applies. The table enforces char_length(label) <= 100 and char_length(description) <= 500, and nothing client-side rejects a blank label. Input validation is assigned to story 5's form.
+status: open
+
+### DW-17: Overlapping loadEvents calls are last-writer-wins; the identity guard compares userId only.
+origin: spec-deferred d1a10b88a17a
+location: src/stores/slices/eventsSlice.ts
+source_spec: `2-events-service-and-store-slice.md`
+severity: low
+reason: Re-surfaced by this review pass; re-verified unchanged since the prior pass. Two in-flight loads for the same account are not distinguished by the guard, so an older response can overwrite a newer list. No caller triggers this yet — nothing mounts loadEvents until story 3.
+status: open
+
+### DW-18: handleNetworkError's offline message promises a sync that cannot happen for events.
+origin: spec-deferred a118de54f9a8
+location: src/api/errorHandlers.ts:94
+source_spec: `2-events-service-and-store-slice.md`
+severity: medium
+reason: Re-surfaced by this review pass; re-verified unchanged since the prior pass. src/api/errorHandlers.ts composes "Your changes will be synced when you're back online" for every offline throw; events have no offline queue, IndexedDB mirror or retry. Pre-existing and repo-wide (interactionService.ts emits the same text for partner interactions).
+status: open
+
+### DW-19: EventWriteError is unexported and EventWriteResult carries no machine-readable code, so callers must string-match English prose to distinguish outcomes.
+origin: spec-deferred 5652fe1c2471
+location: src/services/eventsService.ts
+source_spec: `2-events-service-and-store-slice.md`
+severity: low
+reason: Re-surfaced by this review pass; re-verified unchanged since the prior pass. Story 5's UI will need different affordances for different failure kinds (refresh vs retry); the shape mirrors PhotoUploadResult's same limitation.
+status: open
+
+### DW-20: Persistence omission from partialize only prevents new writes; a pre-existing persisted blob with an events key would still rehydrate.
+origin: spec-deferred 0f9e6e1214d8
+location: src/stores/useAppStore.ts:120
+source_spec: `2-events-service-and-store-slice.md`
+severity: low
+reason: Re-surfaced by this review pass; re-verified unchanged since the prior pass. useAppStore.ts records that partialize "stops NEW writes, but it does not govern reads", which is why moods is stripped on read but events is not. Unreachable today since no build has ever written events to localStorage.
+status: open
