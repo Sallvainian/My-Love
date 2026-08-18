@@ -309,6 +309,9 @@ describe('eventsService', () => {
       const events = await eventsService.getEvents();
 
       expect(events.map((e) => e.id)).toEqual(['first', 'second']);
+      // The domain model carries the instant so the slice can apply the same
+      // tiebreak locally.
+      expect(events[0].createdAt).toEqual(new Date('2026-08-18T09:00:00+00:00'));
     });
 
     it('keeps a row whose icon is outside the union, falling back to the column default', async () => {

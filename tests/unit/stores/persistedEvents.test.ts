@@ -31,6 +31,7 @@ const IN_MEMORY_EVENT = {
   userId: 'user-A',
   label: 'PRIVATE-EVENT-LABEL',
   date: new Date(2026, 8, 12),
+  createdAt: new Date(2026, 0, 1),
   description: 'PRIVATE-EVENT-DESCRIPTION',
   icon: 'plane' as const,
 };

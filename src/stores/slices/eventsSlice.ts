@@ -63,7 +63,11 @@ export interface EventsSlice {
  * (the same rule `signedOutState()` builds fresh arrays for).
  */
 function sortByDate(events: CoupleEvent[]): CoupleEvent[] {
-  return [...events].sort((a, b) => a.date.getTime() - b.date.getTime());
+  // The created_at tiebreak mirrors getEvents' server order, so same-day cards
+  // hold one position across an add, an edit, and a reload.
+  return [...events].sort(
+    (a, b) => a.date.getTime() - b.date.getTime() || a.createdAt.getTime() - b.createdAt.getTime()
+  );
 }
 
 function messageOf(error: unknown, fallback: string): string {
@@ -130,7 +134,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       // this one's list. success reports the durable write only — this
       // session's state is deliberately untouched.
       if (get().userId !== requestedBy) return { success: true };
-      set((state) => ({ events: sortByDate([created, ...state.events]) }));
+      set((state) => ({ events: sortByDate([...state.events, created]) }));
       logger.debug('[EventsSlice] Added event:', created.id);
       return { success: true };
     } catch (error) {
