@@ -242,6 +242,19 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   // AC 6.4.3: Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        // useFocusTrap handles Escape whenever focus is inside the container.
+        // Focus can still land on <body> -- a focused nav button becoming
+        // disabled at either end of the gallery, or a focused Retry button
+        // unmounting -- and <body> is an ancestor of the container, so its
+        // listener never sees the key again. Cover only that case, so a
+        // single Escape still runs the escape path exactly once.
+        if (!containerRef.current?.contains(document.activeElement)) {
+          handleEscape();
+          event.preventDefault();
+        }
+        return;
+      }
       // Navigation is suspended while the delete confirmation is up: it names a
       // specific photo, and handleDeleteConfirm resolves photos[currentIndex] at
       // click time, so navigating behind the dialog would delete a different
@@ -259,14 +272,9 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
       }
     };
 
-    // Escape is deliberately absent: useFocusTrap above already handles it,
-    // scoped to the container, and its handler is the one that knows whether
-    // the delete confirmation is up. Handling it here as well meant a single
-    // Escape ran onClose() twice. Arrow keys stay global -- they are
-    // navigation within this viewer, not dismissal.
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigatePhoto, showDeleteDialog]);
+  }, [navigatePhoto, showDeleteDialog, handleEscape]);
 
   // WCAG: Screen reader announcements for photo changes
   useEffect(() => {
@@ -377,6 +385,11 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
       // or show error toast to user. For now, logging is sufficient as RLS prevents unauthorized deletion.
     } finally {
       setShowDeleteDialog(false);
+      // The focused Delete button unmounts with the dialog, which would strand
+      // focus on <body> and break the trap's Tab cycle. Not closeDeleteDialog:
+      // the trash button may unmount too, when the next photo is not the
+      // user's own. The container always survives an open viewer.
+      containerRef.current?.focus();
     }
   }, [photos, currentIndex, canNavigateNext, onClose, deletePhoto, resetTransform]);
 
