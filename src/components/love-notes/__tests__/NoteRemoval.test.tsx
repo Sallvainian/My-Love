@@ -139,6 +139,35 @@ describe('remove confirmation dialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('returns focus to the control that opened it when dismissed', async () => {
+    // The trash button is still mounted behind the dialog, so dropping focus on
+    // <body> at dismissal loses a keyboard user's place in the thread.
+    function Harness({ open }: { open: boolean }) {
+      return (
+        <>
+          <button data-testid="trigger">remove</button>
+          {open && (
+            <NoteRemoveConfirmation
+              note={committed}
+              onClose={vi.fn()}
+              onConfirmRemove={vi.fn()}
+            />
+          )}
+        </>
+      );
+    }
+
+    const { rerender } = render(<Harness open={false} />);
+    screen.getByTestId('trigger').focus();
+
+    rerender(<Harness open />);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+
+    rerender(<Harness open={false} />);
+
+    expect(document.activeElement).toBe(screen.getByTestId('trigger'));
+  });
+
   it('closes on Escape and takes focus off the trash button behind the overlay', async () => {
     const onClose = vi.fn();
     const onConfirmRemove = vi.fn();
