@@ -80,9 +80,14 @@ create policy "love_note_removals_insert"
   with check (
     (select auth.uid()) = user_id
     and exists (
+      -- Qualified deliberately. Unqualified, `note_id` resolves outward to this
+      -- table only because love_notes happens to have no column of that name; a
+      -- later migration adding one would silently rebind it to n.note_id and
+      -- turn this into a self-comparison that constrains nothing, while the
+      -- policy kept its name and its place in policies_are.
       select 1
       from public.love_notes n
-      where n.id = note_id
+      where n.id = public.love_note_removals.note_id
         and (    (select auth.uid()) = n.from_user_id
               or (select auth.uid()) = n.to_user_id )
     )
