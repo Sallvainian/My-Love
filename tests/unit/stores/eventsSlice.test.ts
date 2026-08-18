@@ -49,6 +49,7 @@ function event(id: string, isoDate: string, overrides: Partial<CoupleEvent> = {}
     userId: USER_ID,
     label: id,
     date: new Date(year, month - 1, day),
+    createdAt: new Date(2026, 0, 1),
     description: null,
     icon: 'calendar',
     ...overrides,
@@ -155,6 +156,23 @@ describe('eventsSlice', () => {
       expect(store.getState().eventsError).toBeNull();
     });
 
+    it('slots a same-day event after its earlier-created sibling, matching the server order', async () => {
+      // getEvents orders event_date ASC, created_at ASC. A just-created event
+      // has the greatest created_at of its day, so it must land last among its
+      // same-day siblings NOW — or the card jumps position on the next reload.
+      const store = createTestStore();
+      store.setState({
+        events: [event('first-of-day', '2026-10-31', { createdAt: new Date(2026, 0, 1) })],
+      });
+      createEvent.mockResolvedValue(
+        event('second-of-day', '2026-10-31', { createdAt: new Date(2026, 0, 2) })
+      );
+
+      await store.getState().addEvent({ label: 'second-of-day', eventDate: '2026-10-31' });
+
+      expect(store.getState().events.map((e) => e.id)).toEqual(['first-of-day', 'second-of-day']);
+    });
+
     it('passes the signed-in user as the creator', async () => {
       const store = createTestStore();
       createEvent.mockResolvedValue(event('new', '2026-10-31'));
@@ -240,6 +258,25 @@ describe('eventsSlice', () => {
       expect(result).toEqual({ success: true });
       expect(store.getState().events.map((e) => e.id)).toEqual(['b', 'a', 'c']);
       expect(updateEvent).toHaveBeenCalledWith('a', { eventDate: '2026-11-30' });
+    });
+
+    it('orders by creation time when an edit moves a date onto an occupied day', async () => {
+      // The moved event keeps its array index, so without the created_at
+      // tiebreak the stable sort would place it by position, not server order.
+      const store = createTestStore();
+      store.setState({
+        events: [
+          event('moved', '2026-09-12', { createdAt: new Date(2026, 0, 1) }),
+          event('resident', '2026-10-31', { createdAt: new Date(2026, 0, 2) }),
+        ],
+      });
+      updateEvent.mockResolvedValue(event('moved', '2026-10-31', { createdAt: new Date(2026, 0, 1) }));
+
+      await store.getState().editEvent('moved', { eventDate: '2026-10-31' });
+
+      // 'moved' was created first, so among same-day rows it comes first —
+      // exactly where a reload would put it.
+      expect(store.getState().events.map((e) => e.id)).toEqual(['moved', 'resident']);
     });
 
     it('reports a zero-row write as a failure and leaves the list untouched', async () => {

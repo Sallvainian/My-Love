@@ -68,6 +68,8 @@ export interface CoupleEvent {
   userId: string;
   label: string;
   date: Date;
+  /** Server insert instant, used ONLY as the same-day tiebreak — never for calendar display. */
+  createdAt: Date;
   description: string | null;
   icon: EventIcon;
 }
@@ -190,6 +192,9 @@ function toCoupleEvent(row: SupabaseEventRecord): CoupleEvent | null {
     userId: row.user_id,
     label: row.label,
     date,
+    // An absolute instant compared ordinally, so `new Date(iso)` is safe here —
+    // the calendar-date trap above applies only to `event_date`.
+    createdAt: new Date(row.created_at),
     description: row.description,
     icon: isEventIcon(row.icon) ? row.icon : 'calendar',
   };
@@ -275,7 +280,8 @@ class EventsService {
    * @throws {EventWriteError} if `eventDate` is not a real calendar date — a
    *   `date` column would accept `infinity`, and one unreadable row leaves the
    *   whole list unsorted, so the value is refused here rather than stored
-   * @throws {SupabaseServiceError} if offline or the insert fails (RLS rejects a
+   * @throws {EventWriteError} if offline — no queue exists, so the write is lost
+   * @throws {SupabaseServiceError} if the insert fails (RLS rejects a
    *   `user_id` that is not the caller with 42501)
    */
   async createEvent(input: EventCreateInput): Promise<CoupleEvent> {
@@ -349,7 +355,8 @@ class EventsService {
    * @returns The updated event
    * @throws {EventWriteError} if the update matched no row — RLS filters a
    *   non-creator's write silently, so zero rows is the only signal there is
-   * @throws {SupabaseServiceError} if offline or the update fails
+   * @throws {EventWriteError} if offline — no queue exists, so the write is lost
+   * @throws {SupabaseServiceError} if the update fails
    */
   async updateEvent(eventId: string, updates: EventUpdateInput): Promise<CoupleEvent> {
     if (!isOnline()) {
@@ -415,7 +422,8 @@ class EventsService {
    *
    * @throws {EventWriteError} if the delete matched no row (same silent RLS
    *   filter as `updateEvent`)
-   * @throws {SupabaseServiceError} if offline or the delete fails
+   * @throws {EventWriteError} if offline — no queue exists, so the write is lost
+   * @throws {SupabaseServiceError} if the delete fails
    */
   async deleteEvent(eventId: string): Promise<void> {
     if (!isOnline()) {
