@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 import { SettingsSchema } from '../validation/schemas';
 import { createAppSlice } from './slices/appSlice';
 import { createAuthSlice } from './slices/authSlice';
+import { createEventsSlice } from './slices/eventsSlice';
 import { createInteractionsSlice } from './slices/interactionsSlice';
 import { createMessagesSlice } from './slices/messagesSlice';
 import { createMoodSlice } from './slices/moodSlice';
@@ -79,6 +80,7 @@ export const useAppStore = create<AppState>()(
       ...createPartnerSlice(set, get, api),
       ...createNotesSlice(set, get, api),
       ...createScriptureReadingSlice(set, get, api),
+      ...createEventsSlice(set, get, api),
     }),
     {
       name: 'my-love-storage',

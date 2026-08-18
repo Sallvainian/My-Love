@@ -1,0 +1,310 @@
+/**
+ * eventsSlice — what the caller of a write is told, and what the list looks like after
+ *
+ * `eventsService` throws, so every action here has a reason to report. The two
+ * things worth pinning:
+ *
+ * 1. **A write returns its own outcome.** Reading `eventsError` back off the
+ *    store after an await races every other write in the app, so a failed save
+ *    hands the message straight back to the caller as well as parking it in
+ *    `eventsError`. That is what lets the create form tell the user THIS event
+ *    did not save (CAP-7) instead of showing whatever the shared key holds.
+ * 2. **The list stays in date order.** Reads come back `event_date` ascending;
+ *    an added or re-dated event has to land in the right place, not at the end.
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { create, type StateCreator } from 'zustand';
+
+const getEvents = vi.fn();
+const createEvent = vi.fn();
+const updateEvent = vi.fn();
+const deleteEvent = vi.fn();
+
+vi.mock('../../../src/services/eventsService', () => ({
+  eventsService: {
+    getEvents: () => getEvents(),
+    createEvent: (input: unknown) => createEvent(input),
+    updateEvent: (eventId: string, updates: unknown) => updateEvent(eventId, updates),
+    deleteEvent: (eventId: string) => deleteEvent(eventId),
+  },
+}));
+
+import type { CoupleEvent } from '../../../src/services/eventsService';
+import { createEventsSlice, type EventsSlice } from '../../../src/stores/slices/eventsSlice';
+
+const USER_ID = 'USER-A-ID';
+
+type TestStore = EventsSlice & { userId: string | null };
+
+function createTestStore() {
+  const store = create<TestStore>()(createEventsSlice as unknown as StateCreator<TestStore>);
+  store.setState({ userId: USER_ID });
+  return store;
+}
+
+function event(id: string, isoDate: string, overrides: Partial<CoupleEvent> = {}): CoupleEvent {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return {
+    id,
+    userId: USER_ID,
+    label: id,
+    date: new Date(year, month - 1, day),
+    description: null,
+    icon: 'calendar',
+    ...overrides,
+  };
+}
+
+describe('eventsSlice', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('starts with an empty list, not loading, and no error', () => {
+    const store = createTestStore();
+    const state = store.getState();
+
+    expect(state.events).toEqual([]);
+    expect(state.eventsIsLoading).toBe(false);
+    expect(state.eventsError).toBeNull();
+  });
+
+  // ==========================================================================
+  // loadEvents
+  // ==========================================================================
+
+  describe('loadEvents', () => {
+    it('fills the list and releases the flag', async () => {
+      const loaded = [event('sooner', '2026-09-12'), event('later', '2026-12-25')];
+      getEvents.mockResolvedValue(loaded);
+      const store = createTestStore();
+
+      await store.getState().loadEvents();
+
+      expect(store.getState().events).toEqual(loaded);
+      expect(store.getState().eventsIsLoading).toBe(false);
+      expect(store.getState().eventsError).toBeNull();
+    });
+
+    it('raises the flag while the request is open', async () => {
+      let settle: (value: CoupleEvent[]) => void = () => {};
+      getEvents.mockReturnValue(
+        new Promise<CoupleEvent[]>((resolve) => {
+          settle = resolve;
+        })
+      );
+      const store = createTestStore();
+
+      const inFlight = store.getState().loadEvents();
+      expect(store.getState().eventsIsLoading).toBe(true);
+
+      settle([]);
+      await inFlight;
+      expect(store.getState().eventsIsLoading).toBe(false);
+    });
+
+    it('reports the failure, blanks the list and releases the flag', async () => {
+      const message =
+        "[EventsService.getEvents] Network error: Device is offline. " +
+        "Your changes will be synced when you're back online.";
+      getEvents.mockRejectedValue(new Error(message));
+      const store = createTestStore();
+      store.setState({ events: [event('stale', '2026-09-12')] });
+
+      await store.getState().loadEvents();
+
+      // Events are Supabase-only: a failed load means there is nothing to show,
+      // not that yesterday's copy is still true.
+      expect(store.getState().events).toEqual([]);
+      expect(store.getState().eventsError).toBe(message);
+      expect(store.getState().eventsIsLoading).toBe(false);
+    });
+
+    it('clears a previous error when it starts', async () => {
+      getEvents.mockResolvedValue([]);
+      const store = createTestStore();
+      store.setState({ eventsError: 'an older failure' });
+
+      await store.getState().loadEvents();
+
+      expect(store.getState().eventsError).toBeNull();
+    });
+  });
+
+  // ==========================================================================
+  // addEvent
+  // ==========================================================================
+
+  describe('addEvent', () => {
+    it('inserts the created event in date order and reports success', async () => {
+      const store = createTestStore();
+      store.setState({
+        events: [event('sooner', '2026-09-12'), event('later', '2026-12-25')],
+      });
+      const created = event('middle', '2026-10-31');
+      createEvent.mockResolvedValue(created);
+
+      const result = await store.getState().addEvent({
+        label: 'middle',
+        eventDate: '2026-10-31',
+        icon: 'plane',
+      });
+
+      expect(result).toEqual({ success: true });
+      expect(store.getState().events.map((e) => e.id)).toEqual(['sooner', 'middle', 'later']);
+      expect(store.getState().eventsError).toBeNull();
+    });
+
+    it('passes the signed-in user as the creator', async () => {
+      const store = createTestStore();
+      createEvent.mockResolvedValue(event('new', '2026-10-31'));
+
+      await store.getState().addEvent({ label: 'new', eventDate: '2026-10-31' });
+
+      expect(createEvent).toHaveBeenCalledWith({
+        userId: USER_ID,
+        label: 'new',
+        eventDate: '2026-10-31',
+      });
+    });
+
+    it('hands the reason back to the caller AND parks it, leaving the list alone', async () => {
+      const store = createTestStore();
+      const existing = [event('sooner', '2026-09-12')];
+      store.setState({ events: existing });
+      createEvent.mockRejectedValue(
+        new Error('[EventsService.createEvent] Permission denied - check Row Level Security policies')
+      );
+
+      const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
+
+      expect(result.success).toBe(false);
+      expect(result).toEqual({
+        success: false,
+        error: '[EventsService.createEvent] Permission denied - check Row Level Security policies',
+      });
+      expect(store.getState().eventsError).toBe(
+        '[EventsService.createEvent] Permission denied - check Row Level Security policies'
+      );
+      expect(store.getState().events).toEqual(existing);
+    });
+
+    it('reports an offline create as a failure rather than presenting it as saved', async () => {
+      // The service throws before issuing a request when the device is offline.
+      // CAP-7 is the whole point: the event must not appear in the list as if it
+      // had been saved, and the caller has to be told why.
+      //
+      // The message is the one `handleNetworkError` actually composes
+      // (`src/api/errorHandlers.ts:94-95`), copied verbatim rather than invented
+      // — this file mocks the service, so a made-up string would pass while
+      // documenting a message the app never emits. Its promise of a later sync
+      // is inherited from that shared helper and is not true for events, which
+      // have no offline queue; that is recorded as deferred work on the story.
+      const OFFLINE_MESSAGE =
+        "[EventsService.createEvent] Network error: Device is offline. " +
+        "Your changes will be synced when you're back online.";
+      const store = createTestStore();
+      createEvent.mockRejectedValue(new Error(OFFLINE_MESSAGE));
+
+      const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
+
+      expect(result).toEqual({ success: false, error: OFFLINE_MESSAGE });
+      expect(store.getState().eventsError).toBe(OFFLINE_MESSAGE);
+      expect(store.getState().events).toEqual([]);
+    });
+
+    it('refuses without a signed-in user and never reaches the service', async () => {
+      const store = createTestStore();
+      store.setState({ userId: null });
+
+      const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
+
+      expect(result).toEqual({ success: false, error: 'You must be signed in to add an event' });
+      expect(store.getState().eventsError).toBe('You must be signed in to add an event');
+      expect(createEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  // ==========================================================================
+  // editEvent
+  // ==========================================================================
+
+  describe('editEvent', () => {
+    it('replaces the event and re-sorts, because an edit can move the date', async () => {
+      const store = createTestStore();
+      store.setState({
+        events: [event('a', '2026-09-12'), event('b', '2026-10-31'), event('c', '2026-12-25')],
+      });
+      updateEvent.mockResolvedValue(event('a', '2026-11-30'));
+
+      const result = await store.getState().editEvent('a', { eventDate: '2026-11-30' });
+
+      expect(result).toEqual({ success: true });
+      expect(store.getState().events.map((e) => e.id)).toEqual(['b', 'a', 'c']);
+      expect(updateEvent).toHaveBeenCalledWith('a', { eventDate: '2026-11-30' });
+    });
+
+    it('reports a zero-row write as a failure and leaves the list untouched', async () => {
+      // RLS filters a non-creator's UPDATE silently — the service turns that
+      // into a throw, and the list must not pretend the edit landed.
+      const store = createTestStore();
+      const existing = [event('partners-event', '2026-09-12')];
+      store.setState({ events: existing });
+      updateEvent.mockRejectedValue(new Error('Event not found or not yours to edit'));
+
+      const result = await store.getState().editEvent('partners-event', { label: 'mine now' });
+
+      expect(result).toEqual({ success: false, error: 'Event not found or not yours to edit' });
+      expect(store.getState().eventsError).toBe('Event not found or not yours to edit');
+      expect(store.getState().events).toEqual(existing);
+    });
+  });
+
+  // ==========================================================================
+  // removeEvent
+  // ==========================================================================
+
+  describe('removeEvent', () => {
+    it('takes the event out of the list', async () => {
+      const store = createTestStore();
+      store.setState({ events: [event('a', '2026-09-12'), event('b', '2026-10-31')] });
+      deleteEvent.mockResolvedValue(undefined);
+
+      const result = await store.getState().removeEvent('a');
+
+      expect(result).toEqual({ success: true });
+      expect(store.getState().events.map((e) => e.id)).toEqual(['b']);
+    });
+
+    it('reports a zero-row delete as a failure and keeps the event on screen', async () => {
+      const store = createTestStore();
+      const existing = [event('partners-event', '2026-09-12')];
+      store.setState({ events: existing });
+      deleteEvent.mockRejectedValue(new Error('Event not found or not yours to delete'));
+
+      const result = await store.getState().removeEvent('partners-event');
+
+      expect(result).toEqual({ success: false, error: 'Event not found or not yours to delete' });
+      expect(store.getState().eventsError).toBe('Event not found or not yours to delete');
+      expect(store.getState().events).toEqual(existing);
+    });
+  });
+
+  // ==========================================================================
+  // clearEventsError
+  // ==========================================================================
+
+  describe('clearEventsError', () => {
+    it('clears a dismissed banner without touching the list', async () => {
+      const store = createTestStore();
+      const existing = [event('a', '2026-09-12')];
+      store.setState({ events: existing, eventsError: 'something failed' });
+
+      store.getState().clearEventsError();
+
+      expect(store.getState().eventsError).toBeNull();
+      expect(store.getState().events).toEqual(existing);
+    });
+  });
+});

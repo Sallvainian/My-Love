@@ -78,6 +78,9 @@ const EXPECTED_RESET: Record<string, unknown> = {
   pendingRetry: null,
   scriptureError: null,
   isInitialized: false,
+  events: [],
+  eventsIsLoading: false,
+  eventsError: null,
 };
 
 /** Identifiers that must not survive a sign-out */
