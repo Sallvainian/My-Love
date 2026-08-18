@@ -34,6 +34,18 @@ jobs:
         with:
           fetch-depth: 1
 
+      # The review agent's sandbox has no network to the npm registry, so
+      # `npm ci` can never succeed once the agent is running. Install here,
+      # where the runner has network — the agent then runs `npm run test:unit`
+      # and `npm run typecheck` against a ready node_modules, offline.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@9d7150bc8a3dae8149739a88019d192b579ad90c # v1.0.193
