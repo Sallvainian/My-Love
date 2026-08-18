@@ -113,6 +113,40 @@ describe('PhotoViewer focus', () => {
     expect(screen.queryByAltText('second photo')).not.toBeInTheDocument();
   });
 
+  it('moves focus into the delete confirmation when it opens', async () => {
+    // Without this a keyboard user's focus stays on the trash button behind the
+    // overlay, and the confirmation's own buttons are not reachable.
+    render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }));
+    });
+  });
+
+  it('Escape dismisses the delete confirmation, not the viewer', async () => {
+    // The confirmation renders inside the trap's container -- stacked visually,
+    // not in the DOM tree -- so Escape bubbles to useFocusTrap's listener. It
+    // must close the dialog and return focus to the trash button, not tear the
+    // whole viewer down around an open confirmation.
+    const onClose = vi.fn();
+    render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={onClose} />);
+
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+
+    expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByLabelText('Delete photo'));
+
+    // A second Escape, with the confirmation gone, closes the viewer.
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the container reachable by focus, or Escape dies on the first click', () => {
     // Structural, and deliberately so. This viewer has exactly four focusable
     // controls; the photo, the drag surface, the caption bar and the backdrop are
