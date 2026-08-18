@@ -178,6 +178,12 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
    */
   editEvent: async (eventId: string, updates: EventUpdateInput) => {
     const requestedBy = get().userId;
+    if (!requestedBy) {
+      const errorMsg = 'You must be signed in to edit an event';
+      set({ eventsError: errorMsg });
+      return { success: false, error: errorMsg };
+    }
+
     set({ eventsError: null });
 
     try {
@@ -205,6 +211,12 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
    */
   removeEvent: async (eventId: string) => {
     const requestedBy = get().userId;
+    if (!requestedBy) {
+      const errorMsg = 'You must be signed in to delete an event';
+      set({ eventsError: errorMsg });
+      return { success: false, error: errorMsg };
+    }
+
     set({ eventsError: null });
 
     try {
