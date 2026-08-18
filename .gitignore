@@ -10,7 +10,6 @@ gha-creds-*.json
 # Test failure reports
 failures-ai.md
 playwright-results.json
-_bmad-output/
 
 # Build-analysis output. `npm run perf:build` recreates docs/performance/ and
 # writes perf-build.log there; perf-bundle-report.mjs writes bundle-report.md.
