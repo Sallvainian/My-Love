@@ -105,7 +105,10 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
         set({ eventsIsLoading: false });
         return;
       }
-      set({ events: [], eventsError: errorMsg, eventsIsLoading: false });
+      // The last-good list survives a failed refresh: events are Supabase-only
+      // with no mirror to repopulate from, so blanking here would erase data
+      // the user is looking at. Matches notesSlice and moodSlice.
+      set({ eventsError: errorMsg, eventsIsLoading: false });
     }
   },
 
@@ -127,7 +130,8 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     try {
       const created = await eventsService.createEvent({ ...input, userId: requestedBy });
       // The new event belongs to the previous account; it must not appear in
-      // this one's list.
+      // this one's list. success reports the durable write only — this
+      // session's state is deliberately untouched.
       if (get().userId !== requestedBy) return { success: true };
       set((state) => ({ events: sortByDate([created, ...state.events]) }));
       logger.debug('[EventsSlice] Added event:', created.id);
@@ -151,6 +155,8 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
 
     try {
       const updated = await eventsService.updateEvent(eventId, updates);
+      // success reports the durable write only — the account changed, so this
+      // session's state is deliberately untouched.
       if (get().userId !== requestedBy) return { success: true };
       // Re-sorted, not just replaced: an edit may move the date.
       set((state) => ({
@@ -176,6 +182,8 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
 
     try {
       await eventsService.deleteEvent(eventId);
+      // success reports the durable write only — the account changed, so this
+      // session's state is deliberately untouched.
       if (get().userId !== requestedBy) return { success: true };
       set((state) => ({ events: state.events.filter((event) => event.id !== eventId) }));
       logger.debug('[EventsSlice] Removed event:', eventId);
