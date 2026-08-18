@@ -114,6 +114,14 @@ begin
     -- forced before this migration would still be handed back by the reuse
     -- branch, reopening the same channel.
     --
+    -- Accepted consequence of that ordering: a couple who unlinks can no longer
+    -- REJOIN an in-progress together lobby through this RPC, only read the row
+    -- they are already a member of. That is the right trade against re-serving a
+    -- forced session, and nothing reachable regresses -- the Together button is
+    -- disabled unless partnerStatus is 'linked'
+    -- (src/components/scripture-reading/containers/ScriptureOverview.tsx:509) --
+    -- and scripture_convert_to_solo remains available to the stranded caller.
+    --
     -- public. qualification is required: this function is SET search_path TO ''.
     if p_partner_id is distinct from public.get_my_partner_id() then
       raise exception 'Together mode requires your linked partner.'
@@ -397,7 +405,15 @@ begin
   -- 'none' is only trusted when session_user is genuinely an admin login;
   -- service_role is trusted on the role GUC alone, because for a legitimate
   -- service-key request session_user is 'authenticator' too.
-  v_caller_role := current_setting('role', true);
+  --
+  -- The coalesce is deliberate belt-and-braces, not dead code. current_setting's
+  -- missing_ok signature is NULL-able, and `if not (NULL in (...) or ...)` is
+  -- NULL, which plpgsql treats as false -- the RAISE would be skipped and the
+  -- call would proceed. That is the exact fall-through that made
+  -- accept_partner_request exploitable, and a guard whose comment says "fail
+  -- closed" should not carry it, unreachable or not. '' is in no allow-list, so
+  -- a NULL denies.
+  v_caller_role := coalesce(current_setting('role', true), '');
   if not (
        v_caller_role in ('postgres', 'service_role')
        or (v_caller_role = 'none' and session_user in ('postgres', 'supabase_admin'))
