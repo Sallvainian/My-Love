@@ -1,0 +1,42 @@
+- id: "1"
+  title: Events table, security policies, and database tests
+  description: >-
+    Create public.events per data-model.md — the date column, row level
+    security enabled in the creating migration, the four creator-write /
+    partner-read policies, and the grants — then regenerate types. A new
+    numbered pgTAP file asserts the exact policy set; foundation for CAP-1,
+    CAP-2, CAP-3 and CAP-6, nothing visible ships.
+- id: "2"
+  title: Events service and store slice
+  description: >-
+    Build eventsService and eventsSlice per integration-points.md sections
+    1-2, on the throwing error convention CAP-7 needs. Every events state key
+    joins signedOutState() in the same commit (CAP-6), nothing is persisted,
+    and every post-await set() re-checks the captured userId.
+- id: "3"
+  title: Home dashboard reads events from the store
+  description: >-
+    Replace the hardcoded visits map at App.tsx:547-555 with store-driven,
+    past-filtered event cards and delete the visits array, leaving the
+    birthday, wedding and time-together cards untouched (CAP-4). Auto-hide
+    follows CAP-3's local-midnight rule, the "Event passed" branch is
+    retired, and the Home half of CAP-10 renders instead of a gap.
+  done_checkpoint: true
+- id: "4"
+  title: Hamburger tray, Settings view, and sign-out consolidation
+  description: >-
+    Retire the bottom bar for the focus-trapped hamburger tray with badge
+    slots, register the settings view at the five sites, consolidate sign-out
+    into Settings, and sweep the five hardcoded offsets (CAP-8, CAP-9, the
+    reach-Settings half of CAP-5), rewriting the nav tests per navigation.md.
+    Includes both resolved open questions: viewport-fit=cover plus the real
+    safe-area classes, and aria-current on the active destination.
+  spec_checkpoint: true
+  done_checkpoint: true
+- id: "5"
+  title: Manage events in Settings
+  description: >-
+    Build the events CRUD in Settings per integration-points.md section 6 —
+    add, edit and delete with visible save errors and the empty state (CAP-1,
+    CAP-2, CAP-7, the Settings half of CAP-10). Completes CAP-5 end to end.
+  done_checkpoint: true

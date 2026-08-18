@@ -1,0 +1,95 @@
+- id: "1"
+  title: Per-user message-removal table and filtered read path
+  description: >-
+    Create the per-user removal table with RLS, its policies, and the unique
+    key, plus the server-side read path that excludes removed rows before the
+    limit. Covers CAP-2 and CAP-3 at the data layer; no client change.
+  spec_checkpoint: true
+  done_checkpoint: true
+  invoke_dev_with: >-
+    ENABLE ROW LEVEL SECURITY in the same migration that creates the table.
+    supabase/migrations/20260725170000_grant_api_roles_on_public.sql:35 grants
+    ALL on all public tables to anon and authenticated, and :40-41 extends that
+    to future tables, so a new table without RLS is open to every authenticated
+    user. Policies scope a row to its owning auth.uid(), and to a love_notes row
+    that owner is a party to (auth.uid() = from_user_id OR to_user_id).
+
+    Decide view vs RPC for the filtered read and record the reason in the
+    migration comment. PostgREST cannot express the anti-join as a plain query.
+    A view must declare security_invoker = true; an RPC must not be SECURITY
+    DEFINER over love_notes. Either way a third party must still get zero rows.
+
+    UNIQUE (user_id, note_id) — that pair is the natural key. Do not introduce a
+    client-generated idempotency key; unlike the love_notes send path, the row
+    being referenced already has a server id.
+
+    Add pgTAP coverage in a new supabase/tests/database/ file, including a case
+    asserting a third user reads zero rows through the new path.
+    02_rls_policies.sql asserts policies_are only for the five scripture_*
+    tables (:70-92), so it needs no edit. Do not add, rename or drop any storage
+    policy — 16_photos_storage_update_policy.sql:17-32 asserts storage.objects
+    carries exactly nine.
+
+    Never PERFORM realtime.send() inside an RPC. Do not touch the love_notes
+    row itself: no UPDATE policy, no delete, and nothing that reaches
+    deleteLoveNoteImage (src/services/loveNoteImageService.ts:302).
+- id: "2"
+  title: Record and read message removals through the store
+  description: >-
+    Add the store action that writes a removal and move both note fetch paths
+    onto the filtered read, keeping pagination and the end-of-history flag
+    honest. Covers CAP-1 persistence and CAP-4; no UI in this story.
+  invoke_dev_with: >-
+    Both read paths move onto the filtered query, not just the paginated one:
+    fetchNotes queries at src/stores/slices/notesSlice.ts:209-216 and sets
+    notesHasMore at :236; fetchOlderNotes queries at :288-295 and sets it at
+    :318. Both derive the flag as (data?.length || 0) === limit, so filtering
+    after the response shrinks pages and makes the flag lie.
+
+    The write is an idempotent upsert on (user_id, note_id) with
+    ignoreDuplicates: true, so a retried removal converges on one row.
+
+    Re-check the captured user id after every await before set(), clearing any
+    loading flag it set first — the shape at notesSlice.ts:228-231. Add any new
+    account-scoped field to signedOutState() in authSlice.ts in the same commit.
+
+    When a removal empties the loaded window while notesHasMore is still true,
+    refill from the server before the list renders.
+    src/components/love-notes/MessageList.tsx:335 early-returns the empty state
+    before the <List> whose onRowsRendered is the only caller of onLoadMore, so
+    an emptied window would strand the user with unread history behind it.
+
+    Introduce no Realtime work: no channel, no broadcast. Other sessions pick
+    the removal up on their next fetch.
+- id: "3"
+  title: Removal affordance and confirmation on the message bubble
+  description: >-
+    Add the per-message control and its confirmation dialog, so a removal is
+    deliberate and the message leaves the thread immediately. Covers CAP-1's
+    interactive half and CAP-5.
+  invoke_dev_with: >-
+    Gate the affordance on the absence of tempId, not on the sending flag. An
+    optimistic note's id IS the temp string (src/stores/slices/notesSlice.ts:416
+    builds it, :434 assigns id: tempId), and a failed send keeps it — :509-511
+    sets error: true without replacing the id. Both states must be excluded;
+    writing a temp- string into a UUID reference would fail.
+
+    The control must add no layout height to the bubble, or calculateRowHeight
+    (src/components/love-notes/MessageList.tsx:155-182) must be updated in the
+    same change — react-window positions rows from its hand-computed return
+    value. Render any menu or popover outside the virtualized scroll container,
+    as FullScreenImageViewer already does from LoveNoteMessage.tsx:308-313.
+
+    Follow the src/components/PhotoDeleteConfirmation/ pattern rather than a
+    native confirm(). The message must leave the acting session's thread as soon
+    as the confirmation is accepted — no reload, no manual refetch — and still
+    be absent after a reload. There is no undo and no restore surface.
+
+    The empty state reached by removing every visible message must not assert
+    the conversation never happened; the existing "No love notes yet" copy
+    (MessageList.tsx:346) is false in that case.
+
+    New E2E goes in tests/e2e/, importing { test, expect } from
+    tests/support/merged-fixtures.ts, never from @playwright/test. The spec must
+    not link or unlink partners or null a shared row at teardown — those rows
+    belong to other workers in the per-worker pool.
