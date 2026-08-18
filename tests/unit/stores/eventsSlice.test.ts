@@ -367,6 +367,19 @@ describe('eventsSlice', () => {
       expect(store.getState().events.map((e) => e.id)).toEqual(['moved', 'resident']);
     });
 
+    it('refuses without a signed-in user and never reaches the service', async () => {
+      // Mirrors addEvent's bail: without it the service call went out signed
+      // out, and the failure was parked in eventsError for a null session.
+      const store = createTestStore();
+      store.setState({ userId: null });
+
+      const result = await store.getState().editEvent('a', { label: 'x' });
+
+      expect(result).toEqual({ success: false, error: 'You must be signed in to edit an event' });
+      expect(store.getState().eventsError).toBe('You must be signed in to edit an event');
+      expect(updateEvent).not.toHaveBeenCalled();
+    });
+
     it('reports a zero-row write as a failure and leaves the list untouched', async () => {
       // RLS filters a non-creator's UPDATE silently — the service turns that
       // into a throw, and the list must not pretend the edit landed.
@@ -397,6 +410,17 @@ describe('eventsSlice', () => {
 
       expect(result).toEqual({ success: true });
       expect(store.getState().events.map((e) => e.id)).toEqual(['b']);
+    });
+
+    it('refuses without a signed-in user and never reaches the service', async () => {
+      const store = createTestStore();
+      store.setState({ userId: null });
+
+      const result = await store.getState().removeEvent('a');
+
+      expect(result).toEqual({ success: false, error: 'You must be signed in to delete an event' });
+      expect(store.getState().eventsError).toBe('You must be signed in to delete an event');
+      expect(deleteEvent).not.toHaveBeenCalled();
     });
 
     it('reports a zero-row delete as a failure and keeps the event on screen', async () => {
