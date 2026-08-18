@@ -5,7 +5,6 @@
  * - Dating start date (count-up timer)
  * - Birthday information (countdown with age calculation)
  * - Wedding date (countdown or placeholder)
- * - Visit dates (countdown to planned visits)
  */
 
 export interface BirthdayInfo {
@@ -43,22 +42,6 @@ export const RELATIONSHIP_DATES = {
 
   // Wedding date not yet set
   wedding: null,
-
-  // Planned visits (using local dates to avoid UTC timezone issues)
-  visits: [
-    {
-      id: 'visit-1',
-      label: 'Next Visit',
-      date: new Date(2025, 10, 26), // November 26, 2025 (month is 0-indexed)
-      description: 'November visit',
-    },
-    {
-      id: 'visit-2',
-      label: 'Following Visit',
-      date: new Date(2025, 11, 20), // December 20, 2025
-      description: 'December visit',
-    },
-  ],
 };
 
 /**
@@ -98,12 +81,10 @@ export interface TimeDifference {
   minutes: number;
   seconds: number;
   totalMilliseconds: number;
-  isPast: boolean;
 }
 
 export function calculateTimeDifference(from: Date, to: Date): TimeDifference {
   const diff = to.getTime() - from.getTime();
-  const isPast = diff < 0;
   const absDiff = Math.abs(diff);
 
   const seconds = Math.floor(absDiff / 1000) % 60;
@@ -120,6 +101,5 @@ export function calculateTimeDifference(from: Date, to: Date): TimeDifference {
     minutes,
     seconds,
     totalMilliseconds: absDiff,
-    isPast,
   };
 }

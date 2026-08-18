@@ -1,8 +1,14 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
-import { BirthdayCountdown, EventCountdown, TimeTogether } from './components/RelationshipTimers';
+import {
+  BirthdayCountdown,
+  EventCountdown,
+  getCalendarDaysDiff,
+  getEventsSlotView,
+  TimeTogether,
+} from './components/RelationshipTimers';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { RELATIONSHIP_DATES } from './config/relationshipDates';
 import { useShallow } from 'zustand/react/shallow';
@@ -65,18 +71,20 @@ const WELCOME_DISPLAY_INTERVAL = 3600000; // 60 minutes in milliseconds
 const LAST_WELCOME_VIEW_KEY = 'lastWelcomeView';
 
 function App() {
-  const { settings, isLoading, currentView, isOnline } = useAppStore(
+  const { settings, isLoading, currentView, isOnline, events } = useAppStore(
     useShallow((s) => ({
       settings: s.settings,
       isLoading: s.isLoading,
       currentView: s.currentView,
       isOnline: s.syncStatus.isOnline,
+      events: s.events,
     }))
   );
   const initializeApp = useAppStore((s) => s.initializeApp);
   const setView = useAppStore((s) => s.setView);
   const syncPendingMoods = useAppStore((s) => s.syncPendingMoods);
   const updateSyncStatus = useAppStore((s) => s.updateSyncStatus);
+  const loadEvents = useAppStore((s) => s.loadEvents);
   const hasInitialized = useRef(false);
 
   // Story 6.7: Authentication state
@@ -84,6 +92,15 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [needsDisplayName, setNeedsDisplayName] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // Story 3 (dynamic events): which account's first loadEvents() has come back.
+  // Home's events slot stays empty rather than showing the "no upcoming events"
+  // placeholder until this matches the current user, so the placeholder never
+  // flashes before the first response — and it re-arms both for the next
+  // account on a switch and, via the sign-out branch below, for a re-sign-in of
+  // the same account. Declared here, alongside the other auth state, because
+  // that sign-out reset runs in the auth listener further down.
+  const [eventsSettledForUserId, setEventsSettledForUserId] = useState<string | null>(null);
 
   // Helper function to check if welcome splash should be shown
   const shouldShowWelcome = (): boolean => {
@@ -242,6 +259,16 @@ function App() {
         } else {
           clearStoreAuth();
           setNeedsDisplayName(false);
+          // Re-arm Home's events gate. App stays mounted across a sign-out —
+          // the `!session` branch returns the login screen from inside this
+          // component — while clearStoreAuth empties `events` via
+          // signedOutState() (authSlice.ts). Without this reset, signing back
+          // in as the SAME account finds eventsSettledForUserId already equal
+          // to the user id, so firstEventsLoadSettled is true against an empty
+          // list and the "no upcoming events" placeholder paints before the
+          // refetch lands. Keying the load effect on the user id covers an
+          // account switch; only this covers a re-sign-in of the same account.
+          setEventsSettledForUserId(null);
           logger.debug('[App] Auth state changed: signed out');
         }
       }
@@ -366,6 +393,50 @@ function App() {
       logger.debug('[App] Periodic sync interval cleared');
     };
   }, [syncPendingMoods, isOnline, session]);
+
+  // Story 3 (dynamic events): load the couple's countdown events on first
+  // Home render and on every later return to Home while signed in — covers
+  // both "first load" and "B's next load of Home" (CAP-1). No live
+  // subscription: freshness is reload-based only, by design.
+  //
+  // Depends on the signed-in user's id, never `session` itself and never a
+  // bare boolean. onAuthStateChange (sessionService.ts) invokes its callback —
+  // and therefore setSession — on every auth event, including periodic
+  // TOKEN_REFRESHED, each producing a new Session object reference, so keying
+  // on `session` would re-fire loadEvents() on every token refresh. A bare
+  // Boolean(session) fixes that but breaks the opposite case: signing in over
+  // a live session routes through setAuthUser's account-switch branch
+  // (authSlice.ts), which empties `events` via signedOutState(), while
+  // `currentView` is left at 'home' — so with a boolean key neither dependency
+  // changes, loadEvents() never re-fires, and the new account sits on the
+  // empty-state placeholder until it navigates away and back. The user id is
+  // stable across token refreshes and changes on exactly that switch.
+  const authUserId = session?.user?.id ?? null;
+
+  const firstEventsLoadSettled =
+    eventsSettledForUserId !== null && eventsSettledForUserId === authUserId;
+
+  useEffect(() => {
+    if (!authUserId || currentView !== 'home') return;
+
+    let cancelled = false;
+    void loadEvents().finally(() => {
+      if (!cancelled) setEventsSettledForUserId(authUserId);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId, currentView, loadEvents]);
+
+  // Bumped when a card retires itself at local midnight, purely to re-run the
+  // filter and slot decision below. Not a timer of its own: it rides the
+  // one-second interval EventCountdown already runs, so the Never rule against
+  // a dedicated midnight timer still holds. Without it, the last upcoming event
+  // rolling over removes its own card while `upcomingEvents` still counts it,
+  // and the slot shows neither a card nor the placeholder.
+  const [, setRetiredEventTick] = useState(0);
+  const handleEventRetired = useCallback(() => setRetiredEventTick((tick) => tick + 1), []);
 
   // Part 3: Service Worker Background Sync listener
   // Story 1.5: Enhanced to show sync completion feedback (AC-1.5.4)
@@ -509,6 +580,22 @@ function App() {
     );
   }
 
+  // Story 3 (dynamic events): only events that have not yet passed at the
+  // viewer's own local midnight (CAP-3), reusing `getCalendarDaysDiff` — the
+  // same comparison EventCountdown already trusts — rather than re-deriving
+  // it. `events` is already sorted soonest-first by eventsSlice; no re-sort.
+  // One clock reading for the whole list. getCalendarDaysDiff takes `now` for
+  // exactly this reason: called without it, every event samples its own
+  // `new Date()`, so a filter pass straddling a midnight tick can judge two
+  // same-day events against different days.
+  const now = new Date();
+  const upcomingEvents = events.filter((event) => getCalendarDaysDiff(event.date, now) >= 0);
+  const eventsSlotView = getEventsSlotView(
+    events.length,
+    upcomingEvents.length,
+    firstEventsLoadSettled
+  );
+
   // Story 1.4 & 4.1/4.2 & 6.2 & 6.4: Render home, photos, mood, or partner view based on navigation
   return (
     <ErrorBoundary>
@@ -528,7 +615,7 @@ function App() {
               {/* Time Together - replaces Day 37 Together header */}
               <TimeTogether />
 
-              {/* Countdown timers grid: Birthdays (left) | Wedding+Visits (right) */}
+              {/* Countdown timers grid: Birthdays (left) | Wedding+Events (right) */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {/* Left column - Birthdays */}
                 <div className="space-y-4">
@@ -536,7 +623,7 @@ function App() {
                   <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.gracie} />
                 </div>
 
-                {/* Right column - Wedding & Visits */}
+                {/* Right column - Wedding & Events */}
                 <div className="space-y-4">
                   <EventCountdown
                     label="Wedding"
@@ -544,15 +631,29 @@ function App() {
                     date={RELATIONSHIP_DATES.wedding}
                     placeholderText="Date TBD"
                   />
-                  {RELATIONSHIP_DATES.visits.map((visit) => (
-                    <EventCountdown
-                      key={visit.id}
-                      label={visit.label}
-                      icon="plane"
-                      date={visit.date}
-                      description={visit.description}
-                    />
-                  ))}
+                  {eventsSlotView === 'hidden' ? null : eventsSlotView === 'empty' ? (
+                    <div
+                      className="rounded-2xl border-2 border-gray-200 bg-white p-4 text-center shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                      data-testid="events-empty-placeholder"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        No upcoming events yet.
+                      </p>
+                    </div>
+                  ) : (
+                    upcomingEvents.map((event) => (
+                      <EventCountdown
+                        key={event.id}
+                        label={event.label}
+                        icon={event.icon}
+                        date={event.date}
+                        description={event.description ?? undefined}
+                        onRetire={handleEventRetired}
+                      />
+                    ))
+                  )}
                 </div>
               </div>
 
