@@ -16,6 +16,7 @@
  */
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { LoveNote } from '../../types/models';
 
@@ -23,18 +24,26 @@ interface NoteRemoveConfirmationProps {
   note: LoveNote;
   onClose: () => void;
   onConfirmRemove: (noteId: string) => Promise<void>;
+  /**
+   * Where focus goes when the control that opened this dialog does not survive
+   * the removal. Owned by LoveNotes rather than found in the DOM, because the
+   * element has to outlive the thread it belongs to -- see the cleanup below.
+   */
+  fallbackFocusRef: RefObject<HTMLElement | null>;
 }
 
 export function NoteRemoveConfirmation({
   note,
   onClose,
   onConfirmRemove,
+  fallbackFocusRef,
 }: NoteRemoveConfirmationProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const isRemovingRef = useRef(false);
+  const removalSucceededRef = useRef(false);
 
   // useFocusTrap lists onEscape in its effect deps and re-focuses initialFocusRef
   // on every run, so any change of identity re-arms the trap and drags focus back
@@ -75,6 +84,44 @@ export function NoteRemoveConfirmation({
     }
   }, [error, isRemoving]);
 
+  // Only the fallback lives here. useFocusTrap already restores the opener when
+  // the trap goes away; this covers the case unique to a removal, where there is
+  // no opener left to go back to -- the control was on the row that just went.
+  //
+  // Gated on the removal having succeeded, NOT on whether the opener is still in
+  // the document. An earlier version captured document.activeElement and asked
+  // `opener.isConnected` at cleanup, which is not a sound signal: React runs
+  // effect cleanups against a DOM it has not finished mutating, so the answer
+  // depends on where the opener sat in the tree. Measured both ways -- with the
+  // trash button as a direct sibling of the dialog it read false (fallback fired,
+  // correctly), but with the button inside the list container that MessageList
+  // swaps out for its empty state it read true, the guard bailed, and focus
+  // landed on <body>. That is the last-note removal: the case the fallback exists
+  // for, silently broken. Whether the user confirmed is something this component
+  // knows for certain, so it decides on that instead.
+  //
+  // A passive effect, and declared after useFocusTrap so its cleanup runs second.
+  // That ordering is load-bearing, not a nicety: after a removal the hook's
+  // restore does NOT reliably no-op (as measured above, the opener can still
+  // read isConnected at cleanup time) -- it may focus the doomed opener, and
+  // this cleanup, running second, is what overwrites that with the fallback.
+  // Swapping the declaration order of the useFocusTrap call and this effect
+  // would regress the last-note case with no test-visible change here.
+  useEffect(() => {
+    return () => {
+      if (!removalSucceededRef.current) return;
+      // Reading the ref at cleanup is the point, not an oversight. The rule below
+      // wants the node copied in at effect time; doing that would re-freeze a DOM
+      // node the way the version this replaced did, which is what broke the
+      // last-note case.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      const fallback = fallbackFocusRef.current;
+      if (fallback?.isConnected) {
+        fallback.focus();
+      }
+    };
+  }, [fallbackFocusRef]);
+
   const handleRemove = async () => {
     try {
       setIsRemoving(true);
@@ -89,6 +136,7 @@ export function NoteRemoveConfirmation({
       panelRef.current?.focus();
 
       await onConfirmRemove(note.id);
+      removalSucceededRef.current = true;
       onClose();
     } catch (err) {
       console.error('[NoteRemoveConfirmation] Failed to remove note:', err);

@@ -7,11 +7,16 @@ describe('getRelativeTime', () => {
   });
 
   it('returns "Just now" for timestamps < 1 minute ago', () => {
+    // Pinned: day boundaries are calendar-based, so a bare "30 seconds ago"
+    // reads "Yesterday" whenever the suite runs in the first 30s after midnight.
+    vi.setSystemTime(new Date(2026, 2, 15, 12, 0, 0));
     const timestamp = new Date(Date.now() - 30000).toISOString();
     expect(getRelativeTime(timestamp)).toBe('Just now');
   });
 
   it('returns minutes for timestamps < 1 hour ago', () => {
+    // Pinned: a bare "15 minutes ago" is yesterday before 00:15 local.
+    vi.setSystemTime(new Date(2026, 2, 15, 12, 0, 0));
     const timestamp = new Date(Date.now() - 15 * 60000).toISOString();
     expect(getRelativeTime(timestamp)).toBe('15m ago');
   });
