@@ -103,6 +103,12 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     // — so it succeeds and its write lands after clearAuth, putting the previous
     // account's events back on screen for whoever signs in next.
     const requestedBy = get().userId;
+    // Bail before raising the flag: the null -> signed-in transition is the
+    // one auth path that never passes through signedOutState() (authSlice
+    // resets only on an account switch or a sign-out), so a load captured at
+    // null that resolved after sign-in would leave eventsIsLoading stranded
+    // true with nothing due to clear it.
+    if (!requestedBy) return;
     const loadId = ++latestLoadId;
     set({ eventsIsLoading: true, eventsError: null });
 
@@ -111,7 +117,9 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       // Touch nothing: the account transition itself went through
       // discardAccountState -> signedOutState(), which already reset every
       // events key, flag included. Writing the flag here instead would clear a
-      // successor account's own live spinner mid-load.
+      // successor account's own live spinner mid-load. The early null bail is
+      // what makes this sound: with a non-null requestedBy, every mismatch
+      // crossed a sign-out or an account switch, and both run that reset.
       if (get().userId !== requestedBy) return;
       // A newer same-user load owns the flag and the list now.
       if (loadId !== latestLoadId) return;

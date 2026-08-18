@@ -131,6 +131,22 @@ describe('eventsSlice', () => {
       expect(store.getState().eventsError).toBeNull();
     });
 
+    it('does nothing without a signed-in user, so no flag can strand', async () => {
+      // The null -> signed-in transition never passes through signedOutState()
+      // (authSlice resets only on an account switch or a sign-out), so a load
+      // captured at null that resolved after sign-in would have left
+      // eventsIsLoading stuck true with nothing due to clear it. Bailing
+      // before the flag is raised closes the only path into that state.
+      const store = createTestStore();
+      store.setState({ userId: null });
+
+      await store.getState().loadEvents();
+
+      expect(getEvents).not.toHaveBeenCalled();
+      expect(store.getState().eventsIsLoading).toBe(false);
+      expect(store.getState().eventsError).toBeNull();
+    });
+
     it('lets the newer of two overlapping same-user loads win, whatever the order', async () => {
       // A mount effect plus a manual refresh can overlap for the SAME user, so
       // the identity guard sees nothing wrong with either. The request token is
