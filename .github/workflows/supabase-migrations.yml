@@ -43,23 +43,24 @@ jobs:
           echo "✅ All migrations applied successfully"
           echo "migration_status=success" >> $GITHUB_OUTPUT
 
-      - name: Validate RLS policies
+      - name: Type-check plpgsql function bodies
         run: |
-          echo "🔒 Validating RLS policies..."
-
-          # Check for overly permissive policies (qual = true without proper restrictions)
-          PERMISSIVE_POLICIES=$(supabase db lint --level warning 2>/dev/null | grep -i "rls" || true)
-
-          if [ -n "$PERMISSIVE_POLICIES" ]; then
-            echo "⚠️ RLS policy warnings detected:"
-            echo "$PERMISSIVE_POLICIES"
-          else
-            echo "✅ No RLS policy warnings"
-          fi
-
-      - name: Check for security advisories
-        run: |
-          echo "🛡️ Running security check..."
+          echo "🔎 Running plpgsql_check over public..."
+          # `supabase db lint` is plpgsql_check. It type-checks function bodies
+          # and nothing else. It is NOT the Supabase advisor linter: it emits no
+          # 00xx lint, so it can never report rls_enabled_no_policy,
+          # security_definer_view, or the security_definer_function_executable
+          # pair -- and no CLI command can. Those exist only in the dashboard and
+          # the management API, so CI cannot gate on them.
+          #
+          # A step here used to grep this command's output for "rls" and print
+          # "No RLS policy warnings". plpgsql_check never emits that substring,
+          # so the check passed unconditionally and validated nothing; it was
+          # removed rather than repaired. RLS and policy shape are asserted for
+          # real by the pgTAP suite -- `policies_are` pins the exact policy set
+          # per table -- which runs as `supabase test db` in the db-tests job of
+          # test.yml, on every PR that changes a non-documentation file.
+          #
           # --fail-on is load-bearing: without it db lint exits 0 no matter what
           # it finds (the old `|| true` here doubly guaranteed that, so this step
           # could never fail). --schema public because the pgTAP extension the
