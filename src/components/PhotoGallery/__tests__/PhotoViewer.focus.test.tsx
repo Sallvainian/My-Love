@@ -83,9 +83,32 @@ describe('PhotoViewer focus', () => {
       </>
     );
 
-    const overlay = await screen.findByTestId('photo-viewer-overlay');
-    fireEvent.keyDown(overlay, { key: 'Escape' });
+    // Fire from where focus actually is, not from a node picked by the test.
+    // useFocusTrap binds keydown to the container, so an event dispatched on the
+    // container directly would pass whether or not focus could ever get there.
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('keeps the container reachable by focus, or Escape dies on the first click', () => {
+    // Structural, and deliberately so. This viewer has exactly four focusable
+    // controls; the photo, the drag surface, the caption bar and the backdrop are
+    // all non-focusable, so clicking any of them in a browser blurs to <body>.
+    // useFocusTrap listens on the container, <body> is its ancestor, and keydown
+    // bubbles upward -- so once focus lands on <body> the listener never sees
+    // another key and both Escape and the Tab cycle are dead for the rest of the
+    // session. tabindex="-1" makes the container click-focusable, so those clicks
+    // land on it instead and the listener keeps receiving events.
+    //
+    // Asserted as an attribute because the behaviour cannot be reproduced here:
+    // happy-dom's focus() does not enforce focusability (it will focus a plain
+    // <div>), and it does not implement the browser's click-to-nearest-focusable
+    // -ancestor rule at all, so a click-then-Escape test would pass with the
+    // attribute removed. The browser-level check belongs in E2E.
+    render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+
+    expect(screen.getByTestId('photo-viewer-overlay')).toHaveAttribute('tabindex', '-1');
   });
 });
