@@ -38,6 +38,7 @@ interface MessageRowCustomProps {
   userName: string;
   partnerName: string;
   onRetry?: (tempId: string) => void;
+  onRequestRemove?: (note: LoveNote) => void;
 }
 
 /**
@@ -59,6 +60,7 @@ function MessageRow({
   userName,
   partnerName,
   onRetry,
+  onRequestRemove,
 }: {
   index: number;
   style: React.CSSProperties;
@@ -96,6 +98,7 @@ function MessageRow({
         isOwnMessage={isOwnMessage}
         senderName={senderName}
         onRetry={onRetry}
+        onRequestRemove={onRequestRemove}
       />
     </div>
   );
@@ -118,6 +121,8 @@ export interface MessageListProps {
   hasMore?: boolean;
   /** Callback when user clicks retry on a failed message (Story 2.2) */
   onRetry?: (tempId: string) => void;
+  /** Callback when the user asks to remove a message from their own history */
+  onRequestRemove?: (note: LoveNote) => void;
 }
 
 /**
@@ -196,6 +201,7 @@ export function MessageList({
   onLoadMore,
   hasMore = false,
   onRetry,
+  onRequestRemove,
 }: MessageListProps): ReactNode {
   // Use react-window v2's typed ref hook for proper API access
   const listRef = useListRef(null);
@@ -343,10 +349,13 @@ export function MessageList({
         >
           <Heart className="h-12 w-12 text-[#FF6B6B]" />
         </motion.div>
-        <h3 className="mb-2 text-lg font-medium text-gray-700">No love notes yet</h3>
-        <p className="max-w-xs text-gray-500">
-          Send one to start the conversation with your partner! 💕
-        </p>
+        {/*
+          Deliberately neutral: this state is also what a user sees after removing
+          every message they could see, and "no love notes yet" would be a lie
+          about a conversation that did happen.
+        */}
+        <h3 className="mb-2 text-lg font-medium text-gray-700">No messages to show</h3>
+        <p className="max-w-xs text-gray-500">Send your partner a note whenever you like 💕</p>
       </div>
     );
   }
@@ -370,6 +379,7 @@ export function MessageList({
     userName,
     partnerName,
     onRetry,
+    onRequestRemove,
   };
 
   return (
