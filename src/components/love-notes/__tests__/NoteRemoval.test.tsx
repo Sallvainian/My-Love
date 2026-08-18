@@ -11,12 +11,16 @@
  *    they were wrong and cannot undo it.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { HTMLAttributes, ReactNode } from 'react';
+import { useRef, useState, type HTMLAttributes, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoveNote } from '../../../types/models';
 import { LoveNoteMessage } from '../LoveNoteMessage';
 import { MessageList } from '../MessageList';
 import { NoteRemoveConfirmation } from '../NoteRemoveConfirmation';
+
+// Most of these cases never exercise the fallback; they only need the prop to
+// satisfy the contract. The two that do exercise it pass a real ref.
+const inertFallback = { current: null } as React.RefObject<HTMLElement | null>;
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
@@ -115,7 +119,7 @@ describe('remove confirmation dialog', () => {
 
   it('states that the partner keeps their copy', () => {
     render(
-      <NoteRemoveConfirmation note={committed} onClose={vi.fn()} onConfirmRemove={vi.fn()} />
+      <NoteRemoveConfirmation note={committed} onClose={vi.fn()} onConfirmRemove={vi.fn()} fallbackFocusRef={inertFallback} />
     );
 
     expect(screen.getByText(/your partner keeps their copy/i)).toBeInTheDocument();
@@ -130,6 +134,7 @@ describe('remove confirmation dialog', () => {
         note={committed}
         onClose={onClose}
         onConfirmRemove={onConfirmRemove}
+        fallbackFocusRef={inertFallback}
       />
     );
 
@@ -151,6 +156,7 @@ describe('remove confirmation dialog', () => {
               note={committed}
               onClose={vi.fn()}
               onConfirmRemove={vi.fn()}
+              fallbackFocusRef={inertFallback}
             />
           )}
         </>
@@ -169,34 +175,134 @@ describe('remove confirmation dialog', () => {
   });
 
   it('lands focus on the thread when the row that opened it is removed', async () => {
-    // The success path. Removing the note unmounts its row, and with it the
-    // control that opened this dialog — so restoring to the opener is a no-op
-    // and focus would fall to <body>, losing a keyboard user's place entirely.
-    function Harness({ open, rowPresent }: { open: boolean; rowPresent: boolean }) {
+    // The success path. Confirming unmounts the row and the control that opened
+    // this dialog with it, so restoring to the opener is a no-op and focus would
+    // fall to <body> -- losing a keyboard user's place entirely.
+    function Harness() {
+      const threadRef = useRef<HTMLDivElement>(null);
+      const [open, setOpen] = useState(false);
+      const [rowPresent, setRowPresent] = useState(true);
       return (
-        <div data-testid="virtualized-list" tabIndex={-1}>
-          {rowPresent && <button data-testid="trigger">remove</button>}
+        <div ref={threadRef} tabIndex={-1} data-testid="thread">
+          {rowPresent && (
+            <button data-testid="trigger" onClick={() => setOpen(true)}>
+              remove
+            </button>
+          )}
           {open && (
             <NoteRemoveConfirmation
               note={committed}
-              onClose={vi.fn()}
-              onConfirmRemove={vi.fn()}
+              onClose={() => setOpen(false)}
+              onConfirmRemove={async () => {
+                // what removeNote does: the row leaves the store on success
+                setRowPresent(false);
+              }}
+              fallbackFocusRef={threadRef}
             />
           )}
         </div>
       );
     }
 
-    const { rerender } = render(<Harness open={false} rowPresent />);
-    screen.getByTestId('trigger').focus();
+    render(<Harness />);
+    const trigger = screen.getByTestId('trigger');
+    trigger.focus();
+    fireEvent.click(trigger);
 
-    rerender(<Harness open rowPresent />);
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+    fireEvent.click(screen.getByTestId('note-remove-confirm'));
 
-    // The removal succeeds: dialog closes and the row goes with it.
-    rerender(<Harness open={false} rowPresent={false} />);
+    // Gate on focus itself. onConfirmRemove drops the row and onClose closes the
+    // dialog in two separate commits, and which lands first is not fixed -- so
+    // waiting on the row alone can observe the moment after the row goes but
+    // before the dialog's cleanup has placed focus.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('thread')));
+    expect(screen.queryByTestId('trigger')).toBeNull();
+  });
 
-    expect(document.activeElement).toBe(screen.getByTestId('virtualized-list'));
+  it('still lands focus when the removal empties the thread entirely', async () => {
+    // Removing your last visible note is the case an earlier version got wrong.
+    // It asked `opener.isConnected` at cleanup to decide whether the opener had
+    // survived, but React runs cleanups against a DOM it has not finished
+    // mutating: with the trigger nested inside the container MessageList swaps
+    // for its empty state, isConnected still read true, the guard bailed, and
+    // focus fell to <body>. This harness reproduces that nesting -- the inner
+    // container is replaced, the outer wrapper LoveNotes owns is not.
+    function Harness() {
+      const threadRef = useRef<HTMLDivElement>(null);
+      const [open, setOpen] = useState(false);
+      const [hasNotes, setHasNotes] = useState(true);
+      return (
+        <div ref={threadRef} tabIndex={-1} data-testid="thread">
+          {hasNotes ? (
+            <div data-testid="virtualized-list">
+              <button data-testid="trigger" onClick={() => setOpen(true)}>
+                remove
+              </button>
+            </div>
+          ) : (
+            <div data-testid="empty-state">No messages to show</div>
+          )}
+          {open && (
+            <NoteRemoveConfirmation
+              note={committed}
+              onClose={() => setOpen(false)}
+              onConfirmRemove={async () => {
+                setHasNotes(false);
+              }}
+              fallbackFocusRef={threadRef}
+            />
+          )}
+        </div>
+      );
+    }
+
+    render(<Harness />);
+    const trigger = screen.getByTestId('trigger');
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+    fireEvent.click(screen.getByTestId('note-remove-confirm'));
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('thread')));
+    expect(screen.getByTestId('empty-state')).toBeInTheDocument();
+  });
+
+  it('leaves the fallback alone when the user cancels, so the opener keeps focus', async () => {
+    // The counterpart. Cancelling must NOT route through the fallback -- the
+    // opener is still there and useFocusTrap restores it. If this ever lands on
+    // the thread wrapper instead, the success flag is being set too eagerly.
+    function Harness() {
+      const threadRef = useRef<HTMLDivElement>(null);
+      const [open, setOpen] = useState(false);
+      return (
+        <div ref={threadRef} tabIndex={-1} data-testid="thread">
+          <button data-testid="trigger" onClick={() => setOpen(true)}>
+            remove
+          </button>
+          {open && (
+            <NoteRemoveConfirmation
+              note={committed}
+              onClose={() => setOpen(false)}
+              onConfirmRemove={vi.fn()}
+              fallbackFocusRef={threadRef}
+            />
+          )}
+        </div>
+      );
+    }
+
+    render(<Harness />);
+    const trigger = screen.getByTestId('trigger');
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+    fireEvent.click(screen.getByText('Cancel'));
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('trigger')));
+    expect(screen.queryByText('Cancel')).toBeNull();
   });
 
   it('closes on Escape and takes focus off the trash button behind the overlay', async () => {
@@ -207,6 +313,7 @@ describe('remove confirmation dialog', () => {
         note={committed}
         onClose={onClose}
         onConfirmRemove={onConfirmRemove}
+        fallbackFocusRef={inertFallback}
       />
     );
 
@@ -227,7 +334,7 @@ describe('remove confirmation dialog', () => {
     // (a realtime note arriving is enough) changes the identity useFocusTrap
     // depends on and re-runs its effect.
     const { rerender } = render(
-      <NoteRemoveConfirmation note={committed} onClose={() => {}} onConfirmRemove={vi.fn()} />
+      <NoteRemoveConfirmation note={committed} onClose={() => {}} onConfirmRemove={vi.fn()} fallbackFocusRef={inertFallback} />
     );
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
 
@@ -236,7 +343,7 @@ describe('remove confirmation dialog', () => {
     expect(document.activeElement).toBe(screen.getByTestId('note-remove-confirm'));
 
     rerender(
-      <NoteRemoveConfirmation note={committed} onClose={() => {}} onConfirmRemove={vi.fn()} />
+      <NoteRemoveConfirmation note={committed} onClose={() => {}} onConfirmRemove={vi.fn()} fallbackFocusRef={inertFallback} />
     );
 
     expect(document.activeElement).toBe(screen.getByTestId('note-remove-confirm'));
@@ -253,6 +360,7 @@ describe('remove confirmation dialog', () => {
         note={committed}
         onClose={vi.fn()}
         onConfirmRemove={() => pending}
+        fallbackFocusRef={inertFallback}
       />
     );
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
@@ -281,6 +389,7 @@ describe('remove confirmation dialog', () => {
         note={committed}
         onClose={onClose}
         onConfirmRemove={onConfirmRemove}
+        fallbackFocusRef={inertFallback}
       />
     );
 
@@ -301,6 +410,7 @@ describe('remove confirmation dialog', () => {
         onConfirmRemove={async () => {
           throw new Error('That message is no longer loaded');
         }}
+        fallbackFocusRef={inertFallback}
       />
     );
 
@@ -321,6 +431,7 @@ describe('remove confirmation dialog', () => {
         note={committed}
         onClose={onClose}
         onConfirmRemove={onConfirmRemove}
+        fallbackFocusRef={inertFallback}
       />
     );
 

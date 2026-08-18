@@ -216,16 +216,17 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           navigatePhoto('prev');
           event.preventDefault();
           break;
-        case 'Escape':
-          onClose();
-          event.preventDefault();
-          break;
       }
     };
 
+    // Escape is deliberately absent: useFocusTrap above already closes on it,
+    // scoped to the container. Handling it here as well meant a single Escape
+    // ran onClose() twice, and a window-level listener would also fire for a
+    // dialog stacked on top of this one. Arrow keys stay global -- they are
+    // navigation within this viewer, not dismissal.
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigatePhoto, onClose]);
+  }, [navigatePhoto]);
 
   // WCAG: Screen reader announcements for photo changes
   useEffect(() => {
