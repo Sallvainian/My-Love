@@ -230,6 +230,27 @@ describe('remove confirmation dialog', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
+  it('shows the actual reason rather than advice that cannot work', async () => {
+    // removeNote throws user-facing messages, and some of them mean a retry can
+    // never succeed — a note that has left the loaded window throws on every
+    // attempt. A fixed "please try again" sent the user round a loop.
+    render(
+      <NoteRemoveConfirmation
+        note={committed}
+        onClose={vi.fn()}
+        onConfirmRemove={async () => {
+          throw new Error('That message is no longer loaded');
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('note-remove-confirm'));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('That message is no longer loaded')
+    );
+  });
+
   it('keeps the dialog open and explains itself when the removal fails', async () => {
     const onClose = vi.fn();
     const onConfirmRemove = vi.fn(async () => {

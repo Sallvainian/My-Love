@@ -236,7 +236,7 @@ function LoveNoteMessageComponent({
           matches the caption's own 16px line box.
         */}
         <span
-          className={`mb-1 flex items-center gap-1.5 px-1 text-xs leading-4 text-gray-500 ${
+          className={`mb-1 flex items-center gap-2 px-1 text-xs leading-4 text-gray-500 ${
             isOwnMessage ? 'flex-row-reverse' : ''
           }`}
         >
@@ -247,14 +247,18 @@ function LoveNoteMessageComponent({
             // The 16px box is what keeps calculateRowHeight's budget intact, but
             // 16px is under the WCAG 2.5.8 floor of 24px and far under what a
             // thumb needs on a phone. The ::after pseudo-element takes the hit
-            // area to 40x24 without occupying any layout. Vertical growth is
-            // capped at the caption's own 4px mb-1 gap: at -inset-3 the overlay
-            // reached 8px past the gap and sat over the top of the bubble, which
-            // put an invisible delete target on the message itself.
+            // area to 32x24 without occupying any layout.
+            //
+            // Growth on each axis is capped at the gap on that axis, so the
+            // overlay never covers something else: 4px vertically for mb-1, and
+            // 8px horizontally now that the flex gap is gap-2. Earlier values
+            // overshot both -- -inset-3 put 8px of invisible delete target over
+            // the top of the bubble, and -inset-x-3 against a 6px gap-1.5 put
+            // 6px of it over the end of the timestamp text.
             <button
               type="button"
               onClick={() => onRequestRemove?.(message)}
-              className="relative flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center rounded text-gray-400 opacity-60 transition after:absolute after:-inset-x-3 after:-inset-y-1 after:content-[''] hover:text-red-500 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
+              className="relative flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center rounded text-gray-400 opacity-60 transition after:absolute after:-inset-x-2 after:-inset-y-1 after:content-[''] hover:text-red-500 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
               aria-label={`Remove message from ${senderName} at ${fullTimestamp} from your history`}
               data-testid="note-remove-button"
             >
