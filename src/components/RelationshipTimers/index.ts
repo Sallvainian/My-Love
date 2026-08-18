@@ -3,5 +3,5 @@
  */
 
 export { BirthdayCountdown } from './BirthdayCountdown';
-export { EventCountdown } from './EventCountdown';
+export { EventCountdown, getCalendarDaysDiff, getEventsSlotView } from './EventCountdown';
 export { TimeTogether } from './TimeTogether';
