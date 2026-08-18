@@ -233,7 +233,11 @@ class EventsService {
       const { data, error } = await supabase
         .from('events')
         .select('*')
-        .order('event_date', { ascending: true });
+        .order('event_date', { ascending: true })
+        // Tiebreak same-day events on creation time: Postgres leaves ties
+        // unspecified, so without this two same-day cards can swap position
+        // between loads (DW-10).
+        .order('created_at', { ascending: true });
 
       if (error) {
         throw error;

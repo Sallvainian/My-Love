@@ -194,12 +194,12 @@ describe('eventsSlice', () => {
       // CAP-7 is the whole point: the event must not appear in the list as if it
       // had been saved, and the caller has to be told why.
       //
-      // The message is the one `handleNetworkError` actually composes
-      // (`src/api/errorHandlers.ts:94-95`), copied verbatim rather than invented
-      // — this file mocks the service, so a made-up string would pass while
-      // documenting a message the app never emits. Its promise of a later sync
-      // is inherited from that shared helper and is not true for events, which
-      // have no offline queue; that is recorded as deferred work on the story.
+      // The message is the exact string eventsService's offline guard throws —
+      // an EventWriteError that bypasses handleNetworkError precisely so no
+      // "will be synced when you're back online" promise is made; events have
+      // no offline queue. Copied verbatim rather than invented, because this
+      // file mocks the service and a made-up string would pass while
+      // documenting a message the app never emits.
       const OFFLINE_MESSAGE = 'You are offline. Events need a connection to save.';
       const store = createTestStore();
       createEvent.mockRejectedValue(new Error(OFFLINE_MESSAGE));
