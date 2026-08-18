@@ -106,8 +106,7 @@ describe('eventsSlice', () => {
 
     it('reports the failure, keeps the last-good list and releases the flag', async () => {
       const message =
-        "[EventsService.getEvents] Network error: Device is offline. " +
-        "Your changes will be synced when you're back online.";
+        'You are offline. Events need a connection to load.';
       getEvents.mockRejectedValue(new Error(message));
       const store = createTestStore();
       store.setState({ events: [event('stale', '2026-09-12')] });
@@ -201,9 +200,7 @@ describe('eventsSlice', () => {
       // documenting a message the app never emits. Its promise of a later sync
       // is inherited from that shared helper and is not true for events, which
       // have no offline queue; that is recorded as deferred work on the story.
-      const OFFLINE_MESSAGE =
-        "[EventsService.createEvent] Network error: Device is offline. " +
-        "Your changes will be synced when you're back online.";
+      const OFFLINE_MESSAGE = 'You are offline. Events need a connection to save.';
       const store = createTestStore();
       createEvent.mockRejectedValue(new Error(OFFLINE_MESSAGE));
 
