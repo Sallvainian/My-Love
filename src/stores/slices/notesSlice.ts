@@ -778,7 +778,17 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     // Identity guard, as in fetchNotes above: Sign Out sits on the same screen
     // and the request goes out with a still-valid token, so it succeeds and its
     // write would land after clearAuth.
-    if (get().userId !== userId) return;
+    //
+    // The flag is half the guard. It was raised before the await when this
+    // removal would empty the window, so returning without releasing it strands
+    // MessageList on its spinner branch -- notes.length is 0 in exactly that
+    // case, so the tab renders nothing else. signedOutState() happens to clear
+    // it on sign-out, but setAuthUser (authSlice.ts:145) switches accounts
+    // without going through it.
+    if (get().userId !== userId) {
+      if (willEmptyWindow) set({ notesIsLoading: false });
+      return;
+    }
 
     if (error) {
       console.error('[NotesSlice] Error removing note:', error);
