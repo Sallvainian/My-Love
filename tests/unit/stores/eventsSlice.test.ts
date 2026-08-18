@@ -104,7 +104,7 @@ describe('eventsSlice', () => {
       expect(store.getState().eventsIsLoading).toBe(false);
     });
 
-    it('reports the failure, blanks the list and releases the flag', async () => {
+    it('reports the failure, keeps the last-good list and releases the flag', async () => {
       const message =
         "[EventsService.getEvents] Network error: Device is offline. " +
         "Your changes will be synced when you're back online.";
@@ -114,9 +114,9 @@ describe('eventsSlice', () => {
 
       await store.getState().loadEvents();
 
-      // Events are Supabase-only: a failed load means there is nothing to show,
-      // not that yesterday's copy is still true.
-      expect(store.getState().events).toEqual([]);
+      // Supabase-only means there is no mirror to repopulate from, so a failed
+      // refresh must NOT blank a list the user is already looking at.
+      expect(store.getState().events).toEqual([event('stale', '2026-09-12')]);
       expect(store.getState().eventsError).toBe(message);
       expect(store.getState().eventsIsLoading).toBe(false);
     });
