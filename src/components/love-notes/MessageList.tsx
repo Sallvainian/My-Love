@@ -383,7 +383,15 @@ export function MessageList({
   };
 
   return (
-    <div className="relative flex-1 overflow-hidden" data-testid="virtualized-list">
+    // tabIndex -1 makes this a programmatic focus destination without adding a
+    // tab stop: when a removal unmounts the row whose control opened the
+    // confirmation, the dialog hands focus here rather than dropping it on
+    // <body> and losing a keyboard user's place in the thread.
+    <div
+      className="relative flex-1 overflow-hidden outline-none"
+      data-testid="virtualized-list"
+      tabIndex={-1}
+    >
       {/* Story 2.3: AC-2.3.4 - New message indicator */}
       <AnimatePresence>
         {showNewMessageIndicator && (
