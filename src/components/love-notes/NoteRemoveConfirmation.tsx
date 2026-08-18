@@ -15,7 +15,7 @@
  * child resolve against the row instead of the viewport.
  */
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { LoveNote } from '../../types/models';
 
@@ -34,27 +34,59 @@ export function NoteRemoveConfirmation({
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const isRemovingRef = useRef(false);
+
+  // useFocusTrap lists onEscape in its effect deps and re-focuses initialFocusRef
+  // on every run, so any change of identity re-arms the trap and drags focus back
+  // to Cancel -- which a `isRemoving ? undefined : onClose` ternary did on every
+  // write, and an inline arrow from the parent did on every parent render. Read
+  // the flag from a ref instead, so this handler is created once and the effect
+  // runs once. onClose must be stable too; LoveNotes wraps it in useCallback.
+  // Latest-ref rather than a dep: this must hold even when a caller passes an
+  // inline arrow, which is the normal React thing to do. Depending on onClose
+  // would put the component's accessibility at the mercy of every call site
+  // remembering to memoise.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const handleEscape = useCallback(() => {
+    // Escape stays suppressed mid-write so a stray key cannot orphan a removal.
+    if (isRemovingRef.current) return;
+    onCloseRef.current();
+  }, []);
 
   // Focus stays on the trash button behind the overlay otherwise, inside a
   // subtree aria-modal tells assistive tech to ignore -- so a keyboard user
   // opens a dialog they cannot reach or dismiss. Cancel takes initial focus
-  // because this action cannot be undone. Escape is disabled mid-write so a
-  // stray key cannot orphan an in-flight removal.
+  // because this action cannot be undone.
   useFocusTrap(panelRef, true, {
-    onEscape: isRemoving ? undefined : onClose,
+    onEscape: handleEscape,
     initialFocusRef: cancelButtonRef,
   });
 
   const handleRemove = async () => {
     try {
       setIsRemoving(true);
+      isRemovingRef.current = true;
       setError(null);
+
+      // The button the user just activated is about to be disabled, and a browser
+      // moves focus to <body> when the focused element becomes disabled -- verified
+      // in Chrome, and re-focusing an already-disabled Cancel is a no-op. That
+      // would park focus outside the element the trap's keydown listener is bound
+      // to. Move it onto the panel first, while the move can still land.
+      panelRef.current?.focus();
+
       await onConfirmRemove(note.id);
       onClose();
     } catch (err) {
       console.error('[NoteRemoveConfirmation] Failed to remove note:', err);
       setError('Failed to remove the message. Please try again.');
       setIsRemoving(false);
+      isRemovingRef.current = false;
+      cancelButtonRef.current?.focus();
     }
   };
 
@@ -75,7 +107,11 @@ export function NoteRemoveConfirmation({
       aria-modal="true"
       aria-labelledby="remove-note-dialog-title"
     >
-      <div ref={panelRef} className="mx-4 w-full max-w-md rounded-lg bg-gray-800 shadow-xl">
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="mx-4 w-full max-w-md rounded-lg bg-gray-800 shadow-xl outline-none"
+      >
         <div className="flex items-center gap-3 border-b border-gray-700 px-6 py-4">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-900/50">
             <AlertTriangle className="h-5 w-5 text-red-400" />
