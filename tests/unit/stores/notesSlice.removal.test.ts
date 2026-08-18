@@ -36,6 +36,9 @@ const backend = {
   readingAs: USER_ID,
   failNextRemoval: false,
   failNextRead: false,
+  /** hold the next read's response so it can be delivered after a removal returns */
+  holdNextRead: false,
+  releaseHeldRead: null as (() => void) | null,
   /** fires inside the removal write, before it resolves */
   duringRemoval: null as (() => void) | null,
   reset() {
@@ -44,6 +47,8 @@ const backend = {
     this.readingAs = USER_ID;
     this.failNextRemoval = false;
     this.failNextRead = false;
+    this.holdNextRead = false;
+    this.releaseHeldRead = null;
     this.duringRemoval = null;
   },
   seed(count: number) {
@@ -123,6 +128,11 @@ function fakeFrom(table: string) {
         backend.failNextRead = false;
         return Promise.resolve(onFulfilled({ data: null, error: { message: 'network error' } }));
       }
+
+      // Snapshot HERE, where the server evaluates the SELECT — not at delivery.
+      // Anything committing after this point is invisible to this response, which
+      // is the whole shape of the resurrect race: a page evaluated before a
+      // removal commits can still be in flight when the removal finishes.
       let rows = backend.notes.slice();
       // Only the view hides anything. Reading love_notes directly must still
       // return every row — that is the partner's copy staying intact.
@@ -131,7 +141,16 @@ function fakeFrom(table: string) {
       }
       if (before) rows = rows.filter((r) => r.created_at < before!);
       rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return Promise.resolve(onFulfilled({ data: rows.slice(0, take), error: null }));
+      const snapshot = rows.slice(0, take);
+      const deliver = () => onFulfilled({ data: snapshot, error: null });
+
+      if (backend.holdNextRead) {
+        backend.holdNextRead = false;
+        return new Promise((resolve) => {
+          backend.releaseHeldRead = () => resolve(deliver());
+        });
+      }
+      return Promise.resolve(deliver());
     },
   };
   return api;
@@ -270,8 +289,13 @@ describe('notesSlice removeNote', () => {
     // removal had worked while the message reappeared behind it.
     await expect(store.getState().removeNote('note-1')).rejects.toThrow();
 
+    // Restored at its original index rather than re-sorted: server timestamps
+    // and optimistic toISOString ones do not collate against each other.
     expect(store.getState().notes.map((n) => n.id)).toEqual(['note-0', 'note-1', 'note-2']);
-    expect(store.getState().notesError).toBe('Failed to remove message');
+    // The thrown error is the single owner of this failure — setting notesError
+    // too would render it a second time in the page banner, which then outlives
+    // the dialog the user cancels out of.
+    expect(store.getState().notesError).toBeNull();
     expect(backend.removals.size).toBe(0);
   });
 
@@ -321,31 +345,56 @@ describe('notesSlice removeNote', () => {
     expect(store.getState().notesHasMore).toBe(true);
   });
 
-  it('does not resurrect a note when a read lands mid-removal', async () => {
+  it('does not resurrect a note when a read evaluated before it lands after it', async () => {
     backend.seed(3);
     const store = createTestStore();
     await store.getState().fetchNotes();
 
-    // The mount fetch in useLoveNotes is already in flight when the user
-    // confirms; its SELECT was issued before the removal committed, so it comes
-    // back with the note still in it.
-    backend.duringRemoval = () => {
-      void store.getState().fetchNotes();
-    };
+    // The real ordering, and the only one that matters: a read — the mount fetch
+    // in useLoveNotes, or a page request — is evaluated by the server BEFORE the
+    // removal commits, so its rows still contain the note, and it resolves AFTER
+    // removeNote has already returned. The tiny removal insert round-tripping
+    // faster than a 50-row page query is the normal case, not the exotic one.
+    backend.holdNextRead = true;
+    const readInFlight = store.getState().fetchNotes();
+
+    // Let the read actually reach the server and take its snapshot BEFORE the
+    // removal commits. Without this the snapshot is taken afterwards, the fake's
+    // own anti-join already excludes the note, and the test passes whether or not
+    // the client-side guard exists — which is exactly how the previous version
+    // of this test managed to prove nothing.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(backend.releaseHeldRead).not.toBeNull();
+
     await store.getState().removeNote('note-1');
-    await Promise.resolve();
+
+    backend.releaseHeldRead?.();
+    await readInFlight;
 
     expect(store.getState().notes.map((n) => n.id)).not.toContain('note-1');
   });
 
-  it('clears the pending-removal marker once the write commits', async () => {
+  it('keeps the pending marker after the write commits, so a late read stays filtered', async () => {
     backend.seed(3);
     const store = createTestStore();
     await store.getState().fetchNotes();
 
     await store.getState().removeNote('note-1');
 
-    // Left behind, it would silently filter a future note that reused the id.
+    // Clearing it here would drop the guard exactly while a read issued before
+    // the commit is still in flight. Ids are uuids and never reused, and
+    // signedOutState resets the list.
+    expect(store.getState().notesPendingRemoval).toEqual(['note-1']);
+  });
+
+  it('clears the pending marker when the write fails, so the note is not filtered forever', async () => {
+    backend.seed(3);
+    const store = createTestStore();
+    await store.getState().fetchNotes();
+
+    backend.failNextRemoval = true;
+    await expect(store.getState().removeNote('note-1')).rejects.toThrow();
+
     expect(store.getState().notesPendingRemoval).toEqual([]);
   });
 
