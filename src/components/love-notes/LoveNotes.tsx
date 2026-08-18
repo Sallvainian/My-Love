@@ -18,7 +18,7 @@
 
 import { motion } from 'framer-motion';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { authService } from '../../api/authService';
 import { getPartnerDisplayName } from '../../api/supabaseClient';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
@@ -48,6 +48,7 @@ export function LoveNotes(): ReactElement {
   // transform on the message wrapper, either of which would trap a
   // fixed-position dialog inside the row.
   const [notePendingRemoval, setNotePendingRemoval] = useState<LoveNote | null>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
 
   // Stable identity: useFocusTrap depends on the dialog's onEscape, so an inline
   // arrow here re-armed the trap and pulled focus back to Cancel on every render
@@ -119,18 +120,33 @@ export function LoveNotes(): ReactElement {
         </motion.div>
       )}
 
-      {/* Message list */}
-      <MessageList
-        notes={notes}
-        currentUserId={currentUserId}
-        partnerName={partnerName}
-        userName={userName}
-        isLoading={isLoading}
-        onLoadMore={fetchOlderNotes}
-        hasMore={hasMore}
-        onRetry={retryFailedMessage}
-        onRequestRemove={setNotePendingRemoval}
-      />
+      {/*
+        The thread wrapper, and the focus destination for a removal that unmounts
+        the control that requested it. It lives here rather than inside
+        MessageList because MessageList has three roots -- the virtualized list,
+        the empty state and the initial spinner -- and removing your last visible
+        note swaps one for another in the same commit that closes the dialog. A
+        destination inside MessageList is therefore gone exactly when it is
+        needed. This element outlives all three.
+
+        tabIndex -1 makes it a programmatic focus target without adding a tab
+        stop. The outline is left to the browser: this is only ever focused by
+        script, immediately after a keyboard-driven confirmation, so a keyboard
+        user needs to see where they landed.
+      */}
+      <div ref={threadRef} tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
+        <MessageList
+          notes={notes}
+          currentUserId={currentUserId}
+          partnerName={partnerName}
+          userName={userName}
+          isLoading={isLoading}
+          onLoadMore={fetchOlderNotes}
+          hasMore={hasMore}
+          onRetry={retryFailedMessage}
+          onRequestRemove={setNotePendingRemoval}
+        />
+      </div>
 
       {/* Message input - Story 2.2 */}
       <MessageInput />
@@ -140,6 +156,7 @@ export function LoveNotes(): ReactElement {
           note={notePendingRemoval}
           onClose={closeRemovalDialog}
           onConfirmRemove={removeNote}
+          fallbackFocusRef={threadRef}
         />
       )}
     </div>

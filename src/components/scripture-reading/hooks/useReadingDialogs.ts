@@ -17,20 +17,25 @@ export function useReadingDialogs({ saveAndExit }: UseReadingDialogsParams) {
 
   const exitButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   // Story 1.5: Store focus before dialog opens (AC #1, #3)
+  //
+  // Nothing is stored here any more. useFocusTrap captures the active element
+  // when the trap arms and returns focus there when it disarms, which is this
+  // same button -- so the ref this used to fill was written and never read.
   const handleExitRequest = useCallback(() => {
-    previousFocusRef.current = document.activeElement as HTMLElement;
     setShowExitConfirm(true);
   }, []);
 
   // Story 1.5: Restore focus when dialog closes (AC #1, #3)
+  //
+  // The restore itself now lives in useFocusTrap, which returns focus to whatever
+  // held it when the trap armed -- the same exit button this used to track. The
+  // requestAnimationFrame that stood here re-focused that button a frame later,
+  // so the AC had two owners and the next person to change where focus goes
+  // would have had to find both.
   const handleExitCancel = useCallback(() => {
     setShowExitConfirm(false);
-    requestAnimationFrame(() => {
-      previousFocusRef.current?.focus();
-    });
   }, []);
 
   const handleSaveAndExit = useCallback(async () => {

@@ -1,7 +1,7 @@
 import type { PanInfo } from 'framer-motion';
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Loader2, Trash2, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { useAppStore } from '../../stores/useAppStore';
@@ -61,7 +61,67 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
   // AC 6.4.12 & WCAG 2.4.3: Focus trap for modal
   const containerRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(containerRef, true, { onEscape: onClose });
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Dismissing the confirmation must hand focus somewhere still mounted: Cancel
+  // or Delete takes focus while the dialog is up, and letting it unmount
+  // focused would blur to <body>, killing the container-scoped trap for the
+  // rest of the session. The delete button is the opener; the container
+  // (tabIndex -1) is the fallback for the confirm path, where the new current
+  // photo may not be the user's own and the delete button gone with it.
+  //
+  // The restore runs in an effect, not inside closeDeleteDialog: the viewer's
+  // own controls are disabled while the confirmation is up (which is what
+  // confines the trap's Tab cycle to Cancel/Delete), and focusing a
+  // still-disabled button before the re-enabling render commits is a no-op.
+  const restoreAfterDialogRef = useRef(false);
+  const closeDeleteDialog = useCallback(() => {
+    restoreAfterDialogRef.current = true;
+    setShowDeleteDialog(false);
+  }, []);
+  useEffect(() => {
+    if (!showDeleteDialog && restoreAfterDialogRef.current) {
+      restoreAfterDialogRef.current = false;
+      (deleteButtonRef.current ?? containerRef.current)?.focus();
+    }
+  }, [showDeleteDialog]);
+
+  // The confirmation renders inside containerRef -- stacked visually (z-60) but
+  // not in the DOM tree -- so its Escape bubbles to the trap's listener. It has
+  // to dismiss the confirmation, not the viewer.
+  //
+  // Read through refs so the callback stays referentially stable: a new
+  // onEscape re-runs useFocusTrap's arming effect, and that re-run moves focus
+  // back to the container's first focusable -- the trash button -- stealing it
+  // from the Cancel button the confirmation just auto-focused.
+  const [isDeleting, setIsDeleting] = useState(false);
+  const isDeletingRef = useRef(false);
+  const showDeleteDialogRef = useRef(showDeleteDialog);
+  const onCloseRef = useRef(onClose);
+  // Layout effect, not passive: handleEscape reads these from a native keydown
+  // listener, which can fire in the window between commit and passive flush.
+  useLayoutEffect(() => {
+    showDeleteDialogRef.current = showDeleteDialog;
+    onCloseRef.current = onClose;
+  }, [showDeleteDialog, onClose]);
+  const handleCancelDialog = useCallback(() => {
+    if (isDeletingRef.current) return;
+    closeDeleteDialog();
+  }, [closeDeleteDialog]);
+
+  const handleEscape = useCallback(() => {
+    if (showDeleteDialogRef.current) {
+      // Suppressed mid-delete: dismissing while the request is in flight leaves
+      // isDeletingRef set, so the next Delete would be silently swallowed and
+      // the pending finally would close whatever confirmation is open by then.
+      if (isDeletingRef.current) return;
+      closeDeleteDialog();
+      return;
+    }
+    onCloseRef.current();
+  }, [closeDeleteDialog]);
+
+  useFocusTrap(containerRef, true, { onEscape: handleEscape });
 
   const currentPhoto = photos[currentIndex];
   const canNavigatePrev = currentIndex > 0;
@@ -207,6 +267,24 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   // AC 6.4.3: Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        // useFocusTrap handles Escape whenever focus is inside the container.
+        // Focus can still land on <body> -- a focused nav button becoming
+        // disabled at either end of the gallery, or a focused Retry button
+        // unmounting -- and <body> is an ancestor of the container, so its
+        // listener never sees the key again. Cover only that case, so a
+        // single Escape still runs the escape path exactly once.
+        if (!containerRef.current?.contains(document.activeElement)) {
+          handleEscape();
+          event.preventDefault();
+        }
+        return;
+      }
+      // Navigation is suspended while the delete confirmation is up: it names a
+      // specific photo, and handleDeleteConfirm resolves photos[currentIndex] at
+      // click time, so navigating behind the dialog would delete a different
+      // photo than the one the dialog is asking about.
+      if (showDeleteDialog) return;
       switch (event.key) {
         case 'ArrowRight':
           navigatePhoto('next');
@@ -216,16 +294,12 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           navigatePhoto('prev');
           event.preventDefault();
           break;
-        case 'Escape':
-          onClose();
-          event.preventDefault();
-          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigatePhoto, onClose]);
+  }, [navigatePhoto, showDeleteDialog, handleEscape]);
 
   // WCAG: Screen reader announcements for photo changes
   useEffect(() => {
@@ -298,8 +372,18 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     [lastTap, scale]
   );
 
-  // AC 6.4.10: Delete photo handler
+  // AC 6.4.10: Delete photo handler.
+  //
+  // Re-entry is the wrong-photo hazard again: the optimistic setCurrentIndex
+  // has already applied when the request is in flight, so a second tap on
+  // Delete would resolve photos[currentIndex] to a DIFFERENT photo and delete
+  // it too. The ref is the guard (state lags a render); the state disables the
+  // Delete button so a double-tap has nothing to land on. Cancel stays enabled
+  // as the trap's one focusable, guarded in its handler instead.
   const handleDeleteConfirm = useCallback(async () => {
+    if (isDeletingRef.current) return;
+    isDeletingRef.current = true;
+    setIsDeleting(true);
     const photoToDelete = photos[currentIndex];
 
     try {
@@ -335,9 +419,14 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
       // Note: UI already updated optimistically. In production, may want to revert navigation
       // or show error toast to user. For now, logging is sufficient as RLS prevents unauthorized deletion.
     } finally {
-      setShowDeleteDialog(false);
+      isDeletingRef.current = false;
+      setIsDeleting(false);
+      // Routed through closeDeleteDialog so the post-commit effect places
+      // focus: the trash button if the next photo is the user's own, the
+      // container otherwise. By then unmounts and re-enables have committed.
+      closeDeleteDialog();
     }
-  }, [photos, currentIndex, canNavigateNext, onClose, deletePhoto, resetTransform]);
+  }, [photos, currentIndex, canNavigateNext, onClose, deletePhoto, resetTransform, closeDeleteDialog]);
 
   // AC 6.4.15: Image loading handlers
   const handleImageLoad = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
@@ -389,6 +478,14 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         // AC 6.4.1: Full-screen modal overlay with black background
         className="fixed inset-0 z-50 flex items-center justify-center bg-black"
         data-testid="photo-viewer-overlay"
+        // tabIndex -1 keeps this container reachable by focus without adding a
+        // tab stop. useFocusTrap binds Escape and the Tab cycle to this element,
+        // and everything the user is most likely to click -- the photo, the
+        // backdrop, the caption bar -- is non-focusable, so a click would
+        // otherwise blur to <body>. <body> is an ancestor, and keydown bubbles
+        // upward, so the listener here would never see the event again and both
+        // Escape and the trap would go dead for the rest of the session.
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Photo viewer"
@@ -397,12 +494,21 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
       >
-        {/* AC 6.4.12: Top controls - Close and Delete buttons */}
+        {/* AC 6.4.12: Top controls - Close and Delete buttons.
+            Every viewer control (these two, the nav chevrons, and Retry in the
+            error card) takes disabled={showDeleteDialog}: the
+            confirmation renders inside the trap's container, so without it the
+            Tab cycle reaches them under the overlay and Enter operates them --
+            navigating or closing behind an open delete confirmation. Disabling
+            them also drops them from FOCUSABLE_SELECTOR's button:not([disabled]),
+            confining Tab to Cancel/Delete. */}
         <div className="absolute top-4 right-4 z-10 flex gap-2">
           {/* AC 6.4.10: Delete button (own photos only) */}
           {currentPhoto.isOwn && (
             <button
+              ref={deleteButtonRef}
               onClick={() => setShowDeleteDialog(true)}
+              disabled={showDeleteDialog}
               className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
               aria-label="Delete photo"
             >
@@ -413,6 +519,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           {/* AC 6.4.1: Close button */}
           <button
             onClick={onClose}
+            disabled={showDeleteDialog}
             className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
             aria-label="Close viewer"
           >
@@ -423,20 +530,18 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         {/* AC 6.4.12: Navigation buttons */}
         <button
           onClick={() => navigatePhoto('prev')}
-          disabled={!canNavigatePrev}
+          disabled={showDeleteDialog || !canNavigatePrev}
           className="absolute top-1/2 left-4 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Previous photo"
-          aria-disabled={!canNavigatePrev}
         >
           <ChevronLeft className="h-8 w-8 text-white" />
         </button>
 
         <button
           onClick={() => navigatePhoto('next')}
-          disabled={!canNavigateNext}
+          disabled={showDeleteDialog || !canNavigateNext}
           className="absolute top-1/2 right-4 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Next photo"
-          aria-disabled={!canNavigateNext}
         >
           <ChevronRight className="h-8 w-8 text-white" />
         </button>
@@ -473,6 +578,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 <p className="mb-4">Failed to load photo</p>
                 <button
                   onClick={handleRetryLoad}
+                  disabled={showDeleteDialog}
                   className="rounded-lg bg-white/10 px-4 py-2 transition hover:bg-white/20"
                 >
                   Retry
@@ -544,14 +650,24 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 </p>
               )}
               <div className="flex gap-3">
+                {/* autoFocus: nothing else moves focus into this dialog, and
+                    without it a keyboard user is left on the trash button
+                    behind the overlay, inside a subtree the confirmation
+                    visually covers. Cancel, because delete is irreversible. */}
+                {/* Cancel stays enabled mid-delete -- with every other control
+                    disabled the trap would have zero focusables and Tab walks
+                    out of the modal -- but its handler is guarded like Escape:
+                    dismissing mid-flight would orphan the pending finally. */}
                 <button
-                  onClick={() => setShowDeleteDialog(false)}
+                  autoFocus
+                  onClick={handleCancelDialog}
                   className="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
+                  disabled={isDeleting}
                   className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-white transition hover:bg-red-600"
                 >
                   Delete
