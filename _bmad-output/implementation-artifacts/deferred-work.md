@@ -192,3 +192,43 @@ source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: Re-surfaced by this review pass; re-verified unchanged since the prior pass. useAppStore.ts records that partialize "stops NEW writes, but it does not govern reads", which is why moods is stripped on read but events is not. Unreachable today since no build has ever written events to localStorage.
 status: open
+
+### DW-21: Overlapping loadEvents() calls from rapid Home revisits have no in-flight/sequence guard, so an out-of-order response could show stale data for a moment.
+origin: spec-deferred 5c30b7108a47
+location: src/stores/slices/eventsSlice.ts:84-110
+source_spec: `3-home-dashboard-reads-events-from-the-store.md`
+severity: low
+reason: eventsSlice.ts:84-110 (story 2, unchanged by this story) sets `events` unconditionally on success with no request-ordering check. Story 2's own deferred list already flagged this exact race as low severity and "unreachable... until story 3" — story 3's new useEffect in App.tsx is what makes it reachable for the first time, by calling loadEvents() on every return to Home. Fixing it means touching eventsSlice.ts, which is outside this story's Code Map/Tasks.
+status: open
+
+### DW-22: No cap or pagination on the events rendered on Home; the right-hand grid column grows unbounded against the fixed 2-card birthdays column.
+origin: spec-deferred b8c2e0998b06
+location: src/App.tsx (upcomingEvents.map)
+source_spec: `3-home-dashboard-reads-events-from-the-store.md`
+severity: low
+reason: Extends story 2's own already-deferred "eventsService.getEvents applies no limit or pagination" item to the render layer. The codebase has a precedent for capping a similar list (`CountdownTimer anniversaries={...} maxDisplay={3}`, cited in integration-points.md:117), not applied here. Harmless at a couple's scale today.
+status: open
+
+### DW-23: EventCountdown's data-testid is derived from label text with no uniqueness guarantee, so a future user-created event labeled "Wedding" would collide with the fixed Wedding card's testid.
+origin: spec-deferred 17f1ada12518
+location: src/components/RelationshipTimers/EventCountdown.tsx
+source_spec: `3-home-dashboard-reads-events-from-the-store.md`
+severity: low
+reason: EventCountdown.tsx's `data-testid={"event-countdown-" + label.toLowerCase().replace(/\s+/g,'-')}` is pre-existing, unchanged by this diff. Unreachable today since events aren't user-creatable until story 5's CRUD ships; becomes a real risk once it does.
+status: open
+
+### DW-24: No test renders App.tsx at all, so its composition is exercised only by Playwright and a green `npm run test:unit` says nothing about it.
+origin: spec-deferred 657f5db9659f
+location: src/App.tsx
+source_spec: `3-home-dashboard-reads-events-from-the-store.md`
+severity: low
+reason: Grepped every test file for an import of `src/App`: no match. App.tsx's filter + getEventsSlotView call + JSX ternary + loadEvents effect are covered only by tests/e2e/home/events.spec.ts, which needs `supabase start`. Pre-existing: App.tsx has never had a unit or component test, and this story did not introduce the gap. Adding one means bringing a store-and-auth-mocking harness into scope.
+status: open
+
+### DW-25: Follow-up review still recommended for 3 after the damping cap was spent
+origin: review-budget-followup
+location: n/a
+source_spec: `3-home-dashboard-reads-events-from-the-store.md`
+severity: low
+reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260818-153303-cf19; this entry preserves the lingering recommendation for a deliberate later review.
+status: open
