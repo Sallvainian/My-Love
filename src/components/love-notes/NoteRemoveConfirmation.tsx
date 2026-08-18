@@ -15,7 +15,8 @@
  * child resolve against the row instead of the viewport.
  */
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { LoveNote } from '../../types/models';
 
 interface NoteRemoveConfirmationProps {
@@ -31,6 +32,18 @@ export function NoteRemoveConfirmation({
 }: NoteRemoveConfirmationProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Focus stays on the trash button behind the overlay otherwise, inside a
+  // subtree aria-modal tells assistive tech to ignore -- so a keyboard user
+  // opens a dialog they cannot reach or dismiss. Cancel takes initial focus
+  // because this action cannot be undone. Escape is disabled mid-write so a
+  // stray key cannot orphan an in-flight removal.
+  useFocusTrap(panelRef, true, {
+    onEscape: isRemoving ? undefined : onClose,
+    initialFocusRef: cancelButtonRef,
+  });
 
   const handleRemove = async () => {
     try {
@@ -62,7 +75,7 @@ export function NoteRemoveConfirmation({
       aria-modal="true"
       aria-labelledby="remove-note-dialog-title"
     >
-      <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 shadow-xl">
+      <div ref={panelRef} className="mx-4 w-full max-w-md rounded-lg bg-gray-800 shadow-xl">
         <div className="flex items-center gap-3 border-b border-gray-700 px-6 py-4">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-900/50">
             <AlertTriangle className="h-5 w-5 text-red-400" />
@@ -91,6 +104,7 @@ export function NoteRemoveConfirmation({
 
         <div className="flex justify-end gap-3 border-t border-gray-700 px-6 py-4">
           <button
+            ref={cancelButtonRef}
             type="button"
             onClick={onClose}
             disabled={isRemoving}

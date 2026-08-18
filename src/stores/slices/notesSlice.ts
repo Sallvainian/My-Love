@@ -32,6 +32,8 @@ export interface NotesSlice {
   notesError: string | null;
   notesHasMore: boolean;
   sentMessageTimestamps: number[]; // For rate limiting
+  /** Note ids whose removal has been applied locally but not yet committed */
+  notesPendingRemoval: string[];
 
   // Actions
   fetchNotes: (limit?: number) => Promise<void>;
@@ -174,6 +176,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
   notesError: null,
   notesHasMore: true,
   sentMessageTimestamps: [],
+  notesPendingRemoval: [],
 
   // Actions
 
@@ -221,7 +224,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       }
 
       // Reverse to show oldest first in UI (chat order)
-      const notesInChatOrder = (data || []).reverse() as LoveNote[];
+      const pendingRemoval = get().notesPendingRemoval;
+      const notesInChatOrder = ((data || []) as LoveNote[])
+        .filter((note) => !pendingRemoval.includes(note.id))
+        .reverse();
 
       // Identity guard: Sign Out sits on the same screen that fires this, and the
       // request goes out with a still-valid token — so it succeeds and its write
@@ -299,8 +305,13 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         throw error;
       }
 
-      // Reverse to maintain chat order (oldest first) and prepend to existing notes
-      const olderNotes = (data || []).reverse() as LoveNote[];
+      // Reverse to maintain chat order (oldest first) and prepend to existing notes.
+      // Same in-flight guard as fetchNotes: this page may have been requested
+      // before a removal committed and so still contain the removed note.
+      const pendingOlderRemoval = get().notesPendingRemoval;
+      const olderNotes = ((data || []) as LoveNote[])
+        .filter((note) => !pendingOlderRemoval.includes(note.id))
+        .reverse();
 
       // Identity guard, as in fetchNotes above — but this one is worse than the
       // plain case. `notes` was destructured before both awaits, so writing it
@@ -730,7 +741,26 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
     // Drop it before the round trip: the message has to leave the thread as
     // soon as the removal is confirmed, without a reload or a refetch.
-    set({ notes: get().notes.filter((note) => note.id !== noteId), notesError: null });
+    const remaining = get().notes.filter((note) => note.id !== noteId);
+
+    // If this empties the loaded window we go straight into a refill, and
+    // MessageList paints its empty state on `!isLoading && notes.length === 0`.
+    // Without holding the loading flag the user gets a "No messages to show"
+    // flash for the width of the round trip.
+    const willEmptyWindow = remaining.length === 0 && get().notesHasMore;
+
+    set({
+      notes: remaining,
+      notesError: null,
+      // A read already in flight -- the mount fetch in useLoveNotes, or a page
+      // request -- was issued before this removal commits and will come back
+      // with the note still in it. Both read paths drop anything listed here.
+      notesPendingRemoval: [...get().notesPendingRemoval, noteId],
+      notesIsLoading: willEmptyWindow ? true : get().notesIsLoading,
+    });
+
+    const forgetPending = () =>
+      get().notesPendingRemoval.filter((id) => id !== noteId);
 
     const { error } = await supabase.from('love_note_removals').upsert(
       { user_id: userId, note_id: noteId },
@@ -753,8 +783,13 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           ? current
           : [...current, target].sort((a, b) => a.created_at.localeCompare(b.created_at)),
         notesError: 'Failed to remove message',
+        notesPendingRemoval: forgetPending(),
+        notesIsLoading: willEmptyWindow ? false : get().notesIsLoading,
       });
-      return;
+      // Tell the caller. The confirmation dialog closes on a resolved promise,
+      // so swallowing this would dismiss it exactly as on success and leave the
+      // user watching the message reappear with no explanation.
+      throw error instanceof Error ? error : new Error('Failed to remove message');
     }
 
     // MessageList early-returns its empty state before the virtualized list
@@ -762,7 +797,12 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     // window would strand the user on an empty thread with history behind it.
     if (get().notes.length === 0 && get().notesHasMore) {
       await get().fetchNotes();
+    } else if (willEmptyWindow) {
+      set({ notesIsLoading: false });
     }
+
+    // The removal is committed, so reads issued from here on already exclude it.
+    set({ notesPendingRemoval: forgetPending() });
   },
 
   /**

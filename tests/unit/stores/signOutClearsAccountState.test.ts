@@ -49,6 +49,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   notesError: null,
   notesHasMore: true,
   sentMessageTimestamps: [],
+  notesPendingRemoval: [],
   photos: [],
   selectedPhotoId: null,
   isUploading: false,
@@ -134,6 +135,9 @@ function seedSignedInSession(): void {
       },
     ],
     sentMessageTimestamps: [1],
+    // Which messages the previous account removed is theirs, not the next
+    // signer-in's — and left behind it would filter their notes by stale ids.
+    notesPendingRemoval: ['note-1'],
 
     photos: [{ id: 'photo-1', caption: SECRETS.photoCaption }],
     selectedPhotoId: 'photo-1',

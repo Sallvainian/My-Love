@@ -15,6 +15,7 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoveNote } from '../../../types/models';
 import { LoveNoteMessage } from '../LoveNoteMessage';
+import { MessageList } from '../MessageList';
 import { NoteRemoveConfirmation } from '../NoteRemoveConfirmation';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
@@ -42,11 +43,15 @@ const committed: LoveNote = {
   created_at: '2026-08-17T10:00:00.000Z',
 };
 
-function renderBubble(message: LoveNote, onRequestRemove?: (n: LoveNote) => void) {
+function renderBubble(
+  message: LoveNote,
+  onRequestRemove?: (n: LoveNote) => void,
+  isOwnMessage = true
+) {
   return render(
     <LoveNoteMessage
       message={message}
-      isOwnMessage
+      isOwnMessage={isOwnMessage}
       senderName="You"
       onRequestRemove={onRequestRemove}
     />
@@ -63,6 +68,18 @@ describe('remove control on a message bubble', () => {
     fireEvent.click(screen.getByTestId('note-remove-button'));
 
     expect(onRequestRemove).toHaveBeenCalledWith(committed);
+  });
+
+  it('offers removal on a message the partner sent, not just your own', () => {
+    const onRequestRemove = vi.fn();
+    // Narrowing this to own messages only would be a plausible edit and would
+    // silently drop half the feature — the spec is explicit that a user can
+    // remove a message they received.
+    renderBubble({ ...committed, from_user_id: 'user-b', to_user_id: 'user-a' }, onRequestRemove, false);
+
+    fireEvent.click(screen.getByTestId('note-remove-button'));
+
+    expect(onRequestRemove).toHaveBeenCalled();
   });
 
   it('does not offer removal while a message is still sending', () => {
@@ -122,6 +139,28 @@ describe('remove confirmation dialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('closes on Escape and takes focus off the trash button behind the overlay', async () => {
+    const onClose = vi.fn();
+    const onConfirmRemove = vi.fn();
+    render(
+      <NoteRemoveConfirmation
+        note={committed}
+        onClose={onClose}
+        onConfirmRemove={onConfirmRemove}
+      />
+    );
+
+    // Cancel takes initial focus because this cannot be undone.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+
+    // useFocusTrap listens on the dialog container, so the event has to start
+    // where focus actually is and bubble — which is what a real keypress does.
+    fireEvent.keyDown(screen.getByText('Cancel'), { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalled();
+    expect(onConfirmRemove).not.toHaveBeenCalled();
+  });
+
   it('removes only on the confirming action, then closes', async () => {
     const onClose = vi.fn();
     const onConfirmRemove = vi.fn(async () => undefined);
@@ -156,5 +195,32 @@ describe('remove confirmation dialog', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('the wiring from list to dialog', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // onRequestRemove is optional at every hop — MessageListProps, the MessageList
+  // destructure, the rowProps object, MessageRow, and LoveNoteMessage — so
+  // dropping it anywhere typechecks, leaves both other suites green, and removes
+  // the feature. This is the only test that notices.
+  it('carries the request from a rendered row out to the caller', () => {
+    const onRequestRemove = vi.fn();
+
+    render(
+      <MessageList
+        notes={[committed]}
+        currentUserId="user-a"
+        partnerName="Partner"
+        userName="You"
+        isLoading={false}
+        onRequestRemove={onRequestRemove}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('note-remove-button'));
+
+    expect(onRequestRemove).toHaveBeenCalledWith(committed);
   });
 });
