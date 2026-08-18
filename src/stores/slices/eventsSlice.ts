@@ -74,6 +74,18 @@ function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+/**
+ * Monotonic id of the most recent `loadEvents` call. Each load captures its id
+ * and abandons its own resolution if a newer load has started since. The
+ * identity guard cannot catch this case: two refreshes for the SAME user (a
+ * mount effect plus a manual refresh) overlap with identical `userId`s, so
+ * without the token the first to resolve clears `eventsIsLoading` while the
+ * second is still in flight, and whichever lands last owns the list — even if
+ * it carried the older data. Module scope is safe: the app creates exactly one
+ * store instance.
+ */
+let latestLoadId = 0;
+
 export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) => ({
   // Initial state
   events: [],
@@ -91,6 +103,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     // — so it succeeds and its write lands after clearAuth, putting the previous
     // account's events back on screen for whoever signs in next.
     const requestedBy = get().userId;
+    const loadId = ++latestLoadId;
     set({ eventsIsLoading: true, eventsError: null });
 
     try {
@@ -100,12 +113,17 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       // events key, flag included. Writing the flag here instead would clear a
       // successor account's own live spinner mid-load.
       if (get().userId !== requestedBy) return;
+      // A newer same-user load owns the flag and the list now.
+      if (loadId !== latestLoadId) return;
       set({ events, eventsIsLoading: false });
     } catch (error) {
       const errorMsg = messageOf(error, 'Failed to load events');
       console.error('[EventsSlice] Error loading events:', error);
       // Touch nothing here either — same reasoning as the success branch.
       if (get().userId !== requestedBy) return;
+      // A newer same-user load owns the flag now; parking this stale failure
+      // would slap an error banner over a refresh that may yet succeed.
+      if (loadId !== latestLoadId) return;
       // The last-good list survives a failed refresh: events are Supabase-only
       // with no mirror to repopulate from, so blanking here would erase data
       // the user is looking at. Matches notesSlice and moodSlice.
