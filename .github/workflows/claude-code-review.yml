@@ -38,7 +38,7 @@ jobs:
       # `npm ci` can never succeed once the agent is running. Install here,
       # where the runner has network — the agent then runs `npm run test:unit`
       # and `npm run typecheck` against a ready node_modules, offline.
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           cache: 'npm'
@@ -89,13 +89,16 @@ jobs:
 
             ## Filter gate (2-of-4 rule)
 
-            Only report an issue if AT LEAST TWO of these criteria are met:
+            Only report a finding if AT LEAST TWO of these criteria are met:
             - You can quote the exact violated line from `AGENTS.md`, naming its section
-            - The issue is introduced in THIS PR's diff (not pre-existing code)
+            - The finding is introduced in THIS PR's diff (not pre-existing code)
             - It will cause incorrect runtime behavior, a bug, or a security vulnerability
             - It is objectively wrong (not a style preference)
 
-            If fewer than two criteria are met, do not comment.
+            This gate governs the WHOLE review, not the Issues Found section alone.
+            If fewer than two criteria are met, drop the finding entirely — delete it.
+            Do NOT demote it to Suggestions. Suggestions is not the overflow bin for
+            findings that failed this gate; it carries its own additional bar, below.
 
             `AGENTS.md` deliberately names code that ALREADY violates its own rules —
             the four modules still calling `supabase.channel()` directly, the mutators
@@ -166,9 +169,33 @@ jobs:
 
             **Issues Found** — problems that passed the filter gate above. For each:
             `path/to/file.ts:42` — what is wrong, and the fix. Include a suggestion
-            block where a one-click fix is possible.
+            block where a one-click fix is possible. Order by user impact, highest
+            first.
 
-            **Suggestions** — non-blocking improvements, same `file:line` format.
+            **Suggestions** — non-blocking improvements, same `file:line` format. A
+            suggestion must pass the filter gate above AND clear both of these:
+
+            - **Reachable today.** The condition must be reachable from code that
+              exists in the repo right now. If it only manifests once a config value
+              is changed, a `null` is replaced with a real value, or a caller that
+              has not been written yet appears, it is not reachable — drop it.
+              Catching yourself writing "unreachable today, but…", "harmless while
+              nothing calls this", or "once X is set to a real value" IS the signal
+              to drop it, not a caveat to ship alongside it.
+            - **Named user consequence.** Say what a person using this app
+              experiences differently — what they see, lose, wait for, or cannot do.
+              If you cannot name that, it is not a suggestion. Internal consistency,
+              stale or inaccurate comments, naming, and scope-creep observations
+              never clear this bar on their own.
+
+            Order suggestions by user impact, highest first — the one affecting the
+            most users, or costing them the most, leads. There is no cap: every
+            suggestion clearing both bars belongs in the list, however many that is.
+
+            **Minor** — at most ONE line, total, for findings that pass the filter
+            gate but name no user consequence (wrong comments, internal
+            inconsistency, scope creep). Bare `file:line` references, a few words
+            each. Omit the section entirely rather than padding it out.
 
             **Verdict** — a single line stating whether anything blocks merge.
 
