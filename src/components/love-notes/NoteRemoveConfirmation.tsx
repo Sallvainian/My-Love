@@ -66,6 +66,15 @@ export function NoteRemoveConfirmation({
     initialFocusRef: cancelButtonRef,
   });
 
+  // Hand focus back to Cancel once a failure has re-enabled it. This has to run
+  // after that render: doing it inside the catch focuses a still-disabled
+  // button, which the DOM ignores, leaving focus parked on the panel.
+  useEffect(() => {
+    if (error && !isRemoving) {
+      cancelButtonRef.current?.focus();
+    }
+  }, [error, isRemoving]);
+
   const handleRemove = async () => {
     try {
       setIsRemoving(true);
@@ -95,7 +104,9 @@ export function NoteRemoveConfirmation({
       );
       setIsRemoving(false);
       isRemovingRef.current = false;
-      cancelButtonRef.current?.focus();
+      // Focus is restored by the effect below, not here: setIsRemoving(false) is
+      // batched and has not rendered yet, so Cancel still carries `disabled` and
+      // focusing a disabled element is a no-op.
     }
   };
 
