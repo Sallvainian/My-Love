@@ -168,6 +168,37 @@ describe('remove confirmation dialog', () => {
     expect(document.activeElement).toBe(screen.getByTestId('trigger'));
   });
 
+  it('lands focus on the thread when the row that opened it is removed', async () => {
+    // The success path. Removing the note unmounts its row, and with it the
+    // control that opened this dialog — so restoring to the opener is a no-op
+    // and focus would fall to <body>, losing a keyboard user's place entirely.
+    function Harness({ open, rowPresent }: { open: boolean; rowPresent: boolean }) {
+      return (
+        <div data-testid="virtualized-list" tabIndex={-1}>
+          {rowPresent && <button data-testid="trigger">remove</button>}
+          {open && (
+            <NoteRemoveConfirmation
+              note={committed}
+              onClose={vi.fn()}
+              onConfirmRemove={vi.fn()}
+            />
+          )}
+        </div>
+      );
+    }
+
+    const { rerender } = render(<Harness open={false} rowPresent />);
+    screen.getByTestId('trigger').focus();
+
+    rerender(<Harness open rowPresent />);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+
+    // The removal succeeds: dialog closes and the row goes with it.
+    rerender(<Harness open={false} rowPresent={false} />);
+
+    expect(document.activeElement).toBe(screen.getByTestId('virtualized-list'));
+  });
+
   it('closes on Escape and takes focus off the trash button behind the overlay', async () => {
     const onClose = vi.fn();
     const onConfirmRemove = vi.fn();
