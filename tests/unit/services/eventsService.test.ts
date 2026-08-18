@@ -327,7 +327,7 @@ describe('eventsService', () => {
     it('throws without issuing a request when the device is offline', async () => {
       setOnline(false);
 
-      await expect(eventsService.getEvents()).rejects.toThrow(/Network error/);
+      await expect(eventsService.getEvents()).rejects.toThrow('You are offline. Events need a connection to load.');
       expect(backend.fromCalls).toBe(0);
     });
 
@@ -392,7 +392,7 @@ describe('eventsService', () => {
 
       await expect(
         eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
-      ).rejects.toThrow(/Network error/);
+      ).rejects.toThrow('You are offline. Events need a connection to save.');
       expect(backend.fromCalls).toBe(0);
       expect(backend.rows).toEqual([]);
     });
@@ -485,7 +485,7 @@ describe('eventsService', () => {
       setOnline(false);
 
       await expect(eventsService.updateEvent('event-1', { label: 'x' })).rejects.toThrow(
-        /Network error/
+        'You are offline. Events need a connection to save.'
       );
       expect(backend.fromCalls).toBe(0);
     });
@@ -534,7 +534,7 @@ describe('eventsService', () => {
     it('throws before any request when the device is offline', async () => {
       setOnline(false);
 
-      await expect(eventsService.deleteEvent('event-1')).rejects.toThrow(/Network error/);
+      await expect(eventsService.deleteEvent('event-1')).rejects.toThrow('You are offline. Events need a connection to save.');
       expect(backend.fromCalls).toBe(0);
     });
 
