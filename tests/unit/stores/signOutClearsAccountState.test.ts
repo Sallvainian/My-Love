@@ -313,6 +313,57 @@ describe('clearAuth on sign-out', () => {
     revoke.mockRestore();
   });
 
+  it('an account switch that never signs out also clears the previous account', () => {
+    // clearAuth is not the only way the store changes hands. onAuthStateChange
+    // routes every session-bearing event to setAuthUser (App.tsx:233), which
+    // used to set only userId/userEmail/isAuthenticated -- so a sign-in over a
+    // live session would have carried the previous couple's chat into the new
+    // account on a shared device.
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    seedSignedInSession();
+    useAppStore.setState({
+      notes: [
+        {
+          id: 'note-failed',
+          from_user_id: SECRETS.userId,
+          to_user_id: 'USER-B-ID',
+          content: SECRETS.chatMessage,
+          created_at: '2026-08-03T06:00:00.000Z',
+          imagePreviewUrl: 'blob:http://localhost/SWITCH-ORPHANED-BLOB',
+        },
+      ],
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+    expect(useAppStore.getState().notes.length).toBeGreaterThan(0);
+
+    useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
+
+    // Resetting without revoking first strands the blob URL: the array it lives
+    // in is gone, so nothing can reach it afterwards. clearAuth has always done
+    // this; the switch path has to as well.
+    expect(revoke).toHaveBeenCalledWith('blob:http://localhost/SWITCH-ORPHANED-BLOB');
+    revoke.mockRestore();
+
+    expect(useAppStore.getState().userId).toBe('USER-B-ID');
+    expect(useAppStore.getState().notes).toEqual([]);
+    expect(useAppStore.getState().moods).toEqual([]);
+    expect(useAppStore.getState().photos).toEqual([]);
+    expect(useAppStore.getState().partner).toBeNull();
+    expect(useAppStore.getState().notesPendingRemoval).toEqual([]);
+    expect(JSON.stringify(useAppStore.getState())).not.toContain(SECRETS.chatMessage);
+  });
+
+  it('a repeat event for the SAME user leaves the session alone', () => {
+    // TOKEN_REFRESHED, INITIAL_SESSION and USER_UPDATED all arrive here with the
+    // same user. Resetting on those would wipe the screen mid-session.
+    seedSignedInSession();
+    const before = useAppStore.getState().notes;
+
+    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
+
+    expect(useAppStore.getState().notes).toBe(before);
+    expect(useAppStore.getState().userId).toBe(SECRETS.userId);
+  });
+
   it('signedOutState() and this test agree on which fields exist', () => {
     // Catches drift in the other direction: a field ADDED to the source without
     // being added here would otherwise go unasserted forever.
