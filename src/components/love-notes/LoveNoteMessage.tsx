@@ -16,7 +16,7 @@
 
 import DOMPurify from 'dompurify';
 import { motion } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import { memo, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getSignedImageUrl } from '../../services/loveNoteImageService';
 import type { LoveNote } from '../../types/models';
@@ -36,6 +36,8 @@ export interface LoveNoteMessageProps {
   senderName: string;
   /** Callback when user clicks retry on a failed message (Story 2.2) */
   onRetry?: (tempId: string) => void;
+  /** Callback when the user asks to remove this message from their own history */
+  onRequestRemove?: (note: LoveNote) => void;
 }
 
 /**
@@ -56,9 +58,15 @@ function LoveNoteMessageComponent({
   isOwnMessage,
   senderName,
   onRetry,
+  onRequestRemove,
 }: LoveNoteMessageProps): ReactElement {
   const formattedTime = formatMessageTimestamp(message.created_at);
   const fullTimestamp = formatFullTimestamp(message.created_at);
+
+  // A note still carrying a tempId has no server row -- its `id` IS the temp
+  // string, and a failed send keeps it -- so there is nothing a removal could
+  // reference. Offering the control there would post `temp-...` into a uuid.
+  const canRemove = !!onRequestRemove && !message.tempId;
 
   // Image state
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -220,10 +228,32 @@ function LoveNoteMessageComponent({
         data-testid="love-note-message"
       >
         {/* Sender name and timestamp caption */}
+        {/*
+          The control lives inside the existing caption line rather than in a row
+          of its own. MessageList.calculateRowHeight budgets this line at a fixed
+          20px and react-window positions every row from that number, so anything
+          that added height here would silently misplace the whole list. `h-4`
+          matches the caption's own 16px line box.
+        */}
         <span
-          className={`mb-1 px-1 text-xs text-gray-500 ${isOwnMessage ? 'text-right' : 'text-left'}`}
+          className={`mb-1 flex items-center gap-1.5 px-1 text-xs leading-4 text-gray-500 ${
+            isOwnMessage ? 'flex-row-reverse' : ''
+          }`}
         >
-          {senderName} · {formattedTime}
+          <span>
+            {senderName} · {formattedTime}
+          </span>
+          {canRemove && (
+            <button
+              type="button"
+              onClick={() => onRequestRemove?.(message)}
+              className="flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center rounded text-gray-400 opacity-60 transition hover:text-red-500 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
+              aria-label={`Remove message from ${senderName} at ${fullTimestamp} from your history`}
+              data-testid="note-remove-button"
+            >
+              <Trash2 className="h-3 w-3" aria-hidden="true" />
+            </button>
+          )}
         </span>
 
         {/* Message bubble */}
