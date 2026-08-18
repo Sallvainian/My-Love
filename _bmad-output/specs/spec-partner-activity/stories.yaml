@@ -1,0 +1,40 @@
+- id: "1"
+  title: Create the feature_seen watermark table
+  description: >-
+    The feature_seen migration from data-model.md — RLS policies, grants,
+    the server-clock touch trigger, the four-value feature CHECK, and the
+    new idx_interactions_to_user_created index — plus pgTAP
+    20_feature_seen.sql and regenerated types. Grounds CAP-1's per-user
+    watermark; no client code.
+- id: "2"
+  title: Unseen counts in the store
+  description: >-
+    New activitySlice with refreshUnseenCounts() (four count queries) and
+    markFeatureSeen() per integration-points.md §1, wired into the two
+    existing App.tsx hook points, with signedOutState/EXPECTED_RESET keys
+    and unit tests in the same commit. Covers CAP-1's counting, CAP-4,
+    and CAP-7's state half.
+- id: "3"
+  title: Badge UI and clear-on-view
+  description: >-
+    The aggregate hamburger indicator and per-destination counts per
+    integration-points.md §2, markFeatureSeen on entering a destination
+    view, and the badge E2E. Completes CAP-1, CAP-2, and CAP-3 visibly —
+    the shippable badge milestone.
+  done_checkpoint: true
+- id: "4"
+  title: Toast receiver — hook and banner
+  description: >-
+    usePartnerActivity (refcounted registry, partner-activity topic,
+    SUBSCRIBED self-heal, the toast-vs-silent branch incl. the
+    interactions no-loader case) and the 5-second ActivityToast per
+    integration-points.md §3. Covers CAP-5's receive side and CAP-6,
+    unit-tested with faked signals and E2E-tested by driving toast state.
+- id: "5"
+  title: Toast senders — photos, notes, interactions
+  description: >-
+    The send blocks from integration-points.md §4: photos broadcast after
+    upload succeeds, notes add the partner-activity signal beside their
+    existing broadcast, interactions broadcast after sendInteraction's
+    insert. Completes CAP-5 end to end.
+  done_checkpoint: true
