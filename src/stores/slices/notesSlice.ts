@@ -43,6 +43,7 @@ export interface NotesSlice {
   checkRateLimit: () => { recentTimestamps: number[]; now: number };
   sendNote: (content: string, imageFile?: File) => Promise<void>;
   retryFailedMessage: (tempId: string) => Promise<void>;
+  removeNote: (noteId: string) => Promise<void>;
   cleanupPreviewUrls: () => void;
   removeFailedMessage: (tempId: string) => void;
 }
@@ -207,7 +208,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       // Fetch messages for conversation between user and partner
       const { data, error } = await supabase
-        .from('love_notes')
+        .from('love_notes_visible')
         .select('*')
         .or(
           `and(from_user_id.eq.${userId},to_user_id.eq.${partnerId}),and(from_user_id.eq.${partnerId},to_user_id.eq.${userId})`
@@ -285,7 +286,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       // Fetch messages older than the oldest we have
       const { data, error } = await supabase
-        .from('love_notes')
+        .from('love_notes_visible')
         .select('*')
         .or(
           `and(from_user_id.eq.${userId},to_user_id.eq.${partnerId}),and(from_user_id.eq.${partnerId},to_user_id.eq.${userId})`
@@ -694,6 +695,73 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       }
 
       throw error;
+    }
+  },
+
+  /**
+   * Remove a note from this user's own history.
+   *
+   * Not a delete. love_notes holds exactly one row per message and that row is
+   * simultaneously the partner's copy, so it is never touched: the removal is a
+   * row in love_note_removals, and love_notes_visible -- which both read paths
+   * above select from -- anti-joins it. The partner reads the note unchanged.
+   *
+   * One-way by construction: love_note_removals has no DELETE policy and does
+   * not grant the privilege, so there is nothing here to undo against.
+   */
+  removeNote: async (noteId: string) => {
+    const userId = get().userId;
+    if (!userId) {
+      set({ notesError: 'User not authenticated' });
+      return;
+    }
+
+    const target = get().notes.find((note) => note.id === noteId);
+    if (!target) return;
+
+    // An optimistic note's id IS its tempId (see sendNote), so there is no
+    // server row to point at and note_id would reject the `temp-` string. A
+    // failed send keeps that id too. The UI does not offer removal in either
+    // state; this guards the store for callers that bypass it.
+    if (target.tempId) {
+      logger.debug('[NotesSlice] Refusing to remove a note with no server row:', noteId);
+      return;
+    }
+
+    // Drop it before the round trip: the message has to leave the thread as
+    // soon as the removal is confirmed, without a reload or a refetch.
+    set({ notes: get().notes.filter((note) => note.id !== noteId), notesError: null });
+
+    const { error } = await supabase.from('love_note_removals').upsert(
+      { user_id: userId, note_id: noteId },
+      { onConflict: 'user_id,note_id', ignoreDuplicates: true }
+    );
+
+    // Identity guard, as in fetchNotes above: Sign Out sits on the same screen
+    // and the request goes out with a still-valid token, so it succeeds and its
+    // write would land after clearAuth.
+    if (get().userId !== userId) return;
+
+    if (error) {
+      console.error('[NotesSlice] Error removing note:', error);
+      // Re-read rather than reusing a pre-await capture, so a note that arrived
+      // over realtime while the request was in flight is not dropped by the
+      // rollback.
+      const current = get().notes;
+      set({
+        notes: current.some((note) => note.id === noteId)
+          ? current
+          : [...current, target].sort((a, b) => a.created_at.localeCompare(b.created_at)),
+        notesError: 'Failed to remove message',
+      });
+      return;
+    }
+
+    // MessageList early-returns its empty state before the virtualized list
+    // whose onRowsRendered is the only caller of onLoadMore, so an emptied
+    // window would strand the user on an empty thread with history behind it.
+    if (get().notes.length === 0 && get().notesHasMore) {
+      await get().fetchNotes();
     }
   },
 
