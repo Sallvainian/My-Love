@@ -147,6 +147,51 @@ describe('PhotoViewer focus', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('still closes on Escape after focus has fallen to <body>', () => {
+    // A focused nav button disabling at either end of the gallery, or a focused
+    // Retry button unmounting, sends focus to <body> in a real browser. <body>
+    // is an ancestor of the container, so the trap's listener never sees the
+    // key; the window-level fallback covers exactly that case.
+    const onClose = vi.fn();
+    render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={onClose} />);
+
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs onClose exactly once per Escape when focus is inside the container', () => {
+    // The window fallback must stand down while the trap's listener can see the
+    // key, or one Escape closes twice -- the double-call the fallback's guard
+    // exists to prevent.
+    const onClose = vi.fn();
+    render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={onClose} />);
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps focus inside the container after confirming a delete', async () => {
+    // The focused Delete button unmounts with the dialog; without the explicit
+    // refocus, focus falls to <body> and the trap's Tab cycle dies.
+    const two = [
+      photo,
+      { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
+    ];
+    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    });
+    const overlay = screen.getByTestId('photo-viewer-overlay');
+    expect(overlay.contains(document.activeElement)).toBe(true);
+  });
+
   it('keeps the container reachable by focus, or Escape dies on the first click', () => {
     // Structural, and deliberately so. This viewer has exactly four focusable
     // controls; the photo, the drag surface, the caption bar and the backdrop are
