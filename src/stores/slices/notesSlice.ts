@@ -721,14 +721,21 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
    * not grant the privilege, so there is nothing here to undo against.
    */
   removeNote: async (noteId: string) => {
+    // Every path out of here either removes the note or throws. A resolved
+    // promise is the confirmation dialog's success signal -- it closes on one --
+    // so returning quietly would dismiss the dialog as though the message were
+    // gone when nothing had been recorded.
     const userId = get().userId;
     if (!userId) {
-      set({ notesError: 'User not authenticated' });
-      return;
+      throw new Error('User not authenticated');
     }
 
     const target = get().notes.find((note) => note.id === noteId);
-    if (!target) return;
+    if (!target) {
+      // Reachable whenever the loaded window is replaced while the dialog is
+      // open, which the refill below can itself do.
+      throw new Error('That message is no longer loaded');
+    }
 
     // An optimistic note's id IS its tempId (see sendNote), so there is no
     // server row to point at and note_id would reject the `temp-` string. A
@@ -736,7 +743,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     // state; this guards the store for callers that bypass it.
     if (target.tempId) {
       logger.debug('[NotesSlice] Refusing to remove a note with no server row:', noteId);
-      return;
+      throw new Error('That message has not finished sending');
     }
 
     // Drop it before the round trip: the message has to leave the thread as
