@@ -83,7 +83,16 @@ export function NoteRemoveConfirmation({
       onClose();
     } catch (err) {
       console.error('[NoteRemoveConfirmation] Failed to remove note:', err);
-      setError('Failed to remove the message. Please try again.');
+      // Surface what removeNote actually threw. Every message it raises is
+      // written for a person, and the generic "please try again" was advice that
+      // could not work for some of them -- a note that is no longer in the
+      // loaded window throws on every retry, so the fixed string sent the user
+      // round a loop whose only exit was Cancel.
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Failed to remove the message. Please try again.'
+      );
       setIsRemoving(false);
       isRemovingRef.current = false;
       cancelButtonRef.current?.focus();
