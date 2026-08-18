@@ -94,7 +94,8 @@ export interface EventUpdateInput {
 }
 
 /**
- * A write that reached the database and changed nothing.
+ * A write that could not land: it reached the database and changed nothing,
+ * or was refused before leaving the device (offline).
  *
  * Not exported and deliberately re-thrown untouched by the catch tail: routing
  * it through `handleNetworkError` would tell the user their change "will be
@@ -218,11 +219,14 @@ class EventsService {
    * index still serves the RLS predicate's `user_id` lookups.
    *
    * @returns Events in date order, each with a local-midnight `Date`
-   * @throws {SupabaseServiceError} if offline or the query fails
+   * @throws an accurate offline error, or {SupabaseServiceError} if the query fails
    */
   async getEvents(): Promise<CoupleEvent[]> {
     if (!isOnline()) {
-      throw handleNetworkError(new Error('Device is offline'), 'EventsService.getEvents');
+      // NOT handleNetworkError: its message promises the change "will be
+      // synced when you're back online", and events have no sync path in
+      // either direction. Accurate and user-facing instead.
+      throw new Error('You are offline. Events need a connection to load.');
     }
 
     try {
@@ -272,7 +276,9 @@ class EventsService {
    */
   async createEvent(input: EventCreateInput): Promise<CoupleEvent> {
     if (!isOnline()) {
-      throw handleNetworkError(new Error('Device is offline'), 'EventsService.createEvent');
+      // NOT handleNetworkError: no offline queue exists, so its "will be
+      // synced when you're back online" promise is the opposite of the truth.
+      throw new EventWriteError('You are offline. Events need a connection to save.');
     }
 
     const parsedInput = parseEventDate(input.eventDate);
@@ -343,7 +349,9 @@ class EventsService {
    */
   async updateEvent(eventId: string, updates: EventUpdateInput): Promise<CoupleEvent> {
     if (!isOnline()) {
-      throw handleNetworkError(new Error('Device is offline'), 'EventsService.updateEvent');
+      // NOT handleNetworkError: no offline queue exists, so its "will be
+      // synced when you're back online" promise is the opposite of the truth.
+      throw new EventWriteError('You are offline. Events need a connection to save.');
     }
 
     // Same refusal as createEvent: an unreadable date must not reach the column.
@@ -407,7 +415,9 @@ class EventsService {
    */
   async deleteEvent(eventId: string): Promise<void> {
     if (!isOnline()) {
-      throw handleNetworkError(new Error('Device is offline'), 'EventsService.deleteEvent');
+      // NOT handleNetworkError: no offline queue exists, so its "will be
+      // synced when you're back online" promise is the opposite of the truth.
+      throw new EventWriteError('You are offline. Events need a connection to save.');
     }
 
     try {
