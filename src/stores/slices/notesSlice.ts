@@ -741,6 +741,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
     // Drop it before the round trip: the message has to leave the thread as
     // soon as the removal is confirmed, without a reload or a refetch.
+    const originalIndex = get().notes.findIndex((note) => note.id === noteId);
     const remaining = get().notes.filter((note) => note.id !== noteId);
 
     // If this empties the loaded window we go straight into a refill, and
@@ -776,13 +777,24 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       console.error('[NotesSlice] Error removing note:', error);
       // Re-read rather than reusing a pre-await capture, so a note that arrived
       // over realtime while the request was in flight is not dropped by the
-      // rollback.
+      // rollback. Splice it back where it was rather than re-sorting: server
+      // rows carry Postgres timestamptz ('...485294+00:00') while an optimistic
+      // note from sendNote carries toISOString ('...485Z'), and the two do not
+      // collate against each other -- a whole-second server row sorts after a
+      // client note it actually precedes -- so re-sorting could reorder a note
+      // that is still sending.
       const current = get().notes;
+      let restored = current;
+      if (!current.some((note) => note.id === noteId)) {
+        restored = [...current];
+        restored.splice(Math.min(Math.max(originalIndex, 0), restored.length), 0, target);
+      }
       set({
-        notes: current.some((note) => note.id === noteId)
-          ? current
-          : [...current, target].sort((a, b) => a.created_at.localeCompare(b.created_at)),
-        notesError: 'Failed to remove message',
+        notes: restored,
+        // The thrown error is the single owner of this failure. Also setting
+        // notesError would show it twice -- once in the dialog's own alert and
+        // once in the page banner at LoveNotes.tsx -- and the banner would
+        // outlive the dialog the user then cancels out of.
         notesPendingRemoval: forgetPending(),
         notesIsLoading: willEmptyWindow ? false : get().notesIsLoading,
       });
@@ -801,8 +813,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       set({ notesIsLoading: false });
     }
 
-    // The removal is committed, so reads issued from here on already exclude it.
-    set({ notesPendingRemoval: forgetPending() });
+    // Deliberately NOT cleared on success. The marker exists for a read whose
+    // SELECT was evaluated server-side before this removal committed, and such a
+    // read can resolve after this action returns -- both read paths sample the
+    // list only after their own await. Clearing here would drop the guard at
+    // exactly the moment it is still load-bearing, letting a page that was
+    // already in flight prepend the note the user just removed. Note ids are
+    // uuids and are never reused, and signedOutState() resets the list, so
+    // keeping it costs one string per removal for the session.
   },
 
   /**
