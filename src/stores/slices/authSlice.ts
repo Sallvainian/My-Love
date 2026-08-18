@@ -80,6 +80,7 @@ export function signedOutState() {
     notesError: null,
     notesHasMore: true,
     sentMessageTimestamps: [],
+    notesPendingRemoval: [],
 
     // photosSlice
     photos: [],
@@ -136,34 +137,61 @@ export interface AuthSlice {
   clearAuth: () => void;
 }
 
+/**
+ * The one way account state is discarded.
+ *
+ * Revoking and resetting are a pair, not two steps a caller may pick from.
+ * `signedOutState()` empties `notes`, and the unmount cleanup that would
+ * otherwise release their blob URLs reads the live array — so a writer that
+ * takes the reset without the revoke strands every preview URL on a failed image
+ * send for the lifetime of the document. That is not hypothetical: `clearAuth`
+ * carried the rule in a comment, `setAuthUser` later reused `signedOutState()`
+ * alone, and the comment did not stop it. Both callers now go through here, so
+ * the two cannot come apart again.
+ */
+function discardAccountState(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+  identity: Pick<AuthSlice, 'userId' | 'userEmail' | 'isAuthenticated'>
+): void {
+  revokePreviewUrlsFromNotes(get().notes);
+
+  // Everything account-scoped goes at once. Nothing is lost that is not
+  // re-derivable: these are read caches of Supabase and IndexedDB, and unsynced
+  // local entries stay in IndexedDB for their owner to pick up.
+  set({ ...identity, ...signedOutState() } as Partial<AppState>);
+}
+
 export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => ({
   userId: null,
   userEmail: null,
   isAuthenticated: false,
 
   setAuthUser: (userId, email) => {
-    set({
+    // An account switch that never passes through a null session -- signing in
+    // over a live one -- reaches here without clearAuth ever running, and would
+    // otherwise carry the previous account's data into the new one. Route it
+    // through signedOutState() rather than listing fields here, so this stays
+    // correct as slices grow: that helper is the single place account state is
+    // cleared. A repeat call for the SAME user (TOKEN_REFRESHED,
+    // INITIAL_SESSION, USER_UPDATED) must not reset anything.
+    const previous = get().userId;
+    const switchedAccount = previous !== null && userId !== null && previous !== userId;
+    const identity = {
       userId,
       userEmail: email ?? null,
       isAuthenticated: !!userId,
-    });
+    };
+
+    if (switchedAccount) {
+      discardAccountState(get, set, identity);
+      return;
+    }
+
+    set(identity);
   },
 
   clearAuth: () => {
-    // Release the object URLs first. Every other writer of `notes` goes through
-    // this helper; assigning `[]` directly would strand them, because the
-    // unmount cleanup that would otherwise revoke reads the live array and
-    // clearAuth has already emptied it by the time React unmounts.
-    revokePreviewUrlsFromNotes(get().notes);
-
-    // Everything account-scoped goes at once. Nothing is lost that is not
-    // re-derivable: these are read caches of Supabase and IndexedDB, and
-    // unsynced local entries stay in IndexedDB for their owner to pick up.
-    set({
-      userId: null,
-      userEmail: null,
-      isAuthenticated: false,
-      ...signedOutState(),
-    });
+    discardAccountState(get, set, { userId: null, userEmail: null, isAuthenticated: false });
   },
 });

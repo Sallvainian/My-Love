@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
@@ -25,11 +25,23 @@ export function useFocusTrap(
 ): void {
   const onEscape = options?.onEscape;
   const initialFocusRef = options?.initialFocusRef;
+  const restoreRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
     const container = containerRef.current;
     if (!container) return;
+
+    // Captured once per activation rather than per effect run. This effect
+    // re-runs whenever a caller passes an unstable onEscape, and by then focus
+    // is already inside the trap -- capturing again would aim the restore at an
+    // element that unmounts along with the dialog.
+    if (!restoreRef.current) {
+      const active = document.activeElement as HTMLElement | null;
+      if (active && active !== document.body && !container.contains(active)) {
+        restoreRef.current = active;
+      }
+    }
 
     // Auto-focus initial element
     if (initialFocusRef?.current) {
@@ -65,4 +77,20 @@ export function useFocusTrap(
     container.addEventListener('keydown', handleKeyDown);
     return () => container.removeEventListener('keydown', handleKeyDown);
   }, [containerRef, enabled, onEscape, initialFocusRef]);
+
+  // Hand focus back where it came from when the trap goes away. Setting initial
+  // focus without this leaves a dismissed dialog's focus on <body>: the control
+  // that opened it is usually still mounted, and a keyboard user otherwise loses
+  // their position in the page behind the dialog. Keyed on `enabled` alone, so
+  // it fires on unmount or deactivation and not on every re-arm.
+  useEffect(() => {
+    if (!enabled) return;
+    return () => {
+      const target = restoreRef.current;
+      restoreRef.current = null;
+      if (target?.isConnected) {
+        target.focus();
+      }
+    };
+  }, [enabled]);
 }

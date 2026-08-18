@@ -32,6 +32,8 @@ export interface NotesSlice {
   notesError: string | null;
   notesHasMore: boolean;
   sentMessageTimestamps: number[]; // For rate limiting
+  /** Note ids whose removal has been applied locally but not yet committed */
+  notesPendingRemoval: string[];
 
   // Actions
   fetchNotes: (limit?: number) => Promise<void>;
@@ -43,6 +45,7 @@ export interface NotesSlice {
   checkRateLimit: () => { recentTimestamps: number[]; now: number };
   sendNote: (content: string, imageFile?: File) => Promise<void>;
   retryFailedMessage: (tempId: string) => Promise<void>;
+  removeNote: (noteId: string) => Promise<void>;
   cleanupPreviewUrls: () => void;
   removeFailedMessage: (tempId: string) => void;
 }
@@ -173,6 +176,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
   notesError: null,
   notesHasMore: true,
   sentMessageTimestamps: [],
+  notesPendingRemoval: [],
 
   // Actions
 
@@ -207,7 +211,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       // Fetch messages for conversation between user and partner
       const { data, error } = await supabase
-        .from('love_notes')
+        .from('love_notes_visible')
         .select('*')
         .or(
           `and(from_user_id.eq.${userId},to_user_id.eq.${partnerId}),and(from_user_id.eq.${partnerId},to_user_id.eq.${userId})`
@@ -220,7 +224,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       }
 
       // Reverse to show oldest first in UI (chat order)
-      const notesInChatOrder = (data || []).reverse() as LoveNote[];
+      const pendingRemoval = get().notesPendingRemoval;
+      const notesInChatOrder = ((data || []) as LoveNote[])
+        .filter((note) => !pendingRemoval.includes(note.id))
+        .reverse();
 
       // Identity guard: Sign Out sits on the same screen that fires this, and the
       // request goes out with a still-valid token — so it succeeds and its write
@@ -285,7 +292,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       // Fetch messages older than the oldest we have
       const { data, error } = await supabase
-        .from('love_notes')
+        .from('love_notes_visible')
         .select('*')
         .or(
           `and(from_user_id.eq.${userId},to_user_id.eq.${partnerId}),and(from_user_id.eq.${partnerId},to_user_id.eq.${userId})`
@@ -298,8 +305,13 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         throw error;
       }
 
-      // Reverse to maintain chat order (oldest first) and prepend to existing notes
-      const olderNotes = (data || []).reverse() as LoveNote[];
+      // Reverse to maintain chat order (oldest first) and prepend to existing notes.
+      // Same in-flight guard as fetchNotes: this page may have been requested
+      // before a removal committed and so still contain the removed note.
+      const pendingOlderRemoval = get().notesPendingRemoval;
+      const olderNotes = ((data || []) as LoveNote[])
+        .filter((note) => !pendingOlderRemoval.includes(note.id))
+        .reverse();
 
       // Identity guard, as in fetchNotes above — but this one is worse than the
       // plain case. `notes` was destructured before both awaits, so writing it
@@ -695,6 +707,137 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       throw error;
     }
+  },
+
+  /**
+   * Remove a note from this user's own history.
+   *
+   * Not a delete. love_notes holds exactly one row per message and that row is
+   * simultaneously the partner's copy, so it is never touched: the removal is a
+   * row in love_note_removals, and love_notes_visible -- which both read paths
+   * above select from -- anti-joins it. The partner reads the note unchanged.
+   *
+   * One-way by construction: love_note_removals has no DELETE policy and does
+   * not grant the privilege, so there is nothing here to undo against.
+   */
+  removeNote: async (noteId: string) => {
+    // Every path out of here either removes the note or throws. A resolved
+    // promise is the confirmation dialog's success signal -- it closes on one --
+    // so returning quietly would dismiss the dialog as though the message were
+    // gone when nothing had been recorded.
+    const userId = get().userId;
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+
+    const target = get().notes.find((note) => note.id === noteId);
+    if (!target) {
+      // Reachable whenever the loaded window is replaced while the dialog is
+      // open, which the refill below can itself do.
+      throw new Error('That message is no longer loaded');
+    }
+
+    // An optimistic note's id IS its tempId (see sendNote), so there is no
+    // server row to point at and note_id would reject the `temp-` string. A
+    // failed send keeps that id too. The UI does not offer removal in either
+    // state; this guards the store for callers that bypass it.
+    if (target.tempId) {
+      logger.debug('[NotesSlice] Refusing to remove a note with no server row:', noteId);
+      throw new Error('That message has not finished sending');
+    }
+
+    // Drop it before the round trip: the message has to leave the thread as
+    // soon as the removal is confirmed, without a reload or a refetch.
+    const originalIndex = get().notes.findIndex((note) => note.id === noteId);
+    const remaining = get().notes.filter((note) => note.id !== noteId);
+
+    // If this empties the loaded window we go straight into a refill, and
+    // MessageList paints its empty state on `!isLoading && notes.length === 0`.
+    // Without holding the loading flag the user gets a "No messages to show"
+    // flash for the width of the round trip.
+    const willEmptyWindow = remaining.length === 0 && get().notesHasMore;
+
+    set({
+      notes: remaining,
+      notesError: null,
+      // A read already in flight -- the mount fetch in useLoveNotes, or a page
+      // request -- was issued before this removal commits and will come back
+      // with the note still in it. Both read paths drop anything listed here.
+      notesPendingRemoval: [...get().notesPendingRemoval, noteId],
+      notesIsLoading: willEmptyWindow ? true : get().notesIsLoading,
+    });
+
+    const forgetPending = () =>
+      get().notesPendingRemoval.filter((id) => id !== noteId);
+
+    const { error } = await supabase.from('love_note_removals').upsert(
+      { user_id: userId, note_id: noteId },
+      { onConflict: 'user_id,note_id', ignoreDuplicates: true }
+    );
+
+    // Identity guard, as in fetchNotes above: Sign Out sits on the same screen
+    // and the request goes out with a still-valid token, so it succeeds and its
+    // write would land after clearAuth.
+    //
+    // The flag is half the guard. It was raised before the await when this
+    // removal would empty the window, so returning without releasing it strands
+    // MessageList on its spinner branch -- notes.length is 0 in exactly that
+    // case, so the tab renders nothing else. signedOutState() happens to clear
+    // it on sign-out, but setAuthUser (authSlice.ts:145) switches accounts
+    // without going through it.
+    if (get().userId !== userId) {
+      if (willEmptyWindow) set({ notesIsLoading: false });
+      return;
+    }
+
+    if (error) {
+      console.error('[NotesSlice] Error removing note:', error);
+      // Re-read rather than reusing a pre-await capture, so a note that arrived
+      // over realtime while the request was in flight is not dropped by the
+      // rollback. Splice it back where it was rather than re-sorting: server
+      // rows carry Postgres timestamptz ('...485294+00:00') while an optimistic
+      // note from sendNote carries toISOString ('...485Z'), and the two do not
+      // collate against each other -- a whole-second server row sorts after a
+      // client note it actually precedes -- so re-sorting could reorder a note
+      // that is still sending.
+      const current = get().notes;
+      let restored = current;
+      if (!current.some((note) => note.id === noteId)) {
+        restored = [...current];
+        restored.splice(Math.min(Math.max(originalIndex, 0), restored.length), 0, target);
+      }
+      set({
+        notes: restored,
+        // The thrown error is the single owner of this failure. Also setting
+        // notesError would show it twice -- once in the dialog's own alert and
+        // once in the page banner at LoveNotes.tsx -- and the banner would
+        // outlive the dialog the user then cancels out of.
+        notesPendingRemoval: forgetPending(),
+        notesIsLoading: willEmptyWindow ? false : get().notesIsLoading,
+      });
+      // Tell the caller. The confirmation dialog closes on a resolved promise,
+      // so swallowing this would dismiss it exactly as on success and leave the
+      // user watching the message reappear with no explanation.
+      throw error instanceof Error ? error : new Error('Failed to remove message');
+    }
+
+    // MessageList early-returns its empty state before the virtualized list
+    // whose onRowsRendered is the only caller of onLoadMore, so an emptied
+    // window would strand the user on an empty thread with history behind it.
+    if (get().notes.length === 0 && get().notesHasMore) {
+      await get().fetchNotes();
+    } else if (willEmptyWindow) {
+      set({ notesIsLoading: false });
+    }
+
+    // Deliberately NOT cleared on success. The marker exists for a read whose
+    // SELECT was evaluated server-side before this removal committed, and such a
+    // read can resolve after this action returns -- both read paths sample the
+    // list only after their own await. Clearing here would drop the guard at
+    // exactly the moment it is still load-bearing, letting a page that was
+    // already in flight prepend the note the user just removed. Note ids are
+    // uuids and are never reused, and signedOutState() resets the list, so
+    // keeping it costs one string per removal for the session.
   },
 
   /**

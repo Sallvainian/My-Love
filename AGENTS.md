@@ -1,5 +1,5 @@
 <!-- bmad:context -->
-<!-- Verified 2026-08-17 against dddff725. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
+<!-- Verified 2026-08-17 against d32973db. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
 
 ## My Love
 
@@ -17,6 +17,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, scri
 - Fix the cause rather than the symptom, and do not expand scope past it.
 - For migrations, mass renames and restructures: propose a config-level alternative first, get approval, then execute step by step. Never delete a source file before its replacement is confirmed working.
 - When fixing CI, check every failure mode — lint, typecheck, coverage, tests — before pushing.
+- After opening a PR or pushing to one, arm the Claude-review waiter under **Running and verifying** before starting other work, then triage each finding against the actual code and report which hold; never edit or push in response to a review without approval.
 
 ## Where things are
 
@@ -35,6 +36,8 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, scri
 - `npm run lint` is passed `src tests scripts`, but `scripts/**` sits in `eslint.config.js` `ignores` — a green lint says nothing about `scripts/`.
 - `npm run test:p1` runs P0 **and** P1, not P1 alone.
 - Playwright sets `trace`, `screenshot` and `video` to `'on'`, so a large `test-results/` tree is normal and not evidence of failure.
+- Wait for the Claude review by pinning on the commit you pushed, not on the check: poll `gh run list --branch <branch> --workflow claude-code-review.yml --json headSha,status,conclusion,databaseId` and match `headSha` against `git rev-parse HEAD`, until that run reaches `completed`. Reading the `claude-review` check instead is racy in a way an emptiness guard does not cover — until GitHub registers the new run, `gh pr checks` still returns the **previous** run's terminal bucket, and a stale `pass` satisfies both `-n` and `!= pending` on the first poll, delivering an already-actioned review as if it were new. Never trigger on a new `claude[bot]` comment either: `claude-code-review.yml` sets `track_progress: true` and `use_sticky_comment: true`, so the comment is created within seconds reading "Review in progress" and rewritten in place when the review finishes — watch for a new comment id and nothing ever fires.
+- Read the review comment whole; never skim it for a verdict line or grep it for section headings. The body is AI-authored markdown whose shape drifts between runs — one round writes `### Suggestions`, the next writes `**Suggestions**` — so any extraction silently drops findings, and a review whose verdict reads "no blocking issues" can still carry Issues and Suggestions that hold up. After the run completes the sticky comment can briefly still show the previous round's text, so confirm the body contains the run id you waited on (every body embeds its own `/actions/runs/<id>` link).
 
 ## Conventions that differ from defaults
 
