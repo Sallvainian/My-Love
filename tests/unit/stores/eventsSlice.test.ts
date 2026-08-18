@@ -130,6 +130,78 @@ describe('eventsSlice', () => {
 
       expect(store.getState().eventsError).toBeNull();
     });
+
+    it('lets the newer of two overlapping same-user loads win, whatever the order', async () => {
+      // A mount effect plus a manual refresh can overlap for the SAME user, so
+      // the identity guard sees nothing wrong with either. The request token is
+      // what keeps the older resolution from clearing the newer load's spinner
+      // or overwriting its result with staler data.
+      let settleFirst: (value: CoupleEvent[]) => void = () => {};
+      let settleSecond: (value: CoupleEvent[]) => void = () => {};
+      getEvents
+        .mockReturnValueOnce(
+          new Promise<CoupleEvent[]>((resolve) => {
+            settleFirst = resolve;
+          })
+        )
+        .mockReturnValueOnce(
+          new Promise<CoupleEvent[]>((resolve) => {
+            settleSecond = resolve;
+          })
+        );
+      const store = createTestStore();
+
+      const first = store.getState().loadEvents();
+      const second = store.getState().loadEvents();
+
+      settleFirst([event('stale', '2026-09-12')]);
+      await first;
+
+      // The stale resolution changed nothing: the second load still owns both
+      // the flag and the list.
+      expect(store.getState().eventsIsLoading).toBe(true);
+      expect(store.getState().events).toEqual([]);
+
+      settleSecond([event('fresh', '2026-12-25')]);
+      await second;
+
+      expect(store.getState().events.map((e) => e.id)).toEqual(['fresh']);
+      expect(store.getState().eventsIsLoading).toBe(false);
+    });
+
+    it('drops a stale same-user failure instead of parking its error over a live load', async () => {
+      // Same overlap, but the older request fails. Its catch must not raise an
+      // error banner (or drop the spinner) over a refresh that may yet succeed.
+      let rejectFirst: (reason: Error) => void = () => {};
+      let settleSecond: (value: CoupleEvent[]) => void = () => {};
+      getEvents
+        .mockReturnValueOnce(
+          new Promise<CoupleEvent[]>((_resolve, reject) => {
+            rejectFirst = reject;
+          })
+        )
+        .mockReturnValueOnce(
+          new Promise<CoupleEvent[]>((resolve) => {
+            settleSecond = resolve;
+          })
+        );
+      const store = createTestStore();
+
+      const first = store.getState().loadEvents();
+      const second = store.getState().loadEvents();
+
+      rejectFirst(new Error('the older request failed'));
+      await first;
+
+      expect(store.getState().eventsError).toBeNull();
+      expect(store.getState().eventsIsLoading).toBe(true);
+
+      settleSecond([]);
+      await second;
+
+      expect(store.getState().eventsError).toBeNull();
+      expect(store.getState().eventsIsLoading).toBe(false);
+    });
   });
 
   // ==========================================================================
