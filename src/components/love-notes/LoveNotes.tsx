@@ -18,13 +18,15 @@
 
 import { motion } from 'framer-motion';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
-import { useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { authService } from '../../api/authService';
 import { getPartnerDisplayName } from '../../api/supabaseClient';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
+import type { LoveNote } from '../../types/models';
 import { useAppStore } from '../../stores/useAppStore';
 import { MessageInput } from './MessageInput';
 import { MessageList } from './MessageList';
+import { NoteRemoveConfirmation } from './NoteRemoveConfirmation';
 
 /**
  * LoveNotes - Full chat page component
@@ -39,6 +41,18 @@ export function LoveNotes(): ReactElement {
   // Get navigation function and userId from store
   const navigateHome = useAppStore((state) => state.navigateHome);
   const currentUserId = useAppStore((state) => state.userId) ?? '';
+  const removeNote = useAppStore((state) => state.removeNote);
+
+  // The confirmation lives here rather than inside a message row: rows sit in
+  // MessageList's overflow-hidden virtualized container and framer-motion puts a
+  // transform on the message wrapper, either of which would trap a
+  // fixed-position dialog inside the row.
+  const [notePendingRemoval, setNotePendingRemoval] = useState<LoveNote | null>(null);
+
+  // Stable identity: useFocusTrap depends on the dialog's onEscape, so an inline
+  // arrow here re-armed the trap and pulled focus back to Cancel on every render
+  // of this screen -- one arriving realtime note was enough.
+  const closeRemovalDialog = useCallback(() => setNotePendingRemoval(null), []);
   const [userName, setUserName] = useState<string>('You');
   // Partner name fetched from database (not local config)
   const [partnerName, setPartnerName] = useState<string>('Partner');
@@ -115,10 +129,19 @@ export function LoveNotes(): ReactElement {
         onLoadMore={fetchOlderNotes}
         hasMore={hasMore}
         onRetry={retryFailedMessage}
+        onRequestRemove={setNotePendingRemoval}
       />
 
       {/* Message input - Story 2.2 */}
       <MessageInput />
+
+      {notePendingRemoval && (
+        <NoteRemoveConfirmation
+          note={notePendingRemoval}
+          onClose={closeRemovalDialog}
+          onConfirmRemove={removeNote}
+        />
+      )}
     </div>
   );
 }
