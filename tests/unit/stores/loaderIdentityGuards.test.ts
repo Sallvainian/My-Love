@@ -809,8 +809,9 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().eventsIsLoading).toBe(false);
-      // The catch path blanks `events` and writes `eventsError` — neither may
-      // land on the account that did not make the request.
+      // The catch path writes `eventsError` (the list itself survives a failed
+      // refresh) — the error must not land on the account that did not make
+      // the request, and C's own list must stay intact.
       expect(useAppStore.getState().eventsError).toBeNull();
       expect(useAppStore.getState().events).toEqual([{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }]);
     });
