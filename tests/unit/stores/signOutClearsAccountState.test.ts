@@ -319,10 +319,29 @@ describe('clearAuth on sign-out', () => {
     // used to set only userId/userEmail/isAuthenticated -- so a sign-in over a
     // live session would have carried the previous couple's chat into the new
     // account on a shared device.
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     seedSignedInSession();
+    useAppStore.setState({
+      notes: [
+        {
+          id: 'note-failed',
+          from_user_id: SECRETS.userId,
+          to_user_id: 'USER-B-ID',
+          content: SECRETS.chatMessage,
+          created_at: '2026-08-03T06:00:00.000Z',
+          imagePreviewUrl: 'blob:http://localhost/SWITCH-ORPHANED-BLOB',
+        },
+      ],
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
     expect(useAppStore.getState().notes.length).toBeGreaterThan(0);
 
     useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
+
+    // Resetting without revoking first strands the blob URL: the array it lives
+    // in is gone, so nothing can reach it afterwards. clearAuth has always done
+    // this; the switch path has to as well.
+    expect(revoke).toHaveBeenCalledWith('blob:http://localhost/SWITCH-ORPHANED-BLOB');
+    revoke.mockRestore();
 
     expect(useAppStore.getState().userId).toBe('USER-B-ID');
     expect(useAppStore.getState().notes).toEqual([]);
