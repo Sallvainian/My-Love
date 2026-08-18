@@ -161,6 +161,58 @@ describe('remove confirmation dialog', () => {
     expect(onConfirmRemove).not.toHaveBeenCalled();
   });
 
+  it('does not yank focus back to Cancel when the parent re-renders', async () => {
+    // LoveNotes passes `onClose={() => setNotePendingRemoval(null)}` — a fresh
+    // arrow on every render — so any parent re-render while the dialog is open
+    // (a realtime note arriving is enough) changes the identity useFocusTrap
+    // depends on and re-runs its effect.
+    const { rerender } = render(
+      <NoteRemoveConfirmation note={committed} onClose={() => {}} onConfirmRemove={vi.fn()} />
+    );
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+
+    // the user tabs to the destructive button and pauses
+    screen.getByTestId('note-remove-confirm').focus();
+    expect(document.activeElement).toBe(screen.getByTestId('note-remove-confirm'));
+
+    rerender(
+      <NoteRemoveConfirmation note={committed} onClose={() => {}} onConfirmRemove={vi.fn()} />
+    );
+
+    expect(document.activeElement).toBe(screen.getByTestId('note-remove-confirm'));
+  });
+
+  it('keeps focus inside the dialog while the removal is in flight', async () => {
+    let release: (() => void) | undefined;
+    const pending = new Promise<void>((resolve) => {
+      release = () => resolve();
+    });
+
+    render(
+      <NoteRemoveConfirmation
+        note={committed}
+        onClose={vi.fn()}
+        onConfirmRemove={() => pending}
+      />
+    );
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+
+    const confirm = screen.getByTestId('note-remove-confirm');
+    confirm.focus();
+    fireEvent.click(confirm);
+
+    // isRemoving is now true, which disables BOTH buttons. A real browser drops
+    // focus to <body> when the focused element becomes disabled (verified in
+    // Chrome; happy-dom does not model it, so `contains()` alone would pass here
+    // whether or not the bug existed). Assert the explicit custody handover
+    // instead — the panel takes focus before the disable lands.
+    await waitFor(() => expect(screen.getByTestId('note-remove-confirm')).toBeDisabled());
+    const panel = screen.getByRole('dialog').querySelector('[tabindex="-1"]');
+    expect(document.activeElement).toBe(panel);
+
+    release?.();
+  });
+
   it('removes only on the confirming action, then closes', async () => {
     const onClose = vi.fn();
     const onConfirmRemove = vi.fn(async () => undefined);

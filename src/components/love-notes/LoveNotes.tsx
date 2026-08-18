@@ -18,7 +18,7 @@
 
 import { motion } from 'framer-motion';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
-import { useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { authService } from '../../api/authService';
 import { getPartnerDisplayName } from '../../api/supabaseClient';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
@@ -48,6 +48,11 @@ export function LoveNotes(): ReactElement {
   // transform on the message wrapper, either of which would trap a
   // fixed-position dialog inside the row.
   const [notePendingRemoval, setNotePendingRemoval] = useState<LoveNote | null>(null);
+
+  // Stable identity: useFocusTrap depends on the dialog's onEscape, so an inline
+  // arrow here re-armed the trap and pulled focus back to Cancel on every render
+  // of this screen -- one arriving realtime note was enough.
+  const closeRemovalDialog = useCallback(() => setNotePendingRemoval(null), []);
   const [userName, setUserName] = useState<string>('You');
   // Partner name fetched from database (not local config)
   const [partnerName, setPartnerName] = useState<string>('Partner');
@@ -133,7 +138,7 @@ export function LoveNotes(): ReactElement {
       {notePendingRemoval && (
         <NoteRemoveConfirmation
           note={notePendingRemoval}
-          onClose={() => setNotePendingRemoval(null)}
+          onClose={closeRemovalDialog}
           onConfirmRemove={removeNote}
         />
       )}
