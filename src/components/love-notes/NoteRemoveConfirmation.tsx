@@ -101,9 +101,12 @@ export function NoteRemoveConfirmation({
   // knows for certain, so it decides on that instead.
   //
   // A passive effect, and declared after useFocusTrap so its cleanup runs second.
-  // useFocusTrap gets first refusal on the opener (it takes it on cancel and
-  // Escape, and no-ops after a removal because the opener is gone by then); this
-  // then places focus for the case it declined.
+  // That ordering is load-bearing, not a nicety: after a removal the hook's
+  // restore does NOT reliably no-op (as measured above, the opener can still
+  // read isConnected at cleanup time) -- it may focus the doomed opener, and
+  // this cleanup, running second, is what overwrites that with the fallback.
+  // Swapping the declaration order of the useFocusTrap call and this effect
+  // would regress the last-note case with no test-visible change here.
   useEffect(() => {
     return () => {
       if (!removalSucceededRef.current) return;
