@@ -207,6 +207,11 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   // AC 6.4.3: Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Navigation is suspended while the delete confirmation is up: it names a
+      // specific photo, and handleDeleteConfirm resolves photos[currentIndex] at
+      // click time, so navigating behind the dialog would delete a different
+      // photo than the one the dialog is asking about.
+      if (showDeleteDialog) return;
       switch (event.key) {
         case 'ArrowRight':
           navigatePhoto('next');
@@ -226,7 +231,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     // navigation within this viewer, not dismissal.
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigatePhoto]);
+  }, [navigatePhoto, showDeleteDialog]);
 
   // WCAG: Screen reader announcements for photo changes
   useEffect(() => {
