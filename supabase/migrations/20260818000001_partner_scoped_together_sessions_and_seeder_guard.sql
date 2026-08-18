@@ -208,6 +208,15 @@ drop policy if exists scripture_sessions_insert on public.scripture_sessions;
 -- get_my_partner_id" instead of a clean row-level-security denial. Both refuse
 -- the write; scoping the policy keeps the error honest and drops the dependency
 -- on anon's grants.
+--
+-- Knowingly NOT applied to the nine TO public policies from 20260128000001 that
+-- call is_scripture_session_member, which anon likewise no longer holds EXECUTE
+-- on, so anon still gets the function error on those tables. The reasoning is
+-- the same but the cost is not: this policy was being rewritten anyway, whereas
+-- re-declaring nine otherwise-untouched policies across four tables to change an
+-- error message that no app or test path can reach unauthenticated is churn with
+-- no security gain. Both forms deny. If those policies are rewritten for another
+-- reason, add `to authenticated` then.
 create policy scripture_sessions_insert on public.scripture_sessions
   for insert
   to authenticated
@@ -251,11 +260,21 @@ create policy scripture_sessions_insert on public.scripture_sessions
 -- so the empty path costs nothing.
 --
 -- The trigger is unconditional: row triggers are not skipped for table owners or
--- BYPASSRLS roles, so this also blocks postgres and service_role. Nothing in the
--- repo writes these columns, but a future migration that legitimately needs to
--- repoint membership must wrap its UPDATE in
+-- BYPASSRLS roles, so this also blocks postgres and service_role. A future
+-- migration that legitimately needs to repoint membership must wrap its UPDATE in
 --   alter table public.scripture_sessions disable trigger scripture_sessions_freeze_membership;
 --   ... ; alter table public.scripture_sessions enable trigger ...;
+--
+-- One existing writer, and it is worth knowing about: tests/support/helpers/
+-- scripture-overview.ts:74-79 (adoptSessionForBrowserUser) issues
+-- `supabaseAdmin.from('scripture_sessions').update({ user1_id: browserUserId })`
+-- on the paths used by scripture-reflection-2.2, 2.2-errors and 2.3. It passes
+-- only because it is now a no-op: tests/support/factories/index.ts:140-144 seeds
+-- onto the same worker user the browser is signed in as, and `is distinct from`
+-- lets an unchanged value through. Verified both ways -- same id updates fine,
+-- a different id raises 42501. If those ids ever diverge that helper fails loudly
+-- instead of silently reassigning, which is the intended outcome; the helper
+-- carries a note saying so.
 create or replace function public.scripture_sessions_freeze_membership()
 returns trigger
 language plpgsql
