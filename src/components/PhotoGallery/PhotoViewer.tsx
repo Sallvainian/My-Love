@@ -61,7 +61,42 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
   // AC 6.4.12 & WCAG 2.4.3: Focus trap for modal
   const containerRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(containerRef, true, { onEscape: onClose });
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Dismissing the confirmation must hand focus somewhere still mounted: Cancel
+  // takes focus while the dialog is up, and letting it unmount focused would
+  // blur to <body>, killing the container-scoped trap for the rest of the
+  // session. The delete button is the opener; the container (tabIndex -1) is
+  // the fallback for the confirm path, where the new current photo may not be
+  // the user's own and the delete button gone with it.
+  const closeDeleteDialog = useCallback(() => {
+    setShowDeleteDialog(false);
+    (deleteButtonRef.current ?? containerRef.current)?.focus();
+  }, []);
+
+  // The confirmation renders inside containerRef -- stacked visually (z-60) but
+  // not in the DOM tree -- so its Escape bubbles to the trap's listener. It has
+  // to dismiss the confirmation, not the viewer.
+  //
+  // Read through refs so the callback stays referentially stable: a new
+  // onEscape re-runs useFocusTrap's arming effect, and that re-run moves focus
+  // back to the container's first focusable -- the trash button -- stealing it
+  // from the Cancel button the confirmation just auto-focused.
+  const showDeleteDialogRef = useRef(showDeleteDialog);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    showDeleteDialogRef.current = showDeleteDialog;
+    onCloseRef.current = onClose;
+  }, [showDeleteDialog, onClose]);
+  const handleEscape = useCallback(() => {
+    if (showDeleteDialogRef.current) {
+      closeDeleteDialog();
+      return;
+    }
+    onCloseRef.current();
+  }, [closeDeleteDialog]);
+
+  useFocusTrap(containerRef, true, { onEscape: handleEscape });
 
   const currentPhoto = photos[currentIndex];
   const canNavigatePrev = currentIndex > 0;
@@ -224,10 +259,10 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
       }
     };
 
-    // Escape is deliberately absent: useFocusTrap above already closes on it,
-    // scoped to the container. Handling it here as well meant a single Escape
-    // ran onClose() twice, and a window-level listener would also fire for a
-    // dialog stacked on top of this one. Arrow keys stay global -- they are
+    // Escape is deliberately absent: useFocusTrap above already handles it,
+    // scoped to the container, and its handler is the one that knows whether
+    // the delete confirmation is up. Handling it here as well meant a single
+    // Escape ran onClose() twice. Arrow keys stay global -- they are
     // navigation within this viewer, not dismissal.
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -416,6 +451,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           {/* AC 6.4.10: Delete button (own photos only) */}
           {currentPhoto.isOwn && (
             <button
+              ref={deleteButtonRef}
               onClick={() => setShowDeleteDialog(true)}
               className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
               aria-label="Delete photo"
@@ -558,8 +594,13 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 </p>
               )}
               <div className="flex gap-3">
+                {/* autoFocus: nothing else moves focus into this dialog, and
+                    without it a keyboard user is left on the trash button
+                    behind the overlay, inside a subtree the confirmation
+                    visually covers. Cancel, because delete is irreversible. */}
                 <button
-                  onClick={() => setShowDeleteDialog(false)}
+                  autoFocus
+                  onClick={closeDeleteDialog}
                   className="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
                 >
                   Cancel
