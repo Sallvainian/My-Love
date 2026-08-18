@@ -86,8 +86,7 @@ function eventsQuery() {
   let operation: 'select' | 'insert' | 'update' | 'delete' = 'select';
   let payload: Record<string, unknown> = {};
   const filters: { column: string; value: unknown }[] = [];
-  let orderColumn: string | null = null;
-  let ascending = true;
+  const orderings: { column: string; ascending: boolean }[] = [];
 
   const matches = (candidate: EventRow): boolean =>
     filters.every((f) => (candidate as unknown as Record<string, unknown>)[f.column] === f.value);
@@ -117,12 +116,15 @@ function eventsQuery() {
     }
 
     const found = backend.rows.filter(matches);
-    if (orderColumn) {
-      const column = orderColumn;
+    if (orderings.length) {
       found.sort((a, b) => {
-        const left = String((a as unknown as Record<string, unknown>)[column]);
-        const right = String((b as unknown as Record<string, unknown>)[column]);
-        return ascending ? left.localeCompare(right) : right.localeCompare(left);
+        for (const { column, ascending } of orderings) {
+          const left = String((a as unknown as Record<string, unknown>)[column]);
+          const right = String((b as unknown as Record<string, unknown>)[column]);
+          const cmp = ascending ? left.localeCompare(right) : right.localeCompare(left);
+          if (cmp !== 0) return cmp;
+        }
+        return 0;
       });
     }
     return { data: found, error: null };
@@ -152,8 +154,8 @@ function eventsQuery() {
       return builder;
     },
     order: (column: string, options?: { ascending?: boolean }) => {
-      orderColumn = column;
-      ascending = options?.ascending ?? true;
+      const ascending = options?.ascending ?? true;
+      orderings.push({ column, ascending });
       backend.orders.push({ column, ascending });
       return builder;
     },
@@ -279,7 +281,11 @@ describe('eventsService', () => {
       // No user_id filter is applied: the events_select policy already scopes
       // the read to the caller and their partner.
       expect(events.map((e) => e.id)).toEqual(['sooner', 'later']);
-      expect(backend.orders).toEqual([{ column: 'event_date', ascending: true }]);
+      expect(backend.orders).toEqual([
+        { column: 'event_date', ascending: true },
+        // The created_at tiebreak: Postgres leaves same-day order unspecified.
+        { column: 'created_at', ascending: true },
+      ]);
       // Load-bearing: adding `.eq('user_id', ...)` here would drop the partner's
       // half of the couple's list — the whole point of the events_select policy
       // — and every other assertion in this file would still pass.
@@ -292,6 +298,17 @@ describe('eventsService', () => {
       expect(sooner.userId).toBe(USER_ID);
       expect(sooner.label).toBe('Anniversary');
       expect(sooner.description).toBeNull();
+    });
+
+    it('breaks same-day ties on creation time, so reloads cannot reshuffle', async () => {
+      backend.rows = [
+        row({ id: 'second', event_date: '2026-09-12', created_at: '2026-08-18T12:00:00+00:00' }),
+        row({ id: 'first', event_date: '2026-09-12', created_at: '2026-08-18T09:00:00+00:00' }),
+      ];
+
+      const events = await eventsService.getEvents();
+
+      expect(events.map((e) => e.id)).toEqual(['first', 'second']);
     });
 
     it('keeps a row whose icon is outside the union, falling back to the column default', async () => {
