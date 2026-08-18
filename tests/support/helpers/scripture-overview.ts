@@ -53,8 +53,24 @@ async function getBrowserUserId(page: Page): Promise<string> {
 
 /**
  * Re-assign an API-seeded session to the browser's logged-in user.
- * The seeding RPC uses `auth.users ORDER BY created_at LIMIT 1` which may
- * not match the worker-specific user the browser is authenticated as.
+ *
+ * This is now a no-op in practice, and deliberately left in place rather than
+ * deleted. The docstring used to say the seeding RPC resolves its user with
+ * `auth.users ORDER BY created_at LIMIT 1`, which is no longer true:
+ * `createTestSession` (../factories) defaults `p_user1_id` to the calling
+ * worker's own pair, which is the same account the browser is signed in as, so
+ * `browserUserId` already equals `user1_id`.
+ *
+ * It matters because `scripture_sessions` now carries a BEFORE UPDATE trigger
+ * (`scripture_sessions_freeze_membership`, migration 20260818000001) that makes
+ * `user1_id` immutable and forbids repointing `user2_id`. The trigger compares
+ * with `is distinct from`, so writing the same id back is allowed — but the
+ * moment these two ids diverge this call fails with 42501 rather than silently
+ * reassigning the session to another account. Triggers are not skipped for
+ * BYPASSRLS roles, so using `supabaseAdmin` here does not exempt it.
+ *
+ * If a future change makes the seeded user and the browser user genuinely
+ * different, do not disable the trigger — fix the seeding so they match.
  */
 export async function adoptSessionForBrowserUser(params: {
   supabaseAdmin: TypedSupabaseClient;

@@ -40,6 +40,13 @@ declare
 begin
   v_user_a := tests.create_test_user('rpc_user_a@test.com');
   v_user_b := tests.create_test_user('rpc_user_b@test.com');
+
+  -- scripture_create_session now requires p_partner_id to be the caller's real
+  -- partner, so the together-mode test below needs a genuine link. Same pattern
+  -- as 10_scripture_lobby.sql:92-93.
+  update public.users set partner_id = v_user_b where id = v_user_a;
+  update public.users set partner_id = v_user_a where id = v_user_b;
+
   perform set_config('tests.user_a', v_user_a::text, true);
   perform set_config('tests.user_b', v_user_b::text, true);
 end;
