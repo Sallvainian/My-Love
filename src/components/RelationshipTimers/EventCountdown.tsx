@@ -1,7 +1,7 @@
 /**
  * EventCountdown Component
  *
- * Generic countdown for events like wedding or visits.
+ * Generic countdown for the wedding date and the couple's stored events.
  * Shows XX:XX:XX placeholder when date is not yet set.
  * Updates every second for real-time countdown display.
  */
@@ -19,6 +19,14 @@ interface EventCountdownProps {
   date: Date | null;
   description?: string;
   placeholderText?: string;
+  /**
+   * Called when this card retires itself because its date has passed (see the
+   * `isRetired` block below). A parent whose own upcoming-event filter only
+   * recomputes during its render needs this to avoid sitting on a stale count
+   * after local midnight; it rides the 1s interval this component already runs,
+   * so no dedicated midnight timer is introduced.
+   */
+  onRetire?: () => void;
 }
 
 const iconComponents: Record<IconType, typeof Gem> = {
@@ -45,6 +53,49 @@ const iconColors: Record<IconType, { bg: string; text: string; border: string }>
   },
 };
 
+/**
+ * Local-midnight calendar-day difference between today and `date`.
+ *
+ * Extracted so the Home render's auto-hide filter (CAP-3) reuses this exact
+ * comparison instead of re-deriving it — see `integration-points.md` §4.
+ *
+ * `now` is a parameter so a caller that has already sampled the clock passes
+ * that same instant in rather than taking a second reading: two independent
+ * `new Date()` calls can straddle a midnight tick, and
+ * `computeEventCountdownState` would then derive `isToday` and `calendarDays`
+ * from different days.
+ */
+export function getCalendarDaysDiff(date: Date, now: Date = new Date()): number {
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.round((targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export type EventsSlotView = 'hidden' | 'empty' | 'list';
+
+/**
+ * What Home's events slot should show: nothing until the account's first
+ * `loadEvents()` call has settled (avoids an empty-state flash on first
+ * paint), the empty-state placeholder once settled with zero upcoming
+ * events, or the event list otherwise — including mid-reload, so cards
+ * already on screen never blank out during a background refetch.
+ *
+ * `firstLoadSettled` is deliberately NOT `eventsIsLoading`. That flag
+ * initializes `false` (`eventsSlice.ts`) and is only raised once the effect
+ * that calls `loadEvents()` runs, which happens after Home's first paint —
+ * so keying on it renders the placeholder, then a gap, then the cards on
+ * every cold load. The caller tracks "this account's first load has
+ * returned" instead, which is the state this decision actually needs.
+ */
+export function getEventsSlotView(
+  rawEventCount: number,
+  upcomingEventCount: number,
+  firstLoadSettled: boolean
+): EventsSlotView {
+  if (!firstLoadSettled && rawEventCount === 0) return 'hidden';
+  return upcomingEventCount === 0 ? 'empty' : 'list';
+}
+
 function computeEventCountdownState(date: Date | null): {
   timeDiff: TimeDifference | null;
   calendarDays: number;
@@ -60,12 +111,7 @@ function computeEventCountdownState(date: Date | null): {
 
   const now = new Date();
   const diff = calculateTimeDifference(now, date);
-
-  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const targetMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const daysDiff = Math.round(
-    (targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const daysDiff = getCalendarDaysDiff(date, now);
 
   const isToday =
     now.getFullYear() === date.getFullYear() &&
@@ -85,22 +131,24 @@ export function EventCountdown({
   date,
   description,
   placeholderText = 'Date TBD',
+  onRetire,
 }: EventCountdownProps) {
-  const [timeDiff, setTimeDiff] = useState<TimeDifference | null>(
-    () => computeEventCountdownState(date).timeDiff
-  );
-  const [isEventToday, setIsEventToday] = useState<boolean>(
-    () => computeEventCountdownState(date).isEventToday
-  );
-  const [calendarDays, setCalendarDays] = useState<number>(
-    () => computeEventCountdownState(date).calendarDays
-  );
+  // One state object from one clock sample. Three separate useState
+  // initializers each ran computeEventCountdownState independently, so a mount
+  // straddling local midnight could take `isEventToday` from 23:59:59.9 and
+  // `calendarDays` from 00:00:00.0 — `true` and `-1` together, which slips past
+  // the past-date guard below and prints "Today! 🎉" a day late until the next
+  // tick. Sampling once makes that combination unrepresentable.
+  const [countdownState, setCountdownState] = useState<{
+    timeDiff: TimeDifference | null;
+    calendarDays: number;
+    isEventToday: boolean;
+  }>(() => computeEventCountdownState(date));
+
+  const { timeDiff, calendarDays, isEventToday } = countdownState;
 
   const updateCountdown = useCallback(() => {
-    const nextState = computeEventCountdownState(date);
-    setTimeDiff(nextState.timeDiff);
-    setCalendarDays(nextState.calendarDays);
-    setIsEventToday(nextState.isEventToday);
+    setCountdownState(computeEventCountdownState(date));
   }, [date]);
 
   // Update every second for real-time countdown
@@ -109,8 +157,31 @@ export function EventCountdown({
     return () => clearInterval(interval);
   }, [updateCountdown]);
 
+  // A date that has already passed renders nothing at all (CAP-3: a past event
+  // stops occupying the dashboard). Home's filter cannot enforce this on its
+  // own: it runs during App's render, which does not tick, while this
+  // component re-renders every second on its own interval. Without this, a card
+  // whose day rolls over while Home sits open keeps its shell — icon, label,
+  // description — above an empty countdown region until the next reload, since
+  // neither the "Today!" nor the `calendarDays >= 0` countdown branch matches.
+  const isRetired = date !== null && !isEventToday && calendarDays < 0;
+
+  // Tell the parent, so a slot that filters upcoming events during its own
+  // render does not keep counting a card that has already removed itself. This
+  // is what lets the events slot fall back to its empty-state placeholder at
+  // local midnight instead of showing neither a card nor the placeholder.
+  useEffect(() => {
+    if (isRetired) onRetire?.();
+  }, [isRetired, onRetire]);
+
   const IconComponent = iconComponents[icon];
   const colors = iconColors[icon];
+
+  // Returning null lets that same interval retire the card at local midnight
+  // without a dedicated midnight timer.
+  if (isRetired) {
+    return null;
+  }
 
   return (
     <motion.div
@@ -153,10 +224,7 @@ export function EventCountdown({
           >
             <p className="text-2xl font-bold text-green-500 dark:text-green-300">Today! 🎉</p>
           </motion.div>
-        ) : timeDiff && timeDiff.isPast ? (
-          // Event has passed
-          <p className="text-lg text-gray-500 dark:text-gray-400">Event passed</p>
-        ) : timeDiff ? (
+        ) : timeDiff && calendarDays >= 0 ? (
           // Show countdown using calendar days for intuitive display
           <>
             <p className={`text-xl font-bold ${colors.text}`}>
