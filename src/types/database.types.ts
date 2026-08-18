@@ -94,6 +94,39 @@ export type Database = {
           },
         ]
       }
+      love_note_removals: {
+        Row: {
+          note_id: string
+          removed_at: string
+          user_id: string
+        }
+        Insert: {
+          note_id: string
+          removed_at?: string
+          user_id: string
+        }
+        Update: {
+          note_id?: string
+          removed_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "love_note_removals_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "love_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "love_note_removals_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "love_notes_visible"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       love_notes: {
         Row: {
           content: string
@@ -498,7 +531,36 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      love_notes_visible: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          from_user_id: string | null
+          id: string | null
+          idempotency_key: string | null
+          image_url: string | null
+          to_user_id: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          from_user_id?: string | null
+          id?: string | null
+          idempotency_key?: string | null
+          image_url?: string | null
+          to_user_id?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          from_user_id?: string | null
+          id?: string | null
+          idempotency_key?: string | null
+          image_url?: string | null
+          to_user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_partner_request: {
