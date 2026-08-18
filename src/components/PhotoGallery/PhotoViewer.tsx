@@ -64,15 +64,27 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
 
   // Dismissing the confirmation must hand focus somewhere still mounted: Cancel
-  // takes focus while the dialog is up, and letting it unmount focused would
-  // blur to <body>, killing the container-scoped trap for the rest of the
-  // session. The delete button is the opener; the container (tabIndex -1) is
-  // the fallback for the confirm path, where the new current photo may not be
-  // the user's own and the delete button gone with it.
+  // or Delete takes focus while the dialog is up, and letting it unmount
+  // focused would blur to <body>, killing the container-scoped trap for the
+  // rest of the session. The delete button is the opener; the container
+  // (tabIndex -1) is the fallback for the confirm path, where the new current
+  // photo may not be the user's own and the delete button gone with it.
+  //
+  // The restore runs in an effect, not inside closeDeleteDialog: the viewer's
+  // own controls are disabled while the confirmation is up (which is what
+  // confines the trap's Tab cycle to Cancel/Delete), and focusing a
+  // still-disabled button before the re-enabling render commits is a no-op.
+  const restoreAfterDialogRef = useRef(false);
   const closeDeleteDialog = useCallback(() => {
+    restoreAfterDialogRef.current = true;
     setShowDeleteDialog(false);
-    (deleteButtonRef.current ?? containerRef.current)?.focus();
   }, []);
+  useEffect(() => {
+    if (!showDeleteDialog && restoreAfterDialogRef.current) {
+      restoreAfterDialogRef.current = false;
+      (deleteButtonRef.current ?? containerRef.current)?.focus();
+    }
+  }, [showDeleteDialog]);
 
   // The confirmation renders inside containerRef -- stacked visually (z-60) but
   // not in the DOM tree -- so its Escape bubbles to the trap's listener. It has
@@ -384,14 +396,12 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
       // Note: UI already updated optimistically. In production, may want to revert navigation
       // or show error toast to user. For now, logging is sufficient as RLS prevents unauthorized deletion.
     } finally {
-      setShowDeleteDialog(false);
-      // The focused Delete button unmounts with the dialog, which would strand
-      // focus on <body> and break the trap's Tab cycle. Not closeDeleteDialog:
-      // the trash button may unmount too, when the next photo is not the
-      // user's own. The container always survives an open viewer.
-      containerRef.current?.focus();
+      // Routed through closeDeleteDialog so the post-commit effect places
+      // focus: the trash button if the next photo is the user's own, the
+      // container otherwise. By then unmounts and re-enables have committed.
+      closeDeleteDialog();
     }
-  }, [photos, currentIndex, canNavigateNext, onClose, deletePhoto, resetTransform]);
+  }, [photos, currentIndex, canNavigateNext, onClose, deletePhoto, resetTransform, closeDeleteDialog]);
 
   // AC 6.4.15: Image loading handlers
   const handleImageLoad = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
@@ -459,13 +469,20 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
       >
-        {/* AC 6.4.12: Top controls - Close and Delete buttons */}
+        {/* AC 6.4.12: Top controls - Close and Delete buttons.
+            All four viewer controls take disabled={showDeleteDialog}: the
+            confirmation renders inside the trap's container, so without it the
+            Tab cycle reaches them under the overlay and Enter operates them --
+            navigating or closing behind an open delete confirmation. Disabling
+            them also drops them from FOCUSABLE_SELECTOR's button:not([disabled]),
+            confining Tab to Cancel/Delete. */}
         <div className="absolute top-4 right-4 z-10 flex gap-2">
           {/* AC 6.4.10: Delete button (own photos only) */}
           {currentPhoto.isOwn && (
             <button
               ref={deleteButtonRef}
               onClick={() => setShowDeleteDialog(true)}
+              disabled={showDeleteDialog}
               className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
               aria-label="Delete photo"
             >
@@ -476,6 +493,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           {/* AC 6.4.1: Close button */}
           <button
             onClick={onClose}
+            disabled={showDeleteDialog}
             className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
             aria-label="Close viewer"
           >
@@ -486,7 +504,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         {/* AC 6.4.12: Navigation buttons */}
         <button
           onClick={() => navigatePhoto('prev')}
-          disabled={!canNavigatePrev}
+          disabled={showDeleteDialog || !canNavigatePrev}
           className="absolute top-1/2 left-4 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Previous photo"
           aria-disabled={!canNavigatePrev}
@@ -496,7 +514,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
         <button
           onClick={() => navigatePhoto('next')}
-          disabled={!canNavigateNext}
+          disabled={showDeleteDialog || !canNavigateNext}
           className="absolute top-1/2 right-4 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Next photo"
           aria-disabled={!canNavigateNext}

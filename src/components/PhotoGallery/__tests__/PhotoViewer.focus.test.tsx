@@ -192,6 +192,36 @@ describe('PhotoViewer focus', () => {
     expect(overlay.contains(document.activeElement)).toBe(true);
   });
 
+  it('makes the viewer controls inert while the delete confirmation is open', async () => {
+    // The confirmation renders inside the trap's container, so without
+    // disabled={showDeleteDialog} the Tab cycle reaches the viewer's own
+    // buttons under the overlay and Enter operates them -- "Next photo"
+    // re-opens the wrong-photo deletion the arrow guard closed, and "Close
+    // viewer" unmounts the viewer around the open confirmation. Disabling them
+    // also drops them from FOCUSABLE_SELECTOR, confining Tab to Cancel/Delete.
+    const two = [
+      photo,
+      { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
+    ];
+    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
+
+    expect(screen.getByLabelText('Delete photo')).toBeDisabled();
+    expect(screen.getByLabelText('Close viewer')).toBeDisabled();
+    expect(screen.getByLabelText('Previous photo')).toBeDisabled();
+    expect(screen.getByLabelText('Next photo')).toBeDisabled();
+
+    // Dismissal re-enables them, and the effect-timed restore still lands on
+    // the re-enabled trash button rather than no-opping against a disabled one.
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByLabelText('Next photo')).not.toBeDisabled();
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByLabelText('Delete photo'));
+    });
+  });
+
   it('keeps the container reachable by focus, or Escape dies on the first click', () => {
     // Structural, and deliberately so. This viewer has exactly four focusable
     // controls; the photo, the drag surface, the caption bar and the backdrop are
