@@ -15,7 +15,8 @@
  * child resolve against the row instead of the viewport.
  */
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { LoveNote } from '../../types/models';
 
@@ -23,18 +24,26 @@ interface NoteRemoveConfirmationProps {
   note: LoveNote;
   onClose: () => void;
   onConfirmRemove: (noteId: string) => Promise<void>;
+  /**
+   * Where focus goes when the control that opened this dialog does not survive
+   * the removal. Owned by LoveNotes rather than found in the DOM, because the
+   * element has to outlive the thread it belongs to -- see the cleanup below.
+   */
+  fallbackFocusRef: RefObject<HTMLElement | null>;
 }
 
 export function NoteRemoveConfirmation({
   note,
   onClose,
   onConfirmRemove,
+  fallbackFocusRef,
 }: NoteRemoveConfirmationProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const isRemovingRef = useRef(false);
+  const removalSucceededRef = useRef(false);
 
   // useFocusTrap lists onEscape in its effect deps and re-focuses initialFocusRef
   // on every run, so any change of identity re-arms the trap and drags focus back
@@ -75,33 +84,40 @@ export function NoteRemoveConfirmation({
     }
   }, [error, isRemoving]);
 
-  // Give focus back when this dialog goes away. useFocusTrap deliberately does
-  // not do this -- it is shared with four other components that nothing in this
-  // change exercises -- so it is handled here, where it is tested.
+  // Only the fallback lives here. useFocusTrap already restores the opener when
+  // the trap goes away; this covers the case unique to a removal, where there is
+  // no opener left to go back to -- the control was on the row that just went.
   //
-  // Two destinations, because the obvious one does not always survive. On cancel
-  // and Escape the control that opened this is still mounted and takes focus
-  // back. On success the note is gone, so its row and that control unmount with
-  // it; focus then goes to the thread container, which persists. Without the
-  // fallback a successful removal -- the common path -- drops focus on <body>
-  // and a keyboard user loses their place entirely.
-  // useLayoutEffect, not useEffect: useFocusTrap is called above and its passive
-  // effect moves focus to Cancel on mount. A passive effect here would run after
-  // that and capture Cancel as the opener -- an element that unmounts with this
-  // dialog, so the restore would aim at nothing. Layout effects run first.
-  useLayoutEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    const thread = opener?.closest('[data-testid="virtualized-list"]') as HTMLElement | null;
-
+  // Gated on the removal having succeeded, NOT on whether the opener is still in
+  // the document. An earlier version captured document.activeElement and asked
+  // `opener.isConnected` at cleanup, which is not a sound signal: React runs
+  // effect cleanups against a DOM it has not finished mutating, so the answer
+  // depends on where the opener sat in the tree. Measured both ways -- with the
+  // trash button as a direct sibling of the dialog it read false (fallback fired,
+  // correctly), but with the button inside the list container that MessageList
+  // swaps out for its empty state it read true, the guard bailed, and focus
+  // landed on <body>. That is the last-note removal: the case the fallback exists
+  // for, silently broken. Whether the user confirmed is something this component
+  // knows for certain, so it decides on that instead.
+  //
+  // A passive effect, and declared after useFocusTrap so its cleanup runs second.
+  // useFocusTrap gets first refusal on the opener (it takes it on cancel and
+  // Escape, and no-ops after a removal because the opener is gone by then); this
+  // then places focus for the case it declined.
+  useEffect(() => {
     return () => {
-      // Only the fallback lives here. useFocusTrap restores the opener itself;
-      // this covers the case unique to a removal — the opener was the control on
-      // the row that just went away, so there is nothing to go back to.
-      if (!opener?.isConnected && thread?.isConnected) {
-        thread.focus();
+      if (!removalSucceededRef.current) return;
+      // Reading the ref at cleanup is the point, not an oversight. The rule below
+      // wants the node copied in at effect time; doing that would re-freeze a DOM
+      // node the way the version this replaced did, which is what broke the
+      // last-note case.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      const fallback = fallbackFocusRef.current;
+      if (fallback?.isConnected) {
+        fallback.focus();
       }
     };
-  }, []);
+  }, [fallbackFocusRef]);
 
   const handleRemove = async () => {
     try {
@@ -117,6 +133,7 @@ export function NoteRemoveConfirmation({
       panelRef.current?.focus();
 
       await onConfirmRemove(note.id);
+      removalSucceededRef.current = true;
       onClose();
     } catch (err) {
       console.error('[NoteRemoveConfirmation] Failed to remove note:', err);

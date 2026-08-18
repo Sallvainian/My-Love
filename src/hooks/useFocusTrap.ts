@@ -82,9 +82,11 @@ export function useFocusTrap(
   // Give focus back when the trap goes away. Taking focus without returning it
   // strands a keyboard user on <body> with no position in the page behind the
   // dialog, and three consumers already document the return as an acceptance
-  // criterion they did not have: MoodDetailModal.tsx:77, MoodHistoryCalendar.tsx:173
-  // and useReadingDialogs.ts:28 -- the last of which hand-rolls it, as does
-  // FullScreenImageViewer.tsx:64. Doing it here is what those were working around.
+  // criterion they did not have: components/MoodHistory/MoodDetailModal.tsx:77,
+  // components/MoodHistory/MoodHistoryCalendar.tsx:173 and
+  // components/scripture-reading/hooks/useReadingDialogs.ts:28 -- the last of which
+  // hand-rolled it, as does components/love-notes/FullScreenImageViewer.tsx:64.
+  // Doing it here is what those were working around.
   //
   // Keyed on `enabled` alone so it fires on unmount or deactivation, not on
   // every re-arm. The isConnected guard matters: a dialog whose opener was
