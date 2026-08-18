@@ -470,7 +470,8 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         transition={{ duration: 0.2 }}
       >
         {/* AC 6.4.12: Top controls - Close and Delete buttons.
-            All four viewer controls take disabled={showDeleteDialog}: the
+            Every viewer control (these two, the nav chevrons, and Retry in the
+            error card) takes disabled={showDeleteDialog}: the
             confirmation renders inside the trap's container, so without it the
             Tab cycle reaches them under the overlay and Enter operates them --
             navigating or closing behind an open delete confirmation. Disabling
@@ -507,7 +508,6 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           disabled={showDeleteDialog || !canNavigatePrev}
           className="absolute top-1/2 left-4 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Previous photo"
-          aria-disabled={!canNavigatePrev}
         >
           <ChevronLeft className="h-8 w-8 text-white" />
         </button>
@@ -517,7 +517,6 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           disabled={showDeleteDialog || !canNavigateNext}
           className="absolute top-1/2 right-4 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Next photo"
-          aria-disabled={!canNavigateNext}
         >
           <ChevronRight className="h-8 w-8 text-white" />
         </button>
@@ -554,6 +553,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 <p className="mb-4">Failed to load photo</p>
                 <button
                   onClick={handleRetryLoad}
+                  disabled={showDeleteDialog}
                   className="rounded-lg bg-white/10 px-4 py-2 transition hover:bg-white/20"
                 >
                   Retry
