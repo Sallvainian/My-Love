@@ -128,7 +128,7 @@ function deferred<T>() {
  */
 function loveNotesBuilder(result: Promise<{ data: unknown; error: unknown }>) {
   const builder: Record<string, unknown> = {};
-  for (const method of ['select', 'or', 'order', 'limit', 'lt', 'eq']) {
+  for (const method of ['select', 'or', 'order', 'limit', 'lt', 'eq', 'upsert']) {
     builder[method] = () => builder;
   }
   builder.then = (onFulfilled: (value: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
@@ -280,6 +280,35 @@ describe('loader identity guards', () => {
   // ==========================================================================
   // moodSlice
   // ==========================================================================
+
+  describe('removeNote', () => {
+    it('still releases the spinner when it discards', async () => {
+      // A single-note window with more history behind it. Removing the only
+      // loaded note empties the window, which is the branch that raises the
+      // spinner before the await so the refill does not flash an empty state.
+      useAppStore.setState({
+        notes: [note('a1', 'A-ONSCREEN-CHAT-BODY')],
+        notesHasMore: true,
+        notesIsLoading: false,
+        notesPendingRemoval: [],
+      } as unknown as Parameters<typeof useAppStore.setState>[0]);
+
+      const pending = deferred<{ data: unknown; error: unknown }>();
+      loveNotesQuery.mockReturnValue(loveNotesBuilder(pending.promise));
+
+      const inFlight = useAppStore.getState().removeNote('a1');
+      expect(useAppStore.getState().notesIsLoading).toBe(true);
+
+      // setAuthUser switches accounts without passing through signedOutState(),
+      // so nothing else will clear this flag — and with notes emptied,
+      // MessageList renders its spinner branch and nothing else.
+      switchToUserC();
+      pending.settle({ data: null, error: null });
+      await inFlight;
+
+      expect(useAppStore.getState().notesIsLoading).toBe(false);
+    });
+  });
 
   describe('loadMoods', () => {
     it("discards this user's own mood notes when the account changed", async () => {
