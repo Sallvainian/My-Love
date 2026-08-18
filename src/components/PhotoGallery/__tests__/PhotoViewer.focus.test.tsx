@@ -92,6 +92,27 @@ describe('PhotoViewer focus', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('suspends arrow-key navigation while the delete confirmation is open', async () => {
+    // handleDeleteConfirm resolves its target as photos[currentIndex] at click
+    // time, so navigating behind the open dialog would permanently delete a
+    // different photo than the one the dialog named.
+    const two = [
+      photo,
+      { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
+    ];
+    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+
+    // Still on the first photo: the dialog's quoted caption and the image both
+    // name photo-1.
+    expect(screen.getByAltText('a photo')).toBeInTheDocument();
+    expect(screen.queryByAltText('second photo')).not.toBeInTheDocument();
+  });
+
   it('keeps the container reachable by focus, or Escape dies on the first click', () => {
     // Structural, and deliberately so. This viewer has exactly four focusable
     // controls; the photo, the drag surface, the caption bar and the backdrop are
