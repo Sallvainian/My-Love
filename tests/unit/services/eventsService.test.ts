@@ -44,8 +44,9 @@ interface FakePostgrestError {
 
 const backend = {
   rows: [] as EventRow[],
-  /** Injected instead of running the query — models a rejected request. */
-  nextError: null as FakePostgrestError | null,
+  /** Injected instead of running the query — a PostgREST error object, or a
+   *  plain Error standing in for a mid-flight network failure. */
+  nextError: null as FakePostgrestError | Error | null,
   /** Every `.update()` / `.insert()` payload the service sent, in order. */
   payloads: [] as Record<string, unknown>[],
   /** Every `.order()` call, so the ascending read can be asserted. */
@@ -91,7 +92,7 @@ function eventsQuery() {
   const matches = (candidate: EventRow): boolean =>
     filters.every((f) => (candidate as unknown as Record<string, unknown>)[f.column] === f.value);
 
-  const run = (): { data: EventRow[] | null; error: FakePostgrestError | null } => {
+  const run = (): { data: EventRow[] | null; error: FakePostgrestError | Error | null } => {
     if (backend.nextError) return { data: null, error: backend.nextError };
 
     if (operation === 'insert') {
@@ -363,6 +364,24 @@ describe('eventsService', () => {
         /Permission denied - check Row Level Security policies/
       );
     });
+
+    it('does not promise a sync when a load fails mid-flight — reads have no queue', async () => {
+      // A dropped socket rejects with a plain TypeError, not a PostgREST
+      // error. handleNetworkError would append "Your changes will be synced
+      // when you're back online" — there are no changes and there is no queue,
+      // so the catch tail builds its own message. Pinned with toBe: a
+      // substring match could pass with the false promise still attached.
+      backend.nextError = new TypeError('fetch failed');
+
+      const failure = await eventsService.getEvents().then(
+        () => null,
+        (error: Error) => error
+      );
+
+      expect(failure?.message).toBe(
+        '[EventsService.getEvents] Network error: fetch failed. Check your internet connection.'
+      );
+    });
   });
 
   // ==========================================================================
@@ -436,6 +455,23 @@ describe('eventsService', () => {
       await expect(
         eventsService.createEvent({ userId: PARTNER_ID, label: 'x', eventDate: '2026-10-01' })
       ).rejects.toThrow(/Permission denied - check Row Level Security policies/);
+    });
+
+    it('does not promise a sync when the insert fails mid-flight — writes have no queue either', async () => {
+      // Same trap as the read path: the write may or may not have landed, and
+      // nothing will retry it, so the message must not claim a queue will.
+      backend.nextError = new TypeError('fetch failed');
+
+      const failure = await eventsService
+        .createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
+        .then(
+          () => null,
+          (error: Error) => error
+        );
+
+      expect(failure?.message).toBe(
+        '[EventsService.createEvent] Network error: fetch failed. Check your internet connection.'
+      );
     });
   });
 
