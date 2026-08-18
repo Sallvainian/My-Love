@@ -120,6 +120,14 @@ export function signedOutState() {
     pendingRetry: null,
     scriptureError: null,
     isInitialized: false,
+
+    // eventsSlice — a couple's countdown dates are theirs, and nothing else
+    // clears them: events are Supabase-only, deliberately absent from
+    // `partialize`, and the loader that would correct them is gated on being
+    // online. The loading flag goes too, on the same rule as the others.
+    events: [],
+    eventsIsLoading: false,
+    eventsError: null,
   } satisfies Partial<AppState>;
 }
 
