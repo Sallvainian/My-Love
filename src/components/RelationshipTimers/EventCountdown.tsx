@@ -71,14 +71,15 @@ export function getCalendarDaysDiff(date: Date, now: Date = new Date()): number 
   return Math.round((targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export type EventsSlotView = 'hidden' | 'empty' | 'list';
+export type EventsSlotView = 'hidden' | 'empty' | 'list' | 'error';
 
 /**
  * What Home's events slot should show: nothing until the account's first
  * `loadEvents()` call has settled (avoids an empty-state flash on first
  * paint), the empty-state placeholder once settled with zero upcoming
- * events, or the event list otherwise — including mid-reload, so cards
- * already on screen never blank out during a background refetch.
+ * events, a truthful failure notice when that settle was a FAILED load with
+ * nothing to show, or the event list otherwise — including mid-reload, so
+ * cards already on screen never blank out during a background refetch.
  *
  * `firstLoadSettled` is deliberately NOT `eventsIsLoading`. That flag
  * initializes `false` (`eventsSlice.ts`) and is only raised once the effect
@@ -90,10 +91,18 @@ export type EventsSlotView = 'hidden' | 'empty' | 'list';
 export function getEventsSlotView(
   rawEventCount: number,
   upcomingEventCount: number,
-  firstLoadSettled: boolean
+  firstLoadSettled: boolean,
+  lastLoadFailed: boolean
 ): EventsSlotView {
   if (!firstLoadSettled && rawEventCount === 0) return 'hidden';
-  return upcomingEventCount === 0 ? 'empty' : 'list';
+  if (upcomingEventCount > 0) return 'list';
+  // Zero cards to show: only claim "No upcoming events yet." if a load
+  // actually observed that. `loadEvents` never rejects — it parks the reason
+  // in `eventsError` and resolves — so the settled gate alone cannot tell
+  // "loaded nothing" from "could not load", and an offline user would be told
+  // they have no events. When last-good cards exist the list already wins
+  // above: stale-but-real cards beat an error banner.
+  return lastLoadFailed ? 'error' : 'empty';
 }
 
 function computeEventCountdownState(date: Date | null): {

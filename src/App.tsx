@@ -101,6 +101,13 @@ function App() {
   // the same account. Declared here, alongside the other auth state, because
   // that sign-out reset runs in the auth listener further down.
   const [eventsSettledForUserId, setEventsSettledForUserId] = useState<string | null>(null);
+  // Whether that settle was a FAILED load. loadEvents never rejects — it parks
+  // the reason in eventsError and resolves — so the .finally gate alone reads
+  // "settled" for a load that returned nothing, and Home would tell an offline
+  // user "No upcoming events yet.". Snapshotted at settle time rather than
+  // subscribed live, so a later write failure parking its own eventsError
+  // cannot flip a successfully-loaded slot into the error state.
+  const [eventsLoadFailed, setEventsLoadFailed] = useState(false);
 
   // Helper function to check if welcome splash should be shown
   const shouldShowWelcome = (): boolean => {
@@ -269,6 +276,7 @@ function App() {
           // refetch lands. Keying the load effect on the user id covers an
           // account switch; only this covers a re-sign-in of the same account.
           setEventsSettledForUserId(null);
+          setEventsLoadFailed(false);
           logger.debug('[App] Auth state changed: signed out');
         }
       }
@@ -421,7 +429,11 @@ function App() {
 
     let cancelled = false;
     void loadEvents().finally(() => {
-      if (!cancelled) setEventsSettledForUserId(authUserId);
+      if (cancelled) return;
+      // loadEvents cleared eventsError on entry, so non-null here means THIS
+      // load failed — the one signal the resolved-void promise cannot carry.
+      setEventsLoadFailed(useAppStore.getState().eventsError !== null);
+      setEventsSettledForUserId(authUserId);
     });
 
     return () => {
@@ -593,7 +605,8 @@ function App() {
   const eventsSlotView = getEventsSlotView(
     events.length,
     upcomingEvents.length,
-    firstEventsLoadSettled
+    firstEventsLoadSettled,
+    eventsLoadFailed
   );
 
   // Story 1.4 & 4.1/4.2 & 6.2 & 6.4: Render home, photos, mood, or partner view based on navigation
@@ -631,7 +644,18 @@ function App() {
                     date={RELATIONSHIP_DATES.wedding}
                     placeholderText="Date TBD"
                   />
-                  {eventsSlotView === 'hidden' ? null : eventsSlotView === 'empty' ? (
+                  {eventsSlotView === 'hidden' ? null : eventsSlotView === 'error' ? (
+                    <div
+                      className="rounded-2xl border-2 border-gray-200 bg-white p-4 text-center shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                      data-testid="events-load-error"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Unable to load events — check your connection, then come back to Home.
+                      </p>
+                    </div>
+                  ) : eventsSlotView === 'empty' ? (
                     <div
                       className="rounded-2xl border-2 border-gray-200 bg-white p-4 text-center shadow-lg dark:border-gray-700 dark:bg-gray-900"
                       data-testid="events-empty-placeholder"

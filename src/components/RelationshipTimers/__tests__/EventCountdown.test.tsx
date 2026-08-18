@@ -211,25 +211,45 @@ describe('getEventsSlotView', () => {
     // The regression this pins: keying on eventsSlice's `eventsIsLoading`
     // instead, which initializes false and is only raised once the effect
     // runs, paints the placeholder on the first frame and then removes it.
-    expect(getEventsSlotView(0, 0, false)).toBe('hidden');
+    expect(getEventsSlotView(0, 0, false, false)).toBe('hidden');
   });
 
   it('shows the empty placeholder once settled with zero upcoming events', () => {
-    expect(getEventsSlotView(0, 0, true)).toBe('empty');
+    expect(getEventsSlotView(0, 0, true, false)).toBe('empty');
   });
 
   it('shows the list, never hiding already-loaded cards during a background reload', () => {
     // A revisit re-triggers loadEvents() with stale data already in the
     // store: rawEventCount > 0, so the "hidden" branch must not fire even
     // before that reload settles.
-    expect(getEventsSlotView(2, 2, false)).toBe('list');
+    expect(getEventsSlotView(2, 2, false, false)).toBe('list');
   });
 
   it('shows the list once settled with upcoming events', () => {
-    expect(getEventsSlotView(1, 1, true)).toBe('list');
+    expect(getEventsSlotView(1, 1, true, false)).toBe('list');
   });
 
   it('shows the placeholder, not the list, when every stored event has passed', () => {
-    expect(getEventsSlotView(3, 0, true)).toBe('empty');
+    expect(getEventsSlotView(3, 0, true, false)).toBe('empty');
+  });
+
+  it('reports the failure instead of claiming emptiness when the settling load failed', () => {
+    // The lie this pins: loadEvents swallows its error and resolves, so the
+    // .finally gate settles identically for success and failure — and an
+    // offline user on Home was told "No upcoming events yet." about a list
+    // nothing ever observed.
+    expect(getEventsSlotView(0, 0, true, true)).toBe('error');
+  });
+
+  it('keeps showing last-good cards over an error banner when a refresh fails', () => {
+    expect(getEventsSlotView(2, 2, true, true)).toBe('list');
+  });
+
+  it('stays hidden for a new account even if the previous account\'s load had failed', () => {
+    // eventsLoadFailed is App state and outlives an account switch for a
+    // moment; the per-user settled gate is what must decide, so a stale
+    // failure flag must not surface an error for an account that has not
+    // loaded yet.
+    expect(getEventsSlotView(0, 0, false, true)).toBe('hidden');
   });
 });
