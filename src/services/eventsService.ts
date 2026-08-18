@@ -18,7 +18,9 @@
  *
  * 2. **The error convention.** This file THROWS, following `src/api/moodApi.ts`:
  *    offline guard, `if (error) throw error`, and a catch tail that routes
- *    through `handleSupabaseError`/`handleNetworkError`. It deliberately does
+ *    through `handleSupabaseError` or a truthful local network error — never
+ *    `handleNetworkError`, whose message promises a sync (see
+ *    `networkFailure`). It deliberately does
  *    NOT follow `photoService`'s `return []` / `return false` / `return null`,
  *    which loses the reason a write failed — and the reason is exactly what the
  *    creating user has to be told (CAP-7).
@@ -34,7 +36,6 @@
  */
 
 import {
-  handleNetworkError,
   handleSupabaseError,
   isOnline,
   isPostgrestError,
@@ -109,6 +110,20 @@ class EventWriteError extends Error {
     super(message);
     this.name = 'EventWriteError';
   }
+}
+
+/**
+ * A mid-flight failure that is not a PostgREST error — DNS, a timeout, a
+ * dropped socket. NOT `handleNetworkError`: its message promises the change
+ * "will be synced when you're back online" (`errorHandlers.ts:95`), and events
+ * sync in neither direction, so every catch tail here builds its own truthful
+ * message instead. Rewording the shared helper is cross-feature work — its
+ * promise is TRUE for the offline-first mood callers — and is tracked as
+ * deferred work against `errorHandlers.ts`.
+ */
+function networkFailure(context: string, error: unknown): Error {
+  const detail = error instanceof Error ? error.message : 'Unknown network error';
+  return new Error(`[${context}] Network error: ${detail}. Check your internet connection.`);
 }
 
 /**
@@ -224,7 +239,8 @@ class EventsService {
    * index still serves the RLS predicate's `user_id` lookups.
    *
    * @returns Events in date order, each with a local-midnight `Date`
-   * @throws an accurate offline error, or {SupabaseServiceError} if the query fails
+   * @throws an accurate offline or mid-flight network error, or
+   *   {SupabaseServiceError} if the query fails
    */
   async getEvents(): Promise<CoupleEvent[]> {
     if (!isOnline()) {
@@ -264,7 +280,7 @@ class EventsService {
         throw handleSupabaseError(error, 'EventsService.getEvents');
       }
 
-      throw handleNetworkError(error, 'EventsService.getEvents');
+      throw networkFailure('EventsService.getEvents', error);
     }
   }
 
@@ -281,6 +297,7 @@ class EventsService {
    *   `date` column would accept `infinity`, and one unreadable row leaves the
    *   whole list unsorted, so the value is refused here rather than stored
    * @throws {EventWriteError} if offline — no queue exists, so the write is lost
+   * @throws an accurate network error if the request fails mid-flight
    * @throws {SupabaseServiceError} if the insert fails (RLS rejects a
    *   `user_id` that is not the caller with 42501)
    */
@@ -336,7 +353,7 @@ class EventsService {
         throw handleSupabaseError(error, 'EventsService.createEvent');
       }
 
-      throw handleNetworkError(error, 'EventsService.createEvent');
+      throw networkFailure('EventsService.createEvent', error);
     }
   }
 
@@ -356,6 +373,7 @@ class EventsService {
    * @throws {EventWriteError} if the update matched no row — RLS filters a
    *   non-creator's write silently, so zero rows is the only signal there is
    * @throws {EventWriteError} if offline — no queue exists, so the write is lost
+   * @throws an accurate network error if the request fails mid-flight
    * @throws {SupabaseServiceError} if the update fails
    */
   async updateEvent(eventId: string, updates: EventUpdateInput): Promise<CoupleEvent> {
@@ -413,7 +431,7 @@ class EventsService {
         throw handleSupabaseError(error, 'EventsService.updateEvent');
       }
 
-      throw handleNetworkError(error, 'EventsService.updateEvent');
+      throw networkFailure('EventsService.updateEvent', error);
     }
   }
 
@@ -423,6 +441,7 @@ class EventsService {
    * @throws {EventWriteError} if the delete matched no row (same silent RLS
    *   filter as `updateEvent`)
    * @throws {EventWriteError} if offline — no queue exists, so the write is lost
+   * @throws an accurate network error if the request fails mid-flight
    * @throws {SupabaseServiceError} if the delete fails
    */
   async deleteEvent(eventId: string): Promise<void> {
@@ -459,7 +478,7 @@ class EventsService {
         throw handleSupabaseError(error, 'EventsService.deleteEvent');
       }
 
-      throw handleNetworkError(error, 'EventsService.deleteEvent');
+      throw networkFailure('EventsService.deleteEvent', error);
     }
   }
 }
