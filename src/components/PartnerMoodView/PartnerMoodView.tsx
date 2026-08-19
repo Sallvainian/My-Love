@@ -327,7 +327,7 @@ export function PartnerMoodView() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20" data-testid="partner-mood-view">
+    <div className="min-h-screen bg-gray-50 pb-[env(safe-area-inset-bottom)]" data-testid="partner-mood-view">
       {/* Real-time Notification Toast - Story 6.4: Task 6 (AC #4) */}
       <AnimatePresence>
         {notification.show && (
