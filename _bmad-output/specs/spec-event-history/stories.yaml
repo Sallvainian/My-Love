@@ -1,0 +1,49 @@
+- id: "1"
+  title: Event category column, backfill, and database tests
+  description: >-
+    Add `category` to public.events per SPEC CAP-1 — a not-null column with a
+    CHECK over the six values, backfilled deterministically from `icon`
+    (ring→anniversary, plane→trip, calendar→milestone) in the creating
+    migration — then regenerate src/types/database.types.ts. Update
+    supabase/tests/database/20_events.sql: bump its `plan(36)` count and assert
+    both the new CHECK and that every pre-existing row carries a category
+    matching its icon. No policy is added, renamed or dropped, so
+    02_rls_policies.sql is untouched. Foundation for CAP-2 and CAP-8; nothing
+    visible ships.
+- id: "2"
+  title: Category on the events form and the domain type
+  description: >-
+    Surface the category per CAP-2: widen CoupleEvent and the create/update
+    inputs in eventsService, and add a six-option picker to the Settings event
+    form defaulting to `other` for a new event. The icon picker is untouched
+    and stays independent — a Trip may carry any icon. Existing events keep the
+    category story 1 assigned; nothing is re-tagged here.
+- id: "3"
+  title: Events history view, reachable and reloadable
+  description: >-
+    Build the read-only history screen per CAP-3 and CAP-4, structured on
+    EventsSettings.tsx's four-state machine with its testid scheme, listing
+    passed events newest-first with label, date, description, icon and
+    category, and no edit/delete/add control. Register 'events-history' at all
+    six sites named in SPEC Constraints > Navigation — only pathMap is
+    typechecked. Entry points are Home's events slot and the Settings events
+    section; no tray row. E2E must assert reload and back-button both return to
+    history, per tests/e2e/navigation/tray.spec.ts:87-105.
+- id: "4"
+  title: Year, month and category filters
+  description: >-
+    Add the three combining filters per CAP-6, CAP-7 and CAP-8 on the
+    MessageList.tsx `<select>` + count idiom, adding the dark-mode classes that
+    file lacks. Year offers only the years actually present, newest first.
+    Filter state is local component state, never the store. A filtered-to-zero
+    result renders distinctly from a true-empty history, and both get their own
+    assertion.
+- id: "5"
+  title: Full-history read and the ceiling assertion
+  description: >-
+    Resolve DW-41 per CAP-5: history requests enough rows to cover the couple's
+    entire past against the post-7a81ed4 getEvents(limit, offset) signature,
+    and asserts the returned page was not at its ceiling. If it ever is, the
+    screen says it is showing the most recent N rather than silently ending.
+    No load-more control and no paging UI — supabase/config.toml's
+    max_rows = 1000 is the hard ceiling and is far beyond this couple's data.
