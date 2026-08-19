@@ -376,7 +376,13 @@ describe('EventsSettings list states', () => {
 
     expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
 
-    store.patch({ eventsError: 'Event not found or not yours to edit' });
+    // Flushed: without act() React never re-renders before the assertion below,
+    // so subscribing the banner straight to `eventsError` passes this test.
+    // What is pinned here is the post-settle window — a save that fails INSIDE
+    // the first load's flight window is DW-26 and still open.
+    await act(async () => {
+      store.patch({ eventsError: 'Event not found or not yours to edit' });
+    });
 
     expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
   });
@@ -610,6 +616,24 @@ describe('EventsSettings edit', () => {
     expect(screen.getByTestId('events-form-icon-plane')).toBeChecked();
   });
 
+  it('pre-fills from local date components, not from the UTC calendar day', async () => {
+    // A local-midnight fixture cannot tell formatDateISO apart from the
+    // forbidden toISOString().split('T')[0] anywhere west of UTC, and
+    // vitest.config.ts pins TZ=America/New_York — so both idioms pass the test
+    // above. 20:00 local on 2026-09-12 is 2026-09-13 in UTC, which is the only
+    // shape that makes the two disagree under the pinned zone.
+    setStore({
+      events: [
+        makeEvent({ id: 'mine', label: 'Gracie visits', date: new Date(2026, 8, 12, 20, 0, 0) }),
+      ] as AppState['events'],
+    });
+
+    await renderSection();
+    fireEvent.click(screen.getByTestId('event-edit-mine'));
+
+    expect(screen.getByTestId('events-form-date')).toHaveValue('2026-09-12');
+  });
+
   it('routes the save through editEvent with the row id', async () => {
     setStore({
       events: [makeEvent({ id: 'mine', label: 'Gracie visits' })] as AppState['events'],
@@ -763,6 +787,38 @@ describe('EventsSettings delete', () => {
   });
 });
 
+describe('EventsSettings accessible names and modal semantics', () => {
+  it('names the header Add button, which is icon-only below the sm breakpoint', async () => {
+    // The visible "Add Event" span is `hidden sm:inline`, so on the phone
+    // viewport the aria-label is the button's entire accessible name.
+    await renderSection();
+
+    expect(screen.getByRole('button', { name: 'Add event' })).toBe(
+      screen.getByTestId('events-settings-add')
+    );
+  });
+
+  it('exposes the form as a modal dialog named by its heading', async () => {
+    await renderSection();
+    openAddForm();
+
+    const dialog = screen.getByRole('dialog', { name: 'Add Event' });
+    expect(dialog).toBe(screen.getByTestId('events-form'));
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+  });
+
+  it('exposes the delete confirmation as a modal dialog named by its heading', async () => {
+    setStore({ events: [makeEvent({ id: 'mine' })] as AppState['events'] });
+
+    await renderSection();
+    fireEvent.click(screen.getByTestId('event-delete-mine'));
+
+    const dialog = screen.getByRole('dialog', { name: 'Delete this event?' });
+    expect(dialog).toBe(screen.getByTestId('events-delete-confirmation'));
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+  });
+});
+
 describe('EventsSettings dismissal guards', () => {
   it('closes the form on a backdrop click when nothing is in flight', async () => {
     await renderSection();
@@ -792,6 +848,17 @@ describe('EventsSettings dismissal guards', () => {
     submitForm();
 
     await waitFor(() => expect(screen.getByTestId('events-form-submit')).toBeDisabled());
+
+    // handleSubmit parks focus ON THE PANEL before Save is disabled: a browser
+    // moves focus to <body> when the focused element becomes disabled, and
+    // useFocusTrap binds its keydown listener to the container — so without the
+    // move, Tab leaves the dialog and the Escape suppression asserted below is
+    // never reached. The panel itself, not merely "somewhere inside the
+    // dialog": the label input already satisfies the weaker form before submit,
+    // which makes it pass with the parking deleted.
+    expect(document.activeElement).toBe(
+      screen.getByTestId('events-form').querySelector('[tabindex="-1"]')
+    );
 
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
@@ -834,6 +901,11 @@ describe('EventsSettings dismissal guards', () => {
     fireEvent.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() => expect(screen.getByTestId('events-delete-confirm')).toBeDisabled());
+
+    // Same parking as the form — see the note in the save-in-flight test.
+    expect(document.activeElement).toBe(
+      screen.getByTestId('events-delete-confirmation').querySelector('[tabindex="-1"]')
+    );
 
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
