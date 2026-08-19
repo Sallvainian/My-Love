@@ -93,6 +93,7 @@ const SECRETS = {
   searchHitName: 'SEARCH-RESULT-DISPLAY-NAME',
   photoCaption: 'PHOTO-CAPTION-TEXT',
   reflection: 'SCRIPTURE-REFLECTION-TEXT',
+  anniversaryLabel: 'OUR-FIRST-KISS-LABEL',
   userId: 'USER-A-ID',
 };
 
@@ -151,6 +152,19 @@ function seedSignedInSession(): void {
     activeSession: { id: 'sess-1', userId: SECRETS.userId, notes: SECRETS.reflection },
     myRole: 'host',
     partnerJoined: true,
+
+    // Anniversaries live INSIDE `settings`, which partialize persists and
+    // sign-out must otherwise preserve (theme, notifications are device
+    // configuration) — so this seeds through the current object rather than
+    // replacing it.
+    // settingsSlice seeds `settings` non-null defaults, so the assertion holds.
+    settings: {
+      ...useAppStore.getState().settings!,
+      relationship: {
+        ...useAppStore.getState().settings!.relationship,
+        anniversaries: [{ id: 1, date: '2025-11-26', label: SECRETS.anniversaryLabel }],
+      },
+    },
     // Seeding shapes loosely on purpose: the point is what SURVIVES, not that
     // each fixture satisfies its full production type.
   } as unknown as Parameters<typeof useAppStore.setState>[0]);
@@ -243,6 +257,25 @@ describe('clearAuth on sign-out', () => {
     for (const [key, resetValue] of Object.entries(EXPECTED_RESET)) {
       expect(after[key], `${key} was not reset by clearAuth`).toEqual(resetValue);
     }
+  });
+
+  it("drops the previous couple's anniversaries but keeps the device's theme", () => {
+    useAppStore.setState({
+      settings: {
+        ...useAppStore.getState().settings!,
+        themeName: 'ocean',
+      },
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+
+    useAppStore.getState().clearAuth();
+
+    const settings = useAppStore.getState().settings!;
+    // Labels and dates are the couple's, `partialize` persists `settings`, and
+    // there is no server copy to correct them — left in place they rehydrate
+    // into the next account's Home countdown and Settings list.
+    expect(settings.relationship.anniversaries).toEqual([]);
+    // The theme is device preference, not account state.
+    expect(settings.themeName).toBe('ocean');
   });
 
   it("drops the previous account's pending count but keeps the device's network state", () => {
