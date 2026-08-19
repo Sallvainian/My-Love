@@ -387,6 +387,7 @@ export function EventsSettings() {
       <AnimatePresence>
         {isFormOpen && (
           <EventForm
+            key={editingId ?? 'new'}
             event={editingEvent}
             fallbackFocusRef={formNeedsFallback ? addButtonRef : undefined}
             onClose={handleFormClose}
@@ -399,6 +400,7 @@ export function EventsSettings() {
       <AnimatePresence>
         {deletingEvent && (
           <EventDeleteConfirmation
+            key={deletingEvent.id}
             event={deletingEvent}
             fallbackFocusRef={addButtonRef}
             onClose={handleDeleteClose}
