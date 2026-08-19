@@ -336,7 +336,7 @@ export function ScriptureOverview() {
 
   return (
     <main
-      className="min-h-screen p-4"
+      className="min-h-screen p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
       style={{ backgroundColor: scriptureTheme.background }}
       data-testid="scripture-overview"
     >
