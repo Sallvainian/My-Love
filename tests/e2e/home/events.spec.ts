@@ -23,6 +23,7 @@
  * here since that helper is not exported.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { navigateTo } from '../../support/helpers/navigation';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { formatDateISO } from '../../../src/utils/dateUtils';
@@ -332,8 +333,8 @@ test.describe('Home dashboard reads events from the store', () => {
 
     // Leave Home and come back — re-triggers the loadEvents() effect exactly
     // as CAP-1's "B's next load of Home" does.
-    await page.getByTestId('nav-photos').click();
-    await page.getByTestId('nav-home').click();
+    await navigateTo(page, 'photos');
+    await navigateTo(page, 'home');
 
     // The refetch must actually happen: this is the only test anywhere that
     // exercises the effect's `currentView` key, so without this the whole
