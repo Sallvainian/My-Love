@@ -327,7 +327,7 @@ export function PartnerMoodView() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20" data-testid="partner-mood-view">
+    <div className="min-h-screen bg-gray-50 pb-[env(safe-area-inset-bottom)]" data-testid="partner-mood-view">
       {/* Real-time Notification Toast - Story 6.4: Task 6 (AC #4) */}
       <AnimatePresence>
         {notification.show && (
@@ -335,7 +335,7 @@ export function PartnerMoodView() {
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
-            className="fixed top-4 left-1/2 z-50 mx-4 w-full max-w-md -translate-x-1/2 transform"
+            className="fixed top-[calc(5rem+env(safe-area-inset-top))] left-1/2 z-50 mx-4 w-full max-w-md -translate-x-1/2 transform"
             data-testid="partner-mood-notification"
           >
             <div className="flex items-center gap-3 rounded-lg bg-pink-500 px-6 py-4 text-white shadow-lg">

@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { authService } from '../../api/authService';
 import { logger } from '../../utils/logger';
 import { AnniversarySettings } from './AnniversarySettings';
+import { EventsSettings } from './EventsSettings';
 import './Settings.css';
 
 export const Settings: React.FC = () => {
@@ -48,7 +49,7 @@ export const Settings: React.FC = () => {
   };
 
   return (
-    <div className="settings-container">
+    <div className="settings-container" data-testid="settings-view">
       <div className="settings-header">
         <h1 className="settings-title">Settings</h1>
       </div>
@@ -99,7 +100,12 @@ export const Settings: React.FC = () => {
               </div>
             )}
 
-            <button onClick={handleLogout} disabled={isLoggingOut} className="logout-button">
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="logout-button"
+              data-testid="settings-sign-out"
+            >
               {isLoggingOut ? (
                 <span className="loading-spinner">
                   <svg
@@ -144,6 +150,15 @@ export const Settings: React.FC = () => {
                 </>
               )}
             </button>
+          </div>
+        </section>
+
+        {/* Events Section — the couple-shared countdowns, above the
+            device-local anniversaries below it. */}
+        <section className="settings-section">
+          <h2 className="section-title">Events</h2>
+          <div className="section-content">
+            <EventsSettings />
           </div>
         </section>
 

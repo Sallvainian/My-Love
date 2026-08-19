@@ -29,7 +29,7 @@ export function PhotoCarouselControls({
 }: PhotoCarouselControlsProps) {
   return (
     <div
-      className="fixed top-0 right-0 left-0 z-[51] bg-black/50 backdrop-blur-sm"
+      className="fixed top-0 right-0 left-0 z-[51] bg-black/50 pt-[env(safe-area-inset-top)] backdrop-blur-sm"
       data-testid="photo-carousel-controls"
     >
       <div className="flex items-center justify-between px-4 py-3">

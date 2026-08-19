@@ -11,6 +11,8 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 1rem;
+  /* viewport-fit=cover: keep an overflowing form clear of the home indicator. */
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
 }
 
 .login-container {

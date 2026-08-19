@@ -42,7 +42,7 @@ export function SoloReadingFlow() {
     return (
       <LazyMotion features={loadMotionFeatures} strict>
         <m.div
-          className="flex min-h-screen flex-col p-4 pb-20"
+          className="flex min-h-screen flex-col p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
           style={{ backgroundColor: scriptureTheme.background }}
           data-testid="scripture-completion-screen"
           initial={{ opacity: 0 }}

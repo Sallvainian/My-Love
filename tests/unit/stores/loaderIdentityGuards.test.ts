@@ -37,6 +37,10 @@ const fetchMoods = vi.fn();
 const getAllForUser = vi.fn();
 const getUnsyncedMoods = vi.fn();
 const getPhotos = vi.fn();
+const getEvents = vi.fn();
+const createEvent = vi.fn();
+const updateEvent = vi.fn();
+const deleteEvent = vi.fn();
 const getInteractionHistory = vi.fn();
 const getUserSessions = vi.fn();
 const getCoupleStats = vi.fn();
@@ -69,6 +73,15 @@ vi.mock('../../../src/api/partnerService', () => ({
 
 vi.mock('../../../src/services/photoService', () => ({
   photoService: { getPhotos: () => getPhotos() },
+}));
+
+vi.mock('../../../src/services/eventsService', () => ({
+  eventsService: {
+    getEvents: () => getEvents(),
+    createEvent: (input: unknown) => createEvent(input),
+    updateEvent: (eventId: string, updates: unknown) => updateEvent(eventId, updates),
+    deleteEvent: (eventId: string) => deleteEvent(eventId),
+  },
 }));
 
 vi.mock('../../../src/api/interactionService', () => ({
@@ -764,6 +777,184 @@ describe('loader identity guards', () => {
   });
 
   // ==========================================================================
+  // eventsSlice
+  // ==========================================================================
+
+  describe('loadEvents', () => {
+    it('discards the couple’s events when the account changed', async () => {
+      const pending = deferred<unknown[]>();
+      getEvents.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().loadEvents();
+      switchToUserC({ events: [{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }] });
+
+      pending.settle([{ id: 'a-event', label: 'A-PRIVATE-EVENT-LABEL' }]);
+      await inFlight;
+
+      expect(useAppStore.getState().events).toEqual([{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }]);
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-EVENT-LABEL');
+    });
+
+    it('leaves a successor account’s live spinner alone when it discards', async () => {
+      // The real account transition resets eventsIsLoading via signedOutState()
+      // (pinned by signOutClearsAccountState.test.ts), so the guard has nothing
+      // to release. C is seeded mid-load: a stale resolution that wrote the
+      // flag would clear C's own live spinner and flash an empty list while
+      // C's request is still open.
+      const pending = deferred<unknown[]>();
+      getEvents.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().loadEvents();
+      expect(useAppStore.getState().eventsIsLoading).toBe(true);
+
+      switchToUserC({
+        events: [{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }],
+        eventsError: null,
+        eventsIsLoading: true,
+      });
+      pending.fail(new Error('A-REQUEST-FAILURE'));
+      await inFlight;
+
+      expect(useAppStore.getState().eventsIsLoading).toBe(true);
+      // The error must not land on the account that did not make the request,
+      // and C's own list must stay intact.
+      expect(useAppStore.getState().eventsError).toBeNull();
+      expect(useAppStore.getState().events).toEqual([{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }]);
+    });
+  });
+
+  // The three write actions set() after their await too, so each carries the
+  // same guard. Without these describes, deleting any one of the three guards
+  // leaves the whole suite green — the failure this file's header records.
+
+  describe('addEvent', () => {
+    it('does not drop the previous account\'s new event into this one\'s list', async () => {
+      const pending = deferred<unknown>();
+      createEvent.mockReturnValue(pending.promise);
+
+      // C's row is a COMPLETE CoupleEvent on purpose. `sortByDate` reads
+      // `.date.getTime()`, so a `{ id, label }` stub throws inside the set()
+      // updater — which the catch swallows, making this test pass with the
+      // guard deleted. Verified: with a stub it does not discriminate.
+      const cOwnEvent = {
+        id: 'c-event',
+        userId: C,
+        label: 'C-OWN-EVENT-LABEL',
+        date: new Date(2026, 11, 25),
+        description: null,
+        icon: 'calendar',
+      };
+
+      const inFlight = useAppStore.getState().addEvent({
+        label: 'A-PRIVATE-EVENT-LABEL',
+        eventDate: '2026-10-31',
+      });
+      switchToUserC({ events: [cOwnEvent] });
+
+      pending.settle({
+        id: 'a-event',
+        userId: A,
+        label: 'A-PRIVATE-EVENT-LABEL',
+        date: new Date(2026, 9, 31),
+        description: null,
+        icon: 'calendar',
+      });
+      await inFlight;
+
+      expect(useAppStore.getState().events).toEqual([cOwnEvent]);
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-EVENT-LABEL');
+    });
+
+    it('does not paint the previous account\'s failure onto the new one', async () => {
+      const pending = deferred<unknown>();
+      createEvent.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().addEvent({
+        label: 'x',
+        eventDate: '2026-10-31',
+      });
+      switchToUserC({ events: [], eventsError: null });
+
+      pending.fail(new Error('A-REQUEST-FAILURE'));
+      await inFlight;
+
+      expect(useAppStore.getState().eventsError).toBeNull();
+    });
+  });
+
+  describe('editEvent', () => {
+    it('does not apply the previous account\'s edit to this one\'s list', async () => {
+      const pending = deferred<unknown>();
+      updateEvent.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().editEvent('a-event', { label: 'renamed' });
+      switchToUserC({ events: [{ id: 'a-event', label: 'C-OWN-EVENT-LABEL' }] });
+
+      pending.settle({
+        id: 'a-event',
+        userId: A,
+        label: 'A-PRIVATE-EVENT-LABEL',
+        date: new Date(2026, 9, 31),
+        description: null,
+        icon: 'calendar',
+      });
+      await inFlight;
+
+      // Same id in both accounts: without the guard the map() would overwrite
+      // C's row with A's, which is the leak in its most direct form.
+      expect(useAppStore.getState().events).toEqual([
+        { id: 'a-event', label: 'C-OWN-EVENT-LABEL' },
+      ]);
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-EVENT-LABEL');
+    });
+
+    it('does not paint the previous account\'s failure onto the new one', async () => {
+      const pending = deferred<unknown>();
+      updateEvent.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().editEvent('a-event', { label: 'x' });
+      switchToUserC({ events: [], eventsError: null });
+
+      pending.fail(new Error('A-REQUEST-FAILURE'));
+      await inFlight;
+
+      expect(useAppStore.getState().eventsError).toBeNull();
+    });
+  });
+
+  describe('removeEvent', () => {
+    it('does not delete this account\'s event because the previous one asked', async () => {
+      const pending = deferred<unknown>();
+      deleteEvent.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().removeEvent('shared-id');
+      switchToUserC({ events: [{ id: 'shared-id', label: 'C-OWN-EVENT-LABEL' }] });
+
+      pending.settle(undefined);
+      await inFlight;
+
+      // The filter is by id alone, so an unguarded write would take C's row out
+      // of C's list on A's behalf.
+      expect(useAppStore.getState().events).toEqual([
+        { id: 'shared-id', label: 'C-OWN-EVENT-LABEL' },
+      ]);
+    });
+
+    it('does not paint the previous account\'s failure onto the new one', async () => {
+      const pending = deferred<unknown>();
+      deleteEvent.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().removeEvent('a-event');
+      switchToUserC({ events: [], eventsError: null });
+
+      pending.fail(new Error('A-REQUEST-FAILURE'));
+      await inFlight;
+
+      expect(useAppStore.getState().eventsError).toBeNull();
+    });
+  });
+
+  // ==========================================================================
   // The ordinary path the guards wrap
   // ==========================================================================
 
@@ -795,6 +986,15 @@ describe('loader identity guards', () => {
 
       expect(useAppStore.getState().coupleStats).toEqual({ totalSessions: 3 });
       expect(useAppStore.getState().isStatsLoading).toBe(false);
+    });
+
+    it('loadEvents writes normally', async () => {
+      getEvents.mockResolvedValue([{ id: 'a-event', label: 'A-EVENT' }]);
+
+      await useAppStore.getState().loadEvents();
+
+      expect(useAppStore.getState().events).toEqual([{ id: 'a-event', label: 'A-EVENT' }]);
+      expect(useAppStore.getState().eventsIsLoading).toBe(false);
     });
 
     it('checkForActiveSession writes normally', async () => {
