@@ -89,6 +89,15 @@ test.describe('Login Flow', () => {
       },
     });
 
+    // Intercept the events fetch Home fires once auth settles — against the
+    // real API the fake access token above earns it a 401, which the
+    // network-error monitor turns into a test failure.
+    interceptNetworkCall({
+      url: '**/rest/v1/events**',
+      method: 'GET',
+      fulfillResponse: { status: 200, body: [] },
+    });
+
     // GIVEN: User is on login screen
     await page.goto('/');
     await expect(page.getByTestId('login-screen')).toBeVisible();
