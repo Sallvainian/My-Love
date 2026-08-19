@@ -59,7 +59,7 @@ export function ReportPhaseView({
     return (
       <LazyMotion features={loadMotionFeatures} strict>
         <m.div
-          className="flex min-h-screen flex-col p-4 pb-20"
+          className="flex min-h-screen flex-col p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
           style={{ backgroundColor: scriptureTheme.background }}
           data-testid="scripture-unlinked-complete-screen"
           initial={{ opacity: 0 }}
@@ -117,7 +117,7 @@ export function ReportPhaseView({
     return (
       <LazyMotion features={loadMotionFeatures} strict>
         <m.div
-          className="flex min-h-screen flex-col p-4 pb-20"
+          className="flex min-h-screen flex-col p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
           style={{ backgroundColor: scriptureTheme.background }}
           data-testid="scripture-completion-error-screen"
           initial={{ opacity: 0 }}
@@ -166,7 +166,7 @@ export function ReportPhaseView({
     return (
       <LazyMotion features={loadMotionFeatures} strict>
         <m.div
-          className="flex min-h-screen flex-col p-4 pb-20"
+          className="flex min-h-screen flex-col p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
           style={{ backgroundColor: scriptureTheme.background }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -211,7 +211,7 @@ export function ReportPhaseView({
   return (
     <LazyMotion features={loadMotionFeatures} strict>
       <m.div
-        className="flex min-h-screen flex-col p-4 pb-20"
+        className="flex min-h-screen flex-col p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
         style={{ backgroundColor: scriptureTheme.background }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

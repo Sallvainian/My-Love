@@ -89,7 +89,7 @@ export function ReadingPhaseView({
   return (
     <LazyMotion features={loadMotionFeatures} strict>
       <div
-        className="flex min-h-screen flex-col pb-20"
+        className="flex min-h-screen flex-col pb-[env(safe-area-inset-bottom)]"
         style={{ backgroundColor: scriptureTheme.background }}
         data-testid="solo-reading-flow"
       >
