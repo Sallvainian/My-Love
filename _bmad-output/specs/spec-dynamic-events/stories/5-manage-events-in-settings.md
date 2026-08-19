@@ -42,6 +42,91 @@ deferred:
     location: >-
       src/components/Settings/EventsSettings.tsx (load effect deps)
     severity: low
+  - summary: >-
+      The three primary buttons this section adds are white text on
+      `bg-pink-500`, which measures 3.58:1 against the 4.5:1 WCAG AA
+      requirement.
+    evidence: |-
+      Measured twice and independently. The parked axe run at
+      `_bmad-output/test-artifacts/atdd-scaffolds-5-manage-events-in-settings/e2e-events-accessibility.spec.ts`
+      reports impact "serious" on `events-settings-add` and `events-form-submit`
+      -- "insufficient color contrast of 3.58 (foreground color: #ffffff,
+      background color: #f6339a ... Expected contrast ratio of 4.5:1". Computing
+      the relative luminance of #f6339a by hand gives (1.0 + 0.05) / (0.24294 +
+      0.05) = 3.58, the same number.
+
+      A third instance nobody scanned carries the identical class string:
+      `events-settings-empty-add` at EventsSettings.tsx:296. The axe scaffold
+      seeds a row before every scan, so the empty state never renders and that
+      button was never measured -- a developer following the checklist, which
+      lists only :255 and :813, ships two fixed buttons and one unfixed one.
+
+      The root cause is not this story's markup. `grep -rn "bg-pink-500" src/ |
+      grep -c "text-white"` is 17, across 9 files, including the sibling
+      AnniversarySettings rendered directly below this section in the same
+      Settings view. Repainting only these three would leave two visibly
+      different primary buttons side by side, and repainting the house style is
+      outside the five-file fence this story's own acceptance criterion pins.
+
+      The ATDD checklist states both that the failing elements are "inside story
+      5's own component" and, two sentences later, that the fix is "outside the
+      story-5 diff". The first is right and the second is not; the operative
+      reason to defer is the shared token, not the file boundary.
+    location: >-
+      src/components/Settings/EventsSettings.tsx:255, :296, :813 (root cause: the shared bg-pink-500 button style, 17 sites in 9 files)
+    severity: medium
+  - summary: >-
+      A write that lands while the first load is still in flight is discarded by
+      that load, so a saved edit or a new event silently reverts on screen.
+    evidence: |-
+      `loadEvents` replaces the list wholesale on resolution --
+      `set({ events, eventsIsLoading: false })` at eventsSlice.ts, guarded only
+      by `latestLoadId` against other loads, never against writes. `addEvent` /
+      `editEvent` mutate `events` in place the moment their own request
+      resolves. So a write that resolves inside the load's flight window is
+      overwritten by the server list the load captured before that write landed.
+
+      The reachable form is not the empty-list one. `slot` is `'list'` whenever
+      `events.length > 0`, and `events` survives view changes -- so a user who
+      loads Home (App's effect populates `events`) and then opens Settings sees
+      a fully rendered list with Edit and Delete live while EventsSettings' own
+      mount load is still outstanding. An edit accepted in that window reverts
+      visually when the load resolves, and the row is durably changed on the
+      server, so nothing on screen says a write succeeded.
+
+      This is the success-path twin of DW-26, and it has the same root cause and
+      the same blocker: reconciling a write against an in-flight load lives in
+      eventsSlice.ts, which this story's Never list forbids editing and which
+      "Block If" names explicitly. Gating the header Add button on
+      `firstLoadSettled` was considered and rejected -- it closes only the
+      empty-list variant and leaves the reachable Edit/Delete one open, which
+      would read as a fix.
+    location: >-
+      src/stores/slices/eventsSlice.ts (loadEvents resolution) exposed by src/components/Settings/EventsSettings.tsx
+    severity: medium
+  - summary: >-
+      Roughly 4,000 lines of measured tests shipped in this change set are
+      matched by no test runner and execute nowhere.
+    evidence: |-
+      `_bmad-output/test-artifacts/` holds 6 ATDD scaffolds and 3 automation
+      files. `vitest.config.ts` includes only `tests/**` and `src/**`, and
+      Playwright's three projects set testDir to `./tests/e2e`, `./tests/api`
+      and `./tests/integration`, so nothing reaches them. Both TEA summaries say
+      so plainly ("Nothing here is active until it is moved") and record the
+      `git mv` commands that would activate them, along with measurements taken
+      by copying each file to its target, running it, and removing it again.
+
+      Two of the three defects this review confirmed were first surfaced by that
+      parked tree, so the coverage is real rather than speculative. Activation
+      is a deliberate operator decision, not a patch: `automation-summary.md`
+      measures typecheck at 6 TS2883 errors without the generated files and 1
+      with them, so acceptance criterion 3 -- which pins the literal number six
+      -- becomes false the moment the activation happens, and the one-line fix
+      the summary proposes at `tests/support/merged-fixtures.ts:53` should land
+      with or before it.
+    location: >-
+      _bmad-output/test-artifacts/ (9 test files, 23 tests)
+    severity: low
 ---
 
 <intent-contract>
@@ -195,6 +280,39 @@ deferred:
   - `[low]` `[patch]` The mid-write Escape and backdrop suppression guards were exercised nowhere — added a dismissal-guards describe covering both dialogs, idle and in-flight.
   - `[low]` `[patch]` Two E2E defects: the past-event absence assertion fired before the load could settle and passed vacuously, and the "30 days" expectation was computed from Node's clock while the assertion read the browser's, flaking across local midnight. The absence is now grounded behind a witness card from the same load, and the day count is computed and compared inside a single browser-side sample.
 
+### 2026-08-19 — Review pass
+
+- intent_gap: 0
+- bad_spec: 0
+- patch: 4: (high 0, medium 1, low 3)
+- defer: 3: (high 0, medium 2, low 1)
+- dismissed:
+  - `deferred-work.md` is edited in this change set against the story's Never list — the DW-26 / DW-27 append was made by the orchestrator before this session opened; both TEA result files record it as "already present when this session started". The Never clause binds this story's implementation, which never touched the file.
+  - `test-design-epic-5.md` quotes "Story residual risk, lines 309-311", which does not exist — measured: `git show HEAD:…/5-manage-events-in-settings.md | wc -l` is 314, and lines 309-311 read the quoted text verbatim. The citation resolves; the reviewer measured against the working copy after this run's predecessor stripped the 83-line Auto Run Result section.
+  - Three artifacts record the story as 314 lines and `status: 'done'` while it is 231 and `in-review` — same measurement: at HEAD the file is exactly 314 lines with `status: 'done'`, so all three recorded it accurately. 231 is the stripped working copy and `in-review` is the status this pass set at its own start.
+  - `review_loop_iteration: 0` contradicts the Review Triage Log — the counter bounds bad_spec repair loopbacks, not completed passes, and step-01 resets it to 0 when re-reviewing a `done` spec. No bad_spec loopback has ever run on this story, so 0 is correct.
+  - The `## Spec Change Log` heading is empty — it records spec amendments made during a bad_spec loopback. None has occurred, so empty is its correct state; the 13 earlier patches are recorded in this log, where they belong.
+  - The `useAppStore.getState()` suppression is not the only one in `src/`, so the earlier dismissal's premise is false — measured: `grep -rn "no-restricted-properties" src/ | grep -c "eslint-disable"` is 1. The claim was about that suppression and it holds; the file's other `eslint-disable` comments suppress a different rule.
+  - Two inert `eslint-disable-next-line react-hooks/exhaustive-deps` comments ship in production code — refuted by measurement: deleting both makes eslint report `react-hooks/exhaustive-deps` at `EventsSettings.tsx:469:42` and `:878:41`, the ref-access sites. The rule reports ref-in-cleanup at the access, not only at the dependency array, so both suppressions are load-bearing.
+  - The section heading hierarchy skips a level — document order is h1 "Settings" → h2 "Events" → h2 "Event Countdowns" → h3 row labels. No level is skipped, and `AnniversarySettings.tsx:61` is the identical h2-under-h2 shape this section was told to copy.
+  - The label and description inputs carry no `maxLength` — the I/O matrix specifies exactly the shipped behaviour ("Over-length label → Field error naming the 100-character limit; no request issued"). A submit-time field error is the captured requirement, not a departure from it.
+  - The unreachable icon validation branch and its testid should go — the branch implements an enumerated Always clause ("icon one of `'ring' | 'plane' | 'calendar'`"); the stated consequence is a hypothetical future test, which is not a consequence that occurs.
+  - "Added by your partner" (`event-partner-note-<id>`) is asserted by no test — the matrix row it sits on (a partner row renders label, date and description and no Edit or Delete) is asserted; the note itself is beyond the captured intent, so no requirement goes unpinned by its absence.
+  - A stale save error stays on screen after the user edits a field — `role="alert"` re-announces only on content change, and the message accurately reports the last submitted attempt. The intent prescribes keeping it with the form open and is silent on clearing it.
+  - The automate run's citations into `EventsSettings.tsx` are off by 5-8 lines — confirmed (180 vs `:172`, 549 vs `:544`, 142 vs `:141`), but every cited construct is unique in the file and greppable, so no reader is directed to the wrong code.
+  - "33 `data-testid` attributes" is 32 — confirmed 32. The measurement was quoted to show no production change was needed, and 32 supports that conclusion identically.
+  - Activating the parked automation files invalidates acceptance criterion 3 — AC3 is evaluated against this change set, where typecheck emits exactly the six `TS2883` errors. The claim is about a future activation, and its fix would edit this spec's acceptance criteria. The substance is carried in the third deferred item instead.
+  - The ledger and the risk register grade DW-27 differently — `severity` in the ledger is user impact; the register's `P × I` is test-planning priority. Different scales, so a difference in number is not a contradiction, and the ledger is orchestrator-owned and outside this run's reach.
+  - `DE.5-API-*` is used while the id convention list omits `API` — an artifact-documentation omission already recorded as future work in three places. The tests run and report under those ids, so no consumer is affected.
+  - The offline scaffold's header and body disagree on whether `setOffline` was verified — the scaffold is parked and reached by no runner, so nothing consumes the stale note; if the file is ever activated, its own measured header is the operative record.
+  - `futureDate(-14)` is used to build a past date — the helper is documented as "a `YYYY-MM-DD` calendar date N days out" and a negative offset is the same arithmetic. The call site binds the result to `pastDate`, so the intent is recorded where it is read.
+  - The diff introduces a Zod schema against the Never list — the schema is `TEST-LOCAL` inside `_bmad-output/`, and the Never's Always twin scopes the prohibition to `src/` ("No component in `src/` imports a Zod schema"). No `src/` file imports Zod; the summary's suggestion to move it into `src/validation/schemas.ts` was not acted on.
+- addressed_findings:
+  - `[medium]` `[patch]` The only test pinning the intent's "a save failure must not paint a list-level banner" rule wrote to the shared key outside `act()`, so React never re-rendered before the assertion. Measured: subscribing the banner straight to `eventsError` passed 45/45. The write is now flushed, and a comment names the post-settle boundary the test actually covers.
+  - `[low]` `[patch]` Both dialogs park focus on the panel before their control is disabled, and nothing observed it. Measured: deleting both `panelRef.current?.focus()` calls left 45/45 green. The two in-flight tests now assert the panel itself is `document.activeElement` — the weaker "somewhere inside the dialog" form still passes with the parking deleted, so it was rejected.
+  - `[low]` `[patch]` The Add button's accessible name and both dialogs' `role`/`aria-modal`/`aria-labelledby` were asserted nowhere. Measured: deleting `aria-label="Add event"` and both `aria-modal` attributes left 45/45 green. Added three cases; the mutation now fails three of them.
+  - `[low]` `[patch]` The edit form's date pre-fill could not tell `formatDateISO` apart from the forbidden `toISOString().split('T')[0]`. Measured: the forbidden idiom passed 45/45, because under the pinned `TZ=America/New_York` a local-midnight fixture has the same UTC day. Added a case whose fixture is 20:00 local, the only shape that makes the two disagree west of UTC.
+
 ## Design Notes
 
 **Why the component loads its own events rather than widening App's effect.** App's effect is deliberately Home-scoped — story 3's Always rule ties it to `currentView === 'home'`, and its companion state (`eventsSettledForUserId`, `eventsLoadFailed`, the retirement tick) exists to drive Home's four-way slot decision. Widening the gate would make App track settled-state for two views with different empty-state semantics. A mount effect inside `EventsSettings` keeps the lifecycle next to the list it feeds, and the slice's `latestLoadId` guard already makes the overlap safe. The cost is one extra fetch when a user goes Home → Settings; at a couple's data scale that is the cheaper side of the trade.
@@ -229,6 +347,7 @@ onClose();
 - On a narrow viewport, open Settings, add an event, and confirm the form closes and the row appears in date order; reopen it on the row's Edit and confirm the date input is pre-filled with the same calendar day that the list shows.
 - With the tray open on Settings, Tab through the add form and confirm focus never leaves the panel; press Escape and confirm focus lands back on the Add button.
 
+
 ## Auto Run Result
 
 Status: done
@@ -246,69 +365,92 @@ with a surviving fallback focus target. A rejected write renders the message fro
 `EventWriteResult` inside the form as a `role="alert"` and keeps the form open, and a failed load is
 tracked in local component state so a save failure can never paint a list-level notice.
 
+This run was a follow-up review pass over that already-committed change (the previous pass finished
+with `followup_review_recommended: true`). It changed no production code. Four review layers ran in
+parallel over the full diff since `47f28b8f`, untracked files included; the four findings that
+survived verification were all gaps in the new suites' ability to detect a regression, and each was
+closed by a test that was then proven to fail against the mutation it exists to catch.
+
 ### Files changed
 
+Since `47f28b8f`, outside `_bmad-output/`:
+
 - `src/components/Settings/EventsSettings.tsx` (new) — the whole feature: load effect, list, empty /
-  loading / load-error states, the add-edit form modal, and the delete confirmation.
+  loading / load-error states, the add-edit form modal, and the delete confirmation. Unchanged by
+  this pass.
 - `src/components/Settings/Settings.tsx` — mounts the new `Events` section between Account and
-  Anniversary.
-- `src/components/Settings/__tests__/EventsSettings.test.tsx` (new) — 34 behavioural tests over a
-  subscribable mocked store; the first test in this directory, so it also fixes the conventions.
+  Anniversary. Unchanged by this pass.
+- `src/components/Settings/__tests__/EventsSettings.test.tsx` (new) — behavioural tests over a
+  subscribable mocked store. **This pass added 4 and repaired 1**, taking the file from 34 to 38.
 - `src/components/Settings/__tests__/EventsSettings.focus.test.tsx` (new) — 11 focus tests, one
-  dedicated file per the house standard.
-- `tests/e2e/settings/events-crud.spec.ts` (new) — the real round trip against the local stack:
-  add, appear on Home, edit, delete, empty state, deep-link reload, past event, partner's event, and
-  a rejected create.
+  dedicated file per the house standard. Unchanged by this pass.
+- `tests/e2e/settings/events-crud.spec.ts` (new) — the real round trip against the local stack.
+  Unchanged by this pass.
+
+Inside `_bmad-output/`, this pass edited only this spec file. The three `bmad-build-auto-result-5-tea.*`
+reports and the nine files under `test-artifacts/` were produced by earlier TEA runs in this same
+change set and are committed as they were found; `deferred-work.md` carries the orchestrator's own
+DW-26 / DW-27 append, which this run was instructed not to touch and did not.
 
 ### Review findings
 
-Four review layers ran in parallel; every finding was verified at the location it named before being
-kept or dismissed.
+Four layers ran in parallel — blind hunter, edge-case hunter, verification-gap, intent-alignment.
+Every finding was verified at the location it named before being kept or dismissed, and every kept
+finding was reproduced by running or mutating the code rather than by reading it.
 
-- **Patches applied: 13** — 4 medium, 9 low. Accessibility (Add-button accessible name, announced and
-  associated field errors, a focus indicator on the icon radios), UI correctness (the duplicated
-  "Events" heading, the unrendered `'error'` slot, field errors that never cleared, a testid on the
-  visible icon control), and verification (a subscribable test store so the fallback-focus tests
-  exercise the real `isConnected === false` branch, ordering after a write, the
-  banner-over-a-surviving-list precedence, the form's post-failure focus return, the mid-write
-  dismissal guards, and two E2E defects — a vacuous absence assertion and a cross-clock day-count
-  race).
-- **Deferred: 2** — both low, both rooted in the shared `eventsError` key in `eventsSlice.ts`, which
-  this story's Never list forbids editing. Recorded in frontmatter `deferred`.
-- **Dismissed: 11** — each with its reason in the Review Triage Log above. Two were settled by direct
-  measurement in Chromium rather than by reading: the stale-prefill-on-fast-reopen claim (the exiting
-  overlay occludes the pointer and the focus trap stays armed for the whole window, so no user-reachable
-  path exists) and the locked-modal claim (browser Back exits via the `popstate` handler at
-  `src/App.tsx:210`, so "only a reload frees the user" does not hold).
-- **Follow-up review recommended: true.** Patched entries by severity: high 0, medium 4, low 9.
-  Score = 3 x 4 + 1 x 9 = 21, which is >= 5.
+- **Patches applied: 4** — 1 medium, 3 low, all in `EventsSettings.test.tsx`. Each one closes a
+  measured hole: the load-banner isolation rule (the assertion ran before React re-rendered, so the
+  forbidden regression passed 45/45), both dialogs' mid-write focus parking, the Add button's
+  accessible name together with both dialogs' modal semantics, and the date pre-fill's inability to
+  distinguish `formatDateISO` from the `toISOString()` idiom the intent forbids. All four mutations
+  now fail the suite; the unmutated suite is 49/49.
+- **Deferred: 3** — a measured WCAG AA contrast failure (3.58:1) on three new buttons whose root
+  cause is a house token used at 17 sites in 9 files; a write that lands inside the first load's
+  flight window being discarded by that load, whose fix lives in `eventsSlice.ts` and is fenced off
+  by the Never list; and roughly 4,000 lines of measured tests parked outside every runner. Recorded
+  in frontmatter `deferred`.
+- **Dismissed: 20** — each with its reason in the Review Triage Log above. Four were settled by
+  direct measurement rather than by reading: the two suppressions claimed inert do in fact suppress
+  live warnings at the ref-access sites; the story at `HEAD` is exactly 314 lines with
+  `status: 'done'`, so the three artifacts said to misreport it were accurate and the citation to
+  lines 309-311 resolves verbatim; `no-restricted-properties` is suppressed exactly once in `src/`;
+  and the heading order skips no level.
+- **Follow-up review recommended: true.** Patched entries by severity: high 0, medium 1, low 3.
+  Score = 3 x 1 + 1 x 3 = 6, which is >= 5.
 
 ### Verification performed
 
-Run after the patches were applied, against the staged diff rather than the implementer's report.
+Every command in the `## Verification` section was run after the patches, plus the mutation checks
+that justify each patch.
 
 | Check | Outcome |
 |---|---|
 | `npm run typecheck` | 6 errors, all `TS2883` at `tests/support/merged-fixtures.ts(53,14)` — the known worktree baseline, no others |
 | `npm run lint` | 0 errors; 2 warnings, both the pre-existing `react-refresh/only-export-components` in `EventCountdown.tsx:68,91` |
-| `npm run test:unit` | 86 files, 1283 tests passed — the 1238 baseline plus 45 new |
-| `npx vitest run src/components/Settings/__tests__` | Both new suites present and passing (34 + 11) |
-| `npx playwright test tests/e2e/ --project=chromium` | 127 passed, 2 skipped, 0 failed — unchanged from before the patches |
+| `npm run test:unit` | 86 files, 1287 tests passed — the 1283 measured before this pass plus the 4 added |
+| `npx vitest run src/components/Settings/__tests__` | 49 passed (38 + 11); the `act(...)` warning the suite used to print is gone |
+| `npx playwright test tests/e2e/ --project=chromium` | 127 passed, 2 skipped, 0 failed — unchanged |
+| Mutation: banner subscribes to `eventsError` | 1 test fails (passed 45/45 before this pass) |
+| Mutation: both `panelRef.current?.focus()` deleted | 2 tests fail (passed 45/45 before) |
+| Mutation: `aria-label` + both `aria-modal` deleted | 3 tests fail (passed 45/45 before) |
+| Mutation: `toISOString().split('T')[0]` pre-fill | 1 test fails (passed 45/45 before) |
 | `grep -rn "eventsService" src/components/` | No hits; the UI reaches events only through the store |
-| `git status --porcelain` | Exactly the five files above outside `_bmad-output/` |
+| `git diff --name-only` outside `_bmad-output/` | Exactly the five files above |
+| `select count(*) from public.events` | 0 — no rows left behind by the E2E run |
 
-Every row of the I/O & Edge-Case Matrix is covered by at least one test that ran and passed. The
-React console warning visible in the E2E output was traced to the baseline: `tests/e2e/navigation/tray.spec.ts`
-emits it three times with the story-5 code stashed, so it is not introduced here.
+The component file was restored from a byte-for-byte copy after every mutation and confirmed
+identical to the committed version (`git diff --stat` empty) before the final measurements.
 
 ### Residual risks
 
-- The two deferred items above: a save that fails inside the first load's flight window can leave a
-  false load-failure notice, and a failed load never re-fires on reconnect. Both need a per-call error
-  token in `eventsSlice.ts`, which is story 2's contract.
-- A write whose promise never settles leaves the dialog on its spinner until the user navigates away
-  with browser Back. There is no request timeout in the Supabase client, and the intent does not
-  specify a dismissal policy for a hung write.
-- The `useAppStore.getState()` read in the load effect carries the only
-  `no-restricted-properties` suppression in `src/`. It is required: the rule prescribes a subscribed
-  selector, which is exactly what the intent forbids.
+- The three deferred items above. The contrast failure is the one a user can see today; the other
+  two are a narrow race and an operator decision about activating parked tests.
+- DW-26 and DW-27 remain open in the orchestrator's ledger. This pass confirmed DW-26's boundary
+  rather than closing it: the repaired isolation test now genuinely pins the post-settle window, and
+  the in-flight window is still unguarded.
+- Acceptance criterion 3 pins the literal number six for the `TS2883` baseline. It holds for this
+  change set, but the count is a property of the worktree rather than of the code, and activating the
+  parked API specs would change it. The one-line fix at `tests/support/merged-fixtures.ts:53` that the
+  automation summary proposes should land with or before any such activation.
+- A write whose promise never settles still leaves its dialog on a spinner. There is no request
+  timeout in the Supabase client, and the intent specifies no dismissal policy for a hung write.
