@@ -21,7 +21,8 @@ resolution: Superseded by dynamic events feature (Goal C), tracked as DW-3
 origin: migrated from legacy ledger ("From: A+B Patch (2026-03-20)"), 2026-08-17
 location: Home dashboard event cards
 reason: Replace hardcoded home dashboard event cards with user-managed events: new Supabase table, CRUD UI for adding, editing and deleting events, and dynamic timer cards that auto-hide once the event has passed. Full feature build spanning DB migration, service, store slice and UI components, so it was deferred as its own piece of work rather than done inside the A+B patch.
-status: open
+status: done 2026-08-19
+resolution: already resolved: All five spec-dynamic-events stories are status: 'done' and the feature merged as PR #268 (a375671): supabase/migrations/20260818000002_create_events_table.sql creates public.events with RLS via get_my_partner_id(), src/types/database.types.ts:55 carries the events row type, src/services/eventsService.ts and src/stores/slices/eventsSlice.ts ship the service and slice (composed at src/stores/useAppStore.ts:7), src/components/Settings/EventsSettings.tsx is the CRUD UI rendered at src/components/Settings/Settings.tsx:161, src/App.tsx:609 filters to non-passed events and :680 maps them as store-driven cards, and `visits` no longer appears anywhere in src/config/relationshipDates.ts.
 decision: 2026-08-17 Couple-shared Supabase events table — Build user-managed events backed by Supabase so both partners see the same events. Add a migration creating an `events` table (owner user id, couple/partner visibility, label, event timestamp, optional description, icon kind, created/updated timestamps) with RLS policies matching the pattern used by the existing mood and photo tables, regenerate src/types/database.types.ts, add an events service alongside src/services/, add an `eventsSlice` to src/stores/slices/ and compose it into src/stores/useAppStore.ts, and add a Settings CRUD UI modelled on src/components/Settings/AnniversarySettings.tsx. Then replace the hardcoded `RELATIONSHIP_DATES.visits` render at src/App.tsx:547-555 with store-driven cards, and auto-hide events once they have passed instead of showing "Event passed" (src/components/RelationshipTimers/EventCountdown.tsx:158). Keep the existing birthday and wedding cards working; migrate the two literal visits in src/config/relationshipDates.ts:48-61 as seed data rather than deleting user-visible cards outright. This is the largest of the three options and should be sequenced migration + service + slice first, UI second, if it does not fit one session.
 
 ### DW-4: CI never applies migrations to production
@@ -111,7 +112,8 @@ location: src/services/eventsService.ts
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: The read orders on event_date alone, and Postgres leaves ties unspecified, so same-day cards can swap position between reloads. A secondary key such as created_at would fix it.
-status: open
+status: done 2026-08-19
+resolution: already resolved: src/services/eventsService.ts:261 adds `.order('created_at', { ascending: true })` after the event_date order, with the comment at :258-260 naming DW-10 by id — commit 44188ba 'fix(events): pin same-day event order with a created_at tiebreak'; src/stores/slices/eventsSlice.ts:69 mirrors the same tiebreak client-side so a write holds the server's position.
 
 ### DW-11: Overlapping loadEvents calls are last-writer-wins; the guard compares userId only.
 origin: spec-deferred 27d87ebc0b13
@@ -119,7 +121,8 @@ location: src/stores/slices/eventsSlice.ts
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: The identity guard catches an account switch but not two in-flight loads for the same account, where an older response can overwrite a newer list. No caller triggers this yet — nothing mounts loadEvents until story 3 — so the state is currently unreachable.
-status: open
+status: done 2026-08-19
+resolution: already resolved: src/stores/slices/eventsSlice.ts:87 declares a module-scoped monotonic `latestLoadId`, :112 captures `const loadId = ++latestLoadId` per call, and both the success path :125 and the error path :134 bail with `if (loadId !== latestLoadId) return;` — so a superseded same-user load abandons its own resolution. Commit 0417813 'fix(events): abandon a stale same-user load instead of racing the newer one'.
 
 ### DW-12: A double-submitted addEvent creates two rows.
 origin: spec-deferred 3ef25a69c45f
@@ -127,7 +130,8 @@ location: src/stores/slices/eventsSlice.ts
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: Deliberate at the data layer: public.events carries no idempotency_key column and no UNIQUE constraint, so AGENTS.md:59's retryable-INSERT rule has nothing to key on and the story forbids automatic retry. Guarding a double submit is story 5's form (disable the button while the write is open).
-status: open
+status: done 2026-08-19
+resolution: already resolved: The events form's submit button carries `disabled={isSaving}` at src/components/Settings/EventsSettings.tsx:812 (data-testid `events-form-submit` at :813) — the exact guard this entry assigned to story 5's form — added by commit dab5142 'feat(settings): manage events from Settings'; Cancel is disabled the same way at :803.
 
 ### DW-13: EventWriteError is unexported and EventWriteResult carries no machine-readable code, so callers must string-match English prose to tell "not yours" from a transport failure.
 origin: spec-deferred 87c45d388242
@@ -167,7 +171,8 @@ location: src/stores/slices/eventsSlice.ts
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: Re-surfaced by this review pass; re-verified unchanged since the prior pass. Two in-flight loads for the same account are not distinguished by the guard, so an older response can overwrite a newer list. No caller triggers this yet — nothing mounts loadEvents until story 3.
-status: open
+status: done 2026-08-19
+resolution: already resolved: Verbatim re-file of DW-11 and fixed by the same change: src/stores/slices/eventsSlice.ts:87 declares the monotonic `latestLoadId`, :112 captures it per call, and :125 and :134 abandon a superseded same-user load's resolution. Commit 0417813 'fix(events): abandon a stale same-user load instead of racing the newer one'.
 
 ### DW-18: handleNetworkError's offline message promises a sync that cannot happen for events.
 origin: spec-deferred a118de54f9a8
@@ -199,7 +204,8 @@ location: src/stores/slices/eventsSlice.ts:84-110
 source_spec: `3-home-dashboard-reads-events-from-the-store.md`
 severity: low
 reason: eventsSlice.ts:84-110 (story 2, unchanged by this story) sets `events` unconditionally on success with no request-ordering check. Story 2's own deferred list already flagged this exact race as low severity and "unreachable... until story 3" — story 3's new useEffect in App.tsx is what makes it reachable for the first time, by calling loadEvents() on every return to Home. Fixing it means touching eventsSlice.ts, which is outside this story's Code Map/Tasks.
-status: open
+status: done 2026-08-19
+resolution: already resolved: Story 3's Home effect (src/App.tsx:432 `void loadEvents()`) is the caller this entry said would make the race reachable, and the race is now guarded: src/stores/slices/eventsSlice.ts:87/:112/:125/:134 carry the monotonic `latestLoadId` so an out-of-order response is discarded rather than painted (commit 0417813). Story 5's spec cites the same fix at 5-manage-events-in-settings.md:144 — 'eventsSlice.ts:87,112,125 carries a monotonic latestLoadId so a superseded load abandons its own resolution'.
 
 ### DW-22: No cap or pagination on the events rendered on Home; the right-hand grid column grows unbounded against the fixed 2-card birthdays column.
 origin: spec-deferred b8c2e0998b06
