@@ -245,7 +245,8 @@ describe('EventsSettings form focus', () => {
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
     expect(opener.isConnected).toBe(true);
-    expect(document.activeElement).toBe(opener);
+    // The hook's restore is a passive-phase cleanup too — same race as below.
+    await waitFor(() => expect(document.activeElement).toBe(opener));
   });
 
   it('lands focus on the header Add button when the empty state’s own opener is gone', async () => {
@@ -267,7 +268,11 @@ describe('EventsSettings form focus', () => {
     // The premise, asserted rather than assumed.
     expect(screen.queryByTestId('events-settings-empty-add')).not.toBeInTheDocument();
     expect(opener.isConnected).toBe(false);
-    expect(document.activeElement).toBe(screen.getByTestId('events-settings-add'));
+    // The fallback focus runs in a passive-phase effect cleanup, which can
+    // land after the waitFor above has seen the DOM removal — poll for it.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('events-settings-add'))
+    );
   });
 
   it('hands focus back to Save once a rejected write re-enables it', async () => {
@@ -368,7 +373,10 @@ describe('EventsSettings delete dialog focus', () => {
     // The premise, asserted rather than assumed.
     expect(screen.queryByTestId('event-row-mine')).not.toBeInTheDocument();
     expect(opener.isConnected).toBe(false);
-    expect(document.activeElement).toBe(screen.getByTestId('events-settings-add'));
+    // Same passive-phase race as the save test above — poll, don't read.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('events-settings-add'))
+    );
   });
 
   it('leaves focus on Cancel when the delete fails, so the user can get out', async () => {
