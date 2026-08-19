@@ -14,6 +14,7 @@
 import { test, expect } from '../../support/merged-fixtures';
 import {
   navigateBothToReadingPhase,
+  skipToDisconnectionTimeout,
   waitForDisconnectionTimeout,
   waitForPartnerDisconnected,
   waitForPartnerReconnected,
@@ -56,6 +57,12 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
 
     // -----------------------------------------------------------------------
     // WHEN: 30s timeout reached → Phase B
+    //
+    // Real clock on purpose. Phase B *is* this test's acceptance criterion
+    // (AC#2), so this is the one place the genuine timer and the overlay's
+    // setInterval re-render are exercised end to end. Tests 2 and 3 use
+    // skipToDisconnectionTimeout instead — for them Phase B is only the route
+    // to the Keep Waiting button, so paying 30s there buys nothing.
     // -----------------------------------------------------------------------
     await waitForDisconnectionTimeout(page);
 
@@ -113,8 +120,9 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
     // THEN: User A sees disconnect overlay
     await waitForPartnerDisconnected(page);
 
-    // Wait for Phase B timeout
-    await waitForDisconnectionTimeout(page);
+    // Phase B is only the route to the Keep Waiting button here: this test owns
+    // AC#3 and AC#5, not AC#2. 4.3-E2E-001 pays the real 30s for that one.
+    await skipToDisconnectionTimeout(page);
 
     // -----------------------------------------------------------------------
     // WHEN: User A taps "Keep Waiting"
@@ -220,8 +228,12 @@ test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
     // their Zustand store would make any later assertion about User A a check on what
     // this test just wrote, not on what the app did.
 
-    // Dismiss the disconnect overlay so User A can continue
-    await waitForDisconnectionTimeout(page);
+    // Dismiss the disconnect overlay so User A can continue. Phase B is not this
+    // test's criterion (AC#6 is), so skip the real 30s. Nothing in the window
+    // between the DB write above and the reconnect below needs settling time:
+    // the PATCH is awaited, so it has committed, and reconnectPartnerAndLoadSession
+    // reads the row back through loadSession rather than waiting on realtime.
+    await skipToDisconnectionTimeout(page);
     await page.getByTestId('disconnection-keep-waiting').click();
 
     // -----------------------------------------------------------------------
