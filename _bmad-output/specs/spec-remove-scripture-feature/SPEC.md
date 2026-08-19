@@ -76,6 +76,6 @@ A push to the branch produces a fully green CI run in which `grep -ri scripture`
 
 - Post-removal worst E2E shard is estimated at ~220s versus 381s measured today (~2.5 min saved), from the 150s setup floor plus ~76 surviving tests at 2-7s each. This is an estimate, not a measurement; CAP-6 exists to replace it with a real number.
 - ~~No production user other than Sallvain and their partner has scripture data worth considering.~~ **Replaced by measurement** — see the production-data note below; this is no longer an assumption.
-- The three enum types created in migrations but absent from `database.types.ts` `public.Enums` (`interaction_type`, `mood_type`, `partner_request_status`) are not live in the current schema; only the four scripture enums are, so regeneration will correctly empty that block.
+- ~~The three enum types created in migrations but absent from `database.types.ts` are not live.~~ **Verified against production 2026-08-19, no longer an assumption:** `pg_type`/`pg_enum` report exactly four enums in `public`, all scripture (`scripture_session_mode`, `_phase`, `_role`, `_status`). `interaction_type`, `mood_type` and `partner_request_status` do not exist. Regeneration will correctly empty that block.
 
 <!-- No open questions remain. All four were resolved by Sallvain on 2026-08-19 and are recorded as constraints or in the data-preservation non-goal. -->
