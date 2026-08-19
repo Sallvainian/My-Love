@@ -96,7 +96,7 @@ function FullScreenImageViewerComponent({
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 focus:ring-2 focus:ring-white focus:outline-none"
+            className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-10 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 focus:ring-2 focus:ring-white focus:outline-none"
             aria-label="Close image viewer"
           >
             <X size={24} aria-hidden="true" />
