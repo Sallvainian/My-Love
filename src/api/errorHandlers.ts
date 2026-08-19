@@ -63,6 +63,7 @@ export const handleSupabaseError = (
     '23505': 'This record already exists',
     '23503': 'Referenced record not found',
     '23502': 'Required field is missing',
+    '23514': 'Some values are not allowed - check length and format limits',
     '42501': 'Permission denied - check Row Level Security policies',
     '42P01': 'Table not found - database schema may be out of sync',
     PGRST116: 'No rows found',
