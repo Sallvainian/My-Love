@@ -270,9 +270,37 @@ jobs:
   # Runs alongside e2e-tests rather than after it. Burn-in re-runs the changed
   # specs from scratch 5x, so it never consumed anything the shards produced —
   # waiting on them just added the slowest shard to the critical path.
+  #
+  # Sharded 3 ways because this job, not e2e-tests, is what the pipeline waits
+  # on whenever a PR touches E2E specs. On run 32213236507 (8 changed specs, 36
+  # tests) the loop ran 5 x 88s = 443s against 6m54s for the slowest E2E shard.
+  # That job read 13m31s, but 163s of it was the install-deps step since removed
+  # (see setup-playwright-e2e/action.yml); the comparable job today is 10m34s,
+  # measured on run 32218238012 — still ~4 minutes past the E2E shards.
+  #
+  # Sharding rather than raising `workers` is deliberate. The loop below pins
+  # --retries=0, so a test that times out under CPU contention goes straight to
+  # a red required check with no retry to absorb it; the e2e-tests shards get
+  # `retries: 2` from playwright.config.ts and can.
+  #
+  # What this does NOT give up: per-spec repetition. Every changed spec still
+  # runs 5 times, cold, with retries off. What it DOES give up: cross-spec
+  # interference. `fullyParallel` is on, so today tests from different spec
+  # files co-execute against one Supabase — after sharding, specs in different
+  # slices never do, and a slice holding a single one-test file (there are two:
+  # scripture-reflection-2.2-errors and scripture-stats) runs at 1 worker rather
+  # than 2. playwright.config.ts:107-110 names contention-starved realtime
+  # timeouts as this suite's flake class, so that is a real, if partial, loss.
+  #
+  # The split is round-robin by FILE count, which is not test count: spec files
+  # here hold 1 to 12 tests. Applied to the run cited above the slices come out
+  # 17/14/5 tests, so the largest shard carries ~47% and the win is nearer 2x
+  # than 3x. Shards whose slice comes out empty skip provisioning via the same
+  # `specs != ''` guard the whole job already used, so a single-spec PR still
+  # burns exactly one runner.
   # ============================================
   burn-in:
-    name: Burn-In (Flaky Detection)
+    name: Burn-In (Shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -282,6 +310,12 @@ jobs:
       needs.changes.outputs.app == 'true' &&
       github.event_name == 'pull_request' &&
       github.base_ref == 'main'
+    strategy:
+      # One shard finding a flake must not cancel the others: the point of this
+      # job is the report, and a second shard's result is evidence too.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       CI: 'true'
     steps:
@@ -292,18 +326,45 @@ jobs:
       # Detect BEFORE provisioning. Setup Playwright E2E costs ~2.5 minutes
       # (deps + browsers + local Supabase) and used to run ahead of this check,
       # so every PR that touched no E2E spec paid for a job that then skipped.
+      #
+      # `specs` is this shard's slice, not the whole list, so every guard below
+      # keys on it and an empty slice costs a checkout rather than a provision.
       - name: Detect changed E2E test files
         id: changed-tests
         run: |
+          # set -e, not the bare shell the single-job version used: a transient
+          # `git fetch` failure leaves CHANGED empty, which the `|| true` below
+          # masks, and the shard then reports success having burned in nothing.
+          # One job silently skipping was already wrong; three of them are also
+          # indistinguishable from legitimately-empty slices.
+          set -euo pipefail
           git fetch origin ${{ github.base_ref }}
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^tests/e2e/.*\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
+
+          # --diff-filter=d excludes DELETED paths. Without it, a shard whose
+          # whole slice is a deleted spec runs `playwright test <gone>` on its
+          # own, and Playwright exits 1 with "No tests found" — a red required
+          # check for a PR that merely removed a spec. The single-invocation
+          # version tolerated this because the surviving filters still matched
+          # something; three narrow invocations do not. Commit 401fd769 is
+          # exactly this shape: 4 changed specs, one of them a deletion.
+          CHANGED=$(git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD | grep -E '^tests/e2e/.*\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
+
+          # NF drops the blank line `echo` emits for an empty CHANGED, which
+          # would otherwise hand shard 1 a one-element list of "".
+          MINE=$(echo "$CHANGED" | awk -v s="${{ matrix.shard }}" -v t=3 'NF && (NR % t) == (s % t)')
+
+          echo "All changed E2E specs:"
+          echo "${CHANGED:-  (none)}"
+          echo "This shard (${{ matrix.shard }}/3) will burn in:"
+          echo "${MINE:-  (none)}"
+
           echo "specs<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "$MINE" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Skip burn-in (no E2E test changes)
+      - name: Skip burn-in (no E2E specs for this shard)
         if: steps.changed-tests.outputs.specs == ''
-        run: echo "No E2E test files changed — burn-in skipped"
+        run: echo "Nothing for shard ${{ matrix.shard }}/3 — skipped"
 
       - uses: actions/setup-node@v7
         if: steps.changed-tests.outputs.specs != ''
@@ -320,17 +381,23 @@ jobs:
         env:
           SPECS: ${{ steps.changed-tests.outputs.specs }}
         run: |
-          echo "Running 5 iterations on changed E2E test files"
+          echo "Running 5 iterations on shard ${{ matrix.shard }}/3's changed E2E test files"
           # --retries=0 is load-bearing. The job sets CI=true, and
           # playwright.config.ts reads `retries: process.env.CI ? 2 : 0`, so
           # without this flag each iteration retries a failure twice and burn-in
           # reports "5/5 stable" for a spec that flaked up to 10 times. A flake
           # detector that retries flakes away detects nothing.
+          #
+          # Five SEPARATE invocations, not one --repeat-each=5. Each iteration
+          # is a cold start — fresh worker processes, fresh browser, fresh
+          # login — which is the state most flakes surface in. --repeat-each
+          # would interleave all 25 executions into one warm scheduler pool and
+          # lose both that and the `|| exit 1` fail-fast below.
           for i in {1..5}; do
-            echo "--- Burn-in iteration $i/5 ---"
+            echo "--- Burn-in iteration $i/5 (shard ${{ matrix.shard }}/3) ---"
             npx playwright test --project=chromium --retries=0 $SPECS || exit 1
           done
-          echo "Burn-in passed: 5/5 stable"
+          echo "Burn-in passed: 5/5 stable on shard ${{ matrix.shard }}/3"
 
       - name: Stop Supabase
         if: always() && steps.changed-tests.outputs.specs != ''
@@ -340,7 +407,11 @@ jobs:
         if: failure() && steps.changed-tests.outputs.specs != ''
         uses: actions/upload-artifact@v7
         with:
-          name: burn-in-failures
+          # Must carry the shard: upload-artifact@v4+ rejects a second upload
+          # to a name that already exists, so three shards sharing one name
+          # would fail every shard that lost the race — masking the real
+          # failure this step exists to preserve.
+          name: burn-in-failures-shard-${{ matrix.shard }}
           path: |
             test-results/
             playwright-report/
