@@ -50,11 +50,90 @@ runs:
       shell: bash
       run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+    # `-x` excludes five services no CI job here touches. Verified against the pinned
+    # CLI source that the flag skips the PULL, not merely the container start:
+    # internal/start/start.go:234 filters the excluded names out of the compose
+    # project (`Services: utils.GetServices().Filter(notExcluded)`) BEFORE :236 pulls
+    # it, and the other pull path (utils/docker.go DockerStart ->
+    # DockerPullImageIfNotCached) sits behind `!isContainerExcluded(...)` at every
+    # call site. The CLI's own test "skips excluded containers" asserts zero
+    # unmatched image requests, which is the same claim from the other direction.
+    #
+    # This removes 36 of 118 blob requests — roughly a third of the pulled bytes —
+    # from each of the 10 concurrent jobs. Deliberately no absolute MB figure here:
+    # pkg/config/config.go replaceImageTag overrides the Dockerfile's pinned tags at
+    # runtime (CI pulls gotrue v2.193.1 where the CLI pins v2.187.0), so any byte
+    # total is a point-in-time measurement that drifts silently. The blob count is
+    # stable because it follows the layer count, not the layer contents.
+    #
+    # All 11 images come from one rate-limited origin — utils/docker.go
+    # GetRegistryImageUrl rewrites every image to public.ecr.aws — so 10 jobs x 36
+    # fewer blobs is ~360 fewer requests per run against the same bucket. Those jobs
+    # pull simultaneously and hit `toomanyrequests: Rate exceeded` 3-8 times per run;
+    # in run 32268765187 it exhausted the retry ladder and killed Burn-In shard 2
+    # before it ran a single test, reddening the sole required check.
+    #
+    # Why each name is safe to drop:
+    #   imgproxy      pulled but never even started today — config.toml:120-121
+    #                 leaves [storage.image_transformation] commented out, and the
+    #                 run log already lists supabase_imgproxy_My-Love as stopped.
+    #   studio        dev UI; nothing in src/ or tests/ references port 54323.
+    #   postgres-meta studio's backend, gated SEPARATELY in the CLI, so excluding
+    #                 studio alone would still pull this. Both names are required.
+    #   mailpit       no mail is ever sent: auth.email enable_confirmations is off
+    #                 and global-setup.ts mints users with email_confirm: true.
+    #   edge-runtime  biggest single saving. The only caller is
+    #                 loveNoteImageService.ts (/functions/v1/upload-love-note-image),
+    #                 reached only when a love note carries an image, and no
+    #                 Playwright spec attaches one. IF YOU ADD AN E2E FOR LOVE-NOTE
+    #                 IMAGE UPLOAD, REMOVE edge-runtime FROM THIS LIST — it would
+    #                 otherwise fail against a dead Kong upstream.
+    #
+    # NOT excludable: postgres, plus kong/postgrest/gotrue/realtime/storage-api,
+    # which the steps below and the suite depend on.
+    #
+    # CI-only. supabase/config.toml is untouched, so a local `supabase start` still
+    # brings up Studio, Mailpit, pg-meta and edge functions exactly as before.
+    #
+    # The name guard is load-bearing: the CLI only PRINTS a warning for an
+    # unrecognised -x name and carries on, so a rename upstream would silently
+    # revert this to pulling all 11 images with nothing going red. Matching is
+    # comma-delimited against the help text's own list rather than a substring
+    # grep, because `postgres` is a substring of `postgres-meta` and would pass a
+    # naive check while not being an excludable name at all.
     - name: Start Supabase Local
       shell: bash
       run: |
         set -euo pipefail
-        supabase start
+        EXCLUDE='studio,postgres-meta,mailpit,edge-runtime,imgproxy'
+
+        # `|| true` so a non-zero `--help` reaches the -z branch below and reports
+        # the annotated error, rather than `set -e` aborting the step with nothing
+        # but a bare exit code. The version nag goes to stderr, so $( ) stays clean.
+        VALID=$(supabase start --help 2>/dev/null | sed -n 's/.*--exclude.*\[\([^]]*\)\].*/\1/p') || true
+        if [ -z "$VALID" ]; then
+          echo "::error::Could not parse the -x name list from 'supabase start --help'."
+          exit 1
+        fi
+        for svc in ${EXCLUDE//,/ }; do
+          case ",$VALID," in
+            *",$svc,"*) ;;
+            *) echo "::error::'$svc' is not an excludable container in Supabase CLI ${{ inputs.supabase-version }} (valid: $VALID). The exclusion list would silently do nothing."; exit 1 ;;
+          esac
+        done
+
+        # One retry. The CLI's internal ladder is 3 attempts ~12s apart in total,
+        # which run 32268765187 exhausted attempt-for-attempt on gotrue. A second
+        # outer attempt is cheap because `supabase stop` prunes containers, volumes
+        # and networks but never images, so it re-pulls only what attempt 1 missed.
+        # Capped at 2 attempts to stay inside db-tests' 10-minute job timeout.
+        if ! supabase start -x "$EXCLUDE"; then
+          echo "::warning::supabase start failed on attempt 1 — retrying once. Cached images are reused."
+          supabase stop --no-backup || true
+          sleep 30
+          supabase start -x "$EXCLUDE"
+        fi
+
         supabase status --output json | jq -e ".DB_URL" > /dev/null
         echo "Supabase Local started successfully"
 
