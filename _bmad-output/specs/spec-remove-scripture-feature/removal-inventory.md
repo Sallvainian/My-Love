@@ -223,17 +223,24 @@ Same file, also required:
 - Reword comments at 108 and 143
 - **Keep** FN-GRANT-001/002 (61-90) — they enumerate `pg_proc` generically and need no edit — plus 005/006/009 and Parts 2/3
 
-### 4.2 `tests/unit/services/dbSchema.test.ts` — three count assertions
+### 4.2 `tests/unit/services/dbSchema.test.ts` — four assertions, not three
 
 ```
-73:      expect(db.objectStoreNames.length).toBe(8);
-106:      expect(dbV4.objectStoreNames.length).toBe(4);
-127:      expect(dbV5.objectStoreNames.length).toBe(8);
+ 73:      expect(db.objectStoreNames.length).toBe(8);      -> becomes 4
+106:      expect(dbV4.objectStoreNames.length).toBe(4);    -> DO NOT TOUCH
+127:      expect(dbV5.objectStoreNames.length).toBe(8);    -> deleted with its block, see below
+219:      expect(DB_VERSION).toBe(7);                      -> becomes 8
 ```
 
-Line 73 and line 127 must both become `4`. **Line 106 already reads `4` and must not be touched** — it asserts the v4 (pre-scripture) store count, which coincidentally equals the post-removal count. Whichever way you edit, check all three: a blind find-and-replace on `toBe(8)` is correct here, but a blind replace on the count `4` is not.
+**Line 73** becomes `4`.
 
-Also delete: the scripture `contains` checks at 61-65 and 107-119, the "upgrading from v4" describe at 77-125, the four index tests at 132-170, and the `STORE_NAMES` assertions at 196-201.
+**Line 106 must not be touched.** It asserts the v4 (pre-scripture) store count, which coincidentally equals the post-removal count. A blind find-and-replace on `toBe(8)` is safe here; a blind replace involving the number `4` is not.
+
+**Line 127 is not edited — it is deleted.** It sits inside the `describe('upgrade from v4 to v5', ...)` block that opens at line 77 and closes at **129** (verified: the next `describe` opens at 131). Deleting that block removes line 127 with it. Do not both edit 127 and delete its enclosing block.
+
+**Line 219 `expect(DB_VERSION).toBe(7);`** lives in a separate `describe('DB constants', ...)` block at 211+ and must become `8` when story 4 bumps `DB_VERSION`. This is a version assertion, not a store-count assertion, which is why it is easy to miss when hunting for counts.
+
+Also delete: the scripture `contains` checks at 61-65 and 107-119, the whole "upgrade from v4 to v5" describe at **77-129**, the four index tests at 132-170, and the `STORE_NAMES` assertions at 196-201.
 
 ### 4.3 `tests/unit/services/storageSchema.test.ts` — `ALL_STORES`
 
@@ -260,7 +267,9 @@ Two coupled assertions. The key-parity one, verbatim at 476-480:
   });
 ```
 
-`EXPECTED_RESET` (lines 67-84) must shrink in exact lockstep with `signedOutState()` in `authSlice.ts:103-128`. The duplication is deliberate — the comment at 249-252 says so — and must not be refactored into a derivation.
+`EXPECTED_RESET` (lines **66-85**) must shrink in exact lockstep with `signedOutState()` in `authSlice.ts:103-128`. The duplication is deliberate — the comment at 249-252 says so — and must not be refactored into a derivation.
+
+**The range is 66-85, not 67-84.** Line 66 is `session: null,` and line 85 is `isInitialized: false,` — both scripture-owned, and both just outside the tempting inner range. The 20 field names in 66-85 match, in order, the 20 fields in `authSlice.ts:104-128`. `EXPECTED_RESET` is typed `Record<string, unknown>`, so TypeScript will not catch a mismatch — only the runtime key-parity assertion at :479 will, and it will fail.
 
 Also in this file: delete `SECRETS.reflection` (100), the fixture at 157, the test at 228, and the whole `it` at 379-393.
 

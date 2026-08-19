@@ -55,7 +55,9 @@
     - navigationSlice.ts:24 (ViewType union member) with :57 (pathMap entry).
       pathMap is Record<ViewType, string>, so it is exhaustive.
     - authSlice.ts signedOutState() 103-128 with the EXPECTED_RESET constant in
-      tests/unit/stores/signOutClearsAccountState.test.ts:67-84. A key-parity
+      tests/unit/stores/signOutClearsAccountState.test.ts:66-85 (NOT 67-84 —
+      line 66 `session: null,` and line 85 `isInitialized: false,` are both
+      scripture-owned and sit just outside the tempting inner range). A key-parity
       assertion at :476-480 compares the two key sets directly.
 
     TRAP in authSlice.ts: of the 21 fields to delete, EIGHT are named partner*/my*
@@ -169,10 +171,17 @@
     dbSchema.ts:2 — because the typed wrapper cannot name a store that is no
     longer in MyLoveDBSchema.
 
-    COUNT-ASSERTION TRAP in tests/unit/services/dbSchema.test.ts: there are THREE
-    count assertions, not one. :73 toBe(8) and :127 toBe(8) both become 4.
-    :106 already reads toBe(4) — it asserts the v4 pre-scripture count and MUST
-    NOT be edited, even though the post-removal count coincidentally equals it.
+    ASSERTION TRAP in tests/unit/services/dbSchema.test.ts — FOUR assertions,
+    not three:
+      :73  toBe(8)  -> becomes 4
+      :106 toBe(4)  -> DO NOT TOUCH (asserts the v4 pre-scripture count, which
+           coincidentally equals the post-removal count)
+      :127 toBe(8)  -> NOT edited; it sits inside the describe block spanning
+           77-129, which you delete wholesale. Do not both edit it and delete
+           its enclosing block.
+      :219 expect(DB_VERSION).toBe(7) -> becomes 8. This one is a VERSION
+           assertion in a separate 'DB constants' describe at 211+, so a hunt
+           for store counts misses it entirely.
     A blind replace of toBe(8) is safe; a blind replace involving 4 is not.
 
     In tests/unit/services/storageSchema.test.ts remove only entries 28-31 from
