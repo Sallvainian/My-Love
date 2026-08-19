@@ -445,7 +445,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="fixed top-20 left-1/2 z-50 -translate-x-1/2 transform rounded-full bg-black/80 px-6 py-3 text-white shadow-lg"
+              className="fixed top-[calc(5rem+env(safe-area-inset-top))] left-1/2 z-50 -translate-x-1/2 transform rounded-full bg-black/80 px-6 py-3 text-white shadow-lg"
               data-testid="toast-notification"
             >
               {showToast}

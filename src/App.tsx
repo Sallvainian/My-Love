@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
-import { BottomNavigation } from './components/Navigation/BottomNavigation';
+import { NavigationTray } from './components/Navigation/NavigationTray';
 import {
   BirthdayCountdown,
   EventCountdown,
@@ -15,7 +15,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from './stores/useAppStore';
 // PokeKissInterface moved to PartnerMoodView
 import type { Session } from '@supabase/supabase-js';
-import { signOut } from './api/auth/actionService';
 import { getSession, onAuthStateChange } from './api/auth/sessionService';
 import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { LoginScreen } from './components/LoginScreen';
@@ -46,6 +45,13 @@ const LoveNotes = lazy(() =>
 // Story 1.1: Scripture Reading Entry Point
 const ScriptureOverview = lazy(() =>
   import('./components/scripture-reading').then((m) => ({ default: m.ScriptureOverview }))
+);
+
+// Story 4 (dynamic events): Settings is the app's only sign-out and, from
+// story 5, the home of events CRUD. It was unreachable dead code until the
+// navigation tray gave it a destination.
+const Settings = lazy(() =>
+  import('./components/Settings/Settings').then((m) => ({ default: m.Settings }))
 );
 
 // Lazy load modal/conditional components to reduce initial bundle
@@ -91,7 +97,6 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [needsDisplayName, setNeedsDisplayName] = useState(false);
-  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Story 3 (dynamic events): which account's first loadEvents() has come back.
   // Home's events slot stays empty rather than showing the "no upcoming events"
@@ -143,21 +148,13 @@ function App() {
   // Story 1.5: Sync completion feedback state (AC-1.5.4)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
-  const handleSignOut = async () => {
-    if (isSigningOut) {
-      return;
-    }
-
-    setIsSigningOut(true);
-
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('[App] Sign-out failed:', error);
-    } finally {
-      setIsSigningOut(false);
-    }
-  };
+  // Sign-out lives in Settings alone (story 4). Both controls called the same
+  // `signOut` -- api/authService.ts:10 re-exports the very function this file
+  // used to import from ./api/auth/actionService -- and the store reset hangs
+  // off the auth listener below (clearStoreAuth -> authSlice.clearAuth ->
+  // signedOutState()), not off either caller, so nothing was lost with the
+  // App-level wiring. Settings' copy is strictly better: it surfaces the
+  // failure to the user instead of only console.error-ing it.
 
   // Helper to get route path without base (handles both dev and production)
   const getRoutePath = (pathname: string): string => {
@@ -184,7 +181,9 @@ function App() {
               ? 'notes'
               : routePath === '/scripture'
                 ? 'scripture'
-                : 'home';
+                : routePath === '/settings'
+                  ? 'settings'
+                  : 'home';
     setView(initialView, true); // Skip history update on initial load
 
     // AC-4.5.6: Browser back/forward button support
@@ -201,7 +200,9 @@ function App() {
                 ? 'notes'
                 : routePath === '/scripture'
                   ? 'scripture'
-                  : 'home';
+                  : routePath === '/settings'
+                    ? 'settings'
+                    : 'home';
       setView(view, true); // Skip history update to prevent loop
       logger.debug(`[App] Popstate: navigated to ${view}`);
     };
@@ -616,7 +617,12 @@ function App() {
   // Story 1.4 & 4.1/4.2 & 6.2 & 6.4: Render home, photos, mood, or partner view based on navigation
   return (
     <ErrorBoundary>
-      <div className="min-h-screen pb-16" data-testid="app-container">
+      <div className="min-h-screen" data-testid="app-container">
+        {/* Story 4 (dynamic events): sticky app chrome. It sits in normal flow
+            above <main>, so no view needs a compensating pad -- which is why
+            the retired bottom bar's `pb-16` is gone rather than mirrored. */}
+        <NavigationTray currentView={currentView} onViewChange={setView} />
+
         {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
         <NetworkStatusIndicator showOnlyWhenOffline />
 
@@ -706,20 +712,13 @@ function App() {
 
                 {/* Story 1.1: Scripture Reading Entry Point */}
                 {currentView === 'scripture' && <ScriptureOverview />}
+
+                {/* Story 4 (dynamic events): Settings, home of the only sign-out */}
+                {currentView === 'settings' && <Settings />}
               </Suspense>
             </ViewErrorBoundary>
           )}
         </main>
-
-        {/* Bottom navigation - always visible, outside error boundary */}
-        <BottomNavigation
-          currentView={currentView}
-          onViewChange={setView}
-          onSignOut={() => {
-            void handleSignOut();
-          }}
-          signOutDisabled={isSigningOut}
-        />
 
         {/* Photo upload modal - Story 4.1 (lazy loaded) */}
         <Suspense fallback={null}>
