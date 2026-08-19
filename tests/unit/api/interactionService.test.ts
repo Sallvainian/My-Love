@@ -334,17 +334,20 @@ describe('interactionService', () => {
 
   describe('getInteractionHistory — what the read actually returns', () => {
     beforeEach(() => {
-      backend.seed({
-        id: 'sent-by-me',
-        from_user_id: USER_ID,
-        to_user_id: PARTNER_ID,
-        created_at: '2026-08-18T03:00:00.000Z',
-      });
+      // Seeded oldest-first on purpose: insertion order is the reverse of the
+      // expected order, so 'returns the newest first' fails if .order() is ever
+      // dropped from the read. Seeded newest-first it passed either way.
       backend.seed({
         id: 'sent-to-me',
         from_user_id: PARTNER_ID,
         to_user_id: USER_ID,
         created_at: '2026-08-18T02:00:00.000Z',
+      });
+      backend.seed({
+        id: 'sent-by-me',
+        from_user_id: USER_ID,
+        to_user_id: PARTNER_ID,
+        created_at: '2026-08-18T03:00:00.000Z',
       });
       backend.seed({
         id: 'between-strangers',
