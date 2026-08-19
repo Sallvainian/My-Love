@@ -199,7 +199,7 @@ export function PhotoCarousel() {
       </AnimatePresence>
 
       {/* Navigation hint text */}
-      <div className="fixed right-0 bottom-4 left-0 text-center text-sm text-white/60">
+      <div className="fixed right-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] left-0 text-center text-sm text-white/60">
         <p>← → Arrow keys or swipe to navigate • Esc to close • ↓ Swipe down to close</p>
       </div>
 

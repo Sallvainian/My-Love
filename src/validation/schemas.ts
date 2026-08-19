@@ -107,8 +107,11 @@ const IsoDateStringSchema = z
     if (month < 1 || month > 12) return false;
     if (day < 1 || day > 31) return false;
 
-    // Check if date is valid by parsing
+    // Check if date is valid by parsing. The NaN guard matters: zod v4 runs
+    // this refine even when the regex above already failed, and toISOString()
+    // THROWS on an invalid Date — turning safeParse into a crash on garbage.
     const dateObj = new Date(date);
+    if (Number.isNaN(dateObj.getTime())) return false;
     return dateObj.toISOString().startsWith(date);
   }, 'Invalid date values');
 
@@ -149,7 +152,7 @@ const TimeFormatSchema = z
 /**
  * Anniversary schema for relationship milestones
  */
-const AnniversarySchema = z.object({
+export const AnniversarySchema = z.object({
   id: z.number().int().positive(),
   date: IsoDateStringSchema,
   label: z.string().min(1, 'Anniversary label cannot be empty'),

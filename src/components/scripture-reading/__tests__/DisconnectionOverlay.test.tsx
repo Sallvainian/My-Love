@@ -16,6 +16,7 @@
 
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { DISCONNECT_TIMEOUT_MS } from '../constants';
 import { DisconnectionOverlay } from '../session/DisconnectionOverlay';
 
 describe('DisconnectionOverlay', () => {
@@ -80,7 +81,7 @@ describe('DisconnectionOverlay', () => {
 
   test('[P0] transitions to Phase B after 30s with timeout buttons', () => {
     // Given: partner disconnected 31 seconds ago
-    const thirtyOneSecondsAgo = Date.now() - 31_000;
+    const thirtyOneSecondsAgo = Date.now() - (DISCONNECT_TIMEOUT_MS + 1_000);
     render(<DisconnectionOverlay {...defaultProps} disconnectedAt={thirtyOneSecondsAgo} />);
 
     // Then: Phase B content should be visible
@@ -104,7 +105,7 @@ describe('DisconnectionOverlay', () => {
 
     // When: 30 seconds pass
     act(() => {
-      vi.advanceTimersByTime(30_000);
+      vi.advanceTimersByTime(DISCONNECT_TIMEOUT_MS);
     });
 
     // Then: transitions to Phase B
@@ -120,7 +121,7 @@ describe('DisconnectionOverlay', () => {
   test('[P0] "Keep Waiting" calls onKeepWaiting callback', () => {
     // Given: Phase B (> 30s)
     const onKeepWaiting = vi.fn();
-    const thirtyOneSecondsAgo = Date.now() - 31_000;
+    const thirtyOneSecondsAgo = Date.now() - (DISCONNECT_TIMEOUT_MS + 1_000);
     render(
       <DisconnectionOverlay
         {...defaultProps}
@@ -139,7 +140,7 @@ describe('DisconnectionOverlay', () => {
   test('[P0] "End Session" requires explicit confirmation before callback', () => {
     // Given: Phase B (> 30s)
     const onEndSession = vi.fn();
-    const thirtyOneSecondsAgo = Date.now() - 31_000;
+    const thirtyOneSecondsAgo = Date.now() - (DISCONNECT_TIMEOUT_MS + 1_000);
     render(
       <DisconnectionOverlay
         {...defaultProps}
@@ -164,7 +165,7 @@ describe('DisconnectionOverlay', () => {
 
   test('[P1] canceling end-session confirmation returns to timeout actions', () => {
     // Given: Phase B (> 30s)
-    const thirtyOneSecondsAgo = Date.now() - 31_000;
+    const thirtyOneSecondsAgo = Date.now() - (DISCONNECT_TIMEOUT_MS + 1_000);
     render(<DisconnectionOverlay {...defaultProps} disconnectedAt={thirtyOneSecondsAgo} />);
 
     // Enter confirmation state
@@ -186,7 +187,7 @@ describe('DisconnectionOverlay', () => {
 
   test('[P1] uses neutral language — no blame words in visible text', () => {
     // Given: Phase B (timeout)
-    const thirtyOneSecondsAgo = Date.now() - 31_000;
+    const thirtyOneSecondsAgo = Date.now() - (DISCONNECT_TIMEOUT_MS + 1_000);
     render(<DisconnectionOverlay {...defaultProps} disconnectedAt={thirtyOneSecondsAgo} />);
 
     // Then: visible text (excluding sr-only aria region) should NOT contain blame/alarm language
@@ -201,7 +202,7 @@ describe('DisconnectionOverlay', () => {
 
   test('[P1] buttons have minimum 48px touch targets', () => {
     // Given: Phase B
-    const thirtyOneSecondsAgo = Date.now() - 31_000;
+    const thirtyOneSecondsAgo = Date.now() - (DISCONNECT_TIMEOUT_MS + 1_000);
     render(<DisconnectionOverlay {...defaultProps} disconnectedAt={thirtyOneSecondsAgo} />);
 
     // Then: both buttons should have min-h-[48px] (via class or style)
@@ -233,7 +234,7 @@ describe('DisconnectionOverlay', () => {
 
   test('[P2] re-renders correctly when disconnectedAt changes (Keep Waiting resets timer)', () => {
     // Given: overlay in Phase B (> 30s elapsed)
-    const thirtyOneSecondsAgo = Date.now() - 31_000;
+    const thirtyOneSecondsAgo = Date.now() - (DISCONNECT_TIMEOUT_MS + 1_000);
     const { rerender } = render(
       <DisconnectionOverlay {...defaultProps} disconnectedAt={thirtyOneSecondsAgo} />
     );

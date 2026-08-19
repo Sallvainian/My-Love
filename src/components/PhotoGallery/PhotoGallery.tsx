@@ -260,7 +260,10 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   // AC-4.2.1: Responsive grid layout
   // 3 columns (mobile), 4 columns (desktop md:768px+)
   return (
-    <div className="min-h-screen p-4" data-testid="photo-gallery">
+    <div
+      className="min-h-screen p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+      data-testid="photo-gallery"
+    >
       <div
         className="grid w-full grid-cols-3 gap-2 md:grid-cols-4 md:gap-3"
         data-testid="photo-gallery-grid"
@@ -303,7 +306,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       {/* Floating action button (FAB) for uploading more photos */}
       <button
         onClick={onUploadClick}
-        className="fixed right-4 bottom-20 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg transition-shadow hover:shadow-xl"
+        className="fixed right-4 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg transition-shadow hover:shadow-xl"
         aria-label="Upload photo"
         data-testid="photo-gallery-upload-fab"
       >

@@ -11,6 +11,12 @@
  * - NOT persisted (derived from Supabase session on each app load)
  */
 
+import {
+  getAnniversaryOwner,
+  setAnniversaryOwner,
+  stashAnniversaries,
+  takeAnniversaries,
+} from '../../services/anniversaryVault';
 import type { AppState, AppStateCreator } from '../types';
 import { revokePreviewUrlsFromNotes } from './notesSlice';
 
@@ -120,6 +126,14 @@ export function signedOutState() {
     pendingRetry: null,
     scriptureError: null,
     isInitialized: false,
+
+    // eventsSlice — a couple's countdown dates are theirs, and nothing else
+    // clears them: events are Supabase-only, deliberately absent from
+    // `partialize`, and the loader that would correct them is gated on being
+    // online. The loading flag goes too, on the same rule as the others.
+    events: [],
+    eventsIsLoading: false,
+    eventsError: null,
   } satisfies Partial<AppState>;
 }
 
@@ -159,7 +173,39 @@ function discardAccountState(
   // Everything account-scoped goes at once. Nothing is lost that is not
   // re-derivable: these are read caches of Supabase and IndexedDB, and unsynced
   // local entries stay in IndexedDB for their owner to pick up.
-  set({ ...identity, ...signedOutState() } as Partial<AppState>);
+  //
+  // `settings` survives as a whole — it is device configuration (theme,
+  // notifications) — except relationship.anniversaries inside it, which is
+  // couple data: user-writable from Settings, persisted by `partialize`, and
+  // rendered on Home. It is also localStorage-only, so a plain clear would
+  // destroy it: the outgoing user's list is stashed in the per-user vault
+  // instead, and the incoming user's (if any) popped back. This cannot live in
+  // signedOutState(), which has no access to the current object it must
+  // otherwise preserve.
+  const settings = get().settings;
+  // A no-session boot (expired or revoked refresh token, sign-out-everywhere
+  // from the partner's device) reaches here with userId never populated —
+  // authSlice is not persisted. The owner marker recorded at the last sign-in
+  // is what lets that path stash the list instead of destroying it.
+  const outgoingUserId = get().userId ?? getAnniversaryOwner();
+  if (outgoingUserId && settings) {
+    stashAnniversaries(outgoingUserId, settings.relationship.anniversaries);
+  }
+  const restored = identity.userId && settings ? takeAnniversaries(identity.userId) : null;
+  setAnniversaryOwner(identity.userId);
+
+  set({
+    ...identity,
+    ...signedOutState(),
+    ...(settings
+      ? {
+          settings: {
+            ...settings,
+            relationship: { ...settings.relationship, anniversaries: restored ?? [] },
+          },
+        }
+      : null),
+  } as Partial<AppState>);
 }
 
 export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => ({
@@ -186,6 +232,28 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => (
     if (switchedAccount) {
       discardAccountState(get, set, identity);
       return;
+    }
+
+    // A fresh sign-in (previous === null) pops this user's stashed
+    // anniversaries back into settings. Pop semantics make the plain-boot case
+    // a no-op: INITIAL_SESSION also lands here with previous === null, but the
+    // vault only holds an entry when this user's last session ended in
+    // sign-out, so a live persisted list is never overwritten by a stale
+    // stash. Repeat calls for the same user (previous === userId) skip this.
+    if (previous === null && userId !== null) {
+      const settings = get().settings;
+      const restored = settings ? takeAnniversaries(userId) : null;
+      setAnniversaryOwner(userId);
+      if (restored !== null && settings) {
+        set({
+          ...identity,
+          settings: {
+            ...settings,
+            relationship: { ...settings.relationship, anniversaries: restored },
+          },
+        } as Partial<AppState>);
+        return;
+      }
     }
 
     set(identity);

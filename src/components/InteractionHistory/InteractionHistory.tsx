@@ -91,7 +91,7 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
 
           {/* Modal */}
           <motion.div
-            className="fixed inset-x-4 top-20 bottom-20 z-50 flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl md:inset-x-auto md:top-1/2 md:left-1/2 md:h-auto md:max-h-[80vh] md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2"
+            className="fixed inset-x-4 top-[calc(5rem+env(safe-area-inset-top))] bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl md:inset-x-auto md:top-1/2 md:left-1/2 md:h-auto md:max-h-[80vh] md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2"
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}

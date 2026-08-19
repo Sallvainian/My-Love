@@ -31,7 +31,7 @@ export function PhotoGridSkeletonGrid() {
   const skeletonCount = 9;
 
   return (
-    <div className="min-h-screen p-4" data-testid="photo-gallery-skeleton">
+    <div className="min-h-screen p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" data-testid="photo-gallery-skeleton">
       <div
         className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 lg:gap-4"
         data-testid="photo-gallery-skeleton-grid"

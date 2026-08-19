@@ -26,6 +26,11 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { signedOutState } from '../../../src/stores/slices/authSlice';
+import {
+  OWNER_STORAGE_KEY,
+  VAULT_STORAGE_KEY,
+  setAnniversaryOwner,
+} from '../../../src/services/anniversaryVault';
 
 const EXPECTED_RESET: Record<string, unknown> = {
   moods: [],
@@ -78,6 +83,9 @@ const EXPECTED_RESET: Record<string, unknown> = {
   pendingRetry: null,
   scriptureError: null,
   isInitialized: false,
+  events: [],
+  eventsIsLoading: false,
+  eventsError: null,
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -90,6 +98,7 @@ const SECRETS = {
   searchHitName: 'SEARCH-RESULT-DISPLAY-NAME',
   photoCaption: 'PHOTO-CAPTION-TEXT',
   reflection: 'SCRIPTURE-REFLECTION-TEXT',
+  anniversaryLabel: 'OUR-FIRST-KISS-LABEL',
   userId: 'USER-A-ID',
 };
 
@@ -148,6 +157,19 @@ function seedSignedInSession(): void {
     activeSession: { id: 'sess-1', userId: SECRETS.userId, notes: SECRETS.reflection },
     myRole: 'host',
     partnerJoined: true,
+
+    // Anniversaries live INSIDE `settings`, which partialize persists and
+    // sign-out must otherwise preserve (theme, notifications are device
+    // configuration) — so this seeds through the current object rather than
+    // replacing it.
+    // settingsSlice seeds `settings` non-null defaults, so the assertion holds.
+    settings: {
+      ...useAppStore.getState().settings!,
+      relationship: {
+        ...useAppStore.getState().settings!.relationship,
+        anniversaries: [{ id: 1, date: '2025-11-26', label: SECRETS.anniversaryLabel }],
+      },
+    },
     // Seeding shapes loosely on purpose: the point is what SURVIVES, not that
     // each fixture satisfies its full production type.
   } as unknown as Parameters<typeof useAppStore.setState>[0]);
@@ -155,7 +177,14 @@ function seedSignedInSession(): void {
 
 describe('clearAuth on sign-out', () => {
   beforeEach(() => {
+    localStorage.removeItem(VAULT_STORAGE_KEY);
+    localStorage.removeItem(OWNER_STORAGE_KEY);
     seedSignedInSession();
+  });
+
+  afterEach(() => {
+    localStorage.removeItem(VAULT_STORAGE_KEY);
+    localStorage.removeItem(OWNER_STORAGE_KEY);
   });
 
   it('clears the identity', () => {
@@ -240,6 +269,86 @@ describe('clearAuth on sign-out', () => {
     for (const [key, resetValue] of Object.entries(EXPECTED_RESET)) {
       expect(after[key], `${key} was not reset by clearAuth`).toEqual(resetValue);
     }
+  });
+
+  it("drops the previous couple's anniversaries but keeps the device's theme", () => {
+    useAppStore.setState({
+      settings: {
+        ...useAppStore.getState().settings!,
+        themeName: 'ocean',
+      },
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+
+    useAppStore.getState().clearAuth();
+
+    const settings = useAppStore.getState().settings!;
+    // Labels and dates are the couple's, `partialize` persists `settings`, and
+    // no service re-derives them — left in place they rehydrate into the next
+    // account's Home countdown and Settings list.
+    expect(settings.relationship.anniversaries).toEqual([]);
+    // The theme is device preference, not account state.
+    expect(settings.themeName).toBe('ocean');
+  });
+
+  it("restores the same user's anniversaries on their next sign-in", () => {
+    useAppStore.getState().clearAuth();
+    expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
+
+    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
+
+    // Anniversaries are localStorage-only, so the sign-out clear must not be
+    // destruction: the vault stashed them per-user and sign-in pops them back.
+    const anniversaries = useAppStore.getState().settings!.relationship.anniversaries;
+    expect(anniversaries).toHaveLength(1);
+    expect(anniversaries[0]!.label).toBe(SECRETS.anniversaryLabel);
+  });
+
+  it("never hands one user's stash to a different account", () => {
+    useAppStore.getState().clearAuth();
+    useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
+
+    expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
+    expect(JSON.stringify(useAppStore.getState())).not.toContain(SECRETS.anniversaryLabel);
+
+    // …while A's entry keeps waiting for A.
+    useAppStore.getState().clearAuth();
+    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
+    expect(useAppStore.getState().settings!.relationship.anniversaries[0]!.label).toBe(
+      SECRETS.anniversaryLabel
+    );
+  });
+
+  it('stashes under the recorded owner when sign-out fires on a no-session boot', () => {
+    // Boot after refresh-token expiry (or sign-out-everywhere): persisted
+    // settings survived, but authSlice — not persisted — never learned who
+    // was signed in. Only the owner marker, written at A's last sign-in,
+    // still says whose list this is.
+    useAppStore.setState({
+      userId: null,
+      userEmail: null,
+      isAuthenticated: false,
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+    setAnniversaryOwner(SECRETS.userId);
+
+    useAppStore.getState().clearAuth();
+    expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
+
+    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
+    expect(useAppStore.getState().settings!.relationship.anniversaries[0]!.label).toBe(
+      SECRETS.anniversaryLabel
+    );
+  });
+
+  it('stashes across a direct account switch that never passes through sign-out', () => {
+    // Signing in over a live session hits setAuthUser's switched-account path.
+    useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
+
+    expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
+
+    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
+    expect(useAppStore.getState().settings!.relationship.anniversaries[0]!.label).toBe(
+      SECRETS.anniversaryLabel
+    );
   });
 
   it("drops the previous account's pending count but keeps the device's network state", () => {

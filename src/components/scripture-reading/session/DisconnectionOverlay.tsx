@@ -13,9 +13,7 @@
 import { WifiOff } from 'lucide-react';
 import { useEffect, useState, type ReactElement } from 'react';
 
-import { FOCUS_RING } from '../constants';
-
-const TIMEOUT_MS = 30_000;
+import { DISCONNECT_TIMEOUT_MS, FOCUS_RING } from '../constants';
 
 interface DisconnectionOverlayProps {
   partnerName: string;
@@ -45,7 +43,7 @@ export function DisconnectionOverlay({
     return () => clearInterval(interval);
   }, [disconnectedAt]);
 
-  const isTimeout = elapsed >= TIMEOUT_MS;
+  const isTimeout = elapsed >= DISCONNECT_TIMEOUT_MS;
 
   return (
     <div
