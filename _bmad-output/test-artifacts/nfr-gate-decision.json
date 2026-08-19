@@ -1,0 +1,103 @@
+{
+  "schema_version": "0.1.0",
+  "artifact": "nfr_assessment",
+  "evaluated_at": "2026-08-19T19:51:16Z",
+  "repo": "My-Love",
+  "target": {
+    "type": "story",
+    "id": "dw-events-offline-message-honesty",
+    "label": "DW-7 / DW-18: stop interactionService promising an offline sync that cannot happen"
+  },
+  "source_sha": "f486587f658fa812987a277ee1e416949f4f2fbc",
+  "scope": "commit f486587 plus the uncommitted working tree",
+  "execution_mode": "sequential",
+  "collection_status": "COLLECTED",
+  "gate_basis": "nfr_evidence_audit",
+  "gate_status": "CONCERNS",
+  "overall_risk": "MEDIUM",
+  "rationale": "No FAIL status, no breached threshold and no blocker. CONCERNS is driven by the undefined-threshold default rule: four of seven thresholds were recorded UNKNOWN by the test design because this repository has no PRD or ADR, so 8 of the 12 CONCERNS are threshold-definition gaps rather than observed failures.",
+  "domain_risk": {
+    "security": "LOW",
+    "performance": "LOW",
+    "reliability": "MEDIUM",
+    "maintainability": "MEDIUM"
+  },
+  "adr_checklist": {
+    "criteria_met": 14,
+    "criteria_total": 29,
+    "pct": 48,
+    "note": "Scores the system, not the change. 11 of the 15 unmet criteria are architecture-level and identical before and after this commit."
+  },
+  "categories": {
+    "testability_automation": "PASS",
+    "test_data_strategy": "PASS",
+    "scalability_availability": "CONCERNS",
+    "disaster_recovery": "CONCERNS",
+    "security": "PASS",
+    "monitorability": "CONCERNS",
+    "qos_qoe": "CONCERNS",
+    "deployability": "CONCERNS"
+  },
+  "finding_counts": {
+    "pass": 6,
+    "concerns": 12,
+    "fail": 0,
+    "not_applicable": 5,
+    "total": 23
+  },
+  "issue_counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 3,
+    "low": 3
+  },
+  "blockers": [],
+  "cross_domain_risks": [
+    {
+      "id": "CDR-1",
+      "domains": ["maintainability", "reliability"],
+      "description": "The honesty guard covers 6 of at least 9 Supabase-only modules and no per-file coverage floor exists, so the reliability property this change establishes could regress without failing CI.",
+      "impact": "MEDIUM"
+    },
+    {
+      "id": "CDR-2",
+      "domains": ["reliability", "qoe"],
+      "description": "PokeKissInterface.tsx:185 and :219 render string constants rather than error.message, so the honest message never reaches a user and the change's user-facing benefit is currently zero.",
+      "impact": "MEDIUM"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "MEDIUM",
+      "action": "Extend the honesty guard's SUPABASE_ONLY_MODULES to photosSlice.ts, loveNoteImageService.ts and partnerService.ts - all three confirmed Supabase-only in this session",
+      "owner": "DEV"
+    },
+    {
+      "priority": "MEDIUM",
+      "action": "Decide whether the honest message should reach the user; today PokeKissInterface renders constants (CDR-2)",
+      "owner": "OPERATOR"
+    },
+    {
+      "priority": "MEDIUM",
+      "action": "Schedule DW-35 - subscribeInteractions surfaces neither CHANNEL_ERROR nor TIMED_OUT and is the entire remaining coverage gap (lines 238-262)",
+      "owner": "DEV"
+    },
+    {
+      "priority": "LOW",
+      "action": "Set a per-file coverage threshold for src/api/interactionService.ts, or record the decision not to",
+      "owner": "OPERATOR"
+    },
+    {
+      "priority": "LOW",
+      "action": "Promote the honesty guard to an ESLint no-restricted-imports override (edits eslint.config.js)",
+      "owner": "OPERATOR"
+    }
+  ],
+  "evidence_gaps": 5,
+  "quick_wins": 2,
+  "links": {
+    "nfr_report_path": "_bmad-output/test-artifacts/nfr-assessment.md",
+    "test_design_path": "_bmad-output/test-artifacts/test-design-epic-dw-events-offline-message-honesty.md",
+    "trace_gate_path": "_bmad-output/test-artifacts/gate-decision.json"
+  }
+}

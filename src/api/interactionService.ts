@@ -5,12 +5,21 @@
  * Provides methods for sending interactions, subscribing to incoming interactions,
  * and fetching interaction history.
  *
+ * **The error convention.** This file throws, but never through
+ * `handleNetworkError`: that helper closes every message it builds with "Your
+ * changes will be synced when you're back online" (`errorHandlers.ts:95`), and
+ * interactions are Supabase-only — no offline queue, no IndexedDB mirror, no
+ * retry — so a poke that never left the device is not waiting to sync, it is
+ * gone. The reasoning is written out at length in
+ * `src/services/eventsService.ts:19-26`, and the two local builders below are
+ * copied from it. The helper's promise stays TRUE for its mood callers, which
+ * do have a service-worker sync queue, so `errorHandlers.ts` is left alone.
+ *
  * @module api/interactionService
  */
 
 import { logger } from '../utils/logger';
 import {
-  handleNetworkError,
   handleSupabaseError,
   isOnline,
   isPostgrestError,
@@ -42,6 +51,34 @@ export interface Interaction {
 }
 
 /**
+ * An interaction that could not be sent: it was refused before leaving the
+ * device (offline), or it reached the database and created nothing.
+ *
+ * Not exported, and deliberately re-thrown untouched by the catch tail —
+ * routing it through `handleNetworkError` would tell the user their poke "will
+ * be synced when you're back online", which is the opposite of what happened.
+ * Same shape as `EventWriteError` (`eventsService.ts:108-113`).
+ */
+class InteractionWriteError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InteractionWriteError';
+  }
+}
+
+/**
+ * A mid-flight failure that is not a PostgREST error — DNS, a timeout, a
+ * dropped socket. NOT `handleNetworkError`, for the reason in the module
+ * header: interactions sync in neither direction, so every catch tail here
+ * builds its own truthful message instead. Copied from
+ * `eventsService.ts:124-127`.
+ */
+function networkFailure(context: string, error: unknown): Error {
+  const detail = error instanceof Error ? error.message : 'Unknown network error';
+  return new Error(`[${context}] Network error: ${detail}. Check your internet connection.`);
+}
+
+/**
  * Interaction Service Class
  *
  * Responsibilities:
@@ -57,7 +94,10 @@ export class InteractionService {
    *
    * @param partnerId - Partner's user ID
    * @returns Supabase interaction record
-   * @throws SupabaseServiceError on failure
+   * @throws {InteractionWriteError} if offline, or if the insert created no
+   *   row — no queue exists, so the interaction is lost rather than deferred
+   * @throws an accurate network error if the request fails mid-flight
+   * @throws {SupabaseServiceError} if PostgREST rejects the insert
    *
    * @example
    * ```typescript
@@ -78,7 +118,10 @@ export class InteractionService {
    *
    * @param partnerId - Partner's user ID
    * @returns Supabase interaction record
-   * @throws SupabaseServiceError on failure
+   * @throws {InteractionWriteError} if offline, or if the insert created no
+   *   row — no queue exists, so the interaction is lost rather than deferred
+   * @throws an accurate network error if the request fails mid-flight
+   * @throws {SupabaseServiceError} if PostgREST rejects the insert
    *
    * @example
    * ```typescript
@@ -100,19 +143,20 @@ export class InteractionService {
    * @param type - Interaction type (poke or kiss)
    * @param toUserId - Recipient user ID
    * @returns Supabase interaction record
-   * @throws SupabaseServiceError on failure
+   * @throws {InteractionWriteError} if offline, or if the insert created no
+   *   row — no queue exists, so the interaction is lost rather than deferred
+   * @throws an accurate network error if the request fails mid-flight
+   * @throws {SupabaseServiceError} if PostgREST rejects the insert
    */
   private async sendInteraction(
     type: InteractionType,
     toUserId: string,
     userId: string
   ): Promise<SupabaseInteractionRecord> {
-    // Check network status
     if (!isOnline()) {
-      throw handleNetworkError(
-        new Error('Device is offline'),
-        'InteractionService.sendInteraction'
-      );
+      // NOT handleNetworkError: no offline queue exists, so its "will be
+      // synced when you're back online" promise is the opposite of the truth.
+      throw new InteractionWriteError(`You are offline. A ${type} needs a connection to send.`);
     }
 
     try {
@@ -136,19 +180,25 @@ export class InteractionService {
       }
 
       if (!data) {
-        throw new Error('No data returned from Supabase insert');
+        // Not a network problem, so it must not be dressed as one: the catch
+        // tail would otherwise promise a sync that no queue exists to perform.
+        throw new InteractionWriteError(`The ${type} was not sent`);
       }
 
       logger.info(`[InteractionService] Sent ${type} to ${toUserId}`);
       return data;
     } catch (error) {
+      if (error instanceof InteractionWriteError) {
+        throw error;
+      }
+
       logSupabaseError('InteractionService.sendInteraction', error);
 
       if (isPostgrestError(error)) {
         throw handleSupabaseError(error, 'InteractionService.sendInteraction');
       }
 
-      throw handleNetworkError(error, 'InteractionService.sendInteraction');
+      throw networkFailure('InteractionService.sendInteraction', error);
     }
   }
 
@@ -265,7 +315,7 @@ export class InteractionService {
         throw handleSupabaseError(error, 'InteractionService.getInteractionHistory');
       }
 
-      throw handleNetworkError(error, 'InteractionService.getInteractionHistory');
+      throw networkFailure('InteractionService.getInteractionHistory', error);
     }
   }
 
@@ -312,7 +362,7 @@ export class InteractionService {
         throw handleSupabaseError(error, 'InteractionService.getUnviewedInteractions');
       }
 
-      throw handleNetworkError(error, 'InteractionService.getUnviewedInteractions');
+      throw networkFailure('InteractionService.getUnviewedInteractions', error);
     }
   }
 
@@ -345,7 +395,7 @@ export class InteractionService {
         throw handleSupabaseError(error, 'InteractionService.markAsViewed');
       }
 
-      throw handleNetworkError(error, 'InteractionService.markAsViewed');
+      throw networkFailure('InteractionService.markAsViewed', error);
     }
   }
 }
