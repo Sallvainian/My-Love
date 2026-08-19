@@ -98,7 +98,9 @@ location: src/api/errorHandlers.ts:62
 source_spec: `2-events-service-and-store-slice.md`
 severity: medium
 reason: The errorMessages map in src/api/errorHandlers.ts:62-70 covers 23505, 23503, 23502, 42501, 42P01, PGRST116 and PGRST301 — no 23514 — so the fallback `Database error: ${error.message}` applies. The table enforces char_length(label) <= 100 and char_length(description) <= 500, and nothing rejects a blank label (char_length('') = 0 passes). Input validation belongs to story 5's form; story 1's triage log already carried the blank-label observation forward to that story.
-status: open
+status: done 2026-08-19
+resolution: resolved by sweep bundle dw-check-constraint-error-mapping
+resolution-undo: cb693b6131bc19853836c66541daaed38f371857c1a417872aed38cbb28440ec 2026-08-19 7374617475733a206f70656e
 
 ### DW-9: eventsService.getEvents applies no limit or pagination.
 origin: spec-deferred 25448caba914
@@ -166,7 +168,9 @@ location: src/api/errorHandlers.ts:62
 source_spec: `2-events-service-and-store-slice.md`
 severity: medium
 reason: Re-surfaced by this review pass's edge-case and blind-hunter layers; re-verified unchanged since the prior pass. The errorMessages map in src/api/errorHandlers.ts has no entry for 23514, so the generic 'Database error: ${message}' fallback applies. The table enforces char_length(label) <= 100 and char_length(description) <= 500, and nothing client-side rejects a blank label. Input validation is assigned to story 5's form.
-status: open
+status: done 2026-08-19
+resolution: resolved by sweep bundle dw-check-constraint-error-mapping
+resolution-undo: cb693b6131bc19853836c66541daaed38f371857c1a417872aed38cbb28440ec 2026-08-19 7374617475733a206f70656e
 
 ### DW-17: Overlapping loadEvents calls are last-writer-wins; the identity guard compares userId only.
 origin: spec-deferred d1a10b88a17a
@@ -326,4 +330,44 @@ location: src/api/interactionService.ts:225
 source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
 severity: low
 reason: src/api/interactionService.ts:253-255 passes a logger into .subscribe() and never surfaces CHANNEL_ERROR or TIMED_OUT to the caller. It also calls supabase.channel() directly, which AGENTS.md already records as a repo-wide teardown pitfall; the missing error path is the half AGENTS.md does not cover. Unchanged by this diff.
+status: open
+
+### DW-36: The SQLSTATE lookup walks Object.prototype, so a code of toString, constructor, valueOf or hasOwnProperty returns an inherited function and renders it to the user as the error message.
+origin: spec-deferred d3c350f0c7d6
+location: src/api/errorHandlers.ts:72
+source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
+severity: low
+reason: `errorMessages` is a bare object literal (src/api/errorHandlers.ts:62) and the lookup is `errorMessages[error.code] || ...` (:72), both unchanged by this story. Measured with node against a literal of the same shape: code 'toString' yields "function toString() { [native code] }", 'constructor' yields "function Object() { [native code] }", and '__proto__' yields "[object Object]". Each is truthy, so the fallback never runs and the string is interpolated straight into the user-facing message. `Object.hasOwn(errorMessages, error.code)` or `Object.create(null)` closes it. error.code comes from the response body, and tests/e2e/settings/events-crud.spec.ts:413-425 shows arbitrary PostgREST bodies are injectable.
+status: open
+
+### DW-37: Sibling SQLSTATEs that also carry raw Postgres text are still unmapped, so the same leak class this story closed for 23514 remains open for them.
+origin: spec-deferred 4115baed8bbf
+location: src/api/errorHandlers.ts:62-70
+source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
+severity: medium
+reason: After this change the map covers 23505, 23503, 23502, 23514, 42501, 42P01, PGRST116 and PGRST301. Still falling through to `Database error: ${error.message}`: 22001 (string data right truncation), 22007 and 22P02 (invalid input syntax, which render the rejected literal verbatim), 23P01, 40001, 57014, PGRST202 and PGRST204. public.events.event_date is `date not null` (supabase/migrations/20260818000002_create_events_table.sql:20), so a malformed date is a 22007 on a live column.
+status: open
+
+### DW-38: Four CHECK-carrying write paths never reach handleSupabaseError, so the SQLSTATE map cannot protect them however many codes it maps.
+origin: spec-deferred 613aa9858056
+location: src/services/photoService.ts, src/services/scriptureReadingService.ts, src/api/partnerService.ts, src/stores/slices/notesSlice.ts
+source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
+severity: medium
+reason: Only three modules import handleSupabaseError (measured with `grep -rln handleSupabaseError src/`): src/api/moodApi.ts:14, src/api/interactionService.ts:23, src/services/eventsService.ts:39. The non-adopters each handle rejections themselves: photoService.ts rethrows the raw insertError, scriptureReadingService.ts interpolates `Failed to submit reflection: ${error.message}`, notesSlice.ts swallows the error into a flag, and partnerService.ts throws hand-written Errors. The CHECK constraints on photos (20251203190800_create_photos_table.sql:18,24), scripture ratings (20260128000001_scripture_reading.sql:65), love_notes and partner_requests (20251206024345_remote_schema.sql:93,105,109,113) sit behind those paths. Pre-existing routing, not introduced here.
+status: open
+
+### DW-39: A PostgrestError with a missing or empty message takes the fallback and surfaces the bare string "Database error: " with nothing after the colon.
+origin: spec-deferred e9534049eabc
+location: src/api/errorHandlers.ts:72
+source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
+severity: low
+reason: The fallback at src/api/errorHandlers.ts:72 interpolates error.message unconditionally. tsconfig.app.json sets no noUncheckedIndexedAccess, so an absent code is typed as string and silently takes the same branch. Nothing in the repo covers either case. Pre-existing; the new tests scope to 23514 per the story intent.
+status: open
+
+### DW-40: SoloReadingFlow.test.tsx is flaky under the full suite, failing about one run in five while passing in isolation.
+origin: spec-deferred ef241b3821d3
+location: src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx
+source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
+severity: low
+reason: Measured during this story's verification. `npm run test:unit` was run five times: four reported 91 files / 1358 tests passed; one reported "1 failed | 1357 passed" on "SoloReadingFlow > Story 2.3: Daily Prayer Report > treats partner as complete when session-level reflection exists". The file run alone (`npx vitest run src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`) passed 113/113 three times consecutively. This story touches only src/api/errorHandlers.ts and tests/unit/api/errorHandlers.test.ts, neither of which SoloReadingFlow imports.
 status: open
