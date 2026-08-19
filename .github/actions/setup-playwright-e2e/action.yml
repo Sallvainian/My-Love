@@ -24,7 +24,29 @@ runs:
       shell: bash
       run: npx playwright install --with-deps chromium
 
-    - name: Install Playwright system deps
-      if: steps.pw-cache.outputs.cache-hit == 'true'
-      shell: bash
-      run: npx playwright install-deps chromium
+    # There was previously an `npx playwright install-deps chromium` step here,
+    # gated on `steps.pw-cache.outputs.cache-hit == 'true'` — the branch this
+    # one does not cover. It bought nothing and cost up to 3.5 minutes.
+    #
+    # Every Chromium runtime library Playwright asks for on ubuntu-24.04
+    # (the 21 entries under `chromium:` in playwright-core's nativeDeps table)
+    # is already present on the runner image and logs as "already the newest
+    # version". The only packages apt actually installed were nine fonts:
+    # fonts-wqy-zenhei, fonts-freefont-ttf, fonts-tlwg-loma-otf,
+    # fonts-ipafont-gothic, fonts-unifont, xfonts-cyrillic, xfonts-scalable
+    # (plus xfonts-encodings and xfonts-utils transitively). Those cover CJK,
+    # Thai and Cyrillic glyphs, which nothing here renders: the suite has no
+    # toHaveScreenshot/toMatchSnapshot assertion and no non-Latin literal in
+    # src/ or tests/e2e/, and Latin plus emoji coverage ships on the image.
+    #
+    # The payload is a constant 21.1 MB, but its cost is set by whichever
+    # azure.archive.ubuntu.com mirror the runner draws — observed fetch rates
+    # span 90.8 MB/s down to 105 kB/s. Across the 14 jobs of runs 32204646202
+    # and 32213236507 the step took 11.6s at best and 211.3s at worst, 163s of
+    # it on the Burn-In job that gates Test Summary. Median 17.4s, so this
+    # reads as cheap until the tail lands on the critical path.
+    #
+    # The cache-MISS path above is untouched: `install --with-deps` still
+    # installs system dependencies when the browser cache is cold. If a future
+    # runner image ever drops one of those libs, Chromium fails at launch on
+    # every job, before any assertion runs — a loud failure, not a silent one.
