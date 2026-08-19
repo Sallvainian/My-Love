@@ -1,0 +1,222 @@
+- id: "1"
+  title: Remove scripture tests and E2E test infrastructure
+  description: >-
+    Delete the 14 scripture E2E specs and all 4 API specs, repair the shared test
+    files that referenced them, and rewrite the sole integration spec against a
+    surviving feature. Covers CAP-3 for the E2E layer and banks most of the CI
+    win before any app or database code is touched.
+  invoke_dev_with: >-
+    Read removal-inventory.md sections 1 and 2.4 before starting.
+
+    HARD ORDERING RULE: tests/support/merged-fixtures.ts lines 21, 23, 60 and 62
+    must be edited in the SAME commit that deletes fixtures/scripture-navigation.ts
+    and fixtures/together-mode.ts. 42 spec files import that barrel and 23 are
+    non-scripture, so a split commit fails the entire Playwright suite at import.
+
+    Three things that will not announce themselves:
+    - tests/e2e/navigation/tray.spec.ts:82 has 'scripture' in a loop asserting
+      .not.toHaveAttribute. A stale entry passes VACUOUSLY against a testid that
+      no longer exists — a silent false-green, not a failure. Remove it.
+    - tests/support/helpers.ts (the flat 679-line file) is 100% scripture and is
+      deleted. tests/support/helpers/index.ts (the directory barrel) is
+      domain-neutral and MUST STAY. Same import root, opposite verdicts.
+    - In tests/support/factories/index.ts keep TypedSupabaseClient (line 16) and
+      in tests/support/fixtures/index.ts keep supabaseAdmin (35-49). Both have
+      non-scripture consumers in the events specs.
+
+    REWRITE, DO NOT DELETE: tests/integration/example-rpc.spec.ts is the only file
+    in tests/integration/ and is the repo's documented worked example for the
+    integration level (its header cites _bmad/bmm/testarch/knowledge/test-levels-framework.md).
+    Rewrite it against the events feature so the level keeps a working reference:
+    same shape — seed through the admin client, assert the rows, clean up — but
+    targeting events instead of scripture_seed_test_data. Do not leave the
+    directory empty. Sallvain approved this on 2026-08-19.
+
+    DELETE tests/support/helpers/rls-security.ts along with its only consumer
+    (tests/e2e/scripture/scripture-rls-security.spec.ts). Its two exports are
+    domain-neutral but unused once that spec goes, and unused test helpers drift
+    out of sync with the rest of the suite. Sallvain approved this on 2026-08-19.
+
+    Do NOT touch src/ or supabase/ in this story. The app and database still
+    have scripture after this lands and that is correct — nothing tests them.
+
+    Verify with: npm run typecheck && npm run lint && npx playwright test --project=chromium
+
+- id: "2"
+  title: Remove scripture from the application
+  description: >-
+    Delete the scripture component directory, hooks, service and store slice,
+    then perform the surgery on the 13 shared src files that reference them.
+    Covers CAP-1 plus the app-side half of CAP-3.
+  invoke_dev_with: >-
+    Read removal-inventory.md sections 1 and 2.2 before starting.
+
+    Two atomic pairs — either half alone is a compile error or a leak:
+    - navigationSlice.ts:24 (ViewType union member) with :57 (pathMap entry).
+      pathMap is Record<ViewType, string>, so it is exhaustive.
+    - authSlice.ts signedOutState() 103-128 with the EXPECTED_RESET constant in
+      tests/unit/stores/signOutClearsAccountState.test.ts:67-84. A key-parity
+      assertion at :476-480 compares the two key sets directly.
+
+    TRAP in authSlice.ts: of the 21 fields to delete, EIGHT are named partner*/my*
+    but are scripture-owned — myRole, partnerJoined, myReady, partnerReady,
+    partnerLocked, partnerDisconnected, partnerDisconnectedAt, countdownStartedAt.
+    partnerSlice owns NONE of them. Deleting by name prefix gets this wrong in
+    both directions. Work from the quoted line range, not from names.
+
+    TRAP: src/hooks/useAutoSave.ts and src/hooks/useMotionConfig.ts have generic
+    names and live in the shared hooks directory but are 100% scripture — verified
+    zero non-scripture importers. Delete both plus their test files. Leaving
+    useAutoSave.ts behind breaks the build (it imports ScriptureSession).
+
+    RETARGET, DO NOT DELETE: NavigationTray.test.tsx:132-142 is the only test
+    covering "selecting a destination reports the view and closes the tray" and
+    it happens to click scripture. Point it at a surviving destination.
+
+    PRESERVE: src/hooks/useFocusTrap.ts has 7 non-scripture consumers — only its
+    comment at 84-89 changes, and line 87 is mid-sentence so reword 85-88 as a unit.
+    In src/services/eventsService.ts:367-370 a non-scripture feature documents a
+    real postgrest-js typing constraint by pointing at scriptureReadingService.ts;
+    inline that explanation rather than lose it.
+
+    NAME COLLISION: SupabaseMessageSchema exists in BOTH src/validation/schemas.ts
+    (scripture messages, delete) and src/api/validation/supabaseSchemas.ts:286
+    (love messages, keep). Do not delete the wrong one.
+
+    Leave src/services/dbSchema.ts and src/types/database.types.ts entirely alone —
+    they are stories 4 and 3. Unused scripture types there are expected after this.
+
+    Verify with: npm run typecheck && npm run lint && npm run test:ci-local
+
+- id: "3"
+  title: Drop the scripture database objects
+  description: >-
+    Add a forward migration dropping the 5 tables, 12 functions, 1 trigger and 4
+    enum types, delete the 14 scripture pgTAP files, repair the two shared ones,
+    add policy coverage for two surviving tables, and regenerate the types.
+    Covers CAP-2 and the FN-GRANT-008 half of CAP-4.
+  invoke_dev_with: >-
+    Read removal-inventory.md section 3 and 4.1 before starting.
+
+    THIS IS THE ONLY IRREVERSIBLE STORY, AND IT IS DELIBERATELY UNGATED.
+    A production query on 2026-08-19 found 64 sessions (only 2 ever completed),
+    18 step states, 5 reflections, 3 bookmarks, 0 messages — including 2 shared
+    scripture reflections written by Sallvain and their partner on 2026-03-13.
+    Sallvain was shown these figures, was offered a one-time export, and declined
+    it on 2026-08-19: "you don't need to export those. I'm not using the scripture
+    feature anymore." Proceed and destroy the data. Do not re-litigate this and do
+    not pause to re-ask.
+
+    DO NOT DELETE ANY FILE UNDER supabase/migrations/. Surviving migration
+    20260818000000 lines 271-294 grants EXECUTE on scripture functions; deleting
+    the creating migrations makes a fresh `supabase db reset` fail with 42883.
+    Add ONE new forward migration ordered after 20260818000001. Section 3.2 has
+    the exact signatures — take them from there, not from memory.
+
+    HIGHEST-VALUE EDIT: supabase/tests/database/18_function_execute_grants.sql
+    FN-GRANT-008 at lines 128-132 is an exact-set assertion listing 13 function
+    names, 10 of them scripture. It must become exactly:
+      'accept_partner_request, decline_partner_request, get_my_partner_id',
+    In the same file also delete FN-GRANT-003/004 (93-103) and FN-GRANT-007
+    (158-161), then renumber `select plan(21);` at line 29 to `plan(18)`.
+    has_function_privilege with a text signature ERRORS (42883) on a missing
+    function rather than returning false, so those three abort the file before
+    FN-GRANT-008 ever runs.
+
+    In supabase/tests/database/00_helpers.sql delete only tests.create_session_as_admin
+    (61-90). KEEP create_test_user/authenticate_as/reset_role (16-59) — six
+    non-scripture files depend on them. plan(1) needs no change.
+
+    ADD NEW COVERAGE (Sallvain approved 2026-08-19): deleting 02_rls_policies.sql
+    removes the last `policies_are` assertion outside storage.objects, and 11
+    non-scripture tables carry RLS policies with no exact-set test at all. Add a
+    new pgTAP file asserting the policy set for the two most privacy-sensitive
+    surviving tables. Production currently reports:
+      love_notes (2): 'Users can insert their own messages' (INSERT),
+                      'Users can view their own messages' (SELECT)
+      users (3):      'Users can insert own profile' (INSERT),
+                      'Users can view self and partner profiles' (SELECT),
+                      'users_update_self_safe' (UPDATE)
+    Those names are from PRODUCTION. The pgTAP suite runs against LOCAL Supabase
+    built from migrations. Re-read the local policy names with
+    `select policyname from pg_policies where tablename in ('love_notes','users')`
+    after `supabase db reset` and assert THOSE. If local and production disagree,
+    stop and report the drift rather than papering over it — the divergence is a
+    finding in its own right.
+
+    NEVER hand-edit src/types/database.types.ts (AGENTS.md policy). Drop first,
+    then regenerate:
+      supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts
+    The 4 scripture enums are the only entries in public.Enums, so that block
+    correctly becomes [_ in never]: never after regeneration.
+
+    Verify with: supabase db reset && supabase test db && npm run typecheck
+
+- id: "4"
+  title: Remove the scripture IndexedDB object stores
+  description: >-
+    Strip the scripture types, schema members and creation branches from
+    dbSchema.ts, bump DB_VERSION to 8 with a deleteObjectStore pass, and handle
+    the service-worker blocked event. Covers CAP-5 and the remaining CAP-4 assertions.
+  invoke_dev_with: >-
+    Read removal-inventory.md sections 2.3, 4.2 and 4.3 before starting.
+
+    The four scripture-only stores are scripture-sessions, scripture-reflections,
+    scripture-bookmarks and scripture-messages. messages, photos, moods and
+    sw-auth are untouched.
+
+    deleteObjectStore must go through idb's unwrap() — already imported at
+    dbSchema.ts:2 — because the typed wrapper cannot name a store that is no
+    longer in MyLoveDBSchema.
+
+    COUNT-ASSERTION TRAP in tests/unit/services/dbSchema.test.ts: there are THREE
+    count assertions, not one. :73 toBe(8) and :127 toBe(8) both become 4.
+    :106 already reads toBe(4) — it asserts the v4 pre-scripture count and MUST
+    NOT be edited, even though the post-removal count coincidentally equals it.
+    A blind replace of toBe(8) is safe; a blind replace involving 4 is not.
+
+    In tests/unit/services/storageSchema.test.ts remove only entries 28-31 from
+    ALL_STORES. The list itself stays — it is the regression net for a real
+    defect where storage.ts created only two stores.
+
+    AMEND, DO NOT DELETE, the version-history comments at dbSchema.ts:111,
+    183-186 and 229-234. The 229-234 paragraph is the design rationale for the
+    existence-check pattern that every SURVIVING store depends on; it is merely
+    worded around the scripture incident.
+
+    Bumping to v8 re-fires upgradeDb for every profile, re-entering the moods
+    `else if (tx)` branch at 284-308. Both its inner guards check
+    indexNames.contains so it is idempotent — verify this rather than assume it.
+
+    REQUIRED: add a `blocked` handler on the openDB call. src/sw-db.ts:27 opens
+    my-love-db independently with its own DB_VERSION, so a service worker still
+    on v7 blocks the v8 upgrade. Surface a clear reload prompt; do not let the
+    app hang or fail silently. This was an explicit product decision.
+
+    Verify with: npm run typecheck && npm run lint && npm run test:ci-local
+
+- id: "5"
+  title: Right-size the CI E2E shard count
+  description: >-
+    Measure the post-removal E2E timings from a green run and choose a shard
+    count from those numbers, recording the decision beside the existing
+    rationale in test.yml. Covers CAP-6.
+  invoke_dev_with: >-
+    Read ci-baseline.md before starting, and follow its "How to verify" steps.
+
+    MEASURE FIRST. Do not pick a shard count from the estimate in that file —
+    replacing that estimate with a real number is the entire point of this story.
+
+    Baseline to beat: worst E2E shard 381s (177s Supabase setup + 174s tests) on
+    run 32279178457. Every job pays a 130-177s Supabase startup floor that this
+    work cannot move, so once ~76 fast tests are spread across shards the setup
+    cost dominates and fewer shards likely trades little wall-clock for a real
+    cut in runner minutes. Confirm that from the measured run before acting on it.
+
+    Do NOT touch the burn-in job or .github/actions/setup-supabase/action.yml —
+    both are explicit SPEC non-goals. Burn-in cost tracks which specs a branch
+    changed, not scripture.
+
+    Record the new numbers in ci-baseline.md and the decision in test.yml beside
+    the existing comment at lines 231-235, which is the precedent for how this
+    project documents a sharding choice.
