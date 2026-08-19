@@ -230,7 +230,7 @@ export function ReadingContainer(): ReactElement | null {
       {/* Toast: "Session updated" */}
       {showToast && (
         <div
-          className="fixed top-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-purple-200 px-4 py-2 text-sm text-purple-800 shadow-md"
+          className="fixed top-[calc(5rem+env(safe-area-inset-top))] left-1/2 z-50 -translate-x-1/2 rounded-lg bg-purple-200 px-4 py-2 text-sm text-purple-800 shadow-md"
           data-testid="session-update-toast"
           role="status"
         >
@@ -241,7 +241,7 @@ export function ReadingContainer(): ReactElement | null {
       {/* Story 4.3: Toast — "Reconnected" (green tint, 2s auto-dismiss) */}
       {showReconnectedToast && (
         <div
-          className="fixed top-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-green-200 px-4 py-2 text-sm text-green-800 shadow-md"
+          className="fixed top-[calc(5rem+env(safe-area-inset-top))] left-1/2 z-50 -translate-x-1/2 rounded-lg bg-green-200 px-4 py-2 text-sm text-green-800 shadow-md"
           data-testid="reconnected-toast"
           role="status"
         >
@@ -252,7 +252,7 @@ export function ReadingContainer(): ReactElement | null {
       {/* Story 4.3: Visible sync failure toast for reading phase actions */}
       {errorToastMessage && (
         <div
-          className="fixed top-16 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-red-100 px-4 py-2 text-sm text-red-800 shadow-md"
+          className="fixed top-[calc(8rem+env(safe-area-inset-top))] left-1/2 z-50 -translate-x-1/2 rounded-lg bg-red-100 px-4 py-2 text-sm text-red-800 shadow-md"
           data-testid="session-error-toast"
           role="alert"
         >
