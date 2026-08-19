@@ -304,7 +304,7 @@ export function MoodTracker() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20" data-testid="mood-tracker">
       {/* Tab Navigation - Story 5.4: Added Timeline tab */}
-      <div className="sticky top-0 z-10 border-b border-gray-200 bg-white">
+      <div className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-10 border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-2xl px-4">
           <div className="flex gap-1">
             <button
