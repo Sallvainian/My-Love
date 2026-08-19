@@ -10,7 +10,7 @@ export function WelcomeButton({ onClick }: WelcomeButtonProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
   return (
-    <div className="fixed right-8 bottom-8 z-50">
+    <div className="fixed right-8 bottom-[calc(2rem+env(safe-area-inset-bottom))] z-50">
       {/* Tooltip */}
       <AnimatePresence>
         {showTooltip && (

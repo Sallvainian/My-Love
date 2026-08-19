@@ -430,7 +430,7 @@ export function PhotoUploader({
       {/* Toast Notification - AC-6.2.8, AC-6.2.9, AC-6.2.13 */}
       {activeToast && (
         <div
-          className={`fixed right-4 bottom-4 max-w-sm rounded-lg p-4 shadow-lg transition-all duration-300 ${
+          className={`fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] max-w-sm rounded-lg p-4 shadow-lg transition-all duration-300 ${
             activeToast.type === 'success'
               ? 'border border-green-200 bg-green-100 text-green-800'
               : activeToast.type === 'error'
