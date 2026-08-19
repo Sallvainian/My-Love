@@ -12,10 +12,22 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { Calendar, Check, Edit2, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
+import { parseEventDate } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
 import type { Anniversary } from '../../types';
 import { formatDateLong } from '../../utils/dateUtils';
 import { isValidationError } from '../../validation/errorMessages';
+
+/**
+ * `anniversary.date` is a bare "YYYY-MM-DD"; fed to `new Date(...)` that is the
+ * ECMA-262 date-only form, parsed as UTC midnight — west of UTC it renders the
+ * previous day. parseEventDate rebuilds from local components, matching
+ * getNextAnniversaryDate's math on Home.
+ */
+function formatAnniversaryDate(date: string): string {
+  const parsed = parseEventDate(date);
+  return parsed ? formatDateLong(parsed) : date;
+}
 
 export function AnniversarySettings() {
   const { settings, addAnniversary, removeAnniversary, updateSettings } = useAppStore();
@@ -100,7 +112,7 @@ export function AnniversarySettings() {
                       {anniversary.label}
                     </h3>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                      {formatDateLong(new Date(anniversary.date))}
+                      {formatAnniversaryDate(anniversary.date)}
                     </p>
                     {anniversary.description && (
                       <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
