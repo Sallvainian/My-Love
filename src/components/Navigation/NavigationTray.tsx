@@ -118,14 +118,14 @@ export function NavigationTray({ currentView, onViewChange, badgeCounts }: Navig
   return (
     <>
       <header
-        className="safe-top sticky top-0 z-40 border-b border-gray-200 bg-white"
+        className="safe-top sticky top-0 z-40 border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
         data-testid="app-header"
       >
         <div className="mx-auto flex h-16 max-w-2xl items-center gap-2 px-4">
           <button
             type="button"
             onClick={() => setIsOpen((open) => !open)}
-            className="relative flex min-h-[48px] min-w-[48px] items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800"
+            className="relative flex min-h-[48px] min-w-[48px] items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
             data-testid="nav-menu-toggle"
             aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={isOpen}
@@ -157,7 +157,7 @@ export function NavigationTray({ currentView, onViewChange, badgeCounts }: Navig
               heading would duplicate that title on screen and make a
               level-1-heading query ambiguous -- which is exactly what broke
               notes/love-notes.spec.ts:27 when this was an h1. */}
-          <span className="flex-1 truncate text-center text-lg font-semibold text-gray-800">
+          <span className="flex-1 truncate text-center text-lg font-semibold text-gray-800 dark:text-gray-100">
             My Love
           </span>
 
@@ -185,7 +185,7 @@ export function NavigationTray({ currentView, onViewChange, badgeCounts }: Navig
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              className="safe-top safe-bottom fixed top-0 left-0 z-50 flex h-full w-72 max-w-[85vw] flex-col overflow-y-auto bg-white shadow-2xl outline-none"
+              className="safe-top safe-bottom fixed top-0 left-0 z-50 flex h-full w-72 max-w-[85vw] flex-col overflow-y-auto bg-white shadow-2xl outline-none dark:bg-gray-800"
               role="dialog"
               aria-modal="true"
               aria-label="Navigation"
@@ -193,11 +193,11 @@ export function NavigationTray({ currentView, onViewChange, badgeCounts }: Navig
               tabIndex={-1}
             >
               <div className="flex h-16 items-center justify-between px-4">
-                <span className="text-lg font-semibold text-gray-800">Menu</span>
+                <span className="text-lg font-semibold text-gray-800 dark:text-gray-100">Menu</span>
                 <button
                   type="button"
                   onClick={close}
-                  className="flex min-h-[48px] min-w-[48px] items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                  className="flex min-h-[48px] min-w-[48px] items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
                   data-testid="nav-tray-close"
                   aria-label="Close navigation menu"
                 >
@@ -218,8 +218,8 @@ export function NavigationTray({ currentView, onViewChange, badgeCounts }: Navig
                       onClick={() => handleSelect(view)}
                       className={`flex min-h-[48px] w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors ${
                         isActive
-                          ? 'bg-pink-50 text-pink-500'
-                          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-600'
+                          ? 'bg-pink-50 text-pink-500 dark:bg-pink-900/30 dark:text-pink-300'
+                          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300'
                       }`}
                       data-testid={`nav-${view}`}
                       aria-label={label}
