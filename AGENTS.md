@@ -3,13 +3,13 @@
 
 ## My Love
 
-PWA for couples — daily messages, mood tracking, photos, love-notes chat, scripture reading, partner interactions. React 19, TypeScript, Vite, Tailwind v4, Zustand, Supabase; npm, Node 24. Deployed to GitHub Pages at https://sallvainian.github.io/My-Love/. There is no generated documentation tree. `_bmad-output/` holds one file, `implementation-artifacts/deferred-work.md`.
+PWA for couples — daily messages, mood tracking, photos, love-notes chat, scripture reading, partner interactions. React 19, TypeScript, Vite, Tailwind v4, Zustand, Supabase; npm, Node 24. Deployed to GitHub Pages at https://sallvainian.github.io/My-Love/. There is no generated documentation tree. `_bmad-output/` holds the loop's specs and implementation/test artifacts; `implementation-artifacts/deferred-work.md` is the deferred-work ledger.
 
 ## Policy
 
 - Never hand-edit `src/types/database.types.ts` or `mise.lock` — both generated. Regenerate types with `supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts`.
 - Never recreate a `docs/` tree and never re-add vendored tool docs — both were deleted deliberately so that no stale prose can hand an agent wrong context. Durable prose goes in this block.
-- Three gitignore mismatches are deliberate; never reconcile them. `.gitignore:13` ignores `_bmad-output/` while `implementation-artifacts/deferred-work.md` is tracked, and `.gitignore:132-133` list `CLAUDE.md` and `AGENTS.md` while both are tracked — `git rm --cached` there would delete the repo's only instructions.
+- Three gitignore mismatches are deliberate; never reconcile them. `.gitignore:13` ignores `_bmad-output/` while its specs and implementation/test artifacts are tracked, and `.gitignore:132-133` list `CLAUDE.md` and `AGENTS.md` while both are tracked — `git rm --cached` there would delete the repo's only instructions.
 - Never add or repair specs in `tests/e2e-archive/` — frozen documentation, excluded from `tsconfig.test.json` and `tsconfig.tsr.json` and matched by no Playwright project; `tests/e2e-archive/README.md` records why each spec was archived. New E2E goes in `tests/e2e/`.
 - Secrets are age-encrypted inline in the committed `fnox.toml`; never write a secret into `.env` or source. Local runs need `fnox exec -- <cmd>`; CI uses GitHub Secrets, not fnox.
 - Branch as `<type>/<description>` (`feature/`, `fix/`, `chore/`, `docs/`, `ci/`). Commit as `type(scope): description` — feat, fix, test, docs, chore, refactor, revert, deps, ci, perf, style. Documentation-only changes get their own commit.
@@ -22,7 +22,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, scri
 ## Where things are
 
 - State: `src/stores/useAppStore.ts` composes 11 slices from `src/stores/slices/`; `appSlice` is composed first and owns `isLoading`/`error`/`__isHydrated`; `authSlice` owns `userId` and is not persisted.
-- A new view is registered in five hand-maintained places: `ViewType` and `pathMap` in `navigationSlice.ts`, both URL ternaries in `App.tsx` (~152 and ~169), the `currentView ===` render chain (~568), and a hardcoded tab in `Navigation/BottomNavigation.tsx`. Only `pathMap` is typechecked, so missing the rest still compiles, renders nothing, and resets to home on reload.
+- A new view is registered in five hand-maintained places: `ViewType` and `pathMap` in `navigationSlice.ts`, both URL ternaries in `App.tsx` (~174 and ~193), the `currentView ===` render chain (~636), and the `DESTINATIONS` list in `Navigation/NavigationTray.tsx`. Only `pathMap` is typechecked, so missing the rest still compiles, renders nothing, and resets to home on reload.
 - E2E fixtures: import `{ test, expect }` from `tests/support/merged-fixtures.ts`, never from `@playwright/test`.
 
 ## Running and verifying
