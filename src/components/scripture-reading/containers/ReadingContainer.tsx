@@ -366,7 +366,7 @@ export function ReadingContainer(): ReactElement | null {
       </div>
 
       {/* Lock-in area — fixed at bottom */}
-      <div className="sticky bottom-0 border-t border-purple-200/50 bg-white/90 p-4 backdrop-blur-sm">
+      <div className="sticky bottom-0 border-t border-purple-200/50 bg-white/90 px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm">
         <div className="mx-auto max-w-md">
           <LockInButton
             isLocked={isPendingLockIn}

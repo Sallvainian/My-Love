@@ -48,7 +48,7 @@ export const Settings: React.FC = () => {
   };
 
   return (
-    <div className="settings-container">
+    <div className="settings-container" data-testid="settings-view">
       <div className="settings-header">
         <h1 className="settings-title">Settings</h1>
       </div>
@@ -99,7 +99,12 @@ export const Settings: React.FC = () => {
               </div>
             )}
 
-            <button onClick={handleLogout} disabled={isLoggingOut} className="logout-button">
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="logout-button"
+              data-testid="settings-sign-out"
+            >
               {isLoggingOut ? (
                 <span className="loading-spinner">
                   <svg

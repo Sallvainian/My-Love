@@ -303,7 +303,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       {/* Floating action button (FAB) for uploading more photos */}
       <button
         onClick={onUploadClick}
-        className="fixed right-4 bottom-20 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg transition-shadow hover:shadow-xl"
+        className="fixed right-4 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg transition-shadow hover:shadow-xl"
         aria-label="Upload photo"
         data-testid="photo-gallery-upload-fab"
       >
