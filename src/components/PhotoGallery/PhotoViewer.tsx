@@ -502,7 +502,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
             navigating or closing behind an open delete confirmation. Disabling
             them also drops them from FOCUSABLE_SELECTOR's button:not([disabled]),
             confining Tab to Cancel/Delete. */}
-        <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-10 flex gap-2">
           {/* AC 6.4.10: Delete button (own photos only) */}
           {currentPhoto.isOwn && (
             <button
