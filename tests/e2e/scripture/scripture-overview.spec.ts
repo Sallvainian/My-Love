@@ -1,7 +1,7 @@
 /**
  * P1 E2E: Scripture Reading - Navigation & Overview
  *
- * Users can access Scripture Reading from bottom navigation,
+ * Users can access Scripture Reading from the navigation tray,
  * see overview page with mode selection, and resume sessions.
  *
  * Test IDs: P1-006, P1-007, P1-008, P1-009
@@ -18,6 +18,7 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { ensureScriptureOverview, waitForScriptureSessionRequest } from '../../support/helpers';
+import { navigateTo, openNavTray } from '../../support/helpers/navigation';
 import {
   saveSoloSessionAtStep,
   isolateSessionForResume,
@@ -25,21 +26,23 @@ import {
 
 test.describe('Scripture Navigation & Overview', () => {
   test.describe('Navigation', () => {
-    test('should show Scripture tab in bottom navigation', async ({ page }) => {
+    test('should show Scripture destination in the navigation tray', async ({ page }) => {
       // GIVEN: User is on any page
       await page.goto('/');
 
-      // WHEN: Page renders
-      // THEN: Scripture tab is visible in bottom navigation
+      // WHEN: The user opens the tray
+      await openNavTray(page);
+
+      // THEN: Scripture is one of its destinations
       await expect(page.getByTestId('nav-scripture')).toBeVisible();
     });
 
-    test('should navigate to scripture overview when tapping Scripture tab', async ({ page }) => {
+    test('should navigate to scripture overview from the tray', async ({ page }) => {
       // GIVEN: User is on the home page
       await page.goto('/');
 
-      // WHEN: User taps the Scripture tab
-      await page.getByTestId('nav-scripture').click();
+      // WHEN: User picks Scripture out of the tray
+      await navigateTo(page, 'scripture');
 
       // THEN: Scripture overview page loads
       await expect(page.getByTestId('scripture-overview')).toBeVisible();
