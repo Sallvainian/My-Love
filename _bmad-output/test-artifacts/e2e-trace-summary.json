@@ -1,0 +1,164 @@
+{
+  "schema_version": "0.2.0",
+  "snapshot_at": "2026-08-19T19:41:42Z",
+  "repo": "My-Love",
+  "collection_mode": "contract_static",
+  "collection_status": "COLLECTED",
+  "inventory_basis": "acceptance_criteria",
+  "gate_basis": "priority_thresholds",
+  "source_sha": "f486587f658fa812987a277ee1e416949f4f2fbc",
+  "target": {
+    "type": "story",
+    "id": "dw-events-offline-message-honesty",
+    "label": "DW-7 / DW-18: stop interactionService promising an offline sync that cannot happen"
+  },
+  "decision_mode": "deterministic",
+  "evaluator": "Sallvain",
+  "confidence": "high",
+  "oracle": {
+    "resolution_mode": "formal_requirements",
+    "confidence": "high",
+    "sources": [
+      "_bmad-output/implementation-artifacts/spec-dw-7-18-events-offline-message-honesty.md",
+      "_bmad-output/test-artifacts/test-design-epic-dw-events-offline-message-honesty.md",
+      "_bmad-output/test-artifacts/automation-summary-epic-dw-events-offline-message-honesty.md",
+      "_bmad-output/implementation-artifacts/deferred-work.md"
+    ],
+    "external_pointer_status": "not_used",
+    "synthetic": false
+  },
+  "gate_status": "PASS",
+  "coverage": {
+    "inventory": {
+      "covered": 16,
+      "total": 19,
+      "pct": 84
+    },
+    "priority_breakdown": {
+      "P0": {
+        "total": 0,
+        "covered": 0,
+        "pct": 100
+      },
+      "P1": {
+        "total": 15,
+        "covered": 14,
+        "pct": 93
+      },
+      "P2": {
+        "total": 2,
+        "covered": 2,
+        "pct": 100
+      },
+      "P3": {
+        "total": 2,
+        "covered": 0,
+        "pct": 0
+      }
+    },
+    "by_level": {
+      "e2e": {
+        "tests": 0,
+        "criteria_covered": 0
+      },
+      "api": {
+        "tests": 0,
+        "criteria_covered": 0
+      },
+      "component": {
+        "tests": 0,
+        "criteria_covered": 0
+      },
+      "unit": {
+        "tests": 44,
+        "criteria_covered": 17
+      },
+      "live": {
+        "tests": 0,
+        "criteria_covered": 0
+      },
+      "other": {
+        "tests": 0,
+        "criteria_covered": 0
+      }
+    }
+  },
+  "tests": {
+    "files": 2,
+    "cases": 44,
+    "skipped_cases": 0,
+    "fixme_cases": 0,
+    "pending_cases": 0
+  },
+  "risk_summary": {
+    "critical_open": 0,
+    "high_open": 0,
+    "medium_open": 0,
+    "low_open": 2
+  },
+  "heuristics": {
+    "endpoint_gaps": 1,
+    "auth_negative_path_status": "present",
+    "error_path_status": "present",
+    "ui_journey_status": "not_applicable",
+    "ui_state_status": "not_applicable"
+  },
+  "live_evidence": {
+    "present": false,
+    "results_file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260819-133049-ee65/worktrees/dw-events-offline-message-honesty/_bmad-output/test-artifacts/live-verification-results.json",
+    "freshness": "not_present",
+    "recorded_source_sha": "",
+    "current_source_sha": "f486587f658fa812987a277ee1e416949f4f2fbc",
+    "producer": "",
+    "counted": 0,
+    "stale": 0,
+    "unverifiable": 0,
+    "failed": 0,
+    "contradicted": 0,
+    "blocked": 0,
+    "skipped": 0,
+    "unmatched": 0,
+    "invalid": 0,
+    "requirements_live_only": 0
+  },
+  "blockers": [],
+  "recommendations": [
+    {
+      "priority": "MEDIUM",
+      "action": "Complete coverage for 1 partially covered requirement(s): extend the honesty guard's module list to the remaining Supabase-only modules (photosSlice.ts, loveNoteImageService.ts, partnerService.ts) after confirming each, and promote the check to the ESLint no-restricted-imports override the test design recommended",
+      "requirements": [
+        "TEST-03"
+      ]
+    },
+    {
+      "priority": "HIGH",
+      "action": "Add API tests for 1 uncovered endpoint(s) — blocked on the DW-35 production change",
+      "requirements": [
+        "EP-1"
+      ]
+    },
+    {
+      "priority": "LOW",
+      "action": "Run /bmad-testarch-test-review to assess test quality",
+      "requirements": []
+    }
+  ],
+  "gate_criteria": {
+    "p0_coverage_required": "100%",
+    "p0_coverage_actual": "100%",
+    "p0_status": "MET",
+    "p1_coverage_target": "90%",
+    "p1_coverage_minimum": "80%",
+    "p1_coverage_actual": "93%",
+    "p1_status": "MET",
+    "overall_coverage_minimum": "80%",
+    "overall_coverage_actual": "84%",
+    "overall_status": "MET"
+  },
+  "links": {
+    "trace_report_path": "_bmad-output/test-artifacts/traceability-matrix.md",
+    "trace_report_url": "",
+    "artifact_url": "",
+    "journey_evidence_url": ""
+  }
+}

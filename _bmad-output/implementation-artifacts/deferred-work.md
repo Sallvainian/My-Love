@@ -88,7 +88,9 @@ location: src/api/errorHandlers.ts:94
 source_spec: `2-events-service-and-store-slice.md`
 severity: medium
 reason: src/api/errorHandlers.ts:94-95 composes that sentence for every offline throw. Pre-existing and repo-wide, not caused by this story: interactionService.ts:111 emits the same text for partner interactions, which are equally Supabase-only (AGENTS.md:65). eventsService's module header already routes EventWriteError around the helper for exactly this reason; the offline guards still use it because the story's Boundaries mandate moodApi's idiom verbatim.
-status: open
+status: done 2026-08-19
+resolution: resolved by sweep bundle dw-events-offline-message-honesty
+resolution-undo: 5c46b35490321cbf6fdd6bc5255a477608d829bd27ecbf075ab278ce08b5c8f2 2026-08-19 7374617475733a206f70656e
 
 ### DW-8: A CHECK-constraint violation (23514) is unmapped, so an over-length label or description reaches the user as raw Postgres constraint text.
 origin: spec-deferred d44dacbe0efd
@@ -181,7 +183,9 @@ location: src/api/errorHandlers.ts:94
 source_spec: `2-events-service-and-store-slice.md`
 severity: medium
 reason: Re-surfaced by this review pass; re-verified unchanged since the prior pass. src/api/errorHandlers.ts composes "Your changes will be synced when you're back online" for every offline throw; events have no offline queue, IndexedDB mirror or retry. Pre-existing and repo-wide (interactionService.ts emits the same text for partner interactions).
-status: open
+status: done 2026-08-19
+resolution: resolved by sweep bundle dw-events-offline-message-honesty
+resolution-undo: 5c46b35490321cbf6fdd6bc5255a477608d829bd27ecbf075ab278ce08b5c8f2 2026-08-19 7374617475733a206f70656e
 
 ### DW-19: EventWriteError is unexported and EventWriteResult carries no machine-readable code, so callers must string-match English prose to distinguish outcomes.
 origin: spec-deferred 5652fe1c2471
@@ -283,3 +287,43 @@ severity: low
 reason: `_bmad-output/test-artifacts/` holds 6 ATDD scaffolds and 3 automation files. `vitest.config.ts` includes only `tests/**` and `src/**`, and Playwright's three projects set testDir to `./tests/e2e`, `./tests/api` and `./tests/integration`, so nothing reaches them. Both TEA summaries say so plainly ("Nothing here is active until it is moved") and record the `git mv` commands that would activate them, along with measurements taken by copying each file to its target, running it, and removing it again. Two of the three defects this review confirmed were first surfaced by that parked tree, so the coverage is real rather than speculative. Activation is a deliberate operator decision, not a patch: `automation-summary.md` measures typecheck at 6 TS2883 errors without the generated files and 1 with them, so acceptance criterion 3 -- which pins the literal number six -- becomes false the moment the activation happens, and the one-line fix the summary proposes at `tests/support/merged-fixtures.ts:
 status: open
 decision: 2026-08-19 Activate the parked tests — Run the git mv sequence recorded at automation-summary.md:594-600, helper first, then remove the test.skip markers each file's header and the ATDD checklist enumerate. Apply the one-line tests/support/merged-fixtures.ts fix the summary proposes, then rewire the six other files onto tests/support/helpers/events.ts as automation-summary.md:616 describes. Measure typecheck before and after rather than trusting the recorded numbers — the six-error TS2883 baseline is recorded as an artifact of the loop's worktree layout and this repo is not a worktree — and update story 5's acceptance criterion 3 in the same change so it no longer pins a count the activation invalidates. Every activated file must actually run and pass in its new home before the change is finished.
+
+### DW-31: markAsViewed resolves successfully when its UPDATE matches zero rows, so a row the caller may not update is reported as marked.
+origin: spec-deferred 1a8de2676ad0
+location: src/api/interactionService.ts:379
+source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
+severity: low
+reason: The UPDATE policy is `USING (auth.uid() = to_user_id)` (supabase/migrations/20251206024345_remote_schema.sql:316-321), so RLS filters a non-recipient's update into a zero-row success with no error. src/api/interactionService.ts:379-400 checks only `error`, never the row count, and interactionsSlice.markInteractionViewed then decrements unviewedCount regardless. This is the same silent-RLS class eventsService guards with 'Event not found or not yours to edit' (src/services/eventsService.ts:413). Not reachable through today's UI: handleAnimationComplete only passes rows from getUnviewedInteractions, which already filters toUserId === userId. Pre-existing; untouched by this change.
+status: open
+
+### DW-32: getInteractionHistory, getUnviewedInteractions and markAsViewed have no isOnline() guard, so an offline caller gets a mid-flight message.
+origin: spec-deferred 1effec975be0
+location: src/api/interactionService.ts:282
+source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
+severity: low
+reason: Only sendInteraction guards (src/api/interactionService.ts:156). The other three go straight into the try, so offline they surface '[InteractionService.<method>] Network error: Failed to fetch. Check your internet connection.' rather than naming the offline state. Truthful either way after this change, so this is specificity, not honesty. Adding guards is new behavior and was excluded by this spec's Never list.
+status: open
+
+### DW-33: The write-error class and networkFailure builder now exist in two copies, one per Supabase-only feature.
+origin: spec-deferred fb1db7ca9280
+location: src/api/interactionService.ts:76
+source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
+severity: low
+reason: src/services/eventsService.ts:108-127 and src/api/interactionService.ts:53-79 carry the same class shape and a byte-identical networkFailure body. Copying was what the intent asked for ('the same treatment eventsService applied'), but a third Supabase-only feature would make extraction worth doing. eventsService.ts:120-122 already records that rewording the shared helper is cross-feature work.
+status: open
+
+### DW-34: The new interactionService test file covers the failure surface only; the success paths of the three read/update methods stay untested.
+origin: spec-deferred 498cf9493c5a
+location: tests/unit/api/interactionService.test.ts:129
+source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
+severity: low
+reason: tests/unit/api/interactionService.test.ts asserts happy paths for sendPoke/sendKiss only. getInteractionHistory, getUnviewedInteractions and markAsViewed appear solely in rejection tests, and the fake builder's or(), order() and range() are deliberate no-ops, so the history read's predicate, ordering and pagination are not exercised at all. Those methods are unchanged by this diff, so the gap is pre-existing rather than introduced.
+status: open
+
+### DW-35: subscribeInteractions has no error handling — a failed subscribe only logs its status and the returned unsubscribe still looks healthy.
+origin: spec-deferred 0f06e1c320a7
+location: src/api/interactionService.ts:225
+source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
+severity: low
+reason: src/api/interactionService.ts:253-255 passes a logger into .subscribe() and never surfaces CHANNEL_ERROR or TIMED_OUT to the caller. It also calls supabase.channel() directly, which AGENTS.md already records as a repo-wide teardown pitfall; the missing error path is the half AGENTS.md does not cover. Unchanged by this diff.
+status: open
