@@ -7,11 +7,14 @@
 import { expect } from '@playwright/test';
 import type { Page, Response } from '@playwright/test';
 import { waitForScriptureRpc, waitForScriptureStore } from '../helpers';
+import { DISCONNECT_TIMEOUT_MS } from '../../../src/components/scripture-reading/constants';
 
 type SuccessfulResponse = Pick<Response, 'url' | 'status' | 'request'>;
 
 const DISCONNECT_DETECT_WINDOW_MS = 25_000;
-const DISCONNECT_PHASE_B_WINDOW_MS = 35_000;
+// Derived, not hardcoded: this is "the product's threshold plus slack to render".
+// Left as a literal it would silently start failing the moment DISCONNECT_TIMEOUT_MS moved.
+const DISCONNECT_PHASE_B_WINDOW_MS = DISCONNECT_TIMEOUT_MS + 5_000;
 
 /** Matches a scripture_toggle_ready RPC 2xx response. */
 export const isToggleReadyResponse = (resp: SuccessfulResponse): boolean =>
@@ -147,6 +150,87 @@ export async function waitForDisconnectionTimeout(page: Page): Promise<void> {
   await expect(page.getByText(/your partner seems to have stepped away/i)).toBeVisible({
     timeout: DISCONNECT_PHASE_B_WINDOW_MS,
   });
+  await expect(page.getByTestId('disconnection-keep-waiting')).toBeVisible();
+  await expect(page.getByTestId('disconnection-end-session')).toBeVisible();
+}
+
+/**
+ * Reach the disconnection overlay's Phase B without spending the real 30 seconds.
+ *
+ * Backdates the one store field the overlay derives elapsed time from, then asserts
+ * the product re-rendered into Phase B on its own. The threshold comparison still
+ * runs for real — DisconnectionOverlay recomputes `Date.now() - disconnectedAt` and
+ * tests it against DISCONNECT_TIMEOUT_MS; only its input moved. This is the same
+ * idiom the component's own unit test uses at 7 sites
+ * (`Date.now() - (DISCONNECT_TIMEOUT_MS + 1_000)` in DisconnectionOverlay.test.tsx).
+ *
+ * Use this ONLY where Phase B is the route to something else. Where Phase B is
+ * itself the acceptance criterion (4.3 AC#2, test 4.3-E2E-001) use
+ * waitForDisconnectionTimeout and pay the 30s: that path is what covers the
+ * setInterval re-render, which this helper bypasses by changing the
+ * `disconnectedAt` prop and re-running the effect instead.
+ *
+ * `page.clock` is NOT an option here despite looking like the natural fit.
+ * Fast-forwarding this page 30s makes every real-clock presence payload from the
+ * reconnected partner look 30s stale, and useScripturePresence drops anything
+ * older than STALE_TTL_MS (20s) — so `waitForPartnerReconnected` would never
+ * resolve and both callers would break.
+ */
+export async function skipToDisconnectionTimeout(page: Page): Promise<void> {
+  // Diagnose inside the evaluate, before any DOM assertion. If a late
+  // presence_update has already cleared the disconnection the overlay is gone,
+  // and a visibility assert would burn the 15s default only to report
+  // "element not visible" — hiding the actual cause.
+  await page.evaluate((thresholdMs) => {
+    const store = window.__APP_STORE__;
+    if (!store) throw new Error('__APP_STORE__ not found');
+
+    const { partnerDisconnected, partnerDisconnectedAt } = store.getState();
+    if (!partnerDisconnected || partnerDisconnectedAt === null) {
+      throw new Error(
+        '[skipToDisconnectionTimeout] expected an active disconnection, got ' +
+          `partnerDisconnected=${String(partnerDisconnected)} ` +
+          `partnerDisconnectedAt=${String(partnerDisconnectedAt)}. ` +
+          'A late presence_update from the closed tab can clear it: useScripturePresence ' +
+          'only drops payloads older than STALE_TTL_MS (20s), so one sent just before ' +
+          'close() can still be accepted for ~10s after the overlay appears.'
+      );
+    }
+
+    // If enough real time has already passed — a caller with slow awaited DB
+    // round trips ahead of this — Phase B is showing on its own and there is
+    // nothing to skip. Return rather than throw: the assertions below would
+    // have passed, and turning a passing state into a hard failure buys nothing.
+    if (Date.now() - partnerDisconnectedAt >= thresholdMs) return;
+
+    store.setState({ partnerDisconnectedAt: partnerDisconnectedAt - (thresholdMs + 1_000) });
+  }, DISCONNECT_TIMEOUT_MS);
+
+  // 5s, not the 15s default. Phase B renders off a prop change, so it is there
+  // on the next paint or not at all; the only realistic way to reach the catch
+  // is a straggler presence_update dismissing the overlay between the evaluate
+  // above and this assertion, which the evaluate's own guard cannot see.
+  try {
+    await expect(page.getByText(/your partner seems to have stepped away/i)).toBeVisible({
+      timeout: 5_000,
+    });
+  } catch (error) {
+    const stillDisconnected = await page.evaluate(
+      () => window.__APP_STORE__?.getState().partnerDisconnected ?? null
+    );
+    if (stillDisconnected !== true) {
+      throw new Error(
+        '[skipToDisconnectionTimeout] the disconnection cleared while backdating ' +
+          `(partnerDisconnected=${String(stillDisconnected)}). A late presence_update from the ` +
+          'closed tab can do this: useScripturePresence drops payloads older than ' +
+          'STALE_TTL_MS (20s), so one sent just before close() stays acceptable for ~10s ' +
+          'after the overlay appears — a window the real 30s wait used to sit past.',
+        { cause: error }
+      );
+    }
+    throw error;
+  }
+
   await expect(page.getByTestId('disconnection-keep-waiting')).toBeVisible();
   await expect(page.getByTestId('disconnection-end-session')).toBeVisible();
 }
