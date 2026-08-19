@@ -439,7 +439,11 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [authUserId, currentView, loadEvents]);
+    // isOnline is a dep for exactly one reason: coming back online re-fires
+    // the load, so the offline error card clears without leaving Home. The
+    // offline-direction re-fire just fails fast into the same parked error,
+    // and a failed refresh never blanks the last-good list (eventsSlice).
+  }, [authUserId, currentView, isOnline, loadEvents]);
 
   // Bumped when a card retires itself at local midnight, purely to re-run the
   // filter and slot decision below. Not a timer of its own: it rides the
