@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { authService } from '../../api/authService';
 import { logger } from '../../utils/logger';
 import { AnniversarySettings } from './AnniversarySettings';
+import { EventsSettings } from './EventsSettings';
 import './Settings.css';
 
 export const Settings: React.FC = () => {
@@ -149,6 +150,15 @@ export const Settings: React.FC = () => {
                 </>
               )}
             </button>
+          </div>
+        </section>
+
+        {/* Events Section — the couple-shared countdowns, above the
+            device-local anniversaries below it. */}
+        <section className="settings-section">
+          <h2 className="section-title">Events</h2>
+          <div className="section-content">
+            <EventsSettings />
           </div>
         </section>
 
