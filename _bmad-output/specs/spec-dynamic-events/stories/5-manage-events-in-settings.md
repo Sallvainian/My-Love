@@ -350,107 +350,77 @@ onClose();
 
 ## Auto Run Result
 
-Status: done
+Status: blocked
 
-### What was implemented
+Blocking condition: `no subagents` — two of the four mandatory review layers could not be
+run, so the review pass never reached classification.
 
-The events CRUD in Settings, completing CAP-5 end to end. `EventsSettings` mounts as a Settings
-section between Account and Anniversary and reaches events only through `useAppStore`: it triggers
-its own load on mount keyed on `userId` (so a `/settings` deep link or a reload on Settings fetches
-without the user ever visiting Home), lists every event unfiltered with past ones included, and
-renders Edit and Delete only on rows the signed-in user created. Add and edit share one
-focus-trapped modal over label, date, description and icon, validated client-side against the
-table's CHECK constraints before any request; delete sits behind its own focus-trapped confirmation
-with a surviving fallback focus target. A rejected write renders the message from its own returned
-`EventWriteResult` inside the form as a `role="alert"` and keeps the form open, and a failed load is
-tracked in local component state so a save failure can never paint a list-level notice.
+### What happened
 
-This run was a follow-up review pass over that already-committed change (the previous pass finished
-with `followup_review_recommended: true`). It changed no production code. Four review layers ran in
-parallel over the full diff since `47f28b8f`, untracked files included; the four findings that
-survived verification were all gaps in the new suites' ability to detect a regression, and each was
-closed by a test that was then proven to fail against the mutation it exists to catch.
+This run routed straight to the review step (the spec was `in-review` with
+`followup_review_recommended: true`). The diff since `47f28b8f` was staged as required —
+8,835 lines across 23 files, untracked included — and all four layers were launched in one
+message, none skipped.
 
-### Files changed
+Two layers reported:
 
-Since `47f28b8f`, outside `_bmad-output/`:
+- **blind-hunter** — 19 findings, mostly about the parked `_bmad-output/` test tree and the
+  four TEA artifacts measuring a superseded 851-line / 34-test version of
+  `EventsSettings.test.tsx` (the shipped file is 923 lines / 38 tests, so the real total is
+  49, not 45).
+- **intent-alignment** — a surface-mismatch audit: the diff implements the fence reading of
+  acceptance criterion 6 plus the literal readings of the load-failure and mount-effect
+  clauses, and three expectations stated at the component surface have their determining
+  mechanism at surfaces the story fenced off.
 
-- `src/components/Settings/EventsSettings.tsx` (new) — the whole feature: load effect, list, empty /
-  loading / load-error states, the add-edit form modal, and the delete confirmation. Unchanged by
-  this pass.
-- `src/components/Settings/Settings.tsx` — mounts the new `Events` section between Account and
-  Anniversary. Unchanged by this pass.
-- `src/components/Settings/__tests__/EventsSettings.test.tsx` (new) — behavioural tests over a
-  subscribable mocked store. **This pass added 4 and repaired 1**, taking the file from 34 to 38.
-- `src/components/Settings/__tests__/EventsSettings.focus.test.tsx` (new) — 11 focus tests, one
-  dedicated file per the house standard. Unchanged by this pass.
-- `tests/e2e/settings/events-crud.spec.ts` (new) — the real round trip against the local stack.
-  Unchanged by this pass.
+Two layers produced nothing:
 
-Inside `_bmad-output/`, this pass edited only this spec file. The three `bmad-build-auto-result-5-tea.*`
-reports and the nine files under `test-artifacts/` were produced by earlier TEA runs in this same
-change set and are committed as they were found; `deferred-work.md` carries the orchestrator's own
-DW-26 / DW-27 append, which this run was instructed not to touch and did not.
+- **edge-case-hunter** and **verification-gap** were each spawned twice (four spawns total)
+  and pinged six times over roughly fifty minutes. Neither returned a single byte — not
+  even a one-word acknowledgement.
 
-### Review findings
+### Why this is a subagent failure rather than a review outcome
 
-Four layers ran in parallel — blind hunter, edge-case hunter, verification-gap, intent-alignment.
-Every finding was verified at the location it named before being kept or dismissed, and every kept
-finding was reproduced by running or mutating the code rather than by reading it.
+A control probe was spawned with a trivial sixty-second task: read five lines of one file,
+stat another, and report. It also returned nothing, including after a direct ping. Both
+reviewer instruction files were read directly from this session and are intact and
+well-formed (110 and 113 lines), and the diff file is readable — blind-hunter reviewed it
+successfully. The failure is in the subagent channel for agents spawned after the first
+batch, not in the review workload, the instruction files, or the staged diff.
 
-- **Patches applied: 4** — 1 medium, 3 low, all in `EventsSettings.test.tsx`. Each one closes a
-  measured hole: the load-banner isolation rule (the assertion ran before React re-rendered, so the
-  forbidden regression passed 45/45), both dialogs' mid-write focus parking, the Add button's
-  accessible name together with both dialogs' modal semantics, and the date pre-fill's inability to
-  distinguish `formatDateISO` from the `toISOString()` idiom the intent forbids. All four mutations
-  now fail the suite; the unmutated suite is 49/49.
-- **Deferred: 3** — a measured WCAG AA contrast failure (3.58:1) on three new buttons whose root
-  cause is a house token used at 17 sites in 9 files; a write that lands inside the first load's
-  flight window being discarded by that load, whose fix lives in `eventsSlice.ts` and is fenced off
-  by the Never list; and roughly 4,000 lines of measured tests parked outside every runner. Recorded
-  in frontmatter `deferred`.
-- **Dismissed: 20** — each with its reason in the Review Triage Log above. Four were settled by
-  direct measurement rather than by reading: the two suppressions claimed inert do in fact suppress
-  live warnings at the ref-access sites; the story at `HEAD` is exactly 314 lines with
-  `status: 'done'`, so the three artifacts said to misreport it were accurate and the citation to
-  lines 309-311 resolves verbatim; `no-restricted-properties` is suppressed exactly once in `src/`;
-  and the heading order skips no level.
-- **Follow-up review recommended: true.** Patched entries by severity: high 0, medium 1, low 3.
-  Score = 3 x 1 + 1 x 3 = 6, which is >= 5.
+### What was deliberately not done
+
+No classification, no triage-log entry, no patches, and no deferrals. The review step
+requires every layer to report before any finding is verified or triaged, and half the
+layers are missing. Recording a verdict from two of four layers would present a partial
+pass as a complete one, and the two silent layers are exactly the ones that trace unhandled
+paths and verification gaps — the findings most likely to change the outcome. The two
+completed layers' raw output is preserved in this run's transcript; nothing from them has
+been acted on.
+
+No production code, test, or artifact was modified by this run. The only change is this
+file's `status` and this section.
 
 ### Verification performed
 
-Every command in the `## Verification` section was run after the patches, plus the mutation checks
-that justify each patch.
+- `npx vitest run src/components/Settings/__tests__/` → 2 files, 49 tests, all passing.
+  Recorded as the pre-existing baseline, not as evidence for any finding.
+- The staged diff was confirmed at 8,835 lines / 23 files before the layers were launched;
+  nothing was `git add`ed.
 
-| Check | Outcome |
-|---|---|
-| `npm run typecheck` | 6 errors, all `TS2883` at `tests/support/merged-fixtures.ts(53,14)` — the known worktree baseline, no others |
-| `npm run lint` | 0 errors; 2 warnings, both the pre-existing `react-refresh/only-export-components` in `EventCountdown.tsx:68,91` |
-| `npm run test:unit` | 86 files, 1287 tests passed — the 1283 measured before this pass plus the 4 added |
-| `npx vitest run src/components/Settings/__tests__` | 49 passed (38 + 11); the `act(...)` warning the suite used to print is gone |
-| `npx playwright test tests/e2e/ --project=chromium` | 127 passed, 2 skipped, 0 failed — unchanged |
-| Mutation: banner subscribes to `eventsError` | 1 test fails (passed 45/45 before this pass) |
-| Mutation: both `panelRef.current?.focus()` deleted | 2 tests fail (passed 45/45 before) |
-| Mutation: `aria-label` + both `aria-modal` deleted | 3 tests fail (passed 45/45 before) |
-| Mutation: `toISOString().split('T')[0]` pre-fill | 1 test fails (passed 45/45 before) |
-| `grep -rn "eventsService" src/components/` | No hits; the UI reaches events only through the store |
-| `git diff --name-only` outside `_bmad-output/` | Exactly the five files above |
-| `select count(*) from public.events` | 0 — no rows left behind by the E2E run |
+### Residual risk
 
-The component file was restored from a byte-for-byte copy after every mutation and confirmed
-identical to the committed version (`git diff --stat` empty) before the final measurements.
+The change set is unreviewed along two of its four axes. The previous pass set
+`followup_review_recommended: true`, and that recommendation still stands unaddressed —
+re-drive this story once subagents are healthy so the edge-case and verification-gap layers
+actually run.
 
-### Residual risks
+## Operator resolution — 2026-08-19
 
-- The three deferred items above. The contrast failure is the one a user can see today; the other
-  two are a narrow race and an operator decision about activating parked tests.
-- DW-26 and DW-27 remain open in the orchestrator's ledger. This pass confirmed DW-26's boundary
-  rather than closing it: the repaired isolation test now genuinely pins the post-settle window, and
-  the in-flight window is still unguarded.
-- Acceptance criterion 3 pins the literal number six for the `TS2883` baseline. It holds for this
-  change set, but the count is a property of the worktree rather than of the code, and activating the
-  parked API specs would change it. The one-line fix at `tests/support/merged-fixtures.ts:53` that the
-  automation summary proposes should land with or before any such activation.
-- A write whose promise never settles still leaves its dialog on a spinner. There is no request
-  timeout in the Supabase client, and the intent specifies no dismissal policy for a hung write.
+Review cycle 1 classified this story **done** (run `20260818-230216-c22b`,
+`5-review-1`). The `blocked` status above it came from the optional follow-up
+review, which could not run two of its four layers because background
+subagents returned nothing (claude v2.1.235 channel failure, proven by the
+reviewer's own control probe) — an environmental failure, not a review
+outcome. The three story commits were merged to `feature/dynamic-events`
+manually as `47bd3e61`; status restored to done accordingly.
