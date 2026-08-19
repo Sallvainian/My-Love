@@ -86,7 +86,7 @@ export function LobbyContainer(): ReactElement {
   if (!myRole) {
     return (
       <main
-        className="min-h-screen p-4"
+        className="min-h-screen p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
         style={{ backgroundColor: scriptureTheme.background }}
         data-testid="lobby-role-selection"
       >
@@ -159,7 +159,7 @@ export function LobbyContainer(): ReactElement {
   // Phase B: Lobby Waiting (role selected, waiting for partner / ready up)
   return (
     <main
-      className="min-h-screen p-4"
+      className="min-h-screen p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
       style={{ backgroundColor: scriptureTheme.background }}
       data-testid="lobby-waiting"
     >

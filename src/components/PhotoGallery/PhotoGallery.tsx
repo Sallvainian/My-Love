@@ -260,7 +260,10 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   // AC-4.2.1: Responsive grid layout
   // 3 columns (mobile), 4 columns (desktop md:768px+)
   return (
-    <div className="min-h-screen p-4" data-testid="photo-gallery">
+    <div
+      className="min-h-screen p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+      data-testid="photo-gallery"
+    >
       <div
         className="grid w-full grid-cols-3 gap-2 md:grid-cols-4 md:gap-3"
         data-testid="photo-gallery-grid"

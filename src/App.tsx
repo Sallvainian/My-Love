@@ -634,7 +634,7 @@ function App() {
         <main id="main-content">
           {/* Home view - inline, not lazy-loaded, always works offline */}
           {currentView === 'home' && (
-            <div className="mx-auto max-w-4xl space-y-6 px-4 py-4">
+            <div className="mx-auto max-w-4xl space-y-6 px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               {/* Time Together - replaces Day 37 Together header */}
               <TimeTogether />
 
