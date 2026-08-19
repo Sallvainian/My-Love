@@ -2,7 +2,7 @@
 title: 'Hamburger tray, Settings view, and sign-out consolidation'
 type: 'feature'
 created: '2026-08-18'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 followup_review_recommended: false
 baseline_commit: '55134ed8c62555eb9cc940853cfc350c85028a79'
