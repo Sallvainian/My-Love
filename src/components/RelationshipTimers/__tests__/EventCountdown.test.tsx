@@ -16,7 +16,12 @@
 import type { ReactNode } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EventCountdown, getCalendarDaysDiff, getEventsSlotView } from '../EventCountdown';
+import {
+  EventCountdown,
+  getCalendarDaysDiff,
+  getEventsSlotView,
+  getUpcomingEventCards,
+} from '../EventCountdown';
 
 // Motion-only props are dropped rather than spread onto the DOM node: React
 // rejects `whileHover`/`initial`/`animate`/`transition` on a plain <div> and
@@ -251,5 +256,67 @@ describe('getEventsSlotView', () => {
     // failure flag must not surface an error for an account that has not
     // loaded yet.
     expect(getEventsSlotView(0, 0, false, true)).toBe('hidden');
+  });
+});
+
+describe('getUpcomingEventCards', () => {
+  /** An event dated `dayOffset` days from the pinned today. */
+  const event = (id: string, dayOffset: number) => ({
+    id,
+    date: localMidnightOffsetFromToday(dayOffset),
+  });
+
+  it('drops events that have already passed and keeps one dated today', () => {
+    const events = [event('past', -1), event('today', 0), event('soon', 3)];
+
+    const { upcomingCount, visible } = getUpcomingEventCards(events, new Date(), 3);
+
+    expect(visible.map((e) => e.id)).toEqual(['today', 'soon']);
+    expect(upcomingCount).toBe(2);
+  });
+
+  it('renders at most maxCards, and specifically the soonest ones', () => {
+    const events = [event('a', 1), event('b', 5), event('c', 9), event('d', 20)];
+
+    const { visible } = getUpcomingEventCards(events, new Date(), 3);
+
+    expect(visible.map((e) => e.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('reports the UNCAPPED upcoming count, which is what the slot decision needs', () => {
+    // Handing getEventsSlotView the capped length instead would make "more
+    // events than fit" indistinguishable from "exactly the cap".
+    const events = [event('a', 1), event('b', 2), event('c', 3), event('d', 4)];
+
+    const { upcomingCount, visible } = getUpcomingEventCards(events, new Date(), 3);
+
+    expect(visible).toHaveLength(3);
+    expect(upcomingCount).toBe(4);
+    expect(getEventsSlotView(events.length, upcomingCount, true, false)).toBe('list');
+  });
+
+  it('refills the freed slot at local midnight instead of leaving a short list', () => {
+    // The state the render cap created: an upcoming event held in the store
+    // and deliberately not rendered. It has to become visible when the soonest
+    // card retires — App re-runs this with a later `now` off the retire tick —
+    // or Home shows two cards with a third event pending until a reload.
+    const events = [event('first', 0), event('second', 4), event('third', 9), event('fourth', 14)];
+
+    const before = getUpcomingEventCards(events, new Date(), 3);
+    expect(before.visible.map((e) => e.id)).toEqual(['first', 'second', 'third']);
+
+    // One day on: 'first' is yesterday, so it leaves the filter entirely.
+    vi.setSystemTime(new Date(2026, 0, 16, 12, 0, 0));
+    const after = getUpcomingEventCards(events, new Date(), 3);
+
+    expect(after.visible.map((e) => e.id)).toEqual(['second', 'third', 'fourth']);
+    expect(after.upcomingCount).toBe(3);
+  });
+
+  it('returns an empty list, not a throw, when nothing is upcoming', () => {
+    const { upcomingCount, visible } = getUpcomingEventCards([event('old', -30)], new Date(), 3);
+
+    expect(visible).toEqual([]);
+    expect(upcomingCount).toBe(0);
   });
 });

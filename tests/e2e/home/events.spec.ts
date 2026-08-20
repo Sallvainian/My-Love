@@ -17,6 +17,8 @@
  *   (CAP-10, Home half)
  * - a background reload (revisiting Home) never blanks a card already on
  *   screen while the refetch is in flight (Design Notes)
+ * - the column renders at most six cards, the six soonest, and a past
+ *   event does not consume one of those slots (DW-22)
  *
  * User id resolution mirrors `tests/support/factories/index.ts`'s
  * `resolveAppUserIdByEmail` (email → `public.users.id`), kept self-contained
@@ -300,6 +302,59 @@ test.describe('Home dashboard reads events from the store', () => {
     expect(await card.locator('h3 ~ p').count()).toBe(0);
 
     await expect(page.getByTestId('events-empty-placeholder')).toHaveCount(0);
+  });
+
+  test('[P0] caps the events column at six cards, keeping the soonest', async ({
+    page,
+    supabaseAdmin,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+    // Seven upcoming events against a cap of six (DW-22). Without the cap the
+    // right-hand column keeps growing past the fixed two-card birthdays column
+    // beside it. Seeded out of date order and across both halves of the couple,
+    // so the assertion pins "the six SOONEST" rather than "the first six
+    // rows the query happened to return".
+    await seedEvent(supabaseAdmin, userId, 24, 'Fourth Meetup E2E', 'Fourth event description');
+    await seedEvent(supabaseAdmin, partnerId, 6, 'Second Meetup E2E', 'Second event description');
+    await seedEvent(supabaseAdmin, userId, 31, 'Fifth Meetup E2E', 'Fifth event description');
+    await seedEvent(supabaseAdmin, userId, 18, 'Third Meetup E2E', 'Third event description');
+    await seedEvent(supabaseAdmin, partnerId, 2, 'First Meetup E2E', 'First event description');
+    await seedEvent(supabaseAdmin, partnerId, 38, 'Sixth Meetup E2E', 'Sixth event description');
+    await seedEvent(supabaseAdmin, userId, 45, 'Seventh Meetup E2E', 'Seventh event description');
+    // A past event too: the store holds it (Settings lists past events), so
+    // this is what pins that the cap counts UPCOMING events only. Cap the raw
+    // `events` array instead of the filtered one and this row eats a slot,
+    // leaving 'Third Meetup E2E' off the page.
+    await seedEvent(supabaseAdmin, userId, -9, 'Old Meetup E2E', 'Old event description');
+
+    await page.goto('/');
+
+    await expect(page.getByTestId('event-countdown-first-meetup-e2e')).toBeVisible();
+
+    const cardLabels = await page
+      .getByTestId(/^event-countdown-\w+-meetup-e2e$/)
+      .locator('h3')
+      .allTextContents();
+    expect(cardLabels).toEqual([
+      'First Meetup E2E',
+      'Second Meetup E2E',
+      'Third Meetup E2E',
+      'Fourth Meetup E2E',
+      'Fifth Meetup E2E',
+      'Sixth Meetup E2E',
+    ]);
+
+    // The overflow is not merely off-screen — it renders nowhere on the page.
+    await expect(page.getByTestId('event-countdown-seventh-meetup-e2e')).toHaveCount(0);
+    await expect(page.getByText('Seventh event description')).toHaveCount(0);
+    await expect(page.getByText('Old Meetup E2E')).toHaveCount(0);
+
+    // Hiding the tail must never turn a real list into the empty state: the
+    // slot decision still sees the uncapped upcoming count.
+    await expect(page.getByTestId('events-empty-placeholder')).toHaveCount(0);
+    await expect(page.getByTestId('events-load-error')).toHaveCount(0);
   });
 
   test('[P0] a background reload never blanks a card already on screen', async ({
