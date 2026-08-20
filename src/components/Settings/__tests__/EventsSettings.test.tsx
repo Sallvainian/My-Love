@@ -129,8 +129,15 @@ function setStore(overrides: Partial<AppState> = {}) {
     events: [],
     eventsIsLoading: false,
     eventsError: null,
+    syncStatus: {
+      pendingMoods: 0,
+      isOnline: true,
+      lastSyncAt: undefined,
+      isSyncing: false,
+    },
     userId: OWN_USER_ID,
     loadEvents: vi.fn(async () => loadOk),
+    clearEventsError: vi.fn(() => store.patch({ eventsError: null })),
     addEvent: vi.fn(async (input: NewEventInput) => {
       created += 1;
       store.patch({
@@ -437,6 +444,176 @@ describe('EventsSettings list states', () => {
 
     expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('events-settings-list')).toBeInTheDocument();
+  });
+
+  it('recovers in place when connectivity returns after a failed load', async () => {
+    const reconnectedEvent = makeEvent({ id: 'reconnected', label: 'Back online' });
+    const loadEvents = vi
+      .fn<() => Promise<EventLoadResult>>()
+      .mockImplementationOnce(async () => ({
+        status: 'failure',
+        error: 'Network error',
+      }))
+      .mockImplementationOnce(async () => {
+        store.patch({
+          events: [reconnectedEvent],
+          eventsError: null,
+          eventsIsLoading: false,
+        });
+        return loadOk;
+      });
+    setStore({
+      syncStatus: {
+        pendingMoods: 0,
+        isOnline: false,
+        lastSyncAt: undefined,
+        isSyncing: false,
+      },
+      loadEvents,
+    });
+
+    await renderSection();
+    expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
+
+    act(() => {
+      store.patch({
+        syncStatus: {
+          ...(store.state.syncStatus as AppState['syncStatus']),
+          isOnline: true,
+        },
+      });
+    });
+
+    await waitFor(() => expect(loadEvents).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument()
+    );
+    expect(screen.getByTestId('event-row-reconnected')).toBeInTheDocument();
+  });
+
+  it('shows the truthful empty state and moves focus to Add after a successful Retry', async () => {
+    let finishRetry: () => void = () => {};
+    const clearEventsError = vi.fn(() => store.patch({ eventsError: null }));
+    const loadEvents = vi
+      .fn<() => Promise<EventLoadResult>>()
+      .mockImplementationOnce(async () => {
+        store.patch({ eventsError: 'Network error' });
+        return { status: 'failure', error: 'Network error' };
+      })
+      .mockImplementationOnce(() => {
+        store.patch({ eventsError: null, eventsIsLoading: true });
+        return new Promise<EventLoadResult>((resolve) => {
+          finishRetry = () => {
+            store.patch({ events: [], eventsError: null, eventsIsLoading: false });
+            resolve(loadOk);
+          };
+        });
+      });
+    setStore({ loadEvents, clearEventsError });
+
+    await renderSection();
+    const retry = screen.getByTestId('events-settings-retry');
+    retry.focus();
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(loadEvents).toHaveBeenCalledTimes(2));
+    expect(clearEventsError).toHaveBeenCalledTimes(1);
+    expect(clearEventsError.mock.invocationCallOrder[0]).toBeLessThan(
+      loadEvents.mock.invocationCallOrder[1]
+    );
+    await waitFor(() => expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument());
+    expect(screen.queryByTestId('events-settings-retry')).not.toBeInTheDocument();
+
+    await act(async () => {
+      finishRetry();
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument()
+    );
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('events-settings-add'))
+    );
+  });
+
+  it('moves focus back to Retry when an empty-state Retry fails again', async () => {
+    let finishRetry: () => void = () => {};
+    const loadEvents = vi
+      .fn<() => Promise<EventLoadResult>>()
+      .mockImplementationOnce(async () => ({
+        status: 'failure',
+        error: 'Initial failure',
+      }))
+      .mockImplementationOnce(() => {
+        store.patch({ eventsError: null, eventsIsLoading: true });
+        return new Promise<EventLoadResult>((resolve) => {
+          finishRetry = () => {
+            store.patch({ eventsError: 'Retry failed', eventsIsLoading: false });
+            resolve({ status: 'failure', error: 'Retry failed' });
+          };
+        });
+      });
+    setStore({ loadEvents });
+
+    await renderSection();
+    const retry = screen.getByTestId('events-settings-retry');
+    retry.focus();
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument());
+    expect(screen.queryByTestId('events-settings-retry')).not.toBeInTheDocument();
+
+    await act(async () => {
+      finishRetry();
+    });
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('events-settings-retry'))
+    );
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getAllByTestId('events-settings-load-error')).toHaveLength(1);
+  });
+
+  it('keeps one retryable notice and the last-good list when Retry fails again', async () => {
+    let finishRetry: () => void = () => {};
+    const loadEvents = vi
+      .fn<() => Promise<EventLoadResult>>()
+      .mockImplementationOnce(async () => ({
+        status: 'failure',
+        error: 'Initial failure',
+      }))
+      .mockImplementationOnce(() => {
+        store.patch({ eventsError: null, eventsIsLoading: true });
+        return new Promise<EventLoadResult>((resolve) => {
+          finishRetry = () => {
+            store.patch({ eventsError: 'Retry failed', eventsIsLoading: false });
+            resolve({ status: 'failure', error: 'Retry failed' });
+          };
+        });
+      });
+    setStore({
+      events: [makeEvent({ id: 'last-good', label: 'Still visible' })] as AppState['events'],
+      loadEvents,
+    });
+
+    await renderSection();
+    const retry = screen.getByTestId('events-settings-retry');
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(retry).toBeDisabled());
+    expect(retry).toHaveTextContent('Retrying…');
+    fireEvent.click(retry);
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      finishRetry();
+    });
+
+    expect(screen.getAllByTestId('events-settings-load-error')).toHaveLength(1);
+    expect(screen.getByTestId('event-row-last-good')).toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-retry')).toBeEnabled();
+    expect(screen.getByTestId('events-settings-retry')).toHaveTextContent('Retry');
   });
 });
 
