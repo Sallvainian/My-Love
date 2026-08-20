@@ -43,6 +43,7 @@ import {
 } from '../api/errorHandlers';
 import type { Database } from '../api/supabaseClient';
 import { supabase } from '../api/supabaseClient';
+import { formatDateISO } from '../utils/dateUtils';
 import { logger } from '../utils/logger';
 
 /**
@@ -216,6 +217,15 @@ function toCoupleEvent(row: SupabaseEventRecord): CoupleEvent | null {
 }
 
 /**
+ * Rows read from each side of today when the caller names no page size.
+ *
+ * Also the fallback for a non-finite `limit`, so the two cannot drift apart:
+ * a caller that passes nothing and a caller that passes `NaN` get the same
+ * window rather than one getting a malformed range.
+ */
+const DEFAULT_EVENTS_PAGE_SIZE = 50;
+
+/**
  * Events Service Class
  *
  * Responsibilities:
@@ -225,24 +235,64 @@ function toCoupleEvent(row: SupabaseEventRecord): CoupleEvent | null {
  */
 class EventsService {
   /**
-   * Fetch every event visible to the signed-in user.
+   * Fetch the couple's events in a bounded window centred on today.
    *
    * No `user_id` filter: the `events_select` policy already scopes the read to
    * the caller and their partner via `get_my_partner_id()`. Adding one would
    * silently drop the partner's half of the couple's list, so the tests assert
-   * that this query carries no filter at all.
+   * that this query carries no equality filter at all.
    *
-   * Ordered `event_date` ascending — soonest first. Note this sort is NOT
-   * index-backed: `idx_events_user_event_date` leads on `user_id`, and with no
-   * equality predicate on that column Postgres cannot walk the index in
-   * `event_date` order. It sorts. That is fine at a couple's scale, and the
-   * index still serves the RLS predicate's `user_id` lookups.
+   * **Two reads, one window.** The returned array is still `event_date`
+   * ascending with a `created_at` ascending tiebreak — the contract
+   * `eventsSlice.sortByDate` mirrors — but the rows come from two bounded
+   * pages, one on each side of today. A single page cannot be bounded safely
+   * here, because one array serves two screens: Home wants the soonest
+   * upcoming events, Settings wants the whole list *including* past ones so a
+   * mistyped date stays editable (`EventsSettings.tsx`).
    *
+   * - One ascending page keeps the OLDEST rows. Every event eventually becomes
+   *   a past event, so given enough history that page holds nothing but past
+   *   events and Home shows its empty placeholder while real events exist.
+   * - One descending page keeps the FARTHEST-FUTURE rows, so it hides the next
+   *   event as soon as the couple has more than `limit` future events.
+   *
+   * Anchoring at today is the only arrangement where the cap can never drop
+   * the soonest upcoming event, and it costs one extra parallel request.
+   *
+   * Neither sort is index-backed: `idx_events_user_event_date` leads on
+   * `user_id`, and with no equality predicate on that column Postgres cannot
+   * walk the index in `event_date` order. It sorts. That is fine at a couple's
+   * scale, and the index still serves the RLS predicate's `user_id` lookups.
+   *
+   * **What the cap drops, and where that shows.** Past `limit` events on a
+   * side, the far ends go: the most distant future and the OLDEST past. The
+   * oldest-past end is the one with a consumer — `EventsSettings` lists the
+   * array unfiltered so a mistyped year can be corrected there, and a year
+   * typed wrong into the deep past is exactly such a row. At the default 50 a
+   * couple reaches that only after 50 past events; there is no "load more"
+   * control, so beyond it those rows are reachable only by passing a larger
+   * `limit` or a non-zero `offset`. Callers that must show everything have to
+   * page; today's single caller does not.
+   *
+   * @param limit - Maximum rows read from EACH side of today: up to `limit`
+   *   upcoming (today included) and up to `limit` already-passed, so a call can
+   *   return up to `2 × limit` rows — the per-side meaning is the intended
+   *   contract, not photoService's whole-result cap. Mirrors
+   *   `photoService.getPhotos(limit = 50, offset = 0)` in signature only.
+   *   Clamped to at least 1, and to {@link DEFAULT_EVENTS_PAGE_SIZE} when not
+   *   finite: `limit = 0` would otherwise build the backwards range `(0, -1)`.
+   * @param offset - How far past the first page to start, applied to both
+   *   sides, so paging walks outward from today in both directions. Note this
+   *   is NOT photoService's paging: successive pages walk in opposite
+   *   directions, so page 1's past rows sort BEFORE page 0's rather than after.
    * @returns Events in date order, each with a local-midnight `Date`
    * @throws an accurate offline or mid-flight network error, or
    *   {SupabaseServiceError} if the query fails
    */
-  async getEvents(): Promise<CoupleEvent[]> {
+  async getEvents(
+    limit: number = DEFAULT_EVENTS_PAGE_SIZE,
+    offset: number = 0
+  ): Promise<CoupleEvent[]> {
     if (!isOnline()) {
       // NOT handleNetworkError: its message promises the change "will be
       // synced when you're back online", and events have no sync path in
@@ -250,25 +300,96 @@ class EventsService {
       throw new Error('You are offline. Events need a connection to load.');
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .order('event_date', { ascending: true })
-        // Tiebreak same-day events on creation time: Postgres leaves ties
-        // unspecified, so without this two same-day cards can swap position
-        // between loads (DW-10).
-        .order('created_at', { ascending: true });
+    // The viewer's own calendar day, so the cut lands where Home's
+    // `getCalendarDaysDiff(...) >= 0` filter already puts it. Built with
+    // `formatDateISO` and never `toISOString().split('T')[0]`, which
+    // `src/utils/dateUtils.ts` records as the same UTC trap in reverse.
+    const todayISO = formatDateISO(new Date());
+    // Clamped before the range is built, in the same spirit as the write paths
+    // that refuse bad input before issuing a request: `limit = 0` yields
+    // `.range(0, -1)` and a fractional limit yields a fractional bound, and
+    // PostgREST answers both with a 400 that surfaces as a failed load.
+    //
+    // The finiteness check is not redundant: `Math.max(1, Math.floor(NaN))` is
+    // NaN and `Math.floor(Infinity)` is Infinity, so a `Math.max` clamp alone
+    // passes both straight through into `.range()` and produces exactly the 400
+    // it is here to prevent. Non-finite falls back to the documented defaults
+    // rather than throwing, because a bad page size is never worth denying the
+    // caller their events.
+    const pageSize = Number.isFinite(limit)
+      ? Math.max(1, Math.floor(limit))
+      : DEFAULT_EVENTS_PAGE_SIZE;
+    const firstRow = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
+    const lastRow = firstRow + pageSize - 1;
 
-      if (error) {
-        throw error;
+    try {
+      const [upcoming, past] = await Promise.all([
+        supabase
+          .from('events')
+          .select('*')
+          .gte('event_date', todayISO)
+          .order('event_date', { ascending: true })
+          // Tiebreak same-day events on creation time: Postgres leaves ties
+          // unspecified, so without this two same-day cards can swap position
+          // between loads (DW-10).
+          .order('created_at', { ascending: true })
+          .range(firstRow, lastRow),
+        supabase
+          .from('events')
+          .select('*')
+          .lt('event_date', todayISO)
+          // Descending so the page holds the MOST RECENT past events — the
+          // ones a wrong date is still worth correcting. Reversed below.
+          .order('event_date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .range(firstRow, lastRow),
+      ]);
+
+      if (upcoming.error) {
+        throw upcoming.error;
+      }
+      if (past.error) {
+        throw past.error;
       }
 
-      // A row whose date cannot be read is dropped, not carried. This read is
-      // ordered by Postgres (`.order()` above), so no JS comparator runs here —
-      // dropping the row instead keeps an Invalid Date out of the domain model
-      // before it can reach a later client-side re-sort (`eventsSlice.sortByDate`).
-      const events = (data ?? [])
+      // Reversing an already-ordered page is not a client-side re-sort: it is
+      // exact, and it turns `event_date` DESC / `created_at` DESC back into the
+      // ascending pair. Every past date sorts before every upcoming one, so the
+      // concatenation is globally ascending with no comparator involved.
+      //
+      // The two pages are two requests, not one snapshot. A row whose date is
+      // edited across today while they are in flight has three possible fates,
+      // and only the first is handled here:
+      //
+      // 1. It comes back in BOTH pages. Handled: one copy is dropped, because
+      //    keeping both would put a duplicate React key into Home's map and
+      //    render the same event twice. The upcoming copy is the one kept — an
+      //    arbitrary but stable choice, so the list never flickers between two
+      //    renderings of the same row.
+      // 2. It comes back in NEITHER, when the past page is answered before the
+      //    edit and the upcoming page after it (or the reverse). The row is
+      //    simply absent until the next load.
+      // 3. It comes back in both and the copy kept is the pre-edit one, so an
+      //    already-passed event renders as upcoming until the next load.
+      //
+      // 2 and 3 are left alone deliberately: both need a partner editing an
+      // event across today's boundary during a load, both correct themselves on
+      // the next `loadEvents()`, and closing them means abandoning the
+      // two-window read for a single request — the shape this design chose
+      // against, and a decision above this function's pay grade. Recorded as a
+      // deferred item on the story rather than patched here.
+      const upcomingRows = upcoming.data ?? [];
+      const upcomingIds = new Set(upcomingRows.map((row) => row.id));
+      const rows = [...(past.data ?? [])]
+        .reverse()
+        .filter((row) => !upcomingIds.has(row.id))
+        .concat(upcomingRows);
+
+      // A row whose date cannot be read is dropped, not carried. Both pages are
+      // ordered by Postgres, so no JS comparator runs here — dropping the row
+      // instead keeps an Invalid Date out of the domain model before it can
+      // reach a later client-side re-sort (`eventsSlice.sortByDate`).
+      const events = rows
         .map(toCoupleEvent)
         .filter((event): event is CoupleEvent => event !== null);
       logger.debug('[EventsService] Fetched events:', events.length);
