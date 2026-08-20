@@ -146,7 +146,9 @@ location: src/services/eventsService.ts
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: Story 5's UI needs different affordances for the two outcomes (refresh the list vs retry the write). The shape mirrors photosSlice's PhotoUploadResult, which has the same limitation, so changing it is a cross-slice decision.
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-events-write-error-codes
+resolution-undo: a56e133f78fb9ed825473b5a7526f95d98b1b0ae337b60eaae078e8a484b671c 2026-08-20 7374617475733a206f70656e
 decision: 2026-08-19 Add a code to events only — Export EventWriteError from src/services/eventsService.ts and widen EventWriteResult in src/stores/slices/eventsSlice.ts to carry a machine-readable discriminant — at minimum separating 'not yours / not found' from 'offline' from 'transport failure' — then switch src/components/Settings/EventsSettings.tsx off prose matching onto that code, choosing refresh-the-list versus retry-the-write affordances from it. Leave photosSlice's PhotoUploadResult exactly as it is and record in the eventsSlice module header that the two shapes now diverge deliberately, so a future reader does not 'restore' the symmetry.
 
 ### DW-14: A persisted blob that already contained an events key would be rehydrated; only moods is stripped on read.
@@ -203,7 +205,9 @@ location: src/services/eventsService.ts
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: Re-surfaced by this review pass; re-verified unchanged since the prior pass. Story 5's UI will need different affordances for different failure kinds (refresh vs retry); the shape mirrors PhotoUploadResult's same limitation.
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-events-write-error-codes
+resolution-undo: a56e133f78fb9ed825473b5a7526f95d98b1b0ae337b60eaae078e8a484b671c 2026-08-20 7374617475733a206f70656e
 
 ### DW-20: Persistence omission from partialize only prevents new writes; a pre-existing persisted blob with an events key would still rehydrate.
 origin: spec-deferred 0f9e6e1214d8
@@ -456,4 +460,44 @@ location: src/stores/useAppStore.ts:74
 source_spec: `spec-dw-14-20-persisted-events-key-strip.md`
 severity: low
 reason: `STALE_PERSISTED_KEYS` (src/stores/useAppStore.ts:74) lists `moods` and `events`. A blob carrying `eventsIsLoading: true` would rehydrate it, and `loadEvents` bails at `if (!requestedBy) return;` (src/stores/slices/eventsSlice.ts:118) *before* raising the flag — so on a signed-out start nothing clears it until the next sign-in, leaving a stranded loading state. `eventsError` would likewise show a stale banner. Neither carries couple data, so this is not the disclosure class DW-14/DW-20 describe, and both are the same unreachability class as the original entries: no build has ever written any events key to localStorage. Excluded from this change on the authority of the bundle intent, which names the `events` key alone ("Strip a stale `events` key out of the persisted blob on read").
+status: open
+
+### DW-49: An invalid-response write can already have landed, but Settings still offers the same write control and a create retry can duplicate the event.
+origin: spec-deferred db701c73ed1f
+location: src/components/Settings/EventsSettings.tsx:872
+source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
+severity: medium
+reason: This behavior predates the bundle: every failure previously left Save enabled. The new `invalid-response` code now identifies it, but choosing a distinct safe affordance was not part of the events-only refresh-versus-retry decision. `createEvent` can throw after insert when the returned row cannot be converted, while Settings routes every code except `not-found` to Save/Delete.
+status: open
+
+### DW-50: The EventsSlice interface comment says `eventsError` is raised only by loads even though writes also park messages there.
+origin: spec-deferred ce0f9f82f812
+location: src/stores/slices/eventsSlice.ts:54
+source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
+severity: low
+reason: The contradiction existed at the baseline: addEvent, editEvent, and removeEvent already set `eventsError` on failure while the state-field comment called it load-only. The current bundle preserves that behavior and documents the result-shape divergence elsewhere in the module header.
+status: open
+
+### DW-51: A load outcome can be misreported when an event write settles in the narrow window before Settings snapshots the shared error field.
+origin: spec-deferred a61e4d489ca9
+location: src/components/Settings/EventsSettings.tsx:130
+source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
+severity: medium
+reason: This shared-state race predates this bundle and is already identified in the component tests as DW-26. `loadEvents` resolves without its own outcome, so `recordLoadOutcome` reads `eventsError`, which write actions can independently clear or replace before that read. A successful load can therefore show a failure banner, or a failed load can appear successful.
+status: open
+
+### DW-52: Invalid-response writes keep the write control even though the mutation may already have landed.
+origin: spec-deferred 7567c0b98908
+location: src/components/Settings/EventsSettings.tsx:872
+source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
+severity: medium
+reason: The behavior predates this bundle, but the coded result makes the ambiguity explicit. Create and update can throw `invalid-response` only after a successful response is missing or cannot be converted; Settings routes every non-`not-found` code back to Save or Update, so create can duplicate a committed event and update can retry without reconciling the stale list.
+status: open
+
+### DW-53: Transport wrapping drops the original non-PostgREST network error as an Error cause.
+origin: spec-deferred 2d2ac9a00a50
+location: src/services/eventsService.ts:147
+source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
+severity: low
+reason: The pre-existing `networkFailure` helper creates a new message-only Error. `writeTransportFailure` now wraps only that message, so the original error identity, stack, and transport metadata remain unavailable for diagnostics even though PostgREST wrapping preserves its mapped error as `cause`.
 status: open

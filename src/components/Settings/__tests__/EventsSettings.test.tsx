@@ -538,6 +538,7 @@ describe('EventsSettings add', () => {
     setStore({
       addEvent: vi.fn(async () => ({
         success: false as const,
+        code: 'offline' as const,
         error: 'You are offline. Events need a connection to save.',
       })),
     });
@@ -554,8 +555,67 @@ describe('EventsSettings add', () => {
       )
     );
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
+    expect(screen.getByTestId('events-form-label')).toHaveValue('Doomed');
+    expect(screen.getByTestId('events-form-date')).toHaveValue('2026-09-12');
+    expect(screen.getByTestId('events-form-submit')).toBeEnabled();
+    expect(screen.queryByTestId('events-form-refresh')).not.toBeInTheDocument();
     expect(screen.queryByTestId('events-settings-list')).not.toBeInTheDocument();
   });
+
+  it('keeps save retry available when the action unexpectedly rejects', async () => {
+    setStore({
+      addEvent: vi.fn(async () => {
+        throw new Error('Unexpected save rejection');
+      }),
+    });
+
+    await renderSection();
+    openAddForm();
+    fillForm({ label: 'Still here', date: '2026-09-12' });
+    submitForm();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('events-form-error')).toHaveTextContent(
+        'Unexpected save rejection'
+      )
+    );
+    expect(screen.getByTestId('events-form-label')).toHaveValue('Still here');
+    expect(screen.getByTestId('events-form-date')).toHaveValue('2026-09-12');
+    expect(screen.getByTestId('events-form-submit')).toBeEnabled();
+    expect(screen.queryByTestId('events-form-refresh')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['not-found', true],
+    ['validation', false],
+    ['transport', false],
+  ] as const)(
+    'selects refresh from the %s code, not from otherwise identical prose',
+    async (code, offersRefresh) => {
+      setStore({
+        addEvent: vi.fn(async () => ({
+          success: false as const,
+          code,
+          error: 'The same returned message',
+        })),
+      });
+
+      await renderSection();
+      openAddForm();
+      fillForm({ label: 'Doomed', date: '2026-09-12' });
+      submitForm();
+
+      await waitFor(() =>
+        expect(screen.getByTestId('events-form-error')).toHaveTextContent(
+          'The same returned message'
+        )
+      );
+      expect(screen.getByTestId('events-form-label')).toHaveValue('Doomed');
+      expect(screen.getByTestId('events-form-date')).toHaveValue('2026-09-12');
+      expect(Boolean(screen.queryByTestId('events-form-refresh'))).toBe(offersRefresh);
+      expect(Boolean(screen.queryByTestId('events-form-submit'))).toBe(!offersRefresh);
+    }
+  );
 
   it('disables submit while the write is open, so a double tap creates one row', async () => {
     // `public.events` carries no unique constraint and no idempotency key, so
@@ -679,6 +739,7 @@ describe('EventsSettings edit', () => {
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       editEvent: vi.fn(async () => ({
         success: false as const,
+        code: 'not-found' as const,
         error: 'Event not found or not yours to edit',
       })),
     });
@@ -693,6 +754,73 @@ describe('EventsSettings edit', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Event not found or not yours to edit')
     );
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
+  });
+
+  it('closes a stale edit and reloads the list when Refresh events is activated', async () => {
+    const loadEvents = vi.fn(async () => {});
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents,
+      editEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'not-found' as const,
+        error: 'This prose is deliberately arbitrary',
+      })),
+    });
+
+    await renderSection();
+    loadEvents.mockClear();
+    loadEvents.mockImplementationOnce(async () => {
+      store.patch({ events: [], eventsError: null });
+    });
+    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    submitForm();
+
+    await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
+    const refresh = screen.getByTestId('events-form-refresh');
+    act(() => {
+      refresh.click();
+      refresh.click();
+    });
+
+    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByTestId('event-row-mine')).not.toBeInTheDocument());
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+  });
+
+  it('clears an existing load banner after a successful stale-row refresh', async () => {
+    const loadEvents = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        store.patch({ eventsError: 'The initial load failed' });
+      })
+      .mockImplementationOnce(async () => {
+        store.patch({ eventsError: null });
+      });
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents,
+      editEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'not-found' as const,
+        error: 'Stale row',
+      })),
+    });
+
+    await renderSection();
+    expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    submitForm();
+    await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('events-form-refresh'));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument()
+    );
+    expect(loadEvents).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -745,6 +873,7 @@ describe('EventsSettings delete', () => {
       events: [makeEvent({ id: 'mine', label: 'Gracie visits' })] as AppState['events'],
       removeEvent: vi.fn(async () => ({
         success: false as const,
+        code: 'not-found' as const,
         error: 'Event not found or not yours to delete',
       })),
     });
@@ -757,6 +886,89 @@ describe('EventsSettings delete', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Event not found or not yours to delete')
     );
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
+    expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
+    expect(screen.getByTestId('events-delete-refresh')).toHaveClass('bg-blue-500');
+    expect(screen.getByTestId('events-delete-refresh')).not.toHaveClass('bg-red-500');
+    expect(screen.queryByTestId('events-delete-confirm')).not.toBeInTheDocument();
+  });
+
+  it('keeps deliberate delete retry enabled for a transport-coded failure', async () => {
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      removeEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'transport' as const,
+        error: 'Event not found or not yours to delete',
+      })),
+    });
+
+    await renderSection();
+    fireEvent.click(screen.getByTestId('event-delete-mine'));
+    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+
+    await waitFor(() => expect(screen.getByTestId('events-delete-error')).toBeInTheDocument());
+    expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
+    expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
+    expect(screen.getByTestId('events-delete-confirm')).toBeEnabled();
+    expect(screen.queryByTestId('events-delete-refresh')).not.toBeInTheDocument();
+  });
+
+  it('keeps delete retry available when the action unexpectedly rejects', async () => {
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      removeEvent: vi.fn(async () => {
+        throw new Error('Unexpected delete rejection');
+      }),
+    });
+
+    await renderSection();
+    fireEvent.click(screen.getByTestId('event-delete-mine'));
+    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('events-delete-error')).toHaveTextContent(
+        'Unexpected delete rejection'
+      )
+    );
+    expect(screen.getByTestId('events-delete-confirm')).toBeEnabled();
+    expect(screen.queryByTestId('events-delete-refresh')).not.toBeInTheDocument();
+    expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
+  });
+
+  it('closes a stale delete and reloads the list when Refresh events is activated', async () => {
+    const loadEvents = vi.fn(async () => {});
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents,
+      removeEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'not-found' as const,
+        error: 'Stale row',
+      })),
+    });
+
+    await renderSection();
+    loadEvents.mockClear();
+    loadEvents.mockImplementationOnce(async () => {
+      store.patch({ eventsError: 'Manual refresh failed' });
+    });
+    fireEvent.click(screen.getByTestId('event-delete-mine'));
+    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+
+    await waitFor(() => expect(screen.getByTestId('events-delete-refresh')).toBeInTheDocument());
+    const refresh = screen.getByTestId('events-delete-refresh');
+    act(() => {
+      refresh.click();
+      refresh.click();
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('events-delete-confirmation')).not.toBeInTheDocument()
+    );
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument()
+    );
     expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
   });
 

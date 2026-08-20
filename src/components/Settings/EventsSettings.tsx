@@ -69,6 +69,7 @@ type EventIcon = CoupleEvent['icon'];
 type NewEventInput = Parameters<AppState['addEvent']>[0];
 type EventUpdateInput = Parameters<AppState['editEvent']>[1];
 type EventWriteResult = Awaited<ReturnType<AppState['addEvent']>>;
+type EventWriteFailure = Extract<EventWriteResult, { success: false }>;
 
 /**
  * Mirrors of the CHECK constraints in
@@ -121,9 +122,22 @@ export function EventsSettings() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [settledForUserId, setSettledForUserId] = useState<string | null>(null);
 
-  // The header Add button: the one control that outlives both a delete and an
-  // add-from-empty, so it is where focus goes when the opener does not survive.
+  // The header Add button: the one control that outlives a delete, an
+  // add-from-empty, and a stale-row refresh, so it is where focus goes when the
+  // opener does not survive.
   const addButtonRef = useRef<HTMLButtonElement>(null);
+
+  const recordLoadOutcome = useCallback((requestedBy: string) => {
+    // eslint-disable-next-line no-restricted-properties
+    const state = useAppStore.getState();
+    if (state.userId !== requestedBy) return;
+
+    // `loadEvents` clears `eventsError` on entry and resolves after parking any
+    // load failure. Read once at that boundary: subscribing would let an
+    // unrelated later write paint the list-level load banner.
+    setLoadFailed(state.eventsError !== null);
+    setSettledForUserId(requestedBy);
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -131,22 +145,13 @@ export function EventsSettings() {
     let cancelled = false;
     void loadEvents().finally(() => {
       if (cancelled) return;
-      // loadEvents clears eventsError on entry, so non-null here means THIS
-      // load failed — the one signal its resolved-void promise cannot carry.
-      //
-      // Read once, imperatively, rather than through a selector: `eventsError`
-      // is shared with all three writes, so a subscribed read would paint a
-      // list-level "could not load" banner the moment an unrelated save failed.
-      // Same idiom as the Home effect in App.tsx.
-      // eslint-disable-next-line no-restricted-properties
-      setLoadFailed(useAppStore.getState().eventsError !== null);
-      setSettledForUserId(userId);
+      recordLoadOutcome(userId);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [userId, loadEvents]);
+  }, [userId, loadEvents, recordLoadOutcome]);
 
   const editingEvent = editingId ? events.find((event) => event.id === editingId) : undefined;
 
@@ -177,6 +182,22 @@ export function EventsSettings() {
   const handleDeleteClose = useCallback(() => {
     setDeletingEvent(null);
   }, []);
+
+  const refreshEvents = useCallback(async () => {
+    if (!userId) return;
+    await loadEvents();
+    recordLoadOutcome(userId);
+  }, [loadEvents, recordLoadOutcome, userId]);
+
+  const handleFormRefresh = useCallback(() => {
+    handleFormClose();
+    void refreshEvents();
+  }, [handleFormClose, refreshEvents]);
+
+  const handleDeleteRefresh = useCallback(() => {
+    handleDeleteClose();
+    void refreshEvents();
+  }, [handleDeleteClose, refreshEvents]);
 
   const handleSave = useCallback(
     (input: NewEventInput): Promise<EventWriteResult> => {
@@ -397,7 +418,9 @@ export function EventsSettings() {
             key={editingId ?? 'new'}
             event={editingEvent}
             fallbackFocusRef={formNeedsFallback ? addButtonRef : undefined}
+            refreshFocusRef={addButtonRef}
             onClose={handleFormClose}
+            onRefresh={handleFormRefresh}
             onSave={handleSave}
           />
         )}
@@ -412,6 +435,7 @@ export function EventsSettings() {
             fallbackFocusRef={addButtonRef}
             onClose={handleDeleteClose}
             onConfirmDelete={handleConfirmDelete}
+            onRefresh={handleDeleteRefresh}
           />
         )}
       </AnimatePresence>
@@ -423,12 +447,22 @@ interface EventFormProps {
   /** Absent for an add. */
   event?: CoupleEvent;
   onClose: () => void;
+  onRefresh: () => void;
   onSave: (input: NewEventInput) => Promise<EventWriteResult>;
   /** Only supplied when the opener will not survive a successful save. */
   fallbackFocusRef?: RefObject<HTMLElement | null>;
+  /** Always survives a refresh that may remove the stale row and its opener. */
+  refreshFocusRef: RefObject<HTMLElement | null>;
 }
 
-function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps) {
+function EventForm({
+  event,
+  onClose,
+  onRefresh,
+  onSave,
+  fallbackFocusRef,
+  refreshFocusRef,
+}: EventFormProps) {
   const [label, setLabel] = useState(event?.label ?? '');
   // formatDateISO, never toISOString().split('T')[0]: the latter is UTC-based
   // and pre-fills the previous day for anyone west of UTC.
@@ -436,7 +470,7 @@ function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps)
   const [description, setDescription] = useState(event?.description ?? '');
   const [icon, setIcon] = useState<EventIcon>(event?.icon ?? 'calendar');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveFailure, setSaveFailure] = useState<EventWriteFailure | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -444,6 +478,7 @@ function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps)
   const submitButtonRef = useRef<HTMLButtonElement>(null);
   const isSavingRef = useRef(false);
   const saveSucceededRef = useRef(false);
+  const refreshRequestedRef = useRef(false);
 
   const isEditing = Boolean(event);
   const titleId = 'events-form-title';
@@ -474,6 +509,15 @@ function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps)
   // this is what overwrites that with a target known to survive.
   useEffect(() => {
     return () => {
+      if (refreshRequestedRef.current) {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        const refreshFallback = refreshFocusRef.current;
+        if (refreshFallback?.isConnected) {
+          refreshFallback.focus();
+        }
+        return;
+      }
+
       if (!saveSucceededRef.current) return;
       // eslint-disable-next-line react-hooks/exhaustive-deps
       const fallback = fallbackFocusRef?.current;
@@ -481,15 +525,16 @@ function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps)
         fallback.focus();
       }
     };
-  }, [fallbackFocusRef]);
+  }, [fallbackFocusRef, refreshFocusRef]);
 
-  // Hand focus back once a failure has re-enabled Save. Doing it inside the
-  // await would focus a still-disabled button, which the DOM ignores.
+  // Hand focus to the enabled primary action after a failure: Save for a
+  // retryable write, Refresh events for a stale row. Doing it inside the await
+  // would focus a still-disabled button, which the DOM ignores.
   useEffect(() => {
-    if (saveError && !isSaving) {
+    if (saveFailure && !isSaving) {
       submitButtonRef.current?.focus();
     }
-  }, [saveError, isSaving]);
+  }, [saveFailure, isSaving]);
 
   /**
    * Drop one field's error the moment the user edits it.
@@ -536,7 +581,7 @@ function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps)
     }
 
     setErrors(nextErrors);
-    setSaveError(null);
+    setSaveFailure(null);
 
     // Nothing is requested until the client-side mirror of the CHECK
     // constraints passes.
@@ -562,7 +607,7 @@ function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps)
       if (!result.success) {
         // The message for THIS write, off its own returned result — not off the
         // shared `eventsError` key, which a background load may have overwritten.
-        setSaveError(result.error);
+        setSaveFailure(result);
         setIsSaving(false);
         isSavingRef.current = false;
         return;
@@ -575,9 +620,11 @@ function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps)
       // belt-and-braces: without it an unexpected throw would leave Save
       // disabled forever with no explanation on screen.
       console.error('[EventsSettings] Unexpected save failure:', err);
-      setSaveError(
-        err instanceof Error && err.message ? err.message : 'Failed to save the event.'
-      );
+      setSaveFailure({
+        success: false,
+        code: 'transport',
+        error: err instanceof Error && err.message ? err.message : 'Failed to save the event.',
+      });
       setIsSaving(false);
       isSavingRef.current = false;
     }
@@ -587,6 +634,14 @@ function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps)
     if (e.target === e.currentTarget && !isSaving) {
       onClose();
     }
+  };
+
+  const handleRefresh = () => {
+    if (refreshRequestedRef.current) return;
+    // Set before closing: the cleanup runs as the dialog unmounts and must beat
+    // the focus trap's attempt to restore the stale row's opener.
+    refreshRequestedRef.current = true;
+    onRefresh();
   };
 
   return (
@@ -793,13 +848,13 @@ function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps)
             )}
           </fieldset>
 
-          {saveError && (
+          {saveFailure && (
             <p
               className="rounded-lg border border-red-300 bg-red-100 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-400"
               data-testid="events-form-error"
               role="alert"
             >
-              {saveError}
+              {saveFailure.error}
             </p>
           )}
 
@@ -814,20 +869,33 @@ function EventForm({ event, onClose, onSave, fallbackFocusRef }: EventFormProps)
               <X className="h-4 w-4" />
               Cancel
             </button>
-            <button
-              ref={submitButtonRef}
-              type="submit"
-              disabled={isSaving}
-              data-testid="events-form-submit"
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-600 disabled:opacity-50"
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4" />
-              )}
-              {isSaving ? 'Saving...' : isEditing ? 'Update' : 'Add'}
-            </button>
+            {saveFailure?.code === 'not-found' ? (
+              <button
+                ref={submitButtonRef}
+                type="button"
+                onClick={handleRefresh}
+                data-testid="events-form-refresh"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-600"
+              >
+                <Calendar className="h-4 w-4" />
+                Refresh events
+              </button>
+            ) : (
+              <button
+                ref={submitButtonRef}
+                type="submit"
+                disabled={isSaving}
+                data-testid="events-form-submit"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-600 disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                {isSaving ? 'Saving...' : isEditing ? 'Update' : 'Add'}
+              </button>
+            )}
           </div>
         </form>
       </motion.div>
@@ -839,8 +907,9 @@ interface EventDeleteConfirmationProps {
   event: CoupleEvent;
   onClose: () => void;
   onConfirmDelete: (eventId: string) => Promise<EventWriteResult>;
+  onRefresh: () => void;
   /**
-   * Where focus goes once the row that held the Delete button is gone.
+   * Where focus goes after a delete or refresh may remove the opener's row.
    * useFocusTrap records that it skips the restore when the opener is no longer
    * connected, which after a successful delete is always the case.
    */
@@ -851,15 +920,17 @@ function EventDeleteConfirmation({
   event,
   onClose,
   onConfirmDelete,
+  onRefresh,
   fallbackFocusRef,
 }: EventDeleteConfirmationProps) {
   const [isDeleting, setIsDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<EventWriteFailure | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const isDeletingRef = useRef(false);
   const deleteSucceededRef = useRef(false);
+  const refreshRequestedRef = useRef(false);
 
   const titleId = 'events-delete-title';
 
@@ -880,11 +951,11 @@ function EventDeleteConfirmation({
   });
 
   // Declared after the trap call so its cleanup runs second — see the same note
-  // in EventForm. Gated on the delete having succeeded rather than on whether
-  // the opener is still connected, which is not a sound signal at cleanup time.
+  // in EventForm. A successful delete and a refresh both choose the surviving
+  // header control; opener connectivity is not a sound signal at cleanup time.
   useEffect(() => {
     return () => {
-      if (!deleteSucceededRef.current) return;
+      if (!deleteSucceededRef.current && !refreshRequestedRef.current) return;
       // eslint-disable-next-line react-hooks/exhaustive-deps
       const fallback = fallbackFocusRef.current;
       if (fallback?.isConnected) {
@@ -894,15 +965,15 @@ function EventDeleteConfirmation({
   }, [fallbackFocusRef]);
 
   useEffect(() => {
-    if (error && !isDeleting) {
+    if (failure && !isDeleting) {
       cancelButtonRef.current?.focus();
     }
-  }, [error, isDeleting]);
+  }, [failure, isDeleting]);
 
   const handleDelete = async () => {
     setIsDeleting(true);
     isDeletingRef.current = true;
-    setError(null);
+    setFailure(null);
     // The button about to be disabled currently holds focus; move it onto the
     // panel while that move can still land, or the browser parks focus on
     // <body>, outside the element the trap's keydown listener is bound to.
@@ -912,7 +983,7 @@ function EventDeleteConfirmation({
       const result = await onConfirmDelete(event.id);
 
       if (!result.success) {
-        setError(result.error);
+        setFailure(result);
         setIsDeleting(false);
         isDeletingRef.current = false;
         return;
@@ -922,9 +993,11 @@ function EventDeleteConfirmation({
       onClose();
     } catch (err) {
       console.error('[EventsSettings] Unexpected delete failure:', err);
-      setError(
-        err instanceof Error && err.message ? err.message : 'Failed to delete the event.'
-      );
+      setFailure({
+        success: false,
+        code: 'transport',
+        error: err instanceof Error && err.message ? err.message : 'Failed to delete the event.',
+      });
       setIsDeleting(false);
       isDeletingRef.current = false;
     }
@@ -934,6 +1007,12 @@ function EventDeleteConfirmation({
     if (e.target === e.currentTarget && !isDeleting) {
       onClose();
     }
+  };
+
+  const handleRefresh = () => {
+    if (refreshRequestedRef.current) return;
+    refreshRequestedRef.current = true;
+    onRefresh();
   };
 
   return (
@@ -972,13 +1051,13 @@ function EventDeleteConfirmation({
         </p>
         <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">You cannot undo this.</p>
 
-        {error && (
+        {failure && (
           <p
             className="mb-4 rounded-lg border border-red-300 bg-red-100 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-400"
             data-testid="events-delete-error"
             role="alert"
           >
-            {error}
+            {failure.error}
           </p>
         )}
 
@@ -993,16 +1072,28 @@ function EventDeleteConfirmation({
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            data-testid="events-delete-confirm"
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-red-600 disabled:opacity-50"
-          >
-            {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isDeleting ? 'Deleting...' : 'Delete'}
-          </button>
+          {failure?.code === 'not-found' ? (
+            <button
+              type="button"
+              onClick={handleRefresh}
+              data-testid="events-delete-refresh"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-600"
+            >
+              <Calendar className="h-4 w-4" />
+              Refresh events
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              data-testid="events-delete-confirm"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-red-600 disabled:opacity-50"
+            >
+              {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </button>
+          )}
         </div>
       </motion.div>
     </motion.div>
