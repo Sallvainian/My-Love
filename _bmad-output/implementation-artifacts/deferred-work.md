@@ -292,7 +292,9 @@ location: src/components/Settings/EventsSettings.tsx:255, :296, :813 (root cause
 source_spec: `5-manage-events-in-settings.md`
 severity: medium
 reason: Measured twice and independently. The parked axe run at `_bmad-output/test-artifacts/atdd-scaffolds-5-manage-events-in-settings/e2e-events-accessibility.spec.ts` reports impact "serious" on `events-settings-add` and `events-form-submit` -- "insufficient color contrast of 3.58 (foreground color: #ffffff, background color: #f6339a ... Expected contrast ratio of 4.5:1". Computing the relative luminance of #f6339a by hand gives (1.0 + 0.05) / (0.24294 + 0.05) = 3.58, the same number. A third instance nobody scanned carries the identical class string: `events-settings-empty-add` at EventsSettings.tsx:296. The axe scaffold seeds a row before every scan, so the empty state never renders and that button was never measured -- a developer following the checklist, which lists only :255 and :813, ships two fixed buttons and one unfixed one. The root cause is not this story's markup. `grep -rn "bg-pink-500" src/ | grep -c "text-white"` is 17, across 9 files, including the sibling AnniversarySetting
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-pink-primary-button-contrast
+resolution-undo: 1f1ce66048fcb7a2fbfadd78a511a0aa0175348f683c99cc90ca35cd1aef7178 2026-08-20 7374617475733a206f70656e
 decision: 2026-08-19 Darken the shared token app-wide — Move every white-on-pink primary button to a darker pink across all 17 sites in 9 files so the app stays visually uniform and passes AA everywhere at once. Pick the shade by measurement rather than assumption — Tailwind v4 resolves its palette through oklch, so pink-500 renders as #f6339a rather than the v3 hex, and the chosen replacement must be re-measured against white to confirm it clears 4.5:1 before the change lands. Include EventsSettings.tsx:296, the empty-state Add button the axe scaffold never reaches, and extend the parked accessibility scan so the empty state is scanned too. This changes the app's primary button colour on every screen, so confirm the new shade looks right in both light and dark mode.
 
 ### DW-29: A write that lands while the first load is still in flight is discarded by that load, so a saved edit or a new event silently reverts on screen.
@@ -546,4 +548,12 @@ location: n/a
 source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260819-202616-75cc; this entry preserves the lingering recommendation for a deliberate later review.
+status: open
+
+### DW-59: The translucent own-photo badge can still miss WCAG AA over a bright photo.
+origin: spec-deferred c395d4263ff0
+location: src/components/PhotoGallery/PhotoGridItem.tsx:100
+source_spec: `spec-dw-28-pink-primary-button-contrast.md`
+severity: medium
+reason: `bg-pink-600/90` composites to approximately `#e91a84` over white, which is about 4.27:1 against the badge's small white text. The same image-dependent contrast issue was pre-existing with `bg-pink-500/90`; DW-28 improves the token but does not make this non-button overlay opaque.
 status: open

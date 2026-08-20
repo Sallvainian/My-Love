@@ -1,0 +1,75 @@
+{
+  "run_key": "dw-pink-primary-button-contrast",
+  "timestamp": "2026-08-20T11-17-01-378Z",
+  "detected_stack": "frontend",
+  "total_tests": 2,
+  "api_tests": 0,
+  "e2e_tests": 2,
+  "backend_tests": 0,
+  "fixtures_created": 0,
+  "fixtures_reused": [
+    "tests/support/merged-fixtures.ts",
+    "coupleEvents",
+    "recurse",
+    "authenticated page",
+    "tests/support/helpers/navigation.ts"
+  ],
+  "api_test_files": 0,
+  "e2e_test_files": 1,
+  "backend_test_files": 0,
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 2,
+    "P2": 0,
+    "P3": 0
+  },
+  "subagent_execution": "SUBAGENT (parallel API and E2E subagents)",
+  "performance_gain": "parallel execution used; no measured sequential baseline",
+  "pact_mcp_reachable": false,
+  "pact_artifacts": "none — relevance gate closed",
+  "files": [
+    {
+      "artifact": "e2e-pink-primary-button-contrast.spec.ts",
+      "target": "tests/e2e/settings/pink-primary-button-contrast.spec.ts",
+      "tests": 2,
+      "priority": "P1"
+    }
+  ],
+  "api_relevance": "closed — rendered CSS contrast has no API/provider contract boundary",
+  "knowledge_fragments_used": [
+    "api-request",
+    "auth-session",
+    "data-factories",
+    "fixture-architecture",
+    "fixtures-composition",
+    "intercept-network-call",
+    "log",
+    "network-error-monitor",
+    "network-first",
+    "overview",
+    "playwright-cli",
+    "playwright-utils-mandate",
+    "recurse",
+    "selector-resilience",
+    "test-levels-framework",
+    "test-priorities-matrix"
+  ],
+  "playwright_utils_deviations": [],
+  "pactjs_utils_deviations": [],
+  "validation": {
+    "playwright": "passed — 2/2 Chromium tests (light and dark)",
+    "eslint": "passed — generated target file",
+    "typecheck": "generated target introduced no errors; repository remains at the same six pre-existing nested-worktree TS2883 errors in tests/support/merged-fixtures.ts",
+    "production_build": "passed — fnox exec -- npm run build",
+    "source_inventory": {
+      "white_on_pink_500": 0,
+      "white_on_pink_600": 18,
+      "hover_pink_700": 16,
+      "changed_component_files": 9
+    },
+    "compiled_css": "pink-600 and hover:pink-700 utilities emitted",
+    "cli_sessions": "clean — playwright-cli list reported no browsers",
+    "diff_check": "passed"
+  },
+  "residual_risk": "photo-grid-item-owner-badge remains excluded from the opaque-button pass claim because bg-pink-600/90 is image-dependent"
+}

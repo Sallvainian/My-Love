@@ -338,7 +338,7 @@ export function PartnerMoodView() {
             className="fixed top-[calc(5rem+env(safe-area-inset-top))] left-1/2 z-50 mx-4 w-full max-w-md -translate-x-1/2 transform"
             data-testid="partner-mood-notification"
           >
-            <div className="flex items-center gap-3 rounded-lg bg-pink-500 px-6 py-4 text-white shadow-lg">
+            <div className="flex items-center gap-3 rounded-lg bg-pink-600 px-6 py-4 text-white shadow-lg">
               <Bell className="h-5 w-5 shrink-0" />
               <div className="flex-1">
                 <p className="font-semibold">
@@ -414,7 +414,7 @@ export function PartnerMoodView() {
                       </div>
                       <button
                         onClick={() => handleSendRequest(user.id)}
-                        className="flex items-center gap-2 rounded-lg bg-pink-500 px-4 py-2 font-medium text-white transition-colors hover:bg-pink-600"
+                        className="flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2 font-medium text-white transition-colors hover:bg-pink-700"
                         data-testid={`send-request-${user.id}`}
                       >
                         <UserPlus className="h-4 w-4" />
@@ -560,7 +560,7 @@ export function PartnerMoodView() {
                   className={`flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-colors ${
                     isRefreshing || !syncStatus.isOnline
                       ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                      : 'bg-pink-500 text-white hover:bg-pink-600'
+                      : 'bg-pink-600 text-white hover:bg-pink-700'
                   }`}
                   data-testid="partner-mood-refresh-button"
                 >

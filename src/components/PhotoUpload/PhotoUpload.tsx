@@ -258,7 +258,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     />
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-2 rounded-lg bg-pink-500 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-600"
+                      className="flex items-center gap-2 rounded-lg bg-pink-600 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-700"
                       data-testid="photo-upload-select-button"
                     >
                       <Upload className="h-5 w-5" />
@@ -412,7 +412,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                       {step === 'error' && (
                         <button
                           onClick={handleRetry}
-                          className="rounded-lg bg-pink-500 px-6 py-2 font-medium text-white transition-colors hover:bg-pink-600"
+                          className="rounded-lg bg-pink-600 px-6 py-2 font-medium text-white transition-colors hover:bg-pink-700"
                           data-testid="photo-upload-retry"
                         >
                           Retry
@@ -422,7 +422,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         <button
                           onClick={handleUpload}
                           disabled={!isFormValid}
-                          className="flex items-center gap-2 rounded-lg bg-pink-500 px-6 py-2 font-medium text-white transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex items-center gap-2 rounded-lg bg-pink-600 px-6 py-2 font-medium text-white transition-colors hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-50"
                           data-testid="photo-upload-submit-button"
                         >
                           <Upload className="h-5 w-5" />

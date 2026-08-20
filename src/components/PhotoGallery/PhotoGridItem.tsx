@@ -97,7 +97,7 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
       <div className="absolute top-2 right-2">
         <div
           className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-            photo.isOwn ? 'bg-pink-500/90 text-white' : 'bg-blue-500/90 text-white'
+            photo.isOwn ? 'bg-pink-600/90 text-white' : 'bg-blue-500/90 text-white'
           }`}
           data-testid="photo-grid-item-owner-badge"
         >
