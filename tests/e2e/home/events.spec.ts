@@ -415,3 +415,64 @@ test.describe('Home dashboard reads events from the store', () => {
     await page.unroute('**/rest/v1/events*');
   });
 });
+
+test.describe(
+  'Home event load failure',
+  { annotation: [{ type: 'skipNetworkMonitoring' }] },
+  () => {
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript(() => {
+        localStorage.setItem('lastWelcomeView', Date.now().toString());
+      });
+    });
+
+    test('[P0] renders the load error and recovers on a later successful Home load', async ({
+      page,
+      supabaseAdmin,
+      interceptNetworkCall,
+    }) => {
+      const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+      await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+      const rejectedLoad = interceptNetworkCall({
+        method: 'GET',
+        url: '**/rest/v1/events*',
+        fulfillResponse: {
+          status: 503,
+          body: {
+            message: 'Injected events load failure',
+            details: '',
+            hint: '',
+            code: 'XX000',
+          },
+        },
+      });
+
+      await page.goto('/');
+      await rejectedLoad;
+
+      await expect(page.getByTestId('events-load-error')).toBeVisible();
+      await expect(page.getByTestId('events-empty-placeholder')).toHaveCount(0);
+
+      // The interceptor persists and fulfilled both parallel pages with 503.
+      // Remove it, then count both successful bounded reads on the reload so
+      // recovery cannot pass after only one side of getEvents has responded.
+      await page.unroute('**/rest/v1/events*');
+      let successfulEventReads = 0;
+      await page.route('**/rest/v1/events*', async (route) => {
+        if (route.request().method() === 'GET') {
+          successfulEventReads += 1;
+        }
+        await route.continue();
+      });
+
+      await navigateTo(page, 'photos');
+      await navigateTo(page, 'home');
+
+      await expect.poll(() => successfulEventReads).toBeGreaterThanOrEqual(2);
+      await expect(page.getByTestId('events-load-error')).toHaveCount(0);
+      await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
+      await page.unroute('**/rest/v1/events*');
+    });
+  }
+);

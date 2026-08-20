@@ -33,6 +33,9 @@ import type { Locator, Page } from '@playwright/test';
  */
 const ADDED_LABEL = 'Settings Trip E2E';
 const EDITED_LABEL = 'Settings Voyage E2E';
+// Vite runs the app in React StrictMode, so Settings' mount effect starts two
+// loads. Each getEvents() load reads upcoming and past pages in parallel.
+const SETTINGS_MOUNT_SNAPSHOT_COUNT = 4;
 
 async function resolveAppUserId(
   supabaseAdmin: TypedSupabaseClient,
@@ -306,6 +309,121 @@ test.describe('Managing events from Settings', () => {
     await expect(row).toBeVisible();
     await expect(row).toContainText(longForm(seededDate));
     await expect(page.getByTestId('events-settings-empty')).toHaveCount(0);
+  });
+
+  test('[P0] keeps a successful edit when Settings mount returns an older snapshot', async ({
+    page,
+    supabaseAdmin,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+    const originalDate = futureDate(20);
+    const orderWitnessDate = futureDate(28);
+    const editedDate = futureDate(35);
+    const { error } = await supabaseAdmin.from('events').insert([
+      {
+        user_id: userId,
+        label: 'Settings Snapshot Before Edit E2E',
+        event_date: originalDate,
+        description: 'Original snapshot',
+        icon: 'calendar',
+      },
+      {
+        user_id: userId,
+        label: 'Settings Snapshot Order Witness E2E',
+        event_date: orderWitnessDate,
+        description: 'Must sort before the edited row',
+        icon: 'calendar',
+      },
+    ]);
+    if (error) {
+      throw new Error(`Failed to seed the stale-response event: ${error.message}`);
+    }
+
+    // Home first populates the real Zustand slice, giving Settings an editable
+    // row while its own mount GET is held below.
+    await page.goto('/');
+    await expect(page.getByTestId('event-countdown-settings-snapshot-before-edit-e2e')).toBeVisible();
+
+    let markSnapshotsCaptured: () => void = () => {};
+    const snapshotsCaptured = new Promise<void>((resolve) => {
+      markSnapshotsCaptured = resolve;
+    });
+    let reservedSnapshotCount = 0;
+    let capturedSnapshotCount = 0;
+    let releaseSnapshots: () => void = () => {};
+    const snapshotsHeld = new Promise<void>((resolve) => {
+      releaseSnapshots = resolve;
+    });
+
+    await page.route('**/rest/v1/events*', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+
+      const slot = reservedSnapshotCount++;
+      if (slot >= SETTINGS_MOUNT_SNAPSHOT_COUNT) {
+        throw new Error(`Unexpected events GET in slot ${slot + 1}`);
+      }
+
+      // Fetch every bounded page for both StrictMode load calls now, before the
+      // PATCH, so every response body contains the old row state even though
+      // they are delivered only after the edit settles.
+      const staleResponse = await route.fetch();
+      if (!staleResponse.ok()) {
+        throw new Error(`Expected successful snapshot, got ${staleResponse.status()}`);
+      }
+      capturedSnapshotCount += 1;
+      if (capturedSnapshotCount === SETTINGS_MOUNT_SNAPSHOT_COUNT) markSnapshotsCaptured();
+      await snapshotsHeld;
+      await route.fulfill({ response: staleResponse });
+    });
+
+    await navigateTo(page, 'settings');
+    await snapshotsCaptured;
+    const loadRegion = page.getByTestId('events-settings-load-region');
+    await expect(loadRegion).toHaveAttribute('aria-busy', 'true');
+
+    const originalRow = rowFor(page, 'Settings Snapshot Before Edit E2E');
+    await expect(originalRow).toBeVisible();
+    await originalRow.locator('[data-testid^="event-edit-"]').click();
+    await page.getByTestId('events-form-label').fill('Settings Snapshot After Edit E2E');
+    await page.getByTestId('events-form-date').fill(editedDate);
+
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/rest/v1/events') && response.request().method() === 'PATCH'
+    );
+    await page.getByTestId('events-form-submit').click();
+    expect((await updateResponse).status()).toBe(200);
+
+    await expect(page.getByTestId('events-form')).toHaveCount(0);
+    const editedRow = rowFor(page, 'Settings Snapshot After Edit E2E');
+    await expect(editedRow).toBeVisible();
+    await expect(editedRow).toContainText(longForm(editedDate));
+    const orderedLabels = page.locator('[data-testid^="event-label-"]');
+    await expect(orderedLabels).toHaveText([
+      'Settings Snapshot Order Witness E2E',
+      'Settings Snapshot After Edit E2E',
+    ]);
+
+    releaseSnapshots();
+    // This flips only after getEvents' two-request Promise.all resolves and the
+    // slice installs its reconciled list, giving the assertion a causal settle
+    // signal rather than an arbitrary frame boundary.
+    await expect(loadRegion).toHaveAttribute('aria-busy', 'false');
+
+    await expect(editedRow).toBeVisible();
+    await expect(editedRow).toContainText(longForm(editedDate));
+    await expect(rowFor(page, 'Settings Snapshot Before Edit E2E')).toHaveCount(0);
+    await expect(orderedLabels).toHaveText([
+      'Settings Snapshot Order Witness E2E',
+      'Settings Snapshot After Edit E2E',
+    ]);
+
+    await page.unroute('**/rest/v1/events*');
   });
 
   test('[P0] lists a past event with its controls, where Home hides it', async ({

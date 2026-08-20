@@ -97,11 +97,11 @@ export function getEventsSlotView(
   if (!firstLoadSettled && rawEventCount === 0) return 'hidden';
   if (upcomingEventCount > 0) return 'list';
   // Zero cards to show: only claim "No upcoming events yet." if a load
-  // actually observed that. `loadEvents` never rejects — it parks the reason
-  // in `eventsError` and resolves — so the settled gate alone cannot tell
-  // "loaded nothing" from "could not load", and an offline user would be told
-  // they have no events. When last-good cards exist the list already wins
-  // above: stale-but-real cards beat an error banner.
+  // actually observed that. The caller records the invocation's returned
+  // success/failure outcome and ignores `stale`, so it can distinguish
+  // "loaded nothing" from "could not load" without consulting shared state.
+  // When last-good cards exist the list already wins above: stale-but-real
+  // cards beat an error banner.
   return lastLoadFailed ? 'error' : 'empty';
 }
 
