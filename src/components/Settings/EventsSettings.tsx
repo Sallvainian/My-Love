@@ -360,7 +360,7 @@ export function EventsSettings() {
           onClick={handleAdd}
           data-testid="events-settings-add"
           aria-label="Add event"
-          className="flex items-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-600 hover:shadow-lg"
+          className="flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-700 hover:shadow-lg"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Add Event</span>
@@ -405,7 +405,7 @@ export function EventsSettings() {
               type="button"
               onClick={handleAddFromEmptyState}
               data-testid="events-settings-empty-add"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-600 hover:shadow-lg"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-700 hover:shadow-lg"
             >
               <Plus className="h-4 w-4" />
               Add your first event
@@ -959,7 +959,7 @@ function EventForm({
                 type="button"
                 onClick={handleRefresh}
                 data-testid="events-form-refresh"
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-600"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-700"
               >
                 <Calendar className="h-4 w-4" />
                 Refresh events
@@ -970,7 +970,7 @@ function EventForm({
                 type="submit"
                 disabled={isSaving}
                 data-testid="events-form-submit"
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-600 disabled:opacity-50"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-700 disabled:opacity-50"
               >
                 {isSaving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
