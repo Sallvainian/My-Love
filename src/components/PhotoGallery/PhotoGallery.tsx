@@ -213,7 +213,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
           <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">{error}</p>
           <button
             onClick={handleRetry}
-            className="rounded-lg bg-pink-500 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-600"
+            className="rounded-lg bg-pink-600 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-700"
             data-testid="photo-gallery-error-retry-button"
           >
             Try Again
@@ -247,7 +247,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
           <p className="mb-6 text-lg text-gray-500">No photos yet. Start building your memories!</p>
           <button
             onClick={onUploadClick}
-            className="rounded-lg bg-pink-500 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-600"
+            className="rounded-lg bg-pink-600 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-700"
             data-testid="photo-gallery-empty-upload-button"
           >
             Upload Photo

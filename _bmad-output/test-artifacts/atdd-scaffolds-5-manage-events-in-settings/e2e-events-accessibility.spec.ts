@@ -5,15 +5,15 @@
  * Settings"). Every test is emitted as `test.skip(...)`; a developer activates
  * one by deleting its `.skip`.
  *
- * Test design: **DE.5-E2E-001**, three scans, all [P1]
+ * Test design: **DE.5-E2E-001**, three original scans, all [P1]
  * (`_bmad-output/test-artifacts/test-design-epic-5.md:345`). Closes risk R-009,
  * recorded there as "No automated accessibility scan on either new dialog, on a
  * change that produced four medium a11y findings during review" (:129).
  *
- * The only AxeBuilder use anywhere in this repo is
- * `tests/e2e/scripture/scripture-accessibility.spec.ts:296-303`; the three
- * scans below copy that shape exactly. `@axe-core/playwright` is already a
- * devDependency (`package.json:55`, "^4.13.0").
+ * DW-28 adds a fourth [P1] scan for the formerly unmeasured empty state, using
+ * the same clear/navigate/AxeBuilder pattern as the original three scans.
+ * `@axe-core/playwright` is already a devDependency (`package.json:55`,
+ * "^4.13.0").
  *
  * Scope note: each scan is `.include()`d on this story's own subtree, never the
  * whole Settings view. The test design records the reason at :527-531 — a
@@ -24,7 +24,7 @@
  *   supabase start
  *   npx playwright test tests/e2e/settings/events-accessibility.spec.ts --project=chromium
  *
- * ── MEASURED first run: 2 of 3 RED ─────────────────────────────────────────
+ * ── HISTORICAL measured first run: 2 of 3 RED ──────────────────────────────
  *
  * Executed during the story-5 ATDD run (2026-08-19) against the local stack,
  * `npx playwright test tests/e2e/settings/events-accessibility.spec.ts
@@ -41,16 +41,18 @@
  *    #ffffff, background color: #f6339a, font size: 12.0pt (16px), font weight:
  *    normal). Expected contrast ratio of 4.5:1"
  *
- * The two failing targets are `button[data-testid="events-settings-add"]` and
+ * At the time, the two failing targets were
+ * `button[data-testid="events-settings-add"]` and
  * `button[data-testid="events-form-submit"]` — white text on Tailwind's
  * `bg-pink-500` (#f6339a). No other axe rule fired anywhere in the three scans.
- * The delete dialog passes because its confirm button is not pink.
+ * The delete dialog passed because its confirm button was not pink.
  *
- * These are therefore RED against a REAL production defect, not against missing
- * implementation — a WCAG 2 AA contrast failure on the primary action of both
- * the section and the form. Fixing it is a production change (a darker pink, or
- * a larger/bolder label, either of which clears 4.5:1), not a test change. It is
- * outside the story-5 diff and belongs to whoever picks up R-009.
+ * Those results were therefore RED against a real production defect, not
+ * against missing implementation: a WCAG 2 AA contrast failure on the primary
+ * action of both the section and the form. DW-28 resolved that root cause by
+ * moving the matching surfaces to measured Tailwind v4 `pink-600` defaults and
+ * `pink-700` hover states. All four `test.skip` scans remain parked as regression
+ * coverage.
  *
  * Test data: rows are seeded and torn down for THIS worker's pair only, keyed
  * on TEST_WORKER_INDEX through `getWorkerPairEmails()`. No partner is linked or
@@ -314,6 +316,34 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       const AxeBuilder = (await import('@axe-core/playwright')).default;
       const accessibilityScanResults = await new AxeBuilder({ page })
         .include('[data-testid="events-delete-confirmation"]')
+        .analyze();
+
+      expect(accessibilityScanResults.violations).toEqual([]);
+    }
+  );
+
+  test.skip(
+    '[P1] DE.5-E2E-001d the empty events section has no axe violations',
+    async ({ page, supabaseAdmin }) => {
+      const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+      // Intentionally do not seed a row: this renders the empty-state Add
+      // action that the three original scans never exercised.
+      await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+
+      await log.step('Open Settings with an empty events section');
+      await page.goto('/');
+      await navigateTo(page, 'settings');
+
+      const eventsSection = page.getByTestId('events-settings');
+      await expect(eventsSection).toBeVisible();
+      await expect(page.getByTestId('events-settings-empty-add')).toBeVisible();
+
+      await log.step('Scan the empty events section');
+      const AxeBuilder = (await import('@axe-core/playwright')).default;
+      const accessibilityScanResults = await new AxeBuilder({ page })
+        .include('[data-testid="events-settings"]')
         .analyze();
 
       expect(accessibilityScanResults.violations).toEqual([]);
