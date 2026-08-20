@@ -428,7 +428,9 @@ location: src/services/eventsService.ts (getEvents merge)
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: `getEvents` issues the upcoming and past windows through `Promise.all` and reconciles only the "returned by BOTH" case, dropping one copy to avoid a duplicate React key. Two other outcomes exist and are now named in the code comment: the row lands in NEITHER page (past answered before the edit, upcoming after, or the reverse), and the copy kept is the pre-edit one, so an already-passed event renders as upcoming. Both need a partner editing an event across today's boundary during a load, and both correct themselves on the next `loadEvents()`. Closing either means abandoning the two-window read for a single request — the shape the Design Notes deliberately chose against — or comparing `updated_at` between copies, which the column supports but is client-maintained (`20260818000002_create_events_table.sql`, comment on `public.events.updated_at`).
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: Both outcomes need a partner editing an event across today's boundary during a load and both correct themselves on the next loadEvents(); eventsService.ts:369-380 already names them in place for the next reader.
+decision: 2026-08-19 Accept the race as documented — Both outcomes need a partner editing an event across today's boundary during a load and both correct themselves on the next loadEvents(); eventsService.ts:369-380 already names them in place for the next reader.
 
 ### DW-46: Neither window requests a row count, so nothing can tell that truncation happened — which the deferred "load more" control would need.
 origin: spec-deferred 3eedd014be6b
@@ -444,7 +446,9 @@ location: tests/api/events-read-window.spec.ts, src/services/eventsService.ts
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: `tests/api/events-read-window.spec.ts` cannot import `eventsService`: `src/api/supabaseClient.ts` reads `import.meta.env`, a Vite build-time substitution with no value under the Playwright runner. Its `readEventWindows` therefore mirrors the `gte`/`lt`/`order`/`range` chain by hand, and already diverges in one respect — it computes `offset + limit - 1` with none of production's clamping. The containment is real and was re-verified this pass: mutating the production chain fails `tests/unit/services/eventsService.test.ts`, whose `backend.queries` assertions pin the exact bounds, orderings and range. What is uncovered is a change made in production AND mirrored here incorrectly. Closing it means making the chain injectable — passing a client into a shared function both the service and the spec call — which is a production design change the intent does not reach.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: eventsService.test.ts pins the production chain's bounds, orderings and range, so only a change mirrored incorrectly into the API spec escapes, and no user-facing behaviour depends on the duplication.
+decision: 2026-08-19 Accept the mirror; the unit test contains it — eventsService.test.ts pins the production chain's bounds, orderings and range, so only a change mirrored incorrectly into the API spec escapes, and no user-facing behaviour depends on the duplication.
 
 ### DW-48: The read-side strip covers the `events` key only; a persisted blob carrying `eventsIsLoading` or `eventsError` would still rehydrate those two.
 origin: spec-deferred ed3babe6b83b
