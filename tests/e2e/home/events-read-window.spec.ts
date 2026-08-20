@@ -69,7 +69,7 @@
 import { test, expect } from '../../support/merged-fixtures';
 
 /** Home renders at most this many event cards (`HOME_MAX_EVENT_CARDS`, `src/App.tsx`). */
-const HOME_MAX_EVENT_CARDS = 3;
+const HOME_MAX_EVENT_CARDS = 6;
 
 /**
  * More past events than `getEvents`' default `limit` of 50.
@@ -167,7 +167,7 @@ test.describe('Home under the bounded events read', () => {
     );
     beforeMidnight.setMinutes(beforeMidnight.getMinutes() - CROSSING_LEAD_MINUTES);
 
-    // Four upcoming events against a cap of three, so exactly one is hidden and
+    // Seven upcoming events against a cap of six, so exactly one is hidden and
     // the refill has somewhere to come from. Offsets are relative to the
     // anchor's day, and the installed clock is one day behind it, so
     // `dayOffset: -1` is what "today" means to the browser: that is the card
@@ -176,7 +176,10 @@ test.describe('Home under the bounded events read', () => {
       { dayOffset: -1, label: 'Refill Today E2E', description: 'Retires at midnight' },
       { dayOffset: 0, label: 'Refill Second E2E', description: 'Second up' },
       { dayOffset: 1, label: 'Refill Third E2E', description: 'Third up' },
-      { dayOffset: 2, label: 'Refill Fourth E2E', description: 'Waiting for a slot' },
+      { dayOffset: 2, label: 'Refill Fourth E2E', description: 'Fourth up' },
+      { dayOffset: 3, label: 'Refill Fifth E2E', description: 'Fifth up' },
+      { dayOffset: 4, label: 'Refill Sixth E2E', description: 'Sixth up' },
+      { dayOffset: 5, label: 'Refill Seventh E2E', description: 'Waiting for a slot' },
     ]);
 
     // Installed before navigating, which `page.clock` requires; the clock then
@@ -193,7 +196,7 @@ test.describe('Home under the bounded events read', () => {
 
     await expect(page.getByTestId('event-countdown-refill-today-e2e')).toBeVisible();
     await expect(eventCards).toHaveCount(HOME_MAX_EVENT_CARDS);
-    await expect(page.getByTestId('event-countdown-refill-fourth-e2e')).toHaveCount(0);
+    await expect(page.getByTestId('event-countdown-refill-seventh-e2e')).toHaveCount(0);
 
     // Cross the viewer's own local midnight, and only that. `fastForward` fires
     // each due timer at most once, so this costs one tick of EventCountdown's
@@ -207,11 +210,18 @@ test.describe('Home under the bounded events read', () => {
     // reading can produce this. Both the frozen-clock mutant and the deleted
     // `onRetire` wiring fail here (see the header).
     await expect(page.getByTestId('event-countdown-refill-today-e2e')).toHaveCount(0);
-    await expect(page.getByTestId('event-countdown-refill-fourth-e2e')).toBeVisible();
+    await expect(page.getByTestId('event-countdown-refill-seventh-e2e')).toBeVisible();
     await expect(eventCards).toHaveCount(HOME_MAX_EVENT_CARDS);
 
     const cardLabels = await eventCards.locator('h3').allTextContents();
-    expect(cardLabels).toEqual(['Refill Second E2E', 'Refill Third E2E', 'Refill Fourth E2E']);
+    expect(cardLabels).toEqual([
+      'Refill Second E2E',
+      'Refill Third E2E',
+      'Refill Fourth E2E',
+      'Refill Fifth E2E',
+      'Refill Sixth E2E',
+      'Refill Seventh E2E',
+    ]);
 
     // The list is still a list: a slot decision reading the CAPPED count would
     // be indistinguishable here today, but the placeholder must never appear
