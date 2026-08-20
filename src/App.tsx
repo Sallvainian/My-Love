@@ -122,12 +122,9 @@ function App() {
   // the same account. Declared here, alongside the other auth state, because
   // that sign-out reset runs in the auth listener further down.
   const [eventsSettledForUserId, setEventsSettledForUserId] = useState<string | null>(null);
-  // Whether that settle was a FAILED load. loadEvents never rejects — it parks
-  // the reason in eventsError and resolves — so the .finally gate alone reads
-  // "settled" for a load that returned nothing, and Home would tell an offline
-  // user "No upcoming events yet.". Snapshotted at settle time rather than
-  // subscribed live, so a later write failure parking its own eventsError
-  // cannot flip a successfully-loaded slot into the error state.
+  // Whether that settle was a FAILED load. Each call returns its own outcome,
+  // so Home never infers this from mutable store state and ignores a stale
+  // response that no longer owns the account or the load slot.
   const [eventsLoadFailed, setEventsLoadFailed] = useState(false);
 
   // Helper function to check if welcome splash should be shown
@@ -445,11 +442,9 @@ function App() {
     if (!authUserId || currentView !== 'home') return;
 
     let cancelled = false;
-    void loadEvents().finally(() => {
-      if (cancelled) return;
-      // loadEvents cleared eventsError on entry, so non-null here means THIS
-      // load failed — the one signal the resolved-void promise cannot carry.
-      setEventsLoadFailed(useAppStore.getState().eventsError !== null);
+    void loadEvents().then((result) => {
+      if (cancelled || result.status === 'stale') return;
+      setEventsLoadFailed(result.status === 'failure');
       setEventsSettledForUserId(authUserId);
     });
 

@@ -272,7 +272,9 @@ location: src/components/Settings/EventsSettings.tsx (load effect) + src/stores/
 source_spec: `5-manage-events-in-settings.md`
 severity: low
 reason: The load-failure flag is read once from the shared `eventsError` key in loadEvents()'s .finally, and `addEvent` writes its own failure into that same key (eventsSlice.ts, addEvent catch tail). The header Add button renders before the load settles, so a save can fail inside the load's flight window and leave the key non-null when the successful load reads it. The list itself still renders correctly; only the notice is wrong. The root cause is that one `eventsError` key serves loads and all three writes with no per-call token, which lives in eventsSlice.ts — a file this story's Never list forbids editing.
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-events-error-attribution
+resolution-undo: 967f607d893782fd21a702cf860f2384988b9ba6aceeda5267c395049534142b 2026-08-20 7374617475733a206f70656e
 
 ### DW-27: Once the Settings events load fails, nothing re-fires it: the notice and the empty list persist until the user reloads the page.
 origin: spec-deferred 289bbe236935
@@ -297,7 +299,9 @@ location: src/stores/slices/eventsSlice.ts (loadEvents resolution) exposed by sr
 source_spec: `5-manage-events-in-settings.md`
 severity: medium
 reason: `loadEvents` replaces the list wholesale on resolution -- `set({ events, eventsIsLoading: false })` at eventsSlice.ts, guarded only by `latestLoadId` against other loads, never against writes. `addEvent` / `editEvent` mutate `events` in place the moment their own request resolves. So a write that resolves inside the load's flight window is overwritten by the server list the load captured before that write landed. The reachable form is not the empty-list one. `slot` is `'list'` whenever `events.length > 0`, and `events` survives view changes -- so a user who loads Home (App's effect populates `events`) and then opens Settings sees a fully rendered list with Edit and Delete live while EventsSettings' own mount load is still outstanding. An edit accepted in that window reverts visually when the load resolves, and the row is durably changed on the server, so nothing on screen says a write succeeded. This is the success-path twin of DW-26, and it has the same root cause and the same blocker
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-events-error-attribution
+resolution-undo: 967f607d893782fd21a702cf860f2384988b9ba6aceeda5267c395049534142b 2026-08-20 7374617475733a206f70656e
 
 ### DW-30: Roughly 4,000 lines of measured tests shipped in this change set are matched by no test runner and execute nowhere.
 origin: spec-deferred cb64960af166
@@ -500,4 +504,44 @@ location: src/services/eventsService.ts:147
 source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: low
 reason: The pre-existing `networkFailure` helper creates a new message-only Error. `writeTransportFailure` now wraps only that message, so the original error identity, stack, and transport metadata remain unavailable for diagnostics even though PostgREST wrapping preserves its mapped error as `cause`.
+status: open
+
+### DW-54: User-id-only event load ownership can admit a pre-sign-out response after signing back into the same account.
+origin: spec-deferred f281396e181b
+location: src/stores/slices/eventsSlice.ts:210; src/App.tsx:441
+source_spec: `spec-dw-26-29-events-error-attribution.md`
+severity: medium
+reason: `loadEvents` validates only `requestedBy` and `latestLoadId`. If account A signs out, signs back in as A, and the old request settles before the new mount effect increments the load id, both guards match and the prior-session response can own the reset list. App's local settled marker is also keyed only by user id. This path predates the bundle; the change preserves rather than introduces those guards.
+status: open
+
+### DW-55: A prior-session event load can still own state after signing back into the same account.
+origin: spec-deferred d08cc52656ce
+location: src/stores/slices/eventsSlice.ts:210; src/App.tsx:441
+source_spec: `spec-dw-26-29-events-error-attribution.md`
+severity: medium
+reason: `loadEvents` continues to identify ownership with `requestedBy` and `latestLoadId`. If account A signs out and signs back in as A before the old request settles and before a successor load allocates a new id, both guards still match. The user-id-only guard predates this bundle; the reviewed change preserves it while adding call-owned outcomes and mutation replay.
+status: open
+
+### DW-56: A prior-session event load can still own the reset list after signing back into the same account.
+origin: spec-deferred a52c0c10748d
+location: src/stores/slices/eventsSlice.ts:210; src/App.tsx:441
+source_spec: `spec-dw-26-29-events-error-attribution.md`
+severity: medium
+reason: `loadEvents` captures only `userId` and `latestLoadId`. A request started before sign-out can therefore pass both guards after the same user signs in again if the successor Home effect has not allocated a new load id yet. This ownership gap predates the reviewed change, which preserves the existing identity guards while adding per-call results and mutation replay.
+status: open
+
+### DW-57: A manual stale-row refresh can settle after Events Settings unmounts and call its local state setters.
+origin: spec-deferred 0c21a7d01775
+location: src/components/Settings/EventsSettings.tsx:185
+source_spec: `spec-dw-26-29-events-error-attribution.md`
+severity: low
+reason: The mount load has a cancellation flag, but `refreshEvents()` awaits `loadEvents()` and then calls `recordLoadOutcome()` without an unmount guard. Navigating away during that request therefore reaches `setLoadFailed` and `setSettledForUserId` after unmount. The path and navigation warning predate this bundle; React discards the update, so the verified consequence is limited to development/test noise.
+status: open
+
+### DW-58: Follow-up review still recommended for dw-events-error-attribution after the damping cap was spent
+origin: review-budget-followup
+location: n/a
+source_spec: `spec-dw-26-29-events-error-attribution.md`
+severity: low
+reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260819-202616-75cc; this entry preserves the lingering recommendation for a deliberate later review.
 status: open

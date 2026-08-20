@@ -24,6 +24,7 @@ import type { AppState } from '../../../stores/types';
 import { EventsSettings } from '../EventsSettings';
 
 type CoupleEvent = AppState['events'][number];
+type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
 type EventWriteResult = Awaited<ReturnType<AppState['addEvent']>>;
 type NewEventInput = Parameters<AppState['addEvent']>[0];
 type EventUpdateInput = Parameters<AppState['editEvent']>[1];
@@ -114,6 +115,7 @@ function currentEvents(): CoupleEvent[] {
 }
 
 const ok: EventWriteResult = { success: true };
+const loadOk: EventLoadResult = { status: 'success' };
 
 /**
  * Install a fresh store state. The three write actions mirror what eventsSlice
@@ -128,7 +130,7 @@ function setStore(overrides: Partial<AppState> = {}) {
     eventsIsLoading: false,
     eventsError: null,
     userId: OWN_USER_ID,
-    loadEvents: vi.fn(async () => {}),
+    loadEvents: vi.fn(async () => loadOk),
     addEvent: vi.fn(async (input: NewEventInput) => {
       created += 1;
       store.patch({
@@ -302,7 +304,7 @@ describe('EventsSettings list states', () => {
       eventsIsLoading: true,
       // Never resolves: the window this test is about is Settings painted with
       // loadEvents still outstanding.
-      loadEvents: vi.fn(() => new Promise<void>(() => {})),
+      loadEvents: vi.fn(() => new Promise<EventLoadResult>(() => {})),
     });
 
     render(<EventsSettings />);
@@ -330,7 +332,10 @@ describe('EventsSettings list states', () => {
   it('explains a failed load in the list area instead of claiming there are no events', async () => {
     setStore({
       loadEvents: vi.fn(async () => {
-        store.patch({ eventsError: 'Network error' });
+        // Deliberately disagree with the result: reading shared state would
+        // incorrectly render the empty placeholder.
+        store.patch({ eventsError: null });
+        return { status: 'failure', error: 'Network error' } as const;
       }),
     });
 
@@ -349,7 +354,8 @@ describe('EventsSettings list states', () => {
     setStore({
       events: [makeEvent({ id: 'stale', label: 'Still here' })] as AppState['events'],
       loadEvents: vi.fn(async () => {
-        store.patch({ eventsError: 'Network error' });
+        store.patch({ eventsError: null });
+        return { status: 'failure', error: 'Network error' } as const;
       }),
     });
 
@@ -364,27 +370,73 @@ describe('EventsSettings list states', () => {
     );
   });
 
-  it('does not paint the load banner when the shared error key holds a save failure', async () => {
-    // eventsError is one key written by loads AND by all three writes. The flag
-    // is captured once, when the load settles, so a later save failure cannot
-    // reach it.
+  it('keeps the form write failure when its pending mount load succeeds', async () => {
+    let finishLoad: () => void = () => {};
+    setStore({
+      eventsIsLoading: true,
+      loadEvents: vi.fn(
+        () =>
+          new Promise<EventLoadResult>((resolve) => {
+            finishLoad = () => {
+              store.patch({ eventsIsLoading: false });
+              resolve({ status: 'success' });
+            };
+          })
+      ),
+      addEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'transport' as const,
+        error: 'This event did not save',
+      })),
+    });
+
+    render(<EventsSettings />);
+    openAddForm();
+    fillForm({ label: 'Unsaved trip', date: '2026-10-31' });
+    submitForm();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('events-form-error')).toHaveTextContent(
+        'This event did not save'
+      )
+    );
+    const loadRegion = screen.getByTestId('events-settings-load-region');
+    expect(loadRegion).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('events-settings')).not.toHaveAttribute('aria-busy');
+    expect(loadRegion).not.toContainElement(screen.getByTestId('events-form-error'));
+    await act(async () => {
+      finishLoad();
+    });
+
+    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('events-form')).toBeInTheDocument();
+    expect(screen.getByTestId('events-form-error')).toHaveTextContent('This event did not save');
+  });
+
+  it('uses the successful call outcome even when shared load error state disagrees', async () => {
+    let finishLoad: (result: EventLoadResult) => void = () => {};
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents: vi.fn(
+        () =>
+          new Promise<EventLoadResult>((resolve) => {
+            finishLoad = resolve;
+          })
+      ),
     });
 
-    await renderSection();
+    render(<EventsSettings />);
 
-    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
-
-    // Flushed: without act() React never re-renders before the assertion below,
-    // so subscribing the banner straight to `eventsError` passes this test.
-    // What is pinned here is the post-settle window — a save that fails INSIDE
-    // the first load's flight window is DW-26 and still open.
     await act(async () => {
-      store.patch({ eventsError: 'Event not found or not yours to edit' });
+      // Deliberately impossible through the revised write actions: this pins
+      // the caller contract so a future regression cannot infer this load's
+      // outcome from unrelated shared state again.
+      store.patch({ eventsError: 'An unrelated stored error' });
+      finishLoad({ status: 'success' });
     });
 
     expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-list')).toBeInTheDocument();
   });
 });
 
@@ -757,7 +809,7 @@ describe('EventsSettings edit', () => {
   });
 
   it('closes a stale edit and reloads the list when Refresh events is activated', async () => {
-    const loadEvents = vi.fn(async () => {});
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
@@ -772,6 +824,7 @@ describe('EventsSettings edit', () => {
     loadEvents.mockClear();
     loadEvents.mockImplementationOnce(async () => {
       store.patch({ events: [], eventsError: null });
+      return loadOk;
     });
     fireEvent.click(screen.getByTestId('event-edit-mine'));
     submitForm();
@@ -794,10 +847,10 @@ describe('EventsSettings edit', () => {
     const loadEvents = vi
       .fn()
       .mockImplementationOnce(async () => {
-        store.patch({ eventsError: 'The initial load failed' });
+        return { status: 'failure', error: 'The initial load failed' } as const;
       })
       .mockImplementationOnce(async () => {
-        store.patch({ eventsError: null });
+        return loadOk;
       });
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
@@ -821,6 +874,48 @@ describe('EventsSettings edit', () => {
       expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument()
     );
     expect(loadEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores an older stale mount outcome after a stale-row refresh fails', async () => {
+    let finishMountLoad: (result: EventLoadResult) => void = () => {};
+    const loadEvents = vi
+      .fn<() => Promise<EventLoadResult>>()
+      .mockImplementationOnce(
+        () =>
+          new Promise<EventLoadResult>((resolve) => {
+            finishMountLoad = resolve;
+          })
+      )
+      .mockImplementationOnce(async () => ({
+        status: 'failure',
+        error: 'The refresh failed',
+      }));
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents,
+      editEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'not-found' as const,
+        error: 'Stale row',
+      })),
+    });
+
+    render(<EventsSettings />);
+    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    submitForm();
+    await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('events-form-refresh'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument()
+    );
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      finishMountLoad({ status: 'stale' });
+    });
+
+    expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
   });
 });
 
@@ -936,7 +1031,7 @@ describe('EventsSettings delete', () => {
   });
 
   it('closes a stale delete and reloads the list when Refresh events is activated', async () => {
-    const loadEvents = vi.fn(async () => {});
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
@@ -951,6 +1046,7 @@ describe('EventsSettings delete', () => {
     loadEvents.mockClear();
     loadEvents.mockImplementationOnce(async () => {
       store.patch({ eventsError: 'Manual refresh failed' });
+      return { status: 'failure', error: 'Manual refresh failed' } as const;
     });
     fireEvent.click(screen.getByTestId('event-delete-mine'));
     fireEvent.click(screen.getByTestId('events-delete-confirm'));
