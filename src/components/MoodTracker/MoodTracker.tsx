@@ -560,7 +560,7 @@ export function MoodTracker() {
                 disabled={!isValid || isSubmitting}
                 className={`w-full rounded-lg px-6 py-3 font-medium transition-colors ${
                   isValid && !isSubmitting
-                    ? 'bg-pink-500 text-white hover:bg-pink-600'
+                    ? 'bg-pink-600 text-white hover:bg-pink-700'
                     : 'cursor-not-allowed bg-gray-200 text-gray-400'
                 }`}
                 data-testid="mood-submit-button"
