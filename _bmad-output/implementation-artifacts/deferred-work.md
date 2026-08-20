@@ -154,7 +154,9 @@ location: src/stores/useAppStore.ts:120
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: useAppStore.ts:111 records that partialize "stops NEW writes, but it does not govern reads", which is why the adapter deletes data.state.moods at :120-123. Verified by writing the assertion: it fails today. Not fixed here because the state is unreachable — no build has ever written events to localStorage, so unlike moods there is no installed base of bad blobs. It would become real only if a later story added events to partialize and then removed it again.
-status: open
+status: done 2026-08-19
+resolution: resolved by sweep bundle dw-persisted-events-key-strip
+resolution-undo: ddb7df62ab97dd5914d84da1658d2bfa011c9cce356a202cdd1b9be1033c6c85 2026-08-19 7374617475733a206f70656e
 
 ### DW-15: A row with an unparseable event_date is silently dropped from the list with only a console.error; nothing surfaces to eventsError or any user-visible state.
 origin: spec-deferred 27703d86d257
@@ -207,7 +209,9 @@ location: src/stores/useAppStore.ts:120
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: Re-surfaced by this review pass; re-verified unchanged since the prior pass. useAppStore.ts records that partialize "stops NEW writes, but it does not govern reads", which is why moods is stripped on read but events is not. Unreachable today since no build has ever written events to localStorage.
-status: open
+status: done 2026-08-19
+resolution: resolved by sweep bundle dw-persisted-events-key-strip
+resolution-undo: ddb7df62ab97dd5914d84da1658d2bfa011c9cce356a202cdd1b9be1033c6c85 2026-08-19 7374617475733a206f70656e
 
 ### DW-21: Overlapping loadEvents() calls from rapid Home revisits have no in-flight/sequence guard, so an out-of-order response could show stale data for a moment.
 origin: spec-deferred 5c30b7108a47
@@ -430,4 +434,12 @@ location: tests/api/events-read-window.spec.ts, src/services/eventsService.ts
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: `tests/api/events-read-window.spec.ts` cannot import `eventsService`: `src/api/supabaseClient.ts` reads `import.meta.env`, a Vite build-time substitution with no value under the Playwright runner. Its `readEventWindows` therefore mirrors the `gte`/`lt`/`order`/`range` chain by hand, and already diverges in one respect — it computes `offset + limit - 1` with none of production's clamping. The containment is real and was re-verified this pass: mutating the production chain fails `tests/unit/services/eventsService.test.ts`, whose `backend.queries` assertions pin the exact bounds, orderings and range. What is uncovered is a change made in production AND mirrored here incorrectly. Closing it means making the chain injectable — passing a client into a shared function both the service and the spec call — which is a production design change the intent does not reach.
+status: open
+
+### DW-48: The read-side strip covers the `events` key only; a persisted blob carrying `eventsIsLoading` or `eventsError` would still rehydrate those two.
+origin: spec-deferred ed3babe6b83b
+location: src/stores/useAppStore.ts:74
+source_spec: `spec-dw-14-20-persisted-events-key-strip.md`
+severity: low
+reason: `STALE_PERSISTED_KEYS` (src/stores/useAppStore.ts:74) lists `moods` and `events`. A blob carrying `eventsIsLoading: true` would rehydrate it, and `loadEvents` bails at `if (!requestedBy) return;` (src/stores/slices/eventsSlice.ts:118) *before* raising the flag — so on a signed-out start nothing clears it until the next sign-in, leaving a stranded loading state. `eventsError` would likewise show a stale banner. Neither carries couple data, so this is not the disclosure class DW-14/DW-20 describe, and both are the same unreachability class as the original entries: no build has ever written any events key to localStorage. Excluded from this change on the authority of the bundle intent, which names the `events` key alone ("Strip a stale `events` key out of the persisted blob on read").
 status: open
