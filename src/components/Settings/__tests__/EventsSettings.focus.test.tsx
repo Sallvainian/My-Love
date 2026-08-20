@@ -28,6 +28,7 @@ import type { AppState } from '../../../stores/types';
 import { EventsSettings } from '../EventsSettings';
 
 type CoupleEvent = AppState['events'][number];
+type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
 type EventWriteResult = Awaited<ReturnType<AppState['addEvent']>>;
 type NewEventInput = Parameters<AppState['addEvent']>[0];
 type EventUpdateInput = Parameters<AppState['editEvent']>[1];
@@ -109,6 +110,7 @@ function currentEvents(): CoupleEvent[] {
 }
 
 const ok: EventWriteResult = { success: true };
+const loadOk: EventLoadResult = { status: 'success' };
 
 function setStore(overrides: Partial<AppState> = {}) {
   let created = 0;
@@ -118,7 +120,7 @@ function setStore(overrides: Partial<AppState> = {}) {
     eventsIsLoading: false,
     eventsError: null,
     userId: OWN_USER_ID,
-    loadEvents: vi.fn(async () => {}),
+    loadEvents: vi.fn(async () => loadOk),
     addEvent: vi.fn(async (input: NewEventInput) => {
       created += 1;
       store.patch({
@@ -306,7 +308,7 @@ describe('EventsSettings form focus', () => {
 
   it('keeps focus on the header after refresh later removes the stale edit opener', async () => {
     let finishRefresh: () => void = () => {};
-    const loadEvents = vi.fn(async () => {});
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
@@ -320,10 +322,10 @@ describe('EventsSettings form focus', () => {
     loadEvents.mockClear();
     loadEvents.mockImplementationOnce(
       () =>
-        new Promise<void>((resolve) => {
+        new Promise<EventLoadResult>((resolve) => {
           finishRefresh = () => {
             store.patch({ events: [], eventsError: null });
-            resolve();
+            resolve(loadOk);
           };
         })
     );
@@ -443,7 +445,7 @@ describe('EventsSettings delete dialog focus', () => {
   });
 
   it('moves focus to the header when refreshing a stale delete', async () => {
-    const loadEvents = vi.fn(async () => {});
+    const loadEvents = vi.fn(async () => loadOk);
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
@@ -457,6 +459,7 @@ describe('EventsSettings delete dialog focus', () => {
     loadEvents.mockClear();
     loadEvents.mockImplementationOnce(async () => {
       store.patch({ events: [], eventsError: null });
+      return loadOk;
     });
 
     const opener = openBy('event-delete-mine');

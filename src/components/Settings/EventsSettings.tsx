@@ -25,10 +25,10 @@
  *    reach them; adding one means giving `loadEvents` a limit/offset it does
  *    not take today.
  *
- * 3. **A save failure comes back from the write's own returned result, never
- *    from `eventsError`.** That key is shared by loads and by all three writes,
- *    so a form reading it can render an error raised by a *different* action.
- *    `eventsSlice` returns `EventWriteResult` for exactly this reason.
+ * 3. **Every async action reports its own outcome.** `eventsError` belongs to
+ *    the active load only, while writes return `EventWriteResult` directly.
+ *    The list likewise uses the settled `EventLoadResult`, so overlapping or
+ *    stale calls cannot attribute another action's state to this invocation.
  *
  * Layout follows `AnniversarySettings` — and deliberately not its data or date
  * handling: it stores an ISO string and renders `new Date(string)`, which is
@@ -70,6 +70,7 @@ type NewEventInput = Parameters<AppState['addEvent']>[0];
 type EventUpdateInput = Parameters<AppState['editEvent']>[1];
 type EventWriteResult = Awaited<ReturnType<AppState['addEvent']>>;
 type EventWriteFailure = Extract<EventWriteResult, { success: false }>;
+type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
 
 /**
  * Mirrors of the CHECK constraints in
@@ -127,15 +128,13 @@ export function EventsSettings() {
   // opener does not survive.
   const addButtonRef = useRef<HTMLButtonElement>(null);
 
-  const recordLoadOutcome = useCallback((requestedBy: string) => {
+  const recordLoadOutcome = useCallback((requestedBy: string, result: EventLoadResult) => {
+    if (result.status === 'stale') return;
     // eslint-disable-next-line no-restricted-properties
     const state = useAppStore.getState();
     if (state.userId !== requestedBy) return;
 
-    // `loadEvents` clears `eventsError` on entry and resolves after parking any
-    // load failure. Read once at that boundary: subscribing would let an
-    // unrelated later write paint the list-level load banner.
-    setLoadFailed(state.eventsError !== null);
+    setLoadFailed(result.status === 'failure');
     setSettledForUserId(requestedBy);
   }, []);
 
@@ -143,9 +142,9 @@ export function EventsSettings() {
     if (!userId) return;
 
     let cancelled = false;
-    void loadEvents().finally(() => {
+    void loadEvents().then((result) => {
       if (cancelled) return;
-      recordLoadOutcome(userId);
+      recordLoadOutcome(userId, result);
     });
 
     return () => {
@@ -185,8 +184,8 @@ export function EventsSettings() {
 
   const refreshEvents = useCallback(async () => {
     if (!userId) return;
-    await loadEvents();
-    recordLoadOutcome(userId);
+    const result = await loadEvents();
+    recordLoadOutcome(userId, result);
   }, [loadEvents, recordLoadOutcome, userId]);
 
   const handleFormRefresh = useCallback(() => {
@@ -293,7 +292,11 @@ export function EventsSettings() {
       {showLoadErrorBanner && loadErrorNotice}
 
       {/* Event list */}
-      <div className="space-y-3">
+      <div
+        className="space-y-3"
+        data-testid="events-settings-load-region"
+        aria-busy={eventsIsLoading}
+      >
         {slot === 'error' && loadErrorNotice}
 
         {slot === 'loading' && (
@@ -606,7 +609,7 @@ function EventForm({
 
       if (!result.success) {
         // The message for THIS write, off its own returned result — not off the
-        // shared `eventsError` key, which a background load may have overwritten.
+        // load-only `eventsError` key, which a background load owns.
         setSaveFailure(result);
         setIsSaving(false);
         isSavingRef.current = false;
