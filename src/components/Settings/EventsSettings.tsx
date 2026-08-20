@@ -106,8 +106,17 @@ const ICON_ERROR_ID = 'events-form-icon-error';
 type ListSlot = 'loading' | 'list' | 'empty' | 'error';
 
 export function EventsSettings() {
-  const { events, eventsIsLoading, userId, loadEvents, addEvent, editEvent, removeEvent } =
-    useAppStore();
+  const {
+    events,
+    eventsIsLoading,
+    syncStatus,
+    userId,
+    loadEvents,
+    addEvent,
+    editEvent,
+    removeEvent,
+    clearEventsError,
+  } = useAppStore();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -122,11 +131,19 @@ export function EventsSettings() {
   const [formNeedsFallback, setFormNeedsFallback] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [settledForUserId, setSettledForUserId] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryFocusRequest, setRetryFocusRequest] = useState(0);
 
   // The header Add button: the one control that outlives a delete, an
   // add-from-empty, and a stale-row refresh, so it is where focus goes when the
   // opener does not survive.
   const addButtonRef = useRef<HTMLButtonElement>(null);
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+  const retryInFlightRef = useRef(false);
+  const retryFocusTargetRef = useRef<{
+    target: 'retry' | 'add';
+    requestedBy: string;
+  } | null>(null);
 
   const recordLoadOutcome = useCallback((requestedBy: string, result: EventLoadResult) => {
     if (result.status === 'stale') return;
@@ -150,7 +167,10 @@ export function EventsSettings() {
     return () => {
       cancelled = true;
     };
-  }, [userId, loadEvents, recordLoadOutcome]);
+    // Re-running on either connectivity transition matches Home: the offline
+    // direction fails back into the same settled notice, while reconnecting
+    // gives a mounted Settings screen a recovery path without navigation.
+  }, [userId, syncStatus.isOnline, loadEvents, recordLoadOutcome]);
 
   const editingEvent = editingId ? events.find((event) => event.id === editingId) : undefined;
 
@@ -183,10 +203,57 @@ export function EventsSettings() {
   }, []);
 
   const refreshEvents = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) return null;
     const result = await loadEvents();
     recordLoadOutcome(userId, result);
+    return result;
   }, [loadEvents, recordLoadOutcome, userId]);
+
+  const handleRetry = useCallback(async () => {
+    // The slice raises this flag synchronously before its request. Guarding the
+    // handler with a local in-flight ref as well as disabling the control closes
+    // both pointer and keyboard duplicate-activation paths.
+    if (eventsIsLoading || retryInFlightRef.current || !userId) return;
+
+    const requestedBy = userId;
+    retryInFlightRef.current = true;
+    setIsRetrying(true);
+    clearEventsError();
+
+    const result = await refreshEvents().finally(() => {
+      retryInFlightRef.current = false;
+      setIsRetrying(false);
+    });
+
+    if (!result || result.status === 'stale') return;
+    // eslint-disable-next-line no-restricted-properties
+    if (useAppStore.getState().userId !== requestedBy) return;
+
+    // An empty failed load removes Retry while its loading slot is mounted.
+    // Restore focus only after the settled render: back to Retry on failure,
+    // or to the always-mounted Add control once recovery succeeds.
+    retryFocusTargetRef.current = {
+      target: result.status === 'failure' ? 'retry' : 'add',
+      requestedBy,
+    };
+    setRetryFocusRequest((request) => request + 1);
+  }, [clearEventsError, eventsIsLoading, refreshEvents, userId]);
+
+  useEffect(() => {
+    if (retryFocusRequest === 0 || isRetrying) return;
+
+    const focusRequest = retryFocusTargetRef.current;
+    retryFocusTargetRef.current = null;
+    if (!focusRequest) return;
+    // eslint-disable-next-line no-restricted-properties
+    if (useAppStore.getState().userId !== focusRequest.requestedBy) return;
+
+    const target =
+      focusRequest.target === 'retry'
+        ? (retryButtonRef.current ?? addButtonRef.current)
+        : addButtonRef.current;
+    if (target?.isConnected) target.focus();
+  }, [isRetrying, retryFocusRequest]);
 
   const handleFormRefresh = useCallback(() => {
     handleFormClose();
@@ -236,6 +303,7 @@ export function EventsSettings() {
   // A stale list is still worth showing, but it must say so — otherwise a
   // failed refresh is indistinguishable from "nothing changed".
   const showLoadErrorBanner = firstLoadSettled && loadFailed && slot === 'list';
+  const retryIsActive = eventsIsLoading || isRetrying;
 
   // One notice, one testid, mounted in whichever of the two positions applies.
   const loadErrorNotice = (
@@ -245,9 +313,22 @@ export function EventsSettings() {
       role="status"
       aria-live="polite"
     >
-      <p className="text-sm text-amber-800 dark:text-amber-300">
-        We couldn&apos;t load your events. Check your connection and reload the page.
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-amber-800 dark:text-amber-300">
+          We couldn&apos;t load your events. Check your connection and try again.
+        </p>
+        <button
+          ref={retryButtonRef}
+          type="button"
+          onClick={() => void handleRetry()}
+          disabled={retryIsActive}
+          data-testid="events-settings-retry"
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-amber-500 px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500 dark:text-amber-200 dark:hover:bg-amber-900/50"
+        >
+          {retryIsActive && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          {retryIsActive ? 'Retrying…' : 'Retry'}
+        </button>
+      </div>
     </div>
   );
 

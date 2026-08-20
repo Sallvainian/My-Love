@@ -119,8 +119,15 @@ function setStore(overrides: Partial<AppState> = {}) {
     events: [],
     eventsIsLoading: false,
     eventsError: null,
+    syncStatus: {
+      pendingMoods: 0,
+      isOnline: true,
+      lastSyncAt: undefined,
+      isSyncing: false,
+    },
     userId: OWN_USER_ID,
     loadEvents: vi.fn(async () => loadOk),
+    clearEventsError: vi.fn(() => store.patch({ eventsError: null })),
     addEvent: vi.fn(async (input: NewEventInput) => {
       created += 1;
       store.patch({
