@@ -38,6 +38,8 @@ export type SupabaseInteractionRecord = Database['public']['Tables']['interactio
  */
 export type InteractionType = 'poke' | 'kiss';
 
+export type InteractionSubscriptionStatus = 'SUBSCRIBED' | 'CHANNEL_ERROR' | 'TIMED_OUT';
+
 /**
  * Local Interaction interface
  */
@@ -224,7 +226,8 @@ export class InteractionService {
    */
   async subscribeInteractions(
     userId: string,
-    callback: (interaction: SupabaseInteractionRecord) => void
+    callback: (interaction: SupabaseInteractionRecord) => void,
+    onStatusChange: (status: InteractionSubscriptionStatus) => void
   ): Promise<() => void> {
     // NOTE: this does NOT give each subscription its own channel, despite the
     // per-call shape. `supabase.channel(topic)` returns whatever is already
@@ -252,6 +255,13 @@ export class InteractionService {
       )
       .subscribe((status) => {
         logger.info('[InteractionService] Realtime subscription status:', status);
+        if (
+          status === 'SUBSCRIBED' ||
+          status === 'CHANNEL_ERROR' ||
+          status === 'TIMED_OUT'
+        ) {
+          onStatusChange(status);
+        }
       });
 
     let removed = false;
