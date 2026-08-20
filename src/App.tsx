@@ -81,13 +81,16 @@ const LAST_WELCOME_VIEW_KEY = 'lastWelcomeView';
  * that column grows with the couple's event list while the birthdays column
  * beside it stays fixed at two cards.
  *
- * 3 follows the codebase's existing cap for a similar list —
+ * 6, chosen by the couple over the 3 this shipped with: a cap of 3 hid events
+ * they had deliberately created, with no "+N more" affordance to say so, and
+ * the upcoming list is bounded anyway by how many future events two people
+ * plan at once. The overflow still gets no affordance — Settings lists every
+ * event, past ones included — but at 6 the overflow is not reachable in
+ * practice. Sibling precedent for the pattern (not the number) is
  * `<CountdownTimer anniversaries={...} maxDisplay={3} />` in `DailyMessage`,
- * implemented as a `.slice(0, count)` in `utils/countdownService.ts`. Like that
- * one, the overflow gets no "+N more" affordance: Settings already lists every
- * event, past ones included.
+ * a `.slice(0, count)` in `utils/countdownService.ts`.
  */
-const HOME_MAX_EVENT_CARDS = 3;
+const HOME_MAX_EVENT_CARDS = 6;
 
 function App() {
   const { settings, isLoading, currentView, isOnline, events } = useAppStore(
