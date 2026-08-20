@@ -71,7 +71,8 @@ origin: migrated from legacy ledger ("From: Mood Stale Sync Discards Edit (2026-
 location: src/services/BaseIndexedDBService.ts:181
 source_spec: _bmad-output/implementation-artifacts/spec-mood-stale-sync-discards-edit.md
 reason: `moodService.updateMood` still reads and writes across two IndexedDB transactions, so a UI edit landing mid-sync can overwrite the `supabaseId` that `markAsSynced` just recorded.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: the two-transaction shape in BaseIndexedDBService.update is still there, but the only consequence is a dropped local supabaseId that moodApi.create's upsert on (user_id, created_at) (src/api/moodApi.ts:83) silently re-resolves to the same row on the next pass — nothing either person can see or lose.
 
 `markAsSynced` is now a single `readwrite` transaction, but `updateMood` still calls
 `super.update`, which is `db.get` at `src/services/BaseIndexedDBService.ts:181` and `db.put` at
@@ -164,7 +165,8 @@ location: src/services/eventsService.ts
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: toCoupleEvent (src/services/eventsService.ts) logs '[EventsService] Skipping event with unreadable event_date' and returns null on an unparseable date, and getEvents filters those nulls out with no further signal. Verified unreachable via any app-originated write today: createEvent and updateEvent both call parseEventDate on the input and throw EventWriteError before issuing any request, so only a direct SQL write (e.g. a literal 'infinity', which a Postgres date column accepts) could produce such a row.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: unreachable — createEvent (eventsService.ts:311) and updateEvent (:387) both reject an unparseable date before any write, so only direct SQL could create the row this branch drops.
 
 ### DW-16: A CHECK-constraint violation (23514) — including a blank or over-length label/description — is unmapped, so it reaches the user as raw Postgres text.
 origin: spec-deferred f5a93068dc47
@@ -238,7 +240,8 @@ location: src/components/RelationshipTimers/EventCountdown.tsx
 source_spec: `3-home-dashboard-reads-events-from-the-store.md`
 severity: low
 reason: EventCountdown.tsx's `data-testid={"event-countdown-" + label.toLowerCase().replace(/\s+/g,'-')}` is pre-existing, unchanged by this diff. Unreachable today since events aren't user-creatable until story 5's CRUD ships; becomes a real risk once it does.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: the testid is read only by Playwright specs that already avoid the collision by convention (tests/e2e/settings/events-crud.spec.ts:30-32); React keys on event.id, so a duplicate label renders two correct cards and costs the users nothing.
 
 ### DW-24: No test renders App.tsx at all, so its composition is exercised only by Playwright and a green `npm run test:unit` says nothing about it.
 origin: spec-deferred 657f5db9659f
@@ -246,7 +249,8 @@ location: src/App.tsx
 source_spec: `3-home-dashboard-reads-events-from-the-store.md`
 severity: low
 reason: Grepped every test file for an import of `src/App`: no match. App.tsx's filter + getEventsSlotView call + JSX ternary + loadEvents effect are covered only by tests/e2e/home/events.spec.ts, which needs `supabase start`. Pre-existing: App.tsx has never had a unit or component test, and this story did not introduce the gap. Adding one means bringing a store-and-auth-mocking harness into scope.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: App.tsx's composition is covered in CI by tests/e2e/home/events.spec.ts and its only extracted logic is unit-tested at EventCountdown.test.tsx:209-253, so the missing component test buys nothing for the cost of a store-and-auth mocking harness.
 
 ### DW-25: Follow-up review still recommended for 3 after the damping cap was spent
 origin: review-budget-followup
@@ -306,7 +310,8 @@ location: src/api/interactionService.ts:379
 source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
 severity: low
 reason: The UPDATE policy is `USING (auth.uid() = to_user_id)` (supabase/migrations/20251206024345_remote_schema.sql:316-321), so RLS filters a non-recipient's update into a zero-row success with no error. src/api/interactionService.ts:379-400 checks only `error`, never the row count, and interactionsSlice.markInteractionViewed then decrements unviewedCount regardless. This is the same silent-RLS class eventsService guards with 'Event not found or not yours to edit' (src/services/eventsService.ts:413). Not reachable through today's UI: handleAnimationComplete only passes rows from getUnviewedInteractions, which already filters toUserId === userId. Pre-existing; untouched by this change.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: the only caller passes ids already filtered to rows the signed-in user received, so the UPDATE can never match zero rows, and the count it guards is ephemeral anyway.
 
 ### DW-32: getInteractionHistory, getUnviewedInteractions and markAsViewed have no isOnline() guard, so an offline caller gets a mid-flight message.
 origin: spec-deferred 1effec975be0
@@ -314,7 +319,8 @@ location: src/api/interactionService.ts:282
 source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
 severity: low
 reason: Only sendInteraction guards (src/api/interactionService.ts:156). The other three go straight into the try, so offline they surface '[InteractionService.<method>] Network error: Failed to fetch. Check your internet connection.' rather than naming the offline state. Truthful either way after this change, so this is specificity, not honesty. Adding guards is new behavior and was excluded by this spec's Never list.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: every caller of these three methods discards the error, so the less-specific offline wording is never shown to either person.
 
 ### DW-33: The write-error class and networkFailure builder now exist in two copies, one per Supabase-only feature.
 origin: spec-deferred fb1db7ca9280
@@ -322,7 +328,8 @@ location: src/api/interactionService.ts:76
 source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
 severity: low
 reason: src/services/eventsService.ts:108-127 and src/api/interactionService.ts:53-79 carry the same class shape and a byte-identical networkFailure body. Copying was what the intent asked for ('the same treatment eventsService applied'), but a third Supabase-only feature would make extraction worth doing. eventsService.ts:120-122 already records that rewording the shared helper is cross-feature work.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: pure source duplication with byte-identical behavior (eventsService.ts:124-127 and interactionService.ts:76-79), invisible to both users, and the entry's own extraction trigger — a third Supabase-only feature — has not occurred.
 
 ### DW-34: The new interactionService test file covers the failure surface only; the success paths of the three read/update methods stay untested.
 origin: spec-deferred 498cf9493c5a
@@ -330,7 +337,8 @@ location: tests/unit/api/interactionService.test.ts:129
 source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
 severity: low
 reason: tests/unit/api/interactionService.test.ts asserts happy paths for sendPoke/sendKiss only. getInteractionHistory, getUnviewedInteractions and markAsViewed appear solely in rejection tests, and the fake builder's or(), order() and range() are deliberate no-ops, so the history read's predicate, ordering and pagination are not exercised at all. Those methods are unchanged by this diff, so the gap is pre-existing rather than introduced.
-status: open
+status: done 2026-08-19
+resolution: already resolved: The three success paths now have their own describes: tests/unit/api/interactionService.test.ts:335 "describe('getInteractionHistory — what the read actually returns', () => {" with :360 "it('returns interactions in both directions and nobody else’s'", :366 "it('returns the newest first'", :372 "it(
 
 ### DW-35: subscribeInteractions has no error handling — a failed subscribe only logs its status and the returned unsubscribe still looks healthy.
 origin: spec-deferred 0f06e1c320a7
@@ -346,7 +354,8 @@ location: src/api/errorHandlers.ts:72
 source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
 severity: low
 reason: `errorMessages` is a bare object literal (src/api/errorHandlers.ts:62) and the lookup is `errorMessages[error.code] || ...` (:72), both unchanged by this story. Measured with node against a literal of the same shape: code 'toString' yields "function toString() { [native code] }", 'constructor' yields "function Object() { [native code] }", and '__proto__' yields "[object Object]". Each is truthy, so the fallback never runs and the string is interpolated straight into the user-facing message. `Object.hasOwn(errorMessages, error.code)` or `Object.create(null)` closes it. error.code comes from the response body, and tests/e2e/settings/events-crud.spec.ts:413-425 shows arbitrary PostgREST bodies are injectable.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: reaching the prototype walk needs a server-sent `error.code` of `toString`/`constructor`/`__proto__`, but every code reaching errorHandlers.ts:73 comes off a PostgREST body (five-char SQLSTATE or PGRSTnnn) and nothing in src/ builds a PostgrestError by hand — the only demonstrated route is a Playwright route stub.
 
 ### DW-37: Sibling SQLSTATEs that also carry raw Postgres text are still unmapped, so the same leak class this story closed for 23514 remains open for them.
 origin: spec-deferred 4115baed8bbf
@@ -354,7 +363,8 @@ location: src/api/errorHandlers.ts:62-70
 source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
 severity: medium
 reason: After this change the map covers 23505, 23503, 23502, 23514, 42501, 42P01, PGRST116 and PGRST301. Still falling through to `Database error: ${error.message}`: 22001 (string data right truncation), 22007 and 22P02 (invalid input syntax, which render the rejected literal verbatim), 23P01, 40001, 57014, PGRST202 and PGRST204. public.events.event_date is `date not null` (supabase/migrations/20260818000002_create_events_table.sql:20), so a malformed date is a 22007 on a live column.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: every listed SQLSTATE is unreachable in this app — no varchar(n) and no exclusion constraints in the schema, dates validated client-side before the request (eventsService.ts:313, :388), no .rpc() call routed through handleSupabaseError, and deploy.yml:91 gates build behind migrate — and the worst outcome is ugly-but-truthful text shown only to th
 
 ### DW-38: Four CHECK-carrying write paths never reach handleSupabaseError, so the SQLSTATE map cannot protect them however many codes it maps.
 origin: spec-deferred 613aa9858056
