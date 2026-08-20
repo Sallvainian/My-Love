@@ -47,20 +47,35 @@ const backend = {
   /** Injected instead of running the query — a PostgREST error object, or a
    *  plain Error standing in for a mid-flight network failure. */
   nextError: null as FakePostgrestError | Error | null,
+  /** Which side of `getEvents`' two-window read `nextError` applies to. `null`
+   *  fails every query, which is what every write test wants; naming one bound
+   *  fails only the window carrying it, so each window's own error check is
+   *  reachable on its own. */
+  errorForBound: null as 'gte' | 'lt' | null,
   /** Every `.update()` / `.insert()` payload the service sent, in order. */
   payloads: [] as Record<string, unknown>[],
-  /** Every `.order()` call, so the ascending read can be asserted. */
-  orders: [] as { column: string; ascending: boolean }[],
-  /** Every `.eq()` the service applied, so an added user_id filter is caught. */
+  /** Every `.eq()` the service applied, so an added user_id filter is caught.
+   *  Date bounds live in `queries` instead, so this stays a pure equality log
+   *  and `expect(backend.filters).toEqual([])` keeps its whole meaning. */
   filters: [] as { column: string; value: unknown }[],
+  /** One entry per query actually RUN, in run order: its date bounds, its
+   *  orderings and its row window. The two-sided read is asserted from here
+   *  rather than from a flat order log, which cannot say which window a
+   *  given `.order()` belonged to. */
+  queries: [] as {
+    bounds: { column: string; op: 'gte' | 'lt'; value: string }[];
+    orderings: { column: string; ascending: boolean }[];
+    range: { from: number; to: number } | null;
+  }[],
   /** Bumped on every `from()` — an offline guard must leave this at 0. */
   fromCalls: 0,
   reset() {
     this.rows = [];
     this.nextError = null;
+    this.errorForBound = null;
     this.payloads = [];
-    this.orders = [];
     this.filters = [];
+    this.queries = [];
     this.fromCalls = 0;
   },
 };
@@ -88,12 +103,28 @@ function eventsQuery() {
   let payload: Record<string, unknown> = {};
   const filters: { column: string; value: unknown }[] = [];
   const orderings: { column: string; ascending: boolean }[] = [];
+  const bounds: { column: string; op: 'gte' | 'lt'; value: string }[] = [];
+  let range: { from: number; to: number } | null = null;
 
-  const matches = (candidate: EventRow): boolean =>
-    filters.every((f) => (candidate as unknown as Record<string, unknown>)[f.column] === f.value);
+  const matches = (candidate: EventRow): boolean => {
+    const record = candidate as unknown as Record<string, unknown>;
+    if (!filters.every((f) => record[f.column] === f.value)) return false;
+    // `event_date` is a Postgres `date`, so its "YYYY-MM-DD" text compares the
+    // same way lexicographically as it does chronologically — which is what
+    // lets this stand in for a real range predicate.
+    return bounds.every((b) => {
+      const value = String(record[b.column]);
+      return b.op === 'gte' ? value >= b.value : value < b.value;
+    });
+  };
 
   const run = (): { data: EventRow[] | null; error: FakePostgrestError | Error | null } => {
-    if (backend.nextError) return { data: null, error: backend.nextError };
+    if (operation === 'select') {
+      backend.queries.push({ bounds: [...bounds], orderings: [...orderings], range });
+    }
+    const errorApplies =
+      backend.errorForBound === null || bounds.some((b) => b.op === backend.errorForBound);
+    if (backend.nextError && errorApplies) return { data: null, error: backend.nextError };
 
     if (operation === 'insert') {
       const inserted: EventRow = {
@@ -128,7 +159,8 @@ function eventsQuery() {
         return 0;
       });
     }
-    return { data: found, error: null };
+    // PostgREST's `.range(from, to)` is inclusive at both ends.
+    return { data: range ? found.slice(range.from, range.to + 1) : found, error: null };
   };
 
   const builder: Record<string, unknown> = {
@@ -154,10 +186,21 @@ function eventsQuery() {
       backend.filters.push({ column, value });
       return builder;
     },
+    gte: (column: string, value: string) => {
+      bounds.push({ column, op: 'gte', value });
+      return builder;
+    },
+    lt: (column: string, value: string) => {
+      bounds.push({ column, op: 'lt', value });
+      return builder;
+    },
+    range: (from: number, to: number) => {
+      range = { from, to };
+      return builder;
+    },
     order: (column: string, options?: { ascending?: boolean }) => {
       const ascending = options?.ascending ?? true;
       orderings.push({ column, ascending });
-      backend.orders.push({ column, ascending });
       return builder;
     },
     single: async () => {
@@ -271,6 +314,31 @@ describe('eventsService', () => {
   // ==========================================================================
 
   describe('getEvents', () => {
+    // The read now cuts its window at the viewer's own calendar day, so every
+    // test below states a date RELATIVE to a pinned today. Without the pin the
+    // fixtures would silently change meaning — '2026-09-12' is upcoming today
+    // and already-passed next year — and the suite would rot into a pass.
+    // Noon local, so the day is the same in every timezone this file must hold
+    // in (see the header).
+    const TODAY = new Date(2026, 7, 19, 12, 0, 0);
+    /** `YYYY-MM-DD` `days` away from the pinned today, in local time. */
+    const dateFromToday = (days: number): string => {
+      const d = new Date(2026, 7, 19 + days, 12, 0, 0);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    /** The window sent for one side of today, or undefined if that side was never read. */
+    const windowFor = (op: 'gte' | 'lt') =>
+      backend.queries.find((q) => q.bounds.some((b) => b.op === op));
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(TODAY);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('returns the couple’s events soonest-first, each date at local midnight', async () => {
       backend.rows = [
         row({ id: 'later', user_id: PARTNER_ID, event_date: '2026-12-25', label: 'Christmas' }),
@@ -282,14 +350,38 @@ describe('eventsService', () => {
       // No user_id filter is applied: the events_select policy already scopes
       // the read to the caller and their partner.
       expect(events.map((e) => e.id)).toEqual(['sooner', 'later']);
-      expect(backend.orders).toEqual([
-        { column: 'event_date', ascending: true },
-        // The created_at tiebreak: Postgres leaves same-day order unspecified.
-        { column: 'created_at', ascending: true },
-      ]);
+
+      // Two windows, cut at today, each capped at the default 50 rows. The
+      // upcoming side reads ascending so the SOONEST events survive the cap;
+      // the past side reads descending so the MOST RECENT ones do. Asserted per
+      // window rather than off the flat order log, which cannot tell them apart.
+      expect(windowFor('gte')).toEqual({
+        bounds: [{ column: 'event_date', op: 'gte', value: '2026-08-19' }],
+        orderings: [
+          { column: 'event_date', ascending: true },
+          // The created_at tiebreak: Postgres leaves same-day order unspecified.
+          { column: 'created_at', ascending: true },
+        ],
+        range: { from: 0, to: 49 },
+      });
+      expect(windowFor('lt')).toEqual({
+        bounds: [{ column: 'event_date', op: 'lt', value: '2026-08-19' }],
+        orderings: [
+          { column: 'event_date', ascending: false },
+          { column: 'created_at', ascending: false },
+        ],
+        range: { from: 0, to: 49 },
+      });
+      // Exactly two, and only two. `windowFor` uses `.find`, so without this a
+      // regression that added a third — an unbounded `.select('*')` alongside
+      // the two windows — would satisfy every other assertion here while
+      // undoing the one thing DW-9 asked for.
+      expect(backend.queries).toHaveLength(2);
+      expect(backend.fromCalls).toBe(2);
       // Load-bearing: adding `.eq('user_id', ...)` here would drop the partner's
       // half of the couple's list — the whole point of the events_select policy
-      // — and every other assertion in this file would still pass.
+      // — and every other assertion in this file would still pass. Date bounds
+      // are recorded in `queries`, so this stays a pure equality-filter log.
       expect(backend.filters).toEqual([]);
 
       const [sooner] = events;
@@ -299,6 +391,181 @@ describe('eventsService', () => {
       expect(sooner.userId).toBe(USER_ID);
       expect(sooner.label).toBe('Anniversary');
       expect(sooner.description).toBeNull();
+    });
+
+    it('returns both sides of today in one ascending list', async () => {
+      backend.rows = [
+        row({ id: 'upcoming-2', event_date: dateFromToday(9) }),
+        row({ id: 'past-3', event_date: dateFromToday(-30) }),
+        row({ id: 'upcoming-1', event_date: dateFromToday(4) }),
+        row({ id: 'past-1', event_date: dateFromToday(-2) }),
+        row({ id: 'past-2', event_date: dateFromToday(-11) }),
+      ];
+
+      const events = await eventsService.getEvents();
+
+      // Past events still reach the caller — Settings shows the unfiltered list
+      // so a mistyped date stays editable — and the two pages concatenate into
+      // one globally ascending list with no client-side comparator.
+      expect(events.map((e) => e.id)).toEqual([
+        'past-3',
+        'past-2',
+        'past-1',
+        'upcoming-1',
+        'upcoming-2',
+      ]);
+    });
+
+    it('caps each side of today at the limit, keeping the nearest events on both', async () => {
+      backend.rows = [
+        row({ id: 'past-far', event_date: dateFromToday(-40) }),
+        row({ id: 'past-mid', event_date: dateFromToday(-20) }),
+        row({ id: 'past-near', event_date: dateFromToday(-1) }),
+        row({ id: 'upcoming-near', event_date: dateFromToday(1) }),
+        row({ id: 'upcoming-mid', event_date: dateFromToday(20) }),
+        row({ id: 'upcoming-far', event_date: dateFromToday(40) }),
+      ];
+
+      const events = await eventsService.getEvents(2);
+
+      // Two from each side, and specifically the two NEAREST on each side: the
+      // deep past and the distant future are what a cap may drop.
+      expect(events.map((e) => e.id)).toEqual([
+        'past-mid',
+        'past-near',
+        'upcoming-near',
+        'upcoming-mid',
+      ]);
+      expect(windowFor('gte')?.range).toEqual({ from: 0, to: 1 });
+      expect(windowFor('lt')?.range).toEqual({ from: 0, to: 1 });
+    });
+
+    it('never lets accumulated history hide the next event', async () => {
+      // The regression this whole two-window shape exists to prevent. Every
+      // event eventually becomes a past event, so a single ascending
+      // `.range(0, limit - 1)` over the couple's whole history eventually
+      // returns nothing but past rows — and Home, which filters those out,
+      // shows its "No upcoming events yet." placeholder while a real event is
+      // days away. Five past rows against a limit of 2 is that state.
+      backend.rows = [
+        row({ id: 'past-1', event_date: dateFromToday(-50) }),
+        row({ id: 'past-2', event_date: dateFromToday(-40) }),
+        row({ id: 'past-3', event_date: dateFromToday(-30) }),
+        row({ id: 'past-4', event_date: dateFromToday(-20) }),
+        row({ id: 'past-5', event_date: dateFromToday(-10) }),
+        row({ id: 'the-next-one', event_date: dateFromToday(3) }),
+      ];
+
+      const events = await eventsService.getEvents(2);
+
+      expect(events.map((e) => e.id)).toContain('the-next-one');
+      // And it is still the first upcoming one in the list the caller gets.
+      // The boundary is derived from the pin rather than re-typed, so moving
+      // TODAY cannot leave this assertion silently comparing against a
+      // different day.
+      const todayMidnight = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+      expect(events.filter((e) => e.date >= todayMidnight).map((e) => e.id)).toEqual([
+        'the-next-one',
+      ]);
+    });
+
+    it('pages outward from today on both sides', async () => {
+      backend.rows = [
+        row({ id: 'past-1', event_date: dateFromToday(-1) }),
+        row({ id: 'past-2', event_date: dateFromToday(-2) }),
+        row({ id: 'past-3', event_date: dateFromToday(-3) }),
+        row({ id: 'past-4', event_date: dateFromToday(-4) }),
+        row({ id: 'upcoming-1', event_date: dateFromToday(1) }),
+        row({ id: 'upcoming-2', event_date: dateFromToday(2) }),
+        row({ id: 'upcoming-3', event_date: dateFromToday(3) }),
+        row({ id: 'upcoming-4', event_date: dateFromToday(4) }),
+      ];
+
+      const events = await eventsService.getEvents(2, 2);
+
+      // Page two on each side: the 3rd and 4th event out from today, in either
+      // direction, still merged ascending.
+      expect(events.map((e) => e.id)).toEqual([
+        'past-4',
+        'past-3',
+        'upcoming-3',
+        'upcoming-4',
+      ]);
+      expect(windowFor('gte')?.range).toEqual({ from: 2, to: 3 });
+      expect(windowFor('lt')?.range).toEqual({ from: 2, to: 3 });
+    });
+
+    it('clamps a nonsense limit or offset instead of sending a backwards range', async () => {
+      // `.range(0, -1)` is what `limit = 0` builds unclamped, and PostgREST
+      // answers it with a 400 the user sees as a failed load. Clamped, the
+      // caller gets the smallest sane page instead.
+      backend.rows = [
+        row({ id: 'past', event_date: dateFromToday(-2) }),
+        row({ id: 'upcoming', event_date: dateFromToday(2) }),
+      ];
+
+      const events = await eventsService.getEvents(0, -5);
+
+      expect(windowFor('gte')?.range).toEqual({ from: 0, to: 0 });
+      expect(windowFor('lt')?.range).toEqual({ from: 0, to: 0 });
+      expect(events.map((e) => e.id)).toEqual(['past', 'upcoming']);
+    });
+
+    it.each([
+      ['NaN', Number.NaN],
+      ['Infinity', Number.POSITIVE_INFINITY],
+    ])('falls back to the default page size when limit is %s', async (_label, limit) => {
+      // A `Math.max`/`Math.floor` clamp alone does NOT catch these:
+      // `Math.max(1, Math.floor(NaN))` is NaN and `Math.floor(Infinity)` is
+      // Infinity, so both reach `.range()` and produce exactly the PostgREST
+      // 400 the clamp exists to prevent. Drop the finiteness check and this
+      // fails on the range assertion.
+      backend.rows = [row({ id: 'upcoming', event_date: dateFromToday(2) })];
+
+      const events = await eventsService.getEvents(limit);
+
+      expect(windowFor('gte')?.range).toEqual({ from: 0, to: 49 });
+      expect(windowFor('lt')?.range).toEqual({ from: 0, to: 49 });
+      expect(events.map((e) => e.id)).toEqual(['upcoming']);
+    });
+
+    it('falls back to offset zero when offset is not finite', async () => {
+      backend.rows = [row({ id: 'upcoming', event_date: dateFromToday(2) })];
+
+      const events = await eventsService.getEvents(10, Number.NaN);
+
+      expect(windowFor('gte')?.range).toEqual({ from: 0, to: 9 });
+      expect(events.map((e) => e.id)).toEqual(['upcoming']);
+    });
+
+    it('issues both windows concurrently, not one after the other', async () => {
+      // Read synchronously, before either response can have been handled. With
+      // `Promise.all` the array literal builds BOTH chains — and so makes both
+      // `from()` calls — before the first `await`. Rewritten as two sequential
+      // `await`s, every other assertion in this file still passes (the fake
+      // records the same two queries either way) and only this one goes red,
+      // which is what makes the "costs one extra PARALLEL request" claim in the
+      // JSDoc and the Design Notes load-bearing rather than decorative.
+      backend.rows = [row({ id: 'upcoming', event_date: dateFromToday(2) })];
+
+      const pending = eventsService.getEvents();
+      expect(backend.fromCalls).toBe(2);
+
+      await pending;
+    });
+
+    it('counts an event dated today as upcoming, not past', async () => {
+      // The `gte` boundary, matching Home's own `getCalendarDaysDiff(...) >= 0`
+      // filter. Tightened to `gt`, this row falls into the past window and Home
+      // stops showing an event happening today.
+      backend.rows = [row({ id: 'today', event_date: dateFromToday(0) })];
+
+      const events = await eventsService.getEvents();
+
+      expect(events.map((e) => e.id)).toEqual(['today']);
+      expect(windowFor('gte')?.bounds).toEqual([
+        { column: 'event_date', op: 'gte', value: '2026-08-19' },
+      ]);
     });
 
     it('breaks same-day ties on creation time, so reloads cannot reshuffle', async () => {
@@ -313,6 +580,65 @@ describe('eventsService', () => {
       // The domain model carries the instant so the slice can apply the same
       // tiebreak locally.
       expect(events[0].createdAt).toEqual(new Date('2026-08-18T09:00:00+00:00'));
+    });
+
+    it('breaks same-day ties on creation time in the PAST window too', async () => {
+      // The past page is read `created_at` DESCENDING and then reversed, which
+      // is the one genuinely new ordering mechanism here. The upcoming-side
+      // tiebreak test cannot reach it: its rows are dated after today. Drop the
+      // past window's `created_at` order and this pair can swap between loads.
+      backend.rows = [
+        row({
+          id: 'second',
+          event_date: dateFromToday(-4),
+          created_at: '2026-08-10T12:00:00+00:00',
+        }),
+        row({
+          id: 'first',
+          event_date: dateFromToday(-4),
+          created_at: '2026-08-10T09:00:00+00:00',
+        }),
+      ];
+
+      const events = await eventsService.getEvents();
+
+      expect(events.map((e) => e.id)).toEqual(['first', 'second']);
+    });
+
+    it('drops the stale copy when a row lands in both windows mid-read', async () => {
+      // Two requests, not one snapshot: a row whose date is edited across today
+      // between them comes back in both pages. Keeping both would hand Home's
+      // map a duplicate React key and render the same event twice.
+      backend.rows = [
+        row({ id: 'moved', event_date: dateFromToday(-3), label: 'Stale' }),
+        row({ id: 'moved', event_date: dateFromToday(3), label: 'Fresh' }),
+      ];
+
+      const events = await eventsService.getEvents();
+
+      expect(events.map((e) => e.id)).toEqual(['moved']);
+      // The upcoming copy is the one kept — it carries the newer date.
+      expect(events[0].label).toBe('Fresh');
+    });
+
+    it.each([
+      ['late evening, west of UTC', new Date(2026, 7, 19, 23, 30, 0)],
+      ['just after midnight, east of UTC', new Date(2026, 7, 19, 0, 30, 0)],
+    ])('cuts the window on the LOCAL calendar day (%s)', async (_label, instant) => {
+      // `toISOString().split('T')[0]` would compile and read plausibly here, and
+      // at noon it is indistinguishable from formatDateISO. These two instants
+      // are the ones where the UTC day differs from the local day — the first
+      // for viewers west of UTC, the second for viewers east — so between them
+      // the UTC form lands on the wrong date in every timezone.
+      vi.setSystemTime(instant);
+      backend.rows = [row({ id: 'today', event_date: dateFromToday(0) })];
+
+      const events = await eventsService.getEvents();
+
+      expect(events.map((e) => e.id)).toEqual(['today']);
+      expect(windowFor('gte')?.bounds).toEqual([
+        { column: 'event_date', op: 'gte', value: dateFromToday(0) },
+      ]);
     });
 
     it('keeps a row whose icon is outside the union, falling back to the column default', async () => {
@@ -364,6 +690,33 @@ describe('eventsService', () => {
         /Permission denied - check Row Level Security policies/
       );
     });
+
+    it.each([
+      ['upcoming', 'gte'],
+      ['already-passed', 'lt'],
+    ] as const)(
+      'surfaces a rejection from the %s window even when the other window succeeds',
+      async (_side, bound) => {
+        // Each window is checked on its own. With only a combined-failure test,
+        // deleting either window's `if (error) throw` would leave its error
+        // silently swallowed and its half of the list quietly missing.
+        backend.rows = [
+          row({ id: 'past', event_date: dateFromToday(-5) }),
+          row({ id: 'upcoming', event_date: dateFromToday(5) }),
+        ];
+        backend.errorForBound = bound;
+        backend.nextError = {
+          code: '42501',
+          message: 'permission denied',
+          details: '',
+          hint: '',
+        };
+
+        await expect(eventsService.getEvents()).rejects.toThrow(
+          /Permission denied - check Row Level Security policies/
+        );
+      }
+    );
 
     it('does not promise a sync when a load fails mid-flight — reads have no queue', async () => {
       // A dropped socket rejects with a plain TypeError, not a PostgREST

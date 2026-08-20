@@ -108,7 +108,9 @@ location: src/services/eventsService.ts
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: integration-points.md section 1 names photoService.getPhotos(limit = 50, offset = 0) as the signature shape to mirror, and moodApi caps its reads. The read grows with the couple's whole event history. Harmless at a couple's scale today, and a limit would interact with the soonest-first ordering.
-status: open
+status: done 2026-08-19
+resolution: resolved by sweep bundle dw-events-read-cap-and-pagination
+resolution-undo: 529326357e46ff317c67b4b965b0aadeeac222881428309d7abbd8fad3749743 2026-08-19 7374617475733a206f70656e
 
 ### DW-10: Two events on the same date have no deterministic order.
 origin: spec-deferred 3c6d3601f0c8
@@ -222,7 +224,9 @@ location: src/App.tsx (upcomingEvents.map)
 source_spec: `3-home-dashboard-reads-events-from-the-store.md`
 severity: low
 reason: Extends story 2's own already-deferred "eventsService.getEvents applies no limit or pagination" item to the render layer. The codebase has a precedent for capping a similar list (`CountdownTimer anniversaries={...} maxDisplay={3}`, cited in integration-points.md:117), not applied here. Harmless at a couple's scale today.
-status: open
+status: done 2026-08-19
+resolution: resolved by sweep bundle dw-events-read-cap-and-pagination
+resolution-undo: 529326357e46ff317c67b4b965b0aadeeac222881428309d7abbd8fad3749743 2026-08-19 7374617475733a206f70656e
 
 ### DW-23: EventCountdown's data-testid is derived from label text with no uniqueness guarantee, so a future user-created event labeled "Wedding" would collide with the fixed Wedding card's testid.
 origin: spec-deferred 17f1ada12518
@@ -370,4 +374,60 @@ location: src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx
 source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
 severity: low
 reason: Measured during this story's verification. `npm run test:unit` was run five times: four reported 91 files / 1358 tests passed; one reported "1 failed | 1357 passed" on "SoloReadingFlow > Story 2.3: Daily Prayer Report > treats partner as complete when session-level reflection exists". The file run alone (`npx vitest run src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`) passed 113/113 three times consecutively. This story touches only src/api/errorHandlers.ts and tests/unit/api/errorHandlers.test.ts, neither of which SoloReadingFlow imports.
+status: open
+
+### DW-41: Settings has no way to reach events the read cap truncates, so past roughly 50 past events the oldest ones become uneditable from the UI.
+origin: spec-deferred 9ee0fff5525a
+location: src/components/Settings/EventsSettings.tsx, src/stores/slices/eventsSlice.ts:116
+source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
+severity: medium
+reason: `EventsSettings.tsx` renders the store array unfiltered and calls `loadEvents()` with no arguments; `eventsSlice.loadEvents` calls `eventsService.getEvents()` bare, so both windows take the default `limit = 50, offset = 0`. Measured with `grep -rn "getEvents(" src tests`: the only production call site is `src/stores/slices/eventsSlice.ts:116`. The screen's own comment states why the list must stay unfiltered — a mistyped year is "the only place a mistyped year can be seen and corrected" — and a year typed wrong into the deep past is exactly the row the descending past window drops first. This change documents the bound in both files; closing it needs a "load more" control and a `loadEvents` that takes limit/offset, which the spec's Boundaries put out of scope.
+status: open
+
+### DW-42: A row whose date cannot be parsed still consumes a slot inside the capped window before it is dropped client-side, so garbage can push a real event off the page.
+origin: spec-deferred 6ae6d93ad3e8
+location: src/services/eventsService.ts
+source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
+severity: low
+reason: `getEvents` caps in the database (`.range`) and drops unreadable rows in JS afterwards (the `toCoupleEvent`/`filter` pair), so an `event_date` of `infinity` — a value a Postgres `date` column accepts, and which `parseEventDate` is written to reject — counts against `limit` and returns one fewer usable event. The covering test for unreadable rows runs at the default limit of 50, where the effect is invisible. Same shape as `photoService.getPhotos`, which also caps server-side and filters after. Closing it means over-fetching and re-capping client-side.
+status: open
+
+### DW-43: Three separate literals encode the single product decision "how many countdown cards a column shows".
+origin: spec-deferred 9fcc81a217ea
+location: src/App.tsx, src/components/DailyMessage/DailyMessage.tsx:366, src/utils/countdownService.ts:49
+source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
+severity: low
+reason: `HOME_MAX_EVENT_CARDS = 3` in `src/App.tsx`, `maxDisplay={3}` passed at `src/components/DailyMessage/DailyMessage.tsx:366`, and `count: number = 3` in `getUpcomingAnniversaries` (`src/utils/countdownService.ts:49-51`). The new constant's JSDoc cites the other two as its precedent but does not share a value with them, so changing the product decision means finding all three. Unifying them is a cross-feature refactor the intent does not reach.
+status: open
+
+### DW-44: An event saved with a date beyond the past read window appears in Settings immediately and then silently disappears on the next load.
+origin: spec-deferred 6e4344fda920
+location: src/stores/slices/eventsSlice.ts (addEvent), src/components/Settings/EventsSettings.tsx
+source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
+severity: medium
+reason: Verified path, both halves read this session: `eventsSlice.addEvent` inserts the created row into the store unconditionally — `set((state) => ({ events: sortByDate([...state.events, created]) }))` — while `loadEvents` re-reads a bounded window (`getEvents()` bare, so `limit = 50` per side). A couple with more than 50 past events who corrects or adds a deep-past date therefore sees the row in Settings, and the next `loadEvents()` drops it because the descending past page no longer reaches it. The row is not lost — it is in the table — only invisible. Distinct from the "no way to reach truncated rows" item: that one is about rows the user never sees, this one is about a row the user just saw confirmed. Closing it needs the same "load more" plumbing, or an in-range check at save time.
+status: open
+
+### DW-45: The two-window read is two requests, so a row whose date is edited across today between them can come back in neither page, or come back as the pre-edit copy.
+origin: spec-deferred b8ca2f59b73d
+location: src/services/eventsService.ts (getEvents merge)
+source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
+severity: low
+reason: `getEvents` issues the upcoming and past windows through `Promise.all` and reconciles only the "returned by BOTH" case, dropping one copy to avoid a duplicate React key. Two other outcomes exist and are now named in the code comment: the row lands in NEITHER page (past answered before the edit, upcoming after, or the reverse), and the copy kept is the pre-edit one, so an already-passed event renders as upcoming. Both need a partner editing an event across today's boundary during a load, and both correct themselves on the next `loadEvents()`. Closing either means abandoning the two-window read for a single request — the shape the Design Notes deliberately chose against — or comparing `updated_at` between copies, which the column supports but is client-maintained (`20260818000002_create_events_table.sql`, comment on `public.events.updated_at`).
+status: open
+
+### DW-46: Neither window requests a row count, so nothing can tell that truncation happened — which the deferred "load more" control would need.
+origin: spec-deferred 3eedd014be6b
+location: src/services/eventsService.ts (both window queries)
+source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
+severity: low
+reason: Both reads are plain `.select('*')` with no `{ count: 'exact' }`, so the service, the store and any future affordance have no "there are more" signal; `logger.debug('[EventsService] Fetched events:', events.length)` cannot distinguish 50 events from 50 of 300. The already-recorded Settings "load more" item names the control and the `limit`/`offset` plumbing it needs, but not the fact that the data to drive its enabled state is not fetched. A count also cannot go anywhere today: the intent's Never list forbids a store-shape change and a second store action.
+status: open
+
+### DW-47: The new API spec re-issues the production query chain by hand, so the two copies can drift if a change is made to both.
+origin: spec-deferred 71695d066668
+location: tests/api/events-read-window.spec.ts, src/services/eventsService.ts
+source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
+severity: low
+reason: `tests/api/events-read-window.spec.ts` cannot import `eventsService`: `src/api/supabaseClient.ts` reads `import.meta.env`, a Vite build-time substitution with no value under the Playwright runner. Its `readEventWindows` therefore mirrors the `gte`/`lt`/`order`/`range` chain by hand, and already diverges in one respect — it computes `offset + limit - 1` with none of production's clamping. The containment is real and was re-verified this pass: mutating the production chain fails `tests/unit/services/eventsService.test.ts`, whose `backend.queries` assertions pin the exact bounds, orderings and range. What is uncovered is a change made in production AND mirrored here incorrectly. Closing it means making the chain injectable — passing a client into a shared function both the service and the spec call — which is a production design change the intent does not reach.
 status: open
