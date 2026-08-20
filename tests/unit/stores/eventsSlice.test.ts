@@ -29,7 +29,10 @@ vi.mock('../../../src/services/eventsService', () => ({
   },
 }));
 
-import type { CoupleEvent } from '../../../src/services/eventsService';
+import type {
+  CoupleEvent,
+  EventWriteErrorCode,
+} from '../../../src/services/eventsService';
 import { createEventsSlice, type EventsSlice } from '../../../src/stores/slices/eventsSlice';
 
 const USER_ID = 'USER-A-ID';
@@ -54,6 +57,10 @@ function event(id: string, isoDate: string, overrides: Partial<CoupleEvent> = {}
     icon: 'calendar',
     ...overrides,
   };
+}
+
+function codedWriteError(code: EventWriteErrorCode, message: string): Error {
+  return Object.assign(new Error(message), { code });
 }
 
 describe('eventsSlice', () => {
@@ -279,7 +286,12 @@ describe('eventsSlice', () => {
       const existing = [event('sooner', '2026-09-12')];
       store.setState({ events: existing });
       createEvent.mockRejectedValue(
-        new Error('[EventsService.createEvent] Permission denied - check Row Level Security policies')
+        Object.assign(
+          new Error(
+            '[EventsService.createEvent] Permission denied - check Row Level Security policies'
+          ),
+          { code: '42501' }
+        )
       );
 
       const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
@@ -287,6 +299,7 @@ describe('eventsSlice', () => {
       expect(result.success).toBe(false);
       expect(result).toEqual({
         success: false,
+        code: 'transport',
         error: '[EventsService.createEvent] Permission denied - check Row Level Security policies',
       });
       expect(store.getState().eventsError).toBe(
@@ -308,14 +321,32 @@ describe('eventsSlice', () => {
       // documenting a message the app never emits.
       const OFFLINE_MESSAGE = 'You are offline. Events need a connection to save.';
       const store = createTestStore();
-      createEvent.mockRejectedValue(new Error(OFFLINE_MESSAGE));
+      createEvent.mockRejectedValue(codedWriteError('offline', OFFLINE_MESSAGE));
 
       const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
 
-      expect(result).toEqual({ success: false, error: OFFLINE_MESSAGE });
+      expect(result).toEqual({ success: false, code: 'offline', error: OFFLINE_MESSAGE });
       expect(store.getState().eventsError).toBe(OFFLINE_MESSAGE);
       expect(store.getState().events).toEqual([]);
     });
+
+    it.each(['validation', 'invalid-response'] as const)(
+      'preserves the %s service code and leaves the list unchanged',
+      async (code) => {
+        const store = createTestStore();
+        const existing = [event('existing', '2026-09-12')];
+        store.setState({ events: existing });
+        createEvent.mockRejectedValue(codedWriteError(code, 'The returned message'));
+
+        const result = await store.getState().addEvent({
+          label: 'x',
+          eventDate: '2026-10-31',
+        });
+
+        expect(result).toEqual({ success: false, code, error: 'The returned message' });
+        expect(store.getState().events).toEqual(existing);
+      }
+    );
 
     it('refuses without a signed-in user and never reaches the service', async () => {
       const store = createTestStore();
@@ -323,7 +354,11 @@ describe('eventsSlice', () => {
 
       const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
 
-      expect(result).toEqual({ success: false, error: 'You must be signed in to add an event' });
+      expect(result).toEqual({
+        success: false,
+        code: 'auth',
+        error: 'You must be signed in to add an event',
+      });
       expect(store.getState().eventsError).toBe('You must be signed in to add an event');
       expect(createEvent).not.toHaveBeenCalled();
     });
@@ -375,7 +410,11 @@ describe('eventsSlice', () => {
 
       const result = await store.getState().editEvent('a', { label: 'x' });
 
-      expect(result).toEqual({ success: false, error: 'You must be signed in to edit an event' });
+      expect(result).toEqual({
+        success: false,
+        code: 'auth',
+        error: 'You must be signed in to edit an event',
+      });
       expect(store.getState().eventsError).toBe('You must be signed in to edit an event');
       expect(updateEvent).not.toHaveBeenCalled();
     });
@@ -386,11 +425,17 @@ describe('eventsSlice', () => {
       const store = createTestStore();
       const existing = [event('partners-event', '2026-09-12')];
       store.setState({ events: existing });
-      updateEvent.mockRejectedValue(new Error('Event not found or not yours to edit'));
+      updateEvent.mockRejectedValue(
+        codedWriteError('not-found', 'Event not found or not yours to edit')
+      );
 
       const result = await store.getState().editEvent('partners-event', { label: 'mine now' });
 
-      expect(result).toEqual({ success: false, error: 'Event not found or not yours to edit' });
+      expect(result).toEqual({
+        success: false,
+        code: 'not-found',
+        error: 'Event not found or not yours to edit',
+      });
       expect(store.getState().eventsError).toBe('Event not found or not yours to edit');
       expect(store.getState().events).toEqual(existing);
     });
@@ -418,7 +463,11 @@ describe('eventsSlice', () => {
 
       const result = await store.getState().removeEvent('a');
 
-      expect(result).toEqual({ success: false, error: 'You must be signed in to delete an event' });
+      expect(result).toEqual({
+        success: false,
+        code: 'auth',
+        error: 'You must be signed in to delete an event',
+      });
       expect(store.getState().eventsError).toBe('You must be signed in to delete an event');
       expect(deleteEvent).not.toHaveBeenCalled();
     });
@@ -427,11 +476,17 @@ describe('eventsSlice', () => {
       const store = createTestStore();
       const existing = [event('partners-event', '2026-09-12')];
       store.setState({ events: existing });
-      deleteEvent.mockRejectedValue(new Error('Event not found or not yours to delete'));
+      deleteEvent.mockRejectedValue(
+        codedWriteError('not-found', 'Event not found or not yours to delete')
+      );
 
       const result = await store.getState().removeEvent('partners-event');
 
-      expect(result).toEqual({ success: false, error: 'Event not found or not yours to delete' });
+      expect(result).toEqual({
+        success: false,
+        code: 'not-found',
+        error: 'Event not found or not yours to delete',
+      });
       expect(store.getState().eventsError).toBe('Event not found or not yours to delete');
       expect(store.getState().events).toEqual(existing);
     });
