@@ -2,7 +2,7 @@
 title: 'DW-13 / DW-19: Events write error codes'
 type: 'feature'
 created: '2026-08-20'
-status: 'blocked'
+status: ready-for-dev
 baseline_revision: '5910a5ded94e3910bd646094f29871719671b9eb'
 review_loop_iteration: 0
 followup_review_recommended: false
@@ -77,7 +77,3 @@ Use one code union shared from the service, with additional store-only codes whe
 - `npm run typecheck` -- expected: the clean target checkout passes; in the nested bmad-loop worktree, exactly the six known worktree-only `TS2883` diagnostics at `tests/support/merged-fixtures.ts:53` are accepted, with zero additional TypeScript errors.
 - `npm run lint` -- expected: source and test lint passes.
 
-## Auto Run Result
-
-Status: blocked
-Blocking condition: implementation verification failed — `npm run typecheck` exits 2 on pre-existing TS2883 inferred-type portability errors at `tests/support/merged-fixtures.ts:53`. The bundle does not modify that file, and repairing it would expand scope beyond events write error codes. Targeted tests passed 115/115; app and test TypeScript checks pass with composite emit disabled; lint completed with zero errors and three pre-existing Fast Refresh warnings; `git diff --check` passed.
