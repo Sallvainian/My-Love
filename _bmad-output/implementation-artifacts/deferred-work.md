@@ -282,7 +282,9 @@ location: src/components/Settings/EventsSettings.tsx (load effect deps)
 source_spec: `5-manage-events-in-settings.md`
 severity: low
 reason: The mount effect's deps are [userId, loadEvents]. App.tsx's otherwise identical Home effect deliberately adds isOnline, commented "coming back online re-fires the load, so the offline error card clears without leaving Home." There is no retry control, and clearEventsError (exported from eventsSlice.ts) still has zero production callers. This story's intent-contract specifies "A mount effect keyed on `userId`", so closing the gap means widening what the intent asked for.
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-events-settings-load-retry
+resolution-undo: 433cb6cdb4b7a3a109c2c9469796fa50d337228f20bc12a5857dcfafb8a9ccf3 2026-08-20 7374617475733a206f70656e
 
 ### DW-28: The three primary buttons this section adds are white text on `bg-pink-500`, which measures 3.58:1 against the 4.5:1 WCAG AA requirement.
 origin: spec-deferred d52fd5748eef

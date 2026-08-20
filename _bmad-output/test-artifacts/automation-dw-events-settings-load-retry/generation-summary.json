@@ -1,0 +1,70 @@
+{
+  "run_key": "dw-events-settings-load-retry",
+  "timestamp": "2026-08-20T10-18-05-788Z",
+  "detected_stack": "frontend",
+  "total_tests": 4,
+  "api_tests": 2,
+  "e2e_tests": 2,
+  "backend_tests": 0,
+  "fixtures_created": 1,
+  "api_test_files": 1,
+  "e2e_test_files": 1,
+  "backend_test_files": 0,
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 2,
+    "P2": 2,
+    "P3": 0
+  },
+  "subagent_execution": "SUBAGENT (parallel API and E2E subagents)",
+  "performance_gain": "parallel execution used; no measured sequential baseline",
+  "pact_mcp_reachable": false,
+  "pact_artifacts": "none — relevance gate closed",
+  "files": [
+    {
+      "artifact": "api-events-settings-load-retry.spec.ts",
+      "target": "tests/api/events-settings-load-retry.spec.ts",
+      "tests": 2,
+      "priority": "P2"
+    },
+    {
+      "artifact": "e2e-events-settings-load-retry.spec.ts",
+      "target": "tests/e2e/settings/events-settings-load-retry.spec.ts",
+      "tests": 2,
+      "priority": "P1"
+    },
+    {
+      "artifact": "events-settings-load-retry-fixtures.ts",
+      "target": "tests/support/fixtures/events-settings-load-retry.ts",
+      "tests": 0,
+      "priority": null
+    }
+  ],
+  "knowledge_fragments_used": [
+    "api-request",
+    "api-testing-patterns",
+    "auth-session",
+    "data-factories",
+    "fixture-architecture",
+    "fixtures-composition",
+    "intercept-network-call",
+    "library-integration-mandate",
+    "log",
+    "network-error-monitor",
+    "network-first",
+    "network-recorder",
+    "overview",
+    "playwright-cli",
+    "playwright-utils-mandate",
+    "recurse",
+    "selector-resilience"
+  ],
+  "playwright_utils_deviations": [
+    {
+      "file": "events-settings-load-retry-fixtures.ts",
+      "operation": "page.unroute",
+      "reason": "interceptNetworkCall installs persistent routes but exposes no teardown handle; the fixture removes only its two exact Settings read patterns"
+    }
+  ],
+  "pactjs_utils_deviations": []
+}
