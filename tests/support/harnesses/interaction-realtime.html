@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Interaction Realtime harness</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import { mountInteractionRealtimeHarness } from './interaction-realtime.tsx';
+
+      const userId = new URLSearchParams(window.location.search).get('userId');
+      if (!userId) throw new Error('Interaction Realtime harness userId is missing');
+      mountInteractionRealtimeHarness(userId);
+    </script>
+  </body>
+</html>

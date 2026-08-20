@@ -24,6 +24,7 @@ import type { AppState } from '../../../stores/types';
 import { EventsSettings } from '../EventsSettings';
 
 type CoupleEvent = AppState['events'][number];
+type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
 type EventWriteResult = Awaited<ReturnType<AppState['addEvent']>>;
 type NewEventInput = Parameters<AppState['addEvent']>[0];
 type EventUpdateInput = Parameters<AppState['editEvent']>[1];
@@ -114,6 +115,7 @@ function currentEvents(): CoupleEvent[] {
 }
 
 const ok: EventWriteResult = { success: true };
+const loadOk: EventLoadResult = { status: 'success' };
 
 /**
  * Install a fresh store state. The three write actions mirror what eventsSlice
@@ -127,8 +129,15 @@ function setStore(overrides: Partial<AppState> = {}) {
     events: [],
     eventsIsLoading: false,
     eventsError: null,
+    syncStatus: {
+      pendingMoods: 0,
+      isOnline: true,
+      lastSyncAt: undefined,
+      isSyncing: false,
+    },
     userId: OWN_USER_ID,
-    loadEvents: vi.fn(async () => {}),
+    loadEvents: vi.fn(async () => loadOk),
+    clearEventsError: vi.fn(() => store.patch({ eventsError: null })),
     addEvent: vi.fn(async (input: NewEventInput) => {
       created += 1;
       store.patch({
@@ -302,7 +311,7 @@ describe('EventsSettings list states', () => {
       eventsIsLoading: true,
       // Never resolves: the window this test is about is Settings painted with
       // loadEvents still outstanding.
-      loadEvents: vi.fn(() => new Promise<void>(() => {})),
+      loadEvents: vi.fn(() => new Promise<EventLoadResult>(() => {})),
     });
 
     render(<EventsSettings />);
@@ -330,7 +339,10 @@ describe('EventsSettings list states', () => {
   it('explains a failed load in the list area instead of claiming there are no events', async () => {
     setStore({
       loadEvents: vi.fn(async () => {
-        store.patch({ eventsError: 'Network error' });
+        // Deliberately disagree with the result: reading shared state would
+        // incorrectly render the empty placeholder.
+        store.patch({ eventsError: null });
+        return { status: 'failure', error: 'Network error' } as const;
       }),
     });
 
@@ -349,7 +361,8 @@ describe('EventsSettings list states', () => {
     setStore({
       events: [makeEvent({ id: 'stale', label: 'Still here' })] as AppState['events'],
       loadEvents: vi.fn(async () => {
-        store.patch({ eventsError: 'Network error' });
+        store.patch({ eventsError: null });
+        return { status: 'failure', error: 'Network error' } as const;
       }),
     });
 
@@ -364,27 +377,243 @@ describe('EventsSettings list states', () => {
     );
   });
 
-  it('does not paint the load banner when the shared error key holds a save failure', async () => {
-    // eventsError is one key written by loads AND by all three writes. The flag
-    // is captured once, when the load settles, so a later save failure cannot
-    // reach it.
+  it('keeps the form write failure when its pending mount load succeeds', async () => {
+    let finishLoad: () => void = () => {};
+    setStore({
+      eventsIsLoading: true,
+      loadEvents: vi.fn(
+        () =>
+          new Promise<EventLoadResult>((resolve) => {
+            finishLoad = () => {
+              store.patch({ eventsIsLoading: false });
+              resolve({ status: 'success' });
+            };
+          })
+      ),
+      addEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'transport' as const,
+        error: 'This event did not save',
+      })),
+    });
+
+    render(<EventsSettings />);
+    openAddForm();
+    fillForm({ label: 'Unsaved trip', date: '2026-10-31' });
+    submitForm();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('events-form-error')).toHaveTextContent(
+        'This event did not save'
+      )
+    );
+    const loadRegion = screen.getByTestId('events-settings-load-region');
+    expect(loadRegion).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('events-settings')).not.toHaveAttribute('aria-busy');
+    expect(loadRegion).not.toContainElement(screen.getByTestId('events-form-error'));
+    await act(async () => {
+      finishLoad();
+    });
+
+    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('events-form')).toBeInTheDocument();
+    expect(screen.getByTestId('events-form-error')).toHaveTextContent('This event did not save');
+  });
+
+  it('uses the successful call outcome even when shared load error state disagrees', async () => {
+    let finishLoad: (result: EventLoadResult) => void = () => {};
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents: vi.fn(
+        () =>
+          new Promise<EventLoadResult>((resolve) => {
+            finishLoad = resolve;
+          })
+      ),
+    });
+
+    render(<EventsSettings />);
+
+    await act(async () => {
+      // Deliberately impossible through the revised write actions: this pins
+      // the caller contract so a future regression cannot infer this load's
+      // outcome from unrelated shared state again.
+      store.patch({ eventsError: 'An unrelated stored error' });
+      finishLoad({ status: 'success' });
+    });
+
+    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-list')).toBeInTheDocument();
+  });
+
+  it('recovers in place when connectivity returns after a failed load', async () => {
+    const reconnectedEvent = makeEvent({ id: 'reconnected', label: 'Back online' });
+    const loadEvents = vi
+      .fn<() => Promise<EventLoadResult>>()
+      .mockImplementationOnce(async () => ({
+        status: 'failure',
+        error: 'Network error',
+      }))
+      .mockImplementationOnce(async () => {
+        store.patch({
+          events: [reconnectedEvent],
+          eventsError: null,
+          eventsIsLoading: false,
+        });
+        return loadOk;
+      });
+    setStore({
+      syncStatus: {
+        pendingMoods: 0,
+        isOnline: false,
+        lastSyncAt: undefined,
+        isSyncing: false,
+      },
+      loadEvents,
     });
 
     await renderSection();
+    expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
 
-    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
-
-    // Flushed: without act() React never re-renders before the assertion below,
-    // so subscribing the banner straight to `eventsError` passes this test.
-    // What is pinned here is the post-settle window — a save that fails INSIDE
-    // the first load's flight window is DW-26 and still open.
-    await act(async () => {
-      store.patch({ eventsError: 'Event not found or not yours to edit' });
+    act(() => {
+      store.patch({
+        syncStatus: {
+          ...(store.state.syncStatus as AppState['syncStatus']),
+          isOnline: true,
+        },
+      });
     });
 
-    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+    await waitFor(() => expect(loadEvents).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument()
+    );
+    expect(screen.getByTestId('event-row-reconnected')).toBeInTheDocument();
+  });
+
+  it('shows the truthful empty state and moves focus to Add after a successful Retry', async () => {
+    let finishRetry: () => void = () => {};
+    const clearEventsError = vi.fn(() => store.patch({ eventsError: null }));
+    const loadEvents = vi
+      .fn<() => Promise<EventLoadResult>>()
+      .mockImplementationOnce(async () => {
+        store.patch({ eventsError: 'Network error' });
+        return { status: 'failure', error: 'Network error' };
+      })
+      .mockImplementationOnce(() => {
+        store.patch({ eventsError: null, eventsIsLoading: true });
+        return new Promise<EventLoadResult>((resolve) => {
+          finishRetry = () => {
+            store.patch({ events: [], eventsError: null, eventsIsLoading: false });
+            resolve(loadOk);
+          };
+        });
+      });
+    setStore({ loadEvents, clearEventsError });
+
+    await renderSection();
+    const retry = screen.getByTestId('events-settings-retry');
+    retry.focus();
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(loadEvents).toHaveBeenCalledTimes(2));
+    expect(clearEventsError).toHaveBeenCalledTimes(1);
+    expect(clearEventsError.mock.invocationCallOrder[0]).toBeLessThan(
+      loadEvents.mock.invocationCallOrder[1]
+    );
+    await waitFor(() => expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument());
+    expect(screen.queryByTestId('events-settings-retry')).not.toBeInTheDocument();
+
+    await act(async () => {
+      finishRetry();
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument()
+    );
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('events-settings-add'))
+    );
+  });
+
+  it('moves focus back to Retry when an empty-state Retry fails again', async () => {
+    let finishRetry: () => void = () => {};
+    const loadEvents = vi
+      .fn<() => Promise<EventLoadResult>>()
+      .mockImplementationOnce(async () => ({
+        status: 'failure',
+        error: 'Initial failure',
+      }))
+      .mockImplementationOnce(() => {
+        store.patch({ eventsError: null, eventsIsLoading: true });
+        return new Promise<EventLoadResult>((resolve) => {
+          finishRetry = () => {
+            store.patch({ eventsError: 'Retry failed', eventsIsLoading: false });
+            resolve({ status: 'failure', error: 'Retry failed' });
+          };
+        });
+      });
+    setStore({ loadEvents });
+
+    await renderSection();
+    const retry = screen.getByTestId('events-settings-retry');
+    retry.focus();
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument());
+    expect(screen.queryByTestId('events-settings-retry')).not.toBeInTheDocument();
+
+    await act(async () => {
+      finishRetry();
+    });
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('events-settings-retry'))
+    );
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getAllByTestId('events-settings-load-error')).toHaveLength(1);
+  });
+
+  it('keeps one retryable notice and the last-good list when Retry fails again', async () => {
+    let finishRetry: () => void = () => {};
+    const loadEvents = vi
+      .fn<() => Promise<EventLoadResult>>()
+      .mockImplementationOnce(async () => ({
+        status: 'failure',
+        error: 'Initial failure',
+      }))
+      .mockImplementationOnce(() => {
+        store.patch({ eventsError: null, eventsIsLoading: true });
+        return new Promise<EventLoadResult>((resolve) => {
+          finishRetry = () => {
+            store.patch({ eventsError: 'Retry failed', eventsIsLoading: false });
+            resolve({ status: 'failure', error: 'Retry failed' });
+          };
+        });
+      });
+    setStore({
+      events: [makeEvent({ id: 'last-good', label: 'Still visible' })] as AppState['events'],
+      loadEvents,
+    });
+
+    await renderSection();
+    const retry = screen.getByTestId('events-settings-retry');
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(retry).toBeDisabled());
+    expect(retry).toHaveTextContent('Retrying…');
+    fireEvent.click(retry);
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      finishRetry();
+    });
+
+    expect(screen.getAllByTestId('events-settings-load-error')).toHaveLength(1);
+    expect(screen.getByTestId('event-row-last-good')).toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-retry')).toBeEnabled();
+    expect(screen.getByTestId('events-settings-retry')).toHaveTextContent('Retry');
   });
 });
 
@@ -538,6 +767,7 @@ describe('EventsSettings add', () => {
     setStore({
       addEvent: vi.fn(async () => ({
         success: false as const,
+        code: 'offline' as const,
         error: 'You are offline. Events need a connection to save.',
       })),
     });
@@ -554,8 +784,67 @@ describe('EventsSettings add', () => {
       )
     );
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
+    expect(screen.getByTestId('events-form-label')).toHaveValue('Doomed');
+    expect(screen.getByTestId('events-form-date')).toHaveValue('2026-09-12');
+    expect(screen.getByTestId('events-form-submit')).toBeEnabled();
+    expect(screen.queryByTestId('events-form-refresh')).not.toBeInTheDocument();
     expect(screen.queryByTestId('events-settings-list')).not.toBeInTheDocument();
   });
+
+  it('keeps save retry available when the action unexpectedly rejects', async () => {
+    setStore({
+      addEvent: vi.fn(async () => {
+        throw new Error('Unexpected save rejection');
+      }),
+    });
+
+    await renderSection();
+    openAddForm();
+    fillForm({ label: 'Still here', date: '2026-09-12' });
+    submitForm();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('events-form-error')).toHaveTextContent(
+        'Unexpected save rejection'
+      )
+    );
+    expect(screen.getByTestId('events-form-label')).toHaveValue('Still here');
+    expect(screen.getByTestId('events-form-date')).toHaveValue('2026-09-12');
+    expect(screen.getByTestId('events-form-submit')).toBeEnabled();
+    expect(screen.queryByTestId('events-form-refresh')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['not-found', true],
+    ['validation', false],
+    ['transport', false],
+  ] as const)(
+    'selects refresh from the %s code, not from otherwise identical prose',
+    async (code, offersRefresh) => {
+      setStore({
+        addEvent: vi.fn(async () => ({
+          success: false as const,
+          code,
+          error: 'The same returned message',
+        })),
+      });
+
+      await renderSection();
+      openAddForm();
+      fillForm({ label: 'Doomed', date: '2026-09-12' });
+      submitForm();
+
+      await waitFor(() =>
+        expect(screen.getByTestId('events-form-error')).toHaveTextContent(
+          'The same returned message'
+        )
+      );
+      expect(screen.getByTestId('events-form-label')).toHaveValue('Doomed');
+      expect(screen.getByTestId('events-form-date')).toHaveValue('2026-09-12');
+      expect(Boolean(screen.queryByTestId('events-form-refresh'))).toBe(offersRefresh);
+      expect(Boolean(screen.queryByTestId('events-form-submit'))).toBe(!offersRefresh);
+    }
+  );
 
   it('disables submit while the write is open, so a double tap creates one row', async () => {
     // `public.events` carries no unique constraint and no idempotency key, so
@@ -679,6 +968,7 @@ describe('EventsSettings edit', () => {
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       editEvent: vi.fn(async () => ({
         success: false as const,
+        code: 'not-found' as const,
         error: 'Event not found or not yours to edit',
       })),
     });
@@ -693,6 +983,116 @@ describe('EventsSettings edit', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Event not found or not yours to edit')
     );
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
+  });
+
+  it('closes a stale edit and reloads the list when Refresh events is activated', async () => {
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents,
+      editEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'not-found' as const,
+        error: 'This prose is deliberately arbitrary',
+      })),
+    });
+
+    await renderSection();
+    loadEvents.mockClear();
+    loadEvents.mockImplementationOnce(async () => {
+      store.patch({ events: [], eventsError: null });
+      return loadOk;
+    });
+    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    submitForm();
+
+    await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
+    const refresh = screen.getByTestId('events-form-refresh');
+    act(() => {
+      refresh.click();
+      refresh.click();
+    });
+
+    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByTestId('event-row-mine')).not.toBeInTheDocument());
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+  });
+
+  it('clears an existing load banner after a successful stale-row refresh', async () => {
+    const loadEvents = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        return { status: 'failure', error: 'The initial load failed' } as const;
+      })
+      .mockImplementationOnce(async () => {
+        return loadOk;
+      });
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents,
+      editEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'not-found' as const,
+        error: 'Stale row',
+      })),
+    });
+
+    await renderSection();
+    expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    submitForm();
+    await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('events-form-refresh'));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument()
+    );
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores an older stale mount outcome after a stale-row refresh fails', async () => {
+    let finishMountLoad: (result: EventLoadResult) => void = () => {};
+    const loadEvents = vi
+      .fn<() => Promise<EventLoadResult>>()
+      .mockImplementationOnce(
+        () =>
+          new Promise<EventLoadResult>((resolve) => {
+            finishMountLoad = resolve;
+          })
+      )
+      .mockImplementationOnce(async () => ({
+        status: 'failure',
+        error: 'The refresh failed',
+      }));
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents,
+      editEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'not-found' as const,
+        error: 'Stale row',
+      })),
+    });
+
+    render(<EventsSettings />);
+    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    submitForm();
+    await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('events-form-refresh'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument()
+    );
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      finishMountLoad({ status: 'stale' });
+    });
+
+    expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
   });
 });
 
@@ -745,6 +1145,7 @@ describe('EventsSettings delete', () => {
       events: [makeEvent({ id: 'mine', label: 'Gracie visits' })] as AppState['events'],
       removeEvent: vi.fn(async () => ({
         success: false as const,
+        code: 'not-found' as const,
         error: 'Event not found or not yours to delete',
       })),
     });
@@ -757,6 +1158,90 @@ describe('EventsSettings delete', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Event not found or not yours to delete')
     );
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
+    expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
+    expect(screen.getByTestId('events-delete-refresh')).toHaveClass('bg-blue-500');
+    expect(screen.getByTestId('events-delete-refresh')).not.toHaveClass('bg-red-500');
+    expect(screen.queryByTestId('events-delete-confirm')).not.toBeInTheDocument();
+  });
+
+  it('keeps deliberate delete retry enabled for a transport-coded failure', async () => {
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      removeEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'transport' as const,
+        error: 'Event not found or not yours to delete',
+      })),
+    });
+
+    await renderSection();
+    fireEvent.click(screen.getByTestId('event-delete-mine'));
+    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+
+    await waitFor(() => expect(screen.getByTestId('events-delete-error')).toBeInTheDocument());
+    expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
+    expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
+    expect(screen.getByTestId('events-delete-confirm')).toBeEnabled();
+    expect(screen.queryByTestId('events-delete-refresh')).not.toBeInTheDocument();
+  });
+
+  it('keeps delete retry available when the action unexpectedly rejects', async () => {
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      removeEvent: vi.fn(async () => {
+        throw new Error('Unexpected delete rejection');
+      }),
+    });
+
+    await renderSection();
+    fireEvent.click(screen.getByTestId('event-delete-mine'));
+    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('events-delete-error')).toHaveTextContent(
+        'Unexpected delete rejection'
+      )
+    );
+    expect(screen.getByTestId('events-delete-confirm')).toBeEnabled();
+    expect(screen.queryByTestId('events-delete-refresh')).not.toBeInTheDocument();
+    expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
+  });
+
+  it('closes a stale delete and reloads the list when Refresh events is activated', async () => {
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents,
+      removeEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'not-found' as const,
+        error: 'Stale row',
+      })),
+    });
+
+    await renderSection();
+    loadEvents.mockClear();
+    loadEvents.mockImplementationOnce(async () => {
+      store.patch({ eventsError: 'Manual refresh failed' });
+      return { status: 'failure', error: 'Manual refresh failed' } as const;
+    });
+    fireEvent.click(screen.getByTestId('event-delete-mine'));
+    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+
+    await waitFor(() => expect(screen.getByTestId('events-delete-refresh')).toBeInTheDocument());
+    const refresh = screen.getByTestId('events-delete-refresh');
+    act(() => {
+      refresh.click();
+      refresh.click();
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('events-delete-confirmation')).not.toBeInTheDocument()
+    );
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument()
+    );
     expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
   });
 

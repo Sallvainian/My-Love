@@ -32,9 +32,50 @@ const SYNC_PROMISE = "will be synced when you're back online";
 
 const backend = new FakeInteractionsBackend();
 
+type RealtimeStatus = 'SUBSCRIBED' | 'CHANNEL_ERROR' | 'TIMED_OUT';
+type RealtimePayload = { new: Record<string, unknown> };
+
+const realtime = vi.hoisted(() => {
+  let recordCallback: ((payload: RealtimePayload) => void) | null = null;
+  let statusCallback: ((status: RealtimeStatus) => void) | null = null;
+
+  const channel = {
+    on: vi.fn(
+      (
+        _event: string,
+        _filter: Record<string, string>,
+        callback: (payload: RealtimePayload) => void
+      ) => {
+        recordCallback = callback;
+        return channel;
+      }
+    ),
+    subscribe: vi.fn((callback: (status: RealtimeStatus) => void) => {
+      statusCallback = callback;
+      return channel;
+    }),
+  };
+
+  return {
+    channel,
+    channelFactory: vi.fn(() => channel),
+    removeChannel: vi.fn(),
+    emitRecord: (payload: RealtimePayload) => recordCallback?.(payload),
+    emitStatus: (status: RealtimeStatus) => statusCallback?.(status),
+    reset: () => {
+      recordCallback = null;
+      statusCallback = null;
+      channel.on.mockClear();
+      channel.subscribe.mockClear();
+    },
+  };
+});
+
 vi.mock('@/api/supabaseClient', () => ({
   supabase: {
     from: (table: string) => backend.client().from(table),
+    channel: realtime.channelFactory,
+    removeChannel: realtime.removeChannel,
   },
 }));
 
@@ -58,10 +99,60 @@ async function rejection(promise: Promise<unknown>): Promise<Error | null> {
 describe('interactionService', () => {
   beforeEach(() => {
     backend.reset();
+    realtime.reset();
+    realtime.channelFactory.mockClear();
+    realtime.removeChannel.mockClear();
     setOnline(true);
     // The catch tails log through logSupabaseError; the thrown error is what
     // is under test, not the noise.
     vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  describe('subscribeInteractions', () => {
+    const incomingRecord = {
+      id: 'incoming-1',
+      type: 'poke',
+      from_user_id: PARTNER_ID,
+      to_user_id: USER_ID,
+      viewed: false,
+      created_at: '2026-08-20T12:00:00.000Z',
+    };
+
+    it('propagates healthy, failed, timed-out, and recovered statuses', async () => {
+      const onStatusChange = vi.fn();
+
+      await interactionService.subscribeInteractions(USER_ID, vi.fn(), onStatusChange);
+      realtime.emitStatus('SUBSCRIBED');
+      realtime.emitStatus('CHANNEL_ERROR');
+      realtime.emitStatus('TIMED_OUT');
+      realtime.emitStatus('SUBSCRIBED');
+
+      expect(onStatusChange.mock.calls).toEqual([
+        ['SUBSCRIBED'],
+        ['CHANNEL_ERROR'],
+        ['TIMED_OUT'],
+        ['SUBSCRIBED'],
+      ]);
+    });
+
+    it('continues delivering incoming records', async () => {
+      const onInteraction = vi.fn();
+
+      await interactionService.subscribeInteractions(USER_ID, onInteraction, vi.fn());
+      realtime.emitRecord({ new: incomingRecord });
+
+      expect(onInteraction).toHaveBeenCalledWith(incomingRecord);
+    });
+
+    it('removes the channel only once when teardown is repeated', async () => {
+      const unsubscribe = await interactionService.subscribeInteractions(USER_ID, vi.fn(), vi.fn());
+
+      unsubscribe();
+      unsubscribe();
+
+      expect(realtime.removeChannel).toHaveBeenCalledTimes(1);
+      expect(realtime.removeChannel).toHaveBeenCalledWith(realtime.channel);
+    });
   });
 
   afterEach(() => {

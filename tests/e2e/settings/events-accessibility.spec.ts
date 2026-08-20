@@ -1,19 +1,18 @@
 /**
  * tests/e2e/settings/events-accessibility.spec.ts
  *
- * RED-PHASE ATDD scaffold — story 5 (`spec-dynamic-events`, "manage events in
- * Settings"). Every test is emitted as `test.skip(...)`; a developer activates
- * one by deleting its `.skip`.
+ * Active ATDD accessibility coverage for story 5 (`spec-dynamic-events`,
+ * "manage events in Settings"), activated under the configured runner by DW-30.
  *
- * Test design: **DE.5-E2E-001**, three scans, all [P1]
+ * Test design: **DE.5-E2E-001**, three original scans, all [P1]
  * (`_bmad-output/test-artifacts/test-design-epic-5.md:345`). Closes risk R-009,
  * recorded there as "No automated accessibility scan on either new dialog, on a
  * change that produced four medium a11y findings during review" (:129).
  *
- * The only AxeBuilder use anywhere in this repo is
- * `tests/e2e/scripture/scripture-accessibility.spec.ts:296-303`; the three
- * scans below copy that shape exactly. `@axe-core/playwright` is already a
- * devDependency (`package.json:55`, "^4.13.0").
+ * DW-28 adds a fourth [P1] scan for the formerly unmeasured empty state, using
+ * the same clear/navigate/AxeBuilder pattern as the original three scans.
+ * `@axe-core/playwright` is already a devDependency (`package.json:55`,
+ * "^4.13.0").
  *
  * Scope note: each scan is `.include()`d on this story's own subtree, never the
  * whole Settings view. The test design records the reason at :527-531 — a
@@ -24,7 +23,7 @@
  *   supabase start
  *   npx playwright test tests/e2e/settings/events-accessibility.spec.ts --project=chromium
  *
- * ── MEASURED first run: 2 of 3 RED ─────────────────────────────────────────
+ * ── HISTORICAL measured first run: 2 of 3 RED ──────────────────────────────
  *
  * Executed during the story-5 ATDD run (2026-08-19) against the local stack,
  * `npx playwright test tests/e2e/settings/events-accessibility.spec.ts
@@ -41,16 +40,17 @@
  *    #ffffff, background color: #f6339a, font size: 12.0pt (16px), font weight:
  *    normal). Expected contrast ratio of 4.5:1"
  *
- * The two failing targets are `button[data-testid="events-settings-add"]` and
+ * At the time, the two failing targets were
+ * `button[data-testid="events-settings-add"]` and
  * `button[data-testid="events-form-submit"]` — white text on Tailwind's
  * `bg-pink-500` (#f6339a). No other axe rule fired anywhere in the three scans.
- * The delete dialog passes because its confirm button is not pink.
+ * The delete dialog passed because its confirm button was not pink.
  *
- * These are therefore RED against a REAL production defect, not against missing
- * implementation — a WCAG 2 AA contrast failure on the primary action of both
- * the section and the form. Fixing it is a production change (a darker pink, or
- * a larger/bolder label, either of which clears 4.5:1), not a test change. It is
- * outside the story-5 diff and belongs to whoever picks up R-009.
+ * Those results were therefore RED against a real production defect, not
+ * against missing implementation: a WCAG 2 AA contrast failure on the primary
+ * action of both the section and the form. DW-28 resolved that root cause by
+ * moving the matching surfaces to measured Tailwind v4 `pink-600` defaults and
+ * `pink-700` hover states. All four scans now run as regression coverage.
  *
  * Test data: rows are seeded and torn down for THIS worker's pair only, keyed
  * on TEST_WORKER_INDEX through `getWorkerPairEmails()`. No partner is linked or
@@ -63,9 +63,13 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
-import { getWorkerPairEmails } from '../../support/auth/worker-pool';
-import type { TypedSupabaseClient } from '../../support/factories';
-import { formatDateISO } from '../../../src/utils/dateUtils';
+import {
+  clearOwnPairEvents,
+  clearPairEvents,
+  isoDateDaysFromNow,
+  resolveOwnPair,
+  seedEvent,
+} from '../../support/helpers/events';
 import { log } from '@seontechnologies/playwright-utils';
 import type { Page } from '@playwright/test';
 
@@ -76,90 +80,9 @@ import type { Page } from '@playwright/test';
  */
 const A11Y_LABEL = 'Settings A11y E2E';
 
-async function resolveAppUserId(
-  supabaseAdmin: TypedSupabaseClient,
-  email: string
-): Promise<string> {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .single();
-
-  if (error || !data?.id) {
-    throw new Error(`Could not resolve app user for ${email}: ${error?.message ?? 'not found'}`);
-  }
-
-  return data.id;
-}
-
-/** This worker's own pair, resolved to `public.users.id`s. Throws outside a worker. */
-async function resolveOwnPair(
-  supabaseAdmin: TypedSupabaseClient
-): Promise<{ userId: string; partnerId: string }> {
-  const pair = getWorkerPairEmails();
-  if (!pair) {
-    throw new Error('resolveOwnPair: no worker identity (TEST_WORKER_INDEX unset)');
-  }
-
-  const [userId, partnerId] = await Promise.all([
-    resolveAppUserId(supabaseAdmin, pair.user1Email),
-    resolveAppUserId(supabaseAdmin, pair.user2Email),
-  ]);
-
-  return { userId, partnerId };
-}
-
-/**
- * Remove every event owned by either half of this worker's pair.
- *
- * Checked, because a silently-failed clear leaves stray rows that break the
- * next test's premise and fail it pointing at the wrong code. Scoped to this
- * worker's own two users: every other row in `events` belongs to another
- * worker's pair.
- */
-async function clearPairEvents(
-  supabaseAdmin: TypedSupabaseClient,
-  userId: string,
-  partnerId: string
-): Promise<void> {
-  const { error } = await supabaseAdmin.from('events').delete().in('user_id', [userId, partnerId]);
-  if (error) {
-    throw new Error(`Failed to clear events for the worker pair: ${error.message}`);
-  }
-}
-
-/**
- * Seed one row owned by `userId`, so the list, its Edit/Delete controls and
- * both dialogs are reachable without driving a create through the UI first.
- */
-async function seedEvent(
-  supabaseAdmin: TypedSupabaseClient,
-  userId: string,
-  label: string,
-  eventDate: string
-): Promise<void> {
-  const { error } = await supabaseAdmin.from('events').insert({
-    user_id: userId,
-    label,
-    event_date: eventDate,
-    description: 'Seeded by the ATDD scaffold',
-    icon: 'calendar',
-  });
-  if (error) {
-    throw new Error(`Failed to seed the event "${label}": ${error.message}`);
-  }
-}
-
 /** The list row carrying a given label. Row testids key on the event's uuid. */
 function rowFor(page: Page, label: string) {
   return page.locator('[data-testid^="event-row-"]').filter({ hasText: label });
-}
-
-function futureDate(dayOffset: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + dayOffset);
-  return formatDateISO(date);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -170,12 +93,11 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.afterEach(async ({ supabaseAdmin }) => {
-  const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-  await clearPairEvents(supabaseAdmin, userId, partnerId);
+  await clearOwnPairEvents(supabaseAdmin);
 });
 
 test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
-  test.skip(
+  test(
     '[P1] DE.5-E2E-001a the settled events section has no axe violations',
     async ({ page, supabaseAdmin }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
@@ -184,7 +106,13 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       // the date line and the two icon-only controls (`event-edit-<id>`,
       // `event-delete-<id>`, EventsSettings.tsx:360,369) into the scan. The
       // empty state would scan almost nothing.
-      await seedEvent(supabaseAdmin, userId, A11Y_LABEL, futureDate(30));
+      await seedEvent(supabaseAdmin, {
+        userId,
+        label: A11Y_LABEL,
+        eventDate: isoDateDaysFromNow(30),
+        description: 'Seeded by the accessibility test',
+        icon: 'calendar',
+      });
 
       // Set for parity with scripture-accessibility.spec.ts:281-291, and it
       // costs nothing — but be clear about what it does NOT do here. That spec
@@ -222,7 +150,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
     }
   );
 
-  test.skip(
+  test(
     '[P1] DE.5-E2E-001b the open add/edit form dialog has no axe violations',
     async ({ page, supabaseAdmin, recurse }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
@@ -230,7 +158,13 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       // A row is seeded so the form can be opened in its EDIT shape: pre-filled
       // label, date and description, plus the icon radio group — the widest
       // version of this dialog, and the one review found four issues on.
-      await seedEvent(supabaseAdmin, userId, A11Y_LABEL, futureDate(30));
+      await seedEvent(supabaseAdmin, {
+        userId,
+        label: A11Y_LABEL,
+        eventDate: isoDateDaysFromNow(30),
+        description: 'Seeded by the accessibility test',
+        icon: 'calendar',
+      });
 
       // Same caveat as above: this does not zero these dialogs' animations.
       await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -274,12 +208,18 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
     }
   );
 
-  test.skip(
+  test(
     '[P1] DE.5-E2E-001c the open delete confirmation has no axe violations',
     async ({ page, supabaseAdmin, recurse }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
-      await seedEvent(supabaseAdmin, userId, A11Y_LABEL, futureDate(30));
+      await seedEvent(supabaseAdmin, {
+        userId,
+        label: A11Y_LABEL,
+        eventDate: isoDateDaysFromNow(30),
+        description: 'Seeded by the accessibility test',
+        icon: 'calendar',
+      });
 
       // Same caveat again — see DE.5-E2E-001a.
       await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -314,6 +254,34 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       const AxeBuilder = (await import('@axe-core/playwright')).default;
       const accessibilityScanResults = await new AxeBuilder({ page })
         .include('[data-testid="events-delete-confirmation"]')
+        .analyze();
+
+      expect(accessibilityScanResults.violations).toEqual([]);
+    }
+  );
+
+  test(
+    '[P1] DE.5-E2E-001d the empty events section has no axe violations',
+    async ({ page, supabaseAdmin }) => {
+      const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+      // Intentionally do not seed a row: this renders the empty-state Add
+      // action that the three original scans never exercised.
+      await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+
+      await log.step('Open Settings with an empty events section');
+      await page.goto('/');
+      await navigateTo(page, 'settings');
+
+      const eventsSection = page.getByTestId('events-settings');
+      await expect(eventsSection).toBeVisible();
+      await expect(page.getByTestId('events-settings-empty-add')).toBeVisible();
+
+      await log.step('Scan the empty events section');
+      const AxeBuilder = (await import('@axe-core/playwright')).default;
+      const accessibilityScanResults = await new AxeBuilder({ page })
+        .include('[data-testid="events-settings"]')
         .analyze();
 
       expect(accessibilityScanResults.violations).toEqual([]);

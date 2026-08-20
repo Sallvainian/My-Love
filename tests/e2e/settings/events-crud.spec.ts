@@ -15,15 +15,20 @@
  * - a rejected create keeps the form open and shows the message the write
  *   itself returned (CAP-7)
  *
- * User id resolution mirrors `tests/e2e/home/events.spec.ts`, which in turn
- * mirrors `tests/support/factories/index.ts`'s `resolveAppUserIdByEmail`, kept
- * self-contained here since that helper is not exported.
+ * Pair resolution, scoped cleanup, event seeding and local-date helpers are
+ * shared through `tests/support/helpers/events.ts`.
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
-import { getWorkerPairEmails } from '../../support/auth/worker-pool';
-import type { TypedSupabaseClient } from '../../support/factories';
-import { formatDateISO, formatDateLong } from '../../../src/utils/dateUtils';
+import {
+  clearOwnPairEvents,
+  clearPairEvents,
+  isoDateDaysFromNow,
+  localDateFromIso,
+  resolveOwnPair,
+  seedEvent,
+} from '../../support/helpers/events';
+import { formatDateLong } from '../../../src/utils/dateUtils';
 import type { Locator, Page } from '@playwright/test';
 
 /**
@@ -33,70 +38,13 @@ import type { Locator, Page } from '@playwright/test';
  */
 const ADDED_LABEL = 'Settings Trip E2E';
 const EDITED_LABEL = 'Settings Voyage E2E';
-
-async function resolveAppUserId(
-  supabaseAdmin: TypedSupabaseClient,
-  email: string
-): Promise<string> {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .single();
-
-  if (error || !data?.id) {
-    throw new Error(`Could not resolve app user for ${email}: ${error?.message ?? 'not found'}`);
-  }
-
-  return data.id;
-}
-
-/** This worker's own pair, resolved to `public.users.id`s. Throws outside a worker. */
-async function resolveOwnPair(
-  supabaseAdmin: TypedSupabaseClient
-): Promise<{ userId: string; partnerId: string }> {
-  const pair = getWorkerPairEmails();
-  if (!pair) {
-    throw new Error('resolveOwnPair: no worker identity (TEST_WORKER_INDEX unset)');
-  }
-
-  const [userId, partnerId] = await Promise.all([
-    resolveAppUserId(supabaseAdmin, pair.user1Email),
-    resolveAppUserId(supabaseAdmin, pair.user2Email),
-  ]);
-
-  return { userId, partnerId };
-}
-
-/**
- * Remove every event owned by either half of this worker's pair.
- *
- * Rows here are created through the UI, so their ids are not known to the test
- * — deleting by `user_id` the way `clearPairEvents` does is the only handle
- * there is. Checked, because a silently-failed clear leaves stray rows that
- * break the next test's premise and fail it as "empty state not visible",
- * pointing at the wrong code.
- */
-async function clearPairEvents(
-  supabaseAdmin: TypedSupabaseClient,
-  userId: string,
-  partnerId: string
-): Promise<void> {
-  const { error } = await supabaseAdmin.from('events').delete().in('user_id', [userId, partnerId]);
-  if (error) {
-    throw new Error(`Failed to clear events for the worker pair: ${error.message}`);
-  }
-}
+// Vite runs the app in React StrictMode, so Settings' mount effect starts two
+// loads. Each getEvents() load reads upcoming and past pages in parallel.
+const SETTINGS_MOUNT_SNAPSHOT_COUNT = 4;
 
 /** The list row carrying a given label. Row testids key on the event's uuid. */
 function rowFor(page: Page, label: string) {
   return page.locator('[data-testid^="event-row-"]').filter({ hasText: label });
-}
-
-function futureDate(dayOffset: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + dayOffset);
-  return formatDateISO(date);
 }
 
 /**
@@ -130,10 +78,7 @@ async function expectCardCountsDownTo(card: Locator, isoDate: string): Promise<v
 }
 
 function longForm(isoDate: string): string {
-  const [year, month, day] = isoDate.split('-').map(Number);
-  // Local components, never `new Date(isoDate)` — the date-only string form is
-  // parsed as UTC midnight and names the previous day west of UTC.
-  return formatDateLong(new Date(year, month - 1, day));
+  return formatDateLong(localDateFromIso(isoDate));
 }
 
 test.beforeEach(async ({ page }) => {
@@ -144,8 +89,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.afterEach(async ({ supabaseAdmin }) => {
-  const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-  await clearPairEvents(supabaseAdmin, userId, partnerId);
+  await clearOwnPairEvents(supabaseAdmin);
 });
 
 test.describe('Managing events from Settings', () => {
@@ -158,8 +102,8 @@ test.describe('Managing events from Settings', () => {
     // half of the couple — the SELECT policy returns own + partner.
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const addedDate = futureDate(30);
-    const editedDate = futureDate(45);
+    const addedDate = isoDateDaysFromNow(30);
+    const editedDate = isoDateDaysFromNow(45);
 
     await page.goto('/');
     await navigateTo(page, 'settings');
@@ -281,17 +225,14 @@ test.describe('Managing events from Settings', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const seededDate = futureDate(20);
-    const { error } = await supabaseAdmin.from('events').insert({
-      user_id: userId,
+    const seededDate = isoDateDaysFromNow(20);
+    await seedEvent(supabaseAdmin, {
+      userId,
       label: 'Settings Deeplink E2E',
-      event_date: seededDate,
+      eventDate: seededDate,
       description: 'Seeded for the deep link',
       icon: 'calendar',
     });
-    if (error) {
-      throw new Error(`Failed to seed the deep-link event: ${error.message}`);
-    }
 
     await page.goto('/');
     await navigateTo(page, 'settings');
@@ -308,6 +249,118 @@ test.describe('Managing events from Settings', () => {
     await expect(page.getByTestId('events-settings-empty')).toHaveCount(0);
   });
 
+  test('[P0] keeps a successful edit when Settings mount returns an older snapshot', async ({
+    page,
+    supabaseAdmin,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+    const originalDate = isoDateDaysFromNow(20);
+    const orderWitnessDate = isoDateDaysFromNow(28);
+    const editedDate = isoDateDaysFromNow(35);
+    await Promise.all([
+      seedEvent(supabaseAdmin, {
+        userId,
+        label: 'Settings Snapshot Before Edit E2E',
+        eventDate: originalDate,
+        description: 'Original snapshot',
+        icon: 'calendar',
+      }),
+      seedEvent(supabaseAdmin, {
+        userId,
+        label: 'Settings Snapshot Order Witness E2E',
+        eventDate: orderWitnessDate,
+        description: 'Must sort before the edited row',
+        icon: 'calendar',
+      }),
+    ]);
+
+    // Home first populates the real Zustand slice, giving Settings an editable
+    // row while its own mount GET is held below.
+    await page.goto('/');
+    await expect(page.getByTestId('event-countdown-settings-snapshot-before-edit-e2e')).toBeVisible();
+
+    let markSnapshotsCaptured: () => void = () => {};
+    const snapshotsCaptured = new Promise<void>((resolve) => {
+      markSnapshotsCaptured = resolve;
+    });
+    let reservedSnapshotCount = 0;
+    let capturedSnapshotCount = 0;
+    let releaseSnapshots: () => void = () => {};
+    const snapshotsHeld = new Promise<void>((resolve) => {
+      releaseSnapshots = resolve;
+    });
+
+    await page.route('**/rest/v1/events*', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+
+      const slot = reservedSnapshotCount++;
+      if (slot >= SETTINGS_MOUNT_SNAPSHOT_COUNT) {
+        throw new Error(`Unexpected events GET in slot ${slot + 1}`);
+      }
+
+      // Fetch every bounded page for both StrictMode load calls now, before the
+      // PATCH, so every response body contains the old row state even though
+      // they are delivered only after the edit settles.
+      const staleResponse = await route.fetch();
+      if (!staleResponse.ok()) {
+        throw new Error(`Expected successful snapshot, got ${staleResponse.status()}`);
+      }
+      capturedSnapshotCount += 1;
+      if (capturedSnapshotCount === SETTINGS_MOUNT_SNAPSHOT_COUNT) markSnapshotsCaptured();
+      await snapshotsHeld;
+      await route.fulfill({ response: staleResponse });
+    });
+
+    await navigateTo(page, 'settings');
+    await snapshotsCaptured;
+    const loadRegion = page.getByTestId('events-settings-load-region');
+    await expect(loadRegion).toHaveAttribute('aria-busy', 'true');
+
+    const originalRow = rowFor(page, 'Settings Snapshot Before Edit E2E');
+    await expect(originalRow).toBeVisible();
+    await originalRow.locator('[data-testid^="event-edit-"]').click();
+    await page.getByTestId('events-form-label').fill('Settings Snapshot After Edit E2E');
+    await page.getByTestId('events-form-date').fill(editedDate);
+
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/rest/v1/events') && response.request().method() === 'PATCH'
+    );
+    await page.getByTestId('events-form-submit').click();
+    expect((await updateResponse).status()).toBe(200);
+
+    await expect(page.getByTestId('events-form')).toHaveCount(0);
+    const editedRow = rowFor(page, 'Settings Snapshot After Edit E2E');
+    await expect(editedRow).toBeVisible();
+    await expect(editedRow).toContainText(longForm(editedDate));
+    const orderedLabels = page.locator('[data-testid^="event-label-"]');
+    await expect(orderedLabels).toHaveText([
+      'Settings Snapshot Order Witness E2E',
+      'Settings Snapshot After Edit E2E',
+    ]);
+
+    releaseSnapshots();
+    // This flips only after getEvents' two-request Promise.all resolves and the
+    // slice installs its reconciled list, giving the assertion a causal settle
+    // signal rather than an arbitrary frame boundary.
+    await expect(loadRegion).toHaveAttribute('aria-busy', 'false');
+
+    await expect(editedRow).toBeVisible();
+    await expect(editedRow).toContainText(longForm(editedDate));
+    await expect(rowFor(page, 'Settings Snapshot Before Edit E2E')).toHaveCount(0);
+    await expect(orderedLabels).toHaveText([
+      'Settings Snapshot Order Witness E2E',
+      'Settings Snapshot After Edit E2E',
+    ]);
+
+    await page.unroute('**/rest/v1/events*');
+  });
+
   test('[P0] lists a past event with its controls, where Home hides it', async ({
     page,
     supabaseAdmin,
@@ -318,31 +371,28 @@ test.describe('Managing events from Settings', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const pastDate = futureDate(-14);
+    const pastDate = isoDateDaysFromNow(-14);
     // A future event is seeded alongside it purely as a load witness: without
     // one, `toHaveCount(0)` on the past card runs before loadEvents can have
     // resolved and passes vacuously — it would still pass if Home rendered
     // every past event it was given.
-    const futureWitnessDate = futureDate(9);
-    const { error } = await supabaseAdmin.from('events').insert([
-      {
-        user_id: userId,
+    const futureWitnessDate = isoDateDaysFromNow(9);
+    await Promise.all([
+      seedEvent(supabaseAdmin, {
+        userId,
         label: 'Settings Bygone E2E',
-        event_date: pastDate,
+        eventDate: pastDate,
         description: null,
         icon: 'calendar',
-      },
-      {
-        user_id: userId,
+      }),
+      seedEvent(supabaseAdmin, {
+        userId,
         label: 'Settings Witness E2E',
-        event_date: futureWitnessDate,
+        eventDate: futureWitnessDate,
         description: null,
         icon: 'calendar',
-      },
+      }),
     ]);
-    if (error) {
-      throw new Error(`Failed to seed the past event: ${error.message}`);
-    }
 
     await page.goto('/');
 
@@ -367,16 +417,13 @@ test.describe('Managing events from Settings', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const { error } = await supabaseAdmin.from('events').insert({
-      user_id: partnerId,
+    await seedEvent(supabaseAdmin, {
+      userId: partnerId,
       label: 'Settings Partner E2E',
-      event_date: futureDate(25),
+      eventDate: isoDateDaysFromNow(25),
       description: 'Theirs, not mine',
       icon: 'ring',
     });
-    if (error) {
-      throw new Error(`Failed to seed the partner event: ${error.message}`);
-    }
 
     await page.goto('/');
     await navigateTo(page, 'settings');
@@ -427,7 +474,7 @@ test.describe(
 
       await page.getByTestId('events-settings-empty-add').click();
       await page.getByTestId('events-form-label').fill('Settings Rejected E2E');
-      await page.getByTestId('events-form-date').fill(futureDate(10));
+      await page.getByTestId('events-form-date').fill(isoDateDaysFromNow(10));
       await page.getByTestId('events-form-submit').click();
 
       await rejectedCreate;

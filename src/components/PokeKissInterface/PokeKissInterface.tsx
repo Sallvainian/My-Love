@@ -23,6 +23,7 @@ import { AnimatePresence, m as motion } from 'framer-motion';
 import { Hand, Heart, History, Wind, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
+import type { InteractionSubscriptionStatus } from '../../api/interactionService';
 import { getPartnerId } from '../../api/supabaseClient';
 import { useAppStore } from '../../stores/useAppStore';
 import type { Interaction } from '../../types';
@@ -89,6 +90,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
   const [showAnimation, setShowAnimation] = useState<AnimationType>(null);
   const [currentInteraction, setCurrentInteraction] = useState<Interaction | null>(null);
   const [showToast, setShowToast] = useState<string | null>(null);
+  const [connectionWarning, setConnectionWarning] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
   // Cooldown state
@@ -132,7 +134,16 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
     let cancelled = false;
     let unsubscribe: (() => void) | null = null;
 
-    subscribeToInteractions()
+    const handleStatusChange = (status: InteractionSubscriptionStatus) => {
+      if (cancelled) return;
+      setConnectionWarning(
+        status === 'SUBSCRIBED'
+          ? null
+          : 'Connection lost. Incoming pokes and kisses may not arrive.'
+      );
+    };
+
+    subscribeToInteractions(handleStatusChange)
       .then((fn) => {
         if (cancelled) {
           // Unmounted before the subscribe promise resolved — tear down now.
@@ -140,7 +151,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
           return;
         }
         unsubscribe = fn;
-        logger.info('[PokeKissInterface] Subscribed to real-time interactions');
+        logger.info('[PokeKissInterface] Real-time interaction subscription created');
       })
       .catch((error) => {
         console.error('[PokeKissInterface] Failed to subscribe:', error);
@@ -357,6 +368,22 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
         className="relative inline-flex items-center"
         data-testid="poke-kiss-interface"
       >
+        <AnimatePresence>
+          {connectionWarning && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed top-[calc(9rem+env(safe-area-inset-top))] left-1/2 z-50 -translate-x-1/2 transform rounded-lg bg-red-900 px-6 py-3 text-white shadow-lg"
+              role="alert"
+              aria-live="assertive"
+              data-testid="interaction-connection-warning"
+            >
+              {connectionWarning}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Action Buttons (expand up or down based on prop) */}
         <AnimatePresence>
           {isExpanded && (

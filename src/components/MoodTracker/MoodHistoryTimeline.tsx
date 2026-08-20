@@ -215,7 +215,7 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
         <p className="text-gray-600 dark:text-gray-400">{error}</p>
         <button
           onClick={() => void retry()}
-          className="mt-4 rounded-lg bg-pink-500 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-600"
+          className="mt-4 rounded-lg bg-pink-600 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-700"
           data-testid="mood-history-retry"
         >
           Try Again

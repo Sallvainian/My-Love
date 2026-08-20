@@ -16,15 +16,17 @@
  * - All three keys are reset by `signedOutState()` in authSlice.
  *
  * Errors: `eventsService` throws, so every action here has a real reason to
- * report. The write actions return that reason to their caller AND park it in
- * `eventsError`, mirroring `PhotoUploadResult` — a caller that awaited its own
- * write gets the message for THAT write rather than whatever the shared key
- * happens to hold by the time it reads.
+ * report. `eventsError` belongs only to the active load. Writes return their
+ * own failure directly so a save/delete error cannot be mistaken for a load
+ * error. `EventWriteResult` deliberately diverges from `PhotoUploadResult`:
+ * event failures also carry a code because Settings must distinguish stale
+ * rows from failures that can retry the same write.
  */
 
 import type {
   CoupleEvent,
   EventCreateInput,
+  EventWriteErrorCode,
   EventUpdateInput,
 } from '../../services/eventsService';
 import { eventsService } from '../../services/eventsService';
@@ -36,7 +38,15 @@ import type { AppStateCreator } from '../types';
  * than read back off the store, so callers get the message for *their* write
  * and not whatever unrelated error `eventsError` happens to hold.
  */
-export type EventWriteResult = { success: true } | { success: false; error: string };
+export type EventWriteResult =
+  | { success: true }
+  | { success: false; code: EventWriteErrorCode | 'auth'; error: string };
+
+/** Outcome owned by one `loadEvents` invocation. */
+export type EventLoadResult =
+  | { status: 'success' }
+  | { status: 'failure'; error: string }
+  | { status: 'stale' };
 
 /** What `addEvent` takes: the creator comes from the store, not the caller. */
 export type NewEventInput = Omit<EventCreateInput, 'userId'>;
@@ -49,7 +59,7 @@ export interface EventsSlice {
   eventsError: string | null;
 
   // Actions
-  loadEvents: () => Promise<void>;
+  loadEvents: () => Promise<EventLoadResult>;
   addEvent: (input: NewEventInput) => Promise<EventWriteResult>;
   editEvent: (eventId: string, updates: EventUpdateInput) => Promise<EventWriteResult>;
   removeEvent: (eventId: string) => Promise<EventWriteResult>;
@@ -70,23 +80,111 @@ function sortByDate(events: CoupleEvent[]): CoupleEvent[] {
   );
 }
 
+/** Replace by id or append, removing any duplicate copies already present. */
+function upsertEvent(events: CoupleEvent[], upserted: CoupleEvent): CoupleEvent[] {
+  return [...events.filter((event) => event.id !== upserted.id), upserted];
+}
+
 function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-/**
- * Monotonic id of the most recent `loadEvents` call. Each load captures its id
- * and abandons its own resolution if a newer load has started since. The
- * identity guard cannot catch this case: two refreshes for the SAME user (a
- * mount effect plus a manual refresh) overlap with identical `userId`s, so
- * without the token the first to resolve clears `eventsIsLoading` while the
- * second is still in flight, and whichever lands last owns the list — even if
- * it carried the older data. Module scope is safe: the app creates exactly one
- * store instance.
- */
-let latestLoadId = 0;
+const EVENT_WRITE_ERROR_CODES = {
+  offline: true,
+  validation: true,
+  'not-found': true,
+  'invalid-response': true,
+  transport: true,
+} satisfies Record<EventWriteErrorCode, true>;
 
-export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) => ({
+function isEventWriteErrorCode(value: unknown): value is EventWriteErrorCode {
+  return typeof value === 'string' && Object.hasOwn(EVENT_WRITE_ERROR_CODES, value);
+}
+
+function writeFailureOf(
+  error: unknown,
+  fallback: string
+): Extract<EventWriteResult, { success: false }> {
+  const code =
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    isEventWriteErrorCode(error.code)
+      ? error.code
+      : 'transport';
+
+  return {
+    success: false,
+    code,
+    error: messageOf(error, fallback),
+  };
+}
+
+type ActiveLoad = {
+  requestedBy: string;
+  mutationSequenceAtStart: number;
+};
+
+type CompletedMutation =
+  | { sequence: number; requestedBy: string; kind: 'upsert'; event: CoupleEvent }
+  | { sequence: number; requestedBy: string; kind: 'delete'; eventId: string };
+
+export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) => {
+  /**
+   * The app has one store, but keeping these counters and registries inside the
+   * slice instance also prevents independent test stores from sharing replay
+   * state. None of this state is persisted or exposed through Zustand.
+   */
+  let latestLoadId = 0;
+  let latestMutationSequence = 0;
+  const activeLoads = new Map<number, ActiveLoad>();
+  let completedMutations: CompletedMutation[] = [];
+
+  const pruneCompletedMutations = () => {
+    completedMutations = completedMutations.filter((mutation) =>
+      Array.from(activeLoads.values()).some(
+        (load) =>
+          load.requestedBy === mutation.requestedBy &&
+          mutation.sequence > load.mutationSequenceAtStart
+      )
+    );
+  };
+
+  const unregisterLoad = (loadId: number) => {
+    activeLoads.delete(loadId);
+    pruneCompletedMutations();
+  };
+
+  const recordMutation = (
+    mutation:
+      | Omit<Extract<CompletedMutation, { kind: 'upsert' }>, 'sequence'>
+      | Omit<Extract<CompletedMutation, { kind: 'delete' }>, 'sequence'>
+  ) => {
+    completedMutations.push({ ...mutation, sequence: ++latestMutationSequence });
+    pruneCompletedMutations();
+  };
+
+  const replayCompletedMutations = (events: CoupleEvent[], load: ActiveLoad): CoupleEvent[] => {
+    let reconciled = events;
+
+    for (const mutation of completedMutations) {
+      if (
+        mutation.requestedBy !== load.requestedBy ||
+        mutation.sequence <= load.mutationSequenceAtStart
+      ) {
+        continue;
+      }
+
+      reconciled =
+        mutation.kind === 'upsert'
+          ? upsertEvent(reconciled, mutation.event)
+          : reconciled.filter((event) => event.id !== mutation.eventId);
+    }
+
+    return sortByDate(reconciled);
+  };
+
+  return {
   // Initial state
   events: [],
   eventsIsLoading: false,
@@ -115,8 +213,17 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     // resets only on an account switch or a sign-out), so a load captured at
     // null that resolved after sign-in would leave eventsIsLoading stranded
     // true with nothing due to clear it.
-    if (!requestedBy) return;
+    if (!requestedBy) return { status: 'stale' };
     const loadId = ++latestLoadId;
+    // This load supersedes every older invocation; none of them may apply, so
+    // they cannot need retained mutation records either.
+    activeLoads.clear();
+    const activeLoad: ActiveLoad = {
+      requestedBy,
+      mutationSequenceAtStart: latestMutationSequence,
+    };
+    activeLoads.set(loadId, activeLoad);
+    pruneCompletedMutations();
     set({ eventsIsLoading: true, eventsError: null });
 
     try {
@@ -127,22 +234,27 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       // successor account's own live spinner mid-load. The early null bail is
       // what makes this sound: with a non-null requestedBy, every mismatch
       // crossed a sign-out or an account switch, and both run that reset.
-      if (get().userId !== requestedBy) return;
+      if (get().userId !== requestedBy) return { status: 'stale' };
       // A newer same-user load owns the flag and the list now.
-      if (loadId !== latestLoadId) return;
-      set({ events, eventsIsLoading: false });
+      if (loadId !== latestLoadId) return { status: 'stale' };
+      const reconciled = replayCompletedMutations(events, activeLoad);
+      set({ events: reconciled, eventsIsLoading: false });
+      return { status: 'success' };
     } catch (error) {
       const errorMsg = messageOf(error, 'Failed to load events');
       console.error('[EventsSlice] Error loading events:', error);
       // Touch nothing here either — same reasoning as the success branch.
-      if (get().userId !== requestedBy) return;
+      if (get().userId !== requestedBy) return { status: 'stale' };
       // A newer same-user load owns the flag now; parking this stale failure
       // would slap an error banner over a refresh that may yet succeed.
-      if (loadId !== latestLoadId) return;
+      if (loadId !== latestLoadId) return { status: 'stale' };
       // The last-good list survives a failed refresh: events are Supabase-only
       // with no mirror to repopulate from, so blanking here would erase data
       // the user is looking at. Matches notesSlice and moodSlice.
       set({ eventsError: errorMsg, eventsIsLoading: false });
+      return { status: 'failure', error: errorMsg };
+    } finally {
+      unregisterLoad(loadId);
     }
   },
 
@@ -155,27 +267,23 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     const requestedBy = get().userId;
     if (!requestedBy) {
       const errorMsg = 'You must be signed in to add an event';
-      set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      return { success: false, code: 'auth', error: errorMsg };
     }
-
-    set({ eventsError: null });
 
     try {
       const created = await eventsService.createEvent({ ...input, userId: requestedBy });
+      recordMutation({ requestedBy, kind: 'upsert', event: created });
       // The new event belongs to the previous account; it must not appear in
       // this one's list. success reports the durable write only — this
       // session's state is deliberately untouched.
       if (get().userId !== requestedBy) return { success: true };
-      set((state) => ({ events: sortByDate([...state.events, created]) }));
+      set((state) => ({ events: sortByDate(upsertEvent(state.events, created)) }));
       logger.debug('[EventsSlice] Added event:', created.id);
       return { success: true };
     } catch (error) {
-      const errorMsg = messageOf(error, 'Failed to add event');
+      const failure = writeFailureOf(error, 'Failed to add event');
       console.error('[EventsSlice] Error adding event:', error);
-      if (get().userId !== requestedBy) return { success: false, error: errorMsg };
-      set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      return failure;
     }
   },
 
@@ -187,29 +295,25 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     const requestedBy = get().userId;
     if (!requestedBy) {
       const errorMsg = 'You must be signed in to edit an event';
-      set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      return { success: false, code: 'auth', error: errorMsg };
     }
-
-    set({ eventsError: null });
 
     try {
       const updated = await eventsService.updateEvent(eventId, updates);
+      recordMutation({ requestedBy, kind: 'upsert', event: updated });
       // success reports the durable write only — the account changed, so this
       // session's state is deliberately untouched.
       if (get().userId !== requestedBy) return { success: true };
       // Re-sorted, not just replaced: an edit may move the date.
       set((state) => ({
-        events: sortByDate(state.events.map((event) => (event.id === eventId ? updated : event))),
+        events: sortByDate(upsertEvent(state.events, updated)),
       }));
       logger.debug('[EventsSlice] Edited event:', eventId);
       return { success: true };
     } catch (error) {
-      const errorMsg = messageOf(error, 'Failed to update event');
+      const failure = writeFailureOf(error, 'Failed to update event');
       console.error('[EventsSlice] Error updating event:', error);
-      if (get().userId !== requestedBy) return { success: false, error: errorMsg };
-      set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      return failure;
     }
   },
 
@@ -220,14 +324,12 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     const requestedBy = get().userId;
     if (!requestedBy) {
       const errorMsg = 'You must be signed in to delete an event';
-      set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      return { success: false, code: 'auth', error: errorMsg };
     }
-
-    set({ eventsError: null });
 
     try {
       await eventsService.deleteEvent(eventId);
+      recordMutation({ requestedBy, kind: 'delete', eventId });
       // success reports the durable write only — the account changed, so this
       // session's state is deliberately untouched.
       if (get().userId !== requestedBy) return { success: true };
@@ -235,11 +337,9 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       logger.debug('[EventsSlice] Removed event:', eventId);
       return { success: true };
     } catch (error) {
-      const errorMsg = messageOf(error, 'Failed to delete event');
+      const failure = writeFailureOf(error, 'Failed to delete event');
       console.error('[EventsSlice] Error deleting event:', error);
-      if (get().userId !== requestedBy) return { success: false, error: errorMsg };
-      set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      return failure;
     }
   },
 
@@ -249,4 +349,5 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
   clearEventsError: () => {
     set({ eventsError: null });
   },
-});
+  };
+};

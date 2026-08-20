@@ -1,16 +1,16 @@
 /**
- * eventsSlice — what the caller of a write is told, and what the list looks like after
+ * eventsSlice — per-call outcomes and concurrent event reconciliation
  *
  * `eventsService` throws, so every action here has a reason to report. The two
  * things worth pinning:
  *
- * 1. **A write returns its own outcome.** Reading `eventsError` back off the
- *    store after an await races every other write in the app, so a failed save
- *    hands the message straight back to the caller as well as parking it in
- *    `eventsError`. That is what lets the create form tell the user THIS event
- *    did not save (CAP-7) instead of showing whatever the shared key holds.
+ * 1. **Every call returns its own outcome.** `eventsError` belongs only to the
+ *    active load; writes hand their failure to their own caller without
+ *    changing that load channel.
  * 2. **The list stays in date order.** Reads come back `event_date` ascending;
  *    an added or re-dated event has to land in the right place, not at the end.
+ * 3. **A load replays writes completed after it began.** Its older response
+ *    cannot roll back an add/edit or resurrect a delete.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { create, type StateCreator } from 'zustand';
@@ -29,7 +29,10 @@ vi.mock('../../../src/services/eventsService', () => ({
   },
 }));
 
-import type { CoupleEvent } from '../../../src/services/eventsService';
+import type {
+  CoupleEvent,
+  EventWriteErrorCode,
+} from '../../../src/services/eventsService';
 import { createEventsSlice, type EventsSlice } from '../../../src/stores/slices/eventsSlice';
 
 const USER_ID = 'USER-A-ID';
@@ -54,6 +57,20 @@ function event(id: string, isoDate: string, overrides: Partial<CoupleEvent> = {}
     icon: 'calendar',
     ...overrides,
   };
+}
+
+function codedWriteError(code: EventWriteErrorCode, message: string): Error {
+  return Object.assign(new Error(message), { code });
+}
+
+function deferred<T>() {
+  let resolve: (value: T) => void = () => {};
+  let reject: (reason: unknown) => void = () => {};
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
 }
 
 describe('eventsSlice', () => {
@@ -81,8 +98,9 @@ describe('eventsSlice', () => {
       getEvents.mockResolvedValue(loaded);
       const store = createTestStore();
 
-      await store.getState().loadEvents();
+      const result = await store.getState().loadEvents();
 
+      expect(result).toEqual({ status: 'success' });
       expect(store.getState().events).toEqual(loaded);
       expect(store.getState().eventsIsLoading).toBe(false);
       expect(store.getState().eventsError).toBeNull();
@@ -112,13 +130,14 @@ describe('eventsSlice', () => {
       const store = createTestStore();
       store.setState({ events: [event('stale', '2026-09-12')] });
 
-      await store.getState().loadEvents();
+      const result = await store.getState().loadEvents();
 
       // Supabase-only means there is no mirror to repopulate from, so a failed
       // refresh must NOT blank a list the user is already looking at.
       expect(store.getState().events).toEqual([event('stale', '2026-09-12')]);
       expect(store.getState().eventsError).toBe(message);
       expect(store.getState().eventsIsLoading).toBe(false);
+      expect(result).toEqual({ status: 'failure', error: message });
     });
 
     it('clears a previous error when it starts', async () => {
@@ -140,8 +159,9 @@ describe('eventsSlice', () => {
       const store = createTestStore();
       store.setState({ userId: null });
 
-      await store.getState().loadEvents();
+      const result = await store.getState().loadEvents();
 
+      expect(result).toEqual({ status: 'stale' });
       expect(getEvents).not.toHaveBeenCalled();
       expect(store.getState().eventsIsLoading).toBe(false);
       expect(store.getState().eventsError).toBeNull();
@@ -171,7 +191,7 @@ describe('eventsSlice', () => {
       const second = store.getState().loadEvents();
 
       settleFirst([event('stale', '2026-09-12')]);
-      await first;
+      expect(await first).toEqual({ status: 'stale' });
 
       // The stale resolution changed nothing: the second load still owns both
       // the flag and the list.
@@ -179,7 +199,7 @@ describe('eventsSlice', () => {
       expect(store.getState().events).toEqual([]);
 
       settleSecond([event('fresh', '2026-12-25')]);
-      await second;
+      expect(await second).toEqual({ status: 'success' });
 
       expect(store.getState().events.map((e) => e.id)).toEqual(['fresh']);
       expect(store.getState().eventsIsLoading).toBe(false);
@@ -207,16 +227,264 @@ describe('eventsSlice', () => {
       const second = store.getState().loadEvents();
 
       rejectFirst(new Error('the older request failed'));
-      await first;
+      expect(await first).toEqual({ status: 'stale' });
 
       expect(store.getState().eventsError).toBeNull();
       expect(store.getState().eventsIsLoading).toBe(true);
 
       settleSecond([]);
-      await second;
+      expect(await second).toEqual({ status: 'success' });
 
       expect(store.getState().eventsError).toBeNull();
       expect(store.getState().eventsIsLoading).toBe(false);
+    });
+
+    it('returns stale and touches no owned state when the account changes', async () => {
+      const pendingLoad = deferred<CoupleEvent[]>();
+      getEvents.mockReturnValue(pendingLoad.promise);
+      const store = createTestStore();
+      const inFlight = store.getState().loadEvents();
+
+      const successorEvents = [event('successor', '2026-12-25', { userId: 'USER-B-ID' })];
+      store.setState({
+        userId: 'USER-B-ID',
+        events: successorEvents,
+        eventsIsLoading: false,
+        eventsError: 'successor owns this',
+      });
+      pendingLoad.resolve([event('previous-account', '2026-09-12')]);
+
+      expect(await inFlight).toEqual({ status: 'stale' });
+      expect(store.getState().events).toEqual(successorEvents);
+      expect(store.getState().eventsIsLoading).toBe(false);
+      expect(store.getState().eventsError).toBe('successor owns this');
+    });
+
+    it("does not replay account A's completed add into account B's active load", async () => {
+      const pendingAdd = deferred<CoupleEvent>();
+      createEvent.mockReturnValue(pendingAdd.promise);
+      const store = createTestStore();
+
+      const accountAAdd = store
+        .getState()
+        .addEvent({ label: 'account-a', eventDate: '2026-10-31' });
+
+      const pendingAccountBLoad = deferred<CoupleEvent[]>();
+      store.setState({
+        userId: 'USER-B-ID',
+        events: [],
+        eventsIsLoading: false,
+        eventsError: null,
+      });
+      getEvents.mockReturnValue(pendingAccountBLoad.promise);
+      const accountBLoad = store.getState().loadEvents();
+
+      const accountAEvent = event('account-a', '2026-10-31');
+      pendingAdd.resolve(accountAEvent);
+      expect(await accountAAdd).toEqual({ success: true });
+
+      const accountBEvent = event('account-b', '2026-12-25', { userId: 'USER-B-ID' });
+      pendingAccountBLoad.resolve([accountBEvent]);
+      expect(await accountBLoad).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual([accountBEvent]);
+    });
+
+    it("does not replay account A's completed edit into account B's active load", async () => {
+      const pendingEdit = deferred<CoupleEvent>();
+      updateEvent.mockReturnValue(pendingEdit.promise);
+      const store = createTestStore();
+
+      const accountAEdit = store.getState().editEvent('account-a-event', {
+        label: 'account-a-edited',
+      });
+
+      const pendingAccountBLoad = deferred<CoupleEvent[]>();
+      store.setState({
+        userId: 'USER-B-ID',
+        events: [],
+        eventsIsLoading: false,
+        eventsError: null,
+      });
+      getEvents.mockReturnValue(pendingAccountBLoad.promise);
+      const accountBLoad = store.getState().loadEvents();
+
+      pendingEdit.resolve(
+        event('account-a-event', '2026-10-31', {
+          label: 'account-a-edited',
+        })
+      );
+      expect(await accountAEdit).toEqual({ success: true });
+
+      const accountBEvent = event('account-b', '2026-12-25', { userId: 'USER-B-ID' });
+      pendingAccountBLoad.resolve([accountBEvent]);
+      expect(await accountBLoad).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual([accountBEvent]);
+    });
+
+    it('keeps a completed add for the newer same-user load after the older load settles stale', async () => {
+      const firstLoad = deferred<CoupleEvent[]>();
+      const secondLoad = deferred<CoupleEvent[]>();
+      getEvents.mockReturnValueOnce(firstLoad.promise).mockReturnValueOnce(secondLoad.promise);
+      const added = event('added-after-second-started', '2026-10-31');
+      createEvent.mockResolvedValue(added);
+      const store = createTestStore();
+
+      const first = store.getState().loadEvents();
+      const second = store.getState().loadEvents();
+      await store
+        .getState()
+        .addEvent({ label: 'added-after-second-started', eventDate: '2026-10-31' });
+
+      firstLoad.resolve([event('superseded', '2026-09-12')]);
+      expect(await first).toEqual({ status: 'stale' });
+
+      const fetched = event('fetched', '2026-12-25');
+      secondLoad.resolve([fetched]);
+      expect(await second).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual([added, fetched]);
+      expect(store.getState().events.filter((item) => item.id === added.id)).toHaveLength(1);
+    });
+
+    it('replays a completed add omitted by the older fetched list', async () => {
+      const pendingLoad = deferred<CoupleEvent[]>();
+      getEvents.mockReturnValue(pendingLoad.promise);
+      const created = event('added', '2026-10-31');
+      createEvent.mockResolvedValue(created);
+      const store = createTestStore();
+
+      const inFlight = store.getState().loadEvents();
+      await store.getState().addEvent({ label: 'added', eventDate: '2026-10-31' });
+      pendingLoad.resolve([]);
+
+      expect(await inFlight).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual([created]);
+    });
+
+    it('does not duplicate an add already installed by the load before create resumes', async () => {
+      const pendingLoad = deferred<CoupleEvent[]>();
+      const pendingCreate = deferred<CoupleEvent>();
+      getEvents.mockReturnValue(pendingLoad.promise);
+      createEvent.mockReturnValue(pendingCreate.promise);
+      const created = event('already-observed', '2026-10-31');
+      const store = createTestStore();
+
+      const inFlight = store.getState().loadEvents();
+      const add = store
+        .getState()
+        .addEvent({ label: 'already-observed', eventDate: '2026-10-31' });
+      pendingLoad.resolve([created]);
+      expect(await inFlight).toEqual({ status: 'success' });
+      pendingCreate.resolve(created);
+      expect(await add).toEqual({ success: true });
+
+      expect(store.getState().events).toEqual([created]);
+    });
+
+    it('upserts an edited row omitted by a load that settles before the edit resumes', async () => {
+      const pendingLoad = deferred<CoupleEvent[]>();
+      const pendingEdit = deferred<CoupleEvent>();
+      getEvents.mockReturnValue(pendingLoad.promise);
+      updateEvent.mockReturnValue(pendingEdit.promise);
+      const oldEdited = event('edited', '2026-12-25');
+      const resident = event('resident', '2026-10-31');
+      const updated = event('edited', '2026-09-12', { label: 'Restored edit' });
+      const store = createTestStore();
+      store.setState({ events: [resident, oldEdited] });
+
+      const load = store.getState().loadEvents();
+      const edit = store.getState().editEvent('edited', { eventDate: '2026-09-12' });
+
+      pendingLoad.resolve([resident]);
+      expect(await load).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual([resident]);
+
+      pendingEdit.resolve(updated);
+      expect(await edit).toEqual({ success: true });
+      expect(store.getState().events).toEqual([updated, resident]);
+    });
+
+    it('replays add then delete in completion order without resurrecting the transient row', async () => {
+      const pendingLoad = deferred<CoupleEvent[]>();
+      getEvents.mockReturnValue(pendingLoad.promise);
+      const transient = event('transient', '2026-10-31');
+      createEvent.mockResolvedValue(transient);
+      deleteEvent.mockResolvedValue(undefined);
+      const store = createTestStore();
+
+      const inFlight = store.getState().loadEvents();
+      await store.getState().addEvent({ label: 'transient', eventDate: '2026-10-31' });
+      await store.getState().removeEvent('transient');
+      // The request captured the row after its add but before its delete. Only
+      // ordered replay of the delete tombstone can remove it from this stale
+      // response; endpoint-only start/current snapshots both see it absent.
+      pendingLoad.resolve([transient]);
+
+      expect(await inFlight).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual([]);
+    });
+
+    it('replays an edit over the older row and restores date order', async () => {
+      const pendingLoad = deferred<CoupleEvent[]>();
+      getEvents.mockReturnValue(pendingLoad.promise);
+      const oldEdited = event('edited', '2026-09-12');
+      const resident = event('resident', '2026-10-31');
+      const updated = event('edited', '2026-12-25', { label: 'Updated' });
+      updateEvent.mockResolvedValue(updated);
+      const store = createTestStore();
+      store.setState({ events: [oldEdited, resident] });
+
+      const inFlight = store.getState().loadEvents();
+      await store.getState().editEvent('edited', { eventDate: '2026-12-25' });
+      pendingLoad.resolve([oldEdited, resident]);
+
+      expect(await inFlight).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual([resident, updated]);
+    });
+
+    it('replays a delete tombstone so an older response cannot resurrect the row', async () => {
+      const pendingLoad = deferred<CoupleEvent[]>();
+      getEvents.mockReturnValue(pendingLoad.promise);
+      deleteEvent.mockResolvedValue(undefined);
+      const deleted = event('deleted', '2026-09-12');
+      const kept = event('kept', '2026-10-31');
+      const store = createTestStore();
+      store.setState({ events: [deleted, kept] });
+
+      const inFlight = store.getState().loadEvents();
+      await store.getState().removeEvent('deleted');
+      pendingLoad.resolve([deleted, kept]);
+
+      expect(await inFlight).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual([kept]);
+    });
+
+    it('keeps all write failures out of a successful load outcome and error channel', async () => {
+      const pendingLoad = deferred<CoupleEvent[]>();
+      getEvents.mockReturnValue(pendingLoad.promise);
+      createEvent.mockRejectedValue(codedWriteError('transport', 'add failed'));
+      updateEvent.mockRejectedValue(codedWriteError('transport', 'edit failed'));
+      deleteEvent.mockRejectedValue(codedWriteError('transport', 'delete failed'));
+      const store = createTestStore();
+
+      const inFlight = store.getState().loadEvents();
+      expect(
+        await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' })
+      ).toMatchObject({ success: false, error: 'add failed' });
+      expect(await store.getState().editEvent('x', { label: 'changed' })).toMatchObject({
+        success: false,
+        error: 'edit failed',
+      });
+      expect(await store.getState().removeEvent('x')).toMatchObject({
+        success: false,
+        error: 'delete failed',
+      });
+      expect(store.getState().eventsError).toBeNull();
+
+      const loaded = [event('loaded', '2026-12-25')];
+      pendingLoad.resolve(loaded);
+      expect(await inFlight).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual(loaded);
+      expect(store.getState().eventsError).toBeNull();
     });
   });
 
@@ -274,12 +542,17 @@ describe('eventsSlice', () => {
       });
     });
 
-    it('hands the reason back to the caller AND parks it, leaving the list alone', async () => {
+    it('hands the reason back without changing the load error, leaving the list alone', async () => {
       const store = createTestStore();
       const existing = [event('sooner', '2026-09-12')];
-      store.setState({ events: existing });
+      store.setState({ events: existing, eventsError: 'the current load failed' });
       createEvent.mockRejectedValue(
-        new Error('[EventsService.createEvent] Permission denied - check Row Level Security policies')
+        Object.assign(
+          new Error(
+            '[EventsService.createEvent] Permission denied - check Row Level Security policies'
+          ),
+          { code: '42501' }
+        )
       );
 
       const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
@@ -287,11 +560,10 @@ describe('eventsSlice', () => {
       expect(result.success).toBe(false);
       expect(result).toEqual({
         success: false,
+        code: 'transport',
         error: '[EventsService.createEvent] Permission denied - check Row Level Security policies',
       });
-      expect(store.getState().eventsError).toBe(
-        '[EventsService.createEvent] Permission denied - check Row Level Security policies'
-      );
+      expect(store.getState().eventsError).toBe('the current load failed');
       expect(store.getState().events).toEqual(existing);
     });
 
@@ -308,14 +580,32 @@ describe('eventsSlice', () => {
       // documenting a message the app never emits.
       const OFFLINE_MESSAGE = 'You are offline. Events need a connection to save.';
       const store = createTestStore();
-      createEvent.mockRejectedValue(new Error(OFFLINE_MESSAGE));
+      createEvent.mockRejectedValue(codedWriteError('offline', OFFLINE_MESSAGE));
 
       const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
 
-      expect(result).toEqual({ success: false, error: OFFLINE_MESSAGE });
-      expect(store.getState().eventsError).toBe(OFFLINE_MESSAGE);
+      expect(result).toEqual({ success: false, code: 'offline', error: OFFLINE_MESSAGE });
+      expect(store.getState().eventsError).toBeNull();
       expect(store.getState().events).toEqual([]);
     });
+
+    it.each(['validation', 'invalid-response'] as const)(
+      'preserves the %s service code and leaves the list unchanged',
+      async (code) => {
+        const store = createTestStore();
+        const existing = [event('existing', '2026-09-12')];
+        store.setState({ events: existing });
+        createEvent.mockRejectedValue(codedWriteError(code, 'The returned message'));
+
+        const result = await store.getState().addEvent({
+          label: 'x',
+          eventDate: '2026-10-31',
+        });
+
+        expect(result).toEqual({ success: false, code, error: 'The returned message' });
+        expect(store.getState().events).toEqual(existing);
+      }
+    );
 
     it('refuses without a signed-in user and never reaches the service', async () => {
       const store = createTestStore();
@@ -323,8 +613,12 @@ describe('eventsSlice', () => {
 
       const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
 
-      expect(result).toEqual({ success: false, error: 'You must be signed in to add an event' });
-      expect(store.getState().eventsError).toBe('You must be signed in to add an event');
+      expect(result).toEqual({
+        success: false,
+        code: 'auth',
+        error: 'You must be signed in to add an event',
+      });
+      expect(store.getState().eventsError).toBeNull();
       expect(createEvent).not.toHaveBeenCalled();
     });
   });
@@ -368,15 +662,19 @@ describe('eventsSlice', () => {
     });
 
     it('refuses without a signed-in user and never reaches the service', async () => {
-      // Mirrors addEvent's bail: without it the service call went out signed
-      // out, and the failure was parked in eventsError for a null session.
+      // Mirrors addEvent's bail: without it the service call would go out
+      // signed out despite there being no caller identity for the edit.
       const store = createTestStore();
       store.setState({ userId: null });
 
       const result = await store.getState().editEvent('a', { label: 'x' });
 
-      expect(result).toEqual({ success: false, error: 'You must be signed in to edit an event' });
-      expect(store.getState().eventsError).toBe('You must be signed in to edit an event');
+      expect(result).toEqual({
+        success: false,
+        code: 'auth',
+        error: 'You must be signed in to edit an event',
+      });
+      expect(store.getState().eventsError).toBeNull();
       expect(updateEvent).not.toHaveBeenCalled();
     });
 
@@ -386,12 +684,18 @@ describe('eventsSlice', () => {
       const store = createTestStore();
       const existing = [event('partners-event', '2026-09-12')];
       store.setState({ events: existing });
-      updateEvent.mockRejectedValue(new Error('Event not found or not yours to edit'));
+      updateEvent.mockRejectedValue(
+        codedWriteError('not-found', 'Event not found or not yours to edit')
+      );
 
       const result = await store.getState().editEvent('partners-event', { label: 'mine now' });
 
-      expect(result).toEqual({ success: false, error: 'Event not found or not yours to edit' });
-      expect(store.getState().eventsError).toBe('Event not found or not yours to edit');
+      expect(result).toEqual({
+        success: false,
+        code: 'not-found',
+        error: 'Event not found or not yours to edit',
+      });
+      expect(store.getState().eventsError).toBeNull();
       expect(store.getState().events).toEqual(existing);
     });
   });
@@ -418,8 +722,12 @@ describe('eventsSlice', () => {
 
       const result = await store.getState().removeEvent('a');
 
-      expect(result).toEqual({ success: false, error: 'You must be signed in to delete an event' });
-      expect(store.getState().eventsError).toBe('You must be signed in to delete an event');
+      expect(result).toEqual({
+        success: false,
+        code: 'auth',
+        error: 'You must be signed in to delete an event',
+      });
+      expect(store.getState().eventsError).toBeNull();
       expect(deleteEvent).not.toHaveBeenCalled();
     });
 
@@ -427,12 +735,18 @@ describe('eventsSlice', () => {
       const store = createTestStore();
       const existing = [event('partners-event', '2026-09-12')];
       store.setState({ events: existing });
-      deleteEvent.mockRejectedValue(new Error('Event not found or not yours to delete'));
+      deleteEvent.mockRejectedValue(
+        codedWriteError('not-found', 'Event not found or not yours to delete')
+      );
 
       const result = await store.getState().removeEvent('partners-event');
 
-      expect(result).toEqual({ success: false, error: 'Event not found or not yours to delete' });
-      expect(store.getState().eventsError).toBe('Event not found or not yours to delete');
+      expect(result).toEqual({
+        success: false,
+        code: 'not-found',
+        error: 'Event not found or not yours to delete',
+      });
+      expect(store.getState().eventsError).toBeNull();
       expect(store.getState().events).toEqual(existing);
     });
   });

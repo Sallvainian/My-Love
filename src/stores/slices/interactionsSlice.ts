@@ -16,7 +16,10 @@
  * - Marked as viewed via Supabase API
  */
 
-import { InteractionService } from '../../api/interactionService';
+import {
+  InteractionService,
+  type InteractionSubscriptionStatus,
+} from '../../api/interactionService';
 import type { Interaction, SupabaseInteractionRecord } from '../../types';
 import { INTERACTION_ERRORS, validateInteraction } from '../../utils/interactionValidation';
 import { logger } from '../../utils/logger';
@@ -38,7 +41,9 @@ export interface InteractionsSlice {
   getUnviewedInteractions: () => Interaction[];
   getInteractionHistory: (days?: number) => Interaction[];
   loadInteractionHistory: (limit?: number) => Promise<void>;
-  subscribeToInteractions: () => Promise<() => void>;
+  subscribeToInteractions: (
+    onStatusChange: (status: InteractionSubscriptionStatus) => void
+  ) => Promise<() => void>;
   addIncomingInteraction: (interaction: SupabaseInteractionRecord) => void;
 }
 
@@ -204,7 +209,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
     }
   },
 
-  subscribeToInteractions: async () => {
+  subscribeToInteractions: async (onStatusChange) => {
     try {
       const currentUserId = get().userId;
       if (!currentUserId) {
@@ -212,20 +217,26 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
       }
 
       // Subscribe to incoming interactions
+      let active = true;
       const unsubscribe = await interactionService.subscribeInteractions(
         currentUserId,
         (record) => {
           // Add incoming interaction to state
           get().addIncomingInteraction(record);
+        },
+        (status) => {
+          if (!active || get().userId !== currentUserId) return;
+          set({ isSubscribed: status === 'SUBSCRIBED' });
+          onStatusChange(status);
         }
       );
 
-      set({ isSubscribed: true });
-
-      logger.debug('[InteractionsSlice] Subscribed to interactions');
+      logger.debug('[InteractionsSlice] Interaction subscription created');
 
       // Return enhanced unsubscribe function that also updates state
       return () => {
+        if (!active) return;
+        active = false;
         unsubscribe();
         set({ isSubscribed: false });
         logger.debug('[InteractionsSlice] Unsubscribed from interactions');

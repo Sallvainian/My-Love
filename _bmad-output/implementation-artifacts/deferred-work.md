@@ -146,7 +146,9 @@ location: src/services/eventsService.ts
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: Story 5's UI needs different affordances for the two outcomes (refresh the list vs retry the write). The shape mirrors photosSlice's PhotoUploadResult, which has the same limitation, so changing it is a cross-slice decision.
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-events-write-error-codes
+resolution-undo: a56e133f78fb9ed825473b5a7526f95d98b1b0ae337b60eaae078e8a484b671c 2026-08-20 7374617475733a206f70656e
 decision: 2026-08-19 Add a code to events only — Export EventWriteError from src/services/eventsService.ts and widen EventWriteResult in src/stores/slices/eventsSlice.ts to carry a machine-readable discriminant — at minimum separating 'not yours / not found' from 'offline' from 'transport failure' — then switch src/components/Settings/EventsSettings.tsx off prose matching onto that code, choosing refresh-the-list versus retry-the-write affordances from it. Leave photosSlice's PhotoUploadResult exactly as it is and record in the eventsSlice module header that the two shapes now diverge deliberately, so a future reader does not 'restore' the symmetry.
 
 ### DW-14: A persisted blob that already contained an events key would be rehydrated; only moods is stripped on read.
@@ -203,7 +205,9 @@ location: src/services/eventsService.ts
 source_spec: `2-events-service-and-store-slice.md`
 severity: low
 reason: Re-surfaced by this review pass; re-verified unchanged since the prior pass. Story 5's UI will need different affordances for different failure kinds (refresh vs retry); the shape mirrors PhotoUploadResult's same limitation.
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-events-write-error-codes
+resolution-undo: a56e133f78fb9ed825473b5a7526f95d98b1b0ae337b60eaae078e8a484b671c 2026-08-20 7374617475733a206f70656e
 
 ### DW-20: Persistence omission from partialize only prevents new writes; a pre-existing persisted blob with an events key would still rehydrate.
 origin: spec-deferred 0f9e6e1214d8
@@ -268,7 +272,9 @@ location: src/components/Settings/EventsSettings.tsx (load effect) + src/stores/
 source_spec: `5-manage-events-in-settings.md`
 severity: low
 reason: The load-failure flag is read once from the shared `eventsError` key in loadEvents()'s .finally, and `addEvent` writes its own failure into that same key (eventsSlice.ts, addEvent catch tail). The header Add button renders before the load settles, so a save can fail inside the load's flight window and leave the key non-null when the successful load reads it. The list itself still renders correctly; only the notice is wrong. The root cause is that one `eventsError` key serves loads and all three writes with no per-call token, which lives in eventsSlice.ts — a file this story's Never list forbids editing.
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-events-error-attribution
+resolution-undo: 967f607d893782fd21a702cf860f2384988b9ba6aceeda5267c395049534142b 2026-08-20 7374617475733a206f70656e
 
 ### DW-27: Once the Settings events load fails, nothing re-fires it: the notice and the empty list persist until the user reloads the page.
 origin: spec-deferred 289bbe236935
@@ -276,7 +282,9 @@ location: src/components/Settings/EventsSettings.tsx (load effect deps)
 source_spec: `5-manage-events-in-settings.md`
 severity: low
 reason: The mount effect's deps are [userId, loadEvents]. App.tsx's otherwise identical Home effect deliberately adds isOnline, commented "coming back online re-fires the load, so the offline error card clears without leaving Home." There is no retry control, and clearEventsError (exported from eventsSlice.ts) still has zero production callers. This story's intent-contract specifies "A mount effect keyed on `userId`", so closing the gap means widening what the intent asked for.
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-events-settings-load-retry
+resolution-undo: 433cb6cdb4b7a3a109c2c9469796fa50d337228f20bc12a5857dcfafb8a9ccf3 2026-08-20 7374617475733a206f70656e
 
 ### DW-28: The three primary buttons this section adds are white text on `bg-pink-500`, which measures 3.58:1 against the 4.5:1 WCAG AA requirement.
 origin: spec-deferred d52fd5748eef
@@ -284,7 +292,9 @@ location: src/components/Settings/EventsSettings.tsx:255, :296, :813 (root cause
 source_spec: `5-manage-events-in-settings.md`
 severity: medium
 reason: Measured twice and independently. The parked axe run at `_bmad-output/test-artifacts/atdd-scaffolds-5-manage-events-in-settings/e2e-events-accessibility.spec.ts` reports impact "serious" on `events-settings-add` and `events-form-submit` -- "insufficient color contrast of 3.58 (foreground color: #ffffff, background color: #f6339a ... Expected contrast ratio of 4.5:1". Computing the relative luminance of #f6339a by hand gives (1.0 + 0.05) / (0.24294 + 0.05) = 3.58, the same number. A third instance nobody scanned carries the identical class string: `events-settings-empty-add` at EventsSettings.tsx:296. The axe scaffold seeds a row before every scan, so the empty state never renders and that button was never measured -- a developer following the checklist, which lists only :255 and :813, ships two fixed buttons and one unfixed one. The root cause is not this story's markup. `grep -rn "bg-pink-500" src/ | grep -c "text-white"` is 17, across 9 files, including the sibling AnniversarySetting
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-pink-primary-button-contrast
+resolution-undo: 1f1ce66048fcb7a2fbfadd78a511a0aa0175348f683c99cc90ca35cd1aef7178 2026-08-20 7374617475733a206f70656e
 decision: 2026-08-19 Darken the shared token app-wide — Move every white-on-pink primary button to a darker pink across all 17 sites in 9 files so the app stays visually uniform and passes AA everywhere at once. Pick the shade by measurement rather than assumption — Tailwind v4 resolves its palette through oklch, so pink-500 renders as #f6339a rather than the v3 hex, and the chosen replacement must be re-measured against white to confirm it clears 4.5:1 before the change lands. Include EventsSettings.tsx:296, the empty-state Add button the axe scaffold never reaches, and extend the parked accessibility scan so the empty state is scanned too. This changes the app's primary button colour on every screen, so confirm the new shade looks right in both light and dark mode.
 
 ### DW-29: A write that lands while the first load is still in flight is discarded by that load, so a saved edit or a new event silently reverts on screen.
@@ -293,7 +303,9 @@ location: src/stores/slices/eventsSlice.ts (loadEvents resolution) exposed by sr
 source_spec: `5-manage-events-in-settings.md`
 severity: medium
 reason: `loadEvents` replaces the list wholesale on resolution -- `set({ events, eventsIsLoading: false })` at eventsSlice.ts, guarded only by `latestLoadId` against other loads, never against writes. `addEvent` / `editEvent` mutate `events` in place the moment their own request resolves. So a write that resolves inside the load's flight window is overwritten by the server list the load captured before that write landed. The reachable form is not the empty-list one. `slot` is `'list'` whenever `events.length > 0`, and `events` survives view changes -- so a user who loads Home (App's effect populates `events`) and then opens Settings sees a fully rendered list with Edit and Delete live while EventsSettings' own mount load is still outstanding. An edit accepted in that window reverts visually when the load resolves, and the row is durably changed on the server, so nothing on screen says a write succeeded. This is the success-path twin of DW-26, and it has the same root cause and the same blocker
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-events-error-attribution
+resolution-undo: 967f607d893782fd21a702cf860f2384988b9ba6aceeda5267c395049534142b 2026-08-20 7374617475733a206f70656e
 
 ### DW-30: Roughly 4,000 lines of measured tests shipped in this change set are matched by no test runner and execute nowhere.
 origin: spec-deferred cb64960af166
@@ -301,7 +313,9 @@ location: _bmad-output/test-artifacts/ (9 test files, 23 tests)
 source_spec: `5-manage-events-in-settings.md`
 severity: low
 reason: `_bmad-output/test-artifacts/` holds 6 ATDD scaffolds and 3 automation files. `vitest.config.ts` includes only `tests/**` and `src/**`, and Playwright's three projects set testDir to `./tests/e2e`, `./tests/api` and `./tests/integration`, so nothing reaches them. Both TEA summaries say so plainly ("Nothing here is active until it is moved") and record the `git mv` commands that would activate them, along with measurements taken by copying each file to its target, running it, and removing it again. Two of the three defects this review confirmed were first surfaced by that parked tree, so the coverage is real rather than speculative. Activation is a deliberate operator decision, not a patch: `automation-summary.md` measures typecheck at 6 TS2883 errors without the generated files and 1 with them, so acceptance criterion 3 -- which pins the literal number six -- becomes false the moment the activation happens, and the one-line fix the summary proposes at `tests/support/merged-fixtures.ts:
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-activate-parked-event-tests
+resolution-undo: 17ce3b66d18c0b51d563a4a8722d775298fe4d3f3192f08273b06052a5fbaf4f 2026-08-20 7374617475733a206f70656e
 decision: 2026-08-19 Activate the parked tests — Run the git mv sequence recorded at automation-summary.md:594-600, helper first, then remove the test.skip markers each file's header and the ATDD checklist enumerate. Apply the one-line tests/support/merged-fixtures.ts fix the summary proposes, then rewire the six other files onto tests/support/helpers/events.ts as automation-summary.md:616 describes. Measure typecheck before and after rather than trusting the recorded numbers — the six-error TS2883 baseline is recorded as an artifact of the loop's worktree layout and this repo is not a worktree — and update story 5's acceptance criterion 3 in the same change so it no longer pins a count the activation invalidates. Every activated file must actually run and pass in its new home before the change is finished.
 
 ### DW-31: markAsViewed resolves successfully when its UPDATE matches zero rows, so a row the caller may not update is reported as marked.
@@ -346,7 +360,9 @@ location: src/api/interactionService.ts:225
 source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
 severity: low
 reason: src/api/interactionService.ts:253-255 passes a logger into .subscribe() and never surfaces CHANNEL_ERROR or TIMED_OUT to the caller. It also calls supabase.channel() directly, which AGENTS.md already records as a repo-wide teardown pitfall; the missing error path is the half AGENTS.md does not cover. Unchanged by this diff.
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-interaction-subscribe-error-surfacing
+resolution-undo: 2b166d2a835fd67e36fae399847dd6a6dbf4ddc63c28d08a577652ead0c14b78 2026-08-20 7374617475733a206f70656e
 
 ### DW-36: The SQLSTATE lookup walks Object.prototype, so a code of toString, constructor, valueOf or hasOwnProperty returns an inherited function and renders it to the user as the error message.
 origin: spec-deferred d3c350f0c7d6
@@ -428,7 +444,9 @@ location: src/services/eventsService.ts (getEvents merge)
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: `getEvents` issues the upcoming and past windows through `Promise.all` and reconciles only the "returned by BOTH" case, dropping one copy to avoid a duplicate React key. Two other outcomes exist and are now named in the code comment: the row lands in NEITHER page (past answered before the edit, upcoming after, or the reverse), and the copy kept is the pre-edit one, so an already-passed event renders as upcoming. Both need a partner editing an event across today's boundary during a load, and both correct themselves on the next `loadEvents()`. Closing either means abandoning the two-window read for a single request — the shape the Design Notes deliberately chose against — or comparing `updated_at` between copies, which the column supports but is client-maintained (`20260818000002_create_events_table.sql`, comment on `public.events.updated_at`).
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: Both outcomes need a partner editing an event across today's boundary during a load and both correct themselves on the next loadEvents(); eventsService.ts:369-380 already names them in place for the next reader.
+decision: 2026-08-19 Accept the race as documented — Both outcomes need a partner editing an event across today's boundary during a load and both correct themselves on the next loadEvents(); eventsService.ts:369-380 already names them in place for the next reader.
 
 ### DW-46: Neither window requests a row count, so nothing can tell that truncation happened — which the deferred "load more" control would need.
 origin: spec-deferred 3eedd014be6b
@@ -444,7 +462,9 @@ location: tests/api/events-read-window.spec.ts, src/services/eventsService.ts
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: `tests/api/events-read-window.spec.ts` cannot import `eventsService`: `src/api/supabaseClient.ts` reads `import.meta.env`, a Vite build-time substitution with no value under the Playwright runner. Its `readEventWindows` therefore mirrors the `gte`/`lt`/`order`/`range` chain by hand, and already diverges in one respect — it computes `offset + limit - 1` with none of production's clamping. The containment is real and was re-verified this pass: mutating the production chain fails `tests/unit/services/eventsService.test.ts`, whose `backend.queries` assertions pin the exact bounds, orderings and range. What is uncovered is a change made in production AND mirrored here incorrectly. Closing it means making the chain injectable — passing a client into a shared function both the service and the spec call — which is a production design change the intent does not reach.
-status: open
+status: done 2026-08-19
+resolution: closed by human decision: eventsService.test.ts pins the production chain's bounds, orderings and range, so only a change mirrored incorrectly into the API spec escapes, and no user-facing behaviour depends on the duplication.
+decision: 2026-08-19 Accept the mirror; the unit test contains it — eventsService.test.ts pins the production chain's bounds, orderings and range, so only a change mirrored incorrectly into the API spec escapes, and no user-facing behaviour depends on the duplication.
 
 ### DW-48: The read-side strip covers the `events` key only; a persisted blob carrying `eventsIsLoading` or `eventsError` would still rehydrate those two.
 origin: spec-deferred ed3babe6b83b
@@ -452,4 +472,228 @@ location: src/stores/useAppStore.ts:74
 source_spec: `spec-dw-14-20-persisted-events-key-strip.md`
 severity: low
 reason: `STALE_PERSISTED_KEYS` (src/stores/useAppStore.ts:74) lists `moods` and `events`. A blob carrying `eventsIsLoading: true` would rehydrate it, and `loadEvents` bails at `if (!requestedBy) return;` (src/stores/slices/eventsSlice.ts:118) *before* raising the flag — so on a signed-out start nothing clears it until the next sign-in, leaving a stranded loading state. `eventsError` would likewise show a stale banner. Neither carries couple data, so this is not the disclosure class DW-14/DW-20 describe, and both are the same unreachability class as the original entries: no build has ever written any events key to localStorage. Excluded from this change on the authority of the bundle intent, which names the `events` key alone ("Strip a stale `events` key out of the persisted blob on read").
+status: open
+
+### DW-49: An invalid-response write can already have landed, but Settings still offers the same write control and a create retry can duplicate the event.
+origin: spec-deferred db701c73ed1f
+location: src/components/Settings/EventsSettings.tsx:872
+source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
+severity: medium
+reason: This behavior predates the bundle: every failure previously left Save enabled. The new `invalid-response` code now identifies it, but choosing a distinct safe affordance was not part of the events-only refresh-versus-retry decision. `createEvent` can throw after insert when the returned row cannot be converted, while Settings routes every code except `not-found` to Save/Delete.
+status: open
+
+### DW-50: The EventsSlice interface comment says `eventsError` is raised only by loads even though writes also park messages there.
+origin: spec-deferred ce0f9f82f812
+location: src/stores/slices/eventsSlice.ts:54
+source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
+severity: low
+reason: The contradiction existed at the baseline: addEvent, editEvent, and removeEvent already set `eventsError` on failure while the state-field comment called it load-only. The current bundle preserves that behavior and documents the result-shape divergence elsewhere in the module header.
+status: open
+
+### DW-51: A load outcome can be misreported when an event write settles in the narrow window before Settings snapshots the shared error field.
+origin: spec-deferred a61e4d489ca9
+location: src/components/Settings/EventsSettings.tsx:130
+source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
+severity: medium
+reason: This shared-state race predates this bundle and is already identified in the component tests as DW-26. `loadEvents` resolves without its own outcome, so `recordLoadOutcome` reads `eventsError`, which write actions can independently clear or replace before that read. A successful load can therefore show a failure banner, or a failed load can appear successful.
+status: open
+
+### DW-52: Invalid-response writes keep the write control even though the mutation may already have landed.
+origin: spec-deferred 7567c0b98908
+location: src/components/Settings/EventsSettings.tsx:872
+source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
+severity: medium
+reason: The behavior predates this bundle, but the coded result makes the ambiguity explicit. Create and update can throw `invalid-response` only after a successful response is missing or cannot be converted; Settings routes every non-`not-found` code back to Save or Update, so create can duplicate a committed event and update can retry without reconciling the stale list.
+status: open
+
+### DW-53: Transport wrapping drops the original non-PostgREST network error as an Error cause.
+origin: spec-deferred 2d2ac9a00a50
+location: src/services/eventsService.ts:147
+source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
+severity: low
+reason: The pre-existing `networkFailure` helper creates a new message-only Error. `writeTransportFailure` now wraps only that message, so the original error identity, stack, and transport metadata remain unavailable for diagnostics even though PostgREST wrapping preserves its mapped error as `cause`.
+status: open
+
+### DW-54: User-id-only event load ownership can admit a pre-sign-out response after signing back into the same account.
+origin: spec-deferred f281396e181b
+location: src/stores/slices/eventsSlice.ts:210; src/App.tsx:441
+source_spec: `spec-dw-26-29-events-error-attribution.md`
+severity: medium
+reason: `loadEvents` validates only `requestedBy` and `latestLoadId`. If account A signs out, signs back in as A, and the old request settles before the new mount effect increments the load id, both guards match and the prior-session response can own the reset list. App's local settled marker is also keyed only by user id. This path predates the bundle; the change preserves rather than introduces those guards.
+status: open
+
+### DW-55: A prior-session event load can still own state after signing back into the same account.
+origin: spec-deferred d08cc52656ce
+location: src/stores/slices/eventsSlice.ts:210; src/App.tsx:441
+source_spec: `spec-dw-26-29-events-error-attribution.md`
+severity: medium
+reason: `loadEvents` continues to identify ownership with `requestedBy` and `latestLoadId`. If account A signs out and signs back in as A before the old request settles and before a successor load allocates a new id, both guards still match. The user-id-only guard predates this bundle; the reviewed change preserves it while adding call-owned outcomes and mutation replay.
+status: open
+
+### DW-56: A prior-session event load can still own the reset list after signing back into the same account.
+origin: spec-deferred a52c0c10748d
+location: src/stores/slices/eventsSlice.ts:210; src/App.tsx:441
+source_spec: `spec-dw-26-29-events-error-attribution.md`
+severity: medium
+reason: `loadEvents` captures only `userId` and `latestLoadId`. A request started before sign-out can therefore pass both guards after the same user signs in again if the successor Home effect has not allocated a new load id yet. This ownership gap predates the reviewed change, which preserves the existing identity guards while adding per-call results and mutation replay.
+status: open
+
+### DW-57: A manual stale-row refresh can settle after Events Settings unmounts and call its local state setters.
+origin: spec-deferred 0c21a7d01775
+location: src/components/Settings/EventsSettings.tsx:185
+source_spec: `spec-dw-26-29-events-error-attribution.md`
+severity: low
+reason: The mount load has a cancellation flag, but `refreshEvents()` awaits `loadEvents()` and then calls `recordLoadOutcome()` without an unmount guard. Navigating away during that request therefore reaches `setLoadFailed` and `setSettledForUserId` after unmount. The path and navigation warning predate this bundle; React discards the update, so the verified consequence is limited to development/test noise.
+status: open
+
+### DW-58: Follow-up review still recommended for dw-events-error-attribution after the damping cap was spent
+origin: review-budget-followup
+location: n/a
+source_spec: `spec-dw-26-29-events-error-attribution.md`
+severity: low
+reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260819-202616-75cc; this entry preserves the lingering recommendation for a deliberate later review.
+status: open
+
+### DW-59: The translucent own-photo badge can still miss WCAG AA over a bright photo.
+origin: spec-deferred c395d4263ff0
+location: src/components/PhotoGallery/PhotoGridItem.tsx:100
+source_spec: `spec-dw-28-pink-primary-button-contrast.md`
+severity: medium
+reason: `bg-pink-600/90` composites to approximately `#e91a84` over white, which is about 4.27:1 against the badge's small white text. The same image-dependent contrast issue was pre-existing with `bg-pink-500/90`; DW-28 improves the token but does not make this non-button overlay opaque.
+status: open
+
+### DW-60: The UI/SQL validation mirror test compares against the original create migration, not the effective constraint after all migrations have run.
+origin: spec-deferred eb5b0fb56687
+location: tests/unit/components/eventsValidationMirrors.test.ts:23
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: `tests/unit/components/eventsValidationMirrors.test.ts` reads the constraint from `20260815010000_create_events.sql`. A future migration could tighten or replace that constraint while this guard remained green, allowing the UI and deployed database rules to drift. No later events migration currently changes the constraint, so this is a test-maintainability risk rather than a current behavior defect.
+status: open
+
+### DW-61: Repeated date-helper calls can derive different calendar anchors if a seeding batch crosses local midnight.
+origin: spec-deferred 07bf0f3e8d6a
+location: tests/support/helpers/events.ts:179
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: `isoDateDaysFromNow` creates a fresh `Date` on every call. Multi-row tests call it repeatedly, so a run spanning midnight could produce dates based on different days. The older factory avoids this by accepting one shared anchor, but consolidating these helper APIs is outside the bundle's explicit move-and-rewire surface.
+status: open
+
+### DW-62: Historical story acceptance criteria AC4 and AC6 still pin obsolete test totals and the pre-activation file boundary.
+origin: spec-deferred 0bff1e60324b
+location: _bmad-output/specs/spec-dynamic-events/stories/5-manage-events-in-settings.md:244
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: Story 5 AC4 names a historical 1238-test baseline and only two EventsSettings suites; AC6 limits non-artifact changes to five original story files. Activating the parked runner files necessarily invalidates both descriptions. The bundle authorizes the exact AC3 rewrite only, and review policy requires changes to other specification assertions to be deferred instead of patched during review.
+status: open
+
+### DW-63: The validation drift guard reads the original events migration instead of the effective schema after every migration.
+origin: spec-deferred 8995c6651fba
+location: tests/unit/components/eventsValidationMirrors.test.ts:38
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: `tests/unit/components/eventsValidationMirrors.test.ts` extracts constraints from `20260818000002_create_events_table.sql`. A later migration could replace or tighten a constraint without changing that source file, leaving the guard green while the deployed database and UI differ. No later events migration currently changes these constraints.
+status: open
+
+### DW-64: Repeated event-date helper calls can use different calendar anchors across local midnight.
+origin: spec-deferred f5a669342ad5
+location: tests/support/helpers/events.ts:177
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: `isoDateDaysFromNow` creates a new `Date` on each invocation. A multi-row setup that crosses local midnight can therefore derive rows from different base days. The anchored `coupleEvents` factory avoids this, but consolidating both helper contracts is separate work.
+status: open
+
+### DW-65: Story 5 acceptance criteria AC4 and AC6 describe the pre-activation test totals and file boundary.
+origin: spec-deferred 7792fe01375e
+location: _bmad-output/specs/spec-dynamic-events/stories/5-manage-events-in-settings.md:242
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: AC4 retains the historical 1238-test baseline and names only the two original EventsSettings suites, while AC6 limits non-artifact changes to the five story files. Activating the parked API, E2E, component, and unit coverage makes both statements stale. The affected file is an agent-context specification, so review policy defers rather than edits it.
+status: open
+
+### DW-66: The validation drift guard reads one historical migration instead of the effective constraint installed by the complete migration chain.
+origin: spec-deferred 4abe4f39af4c
+location: tests/unit/components/eventsValidationMirrors.test.ts:38
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: `tests/unit/components/eventsValidationMirrors.test.ts` compares UI constants with `20260818000002_create_events_table.sql`. If a later migration tightens or replaces a constraint, the guard still compares against the obsolete source and can stay green while the form accepts input that the deployed database rejects.
+status: open
+
+### DW-67: The icon extractor can silently omit database values containing non-letter characters.
+origin: spec-deferred 0fdd766222cc
+location: tests/unit/components/eventsValidationMirrors.test.ts:98
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: The drift guard extracts icons with `'([a-z]+)'`. A later value such as `party-hat` does not match, so a database-only addition can be absent from `dbIcons` and leave the equality assertion green even though the UI does not offer the admitted value.
+status: open
+
+### DW-68: The validation mirror checks constant declarations but not the validation branches that consume them.
+origin: spec-deferred aa42fa28a662
+location: tests/unit/components/eventsValidationMirrors.test.ts:68
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: The guard proves that `LABEL_MAX_LENGTH` and `DESCRIPTION_MAX_LENGTH` match the migration, but a future edit can validate against a different literal while retaining those constants for messages or another use. Existing boundary tests cover rejection at 101 and 501, not acceptance at the exact database limits.
+status: open
+
+### DW-69: Repeated date-helper calls can anchor one setup batch to different local days at midnight.
+origin: spec-deferred 48f645dfe7e2
+location: tests/support/helpers/events.ts:177
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: `isoDateDaysFromNow` creates a new `Date` for every call. Multi-row setup in the activated API and E2E suites invokes it repeatedly, so a batch crossing local midnight can receive dates derived from different calendar anchors.
+status: open
+
+### DW-70: The anonymous-write isolation check can fail on a stale row from an interrupted prior run.
+origin: spec-deferred 1f8f5181ea11
+location: tests/api/events-wire-contract.spec.ts:247
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: The first wire-contract test queries the fixed `ANON_ATTEMPT_LABEL` without clearing the worker pair first. A prior run terminated before teardown can leave that label behind, so the final zero-row assertion can fail even though the anonymous POST wrote nothing.
+status: open
+
+### DW-71: Outsider account cleanup ignores a returned deletion error when sign-in setup fails.
+origin: spec-deferred 588dd42563e8
+location: tests/support/helpers/rls-security.ts:64
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: `createOutsiderClient` catches a failed sign-in and awaits `cleanup()`, but the Supabase admin deletion reports ordinary failures through its returned `error` field. That response is not checked on this setup-failure path, so the throwaway auth account can remain while only the sign-in error is reported.
+status: open
+
+### DW-72: The test-local event row schema accepts undeclared response columns despite its exact-schema claim.
+origin: spec-deferred ebb7963b5d9c
+location: tests/api/events-wire-contract.spec.ts:141
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: Zod objects strip unknown keys by default. Because `EventRowSchema` is not strict, a new PostgREST column returned by `select=*` is accepted even though the surrounding test prose says the schema mirrors the events table column for column.
+status: open
+
+### DW-73: The persistence suite header overstates reload coverage for the cleared-description case.
+origin: spec-deferred 5000b9059f98
+location: tests/e2e/settings/events-persistence.spec.ts:6
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: The file header says every row is read after a real reload, but DE.5-E2E-006 observes the pass-through PATCH response and resulting Settings and Home state without reloading. The behavior assertion remains valid, but the suite-level description is inaccurate.
+status: open
+
+### DW-74: Story 5 acceptance criteria AC4 and AC6 remain pinned to the pre-activation test inventory and file boundary.
+origin: spec-deferred 41994f83a590
+location: _bmad-output/specs/spec-dynamic-events/stories/5-manage-events-in-settings.md:242
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: AC4 names the historical 1238-test baseline and only the original EventsSettings suites, while AC6 permits only five story files outside artifacts. The activated API, E2E, component, unit, and shared-helper changes make both statements stale. Review policy requires deferring changes to this agent-context specification.
+status: open
+
+### DW-75: Incoming interaction callbacks can still write records from a previous account after the active user changes or teardown begins.
+origin: spec-deferred cdf80216e859
+location: src/stores/slices/interactionsSlice.ts:223
+source_spec: `spec-dw-35-interaction-subscribe-error-surfacing.md`
+severity: high
+reason: The pre-existing record callback in interactionsSlice calls addIncomingInteraction without checking the captured user or the subscription's active flag. A queued record from the old channel can therefore repopulate shared store state after an account switch. This was not introduced by DW-35's new status callback.
+status: open
+
+### DW-76: The subscribeInteractions JSDoc example does not match the method's required arguments.
+origin: spec-deferred 81acc5a7d387
+location: src/api/interactionService.ts:216
+source_spec: `spec-dw-35-interaction-subscribe-error-surfacing.md`
+severity: low
+reason: The example already omitted userId before this change and now also omits the status callback, so copied sample code does not typecheck. It is pre-existing documentation debt outside DW-35's runtime error surface.
 status: open

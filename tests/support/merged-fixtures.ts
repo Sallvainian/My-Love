@@ -21,6 +21,7 @@ import { test as customFixtures } from './fixtures';
 import { test as scriptureNavFixture } from './fixtures/scripture-navigation';
 import { test as authFixture } from './fixtures/auth';
 import { test as togetherModeFixture } from './fixtures/together-mode';
+import { test as interactionRealtimeFixture } from './fixtures/interaction-realtime-control';
 
 /**
  * Create network error monitor with project-specific exclusions.
@@ -50,7 +51,22 @@ const networkMonitorFixture = base.extend(
  * Auth: Uses SupabaseAuthProvider via @seontechnologies/playwright-utils auth-session.
  * Each worker gets a unique user identity via authOptions (worker-scoped).
  */
-export const test = mergeTests(
+export const test: ReturnType<
+  typeof mergeTests<
+    [
+      typeof apiRequestFixture,
+      typeof recurseFixture,
+      typeof logFixture,
+      typeof interceptFixture,
+      typeof networkMonitorFixture,
+      typeof customFixtures,
+      typeof scriptureNavFixture,
+      typeof authFixture,
+      typeof togetherModeFixture,
+      typeof interactionRealtimeFixture,
+    ]
+  >
+> = mergeTests(
   apiRequestFixture,
   recurseFixture,
   logFixture,
@@ -59,7 +75,8 @@ export const test = mergeTests(
   customFixtures,
   scriptureNavFixture,
   authFixture,
-  togetherModeFixture
+  togetherModeFixture,
+  interactionRealtimeFixture
 );
 
 export { expect } from '@playwright/test';

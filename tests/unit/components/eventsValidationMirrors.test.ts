@@ -1,9 +1,5 @@
 /**
- * RED-PHASE ATDD SCAFFOLD — story 5, `5-manage-events-in-settings`
- *
- * TARGET PATH ON ACTIVATION: tests/unit/components/eventsValidationMirrors.test.ts
- *   (`tests/unit/components/` does not exist yet — `mkdir` it; vitest.config.ts:40
- *   already includes `tests/**\/*.test.ts`.)
+ * Active ATDD drift guard — story 5, `5-manage-events-in-settings`
  *
  * COVERS: DE.5-UNIT-001 [P1] — `test-design-epic-5.md:343`, risk R-007
  *   ("Client validation mirrors drift from the DB constraints", score 4).
@@ -62,7 +58,7 @@ function capture(source: string, pattern: RegExp, what: string): string {
   return match[1];
 }
 
-describe.skip('DE.5-UNIT-001: client validation mirrors match the events CHECK constraints', () => {
+describe('DE.5-UNIT-001: client validation mirrors match the events CHECK constraints', () => {
   it('mirrors the label length limit', () => {
     const dbLimit = capture(
       read(MIGRATION),

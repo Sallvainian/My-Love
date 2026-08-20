@@ -28,6 +28,7 @@ import type { AppState } from '../../../stores/types';
 import { EventsSettings } from '../EventsSettings';
 
 type CoupleEvent = AppState['events'][number];
+type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
 type EventWriteResult = Awaited<ReturnType<AppState['addEvent']>>;
 type NewEventInput = Parameters<AppState['addEvent']>[0];
 type EventUpdateInput = Parameters<AppState['editEvent']>[1];
@@ -109,6 +110,7 @@ function currentEvents(): CoupleEvent[] {
 }
 
 const ok: EventWriteResult = { success: true };
+const loadOk: EventLoadResult = { status: 'success' };
 
 function setStore(overrides: Partial<AppState> = {}) {
   let created = 0;
@@ -117,8 +119,15 @@ function setStore(overrides: Partial<AppState> = {}) {
     events: [],
     eventsIsLoading: false,
     eventsError: null,
+    syncStatus: {
+      pendingMoods: 0,
+      isOnline: true,
+      lastSyncAt: undefined,
+      isSyncing: false,
+    },
     userId: OWN_USER_ID,
-    loadEvents: vi.fn(async () => {}),
+    loadEvents: vi.fn(async () => loadOk),
+    clearEventsError: vi.fn(() => store.patch({ eventsError: null })),
     addEvent: vi.fn(async (input: NewEventInput) => {
       created += 1;
       store.patch({
@@ -284,6 +293,7 @@ describe('EventsSettings form focus', () => {
     setStore({
       addEvent: vi.fn(async () => ({
         success: false as const,
+        code: 'offline' as const,
         error: 'You are offline. Events need a connection to save.',
       })),
     });
@@ -301,6 +311,49 @@ describe('EventsSettings form focus', () => {
     await waitFor(() => expect(screen.getByTestId('events-form-error')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByTestId('events-form-submit')).not.toBeDisabled());
     expect(document.activeElement).toBe(screen.getByTestId('events-form-submit'));
+  });
+
+  it('keeps focus on the header after refresh later removes the stale edit opener', async () => {
+    let finishRefresh: () => void = () => {};
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents,
+      editEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'not-found' as const,
+        error: 'Stale row',
+      })),
+    });
+    await renderSection();
+    loadEvents.mockClear();
+    loadEvents.mockImplementationOnce(
+      () =>
+        new Promise<EventLoadResult>((resolve) => {
+          finishRefresh = () => {
+            store.patch({ events: [], eventsError: null });
+            resolve(loadOk);
+          };
+        })
+    );
+
+    const opener = openBy('event-edit-mine');
+    fireEvent.click(screen.getByTestId('events-form-submit'));
+    await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('events-form-refresh'));
+
+    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('events-settings-add'))
+    );
+    expect(opener.isConnected).toBe(true);
+
+    await act(async () => {
+      finishRefresh();
+    });
+    await waitFor(() => expect(screen.queryByTestId('event-row-mine')).not.toBeInTheDocument());
+    expect(opener.isConnected).toBe(false);
+    expect(document.activeElement).toBe(screen.getByTestId('events-settings-add'));
   });
 });
 
@@ -384,6 +437,7 @@ describe('EventsSettings delete dialog focus', () => {
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       removeEvent: vi.fn(async () => ({
         success: false as const,
+        code: 'not-found' as const,
         error: 'Event not found or not yours to delete',
       })),
     });
@@ -395,5 +449,38 @@ describe('EventsSettings delete dialog focus', () => {
     await waitFor(() => expect(screen.getByTestId('events-delete-error')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByTestId('events-delete-cancel')).not.toBeDisabled());
     expect(document.activeElement).toBe(screen.getByTestId('events-delete-cancel'));
+  });
+
+  it('moves focus to the header when refreshing a stale delete', async () => {
+    const loadEvents = vi.fn(async () => loadOk);
+    setStore({
+      events: [makeEvent({ id: 'mine' })] as AppState['events'],
+      loadEvents,
+      removeEvent: vi.fn(async () => ({
+        success: false as const,
+        code: 'not-found' as const,
+        error: 'Stale row',
+      })),
+    });
+    await renderSection();
+    loadEvents.mockClear();
+    loadEvents.mockImplementationOnce(async () => {
+      store.patch({ events: [], eventsError: null });
+      return loadOk;
+    });
+
+    const opener = openBy('event-delete-mine');
+    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await waitFor(() => expect(screen.getByTestId('events-delete-refresh')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('events-delete-refresh'));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('events-delete-confirmation')).not.toBeInTheDocument()
+    );
+    await waitFor(() => expect(screen.queryByTestId('event-row-mine')).not.toBeInTheDocument());
+    expect(opener.isConnected).toBe(false);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('events-settings-add'))
+    );
   });
 });

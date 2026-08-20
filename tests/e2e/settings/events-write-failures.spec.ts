@@ -1,9 +1,8 @@
 /**
  * tests/e2e/settings/events-write-failures.spec.ts
  *
- * RED-PHASE ATDD scaffold — story 5 (`spec-dynamic-events`, "manage events in
- * Settings"). Every test is emitted as `test.skip(...)`; a developer activates
- * one by deleting its `.skip`.
+ * Active ATDD write-failure coverage for story 5 (`spec-dynamic-events`,
+ * "manage events in Settings"), activated under the configured runner by DW-30.
  *
  * Test design:
  *   - **DE.5-E2E-002** ×2, [P2] — "a rejected edit and a rejected delete carry
@@ -27,8 +26,7 @@
  * `npx playwright test tests/e2e/settings/events-write-failures.spec.ts
  * --project=chromium --workers=1`. Result: **3 passed, 0 failed.**
  *
- * So these are not red-phase tests in the TDD sense, and this header does not
- * pretend otherwise. They close an OBSERVATION gap the test design named at
+ * These tests close an observation gap the test design named at
  * `test-design-epic-5.md:355`: the real service messages —
  * `'Event not found or not yours to edit'` (src/services/eventsService.ts:413),
  * `'Event not found or not yours to delete'` (:466) and
@@ -46,9 +44,13 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
-import { getWorkerPairEmails } from '../../support/auth/worker-pool';
-import type { TypedSupabaseClient } from '../../support/factories';
-import { formatDateISO } from '../../../src/utils/dateUtils';
+import {
+  clearOwnPairEvents,
+  clearPairEvents,
+  isoDateDaysFromNow,
+  resolveOwnPair,
+  seedEvent,
+} from '../../support/helpers/events';
 import { log } from '@seontechnologies/playwright-utils';
 import type { Page } from '@playwright/test';
 
@@ -74,90 +76,9 @@ const EDIT_ATTEMPT_LABEL = 'Settings Reject Edit Attempt E2E';
 const DELETE_LABEL = 'Settings Reject Delete E2E';
 const OFFLINE_LABEL = 'Settings Offline Save E2E';
 
-async function resolveAppUserId(
-  supabaseAdmin: TypedSupabaseClient,
-  email: string
-): Promise<string> {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .single();
-
-  if (error || !data?.id) {
-    throw new Error(`Could not resolve app user for ${email}: ${error?.message ?? 'not found'}`);
-  }
-
-  return data.id;
-}
-
-/** This worker's own pair, resolved to `public.users.id`s. Throws outside a worker. */
-async function resolveOwnPair(
-  supabaseAdmin: TypedSupabaseClient
-): Promise<{ userId: string; partnerId: string }> {
-  const pair = getWorkerPairEmails();
-  if (!pair) {
-    throw new Error('resolveOwnPair: no worker identity (TEST_WORKER_INDEX unset)');
-  }
-
-  const [userId, partnerId] = await Promise.all([
-    resolveAppUserId(supabaseAdmin, pair.user1Email),
-    resolveAppUserId(supabaseAdmin, pair.user2Email),
-  ]);
-
-  return { userId, partnerId };
-}
-
-/**
- * Remove every event owned by either half of this worker's pair.
- *
- * Checked, because a silently-failed clear leaves stray rows that break the
- * next test's premise and fail it pointing at the wrong code. Scoped to this
- * worker's own two users: every other row in `events` belongs to another
- * worker's pair.
- */
-async function clearPairEvents(
-  supabaseAdmin: TypedSupabaseClient,
-  userId: string,
-  partnerId: string
-): Promise<void> {
-  const { error } = await supabaseAdmin.from('events').delete().in('user_id', [userId, partnerId]);
-  if (error) {
-    throw new Error(`Failed to clear events for the worker pair: ${error.message}`);
-  }
-}
-
-/**
- * Seed one row owned by `userId`, so the list, its Edit/Delete controls and
- * both dialogs are reachable without driving a create through the UI first.
- */
-async function seedEvent(
-  supabaseAdmin: TypedSupabaseClient,
-  userId: string,
-  label: string,
-  eventDate: string
-): Promise<void> {
-  const { error } = await supabaseAdmin.from('events').insert({
-    user_id: userId,
-    label,
-    event_date: eventDate,
-    description: 'Seeded by the ATDD scaffold',
-    icon: 'calendar',
-  });
-  if (error) {
-    throw new Error(`Failed to seed the event "${label}": ${error.message}`);
-  }
-}
-
 /** The list row carrying a given label. Row testids key on the event's uuid. */
 function rowFor(page: Page, label: string) {
   return page.locator('[data-testid^="event-row-"]').filter({ hasText: label });
-}
-
-function futureDate(dayOffset: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + dayOffset);
-  return formatDateISO(date);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -168,8 +89,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.afterEach(async ({ supabaseAdmin }) => {
-  const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-  await clearPairEvents(supabaseAdmin, userId, partnerId);
+  await clearOwnPairEvents(supabaseAdmin);
 });
 
 /**
@@ -182,12 +102,18 @@ test.afterEach(async ({ supabaseAdmin }) => {
  * out of, and leaving it armed keeps a genuine backend error visible.
  */
 test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', () => {
-  test.skip(
+  test(
     '[P2] DE.5-E2E-002a a rejected edit carries the service message into the form',
     async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
-      await seedEvent(supabaseAdmin, userId, EDIT_LABEL, futureDate(30));
+      await seedEvent(supabaseAdmin, {
+        userId,
+        label: EDIT_LABEL,
+        eventDate: isoDateDaysFromNow(30),
+        description: 'Seeded by the write-failure test',
+        icon: 'calendar',
+      });
 
       await log.step('Open Settings on a row this account owns');
       await page.goto('/');
@@ -220,10 +146,12 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
       await expect(page.getByTestId('events-form-error')).toContainText(
         'Event not found or not yours to edit'
       );
-      // The form stays open, and Save is usable again so a retry needs no
-      // reopen (EventsSettings.tsx sets isSaving false on the failure branch).
+      // The form stays open, but a not-found result means the row snapshot may
+      // be stale. The safe next action is Refresh events, not repeating the
+      // same write against the same stale id.
       await expect(page.getByTestId('events-form')).toBeVisible();
-      await expect(page.getByTestId('events-form-submit')).toBeEnabled();
+      await expect(page.getByTestId('events-form-refresh')).toBeEnabled();
+      await expect(page.getByTestId('events-form-submit')).toHaveCount(0);
 
       // And the list behind it still carries the ORIGINAL label: a rejected
       // write must not be reflected optimistically.
@@ -232,12 +160,18 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
     }
   );
 
-  test.skip(
+  test(
     '[P2] DE.5-E2E-002b a rejected delete carries the service message into the confirmation',
     async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
-      await seedEvent(supabaseAdmin, userId, DELETE_LABEL, futureDate(30));
+      await seedEvent(supabaseAdmin, {
+        userId,
+        label: DELETE_LABEL,
+        eventDate: isoDateDaysFromNow(30),
+        description: 'Seeded by the write-failure test',
+        icon: 'calendar',
+      });
 
       await log.step('Open Settings on a row this account owns');
       await page.goto('/');
@@ -264,9 +198,12 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
       await expect(page.getByTestId('events-delete-error')).toContainText(
         'Event not found or not yours to delete'
       );
-      // The confirmation stays open, with both controls usable again.
+      // The confirmation stays open, with Cancel and the stale-row Refresh
+      // action usable again. Repeating the same delete is intentionally not
+      // offered for a not-found result.
       await expect(page.getByTestId('events-delete-confirmation')).toBeVisible();
-      await expect(page.getByTestId('events-delete-confirm')).toBeEnabled();
+      await expect(page.getByTestId('events-delete-refresh')).toBeEnabled();
+      await expect(page.getByTestId('events-delete-confirm')).toHaveCount(0);
       await expect(page.getByTestId('events-delete-cancel')).toBeEnabled();
 
       // The row survives the rejection.
@@ -282,7 +219,7 @@ test.describe('Saving an event while offline (DE.5-E2E-003)', () => {
   // offline are aborted rather than answered, so the monitor — which fails only
   // on a 4xx/5xx response — has nothing to react to. If it does fire, that is
   // signal about the app during the offline window, not about this test.
-  test.skip(
+  test(
     '[P3] DE.5-E2E-003 an offline save surfaces the service offline message in the form',
     async ({ page, supabaseAdmin }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
@@ -296,7 +233,7 @@ test.describe('Saving an event while offline (DE.5-E2E-003)', () => {
       await page.getByTestId('events-settings-empty-add').click();
       await expect(page.getByTestId('events-form')).toBeVisible();
       await page.getByTestId('events-form-label').fill(OFFLINE_LABEL);
-      await page.getByTestId('events-form-date').fill(futureDate(12));
+      await page.getByTestId('events-form-date').fill(isoDateDaysFromNow(12));
 
       await log.step('Drop the connection, then save');
       // `isOnline()` reads `navigator.onLine` (src/api/errorHandlers.ts:44), and
@@ -305,12 +242,10 @@ test.describe('Saving an event while offline (DE.5-E2E-003)', () => {
       // network-status.spec.ts:28-29 — it is what App.tsx:365-366 listens on to
       // update `syncStatus.isOnline`; the service itself does not need it.
       //
-      // UNVERIFIED: that `context.setOffline(true)` actually flips
-      // `navigator.onLine` to false in this project is asserted only at
-      // `tests/e2e-archive/epic-1-validation.spec.ts:325-330`, in a frozen
-      // archive that no Playwright project runs. It was not measured this
-      // session. If the guard does not trip, this test fails on the assertion
-      // below rather than on anything about the form.
+      // Measured in the activated runner: `context.setOffline(true)` flips
+      // `navigator.onLine` to false here, so the service guard trips before a
+      // request leaves the page. The assertion below keeps that fact visible
+      // outside the frozen archive that originally carried the only probe.
       await page.context().setOffline(true);
       await page.evaluate(() => window.dispatchEvent(new Event('offline')));
 

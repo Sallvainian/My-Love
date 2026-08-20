@@ -80,7 +80,7 @@ export function AnniversarySettings() {
 
         <button
           onClick={handleAdd}
-          className="flex items-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-600 hover:shadow-lg"
+          className="flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-700 hover:shadow-lg"
         >
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Add Anniversary</span>
@@ -398,7 +398,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
             </button>
             <button
               type="submit"
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-600"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-700"
             >
               <Check className="h-4 w-4" />
               {isEditing ? 'Update' : 'Add'}
