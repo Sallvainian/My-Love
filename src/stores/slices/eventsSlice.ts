@@ -16,15 +16,18 @@
  * - All three keys are reset by `signedOutState()` in authSlice.
  *
  * Errors: `eventsService` throws, so every action here has a real reason to
- * report. The write actions return that reason to their caller AND park it in
- * `eventsError`, mirroring `PhotoUploadResult` — a caller that awaited its own
- * write gets the message for THAT write rather than whatever the shared key
- * happens to hold by the time it reads.
+ * report. The write actions return that reason to their caller AND park its
+ * message in `eventsError` — a caller that awaited its own write gets the
+ * message for THAT write rather than whatever the shared key happens to hold
+ * by the time it reads. `EventWriteResult` deliberately diverges from
+ * `PhotoUploadResult`: event failures also carry a code because Settings must
+ * distinguish stale rows from failures that can retry the same write.
  */
 
 import type {
   CoupleEvent,
   EventCreateInput,
+  EventWriteErrorCode,
   EventUpdateInput,
 } from '../../services/eventsService';
 import { eventsService } from '../../services/eventsService';
@@ -36,7 +39,9 @@ import type { AppStateCreator } from '../types';
  * than read back off the store, so callers get the message for *their* write
  * and not whatever unrelated error `eventsError` happens to hold.
  */
-export type EventWriteResult = { success: true } | { success: false; error: string };
+export type EventWriteResult =
+  | { success: true }
+  | { success: false; code: EventWriteErrorCode | 'auth'; error: string };
 
 /** What `addEvent` takes: the creator comes from the store, not the caller. */
 export type NewEventInput = Omit<EventCreateInput, 'userId'>;
@@ -72,6 +77,37 @@ function sortByDate(events: CoupleEvent[]): CoupleEvent[] {
 
 function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+const EVENT_WRITE_ERROR_CODES = {
+  offline: true,
+  validation: true,
+  'not-found': true,
+  'invalid-response': true,
+  transport: true,
+} satisfies Record<EventWriteErrorCode, true>;
+
+function isEventWriteErrorCode(value: unknown): value is EventWriteErrorCode {
+  return typeof value === 'string' && Object.hasOwn(EVENT_WRITE_ERROR_CODES, value);
+}
+
+function writeFailureOf(
+  error: unknown,
+  fallback: string
+): Extract<EventWriteResult, { success: false }> {
+  const code =
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    isEventWriteErrorCode(error.code)
+      ? error.code
+      : 'transport';
+
+  return {
+    success: false,
+    code,
+    error: messageOf(error, fallback),
+  };
 }
 
 /**
@@ -156,7 +192,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     if (!requestedBy) {
       const errorMsg = 'You must be signed in to add an event';
       set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      return { success: false, code: 'auth', error: errorMsg };
     }
 
     set({ eventsError: null });
@@ -171,11 +207,11 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       logger.debug('[EventsSlice] Added event:', created.id);
       return { success: true };
     } catch (error) {
-      const errorMsg = messageOf(error, 'Failed to add event');
+      const failure = writeFailureOf(error, 'Failed to add event');
       console.error('[EventsSlice] Error adding event:', error);
-      if (get().userId !== requestedBy) return { success: false, error: errorMsg };
-      set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      if (get().userId !== requestedBy) return failure;
+      set({ eventsError: failure.error });
+      return failure;
     }
   },
 
@@ -188,7 +224,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     if (!requestedBy) {
       const errorMsg = 'You must be signed in to edit an event';
       set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      return { success: false, code: 'auth', error: errorMsg };
     }
 
     set({ eventsError: null });
@@ -205,11 +241,11 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       logger.debug('[EventsSlice] Edited event:', eventId);
       return { success: true };
     } catch (error) {
-      const errorMsg = messageOf(error, 'Failed to update event');
+      const failure = writeFailureOf(error, 'Failed to update event');
       console.error('[EventsSlice] Error updating event:', error);
-      if (get().userId !== requestedBy) return { success: false, error: errorMsg };
-      set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      if (get().userId !== requestedBy) return failure;
+      set({ eventsError: failure.error });
+      return failure;
     }
   },
 
@@ -221,7 +257,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     if (!requestedBy) {
       const errorMsg = 'You must be signed in to delete an event';
       set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      return { success: false, code: 'auth', error: errorMsg };
     }
 
     set({ eventsError: null });
@@ -235,11 +271,11 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       logger.debug('[EventsSlice] Removed event:', eventId);
       return { success: true };
     } catch (error) {
-      const errorMsg = messageOf(error, 'Failed to delete event');
+      const failure = writeFailureOf(error, 'Failed to delete event');
       console.error('[EventsSlice] Error deleting event:', error);
-      if (get().userId !== requestedBy) return { success: false, error: errorMsg };
-      set({ eventsError: errorMsg });
-      return { success: false, error: errorMsg };
+      if (get().userId !== requestedBy) return failure;
+      set({ eventsError: failure.error });
+      return failure;
     }
   },
 
