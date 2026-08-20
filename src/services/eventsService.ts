@@ -25,9 +25,11 @@
  *    which loses the reason a write failed — and the reason is exactly what the
  *    creating user has to be told (CAP-7).
  *
- * A write that matches zero rows also throws. RLS filters a non-creator's UPDATE
- * or DELETE silently — no error, no rows — so without this the UI would report
- * success for a no-op.
+ * Every write failure carries an `EventWriteErrorCode` beside its message, so a
+ * caller can distinguish a stale row from an offline or transport failure
+ * without matching English prose. A write that matches zero rows also throws.
+ * RLS filters a non-creator's UPDATE or DELETE silently — no error, no rows —
+ * so without this the UI would report success for a no-op.
  *
  * No realtime, no IndexedDB mirror: events are Supabase-only, and freshness is
  * reload-based (see `integration-points.md` §8).
@@ -98,17 +100,31 @@ export interface EventUpdateInput {
 }
 
 /**
- * A write that could not land: it reached the database and changed nothing,
- * or was refused before leaving the device (offline).
- *
- * Not exported and deliberately re-thrown untouched by the catch tail: routing
- * it through `handleNetworkError` would tell the user their change "will be
- * synced when you're back online", which is the opposite of what happened.
- * Same shape as `moodApi`'s `ApiValidationError` (`moodApi.ts:30-37,104-107`).
+ * Machine-readable reason a write failed. Store-only failures extend this with
+ * `auth`, because a signed-out call is refused before this service is reached.
  */
-class EventWriteError extends Error {
-  constructor(message: string) {
-    super(message);
+export type EventWriteErrorCode =
+  | 'offline'
+  | 'validation'
+  | 'not-found'
+  | 'invalid-response'
+  | 'transport';
+
+/**
+ * A write failure with presentation text and a stable control-flow code.
+ *
+ * Exported so the store can preserve the code instead of inferring it from the
+ * message. Deliberately re-thrown untouched by write catch tails. PostgREST
+ * failures keep the mapped Supabase error as `cause`, preserving its metadata
+ * without replacing this feature-level code.
+ */
+export class EventWriteError extends Error {
+  constructor(
+    public readonly code: EventWriteErrorCode,
+    message: string,
+    options?: ErrorOptions
+  ) {
+    super(message, options);
     this.name = 'EventWriteError';
   }
 }
@@ -125,6 +141,20 @@ class EventWriteError extends Error {
 function networkFailure(context: string, error: unknown): Error {
   const detail = error instanceof Error ? error.message : 'Unknown network error';
   return new Error(`[${context}] Network error: ${detail}. Check your internet connection.`);
+}
+
+/** Preserve the truthful write-network message while adding its stable code. */
+function writeTransportFailure(context: string, error: unknown): EventWriteError {
+  return new EventWriteError('transport', networkFailure(context, error).message);
+}
+
+/** Preserve the existing friendly PostgREST message while adding its stable code. */
+function writePostgrestFailure(
+  context: string,
+  error: Parameters<typeof handleSupabaseError>[0]
+): EventWriteError {
+  const mappedError = handleSupabaseError(error, context);
+  return new EventWriteError('transport', mappedError.message, { cause: mappedError });
 }
 
 /**
@@ -418,20 +448,26 @@ class EventsService {
    *   `date` column would accept `infinity`, and one unreadable row leaves the
    *   whole list unsorted, so the value is refused here rather than stored
    * @throws {EventWriteError} if offline — no queue exists, so the write is lost
-   * @throws an accurate network error if the request fails mid-flight
-   * @throws {SupabaseServiceError} if the insert fails (RLS rejects a
-   *   `user_id` that is not the caller with 42501)
+   * @throws {EventWriteError} with `transport` if the request fails mid-flight
+   *   or PostgREST rejects it (RLS rejects a `user_id` that is not the caller
+   *   with 42501)
    */
   async createEvent(input: EventCreateInput): Promise<CoupleEvent> {
     if (!isOnline()) {
       // NOT handleNetworkError: no offline queue exists, so its "will be
       // synced when you're back online" promise is the opposite of the truth.
-      throw new EventWriteError('You are offline. Events need a connection to save.');
+      throw new EventWriteError(
+        'offline',
+        'You are offline. Events need a connection to save.'
+      );
     }
 
     const parsedInput = parseEventDate(input.eventDate);
     if (!parsedInput) {
-      throw new EventWriteError(`Not a valid calendar date: ${input.eventDate}`);
+      throw new EventWriteError(
+        'validation',
+        `Not a valid calendar date: ${input.eventDate}`
+      );
     }
 
     try {
@@ -453,12 +489,15 @@ class EventsService {
       if (!data) {
         // Not a network problem, so it must not be dressed as one: the catch
         // tail would otherwise promise a sync that no queue exists to perform.
-        throw new EventWriteError('The event was not created');
+        throw new EventWriteError('invalid-response', 'The event was not created');
       }
 
       const created = toCoupleEvent(data);
       if (!created) {
-        throw new EventWriteError('The event was saved but its date could not be read');
+        throw new EventWriteError(
+          'invalid-response',
+          'The event was saved but its date could not be read'
+        );
       }
 
       logger.debug('[EventsService] Created event:', created.id);
@@ -471,10 +510,10 @@ class EventsService {
       logSupabaseError('EventsService.createEvent', error);
 
       if (isPostgrestError(error)) {
-        throw handleSupabaseError(error, 'EventsService.createEvent');
+        throw writePostgrestFailure('EventsService.createEvent', error);
       }
 
-      throw networkFailure('EventsService.createEvent', error);
+      throw writeTransportFailure('EventsService.createEvent', error);
     }
   }
 
@@ -494,19 +533,25 @@ class EventsService {
    * @throws {EventWriteError} if the update matched no row — RLS filters a
    *   non-creator's write silently, so zero rows is the only signal there is
    * @throws {EventWriteError} if offline — no queue exists, so the write is lost
-   * @throws an accurate network error if the request fails mid-flight
-   * @throws {SupabaseServiceError} if the update fails
+   * @throws {EventWriteError} with `transport` if the request fails mid-flight
+   *   or PostgREST rejects it
    */
   async updateEvent(eventId: string, updates: EventUpdateInput): Promise<CoupleEvent> {
     if (!isOnline()) {
       // NOT handleNetworkError: no offline queue exists, so its "will be
       // synced when you're back online" promise is the opposite of the truth.
-      throw new EventWriteError('You are offline. Events need a connection to save.');
+      throw new EventWriteError(
+        'offline',
+        'You are offline. Events need a connection to save.'
+      );
     }
 
     // Same refusal as createEvent: an unreadable date must not reach the column.
     if (updates.eventDate !== undefined && !parseEventDate(updates.eventDate)) {
-      throw new EventWriteError(`Not a valid calendar date: ${updates.eventDate}`);
+      throw new EventWriteError(
+        'validation',
+        `Not a valid calendar date: ${updates.eventDate}`
+      );
     }
 
     try {
@@ -531,12 +576,15 @@ class EventsService {
       }
 
       if (!data || data.length === 0) {
-        throw new EventWriteError('Event not found or not yours to edit');
+        throw new EventWriteError('not-found', 'Event not found or not yours to edit');
       }
 
       const updated = toCoupleEvent(data[0]);
       if (!updated) {
-        throw new EventWriteError('The event was saved but its date could not be read');
+        throw new EventWriteError(
+          'invalid-response',
+          'The event was saved but its date could not be read'
+        );
       }
 
       logger.debug('[EventsService] Updated event:', eventId);
@@ -549,10 +597,10 @@ class EventsService {
       logSupabaseError('EventsService.updateEvent', error);
 
       if (isPostgrestError(error)) {
-        throw handleSupabaseError(error, 'EventsService.updateEvent');
+        throw writePostgrestFailure('EventsService.updateEvent', error);
       }
 
-      throw networkFailure('EventsService.updateEvent', error);
+      throw writeTransportFailure('EventsService.updateEvent', error);
     }
   }
 
@@ -562,14 +610,17 @@ class EventsService {
    * @throws {EventWriteError} if the delete matched no row (same silent RLS
    *   filter as `updateEvent`)
    * @throws {EventWriteError} if offline — no queue exists, so the write is lost
-   * @throws an accurate network error if the request fails mid-flight
-   * @throws {SupabaseServiceError} if the delete fails
+   * @throws {EventWriteError} with `transport` if the request fails mid-flight
+   *   or PostgREST rejects it
    */
   async deleteEvent(eventId: string): Promise<void> {
     if (!isOnline()) {
       // NOT handleNetworkError: no offline queue exists, so its "will be
       // synced when you're back online" promise is the opposite of the truth.
-      throw new EventWriteError('You are offline. Events need a connection to save.');
+      throw new EventWriteError(
+        'offline',
+        'You are offline. Events need a connection to save.'
+      );
     }
 
     try {
@@ -584,7 +635,7 @@ class EventsService {
       }
 
       if (!data || data.length === 0) {
-        throw new EventWriteError('Event not found or not yours to delete');
+        throw new EventWriteError('not-found', 'Event not found or not yours to delete');
       }
 
       logger.debug('[EventsService] Deleted event:', eventId);
@@ -596,10 +647,10 @@ class EventsService {
       logSupabaseError('EventsService.deleteEvent', error);
 
       if (isPostgrestError(error)) {
-        throw handleSupabaseError(error, 'EventsService.deleteEvent');
+        throw writePostgrestFailure('EventsService.deleteEvent', error);
       }
 
-      throw networkFailure('EventsService.deleteEvent', error);
+      throw writeTransportFailure('EventsService.deleteEvent', error);
     }
   }
 }

@@ -138,6 +138,7 @@ interface ThrownServiceError extends Error {
   details?: string | null;
   hint?: string | null;
   isNetworkError?: boolean;
+  cause?: unknown;
 }
 
 /** The rejection reason, so its message can be compared whole. */
@@ -152,6 +153,11 @@ async function rejection(promise: Promise<unknown>): Promise<ThrownServiceError>
   }
 
   return caught;
+}
+
+/** Events adds its own machine-readable code and retains this mapped error as its cause. */
+function mappedErrorOf(error: ThrownServiceError): ThrownServiceError {
+  return error.cause instanceof Error ? (error.cause as ThrownServiceError) : error;
 }
 
 function moodInsert(overrides: Partial<MoodInsert> = {}): MoodInsert {
@@ -229,7 +235,7 @@ describe('a 23514 reaching the caller that issued the write', () => {
     });
   });
 
-  describe.each(ADOPTERS)('$module', ({ context, table, envelope, write }) => {
+  describe.each(ADOPTERS)('$module', ({ module, context, table, envelope, write }) => {
     it('surfaces the mapped sentence, context-prefixed', async () => {
       backend.nextError = envelope;
 
@@ -257,26 +263,40 @@ describe('a 23514 reaching the caller that issued the write', () => {
       backend.nextError = envelope;
 
       const error = await rejection(write() as Promise<unknown>);
+      const mappedError = mappedErrorOf(error);
 
       // The network tail is the other wrong answer: it promises a sync that
       // no queue exists to perform for any of these three modules.
       expect(error.message).not.toContain(SYNC_PROMISE);
       expect(error.message).not.toContain('Network error:');
-      expect(error.isNetworkError).toBe(false);
+      expect(mappedError.isNetworkError).toBe(false);
     });
 
-    it('passes code, details and hint through unchanged', async () => {
+    it('keeps the mapped code, details, hint and identity inspectable', async () => {
       backend.nextError = envelope;
 
       const error = await rejection(write() as Promise<unknown>);
+      const mappedError = mappedErrorOf(error);
 
-      expect(error.code).toBe('23514');
+      if (module === 'eventsService.createEvent') {
+        expect(error).toMatchObject({
+          name: 'EventWriteError',
+          code: 'transport',
+          cause: mappedError,
+        });
+        expect(mappedError).not.toBe(error);
+      } else {
+        // The other adopters keep their established direct-error contract.
+        expect(mappedError).toBe(error);
+      }
+
+      expect(mappedError.code).toBe('23514');
       // Both null on the wire for an authenticated caller, and both must
       // arrive that way rather than as '' — an empty string would read as
       // "the server sent nothing here", which is a different claim.
-      expect(error.details).toBeNull();
-      expect(error.hint).toBeNull();
-      expect(error.name).toBe('SupabaseServiceError');
+      expect(mappedError.details).toBeNull();
+      expect(mappedError.hint).toBeNull();
+      expect(mappedError.name).toBe('SupabaseServiceError');
     });
 
     it('keeps the failing row out of the message when a caller IS shown one', async () => {
@@ -290,8 +310,9 @@ describe('a 23514 reaching the caller that issued the write', () => {
       backend.nextError = { ...SERVICE_ROLE_EVENTS_ICON_CHECK };
 
       const error = await rejection(write() as Promise<unknown>);
+      const mappedError = mappedErrorOf(error);
 
-      expect(error.details).toContain('Failing row contains');
+      expect(mappedError.details).toContain('Failing row contains');
       expect(error.message).not.toContain('Failing row contains');
       expect(error.message).toBe(`[${context}] ${CHECK_VIOLATION_MESSAGE}`);
     });
@@ -309,11 +330,12 @@ describe('a 23514 reaching the caller that issued the write', () => {
       });
 
       const error = await rejection(write() as Promise<unknown>);
+      const mappedError = mappedErrorOf(error);
 
       expect(error.message).toBe(
         `[${context}] Database error: conflicting key value violates exclusion constraint "x"`
       );
-      expect(error.code).toBe('23515');
+      expect(mappedError.code).toBe('23515');
     });
   });
 });
