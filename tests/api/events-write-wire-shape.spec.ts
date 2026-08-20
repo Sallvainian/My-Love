@@ -1,14 +1,12 @@
 /**
- * RED-PHASE ATDD scaffold — the PostgREST wire shape of an RLS-filtered events write.
+ * Active ATDD coverage — the PostgREST wire shape of an RLS-filtered events write.
  *
- * Target path once activated: `tests/api/events-write-wire-shape.spec.ts`
- * (Playwright project `api` — `playwright.config.ts:146-155`, `testDir: './tests/api'`,
+ * Runs in the Playwright `api` project (`playwright.config.ts`,
+ * `testDir: './tests/api'`,
  * `baseURL: process.env.SUPABASE_URL`, `extraHTTPHeaders.apikey = process.env.SUPABASE_ANON_KEY`).
  *
- * This file is a RED-PHASE ATDD scaffold produced by the story-5 ATDD run
- * (spec-dynamic-events, "Manage events in Settings"). It is parked outside
- * `tests/` until a developer moves it to the target path and removes the
- * `test.skip` markers. Nothing here is an active spec yet.
+ * Produced by the story-5 ATDD run (spec-dynamic-events, "Manage events in
+ * Settings") and activated under the configured runner by DW-30.
  *
  * Test-design IDs covered: DE.5-API-001, DE.5-API-002, DE.5-API-003.
  * Those three IDs are new. `_bmad-output/test-artifacts/test-design-epic-5.md:288-290`
@@ -17,7 +15,7 @@
  * yet written into that document. The risk they attach to is R-005
  * (`test-design-epic-5.md:130`): "The UI's creator-only gate drifting from RLS".
  *
- * Run it once moved:
+ * Run:
  *   npx playwright test tests/api/events-write-wire-shape.spec.ts --project=api
  * Prerequisite: `supabase start`, plus the local `SUPABASE_URL`,
  * `SUPABASE_ANON_KEY` and service-role env the `api` project already reads.
@@ -69,8 +67,12 @@ import { test, expect } from '../support/merged-fixtures';
 // so it is imported straight from the package.
 import { log } from '@seontechnologies/playwright-utils';
 import { getUserAccessToken } from '../support/helpers/supabase';
-import { getWorkerPairEmails } from '../support/auth/worker-pool';
-import type { TypedSupabaseClient } from '../support/factories';
+import {
+  clearPairEvents,
+  isoDateDaysFromNow,
+  resolveOwnPair,
+  seedEvent,
+} from '../support/helpers/events';
 
 /**
  * The `public.events` row as PostgREST returns it.
@@ -100,102 +102,49 @@ const SEEDED_LABEL = 'Events API Seeded Trip';
 const PARTNER_ATTEMPT_LABEL = 'Events API Partner Overwrite';
 const CREATOR_EDIT_LABEL = 'Events API Creator Voyage';
 
-/** Resolve a `public.users.id` by email. `public.users.id` is a PK on `auth.users(id)`
- * (`20251203000001_create_base_schema.sql:14`), so the same uuid is what
- * `events.user_id` references and what `getUserAccessToken` takes. */
-async function resolveAppUserId(
-  supabaseAdmin: TypedSupabaseClient,
-  email: string
-): Promise<string> {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .single();
-
-  if (error || !data?.id) {
-    throw new Error(`Could not resolve app user for ${email}: ${error?.message ?? 'not found'}`);
-  }
-
-  return data.id;
-}
-
-/** This worker's own pair, resolved to `public.users.id`s. Throws outside a worker. */
-async function resolveOwnPair(
-  supabaseAdmin: TypedSupabaseClient
-): Promise<{ userId: string; partnerId: string }> {
-  const pair = getWorkerPairEmails();
-  if (!pair) {
-    throw new Error('resolveOwnPair: no worker identity (TEST_WORKER_INDEX unset)');
-  }
-
-  const [userId, partnerId] = await Promise.all([
-    resolveAppUserId(supabaseAdmin, pair.user1Email),
-    resolveAppUserId(supabaseAdmin, pair.user2Email),
-  ]);
-
-  return { userId, partnerId };
-}
-
-/**
- * Remove every event owned by either half of THIS worker's pair, and only that
- * pair. Checked, because a silently-failed clear leaves stray rows that break
- * the next test's premise and fail it for the wrong reason.
- */
-async function clearPairEvents(
-  supabaseAdmin: TypedSupabaseClient,
+/** Preserve the test-body failure when checked teardown fails too. */
+async function runWithPairCleanup(
+  supabaseAdmin: Parameters<typeof clearPairEvents>[0],
   userId: string,
-  partnerId: string
+  partnerId: string,
+  action: () => Promise<void>
 ): Promise<void> {
-  const { error } = await supabaseAdmin.from('events').delete().in('user_id', [userId, partnerId]);
-  if (error) {
-    throw new Error(`Failed to clear events for the worker pair: ${error.message}`);
-  }
-}
+  let actionFailure: unknown;
+  let actionFailed = false;
 
-/** Seed one event owned by `userId` and return its id. Snake_case columns. */
-async function seedCreatorEvent(
-  supabaseAdmin: TypedSupabaseClient,
-  userId: string,
-  eventDate: string
-): Promise<string> {
-  const { data, error } = await supabaseAdmin
-    .from('events')
-    .insert({
-      user_id: userId,
-      label: SEEDED_LABEL,
-      event_date: eventDate,
-      description: 'Seeded by the events write wire-shape scaffold',
-      icon: 'calendar',
-    })
-    .select('id')
-    .single();
-
-  if (error || !data?.id) {
-    throw new Error(`Failed to seed the creator's event: ${error?.message ?? 'no row returned'}`);
+  try {
+    await action();
+  } catch (error) {
+    actionFailed = true;
+    actionFailure = error;
   }
 
-  return data.id;
+  let cleanupFailure: unknown;
+  let cleanupFailed = false;
+  try {
+    await clearPairEvents(supabaseAdmin, userId, partnerId);
+  } catch (error) {
+    cleanupFailed = true;
+    cleanupFailure = error;
+  }
+
+  if (actionFailed && cleanupFailed) {
+    throw new AggregateError(
+      [actionFailure, cleanupFailure],
+      'The events wire-shape assertion and pair cleanup both failed'
+    );
+  }
+  if (cleanupFailed) throw cleanupFailure;
+  if (actionFailed) throw actionFailure;
 }
 
-/** A `YYYY-MM-DD` calendar date N days out. `event_date` is a `date`, not a
- * timestamptz, so a bare date string is what the column takes. */
-function isoDateDaysFromNow(dayOffset: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + dayOffset);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-test.describe('Events write wire shape over PostgREST — story 5 (ATDD RED)', () => {
+test.describe('Events write wire shape over PostgREST — story 5', () => {
   // ==========================================================================
   // DE.5-API-001
   // Risk: R-005. Precondition for `eventsService.updateEvent`'s
   // `'Event not found or not yours to edit'` (src/services/eventsService.ts:400-414).
   // ==========================================================================
-  test.skip('[P1] DE.5-API-001 a partner PATCH on the creator\'s event returns 200 with zero rows, not an error', async ({
+  test('[P1] DE.5-API-001 a partner PATCH on the creator\'s event returns 200 with zero rows, not an error', async ({
     supabaseAdmin,
     apiRequest,
   }) => {
@@ -203,10 +152,16 @@ test.describe('Events write wire shape over PostgREST — story 5 (ATDD RED)', (
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    try {
+    await runWithPairCleanup(supabaseAdmin, userId, partnerId, async () => {
       await log.step('Seed one event owned by the creator');
       const seededDate = isoDateDaysFromNow(30);
-      const eventId = await seedCreatorEvent(supabaseAdmin, userId, seededDate);
+      const eventId = await seedEvent(supabaseAdmin, {
+        userId,
+        label: SEEDED_LABEL,
+        eventDate: seededDate,
+        description: 'Seeded by the events write wire-shape test',
+        icon: 'calendar',
+      });
 
       await log.step('Sign in as the PARTNER and PATCH the creator\'s row');
       const partnerToken = await getUserAccessToken(supabaseAdmin, partnerId);
@@ -243,9 +198,7 @@ test.describe('Events write wire shape over PostgREST — story 5 (ATDD RED)', (
       expect(afterError).toBeNull();
       expect(afterRow?.label).toBe(SEEDED_LABEL);
       expect(afterRow?.event_date).toBe(seededDate);
-    } finally {
-      await clearPairEvents(supabaseAdmin, userId, partnerId);
-    }
+    });
   });
 
   // ==========================================================================
@@ -253,7 +206,7 @@ test.describe('Events write wire shape over PostgREST — story 5 (ATDD RED)', (
   // Risk: R-005. Precondition for `eventsService.deleteEvent`'s
   // `'Event not found or not yours to delete'` (src/services/eventsService.ts:452-467).
   // ==========================================================================
-  test.skip('[P1] DE.5-API-002 a partner DELETE on the creator\'s event returns 200 with zero rows, not an error', async ({
+  test('[P1] DE.5-API-002 a partner DELETE on the creator\'s event returns 200 with zero rows, not an error', async ({
     supabaseAdmin,
     apiRequest,
   }) => {
@@ -261,10 +214,16 @@ test.describe('Events write wire shape over PostgREST — story 5 (ATDD RED)', (
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    try {
+    await runWithPairCleanup(supabaseAdmin, userId, partnerId, async () => {
       await log.step('Seed one event owned by the creator');
       const seededDate = isoDateDaysFromNow(45);
-      const eventId = await seedCreatorEvent(supabaseAdmin, userId, seededDate);
+      const eventId = await seedEvent(supabaseAdmin, {
+        userId,
+        label: SEEDED_LABEL,
+        eventDate: seededDate,
+        description: 'Seeded by the events write wire-shape test',
+        icon: 'calendar',
+      });
 
       await log.step('Sign in as the PARTNER and DELETE the creator\'s row');
       const partnerToken = await getUserAccessToken(supabaseAdmin, partnerId);
@@ -291,9 +250,7 @@ test.describe('Events write wire shape over PostgREST — story 5 (ATDD RED)', (
       expect(surviveError).toBeNull();
       expect(survivors).toHaveLength(1);
       expect(survivors?.[0]?.label).toBe(SEEDED_LABEL);
-    } finally {
-      await clearPairEvents(supabaseAdmin, userId, partnerId);
-    }
+    });
   });
 
   // ==========================================================================
@@ -303,7 +260,7 @@ test.describe('Events write wire shape over PostgREST — story 5 (ATDD RED)', (
   // the same empty array. This test is what makes the zero-row result mean
   // "RLS filtered it" rather than "the write path is dead".
   // ==========================================================================
-  test.skip('[P1] DE.5-API-003 the creator\'s own PATCH on the same row returns 200 with exactly one updated row', async ({
+  test('[P1] DE.5-API-003 the creator\'s own PATCH on the same row returns 200 with exactly one updated row', async ({
     supabaseAdmin,
     apiRequest,
   }) => {
@@ -311,10 +268,16 @@ test.describe('Events write wire shape over PostgREST — story 5 (ATDD RED)', (
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    try {
+    await runWithPairCleanup(supabaseAdmin, userId, partnerId, async () => {
       await log.step('Seed one event owned by the creator');
       const seededDate = isoDateDaysFromNow(60);
-      const eventId = await seedCreatorEvent(supabaseAdmin, userId, seededDate);
+      const eventId = await seedEvent(supabaseAdmin, {
+        userId,
+        label: SEEDED_LABEL,
+        eventDate: seededDate,
+        description: 'Seeded by the events write wire-shape test',
+        icon: 'calendar',
+      });
 
       await log.step('Sign in as the CREATOR and PATCH their own row');
       const creatorToken = await getUserAccessToken(supabaseAdmin, userId);
@@ -356,8 +319,6 @@ test.describe('Events write wire shape over PostgREST — story 5 (ATDD RED)', (
 
       expect(afterError).toBeNull();
       expect(afterRow?.label).toBe(CREATOR_EDIT_LABEL);
-    } finally {
-      await clearPairEvents(supabaseAdmin, userId, partnerId);
-    }
+    });
   });
 });

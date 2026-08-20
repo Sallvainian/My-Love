@@ -313,7 +313,9 @@ location: _bmad-output/test-artifacts/ (9 test files, 23 tests)
 source_spec: `5-manage-events-in-settings.md`
 severity: low
 reason: `_bmad-output/test-artifacts/` holds 6 ATDD scaffolds and 3 automation files. `vitest.config.ts` includes only `tests/**` and `src/**`, and Playwright's three projects set testDir to `./tests/e2e`, `./tests/api` and `./tests/integration`, so nothing reaches them. Both TEA summaries say so plainly ("Nothing here is active until it is moved") and record the `git mv` commands that would activate them, along with measurements taken by copying each file to its target, running it, and removing it again. Two of the three defects this review confirmed were first surfaced by that parked tree, so the coverage is real rather than speculative. Activation is a deliberate operator decision, not a patch: `automation-summary.md` measures typecheck at 6 TS2883 errors without the generated files and 1 with them, so acceptance criterion 3 -- which pins the literal number six -- becomes false the moment the activation happens, and the one-line fix the summary proposes at `tests/support/merged-fixtures.ts:
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-activate-parked-event-tests
+resolution-undo: 17ce3b66d18c0b51d563a4a8722d775298fe4d3f3192f08273b06052a5fbaf4f 2026-08-20 7374617475733a206f70656e
 decision: 2026-08-19 Activate the parked tests — Run the git mv sequence recorded at automation-summary.md:594-600, helper first, then remove the test.skip markers each file's header and the ATDD checklist enumerate. Apply the one-line tests/support/merged-fixtures.ts fix the summary proposes, then rewire the six other files onto tests/support/helpers/events.ts as automation-summary.md:616 describes. Measure typecheck before and after rather than trusting the recorded numbers — the six-error TS2883 baseline is recorded as an artifact of the loop's worktree layout and this repo is not a worktree — and update story 5's acceptance criterion 3 in the same change so it no longer pins a count the activation invalidates. Every activated file must actually run and pass in its new home before the change is finished.
 
 ### DW-31: markAsViewed resolves successfully when its UPDATE matches zero rows, so a row the caller may not update is reported as marked.
@@ -556,4 +558,124 @@ location: src/components/PhotoGallery/PhotoGridItem.tsx:100
 source_spec: `spec-dw-28-pink-primary-button-contrast.md`
 severity: medium
 reason: `bg-pink-600/90` composites to approximately `#e91a84` over white, which is about 4.27:1 against the badge's small white text. The same image-dependent contrast issue was pre-existing with `bg-pink-500/90`; DW-28 improves the token but does not make this non-button overlay opaque.
+status: open
+
+### DW-60: The UI/SQL validation mirror test compares against the original create migration, not the effective constraint after all migrations have run.
+origin: spec-deferred eb5b0fb56687
+location: tests/unit/components/eventsValidationMirrors.test.ts:23
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: `tests/unit/components/eventsValidationMirrors.test.ts` reads the constraint from `20260815010000_create_events.sql`. A future migration could tighten or replace that constraint while this guard remained green, allowing the UI and deployed database rules to drift. No later events migration currently changes the constraint, so this is a test-maintainability risk rather than a current behavior defect.
+status: open
+
+### DW-61: Repeated date-helper calls can derive different calendar anchors if a seeding batch crosses local midnight.
+origin: spec-deferred 07bf0f3e8d6a
+location: tests/support/helpers/events.ts:179
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: `isoDateDaysFromNow` creates a fresh `Date` on every call. Multi-row tests call it repeatedly, so a run spanning midnight could produce dates based on different days. The older factory avoids this by accepting one shared anchor, but consolidating these helper APIs is outside the bundle's explicit move-and-rewire surface.
+status: open
+
+### DW-62: Historical story acceptance criteria AC4 and AC6 still pin obsolete test totals and the pre-activation file boundary.
+origin: spec-deferred 0bff1e60324b
+location: _bmad-output/specs/spec-dynamic-events/stories/5-manage-events-in-settings.md:244
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: Story 5 AC4 names a historical 1238-test baseline and only two EventsSettings suites; AC6 limits non-artifact changes to five original story files. Activating the parked runner files necessarily invalidates both descriptions. The bundle authorizes the exact AC3 rewrite only, and review policy requires changes to other specification assertions to be deferred instead of patched during review.
+status: open
+
+### DW-63: The validation drift guard reads the original events migration instead of the effective schema after every migration.
+origin: spec-deferred 8995c6651fba
+location: tests/unit/components/eventsValidationMirrors.test.ts:38
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: `tests/unit/components/eventsValidationMirrors.test.ts` extracts constraints from `20260818000002_create_events_table.sql`. A later migration could replace or tighten a constraint without changing that source file, leaving the guard green while the deployed database and UI differ. No later events migration currently changes these constraints.
+status: open
+
+### DW-64: Repeated event-date helper calls can use different calendar anchors across local midnight.
+origin: spec-deferred f5a669342ad5
+location: tests/support/helpers/events.ts:177
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: `isoDateDaysFromNow` creates a new `Date` on each invocation. A multi-row setup that crosses local midnight can therefore derive rows from different base days. The anchored `coupleEvents` factory avoids this, but consolidating both helper contracts is separate work.
+status: open
+
+### DW-65: Story 5 acceptance criteria AC4 and AC6 describe the pre-activation test totals and file boundary.
+origin: spec-deferred 7792fe01375e
+location: _bmad-output/specs/spec-dynamic-events/stories/5-manage-events-in-settings.md:242
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: AC4 retains the historical 1238-test baseline and names only the two original EventsSettings suites, while AC6 limits non-artifact changes to the five story files. Activating the parked API, E2E, component, and unit coverage makes both statements stale. The affected file is an agent-context specification, so review policy defers rather than edits it.
+status: open
+
+### DW-66: The validation drift guard reads one historical migration instead of the effective constraint installed by the complete migration chain.
+origin: spec-deferred 4abe4f39af4c
+location: tests/unit/components/eventsValidationMirrors.test.ts:38
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: `tests/unit/components/eventsValidationMirrors.test.ts` compares UI constants with `20260818000002_create_events_table.sql`. If a later migration tightens or replaces a constraint, the guard still compares against the obsolete source and can stay green while the form accepts input that the deployed database rejects.
+status: open
+
+### DW-67: The icon extractor can silently omit database values containing non-letter characters.
+origin: spec-deferred 0fdd766222cc
+location: tests/unit/components/eventsValidationMirrors.test.ts:98
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: The drift guard extracts icons with `'([a-z]+)'`. A later value such as `party-hat` does not match, so a database-only addition can be absent from `dbIcons` and leave the equality assertion green even though the UI does not offer the admitted value.
+status: open
+
+### DW-68: The validation mirror checks constant declarations but not the validation branches that consume them.
+origin: spec-deferred aa42fa28a662
+location: tests/unit/components/eventsValidationMirrors.test.ts:68
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: The guard proves that `LABEL_MAX_LENGTH` and `DESCRIPTION_MAX_LENGTH` match the migration, but a future edit can validate against a different literal while retaining those constants for messages or another use. Existing boundary tests cover rejection at 101 and 501, not acceptance at the exact database limits.
+status: open
+
+### DW-69: Repeated date-helper calls can anchor one setup batch to different local days at midnight.
+origin: spec-deferred 48f645dfe7e2
+location: tests/support/helpers/events.ts:177
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: `isoDateDaysFromNow` creates a new `Date` for every call. Multi-row setup in the activated API and E2E suites invokes it repeatedly, so a batch crossing local midnight can receive dates derived from different calendar anchors.
+status: open
+
+### DW-70: The anonymous-write isolation check can fail on a stale row from an interrupted prior run.
+origin: spec-deferred 1f8f5181ea11
+location: tests/api/events-wire-contract.spec.ts:247
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: The first wire-contract test queries the fixed `ANON_ATTEMPT_LABEL` without clearing the worker pair first. A prior run terminated before teardown can leave that label behind, so the final zero-row assertion can fail even though the anonymous POST wrote nothing.
+status: open
+
+### DW-71: Outsider account cleanup ignores a returned deletion error when sign-in setup fails.
+origin: spec-deferred 588dd42563e8
+location: tests/support/helpers/rls-security.ts:64
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: medium
+reason: `createOutsiderClient` catches a failed sign-in and awaits `cleanup()`, but the Supabase admin deletion reports ordinary failures through its returned `error` field. That response is not checked on this setup-failure path, so the throwaway auth account can remain while only the sign-in error is reported.
+status: open
+
+### DW-72: The test-local event row schema accepts undeclared response columns despite its exact-schema claim.
+origin: spec-deferred ebb7963b5d9c
+location: tests/api/events-wire-contract.spec.ts:141
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: Zod objects strip unknown keys by default. Because `EventRowSchema` is not strict, a new PostgREST column returned by `select=*` is accepted even though the surrounding test prose says the schema mirrors the events table column for column.
+status: open
+
+### DW-73: The persistence suite header overstates reload coverage for the cleared-description case.
+origin: spec-deferred 5000b9059f98
+location: tests/e2e/settings/events-persistence.spec.ts:6
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: The file header says every row is read after a real reload, but DE.5-E2E-006 observes the pass-through PATCH response and resulting Settings and Home state without reloading. The behavior assertion remains valid, but the suite-level description is inaccurate.
+status: open
+
+### DW-74: Story 5 acceptance criteria AC4 and AC6 remain pinned to the pre-activation test inventory and file boundary.
+origin: spec-deferred 41994f83a590
+location: _bmad-output/specs/spec-dynamic-events/stories/5-manage-events-in-settings.md:242
+source_spec: `spec-dw-30-activate-parked-event-tests.md`
+severity: low
+reason: AC4 names the historical 1238-test baseline and only the original EventsSettings suites, while AC6 permits only five story files outside artifacts. The activated API, E2E, component, unit, and shared-helper changes make both statements stale. Review policy requires deferring changes to this agent-context specification.
 status: open
