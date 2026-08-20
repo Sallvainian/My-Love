@@ -95,7 +95,14 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
   // Actions
 
   /**
-   * Load every event visible to this account (own + partner's), date-ordered.
+   * Load the events visible to this account (own + partner's), date-ordered.
+   *
+   * Not every event: `getEvents()` is called bare, so it reads its default
+   * bounded window — up to 50 rows on each side of today. Past roughly 50 past
+   * events the oldest ones stop arriving, which matters to `EventsSettings`,
+   * the one screen that lists past events so a mistyped date stays editable.
+   * There is no "load more"; see `eventsService.getEvents` for what the cap
+   * drops and why the window is anchored at today.
    */
   loadEvents: async () => {
     // Whose data this is, captured before the await. Sign Out sits on the same

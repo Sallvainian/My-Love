@@ -105,6 +105,39 @@ export function getEventsSlotView(
   return lastLoadFailed ? 'error' : 'empty';
 }
 
+/**
+ * Which events Home's column shows, and how many are eligible.
+ *
+ * Two answers rather than one, because they feed different decisions and must
+ * not be the same number: `visible` is the capped list that renders, while
+ * `upcomingCount` is the UNCAPPED eligible count that `getEventsSlotView`
+ * needs. Passing the capped length there would be harmless today but would
+ * make "more events than fit" indistinguishable from "exactly the cap", and
+ * any future rule keyed on that count would silently read the wrong one.
+ *
+ * The cap is applied AFTER the filter, so it is always the soonest `maxCards`
+ * events that are eligible *right now*. That is what makes the hidden tail
+ * transient: when the soonest card retires at local midnight and the caller
+ * re-runs this with a later `now`, the retired event leaves the filter and the
+ * next one moves into the freed slot without a reload.
+ *
+ * Generic over the element so this stays a leaf: it never imports the events
+ * service's `CoupleEvent`, it only requires a real `Date`.
+ *
+ * @param events - The store's events, already soonest-first
+ * @param now - One clock reading for the whole pass, for the same reason
+ *   `getCalendarDaysDiff` takes it: two readings can straddle a midnight tick
+ * @param maxCards - How many cards the column renders
+ */
+export function getUpcomingEventCards<T extends { date: Date }>(
+  events: T[],
+  now: Date,
+  maxCards: number
+): { upcomingCount: number; visible: T[] } {
+  const upcoming = events.filter((event) => getCalendarDaysDiff(event.date, now) >= 0);
+  return { upcomingCount: upcoming.length, visible: upcoming.slice(0, maxCards) };
+}
+
 function computeEventCountdownState(date: Date | null): {
   timeDiff: TimeDifference | null;
   calendarDays: number;
