@@ -21,6 +21,7 @@ import { test as customFixtures } from './fixtures';
 import { test as scriptureNavFixture } from './fixtures/scripture-navigation';
 import { test as authFixture } from './fixtures/auth';
 import { test as togetherModeFixture } from './fixtures/together-mode';
+import { test as interactionRealtimeFixture } from './fixtures/interaction-realtime-control';
 
 /**
  * Create network error monitor with project-specific exclusions.
@@ -62,6 +63,7 @@ export const test: ReturnType<
       typeof scriptureNavFixture,
       typeof authFixture,
       typeof togetherModeFixture,
+      typeof interactionRealtimeFixture,
     ]
   >
 > = mergeTests(
@@ -73,7 +75,8 @@ export const test: ReturnType<
   customFixtures,
   scriptureNavFixture,
   authFixture,
-  togetherModeFixture
+  togetherModeFixture,
+  interactionRealtimeFixture
 );
 
 export { expect } from '@playwright/test';
