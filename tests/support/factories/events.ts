@@ -1,18 +1,14 @@
 /**
  * Events Test Factory
  *
- * Pure functions for seeding `public.events` rows for the running worker's own
- * couple, plus the worker-pair id resolution every events spec currently
- * re-declares by hand (`tests/e2e/home/events.spec.ts:36-68`,
- * `tests/e2e/settings/events-crud.spec.ts:37-69`,
- * `tests/api/check-constraint-error-mapping.spec.ts:65-84`).
+ * Pure functions for anchored batch seeding of `public.events` rows for the
+ * running worker's own couple. Single-row specs use
+ * `tests/support/helpers/events.ts`; constraint-focused specs may keep smaller
+ * self-contained setup when adopting the fixture would add unrelated scope.
  *
- * Those three hand-rolled copies were deliberately NOT migrated onto this
- * module: they are green, they are not what this story changed, and rewriting
- * three passing specs to prove a new helper works is how a test refactor breaks
- * coverage it was supposed to preserve. So this is the shared module for NEW
- * events specs, and the duplication it names above is still there. Migrating it
- * is its own change.
+ * This remains the shared module for specs that need one stable clock anchor,
+ * deterministic bulk insertion, or the `coupleEvents` fixture. It complements
+ * the single-row helper instead of replacing it.
  *
  * Pure function → fixture wrapper, per `fixture-architecture.md`: nothing here
  * touches Playwright. The fixture that owns setup and teardown is

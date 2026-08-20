@@ -1,21 +1,19 @@
 /**
  * Events test helpers — the couple pair, its rows, and the dates they carry.
  *
- * Target path once activated: `tests/support/helpers/events.ts`.
  * Import by this DEEP path, never through `../helpers`: the barrel at
  * `tests/support/helpers/index.ts` re-exports only `./navigation`, and
  * `../helpers` resolves to that barrel rather than to this module.
  *
  * ── Why this module exists ────────────────────────────────────────────────
  *
- * `resolveAppUserId`, `resolveOwnPair` and `clearPairEvents` are currently
- * hand-copied into every spec that touches `public.events`. Measured with
+ * `resolveAppUserId`, `resolveOwnPair` and `clearPairEvents` were previously
+ * hand-copied into every spec that touched `public.events`. Measured with
  * `grep -rln` over `tests/` and `_bmad-output/test-artifacts/` on 2026-08-19:
  * `resolveAppUserId` in 7 files, `resolveOwnPair` in 6, `clearPairEvents` in 6
  * — `tests/e2e/home/events.spec.ts`, `tests/e2e/settings/events-crud.spec.ts`,
- * the four parked ATDD scaffolds, and now the two specs this automation run
- * generated. `data-factories.md` sets the extraction bar at three or more
- * consumers of the same thing; this is eight.
+ * four ATDD specs, and two automation specs. `data-factories.md` sets the
+ * extraction bar at three or more consumers of the same thing; this is eight.
  *
  * The duplication is not cosmetic. `clearPairEvents` is the teardown that keeps
  * one worker's rows out of another worker's premise, and eight independent

@@ -238,7 +238,7 @@ deferred:
 **Acceptance Criteria:**
 - Given a signed-in account on `/settings` reached by direct navigation rather than through Home, when the view mounts, then the events list loads and settles without the user visiting Home first.
 - Given an event added from Settings, when the user navigates to Home, then its card is present with the same label, date and description, and no reload was needed.
-- Given `npm run typecheck` and `npm run lint`, when both run, then lint is clean and typecheck emits only the six pre-existing `TS2883` errors at `tests/support/merged-fixtures.ts(53,14)`.
+- Given `npm run typecheck` and `npm run lint`, when both run, then both complete with no errors.
 - Given `npm run test:unit`, when it runs, then every suite passes including the two new `EventsSettings` suites, and the existing 1238-test baseline is unbroken.
 - Given `supabase start` and the local stack, when `npx playwright test tests/e2e/ --project=chromium` runs, then every spec passes, including the new Settings spec and the unchanged `tests/e2e/home/events.spec.ts`.
 - Given `git diff --name-only` outside `_bmad-output/`, when inspected, then it lists only the five files above — nothing under `supabase/`, `src/types/`, `src/services/`, `src/stores/`, or `src/App.tsx`.

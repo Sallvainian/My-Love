@@ -59,8 +59,8 @@ const OVER_LONG_NOTE = 'n'.repeat(501);
 /**
  * Resolve this worker's own `public.users.id`.
  *
- * Mirrors `tests/e2e/settings/events-crud.spec.ts:37-69`, kept self-contained
- * there and here because the factory helper it mirrors is not exported.
+ * Kept self-contained because this API case needs only the signed-in user's id;
+ * the broader pair helpers used by event lifecycle specs would add unused setup.
  */
 async function resolveOwnUserId(supabaseAdmin: TypedSupabaseClient): Promise<string> {
   const pair = getWorkerPairEmails();

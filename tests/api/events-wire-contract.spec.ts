@@ -1,16 +1,13 @@
 /**
  * ACTIVE API specs — the PostgREST wire contract of `public.events`.
  *
- * Target path once activated: `tests/api/events-wire-contract.spec.ts`
- * (Playwright project `api` — `playwright.config.ts:146-155`, `testDir: './tests/api'`,
+ * Runs in the Playwright `api` project (`playwright.config.ts`,
+ * `testDir: './tests/api'`,
  * `baseURL: process.env.SUPABASE_URL`, `extraHTTPHeaders.apikey = process.env.SUPABASE_ANON_KEY`,
  * `'Content-Type': 'application/json'`).
  *
  * Produced by the story-5 `automate` run (spec-dynamic-events, "Manage events in
- * Settings"). These are ACTIVE tests, not RED-phase scaffolds: no `test.skip`.
- * The file is parked here rather than in `tests/` only because the story's
- * acceptance criterion pins the production diff to five files; moving it to the
- * target path above is the whole activation step.
+ * Settings") and activated under the configured runner by DW-30.
  *
  * Test-design IDs covered: DE.5-API-004, DE.5-API-005, DE.5-API-006, DE.5-API-007,
  * DE.5-API-008.
@@ -20,7 +17,7 @@
  * `UNIT`, `COMP`, `E2E` only). DE.5-API-001..003 live in the ATDD sibling
  * `api-events-write-wire-shape.spec.ts` and are deliberately not repeated here.
  *
- * Run once moved:
+ * Run:
  *   npx playwright test tests/api/events-wire-contract.spec.ts --project=api --workers=1
  * Prerequisite: `supabase start`, plus the local `SUPABASE_URL`,
  * `SUPABASE_ANON_KEY` and service-role env the `api` project already reads.
@@ -61,14 +58,12 @@
  *   string survives the round trip with no timezone shift. Asserted against a
  *   hard-coded literal, deliberately `2027-01-01`: the sharpest case, since a
  *   UTC-midnight misparse renders it as the previous YEAR west of UTC.
- * DE.5-API-005 [P1] — mirrors `eventsService.getEvents`
- *   (`src/services/eventsService.ts:253-260`): `select=*`, `.order('event_date')`,
- *   then `.order('created_at')`. Two `.order()` calls serialize to ONE
- *   comma-joined parameter, `order=event_date.asc,created_at.asc`
- *   (`node_modules/@supabase/postgrest-js/src/PostgrestTransformBuilder.ts:380-388`),
- *   which is what this test sends. It also proves the read carries no `user_id`
- *   filter and still returns the partner's rows through the `events_select`
- *   policy.
+ * DE.5-API-005 [P1] — pins the lower-level raw PostgREST contract: one
+ *   unbounded request with `select=*` and ascending `event_date`, then
+ *   `created_at`, returns both halves of the couple through `events_select`.
+ *   Two order keys serialize to one comma-joined parameter. The service's
+ *   current split, bounded window is exercised by the active
+ *   `tests/api/events-read-window.spec.ts` suite.
  * DE.5-API-008 [P1] — the HTTP twin of EV-DB-022/023
  *   (`supabase/tests/database/20_events.sql:219,224`), which prove the predicate
  *   in SQL only. NOT a duplicate of DE.5-API-007, and the two answers are not
@@ -133,6 +128,7 @@ import {
   clearPairEvents,
   isoDateDaysFromNow,
   resolveOwnPair,
+  seedEvent,
 } from '../support/helpers/events';
 
 /**
@@ -337,10 +333,11 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
 
   // ==========================================================================
   // DE.5-API-005 [P1]
-  // `eventsService.getEvents`'s exact query, including the created_at tiebreak
-  // that DW-10 added, and the partner half the unfiltered read must return.
+  // The raw PostgREST ordering/RLS contract, including the created_at
+  // tiebreak and the partner half the unfiltered read must return. The current
+  // split, bounded service query is covered by events-read-window.spec.ts.
   // ==========================================================================
-  test('[P1] DE.5-API-005 GET with the service query returns both halves of the pair in event_date then created_at order', async ({
+  test('[P1] DE.5-API-005 a raw ascending GET returns both halves of the pair in event_date then created_at order', async ({
     apiRequest,
     recurse,
     supabaseAdmin,
@@ -405,16 +402,16 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
 
     expect(seedError).toBeNull();
 
-    // WHEN: the creator reads with the exact query eventsService.getEvents sends
+    // WHEN: the creator issues one raw, unbounded ascending PostgREST read
     // THEN: PostgREST returns both halves of the pair in event_date, created_at order
-    await log.step('Read as the creator with the exact query eventsService.getEvents sends');
+    await log.step('Read as the creator with one raw unbounded ascending query');
     const creatorToken = await getUserAccessToken(supabaseAdmin, userId);
 
     // `order=event_date.asc,created_at.asc` — ONE comma-joined parameter, which
     // is what two `.order()` calls serialize to
     // (@supabase/postgrest-js/src/PostgrestTransformBuilder.ts:380-388).
-    // No `user_id` filter, exactly as the service sends it: the `events_select`
-    // policy is what scopes the read, and a filter would drop the partner half.
+    // Deliberately no `user_id` filter: the `events_select` policy scopes the
+    // read, and a filter would drop the partner half.
     const listed = await recurse(
       () =>
         apiRequest<EventRow[]>({
@@ -496,6 +493,9 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     // worker. It is linked to nobody, which is the whole point: it is exactly
     // the caller `get_my_partner_id()` returns NULL for.
     const outsider = await createOutsiderClient(supabaseAdmin, 'events-wire-outsider');
+    let testFailure: unknown;
+    let testFailed = false;
+    let cleanupFailure: Error | null = null;
 
     try {
       // GIVEN (positive control): the same endpoint does serve the creator both rows,
@@ -546,10 +546,61 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
 
       expect(stillError).toBeNull();
       expect(stillThere).toHaveLength(2);
+
+      // The shared afterEach helper must remain scoped to this worker's pair.
+      // Give a non-pool user a row, run the real helper, and prove that row
+      // survives while the couple's two rows are cleared.
+      await log.step('Confirm shared cleanup leaves an outsider-owned row untouched');
+      const outsiderEventId = await seedEvent(supabaseAdmin, {
+        userId: outsider.userId,
+        label: 'Events Wire Outsider Cleanup Witness',
+        eventDate: isoDateDaysFromNow(24),
+      });
+
+      await clearOwnPairEvents(supabaseAdmin);
+
+      const { data: outsiderRow, error: outsiderRowError } = await supabaseAdmin
+        .from('events')
+        .select('id')
+        .eq('id', outsiderEventId)
+        .single();
+      const { count: remainingPairRows, error: pairCountError } = await supabaseAdmin
+        .from('events')
+        .select('id', { count: 'exact', head: true })
+        .in('user_id', [userId, partnerId]);
+
+      expect(outsiderRowError).toBeNull();
+      expect(outsiderRow?.id).toBe(outsiderEventId);
+      expect(pairCountError).toBeNull();
+      expect(remainingPairRows).toBe(0);
+    } catch (error) {
+      testFailed = true;
+      testFailure = error;
     } finally {
       // Always, even on failure: the account exists in auth.users until this runs.
-      await outsider.cleanup();
+      try {
+        const { error: cleanupError } = await outsider.cleanup();
+        if (cleanupError) {
+          cleanupFailure = new Error(
+            `Failed to clean up outsider account ${outsider.userId}: ${cleanupError.message}`
+          );
+        }
+      } catch (error) {
+        cleanupFailure =
+          error instanceof Error
+            ? error
+            : new Error(`Outsider account cleanup rejected with: ${String(error)}`);
+      }
     }
+
+    if (testFailed && cleanupFailure) {
+      throw new AggregateError(
+        [testFailure, cleanupFailure],
+        'The outsider test and its account cleanup both failed'
+      );
+    }
+    if (cleanupFailure) throw cleanupFailure;
+    if (testFailed) throw testFailure;
   });
 
   // ==========================================================================
