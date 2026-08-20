@@ -63,6 +63,16 @@ function validateHydratedState(state: Partial<AppState> | undefined): {
   return { isValid: !hasCriticalErrors, errors };
 }
 
+/**
+ * Keys a persisted blob may still carry that must never reach store state.
+ *
+ * Every one of them is account- or couple-scoped and none is in `partialize`,
+ * so this list only ever shrinks the blob on the way in — the write side
+ * already omits them. The next slice that needs the same protection extends
+ * this array rather than adding a second branch in `getItem`.
+ */
+const STALE_PERSISTED_KEYS = ['moods', 'events'] as const;
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get, api) => ({
@@ -108,20 +118,29 @@ export const useAppStore = create<AppState>()(
               return null;
             }
 
-            // Drop any previously-persisted moods.
+            // Drop any stale keys the blob still carries.
             //
-            // `partialize` stops NEW writes, but it does not govern reads: the
-            // blob already in localStorage still carries a `moods` array, and
-            // Zustand merges whatever it finds. Without this, the first load
-            // after upgrading rehydrates the previous account's entries --
-            // and MoodTracker's mount effect pre-fills that note into the
-            // textarea before loadMoods() can replace the array. Stripping it
-            // here rather than bumping the persist version keeps `version: 0`,
-            // which the E2E auth fixtures pin.
+            // `partialize` stops NEW writes, but it does not govern reads: a
+            // blob already on disk still carries these arrays, and Zustand
+            // merges whatever it finds. `moods` is the key with an installed
+            // base -- the first load after upgrading rehydrated the previous
+            // account's entries, and MoodTracker's mount effect pre-filled that
+            // note into the textarea before loadMoods() could replace the
+            // array. `events` is the same data class one step earlier:
+            // couple-scoped and Supabase-only, so on a shared device a blob
+            // carrying it would put one couple's countdown dates in front of
+            // the next account -- and since JSON has no Date, it would hand
+            // EventCountdown a string where it calls date.getFullYear().
+            // Stripping here rather than bumping the persist version keeps
+            // `version: 0`, which the E2E auth fixtures pin.
             let mutated = false;
-            if (data.state && 'moods' in data.state) {
-              delete data.state.moods;
-              mutated = true;
+            if (data.state) {
+              for (const key of STALE_PERSISTED_KEYS) {
+                if (key in data.state) {
+                  delete data.state[key];
+                  mutated = true;
+                }
+              }
             }
 
             // Schema-validate persisted settings; drop just `settings` on failure

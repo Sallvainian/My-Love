@@ -18,6 +18,13 @@
  *    seen and corrected. Filtering here would make a wrong-year event both
  *    invisible and uneditable.
  *
+ *    Unfiltered is not unbounded. `eventsService.getEvents` reads a capped
+ *    window on each side of today (50 by default), so past roughly 50 past
+ *    events the OLDEST ones stop arriving — and a year typed wrong into the
+ *    deep past is exactly such a row. This screen has no "load more" control to
+ *    reach them; adding one means giving `loadEvents` a limit/offset it does
+ *    not take today.
+ *
  * 3. **A save failure comes back from the write's own returned result, never
  *    from `eventsError`.** That key is shared by loads and by all three writes,
  *    so a form reading it can render an error raised by a *different* action.

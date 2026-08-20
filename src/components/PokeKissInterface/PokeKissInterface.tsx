@@ -22,6 +22,7 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { Hand, Heart, History, Wind, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { isOnline } from '../../api/errorHandlers';
 import { getPartnerId } from '../../api/supabaseClient';
 import { useAppStore } from '../../stores/useAppStore';
 import type { Interaction } from '../../types';
@@ -163,6 +164,17 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
       return;
     }
 
+    // Ahead of getPartnerId, not in the catch below: getPartnerId queries the
+    // users table, and every failure path returns null (supabaseClient.ts:99-112),
+    // so offline it reports "Partner not configured" and returns before sendPoke
+    // is ever called. interactionService.ts:159's honest sentence is unreachable
+    // from there. Interactions are Supabase-only -- no queue, no retry -- so say so.
+    if (!isOnline()) {
+      setShowToast('You are offline. A poke needs a connection to send.');
+      setTimeout(() => setShowToast(null), 3000);
+      return;
+    }
+
     const partnerId = await getPartnerId();
     if (!partnerId) {
       console.error('[PokeKissInterface] No partner ID configured');
@@ -193,6 +205,13 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
   const handleKiss = async () => {
     if (kissCooldown > 0) {
       setShowToast(`Wait ${formatCooldown(kissCooldown)} before kissing again`);
+      setTimeout(() => setShowToast(null), 3000);
+      return;
+    }
+
+    // See the note in handlePoke: the offline guard has to precede getPartnerId.
+    if (!isOnline()) {
+      setShowToast('You are offline. A kiss needs a connection to send.');
       setTimeout(() => setShowToast(null), 3000);
       return;
     }

@@ -5,8 +5,8 @@ import { NavigationTray } from './components/Navigation/NavigationTray';
 import {
   BirthdayCountdown,
   EventCountdown,
-  getCalendarDaysDiff,
   getEventsSlotView,
+  getUpcomingEventCards,
   TimeTogether,
 } from './components/RelationshipTimers';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
@@ -75,6 +75,22 @@ const LoadingSpinner = () => (
 // Timer configuration
 const WELCOME_DISPLAY_INTERVAL = 3600000; // 60 minutes in milliseconds
 const LAST_WELCOME_VIEW_KEY = 'lastWelcomeView';
+
+/**
+ * How many event cards Home's right-hand column renders (DW-22). Without it
+ * that column grows with the couple's event list while the birthdays column
+ * beside it stays fixed at two cards.
+ *
+ * 6, chosen by the couple over the 3 this shipped with: a cap of 3 hid events
+ * they had deliberately created, with no "+N more" affordance to say so, and
+ * the upcoming list is bounded anyway by how many future events two people
+ * plan at once. The overflow still gets no affordance — Settings lists every
+ * event, past ones included — but at 6 the overflow is not reachable in
+ * practice. Sibling precedent for the pattern (not the number) is
+ * `<CountdownTimer anniversaries={...} maxDisplay={3} />` in `DailyMessage`,
+ * a `.slice(0, count)` in `utils/countdownService.ts`.
+ */
+const HOME_MAX_EVENT_CARDS = 6;
 
 function App() {
   const { settings, isLoading, currentView, isOnline, events } = useAppStore(
@@ -450,8 +466,10 @@ function App() {
   // filter and slot decision below. Not a timer of its own: it rides the
   // one-second interval EventCountdown already runs, so the Never rule against
   // a dedicated midnight timer still holds. Without it, the last upcoming event
-  // rolling over removes its own card while `upcomingEvents` still counts it,
-  // and the slot shows neither a card nor the placeholder.
+  // rolling over removes its own card while the upcoming count still includes
+  // it, and the slot shows neither a card nor the placeholder. With the render
+  // cap it also refills: the tick is what lets the 4th event take the slot the
+  // retiring 1st just freed, without a reload.
   const [, setRetiredEventTick] = useState(0);
   const handleEventRetired = useCallback(() => setRetiredEventTick((tick) => tick + 1), []);
 
@@ -598,18 +616,23 @@ function App() {
   }
 
   // Story 3 (dynamic events): only events that have not yet passed at the
-  // viewer's own local midnight (CAP-3), reusing `getCalendarDaysDiff` — the
-  // same comparison EventCountdown already trusts — rather than re-deriving
-  // it. `events` is already sorted soonest-first by eventsSlice; no re-sort.
-  // One clock reading for the whole list. getCalendarDaysDiff takes `now` for
-  // exactly this reason: called without it, every event samples its own
-  // `new Date()`, so a filter pass straddling a midnight tick can judge two
-  // same-day events against different days.
+  // viewer's own local midnight (CAP-3), capped at HOME_MAX_EVENT_CARDS
+  // (DW-22). Both live in `getUpcomingEventCards`, which reuses
+  // `getCalendarDaysDiff` — the same comparison EventCountdown already trusts —
+  // rather than re-deriving it. `events` is already sorted soonest-first by
+  // eventsSlice; no re-sort. One clock reading for the whole list: called
+  // without `now`, every event samples its own `new Date()`, so a pass
+  // straddling a midnight tick can judge two same-day events against different
+  // days.
   const now = new Date();
-  const upcomingEvents = events.filter((event) => getCalendarDaysDiff(event.date, now) >= 0);
+  const { upcomingCount, visible: visibleEvents } = getUpcomingEventCards(
+    events,
+    now,
+    HOME_MAX_EVENT_CARDS
+  );
   const eventsSlotView = getEventsSlotView(
     events.length,
-    upcomingEvents.length,
+    upcomingCount,
     firstEventsLoadSettled,
     eventsLoadFailed
   );
@@ -677,7 +700,11 @@ function App() {
                       </p>
                     </div>
                   ) : (
-                    upcomingEvents.map((event) => (
+                    // Already filtered and capped by getUpcomingEventCards,
+                    // which hands the slot decision above the UNCAPPED count —
+                    // so hiding the tail can never turn a real list into the
+                    // empty placeholder.
+                    visibleEvents.map((event) => (
                       <EventCountdown
                         key={event.id}
                         label={event.label}
