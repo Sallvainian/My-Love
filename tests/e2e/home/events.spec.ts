@@ -20,102 +20,21 @@
  * - the column renders at most six cards, the six soonest, and a past
  *   event does not consume one of those slots (DW-22)
  *
- * User id resolution mirrors `tests/support/factories/index.ts`'s
- * `resolveAppUserIdByEmail` (email → `public.users.id`), kept self-contained
- * here since that helper is not exported.
+ * Pair resolution, scoped cleanup, seeding and local-date creation come from
+ * the shared event helper.
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
-import { getWorkerPairEmails } from '../../support/auth/worker-pool';
-import type { TypedSupabaseClient } from '../../support/factories';
-import { formatDateISO } from '../../../src/utils/dateUtils';
-
-/** Ids of events seeded by this file's tests, drained in afterEach. */
-const pendingEventIds: string[] = [];
-
-async function resolveAppUserId(
-  supabaseAdmin: TypedSupabaseClient,
-  email: string
-): Promise<string> {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .single();
-
-  if (error || !data?.id) {
-    throw new Error(`Could not resolve app user for ${email}: ${error?.message ?? 'not found'}`);
-  }
-
-  return data.id;
-}
-
-/** This worker's own pair, resolved to `public.users.id`s. Throws outside a worker. */
-async function resolveOwnPair(
-  supabaseAdmin: TypedSupabaseClient
-): Promise<{ userId: string; partnerId: string }> {
-  const pair = getWorkerPairEmails();
-  if (!pair) {
-    throw new Error('resolveOwnPair: no worker identity (TEST_WORKER_INDEX unset)');
-  }
-
-  const [userId, partnerId] = await Promise.all([
-    resolveAppUserId(supabaseAdmin, pair.user1Email),
-    resolveAppUserId(supabaseAdmin, pair.user2Email),
-  ]);
-
-  return { userId, partnerId };
-}
-
-async function seedEvent(
-  supabaseAdmin: TypedSupabaseClient,
-  userId: string,
-  dayOffset: number,
-  label: string,
-  description: string | null,
-  icon: 'ring' | 'plane' | 'calendar' = 'calendar'
-): Promise<void> {
-  const date = new Date();
-  date.setDate(date.getDate() + dayOffset);
-
-  const { data, error } = await supabaseAdmin
-    .from('events')
-    .insert({ user_id: userId, label, event_date: formatDateISO(date), description, icon })
-    .select('id')
-    .single();
-
-  if (error || !data?.id) {
-    throw new Error(`Failed to seed event "${label}": ${error?.message ?? 'no row returned'}`);
-  }
-
-  pendingEventIds.push(data.id);
-}
-
-/** Remove every event owned by either half of this worker's pair. */
-async function clearPairEvents(
-  supabaseAdmin: TypedSupabaseClient,
-  userId: string,
-  partnerId: string
-): Promise<void> {
-  // Checked for the same reason afterEach's delete is: a silently-failed
-  // pre-clear leaves stray rows that break the next test's premise and fail it
-  // as "placeholder not visible", pointing at the wrong code.
-  const { error } = await supabaseAdmin.from('events').delete().in('user_id', [userId, partnerId]);
-  if (error) {
-    throw new Error(`Failed to clear seeded events for the worker pair: ${error.message}`);
-  }
-}
+import {
+  clearOwnPairEvents,
+  clearPairEvents,
+  isoDateDaysFromNow,
+  resolveOwnPair,
+  seedEvent,
+} from '../../support/helpers/events';
 
 test.afterEach(async ({ supabaseAdmin }) => {
-  const ids = pendingEventIds.splice(0);
-  if (ids.length > 0) {
-    const { error } = await supabaseAdmin.from('events').delete().in('id', ids);
-    if (error) {
-      // Unchecked, this fails silently and leaves orphaned rows for this
-      // worker's fixed test identity (worker-pool.ts) to trip over next run.
-      throw new Error(`Failed to clean up seeded events [${ids.join(', ')}]: ${error.message}`);
-    }
-  }
+  await clearOwnPairEvents(supabaseAdmin);
 });
 
 test.describe('Home dashboard reads events from the store', () => {
@@ -136,8 +55,20 @@ test.describe('Home dashboard reads events from the store', () => {
     // either half of the couple — Home's SELECT reads own + partner.
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    await seedEvent(supabaseAdmin, userId, 14, 'Future Meetup E2E', 'Future event description');
-    await seedEvent(supabaseAdmin, userId, -14, 'Past Meetup E2E', 'Past event description');
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Future Meetup E2E',
+      eventDate: isoDateDaysFromNow(14),
+      description: 'Future event description',
+      icon: 'calendar',
+    });
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Past Meetup E2E',
+      eventDate: isoDateDaysFromNow(-14),
+      description: 'Past event description',
+      icon: 'calendar',
+    });
     // CAP-1's couple-shared visibility: the SELECT policy returns own +
     // partner events with no user_id filter applied client-side, so a
     // partner-owned event must render on the signed-in user's Home too.
@@ -146,11 +77,13 @@ test.describe('Home dashboard reads events from the store', () => {
     // in App.tsx fails the icon assertion below.
     await seedEvent(
       supabaseAdmin,
-      partnerId,
-      21,
-      'Partner Meetup E2E',
-      'Partner event description',
-      'ring'
+      {
+        userId: partnerId,
+        label: 'Partner Meetup E2E',
+        eventDate: isoDateDaysFromNow(21),
+        description: 'Partner event description',
+        icon: 'ring',
+      }
     );
 
     await page.goto('/');
@@ -221,7 +154,13 @@ test.describe('Home dashboard reads events from the store', () => {
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
-    await seedEvent(supabaseAdmin, userId, 12, 'Flash Meetup E2E', 'Flash event description');
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Flash Meetup E2E',
+      eventDate: isoDateDaysFromNow(12),
+      description: 'Flash event description',
+      icon: 'calendar',
+    });
 
     // Hold the account's very FIRST events fetch, so the window this test is
     // about — Home painted, loadEvents() still outstanding — lasts as long as
@@ -266,8 +205,20 @@ test.describe('Home dashboard reads events from the store', () => {
     // filter: delete it (`upcomingEvents = events`) and the slot computes
     // 'list', renders two components that each return null, and shows neither
     // cards nor the placeholder — the unexplained gap CAP-10 forbids.
-    await seedEvent(supabaseAdmin, userId, -3, 'Old Meetup E2E', 'Old event description');
-    await seedEvent(supabaseAdmin, partnerId, -30, 'Older Meetup E2E', 'Older event description');
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Old Meetup E2E',
+      eventDate: isoDateDaysFromNow(-3),
+      description: 'Old event description',
+      icon: 'calendar',
+    });
+    await seedEvent(supabaseAdmin, {
+      userId: partnerId,
+      label: 'Older Meetup E2E',
+      eventDate: isoDateDaysFromNow(-30),
+      description: 'Older event description',
+      icon: 'calendar',
+    });
 
     await page.goto('/');
 
@@ -289,7 +240,13 @@ test.describe('Home dashboard reads events from the store', () => {
     // `description: null` is the column's nullable case, which App coerces with
     // `event.description ?? undefined` — every other seeded row supplies a
     // string, so this is the only test that carries a null through.
-    await seedEvent(supabaseAdmin, userId, 0, 'Today Meetup E2E', null);
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Today Meetup E2E',
+      eventDate: isoDateDaysFromNow(0),
+      description: null,
+      icon: 'calendar',
+    });
 
     await page.goto('/');
 
@@ -316,18 +273,66 @@ test.describe('Home dashboard reads events from the store', () => {
     // beside it. Seeded out of date order and across both halves of the couple,
     // so the assertion pins "the six SOONEST" rather than "the first six
     // rows the query happened to return".
-    await seedEvent(supabaseAdmin, userId, 24, 'Fourth Meetup E2E', 'Fourth event description');
-    await seedEvent(supabaseAdmin, partnerId, 6, 'Second Meetup E2E', 'Second event description');
-    await seedEvent(supabaseAdmin, userId, 31, 'Fifth Meetup E2E', 'Fifth event description');
-    await seedEvent(supabaseAdmin, userId, 18, 'Third Meetup E2E', 'Third event description');
-    await seedEvent(supabaseAdmin, partnerId, 2, 'First Meetup E2E', 'First event description');
-    await seedEvent(supabaseAdmin, partnerId, 38, 'Sixth Meetup E2E', 'Sixth event description');
-    await seedEvent(supabaseAdmin, userId, 45, 'Seventh Meetup E2E', 'Seventh event description');
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Fourth Meetup E2E',
+      eventDate: isoDateDaysFromNow(24),
+      description: 'Fourth event description',
+      icon: 'calendar',
+    });
+    await seedEvent(supabaseAdmin, {
+      userId: partnerId,
+      label: 'Second Meetup E2E',
+      eventDate: isoDateDaysFromNow(6),
+      description: 'Second event description',
+      icon: 'calendar',
+    });
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Fifth Meetup E2E',
+      eventDate: isoDateDaysFromNow(31),
+      description: 'Fifth event description',
+      icon: 'calendar',
+    });
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Third Meetup E2E',
+      eventDate: isoDateDaysFromNow(18),
+      description: 'Third event description',
+      icon: 'calendar',
+    });
+    await seedEvent(supabaseAdmin, {
+      userId: partnerId,
+      label: 'First Meetup E2E',
+      eventDate: isoDateDaysFromNow(2),
+      description: 'First event description',
+      icon: 'calendar',
+    });
+    await seedEvent(supabaseAdmin, {
+      userId: partnerId,
+      label: 'Sixth Meetup E2E',
+      eventDate: isoDateDaysFromNow(38),
+      description: 'Sixth event description',
+      icon: 'calendar',
+    });
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Seventh Meetup E2E',
+      eventDate: isoDateDaysFromNow(45),
+      description: 'Seventh event description',
+      icon: 'calendar',
+    });
     // A past event too: the store holds it (Settings lists past events), so
     // this is what pins that the cap counts UPCOMING events only. Cap the raw
     // `events` array instead of the filtered one and this row eats a slot,
     // leaving 'Third Meetup E2E' off the page.
-    await seedEvent(supabaseAdmin, userId, -9, 'Old Meetup E2E', 'Old event description');
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Old Meetup E2E',
+      eventDate: isoDateDaysFromNow(-9),
+      description: 'Old event description',
+      icon: 'calendar',
+    });
 
     await page.goto('/');
 
@@ -364,7 +369,13 @@ test.describe('Home dashboard reads events from the store', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    await seedEvent(supabaseAdmin, userId, 10, 'Reload Meetup E2E', 'Reload event description');
+    await seedEvent(supabaseAdmin, {
+      userId,
+      label: 'Reload Meetup E2E',
+      eventDate: isoDateDaysFromNow(10),
+      description: 'Reload event description',
+      icon: 'calendar',
+    });
 
     await page.goto('/');
 

@@ -50,7 +50,21 @@ const networkMonitorFixture = base.extend(
  * Auth: Uses SupabaseAuthProvider via @seontechnologies/playwright-utils auth-session.
  * Each worker gets a unique user identity via authOptions (worker-scoped).
  */
-export const test = mergeTests(
+export const test: ReturnType<
+  typeof mergeTests<
+    [
+      typeof apiRequestFixture,
+      typeof recurseFixture,
+      typeof logFixture,
+      typeof interceptFixture,
+      typeof networkMonitorFixture,
+      typeof customFixtures,
+      typeof scriptureNavFixture,
+      typeof authFixture,
+      typeof togetherModeFixture,
+    ]
+  >
+> = mergeTests(
   apiRequestFixture,
   recurseFixture,
   logFixture,
