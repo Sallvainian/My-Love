@@ -1,0 +1,46 @@
+{
+  "workflow": "bmad-testarch-automate",
+  "runKey": "dw-activate-parked-event-tests",
+  "stack": "frontend",
+  "execution": {
+    "requestedMode": "auto",
+    "probeEnabled": true,
+    "supportsAgentTeam": false,
+    "supportsSubagent": true,
+    "resolvedMode": "subagent"
+  },
+  "generated": {
+    "apiTests": 0,
+    "e2eTests": 0,
+    "testFiles": [],
+    "fixtures": []
+  },
+  "selectedActiveCoverage": {
+    "api": {
+      "count": 8,
+      "files": [
+        "tests/api/events-wire-contract.spec.ts",
+        "tests/api/events-write-wire-shape.spec.ts"
+      ],
+      "priorities": { "P0": 1, "P1": 7, "P2": 0, "P3": 0 }
+    },
+    "e2e": {
+      "count": 11,
+      "files": [
+        "tests/e2e/settings/events-accessibility.spec.ts",
+        "tests/e2e/settings/events-load-recovery.spec.ts",
+        "tests/e2e/settings/events-persistence.spec.ts",
+        "tests/e2e/settings/events-write-failures.spec.ts"
+      ],
+      "priorities": { "P0": 0, "P1": 6, "P2": 4, "P3": 1 }
+    }
+  },
+  "fixtureContract": {
+    "decision": "reuse",
+    "entrypoint": "tests/support/merged-fixtures.ts",
+    "sharedHelper": "tests/support/helpers/events.ts",
+    "anchoredFixture": "tests/support/fixtures/index.ts#coupleEvents",
+    "reason": "Existing worker-scoped pair identity, checked cleanup, event seeding, and one-anchor batch data cover every identified need; another fixture would duplicate infrastructure."
+  },
+  "decision": "No new behavioral API/E2E files were emitted because the branch changes runner visibility and test support only. The selected active pack already covers every mapped risk at the correct level."
+}
