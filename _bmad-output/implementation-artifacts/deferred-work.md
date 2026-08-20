@@ -360,7 +360,9 @@ location: src/api/interactionService.ts:225
 source_spec: `spec-dw-7-18-events-offline-message-honesty.md`
 severity: low
 reason: src/api/interactionService.ts:253-255 passes a logger into .subscribe() and never surfaces CHANNEL_ERROR or TIMED_OUT to the caller. It also calls supabase.channel() directly, which AGENTS.md already records as a repo-wide teardown pitfall; the missing error path is the half AGENTS.md does not cover. Unchanged by this diff.
-status: open
+status: done 2026-08-20
+resolution: resolved by sweep bundle dw-interaction-subscribe-error-surfacing
+resolution-undo: 2b166d2a835fd67e36fae399847dd6a6dbf4ddc63c28d08a577652ead0c14b78 2026-08-20 7374617475733a206f70656e
 
 ### DW-36: The SQLSTATE lookup walks Object.prototype, so a code of toString, constructor, valueOf or hasOwnProperty returns an inherited function and renders it to the user as the error message.
 origin: spec-deferred d3c350f0c7d6
@@ -678,4 +680,20 @@ location: _bmad-output/specs/spec-dynamic-events/stories/5-manage-events-in-sett
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: AC4 names the historical 1238-test baseline and only the original EventsSettings suites, while AC6 permits only five story files outside artifacts. The activated API, E2E, component, unit, and shared-helper changes make both statements stale. Review policy requires deferring changes to this agent-context specification.
+status: open
+
+### DW-75: Incoming interaction callbacks can still write records from a previous account after the active user changes or teardown begins.
+origin: spec-deferred cdf80216e859
+location: src/stores/slices/interactionsSlice.ts:223
+source_spec: `spec-dw-35-interaction-subscribe-error-surfacing.md`
+severity: high
+reason: The pre-existing record callback in interactionsSlice calls addIncomingInteraction without checking the captured user or the subscription's active flag. A queued record from the old channel can therefore repopulate shared store state after an account switch. This was not introduced by DW-35's new status callback.
+status: open
+
+### DW-76: The subscribeInteractions JSDoc example does not match the method's required arguments.
+origin: spec-deferred 81acc5a7d387
+location: src/api/interactionService.ts:216
+source_spec: `spec-dw-35-interaction-subscribe-error-surfacing.md`
+severity: low
+reason: The example already omitted userId before this change and now also omits the status callback, so copied sample code does not typecheck. It is pre-existing documentation debt outside DW-35's runtime error surface.
 status: open
