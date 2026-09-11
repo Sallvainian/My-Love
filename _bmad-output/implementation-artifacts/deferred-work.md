@@ -413,6 +413,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: `EventsSettings.tsx` renders the store array unfiltered and calls `loadEvents()` with no arguments; `eventsSlice.loadEvents` calls `eventsService.getEvents()` bare, so both windows take the default `limit = 50, offset = 0`. Measured with `grep -rn "getEvents(" src tests`: the only production call site is `src/stores/slices/eventsSlice.ts:116`. The screen's own comment states why the list must stay unfiltered — a mistyped year is "the only place a mistyped year can be seen and corrected" — and a year typed wrong into the deep past is exactly the row the descending past window drops first. This change documents the bound in both files; closing it needs a "load more" control and a `loadEvents` that takes limit/offset, which the spec's Boundaries put out of scope.
 status: open
+decision: 2026-09-11 Defer pagination
 
 ### DW-42: A row whose date cannot be parsed still consumes a slot inside the capped window before it is dropped client-side, so garbage can push a real event off the page.
 origin: spec-deferred 6ae6d93ad3e8
@@ -437,6 +438,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: Verified path, both halves read this session: `eventsSlice.addEvent` inserts the created row into the store unconditionally — `set((state) => ({ events: sortByDate([...state.events, created]) }))` — while `loadEvents` re-reads a bounded window (`getEvents()` bare, so `limit = 50` per side). A couple with more than 50 past events who corrects or adds a deep-past date therefore sees the row in Settings, and the next `loadEvents()` drops it because the descending past page no longer reaches it. The row is not lost — it is in the table — only invisible. Distinct from the "no way to reach truncated rows" item: that one is about rows the user never sees, this one is about a row the user just saw confirmed. Closing it needs the same "load more" plumbing, or an in-range check at save time.
 status: open
+decision: 2026-09-11 Defer pagination
 
 ### DW-45: The two-window read is two requests, so a row whose date is edited across today between them can come back in neither page, or come back as the pre-edit copy.
 origin: spec-deferred b8ca2f59b73d
@@ -455,6 +457,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: Both reads are plain `.select('*')` with no `{ count: 'exact' }`, so the service, the store and any future affordance have no "there are more" signal; `logger.debug('[EventsService] Fetched events:', events.length)` cannot distinguish 50 events from 50 of 300. The already-recorded Settings "load more" item names the control and the `limit`/`offset` plumbing it needs, but not the fact that the data to drive its enabled state is not fetched. A count also cannot go anywhere today: the intent's Never list forbids a store-shape change and a second store action.
 status: open
+decision: 2026-09-11 Defer pagination
 
 ### DW-47: The new API spec re-issues the production query chain by hand, so the two copies can drift if a change is made to both.
 origin: spec-deferred 71695d066668
@@ -472,7 +475,9 @@ location: src/stores/useAppStore.ts:74
 source_spec: `spec-dw-14-20-persisted-events-key-strip.md`
 severity: low
 reason: `STALE_PERSISTED_KEYS` (src/stores/useAppStore.ts:74) lists `moods` and `events`. A blob carrying `eventsIsLoading: true` would rehydrate it, and `loadEvents` bails at `if (!requestedBy) return;` (src/stores/slices/eventsSlice.ts:118) *before* raising the flag — so on a signed-out start nothing clears it until the next sign-in, leaving a stranded loading state. `eventsError` would likewise show a stale banner. Neither carries couple data, so this is not the disclosure class DW-14/DW-20 describe, and both are the same unreachability class as the original entries: no build has ever written any events key to localStorage. Excluded from this change on the authority of the bundle intent, which names the `events` key alone ("Strip a stale `events` key out of the persisted blob on read").
-status: open
+status: done 2026-09-11
+resolution: closed by human decision: Preserve the existing persistence scope: no shipped build wrote these transient events flags, as documented in the source spec's Design Notes.
+decision: 2026-09-11 Retain the deliberate exclusion — Preserve the existing persistence scope: no shipped build wrote these transient events flags, as documented in the source spec's Design Notes.
 
 ### DW-49: An invalid-response write can already have landed, but Settings still offers the same write control and a create retry can duplicate the event.
 origin: spec-deferred db701c73ed1f
@@ -481,6 +486,7 @@ source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: This behavior predates the bundle: every failure previously left Save enabled. The new `invalid-response` code now identifies it, but choosing a distinct safe affordance was not part of the events-only refresh-versus-retry decision. `createEvent` can throw after insert when the returned row cannot be converted, while Settings routes every code except `not-found` to Save/Delete.
 status: open
+decision: 2026-09-11 Defer the recovery choice
 
 ### DW-50: The EventsSlice interface comment says `eventsError` is raised only by loads even though writes also park messages there.
 origin: spec-deferred ce0f9f82f812
@@ -507,6 +513,7 @@ source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: The behavior predates this bundle, but the coded result makes the ambiguity explicit. Create and update can throw `invalid-response` only after a successful response is missing or cannot be converted; Settings routes every non-`not-found` code back to Save or Update, so create can duplicate a committed event and update can retry without reconciling the stale list.
 status: open
+decision: 2026-09-11 Defer the recovery choice
 
 ### DW-53: Transport wrapping drops the original non-PostgREST network error as an Error cause.
 origin: spec-deferred 2d2ac9a00a50
@@ -555,6 +562,7 @@ source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260819-202616-75cc; this entry preserves the lingering recommendation for a deliberate later review.
 status: open
+decision: 2026-09-11 Keep the review recommendation
 
 ### DW-59: The translucent own-photo badge can still miss WCAG AA over a bright photo.
 origin: spec-deferred c395d4263ff0
@@ -586,7 +594,9 @@ location: _bmad-output/specs/spec-dynamic-events/stories/5-manage-events-in-sett
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: Story 5 AC4 names a historical 1238-test baseline and only two EventsSettings suites; AC6 limits non-artifact changes to five original story files. Activating the parked runner files necessarily invalidates both descriptions. The bundle authorizes the exact AC3 rewrite only, and review policy requires changes to other specification assertions to be deferred instead of patched during review.
-status: open
+status: done 2026-09-11
+resolution: closed by human decision: AC4 and AC6 describe the original story change; DW-30 separately records the expanded activated test inventory and verification.
+decision: 2026-09-11 Preserve the historical contract — AC4 and AC6 describe the original story change; DW-30 separately records the expanded activated test inventory and verification.
 
 ### DW-63: The validation drift guard reads the original events migration instead of the effective schema after every migration.
 origin: spec-deferred 8995c6651fba
@@ -610,7 +620,9 @@ location: _bmad-output/specs/spec-dynamic-events/stories/5-manage-events-in-sett
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: AC4 retains the historical 1238-test baseline and names only the two original EventsSettings suites, while AC6 limits non-artifact changes to the five story files. Activating the parked API, E2E, component, and unit coverage makes both statements stale. The affected file is an agent-context specification, so review policy defers rather than edits it.
-status: open
+status: done 2026-09-11
+resolution: closed by human decision: AC4 and AC6 describe the original story change; DW-30 separately records the expanded activated test inventory and verification.
+decision: 2026-09-11 Preserve the historical contract — AC4 and AC6 describe the original story change; DW-30 separately records the expanded activated test inventory and verification.
 
 ### DW-66: The validation drift guard reads one historical migration instead of the effective constraint installed by the complete migration chain.
 origin: spec-deferred 4abe4f39af4c
@@ -682,7 +694,9 @@ location: _bmad-output/specs/spec-dynamic-events/stories/5-manage-events-in-sett
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: AC4 names the historical 1238-test baseline and only the original EventsSettings suites, while AC6 permits only five story files outside artifacts. The activated API, E2E, component, unit, and shared-helper changes make both statements stale. Review policy requires deferring changes to this agent-context specification.
-status: open
+status: done 2026-09-11
+resolution: closed by human decision: AC4 and AC6 describe the original story change; DW-30 separately records the expanded activated test inventory and verification.
+decision: 2026-09-11 Preserve the historical contract — AC4 and AC6 describe the original story change; DW-30 separately records the expanded activated test inventory and verification.
 
 ### DW-75: Incoming interaction callbacks can still write records from a previous account after the active user changes or teardown begins.
 origin: spec-deferred cdf80216e859
