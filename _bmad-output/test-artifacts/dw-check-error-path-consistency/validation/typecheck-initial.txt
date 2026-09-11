@@ -1,0 +1,10 @@
+
+> my-love@0.0.0 typecheck
+> tsc -b --force
+
+tests/e2e/errors/check-error-path-consistency.spec.ts(24,17): error TS2339: Property 'step' does not exist on type '(params: LogParams) => Promise<void>'.
+tests/e2e/errors/check-error-path-consistency.spec.ts(41,17): error TS2339: Property 'step' does not exist on type '(params: LogParams) => Promise<void>'.
+tests/e2e/errors/check-error-path-consistency.spec.ts(54,17): error TS2339: Property 'step' does not exist on type '(params: LogParams) => Promise<void>'.
+tests/e2e/errors/check-error-path-consistency.spec.ts(125,19): error TS2339: Property 'step' does not exist on type '(params: LogParams) => Promise<void>'.
+
+Exit code: 2

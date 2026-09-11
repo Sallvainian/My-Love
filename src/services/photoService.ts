@@ -19,6 +19,7 @@
  * @module photoService
  */
 
+import { handleSupabaseError, isPostgrestError } from '../api/errorHandlers';
 import { supabase } from '../api/supabaseClient';
 import { logger } from '../utils/logger';
 
@@ -286,6 +287,8 @@ class PhotoService {
    *
    * @param input - Photo upload input from compression service
    * @param onProgress - Optional callback for upload progress (0-100%)
+   * @param onCheckError - Optional callback reporting friendly metadata CHECK text before rollback
+   * completes; the upload still resolves to null on failure.
    * @returns Created photo record or null on error
    *
    * AC 6.0.5: Users can INSERT photos only with their own user_id
@@ -297,7 +300,8 @@ class PhotoService {
    */
   async uploadPhoto(
     input: PhotoUploadInput,
-    onProgress?: (percent: number) => void
+    onProgress?: (percent: number) => void,
+    onCheckError?: (message: string) => void
   ): Promise<SupabasePhoto | null> {
     try {
       const { data: currentUser } = await supabase.auth.getUser();
@@ -389,6 +393,9 @@ class PhotoService {
 
       if (insertError) {
         console.error('[PhotoService] Database insert error:', insertError);
+        if (isPostgrestError(insertError) && insertError.code === '23514') {
+          onCheckError?.(handleSupabaseError(insertError).message);
+        }
 
         // Roll the object back only once nothing is known to point at it.
         //

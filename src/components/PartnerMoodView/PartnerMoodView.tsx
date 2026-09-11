@@ -23,6 +23,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
+import { handleSupabaseError, isPostgrestError } from '../../api/errorHandlers';
 import { moodSyncService } from '../../api/moodSyncService';
 import { PARTNER_NAME } from '../../config/constants';
 import { useAppStore } from '../../stores/useAppStore';
@@ -294,7 +295,11 @@ export function PartnerMoodView() {
         await sendPartnerRequest(userId);
         setSearchQuery('');
       } catch (err) {
-        setPartnerError(err instanceof Error ? err.message : 'Failed to send partner request');
+        setPartnerError(
+          isPostgrestError(err) && err.code === '23514'
+            ? handleSupabaseError(err).message
+            : err instanceof Error ? err.message : 'Failed to send partner request'
+        );
       }
     },
     [sendPartnerRequest]
@@ -307,7 +312,11 @@ export function PartnerMoodView() {
         setPartnerError(null);
         await acceptPartnerRequest(requestId);
       } catch (err) {
-        setPartnerError(err instanceof Error ? err.message : 'Failed to accept partner request');
+        setPartnerError(
+          isPostgrestError(err) && err.code === '23514'
+            ? handleSupabaseError(err).message
+            : err instanceof Error ? err.message : 'Failed to accept partner request'
+        );
       }
     },
     [acceptPartnerRequest]
@@ -320,7 +329,11 @@ export function PartnerMoodView() {
         setPartnerError(null);
         await declinePartnerRequest(requestId);
       } catch (err) {
-        setPartnerError(err instanceof Error ? err.message : 'Failed to decline partner request');
+        setPartnerError(
+          isPostgrestError(err) && err.code === '23514'
+            ? handleSupabaseError(err).message
+            : err instanceof Error ? err.message : 'Failed to decline partner request'
+        );
       }
     },
     [declinePartnerRequest]
