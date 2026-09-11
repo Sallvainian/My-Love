@@ -1,3 +1,4 @@
+import { handleSupabaseError, isPostgrestError } from '../api/errorHandlers';
 import { openDB } from 'idb';
 import { z } from 'zod/v4';
 import { supabase } from '../api/supabaseClient';
@@ -328,9 +329,11 @@ class ScriptureReadingService extends BaseIndexedDBService<
     });
 
     if (error) {
+      const message = isPostgrestError(error) && error.code === '23514'
+        ? handleSupabaseError(error).message : error.message;
       const scriptureErr = createScriptureError(
         ScriptureErrorCode.SYNC_FAILED,
-        `Failed to submit reflection: ${error.message}`,
+        `Failed to submit reflection: ${message}`,
         error
       );
       handleScriptureError(scriptureErr);

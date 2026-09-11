@@ -16,6 +16,7 @@
  * Story 2.1: Foundation - UI and state management only
  */
 
+import { CHECK_CONSTRAINT_MESSAGE, handleSupabaseError, isPostgrestError } from '../../api/errorHandlers';
 import { sendEphemeralBroadcast } from '../../api/ephemeralBroadcast';
 import { getPartnerId, supabase } from '../../api/supabaseClient';
 import { NOTES_CONFIG } from '../../config/images';
@@ -514,6 +515,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         // Not unconditional: the row may have committed and only the response
         // been lost, in which case the stored note points at this very object.
         await discardUnreferencedImage(storagePath, userId, tempId);
+        if (get().userId !== userId) return;
+        if (isPostgrestError(error) && error.code === '23514') {
+          set({ notesError: handleSupabaseError(error).message });
+        }
 
         // Mark message as failed (preserve imageBlob for retry)
         set((state) => ({
@@ -533,6 +538,11 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       // Clean up preview URL
       if (imagePreviewUrl) {
         URL.revokeObjectURL(imagePreviewUrl);
+      }
+
+      if (get().userId !== userId) return;
+      if (get().notesError === CHECK_CONSTRAINT_MESSAGE) {
+        set({ notesError: null });
       }
 
       set((state) => ({
@@ -577,6 +587,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
    * Love Notes Images - Retry uses cached imageBlob to avoid re-compression
    */
   retryFailedMessage: async (tempId: string) => {
+    const capturedUserId = get().userId;
     try {
       // Check rate limiting before retry
       const { recentTimestamps, now } = get().checkRateLimit();
@@ -594,6 +605,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       if (!partnerId) {
         throw new Error('Partner not configured');
       }
+
+      if (get().userId !== capturedUserId) return;
 
       // Mark as sending again
       set((state) => ({
@@ -650,6 +663,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         // Not unconditional: the row may have committed and only the response
         // been lost, in which case the stored note points at this very object.
         await discardUnreferencedImage(storagePath, userId, tempId);
+        if (get().userId !== userId) return;
+        if (isPostgrestError(error) && error.code === '23514') {
+          set({ notesError: handleSupabaseError(error).message });
+        }
 
         // Mark as failed again
         set((state) => ({
@@ -684,6 +701,11 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       // Clean up preview URL if exists
       if (failedNote.imagePreviewUrl) {
         URL.revokeObjectURL(failedNote.imagePreviewUrl);
+      }
+
+      if (get().userId !== userId) return;
+      if (get().notesError === CHECK_CONSTRAINT_MESSAGE) {
+        set({ notesError: null });
       }
 
       set((state) => ({

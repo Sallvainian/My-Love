@@ -1,0 +1,55 @@
+{
+  "success": true,
+  "subagent": "e2e-tests",
+  "tests": [
+    {
+      "file": "tests/e2e/errors/check-error-path-consistency.spec.ts",
+      "content": "import { log } from '@seontechnologies/playwright-utils';\nimport { test, expect } from '../../support/merged-fixtures';\nimport type { Database } from '../../../src/types/database.types';\nimport { createCheckErrorPathData } from '../../support/factories/check-error-path-data';\n\ntest.describe('DW-38 CHECK error presentation', () => {\n  test(\n    '[P1] DW38-E2E-001 note send and retry show CHECK text, then successful retry clears it',\n    { annotation: [{ type: 'skipNetworkMonitoring' }] },\n    async ({ page, authToken, interceptNetworkCall, recurse }) => {\n      expect(authToken).not.toBe('');\n      const { friendlyCheck, checkError, noteId, createdAt, content } = createCheckErrorPathData();\n      const load = interceptNetworkCall({\n        method: 'GET',\n        url: '**/rest/v1/love_notes_visible**',\n        fulfillResponse: { status: 200, body: [] },\n      });\n      const firstSend = interceptNetworkCall({\n        method: 'POST',\n        url: '**/rest/v1/love_notes?**',\n        fulfillResponse: { status: 400, body: checkError },\n      });\n      await page.goto('/notes');\n      await load;\n      await log.step('Send a message that receives a CHECK failure');\n      await page.getByLabel('Love note message input').fill(content);\n      await page.getByLabel('Send message', { exact: true }).click();\n      const first = await firstSend;\n      expect(first.status).toBe(400);\n      const payload = first.requestJson as Database['public']['Tables']['love_notes']['Insert'];\n      expect(payload.idempotency_key).toEqual(expect.any(String));\n      await recurse(\n        () => page.evaluate(() => window.__APP_STORE__?.getState().notesError),\n        (error) => error === friendlyCheck,\n        { timeout: 10000 }\n      );\n      const bubble = page.getByTestId('love-note-message').filter({ hasText: content });\n      await expect(bubble).toHaveCount(1);\n      await expect(page.getByText(friendlyCheck, { exact: true })).toBeVisible();\n      await expect(page.getByText(checkError.message, { exact: true })).toHaveCount(0);\n\n      await log.step('Retry receives the same CHECK and keeps the retry action');\n      const failedRetry = interceptNetworkCall({\n        method: 'POST',\n        url: '**/rest/v1/love_notes?**',\n        fulfillResponse: { status: 400, body: checkError },\n      });\n      await bubble.getByRole('button', { name: 'Retry sending message' }).click();\n      const retried = await failedRetry;\n      expect(retried.status).toBe(400);\n      expect(retried.requestJson).toEqual(payload);\n      await recurse(\n        () => page.evaluate((key) => {\n          const note = window.__APP_STORE__?.getState().notes.find((entry) => entry.tempId === key);\n          return !!note?.error && !note.sending;\n        }, payload.idempotency_key),\n        (failed) => failed,\n        { timeout: 10000 }\n      );\n      await expect(bubble.getByRole('button', { name: 'Retry sending message' })).toBeVisible();\n      await expect(page.getByText(friendlyCheck, { exact: true })).toBeVisible();\n\n      await log.step('Successful retry replaces the optimistic row and dismisses the CHECK banner');\n      // maybeSingle on POST accepts the one-row representation array from PostgREST.\n      // All writes are fulfilled locally; nothing is inserted or deleted in the shared database.\n      const successfulRetry = interceptNetworkCall({\n        method: 'POST',\n        url: '**/rest/v1/love_notes?**',\n        fulfillResponse: {\n          status: 201,\n          body: [{ ...payload, id: noteId, created_at: createdAt }],\n        },\n      });\n      await bubble.getByRole('button', { name: 'Retry sending message' }).click();\n      const recovered = await successfulRetry;\n      expect(recovered.status).toBe(201);\n      expect(recovered.requestJson).toEqual(payload);\n      await recurse(\n        () => page.evaluate((id) => {\n          const state = window.__APP_STORE__?.getState();\n          const note = state?.notes.find((entry) => entry.id === id);\n          return !!note && !note.error && !note.sending && state?.notesError === null;\n        }, noteId),\n        (settled) => settled,\n        { timeout: 10000 }\n      );\n      await expect(bubble).toHaveCount(1);\n      await expect(bubble).toBeVisible();\n      await expect(bubble.getByRole('button', { name: 'Retry sending message' })).toHaveCount(0);\n      await expect(page.getByText(friendlyCheck, { exact: true })).toHaveCount(0);\n    }\n  );\n\n  for (const action of ['send', 'accept', 'decline'] as const) {\n    test(\n      `[P1] DW38-E2E-${action} partner ${action} presents a plain JSON CHECK error`,\n      { annotation: [{ type: 'skipNetworkMonitoring' }] },\n      async ({ page, authToken, interceptNetworkCall }) => {\n        const { friendlyCheck, checkError, targetId, requestId, createdAt, email } = createCheckErrorPathData();\n        const { sub: userId } = JSON.parse(Buffer.from(authToken.split('.')[1], 'base64url').toString()) as { sub: string };\n        expect(userId).toEqual(expect.any(String));\n        const incoming = action !== 'send';\n        // Fake only this browser's read responses; never unlink worker-pool users.\n        const partnerRead = interceptNetworkCall({\n          method: 'GET',\n          url: '**/rest/v1/users?select=partner_id*',\n          fulfillResponse: { status: 200, body: { partner_id: null, updated_at: createdAt } },\n        });\n        const profiles = interceptNetworkCall({\n          method: 'GET',\n          url: '**/rest/v1/users?select=id*',\n          fulfillResponse: {\n            status: 200,\n            body: [{ id: targetId, email, display_name: 'DW38 Partner' }],\n          },\n        });\n        const requests = interceptNetworkCall({\n          method: 'GET',\n          url: '**/rest/v1/partner_requests?**',\n          fulfillResponse: {\n            status: 200,\n            body: incoming ? [{ id: requestId, from_user_id: targetId, to_user_id: userId, status: 'pending', created_at: createdAt }] : [],\n          },\n        });\n        const write = interceptNetworkCall({\n          method: 'POST',\n          url: action === 'send'\n            ? '**/rest/v1/partner_requests'\n            : `**/rest/v1/rpc/${action}_partner_request`,\n          fulfillResponse: { status: 400, body: checkError },\n        });\n        await page.goto('/partner');\n        await Promise.all([partnerRead, requests]);\n        await log.step(`Attempt to ${action} a partner request`);\n        if (action === 'send') {\n          await page.getByLabel('Search by email or display name').fill('DW38');\n          await profiles;\n          await page.getByRole('button', { name: 'Send Request', exact: true }).click();\n        } else {\n          await profiles;\n          await page.getByRole('button', { name: action === 'accept' ? 'Accept' : 'Decline', exact: true }).click();\n        }\n        const response = await write;\n        expect(response.status).toBe(400);\n        expect(response.responseJson).toEqual(checkError);\n        expect(response.requestJson).toEqual(action === 'send'\n          ? { from_user_id: userId, to_user_id: targetId, status: 'pending' }\n          : { p_request_id: requestId });\n        // The rejected store action rethrows unchanged; this banner is component-local state.\n        const banner = page.getByTestId('partner-connection-error');\n        await expect(banner).toHaveText(friendlyCheck);\n        await expect(banner).not.toContainText('dw38_unique_length_check');\n        await expect(banner).not.toContainText('new row');\n        if (incoming) {\n          await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible();\n          await expect(page.getByRole('button', { name: 'Decline', exact: true })).toBeVisible();\n        } else {\n          await expect(page.getByRole('button', { name: 'Send Request', exact: true })).toBeVisible();\n        }\n      }\n    );\n  }\n});\n",
+      "description": "One note send/retry/recovery journey and three partner action CHECK journeys through real SDK/service/store/component",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 4,
+        "P2": 0,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    "Existing merged fixtures: authToken, interceptNetworkCall, recurse; existing log utility",
+    "tests/support/factories/check-error-path-data.ts (created during aggregation; reuses checkViolation and independent expected message)"
+  ],
+  "knowledge_fragments_used": [
+    "playwright-utils-mandate",
+    "library-integration-mandate",
+    "intercept-network-call",
+    "auth-session",
+    "recurse",
+    "fixture-architecture",
+    "network-first",
+    "selector-resilience",
+    "confidence-gate"
+  ],
+  "playwright_utils_deviations": [],
+  "test_count": 4,
+  "confidence": {
+    "score": 7,
+    "rationale": "Production selectors and endpoint shapes verified in PartnerMoodView.tsx, partnerService.ts, notesSlice.ts, LoveNotes.tsx, LoveNoteMessage.tsx, MessageInput.tsx and existing tests/e2e notes/partner specs; existing merged auth fixture confirmed.",
+    "unknowns": [
+      "No browser verification: local Supabase startup blocked by Docker.",
+      "Execution assumes project provisioned linked worker auth pair as existing notes tests require."
+    ]
+  },
+  "assumptions": [
+    "Success note POST returns one-row PostgREST representation array consumed by maybeSingle.",
+    "Partner users and requests reads are browser-local stubs; all partner writes receive HTTP 400 and never reach DB.",
+    "Note initial conversation read is stubbed empty, all writes fulfilled locally; no DB cleanup necessary."
+  ],
+  "summary": "Generated 4 P1 E2E cases, no test execution attempted. CHECK text, raw diagnostic suppression, retry identity/recovery, all partner write handoffs covered. Photo/reflection E2E additions omitted by agreed scope: existing unit/component and API boundary tests cover changed contracts. Non-CHECK matrix remains at existing unit/component level. Partner error banner is component-local state; await wire then UI; notes additionally polls store before UI.",
+  "execution": "generation complete; 8 tests discovered and typecheck/lint passed; live tests not run because local Docker is unavailable",
+  "aggregation_corrections": [
+    "Use installed requestJson return field",
+    "Use direct log.step import; fixture log is callable",
+    "Fresh faker UUIDs; authenticated error details null from shared factory",
+    "Wait for failed retry store settlement before UI assertions"
+  ]
+}
