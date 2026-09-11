@@ -14,6 +14,8 @@
  * stable path is what makes the retry resolve instead of duplicating. No
  * migration was needed for this fix.
  */
+import { create, type StateCreator } from 'zustand';
+import { createPhotosSlice, type PhotosSlice } from '@/stores/slices/photosSlice';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 interface PhotoRow {
@@ -31,6 +33,7 @@ interface PhotoRow {
 const USER_ID = '00000000-0000-4000-8000-0000000000c0';
 
 const backend = {
+  errorCode: '',
   rows: [] as PhotoRow[],
   objects: new Map<string, { size: number }>(),
   seq: 0,
@@ -39,6 +42,7 @@ const backend = {
   /** Fail the next plain read, as a dead network would */
   failNextLookup: false,
   reset() {
+    this.errorCode = '';
     this.rows = [];
     this.objects = new Map();
     this.seq = 0;
@@ -91,7 +95,7 @@ function photosQuery() {
       return api;
     },
     async maybeSingle() {
-      if (writeRejected) return { data: null, error: { message: 'insert rejected' } };
+      if (writeRejected) return { data: null, error: { code: backend.errorCode, message: 'insert rejected raw constraint', details: '', hint: '' } };
       if (isInsert) return { data: pending, error: null };
 
       if (backend.failNextLookup) {
@@ -166,6 +170,36 @@ describe('photoService upload idempotency', () => {
       percent: 0,
       warning: 'none',
     });
+  });
+
+  it.each(['23514', '23502'])('routes %s through the real service into the store result', async (code) => {
+    type Store = PhotosSlice & { userId: string; error: string | null };
+    const store = create<Store>()(createPhotosSlice as unknown as StateCreator<Store>);
+    store.setState({ userId: USER_ID });
+    backend.errorCode = code;
+    backend.failNextInsert = true;
+    const result = await store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }));
+    const expected = code === '23514' ? 'Some values are not allowed - check length and format limits' : 'Upload failed - no photo returned';
+    expect(result).toEqual({ success: false, error: expected });
+    expect(store.getState().error).toBe(expected);
+    expect(backend.objects.size).toBe(0);
+    expect(backend.rows).toHaveLength(0);
+    vi.spyOn(photoService, 'getSignedUrl').mockResolvedValue('https://example.com/photo');
+    await expect(store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }))).resolves.toEqual({ success: true });
+    expect(backend.rows[0].storage_path).toBe(`${USER_ID}/check-key.jpeg`);
+    expect(backend.rows).toHaveLength(1);
+  });
+
+  it('keeps the service null contract and CHECK rollback safety for a committed row', async () => {
+    const input = uploadInput({ idempotencyKey: 'committed-check' });
+    await photoService.uploadPhoto(input);
+    backend.errorCode = '23514';
+    backend.failNextInsert = true;
+    const callback = vi.fn();
+    await expect(photoService.uploadPhoto(input, undefined, callback)).resolves.toBeNull();
+    expect(callback).toHaveBeenCalledWith('Some values are not allowed - check length and format limits');
+    expect(backend.objects.size).toBe(1);
+    expect(backend.rows).toHaveLength(1);
   });
 
   it('a retry under the same key resolves to the first upload', async () => {

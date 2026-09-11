@@ -13,6 +13,7 @@
  */
 
 import { logger } from '../utils/logger';
+import { handleSupabaseError, isPostgrestError } from './errorHandlers';
 import { supabase } from './supabaseClient';
 
 export interface UserSearchResult {
@@ -188,6 +189,10 @@ class PartnerService {
       });
 
       if (error) {
+        if (isPostgrestError(error) && error.code === '23514') {
+          error.message = handleSupabaseError(error).message;
+          throw error;
+        }
         // Check for duplicate request error
         if (error.message.includes('duplicate') || error.message.includes('unique')) {
           throw new Error('You already have a pending request to this user');
@@ -292,6 +297,9 @@ class PartnerService {
       });
 
       if (error) {
+        if (isPostgrestError(error) && error.code === '23514') {
+          error.message = handleSupabaseError(error).message;
+        }
         throw error;
       }
 
@@ -316,6 +324,9 @@ class PartnerService {
       });
 
       if (error) {
+        if (isPostgrestError(error) && error.code === '23514') {
+          error.message = handleSupabaseError(error).message;
+        }
         throw error;
       }
 
