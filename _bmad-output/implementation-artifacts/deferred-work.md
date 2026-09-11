@@ -488,7 +488,8 @@ location: src/stores/slices/eventsSlice.ts:54
 source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: low
 reason: The contradiction existed at the baseline: addEvent, editEvent, and removeEvent already set `eventsError` on failure while the state-field comment called it load-only. The current bundle preserves that behavior and documents the result-shape divergence elsewhere in the module header.
-status: open
+status: done 2026-09-11
+resolution: already resolved: Commit 9fef9c7 makes eventsError load-only: src/stores/slices/eventsSlice.ts:19 documents ownership and write actions at :266-342 no longer set that field.
 
 ### DW-51: A load outcome can be misreported when an event write settles in the narrow window before Settings snapshots the shared error field.
 origin: spec-deferred a61e4d489ca9
@@ -496,7 +497,8 @@ location: src/components/Settings/EventsSettings.tsx:130
 source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: This shared-state race predates this bundle and is already identified in the component tests as DW-26. `loadEvents` resolves without its own outcome, so `recordLoadOutcome` reads `eventsError`, which write actions can independently clear or replace before that read. A successful load can therefore show a failure banner, or a failed load can appear successful.
-status: open
+status: done 2026-09-11
+resolution: already resolved: Commit 9fef9c7 adds call-owned EventLoadResult at src/stores/slices/eventsSlice.ts:45-49, returns outcomes at :241-255, and src/components/Settings/EventsSettings.tsx:148-155 reads result.status instead of the shared error field.
 
 ### DW-52: Invalid-response writes keep the write control even though the mutation may already have landed.
 origin: spec-deferred 7567c0b98908
