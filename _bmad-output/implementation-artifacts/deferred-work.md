@@ -388,7 +388,9 @@ location: src/services/photoService.ts, src/services/scriptureReadingService.ts,
 source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
 severity: medium
 reason: Only three modules import handleSupabaseError (measured with `grep -rln handleSupabaseError src/`): src/api/moodApi.ts:14, src/api/interactionService.ts:23, src/services/eventsService.ts:39. The non-adopters each handle rejections themselves: photoService.ts rethrows the raw insertError, scriptureReadingService.ts interpolates `Failed to submit reflection: ${error.message}`, notesSlice.ts swallows the error into a flag, and partnerService.ts throws hand-written Errors. The CHECK constraints on photos (20251203190800_create_photos_table.sql:18,24), scripture ratings (20260128000001_scripture_reading.sql:65), love_notes and partner_requests (20251206024345_remote_schema.sql:93,105,109,113) sit behind those paths. Pre-existing routing, not introduced here.
-status: open
+status: done 2026-09-11
+resolution: resolved by sweep bundle dw-check-error-path-consistency
+resolution-undo: e6195a259cb9d15982632c3e6d4cddb9316f11afe7e8f29ae8f4aac5e9a2e827 2026-09-11 7374617475733a206f70656e
 
 ### DW-39: A PostgrestError with a missing or empty message takes the fallback and surfaces the bare string "Database error: " with nothing after the colon.
 origin: spec-deferred e9534049eabc

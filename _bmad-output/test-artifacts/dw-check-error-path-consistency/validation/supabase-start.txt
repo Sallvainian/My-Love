@@ -1,0 +1,4 @@
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+{"_tag":"Error","error":{"code":"LegacyDockerLifecycleInspectError","message":"failed to inspect container health: failed to connect to the docker API at unix:///Users/sallvain/.orbstack/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /Users/sallvain/.orbstack/run/docker.sock: connect: no such file or directory"}}
+
+Exit code: 1

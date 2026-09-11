@@ -1661,6 +1661,24 @@ describe('SoloReadingFlow', () => {
   // ============================================
 
   describe('Story 2.2: Double-Submit Guard', () => {
+    it.each(['23514', '23502'])('presents reflection failure %s without raw database text', async (code) => {
+      mockAddReflection.mockRejectedValueOnce({
+        code: 'SYNC_FAILED', message: 'wrapped failure',
+        details: { code, message: 'raw reflection constraint', details: 'row', hint: '' },
+      });
+      mockStoreState.session = createMockSession({ currentPhase: 'reflection', status: 'in_progress', currentStepIndex: 16 });
+      mockGetBookmarksBySession.mockResolvedValue([{ stepIndex: 0, userId: 'user-456' }]);
+      render(<SoloReadingFlow />);
+      await vi.waitFor(() => expect(screen.getByTestId('scripture-standout-verse-0')).toBeDefined());
+      fireEvent.click(screen.getByTestId('scripture-standout-verse-0'));
+      fireEvent.click(screen.getByTestId('scripture-session-rating-4'));
+      fireEvent.click(screen.getByTestId('scripture-reflection-summary-continue'));
+      const expected = code === '23514' ? 'Some values are not allowed - check length and format limits' : 'We could not save your reflection. Tap Continue to try again.';
+      await vi.waitFor(() => expect(screen.getByText(expected)).toBeDefined());
+      expect(screen.queryByText(/raw reflection constraint/)).toBeNull();
+      expect(mockUpdatePhase).not.toHaveBeenCalled();
+    });
+
     it('prevents concurrent reflection summary submissions', async () => {
       // Use a deferred promise to control when addReflection resolves
       let resolveAddReflection!: () => void;
