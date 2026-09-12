@@ -1,0 +1,209 @@
+{
+  "runKey": "dw-empty-database-error-fallback",
+  "knowledgeRoot": ".agents/skills/bmad-testarch-automate/resources/knowledge",
+  "fragmentCount": 31,
+  "provenance": {
+    "quality_context": "Eleven fragments read in full during preflight and validation preparation.",
+    "root": "Three fragments reported loaded by the coordinating parent.",
+    "workerSources": [
+      "_bmad-output/test-artifacts/dw-empty-database-error-fallback/workers/api.json",
+      "_bmad-output/test-artifacts/dw-empty-database-error-fallback/workers/e2e.json"
+    ]
+  },
+  "fragments": [
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/api-request.md",
+      "loadedBy": [
+        "api-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/api-testing-patterns.md",
+      "loadedBy": [
+        "api-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/auth-session.md",
+      "loadedBy": [
+        "api-tests",
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/burn-in.md",
+      "loadedBy": [
+        "quality_context"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/ci-burn-in.md",
+      "loadedBy": [
+        "quality_context"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/confidence-gate.md",
+      "loadedBy": [
+        "quality_context"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/data-factories.md",
+      "loadedBy": [
+        "api-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/evidence-integrity.md",
+      "loadedBy": [
+        "quality_context"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/file-utils.md",
+      "loadedBy": [
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/fixture-architecture.md",
+      "loadedBy": [
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/fixtures-composition.md",
+      "loadedBy": [
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/intercept-network-call.md",
+      "loadedBy": [
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/library-integration-mandate.md",
+      "loadedBy": [
+        "api-tests",
+        "e2e-tests",
+        "root"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/log.md",
+      "loadedBy": [
+        "api-tests",
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/network-error-monitor.md",
+      "loadedBy": [
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/network-first.md",
+      "loadedBy": [
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/network-recorder.md",
+      "loadedBy": [
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/overview.md",
+      "loadedBy": [
+        "api-tests",
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/pact-mcp.md",
+      "loadedBy": [
+        "root"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/playwright-cli.md",
+      "loadedBy": [
+        "e2e-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/playwright-utils-mandate.md",
+      "loadedBy": [
+        "api-tests",
+        "e2e-tests",
+        "root"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/probability-impact.md",
+      "loadedBy": [
+        "quality_context"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/recurse.md",
+      "loadedBy": [
+        "api-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/risk-governance.md",
+      "loadedBy": [
+        "quality_context"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/selective-testing.md",
+      "loadedBy": [
+        "quality_context"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/selector-resilience.md",
+      "loadedBy": [
+        "e2e-tests",
+        "quality_context"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/test-healing-patterns.md",
+      "loadedBy": [
+        "quality_context"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/test-levels-framework.md",
+      "loadedBy": [
+        "api-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/test-priorities-matrix.md",
+      "loadedBy": [
+        "api-tests"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/test-quality.md",
+      "loadedBy": [
+        "quality_context"
+      ]
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/timing-debugging.md",
+      "loadedBy": [
+        "quality_context"
+      ]
+    }
+  ]
+}

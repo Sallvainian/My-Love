@@ -1,0 +1,17 @@
+[
+  {
+    "source": "tests/api/empty-database-error-fallback.spec.ts",
+    "snapshot": "sources/tests/api/empty-database-error-fallback.spec.ts",
+    "sha256": "44d9b931ae7628c8486bb02041ef303c9f21479ee9d1eef4c0ba06e8ab86f059"
+  },
+  {
+    "source": "tests/e2e/errors/empty-database-error-fallback.spec.ts",
+    "snapshot": "sources/tests/e2e/errors/empty-database-error-fallback.spec.ts",
+    "sha256": "f9d2378ea3036d5020529b69fe9637dd7faa1c47c40430155cf30948b1e72509"
+  },
+  {
+    "source": "tests/support/factories/database-error-envelope.ts",
+    "snapshot": "sources/tests/support/factories/database-error-envelope.ts",
+    "sha256": "f8afa2eee370ba3593a0d1cbdca671cdb95e4806538b8f73576d427db4a25d7e"
+  }
+]
