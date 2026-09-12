@@ -441,7 +441,9 @@ location: src/App.tsx, src/components/DailyMessage/DailyMessage.tsx:366, src/uti
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: `HOME_MAX_EVENT_CARDS = 3` in `src/App.tsx`, `maxDisplay={3}` passed at `src/components/DailyMessage/DailyMessage.tsx:366`, and `count: number = 3` in `getUpcomingAnniversaries` (`src/utils/countdownService.ts:49-51`). The new constant's JSDoc cites the other two as its precedent but does not share a value with them, so changing the product decision means finding all three. Unifying them is a cross-feature refactor the intent does not reach.
-status: open
+status: done 2026-09-12
+resolution: closed by human decision as obsolete: Commit 32c583f8fe021a93a74e11c91aefbde77835ca8c intentionally raised Home to six event cards while anniversary countdowns retain three (src/App.tsx:84-93; src/components/DailyMessage/DailyMessage.tsx:366; src/utils/countdownService.ts:51). These are distinct display choices, so the original single-limit consolidation is no longer needed. No runtime change.
+decision: 2026-09-12 Close as obsolete — Preserve six Home event cards and three anniversary countdowns; do not unify the limits.
 
 ### DW-44: An event saved with a date beyond the past read window appears in Settings immediately and then silently disappears on the next load.
 origin: spec-deferred 6e4344fda920
