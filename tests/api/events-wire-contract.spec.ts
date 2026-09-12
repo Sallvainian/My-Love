@@ -347,13 +347,14 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
 
     // Explicit `created_at` values, one second apart, so the same-date tiebreak
     // is decided by the data rather than by how fast the inserts happened to run.
-    const base = Date.now();
+    const anchor = new Date();
+    const base = anchor.getTime();
     const createdAt = (offsetMs: number): string => new Date(base + offsetMs).toISOString();
 
-    const soonest = isoDateDaysFromNow(10);
-    const middle = isoDateDaysFromNow(25);
-    const later = isoDateDaysFromNow(40);
-    const last = isoDateDaysFromNow(60);
+    const soonest = isoDateDaysFromNow(10, anchor);
+    const middle = isoDateDaysFromNow(25, anchor);
+    const later = isoDateDaysFromNow(40, anchor);
+    const last = isoDateDaysFromNow(60, anchor);
 
     // GIVEN: five rows across both halves of the pair, inserted out of order
     await log.step('Seed five rows across both halves of the pair, in scrambled insert order');
@@ -477,12 +478,13 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
     // GIVEN: one event on each half of the couple
+    const anchor = new Date();
     await log.step('Seed one event on each half of the pair');
     const { data: seeded, error: seedError } = await supabaseAdmin
       .from('events')
       .insert([
-        { user_id: userId, label: OUTSIDER_CREATOR_LABEL, event_date: isoDateDaysFromNow(12) },
-        { user_id: partnerId, label: OUTSIDER_PARTNER_LABEL, event_date: isoDateDaysFromNow(18) },
+        { user_id: userId, label: OUTSIDER_CREATOR_LABEL, event_date: isoDateDaysFromNow(12, anchor) },
+        { user_id: partnerId, label: OUTSIDER_PARTNER_LABEL, event_date: isoDateDaysFromNow(18, anchor) },
       ])
       .select('id');
 
@@ -554,7 +556,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
       const outsiderEventId = await seedEvent(supabaseAdmin, {
         userId: outsider.userId,
         label: 'Events Wire Outsider Cleanup Witness',
-        eventDate: isoDateDaysFromNow(24),
+        eventDate: isoDateDaysFromNow(24, anchor),
       });
 
       await clearOwnPairEvents(supabaseAdmin);
@@ -619,6 +621,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     expect(MAX_LENGTH_LABEL).toHaveLength(100);
     expect(OVER_LENGTH_LABEL).toHaveLength(101);
 
+    const anchor = new Date();
     const creatorToken = await getUserAccessToken(supabaseAdmin, userId);
 
     // GIVEN (positive control): a label at exactly the limit is admitted, so the
@@ -636,7 +639,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
       body: {
         user_id: userId,
         label: MAX_LENGTH_LABEL,
-        event_date: isoDateDaysFromNow(15),
+        event_date: isoDateDaysFromNow(15, anchor),
       },
     }).validateSchema<z.infer<typeof EventRowsSchema>>(EventRowsSchema);
 
@@ -657,7 +660,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
       body: {
         user_id: userId,
         label: OVER_LENGTH_LABEL,
-        event_date: isoDateDaysFromNow(15),
+        event_date: isoDateDaysFromNow(15, anchor),
       },
     });
 

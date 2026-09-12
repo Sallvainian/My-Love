@@ -55,17 +55,18 @@ test.describe('Home dashboard reads events from the store', () => {
     // either half of the couple — Home's SELECT reads own + partner.
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
+    const anchor = new Date();
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Future Meetup E2E',
-      eventDate: isoDateDaysFromNow(14),
+      eventDate: isoDateDaysFromNow(14, anchor),
       description: 'Future event description',
       icon: 'calendar',
     });
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Past Meetup E2E',
-      eventDate: isoDateDaysFromNow(-14),
+      eventDate: isoDateDaysFromNow(-14, anchor),
       description: 'Past event description',
       icon: 'calendar',
     });
@@ -80,7 +81,7 @@ test.describe('Home dashboard reads events from the store', () => {
       {
         userId: partnerId,
         label: 'Partner Meetup E2E',
-        eventDate: isoDateDaysFromNow(21),
+        eventDate: isoDateDaysFromNow(21, anchor),
         description: 'Partner event description',
         icon: 'ring',
       }
@@ -205,17 +206,18 @@ test.describe('Home dashboard reads events from the store', () => {
     // filter: delete it (`upcomingEvents = events`) and the slot computes
     // 'list', renders two components that each return null, and shows neither
     // cards nor the placeholder — the unexplained gap CAP-10 forbids.
+    const anchor = new Date();
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Old Meetup E2E',
-      eventDate: isoDateDaysFromNow(-3),
+      eventDate: isoDateDaysFromNow(-3, anchor),
       description: 'Old event description',
       icon: 'calendar',
     });
     await seedEvent(supabaseAdmin, {
       userId: partnerId,
       label: 'Older Meetup E2E',
-      eventDate: isoDateDaysFromNow(-30),
+      eventDate: isoDateDaysFromNow(-30, anchor),
       description: 'Older event description',
       icon: 'calendar',
     });
@@ -273,52 +275,53 @@ test.describe('Home dashboard reads events from the store', () => {
     // beside it. Seeded out of date order and across both halves of the couple,
     // so the assertion pins "the six SOONEST" rather than "the first six
     // rows the query happened to return".
+    const anchor = new Date();
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Fourth Meetup E2E',
-      eventDate: isoDateDaysFromNow(24),
+      eventDate: isoDateDaysFromNow(24, anchor),
       description: 'Fourth event description',
       icon: 'calendar',
     });
     await seedEvent(supabaseAdmin, {
       userId: partnerId,
       label: 'Second Meetup E2E',
-      eventDate: isoDateDaysFromNow(6),
+      eventDate: isoDateDaysFromNow(6, anchor),
       description: 'Second event description',
       icon: 'calendar',
     });
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Fifth Meetup E2E',
-      eventDate: isoDateDaysFromNow(31),
+      eventDate: isoDateDaysFromNow(31, anchor),
       description: 'Fifth event description',
       icon: 'calendar',
     });
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Third Meetup E2E',
-      eventDate: isoDateDaysFromNow(18),
+      eventDate: isoDateDaysFromNow(18, anchor),
       description: 'Third event description',
       icon: 'calendar',
     });
     await seedEvent(supabaseAdmin, {
       userId: partnerId,
       label: 'First Meetup E2E',
-      eventDate: isoDateDaysFromNow(2),
+      eventDate: isoDateDaysFromNow(2, anchor),
       description: 'First event description',
       icon: 'calendar',
     });
     await seedEvent(supabaseAdmin, {
       userId: partnerId,
       label: 'Sixth Meetup E2E',
-      eventDate: isoDateDaysFromNow(38),
+      eventDate: isoDateDaysFromNow(38, anchor),
       description: 'Sixth event description',
       icon: 'calendar',
     });
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Seventh Meetup E2E',
-      eventDate: isoDateDaysFromNow(45),
+      eventDate: isoDateDaysFromNow(45, anchor),
       description: 'Seventh event description',
       icon: 'calendar',
     });
@@ -329,7 +332,7 @@ test.describe('Home dashboard reads events from the store', () => {
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Old Meetup E2E',
-      eventDate: isoDateDaysFromNow(-9),
+      eventDate: isoDateDaysFromNow(-9, anchor),
       description: 'Old event description',
       icon: 'calendar',
     });

@@ -162,8 +162,10 @@ export async function seedEvent(
 }
 
 /**
- * A `"YYYY-MM-DD"` calendar date `dayOffset` days from today, from LOCAL
- * components.
+ * A `"YYYY-MM-DD"` calendar date `dayOffset` days from the anchor's LOCAL day.
+ * Defaults to today for single-row callers. For a batch, capture one
+ * `const anchor = new Date()` and pass it to every related call so a midnight
+ * crossing cannot shift later rows. The supplied anchor is never mutated.
  *
  * Delegates to the production `formatDateISO` rather than re-padding by hand.
  * The two specs that reached this module had one hand-rolled copy each — one
@@ -174,8 +176,8 @@ export async function seedEvent(
  * feature exists to avoid (`src/utils/dateUtils.ts:126-128`,
  * `AnniversarySettings.tsx:103`).
  */
-export function isoDateDaysFromNow(dayOffset: number): string {
-  const date = new Date();
+export function isoDateDaysFromNow(dayOffset: number, anchor: Date = new Date()): string {
+  const date = new Date(anchor.getTime());
   date.setDate(date.getDate() + dayOffset);
   return formatDateISO(date);
 }

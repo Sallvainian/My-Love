@@ -228,9 +228,10 @@ test.describe('An event survives the round trip through the server', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const lateDate = isoDateDaysFromNow(40);
-    const soonDate = isoDateDaysFromNow(10);
-    const midDate = isoDateDaysFromNow(25);
+    const anchor = new Date();
+    const lateDate = isoDateDaysFromNow(40, anchor);
+    const soonDate = isoDateDaysFromNow(10, anchor);
+    const midDate = isoDateDaysFromNow(25, anchor);
 
     await openSettings(page);
 
