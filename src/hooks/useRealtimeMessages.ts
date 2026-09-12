@@ -25,7 +25,7 @@
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useCallback, useEffect, useRef } from 'react';
-import { getPartnerId, supabase } from '../api/supabaseClient';
+import { resolvePartnerIdForDelivery, supabase } from '../api/supabaseClient';
 import { parseLoveNoteBroadcast } from '../api/validation/broadcastSchemas';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
@@ -127,7 +127,12 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // replace. Dropping them for that window is the safe direction.
       partnerIdRef.current = null;
 
-      void getPartnerId().then((partnerId) => {
+      // Retries a FAILED lookup rather than reading its null as "unlinked".
+      // This is the site the permanent mute came from: the clear above is
+      // correct and has to stay, so a transient error here left the ref null
+      // with nothing to re-arm it -- SUBSCRIBED fires once on a healthy socket
+      // -- and every subsequent note was dropped for the life of the mount.
+      void resolvePartnerIdForDelivery().then((partnerId) => {
         if (cancelled) return;
         partnerIdRef.current = partnerId;
       });
@@ -214,7 +219,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     void (async () => {
       // Snapshot the partner BEFORE the join, so the very first broadcast is
       // already checked against a known sender.
-      const partnerId = await getPartnerId();
+      const partnerId = await resolvePartnerIdForDelivery();
       if (cancelled) return;
       partnerIdRef.current = partnerId;
 

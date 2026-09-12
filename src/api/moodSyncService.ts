@@ -18,7 +18,12 @@ import { sendEphemeralBroadcast } from './ephemeralBroadcast';
 import { handleNetworkError, isOnline } from './errorHandlers';
 import { waitForSocketReady } from './realtimeSocket';
 import { moodApi } from './moodApi';
-import { getPartnerId, getSignedInUserId, supabase } from './supabaseClient';
+import {
+  getPartnerId,
+  getSignedInUserId,
+  resolvePartnerIdForDelivery,
+  supabase,
+} from './supabaseClient';
 import { parseMoodBroadcast } from './validation/broadcastSchemas';
 import type { MoodInsert, SupabaseMood } from './validation/supabaseSchemas';
 
@@ -190,7 +195,13 @@ class MoodSyncService {
       syncedMood = await moodApi.create(moodInsert);
     }
 
-    // Broadcast to partner after successful sync (fire-and-forget)
+    // Broadcast to partner after successful sync (fire-and-forget).
+    //
+    // Plain `getPartnerId`, not the retrying delivery lookup: this is the SEND
+    // side, and a failed lookup here costs one live update whose mood is
+    // already persisted and arrives on the partner's next fetch. The retry
+    // exists for the RECEIVE gate, where a null snapshot drops every later
+    // broadcast too.
     const partnerId = await getPartnerId();
     if (partnerId) {
       this.broadcastMoodToPartner(syncedMood, partnerId).catch((err) => {
@@ -461,7 +472,10 @@ class MoodSyncService {
       return;
     }
 
-    entry.partnerId = await getPartnerId();
+    // Retried on a transient failure; a genuine unlink still resolves null on
+    // the first attempt. Without the retry this refresh turned one failed
+    // `users` read into a permanently muted channel.
+    entry.partnerId = await resolvePartnerIdForDelivery();
   }
 
   /**
@@ -519,7 +533,7 @@ class MoodSyncService {
     // concurrent subscribers can both miss and both open a channel.
     //
     // The partner snapshot is what every incoming broadcast is checked against.
-    const partnerIdAtJoin = await getPartnerId();
+    const partnerIdAtJoin = await resolvePartnerIdForDelivery();
     // Private channels are authorized against the caller's JWT, which Realtime
     // reads from the socket's access token. Without this the join carries the
     // anon key and the SELECT policy denies it.
@@ -630,16 +644,17 @@ class MoodSyncService {
     // nulled by a failed refresh or a vanished session would never recover, and
     // would silently drop every partner mood for the life of the page.
     //
-    // Only a SUCCESSFUL lookup may overwrite it, though. getPartnerId returns
-    // null for a transient failure as readily as for "unlinked"
-    // (supabaseClient.ts:122-136 swallows PGRST116, every other PostgREST
-    // error and any throw), so an unguarded write lets a late subscriber whose
-    // `users` round-trip failed mute a channel that is working for everyone
-    // already attached — permanently, because refreshChannelIdentity runs only
-    // on SUBSCRIBED and a healthy socket emits no further one. Writing null
-    // here never restores delivery; it can only remove it. A genuine unlink is
-    // still covered without this write: couple_broadcast_partner_can_send stops
-    // an ex-partner from broadcasting at all.
+    // Only a SUCCESSFUL lookup may overwrite it, though. The retry in
+    // `resolvePartnerIdForDelivery` narrows how often a null here is a failure
+    // rather than a genuine unlink, but it does not remove the case: a lookup
+    // that fails on every attempt still resolves null. So an unguarded write
+    // would still let a late subscriber mute a channel that is working for
+    // everyone already attached — permanently, because refreshChannelIdentity
+    // runs only on SUBSCRIBED and a healthy socket emits no further one.
+    // Writing null here never restores delivery; it can only remove it. A
+    // genuine unlink is still covered without this write:
+    // couple_broadcast_partner_can_send stops an ex-partner from broadcasting
+    // at all.
     if (partnerIdAtJoin) {
       entry.partnerId = partnerIdAtJoin;
     }

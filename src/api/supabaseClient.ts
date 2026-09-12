@@ -114,7 +114,27 @@ export const getSignedInUserId = async (): Promise<string | null> => {
  *
  * @returns Partner user ID or null if not found/not connected
  */
-export const getPartnerId = async (): Promise<string | null> => {
+export type PartnerLookup =
+  | { status: 'linked'; partnerId: string }
+  | { status: 'unlinked' }
+  | { status: 'error'; reason: string };
+
+/**
+ * The partner lookup, with the two null cases kept apart.
+ *
+ * `getPartnerId` below collapses this to `string | null`, which is the right
+ * shape for the callers that only decide what to render or which id to write
+ * to. It is the wrong shape for the Realtime receivers: they gate delivery on
+ * the snapshot, so "no partner" and "the lookup failed" must not be the same
+ * answer. A transient PostgREST error read as "unlinked" silently drops every
+ * subsequent broadcast, and `SUBSCRIBED` fires once on a healthy socket, so
+ * nothing re-arms it.
+ *
+ * `unlinked` is deliberately returned for PGRST116 and for a missing
+ * `partner_id`: neither is a failure, and retrying either would only delay a
+ * correct answer.
+ */
+export const lookupPartnerId = async (): Promise<PartnerLookup> => {
   try {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     const currentUserId = sessionData.session?.user?.id ?? null;
@@ -122,9 +142,12 @@ export const getPartnerId = async (): Promise<string | null> => {
     if (!currentUserId) {
       if (sessionError) {
         console.error('[Supabase] Failed to get current session:', sessionError);
+        // A failed getSession is not evidence of being signed out; the session
+        // may be perfectly valid and the read transient.
+        return { status: 'error', reason: sessionError.message };
       }
       console.error('[Supabase] Cannot get partner ID: User not authenticated');
-      return null;
+      return { status: 'unlinked' };
     }
 
     // Query current user's partner_id from users table
@@ -138,17 +161,58 @@ export const getPartnerId = async (): Promise<string | null> => {
       // PGRST116 = no rows found (user doesn't have users table record yet)
       if (error.code === 'PGRST116') {
         console.warn('[Supabase] User has no users table record yet');
-        return null;
+        return { status: 'unlinked' };
       }
       console.error('[Supabase] Failed to get partner ID:', error);
-      return null;
+      return { status: 'error', reason: error.message };
     }
 
-    return data?.partner_id ?? null;
+    const partnerId = data?.partner_id ?? null;
+    return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
   } catch (error) {
     console.error('[Supabase] Error getting partner ID:', error);
-    return null;
+    return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
   }
+};
+
+/**
+ * Number of attempts `resolvePartnerIdForDelivery` makes, and the backoff
+ * between them. Three attempts over ~900ms covers the failure this exists for
+ * -- a 5xx, a JWT expiring mid-flight, a network transition between the join
+ * ack and the follow-up fetch -- without holding the join open long enough to
+ * matter. A caller that exhausts them is left with `null`, exactly as before.
+ */
+const PARTNER_LOOKUP_ATTEMPTS = 3;
+const PARTNER_LOOKUP_BACKOFF_MS = [300, 600];
+
+/**
+ * The partner snapshot for a Realtime receiver: retries a failed lookup, and
+ * accepts `unlinked` immediately.
+ *
+ * Returns `null` for a genuine unlink and for an exhausted retry, so callers
+ * keep the fail-closed behaviour they already have -- a null snapshot still
+ * drops every broadcast. What changes is that one transient failure no longer
+ * looks like an unlink, which is what made the drop permanent.
+ */
+export const resolvePartnerIdForDelivery = async (): Promise<string | null> => {
+  for (let attempt = 0; attempt < PARTNER_LOOKUP_ATTEMPTS; attempt += 1) {
+    const result = await lookupPartnerId();
+
+    if (result.status === 'linked') return result.partnerId;
+    if (result.status === 'unlinked') return null;
+
+    const backoff = PARTNER_LOOKUP_BACKOFF_MS[attempt];
+    if (backoff === undefined) break;
+    await new Promise((resolve) => setTimeout(resolve, backoff));
+  }
+
+  console.error('[Supabase] Partner lookup failed on every attempt; delivery stays closed');
+  return null;
+};
+
+export const getPartnerId = async (): Promise<string | null> => {
+  const result = await lookupPartnerId();
+  return result.status === 'linked' ? result.partnerId : null;
 };
 
 /**

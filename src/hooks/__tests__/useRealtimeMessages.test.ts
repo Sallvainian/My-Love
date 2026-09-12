@@ -37,6 +37,12 @@ vi.mock('../../api/supabaseClient', () => ({
     },
   },
   getPartnerId: (...args: unknown[]) => mocks.getPartnerId(...args),
+  // The hook reads the snapshot through the retrying delivery lookup, which
+  // wraps the same round-trip. Routing both names at one mock keeps every
+  // existing `getPartnerId.mockResolvedValue(...)` and call-count assertion in
+  // this file driving the behaviour it always drove; the retry itself is
+  // covered in supabaseClient's own tests, against lookupPartnerId.
+  resolvePartnerIdForDelivery: (...args: unknown[]) => mocks.getPartnerId(...args),
 }));
 
 // Mock app store
