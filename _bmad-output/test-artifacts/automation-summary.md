@@ -732,3 +732,8 @@ accessibility PASS.
 [Interaction record ownership automation](automation-summary-dw-interaction-record-ownership.md) records this run; historical results above are preserved.
 
 DW-75 completion: 4 new tests (2 P0, 2 P1), fixtures and source snapshots delivered; 20/20 executions across five cold runs, 69 existing unit regressions and 2 neighboring Realtime tests passed. Both ownership mutation probes failed as intended. Definition of Done and limits are in the linked story summary.
+
+
+## Subsequent run: DW-81 (2026-09-12)
+
+[Auth bootstrap notification order automation](automation-summary-dw-auth-bootstrap-notification-order.md) records this run; prior reports are preserved.

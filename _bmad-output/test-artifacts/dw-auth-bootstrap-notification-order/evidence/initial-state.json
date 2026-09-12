@@ -1,0 +1,8 @@
+{
+  "head": "59305f61534ce50f6a3e09ae3f2dc910da2115f8",
+  "protected_file_hashes": {
+    "src/App.tsx": "70a86fab5b08a2ae57b136a77f49ebc064d0e53c216db832719db088e5b9879f",
+    "tests/unit/App.eventsSession.test.tsx": "4cf68c940b23bb858dd0c095627d08d2ae95a697846ed44496b4e00109819a8f",
+    "_bmad-output/implementation-artifacts/deferred-work.md": "af12d04a26fa83acbfb970bc12b87d1ca034057b9df85a281b1afe94add8c6f1"
+  }
+}

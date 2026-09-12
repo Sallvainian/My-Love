@@ -229,13 +229,13 @@ function App() {
   // Story 6.7: Check authentication status on mount
   useEffect(() => {
     let isMounted = true;
+    let hasAuthNotification = false;
 
     const checkAuth = async () => {
       try {
         const currentSession = await getSession();
-        if (isMounted) {
+        if (isMounted && !hasAuthNotification) {
           setSession(currentSession);
-          setAuthLoading(false);
 
           // Populate store auth state for synchronous access by all slices
           const { setAuthUser, clearAuth } = useAppStore.getState();
@@ -249,6 +249,7 @@ function App() {
         }
       } catch (error) {
         console.error('[App] Auth check failed:', error);
+      } finally {
         if (isMounted) {
           setAuthLoading(false);
         }
@@ -260,6 +261,9 @@ function App() {
     // Listen for auth state changes
     const unsubscribe = onAuthStateChange((newSession) => {
       if (isMounted) {
+        // Every notification supersedes the pending initial snapshot, including
+        // sign-out and same-user updates that keep the store session version.
+        hasAuthNotification = true;
         setSession(newSession);
 
         // Update store auth state for synchronous access by all slices
