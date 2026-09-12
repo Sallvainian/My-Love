@@ -593,7 +593,9 @@ location: src/components/PhotoGallery/PhotoGridItem.tsx:100
 source_spec: `spec-dw-28-pink-primary-button-contrast.md`
 severity: medium
 reason: `bg-pink-600/90` composites to approximately `#e91a84` over white, which is about 4.27:1 against the badge's small white text. The same image-dependent contrast issue was pre-existing with `bg-pink-500/90`; DW-28 improves the token but does not make this non-button overlay opaque.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-own-photo-badge-contrast
+resolution-undo: ec432d0278a3fa08017a373672da1b3036f4a4639752cce7124810859e34903d 2026-09-12 7374617475733a206f70656e
 
 ### DW-60: The UI/SQL validation mirror test compares against the original create migration, not the effective constraint after all migrations have run.
 origin: spec-deferred eb5b0fb56687
