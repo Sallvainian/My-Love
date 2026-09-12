@@ -10,7 +10,15 @@
  * Story 6.2: Photo Upload with Progress Indicator
  *
  * Cross-slice dependencies:
- * - None (self-contained)
+ * - authSlice: `uploadPhoto`, `deletePhoto` and `updatePhoto` each capture
+ *   `userId` + `authSessionVersion` first and recheck the pair before every
+ *   post-await write, so a continuation raised by one account cannot land in
+ *   the next one's store on a shared device. `loadPhotos` carries the older,
+ *   weaker form of the same guard — `userId` alone — and is deliberately not
+ *   retrofitted here: it writes only `photos`, so the one case the weaker form
+ *   misses (A signs out and back in as A) repopulates A's own gallery with A's
+ *   own rows. No cross-account disclosure follows from it, so widening that
+ *   guard is a separate change with its own contract.
  *
  * Persistence:
  * - Supabase: photos stored in photos table + storage bucket
@@ -67,6 +75,20 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
    * AC 6.2.11: Upload rejected if storage quota > 95%
    */
   uploadPhoto: async (input: PhotoUploadInput) => {
+    // Identity guard. An upload runs for seconds across four awaits, and Sign
+    // Out sits in the bottom nav of the very screen that starts it — so the
+    // request goes out with a still-valid token, succeeds, and its writes land
+    // after the store has been handed to whoever signed in next. Without this,
+    // A's picture, A's signed URL and A's failure banner all appear in B's app.
+    //
+    // `authSessionVersion` is paired with `userId` rather than compared alone:
+    // clearAuth bumps it on every sign-out, so A -> signed out -> A again is
+    // distinguishable from an uninterrupted A. An id-only compare would let a
+    // request from the dead session write as if it were live.
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const ownsUpload = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
       // Clear previous errors
       set({ error: null, storageWarning: null, isUploading: true, uploadProgress: 0 });
@@ -75,26 +97,32 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
       const quota = await photoService.checkStorageQuota();
       if (quota.percent >= 95) {
         // AC 6.2.11: Reject upload if storage nearly full
-        set({
-          error: `Storage nearly full (${quota.percent}%) - delete photos to continue`,
-          isUploading: false,
-          uploadProgress: 0,
-        });
-        return {
-          success: false,
-          error: `Storage nearly full (${quota.percent}%) - delete photos to continue`,
-        };
+        const quotaError = `Storage nearly full (${quota.percent}%) - delete photos to continue`;
+        // The rejection is real and is reported to this caller either way; it
+        // is the shared store that is withheld from the account that did not
+        // ask for the upload.
+        if (ownsUpload()) {
+          set({ error: quotaError, isUploading: false, uploadProgress: 0 });
+        }
+        return { success: false, error: quotaError };
       }
       if (quota.percent >= 80) {
         // AC 6.2.10: Warning if approaching limit
-        set({ storageWarning: `Storage ${quota.percent}% full - consider deleting old photos` });
+        if (ownsUpload()) {
+          set({ storageWarning: `Storage ${quota.percent}% full - consider deleting old photos` });
+        }
       }
 
       // Upload with progress callback (AC 6.2.2, 6.2.3)
       let checkError: string | undefined;
       const photo = await photoService.uploadPhoto(
         input,
-        (percent) => set({ uploadProgress: percent }),
+        (percent) => {
+          // photoService calls this from inside the await above, so it is a
+          // post-await write despite no `await` preceding it here. A stranded
+          // value paints B a progress bar for a photo B never chose.
+          if (ownsUpload()) set({ uploadProgress: percent });
+        },
         (message) => {
           checkError = message;
         }
@@ -107,12 +135,18 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
       // Get signed URL for the uploaded photo
       const signedUrl = await photoService.getSignedUrl(photo.storage_path);
 
-      // Create PhotoWithUrls from SupabasePhoto
-      const currentUserId = get().userId;
+      // The upload itself succeeded and is reported as such; the account
+      // changed, so this session's gallery is deliberately left untouched.
+      if (!ownsUpload()) return { success: true };
+
+      // Create PhotoWithUrls from SupabasePhoto. Ownership reads the captured
+      // id rather than the live one purely so the whole continuation speaks of
+      // one identity; the guard above has already established they are equal
+      // here, so this is not a behaviour change.
       const photoWithUrl: PhotoWithUrls = {
         ...photo,
         signedUrl,
-        isOwn: currentUserId ? photo.user_id === currentUserId : false,
+        isOwn: requestedBy ? photo.user_id === requestedBy : false,
       };
 
       // Add uploaded photo to state (optimistic update)
@@ -127,17 +161,23 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
       const newQuota = await photoService.checkStorageQuota();
       if (newQuota.warning === 'approaching' || newQuota.warning === 'critical') {
         const warningMsg = `Storage ${newQuota.percent}% full - consider deleting old photos`;
-        set({ storageWarning: warningMsg });
+        if (ownsUpload()) {
+          set({ storageWarning: warningMsg });
+        }
       }
 
       return { success: true };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Upload failed';
-      set({
-        error: errorMsg,
-        isUploading: false,
-        uploadProgress: 0,
-      });
+      // `error` is the app-wide banner key (appSlice), and signedOutState()
+      // does not reset it — so an unguarded write here outlives the session.
+      if (ownsUpload()) {
+        set({
+          error: errorMsg,
+          isUploading: false,
+          uploadProgress: 0,
+        });
+      }
 
       return { success: false, error: errorMsg };
     }
@@ -169,6 +209,13 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
    * Only owner can delete (enforced by RLS)
    */
   deletePhoto: async (photoId: string) => {
+    // Same identity guard as uploadPhoto, for the same reason: the delete is
+    // authorized as the account that asked for it, but the state write would
+    // land in whichever gallery is on screen when the response arrives.
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const ownsDelete = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
       const success = await photoService.deletePhoto(photoId);
 
@@ -176,12 +223,20 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
         throw new Error('Failed to delete photo');
       }
 
+      // The durable delete happened; only the state write is withheld. This id
+      // can genuinely be on screen for the next account — partners share a
+      // gallery — but whether that row should go is the new session's own
+      // question, answered by its next loadPhotos, not by a continuation raised
+      // under a session that has already ended.
+      if (!ownsDelete()) return;
+
       // Remove from state on successful deletion
       set((state) => ({
         photos: state.photos.filter((p) => p.id !== photoId),
       }));
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Delete failed';
+      if (!ownsDelete()) return;
       set({ error: errorMsg });
     }
   },
@@ -210,11 +265,19 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
    * merged into local state either.
    */
   updatePhoto: async (photoId: string, updates: Partial<SupabasePhoto>) => {
+    // A caption save is a photo continuation too: it writes `photos` and the
+    // app-wide `error`, the two keys the guard above exists to protect.
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const ownsUpdate = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
       // Returns false on a rejected write or when no updatable field was
       // supplied. Previously unchecked, so a failed save still updated the UI
       // and the change silently disappeared on reload.
       const persisted = await photoService.updatePhoto(photoId, updates);
+
+      if (!ownsUpdate()) return;
 
       if (!persisted) {
         set({ error: 'Failed to save photo changes' });
@@ -230,6 +293,7 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
       }));
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Update failed';
+      if (!ownsUpdate()) return;
       set({ error: errorMsg });
     }
   },
