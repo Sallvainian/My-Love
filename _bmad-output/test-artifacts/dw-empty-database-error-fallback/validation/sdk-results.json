@@ -1,0 +1,371 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "_bmad-output/test-artifacts/dw-empty-database-error-fallback/playwright.sdk.config.ts"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/_bmad-output/test-artifacts/dw-empty-database-error-fallback/playwright.sdk.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/tests/api",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "api",
+        "name": "api",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/tests/api",
+        "testIgnore": [],
+        "testMatch": [
+          "empty-database-error-fallback.spec.ts"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/_bmad-output/test-artifacts/dw-empty-database-error-fallback/validation/sdk-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 2,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "empty-database-error-fallback.spec.ts",
+      "file": "empty-database-error-fallback.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "DW-39 empty database error fallback through SDK parsing",
+          "file": "empty-database-error-fallback.spec.ts",
+          "line": 61,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] DW39-API-001 a null message produces a contextual database fallback",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 376,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[00:08:46] \u001b[1m\u001b[36m==== Parse the controlled events INSERT rejection through the installed SDK ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Parse the controlled events INSERT rejection through the installed SDK",
+                          "duration": 1
+                        }
+                      ],
+                      "startTime": "2026-09-12T00:08:45.541Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk/empty-database-error-fallb-1a74f-ontextual-database-fallback-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk/empty-database-error-fallb-1a74f-ontextual-database-fallback-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7309477da283f8bd698e-3c2e0eb5edaa5579dcce",
+              "file": "empty-database-error-fallback.spec.ts",
+              "line": 65,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW39-API-002 Unicode whitespace uses the fallback and retains null diagnostics",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 377,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[00:08:46] \u001b[1m\u001b[36m==== Parse the controlled events INSERT rejection through the installed SDK ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Parse the controlled events INSERT rejection through the installed SDK",
+                          "duration": 1
+                        }
+                      ],
+                      "startTime": "2026-09-12T00:08:45.543Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk/empty-database-error-fallb-5969e-nd-retains-null-diagnostics-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk/empty-database-error-fallb-5969e-nd-retains-null-diagnostics-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7309477da283f8bd698e-b530b8b457ea2275c85f",
+              "file": "empty-database-error-fallback.spec.ts",
+              "line": 88,
+              "column": 3
+            },
+            {
+              "title": "[P2] DW39-API-003 CHECK mapping takes precedence over an empty SDK message",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 85,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[00:08:46] \u001b[1m\u001b[36m==== Parse the controlled events INSERT rejection through the installed SDK ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Parse the controlled events INSERT rejection through the installed SDK",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T00:08:46.460Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk/empty-database-error-fallb-0ca18-e-over-an-empty-SDK-message-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk/empty-database-error-fallb-0ca18-e-over-an-empty-SDK-message-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7309477da283f8bd698e-4ebb1cd72e46c862d7c8",
+              "file": "empty-database-error-fallback.spec.ts",
+              "line": 105,
+              "column": 3
+            },
+            {
+              "title": "[P2] DW39-API-004 meaningful message whitespace survives SDK parsing and conversion",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 85,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[00:08:46] \u001b[1m\u001b[36m==== Parse the controlled events INSERT rejection through the installed SDK ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Parse the controlled events INSERT rejection through the installed SDK",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T00:08:46.461Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk/empty-database-error-fallb-d7106--SDK-parsing-and-conversion-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk/empty-database-error-fallb-d7106--SDK-parsing-and-conversion-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7309477da283f8bd698e-4b573e2f8fbba287961f",
+              "file": "empty-database-error-fallback.spec.ts",
+              "line": 119,
+              "column": 3
+            },
+            {
+              "title": "[P2] DW39-API-005 a numeric SDK message retains compatibility without throwing",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 68,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[00:08:46] \u001b[1m\u001b[36m==== Parse the controlled events INSERT rejection through the installed SDK ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Parse the controlled events INSERT rejection through the installed SDK",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T00:08:46.560Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk/empty-database-error-fallb-730ce-patibility-without-throwing-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-170829-4a3d/worktrees/dw-empty-database-error-fallback/test-results/dw39-sdk/empty-database-error-fallb-730ce-patibility-without-throwing-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7309477da283f8bd698e-0b796934736f93e6fa0c",
+              "file": "empty-database-error-fallback.spec.ts",
+              "line": 133,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T00:08:43.974Z",
+    "duration": 2691.897,
+    "expected": 5,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

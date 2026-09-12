@@ -1,0 +1,27 @@
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ encrypted .env [www.dotenvx.com]
+
+Running 5 tests using 2 workers
+
+(node:32528) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:32527) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+[00:08:46] ==== Parse the controlled events INSERT rejection through the installed SDK ====
+
+[00:08:46] ==== Parse the controlled events INSERT rejection through the installed SDK ====
+
+  ✓  2 [api] › tests/api/empty-database-error-fallback.spec.ts:88:3 › DW-39 empty database error fallback through SDK parsing › [P1] DW39-API-002 Unicode whitespace uses the fallback and retains null diagnostics (377ms)
+  ✓  1 [api] › tests/api/empty-database-error-fallback.spec.ts:65:3 › DW-39 empty database error fallback through SDK parsing › [P1] DW39-API-001 a null message produces a contextual database fallback (376ms)
+[00:08:46] ==== Parse the controlled events INSERT rejection through the installed SDK ====
+
+[00:08:46] ==== Parse the controlled events INSERT rejection through the installed SDK ====
+
+  ✓  3 [api] › tests/api/empty-database-error-fallback.spec.ts:105:3 › DW-39 empty database error fallback through SDK parsing › [P2] DW39-API-003 CHECK mapping takes precedence over an empty SDK message (85ms)
+  ✓  4 [api] › tests/api/empty-database-error-fallback.spec.ts:119:3 › DW-39 empty database error fallback through SDK parsing › [P2] DW39-API-004 meaningful message whitespace survives SDK parsing and conversion (85ms)
+[00:08:46] ==== Parse the controlled events INSERT rejection through the installed SDK ====
+
+  ✓  5 [api] › tests/api/empty-database-error-fallback.spec.ts:133:3 › DW-39 empty database error fallback through SDK parsing › [P2] DW39-API-005 a numeric SDK message retains compatibility without throwing (68ms)
+
+  5 passed (2.7s)
