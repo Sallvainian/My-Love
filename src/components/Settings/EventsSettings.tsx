@@ -821,9 +821,11 @@ function EventForm({
     const trimmedDescription = description.trim();
     const nextErrors: Record<string, string> = {};
 
+    // PostgreSQL char_length counts code points: spread keeps supplementary
+    // emoji whole while counting combining marks separately.
     if (!trimmedLabel) {
       nextErrors.label = 'Label is required';
-    } else if (trimmedLabel.length > LABEL_MAX_LENGTH) {
+    } else if ([...trimmedLabel].length > LABEL_MAX_LENGTH) {
       nextErrors.label = `Label must be ${LABEL_MAX_LENGTH} characters or fewer`;
     }
 
@@ -833,7 +835,7 @@ function EventForm({
       nextErrors.date = 'Date must be in YYYY-MM-DD format';
     }
 
-    if (trimmedDescription.length > DESCRIPTION_MAX_LENGTH) {
+    if ([...trimmedDescription].length > DESCRIPTION_MAX_LENGTH) {
       nextErrors.description = `Description must be ${DESCRIPTION_MAX_LENGTH} characters or fewer`;
     }
 

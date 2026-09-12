@@ -1,0 +1,11 @@
+{
+  "head": "1de19176e654eb4e51a3993bfefa631339bd71a7",
+  "date": "2026-09-12",
+  "sha256": {
+    "src/components/Settings/EventsSettings.tsx": "bf4acbc5420adf5fb46fdfe5c085fcd5a2b037256d2e3adff8b57b0190de55fc",
+    "src/components/Settings/__tests__/EventsSettings.test.tsx": "0a9e32feb090566986a11659bff203ad02289c0dc327678e287622d1e82091fa",
+    "supabase/tests/database/21_events_validation_contract.sql": "5831aa555c5c72044023d5f37465c71272587e85807a298e7de874ede1751e21",
+    "supabase/migrations/20260818000002_create_events_table.sql": "0ce325a059a07ccf5ce09a07a5dd60486a88568f778f9a62b5b5fa74747c140f",
+    "_bmad-output/implementation-artifacts/deferred-work.md": "da84fdf3999a39042379c6c39b4933cb07b45e262319042553ae1d6292239816"
+  }
+}
