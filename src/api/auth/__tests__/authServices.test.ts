@@ -52,10 +52,29 @@ vi.mock('../../../sw-db', () => ({
   clearAuthToken: mockClearAuthToken,
 }));
 
+function deferred() {
+  let resolve: () => void = () => {};
+  let reject: (reason: unknown) => void = () => {};
+  const promise = new Promise<void>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
+const listenerSession = {
+  access_token: 'listener-access-token',
+  refresh_token: 'listener-refresh-token',
+  expires_at: 777,
+  user: { id: 'listener-user', email: 'listener@example.com' },
+} as Session;
+
 describe('auth session/action services', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authStateCallback = null;
+    mockStoreAuthToken.mockResolvedValue(undefined);
+    mockClearAuthToken.mockResolvedValue(undefined);
 
     mockOnAuthStateChange.mockImplementation(
       (callback: (event: string, session: Session | null) => void | Promise<void>) => {
@@ -144,4 +163,130 @@ describe('auth session/action services', () => {
     unsubscribe();
     expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['SIGNED_IN', 'TOKEN_REFRESHED', 'SIGNED_OUT'])(
+    'delivers %s synchronously while token persistence is pending',
+    async (event) => {
+      const pending = deferred();
+      const sideEffect = event === 'SIGNED_OUT' ? mockClearAuthToken : mockStoreAuthToken;
+      sideEffect.mockReturnValue(pending.promise);
+      const session = event === 'SIGNED_OUT' ? null : listenerSession;
+      const listener = vi.fn();
+      onAuthStateChange(listener);
+
+      const handling = authStateCallback!(event, session);
+
+      expect(listener).toHaveBeenCalledExactlyOnceWith(session);
+      expect(listener.mock.invocationCallOrder[0]).toBeLessThan(
+        sideEffect.mock.invocationCallOrder[0]!
+      );
+      pending.resolve();
+      await handling;
+      expect(listener).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['SIGNED_IN', 'SIGNED_OUT'])(
+    'preserves auth arrival order when delayed %s token persistence finishes last',
+    async (firstEvent) => {
+      const pendingStore = deferred();
+      const pendingClear = deferred();
+      mockStoreAuthToken.mockReturnValue(pendingStore.promise);
+      mockClearAuthToken.mockReturnValue(pendingClear.promise);
+      const listener = vi.fn();
+      onAuthStateChange(listener);
+      const firstSession = firstEvent === 'SIGNED_IN' ? listenerSession : null;
+      const secondSession = firstEvent === 'SIGNED_IN' ? null : listenerSession;
+      const secondEvent = firstEvent === 'SIGNED_IN' ? 'SIGNED_OUT' : 'SIGNED_IN';
+
+      const first = authStateCallback!(firstEvent, firstSession);
+      const second = authStateCallback!(secondEvent, secondSession);
+
+      expect(listener.mock.calls).toEqual([[firstSession], [secondSession]]);
+      const firstStorage = firstEvent === 'SIGNED_IN' ? pendingStore : pendingClear;
+      const secondStorage = firstEvent === 'SIGNED_IN' ? pendingClear : pendingStore;
+      secondStorage.resolve();
+      await second;
+      firstStorage.resolve();
+      await first;
+      expect(listener.mock.calls).toEqual([[firstSession], [secondSession]]);
+    }
+  );
+
+  it.each(['SIGNED_IN', 'TOKEN_REFRESHED', 'SIGNED_OUT'])(
+    'logs a rejected %s token side effect after delivering the auth transition',
+    async (event) => {
+      const pending = deferred();
+      const sideEffect = event === 'SIGNED_OUT' ? mockClearAuthToken : mockStoreAuthToken;
+      sideEffect.mockReturnValue(pending.promise);
+      const session = event === 'SIGNED_OUT' ? null : listenerSession;
+      const listener = vi.fn();
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+      onAuthStateChange(listener);
+
+      const handling = authStateCallback!(event, session);
+      expect(listener).toHaveBeenCalledExactlyOnceWith(session);
+      const error = new Error('Token storage unavailable');
+      pending.reject(error);
+      await handling;
+
+      expect(errorLog).toHaveBeenCalledWith(
+        event === 'SIGNED_OUT'
+          ? '[AuthService] Failed to clear stored auth token:'
+          : '[AuthService] Failed to update stored auth token:',
+        error
+      );
+      expect(listener).toHaveBeenCalledTimes(1);
+      errorLog.mockRestore();
+    }
+  );
+
+  it.each([
+    ['SIGNED_IN', 'resolves'],
+    ['SIGNED_IN', 'rejects'],
+    ['TOKEN_REFRESHED', 'resolves'],
+    ['TOKEN_REFRESHED', 'rejects'],
+    ['SIGNED_OUT', 'resolves'],
+    ['SIGNED_OUT', 'rejects'],
+  ] as const)(
+    'preserves a thrown listener error after %s token persistence %s',
+    async (event, tokenOutcome) => {
+      const pending = deferred();
+      const sideEffect = event === 'SIGNED_OUT' ? mockClearAuthToken : mockStoreAuthToken;
+      sideEffect.mockReturnValue(pending.promise);
+      const session = event === 'SIGNED_OUT' ? null : listenerSession;
+      const listenerError = new Error('App listener failed');
+      const listener = vi.fn(() => {
+        throw listenerError;
+      });
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+      onAuthStateChange(listener);
+
+      const handling = authStateCallback!(event, session);
+      const rejection = expect(handling).rejects.toBe(listenerError);
+
+      expect(listener).toHaveBeenCalledExactlyOnceWith(session);
+      expect(sideEffect).toHaveBeenCalledTimes(1);
+      expect(listener.mock.invocationCallOrder[0]).toBeLessThan(
+        sideEffect.mock.invocationCallOrder[0]!
+      );
+      const tokenError = new Error('Token storage unavailable');
+      if (tokenOutcome === 'rejects') pending.reject(tokenError);
+      else pending.resolve();
+      await rejection;
+
+      if (tokenOutcome === 'rejects') {
+        expect(errorLog).toHaveBeenCalledWith(
+          event === 'SIGNED_OUT'
+            ? '[AuthService] Failed to clear stored auth token:'
+            : '[AuthService] Failed to update stored auth token:',
+          tokenError
+        );
+      } else {
+        expect(errorLog).not.toHaveBeenCalled();
+      }
+      expect(listener).toHaveBeenCalledTimes(1);
+      errorLog.mockRestore();
+    }
+  );
 });

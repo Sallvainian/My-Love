@@ -71,6 +71,14 @@ type EventUpdateInput = Parameters<AppState['editEvent']>[1];
 type EventWriteResult = Awaited<ReturnType<AppState['addEvent']>>;
 type EventWriteFailure = Extract<EventWriteResult, { success: false }>;
 type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
+type EventLoadOwner = { userId: string; authSessionVersion: number };
+
+function ownsCurrentSession(owner: EventLoadOwner): boolean {
+  // Async callbacks can run before React cleans up the old session's effects.
+  // eslint-disable-next-line no-restricted-properties
+  const state = useAppStore.getState();
+  return state.userId === owner.userId && state.authSessionVersion === owner.authSessionVersion;
+}
 
 /**
  * Mirrors of the CHECK constraints in
@@ -111,6 +119,7 @@ export function EventsSettings() {
     eventsIsLoading,
     syncStatus,
     userId,
+    authSessionVersion,
     loadEvents,
     addEvent,
     editEvent,
@@ -129,9 +138,11 @@ export function EventsSettings() {
   // useFocusTrap already restores those — handing the form a fallback
   // unconditionally would steal focus back from a row's Edit button.
   const [formNeedsFallback, setFormNeedsFallback] = useState(false);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [settledForUserId, setSettledForUserId] = useState<string | null>(null);
-  const [isRetrying, setIsRetrying] = useState(false);
+  const [loadSettlement, setLoadSettlement] = useState<
+    (EventLoadOwner & { failed: boolean }) | null
+  >(null);
+  const [retryingForSession, setRetryingForSession] = useState<number | null>(null);
+  const isRetrying = retryingForSession === authSessionVersion;
   const [retryFocusRequest, setRetryFocusRequest] = useState(0);
 
   // The header Add button: the one control that outlives a delete, an
@@ -139,20 +150,15 @@ export function EventsSettings() {
   // opener does not survive.
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const retryButtonRef = useRef<HTMLButtonElement>(null);
-  const retryInFlightRef = useRef(false);
+  const retryInFlightRef = useRef<EventLoadOwner | null>(null);
   const retryFocusTargetRef = useRef<{
     target: 'retry' | 'add';
-    requestedBy: string;
+    owner: EventLoadOwner;
   } | null>(null);
 
-  const recordLoadOutcome = useCallback((requestedBy: string, result: EventLoadResult) => {
-    if (result.status === 'stale') return;
-    // eslint-disable-next-line no-restricted-properties
-    const state = useAppStore.getState();
-    if (state.userId !== requestedBy) return;
-
-    setLoadFailed(result.status === 'failure');
-    setSettledForUserId(requestedBy);
+  const recordLoadOutcome = useCallback((owner: EventLoadOwner, result: EventLoadResult) => {
+    if (result.status === 'stale' || !ownsCurrentSession(owner)) return;
+    setLoadSettlement({ ...owner, failed: result.status === 'failure' });
   }, []);
 
   useEffect(() => {
@@ -161,7 +167,7 @@ export function EventsSettings() {
     let cancelled = false;
     void loadEvents().then((result) => {
       if (cancelled) return;
-      recordLoadOutcome(userId, result);
+      recordLoadOutcome({ userId, authSessionVersion }, result);
     });
 
     return () => {
@@ -170,7 +176,7 @@ export function EventsSettings() {
     // Re-running on either connectivity transition matches Home: the offline
     // direction fails back into the same settled notice, while reconnecting
     // gives a mounted Settings screen a recovery path without navigation.
-  }, [userId, syncStatus.isOnline, loadEvents, recordLoadOutcome]);
+  }, [userId, authSessionVersion, syncStatus.isOnline, loadEvents, recordLoadOutcome]);
 
   const editingEvent = editingId ? events.find((event) => event.id === editingId) : undefined;
 
@@ -204,49 +210,56 @@ export function EventsSettings() {
 
   const refreshEvents = useCallback(async () => {
     if (!userId) return null;
+    const owner = { userId, authSessionVersion };
+    if (!ownsCurrentSession(owner)) return null;
     const result = await loadEvents();
-    recordLoadOutcome(userId, result);
+    recordLoadOutcome(owner, result);
     return result;
-  }, [loadEvents, recordLoadOutcome, userId]);
+  }, [loadEvents, recordLoadOutcome, userId, authSessionVersion]);
 
   const handleRetry = useCallback(async () => {
     // The slice raises this flag synchronously before its request. Guarding the
     // handler with a local in-flight ref as well as disabling the control closes
     // both pointer and keyboard duplicate-activation paths.
-    if (eventsIsLoading || retryInFlightRef.current || !userId) return;
+    if (
+      eventsIsLoading ||
+      retryInFlightRef.current?.authSessionVersion === authSessionVersion ||
+      !userId
+    ) {
+      return;
+    }
 
-    const requestedBy = userId;
-    retryInFlightRef.current = true;
-    setIsRetrying(true);
+    const owner = { userId, authSessionVersion };
+    if (!ownsCurrentSession(owner)) return;
+    retryInFlightRef.current = owner;
+    setRetryingForSession(authSessionVersion);
     clearEventsError();
 
     const result = await refreshEvents().finally(() => {
-      retryInFlightRef.current = false;
-      setIsRetrying(false);
+      // A prior-session retry neither holds nor releases the current lock.
+      if (retryInFlightRef.current !== owner || !ownsCurrentSession(owner)) return;
+      retryInFlightRef.current = null;
+      setRetryingForSession(null);
     });
 
-    if (!result || result.status === 'stale') return;
-    // eslint-disable-next-line no-restricted-properties
-    if (useAppStore.getState().userId !== requestedBy) return;
+    if (!result || result.status === 'stale' || !ownsCurrentSession(owner)) return;
 
     // An empty failed load removes Retry while its loading slot is mounted.
     // Restore focus only after the settled render: back to Retry on failure,
     // or to the always-mounted Add control once recovery succeeds.
     retryFocusTargetRef.current = {
       target: result.status === 'failure' ? 'retry' : 'add',
-      requestedBy,
+      owner,
     };
     setRetryFocusRequest((request) => request + 1);
-  }, [clearEventsError, eventsIsLoading, refreshEvents, userId]);
+  }, [clearEventsError, eventsIsLoading, refreshEvents, userId, authSessionVersion]);
 
   useEffect(() => {
     if (retryFocusRequest === 0 || isRetrying) return;
 
     const focusRequest = retryFocusTargetRef.current;
     retryFocusTargetRef.current = null;
-    if (!focusRequest) return;
-    // eslint-disable-next-line no-restricted-properties
-    if (useAppStore.getState().userId !== focusRequest.requestedBy) return;
+    if (!focusRequest || !ownsCurrentSession(focusRequest.owner)) return;
 
     const target =
       focusRequest.target === 'retry'
@@ -286,7 +299,11 @@ export function EventsSettings() {
     [removeEvent]
   );
 
-  const firstLoadSettled = settledForUserId !== null && settledForUserId === userId;
+  const firstLoadSettled =
+    loadSettlement !== null &&
+    loadSettlement.userId === userId &&
+    loadSettlement.authSessionVersion === authSessionVersion;
+  const loadFailed = firstLoadSettled && loadSettlement.failed;
 
   // A failed refresh never blanks a list already on screen, so a non-empty
   // `events` outranks every other state — including the error banner, which

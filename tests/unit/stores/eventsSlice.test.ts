@@ -37,11 +37,11 @@ import { createEventsSlice, type EventsSlice } from '../../../src/stores/slices/
 
 const USER_ID = 'USER-A-ID';
 
-type TestStore = EventsSlice & { userId: string | null };
+type TestStore = EventsSlice & { userId: string | null; authSessionVersion: number };
 
 function createTestStore() {
   const store = create<TestStore>()(createEventsSlice as unknown as StateCreator<TestStore>);
-  store.setState({ userId: USER_ID });
+  store.setState({ userId: USER_ID, authSessionVersion: 1 });
   return store;
 }
 
