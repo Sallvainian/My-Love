@@ -1,0 +1,13 @@
+-- Remove the bot password row that 20260316031209_create_claude_bot_config.sql
+-- seeded as a plaintext literal (security finding F1).
+--
+-- The literal has been stripped from that migration, so a fresh database never
+-- inserts this row. Databases migrated before the fix (including production)
+-- still hold it, and editing an already-applied migration cannot remove it, so
+-- this forward migration deletes it. The password itself was rotated through
+-- the Auth Admin API; the replacement lives only in the age-encrypted fnox.toml
+-- entry CLAUDE_BOT_PASSWORD and is applied by
+-- `fnox exec -- node scripts/provision-claude-bot.mjs`.
+--
+-- Idempotent: a second run deletes nothing.
+DELETE FROM public.claude_bot_config WHERE key = 'test_password';
