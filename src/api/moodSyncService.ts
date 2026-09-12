@@ -629,7 +629,20 @@ class MoodSyncService {
     // `users` round-trip nobody reads — and, worse, an entry whose snapshot was
     // nulled by a failed refresh or a vanished session would never recover, and
     // would silently drop every partner mood for the life of the page.
-    entry.partnerId = partnerIdAtJoin;
+    //
+    // Only a SUCCESSFUL lookup may overwrite it, though. getPartnerId returns
+    // null for a transient failure as readily as for "unlinked"
+    // (supabaseClient.ts:122-136 swallows PGRST116, every other PostgREST
+    // error and any throw), so an unguarded write lets a late subscriber whose
+    // `users` round-trip failed mute a channel that is working for everyone
+    // already attached — permanently, because refreshChannelIdentity runs only
+    // on SUBSCRIBED and a healthy socket emits no further one. Writing null
+    // here never restores delivery; it can only remove it. A genuine unlink is
+    // still covered without this write: couple_broadcast_partner_can_send stops
+    // an ex-partner from broadcasting at all.
+    if (partnerIdAtJoin) {
+      entry.partnerId = partnerIdAtJoin;
+    }
 
     entry.subscribers.add(subscriber);
 
