@@ -1,0 +1,13 @@
+{
+  "named_browser_session": "tea-automate-wire",
+  "browser_closed_after_snapshot": true,
+  "owned_vite_listener_pids_stopped": [
+    79047
+  ],
+  "worker_temp_outputs_removed_after_durable_copy": [
+    "/tmp/tea-automate-api-tests-2026-09-12T08-52-11-374Z.json",
+    "/tmp/tea-automate-e2e-tests-2026-09-12T08-52-11-374Z.json",
+    "/tmp/tea-automate-summary-2026-09-12T08-52-11-374Z.json"
+  ],
+  "supabase_stack": "Pre-existing; left running"
+}

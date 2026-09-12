@@ -1,0 +1,9 @@
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Listing tests:
+  [chromium] › e2e/settings/events-wire-fidelity.spec.ts:9:1 › [P2] DW.WIRE-E2E-001 same-label couple rows retain identity and controls after reload
+  [api] › api/events-wire-contract-fidelity.spec.ts:200:3 › Events wire contract over PostgREST — story 5 › [P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events
+  [api] › api/events-wire-contract-fidelity.spec.ts:308:3 › Events wire contract over PostgREST — story 5 › [P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults
+  [api] › api/events-wire-contract-fidelity.spec.ts:405:3 › Events wire contract over PostgREST — story 5 › [P1] DE.5-API-005 a raw ascending GET returns both halves of the pair in event_date then created_at order
+  [api] › api/events-wire-contract-fidelity.spec.ts:538:3 › Events wire contract over PostgREST — story 5 › [P1] DE.5-API-008 an authenticated but unlinked outsider reads none of the couple's events
+  [api] › api/events-wire-contract-fidelity.spec.ts:677:3 › Events wire contract over PostgREST — story 5 › [P1] DE.5-API-006 a 101-character label is refused with the CHECK violation the client mirrors
+Total: 6 tests in 2 files

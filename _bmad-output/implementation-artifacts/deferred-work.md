@@ -710,7 +710,9 @@ location: tests/api/events-wire-contract.spec.ts:247
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: The first wire-contract test queries the fixed `ANON_ATTEMPT_LABEL` without clearing the worker pair first. A prior run terminated before teardown can leave that label behind, so the final zero-row assertion can fail even though the anonymous POST wrote nothing.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-wire-contract-fidelity
+resolution-undo: c4828021067babf12116479690590415b10721d96a8ca12d9d16f45a0fc9e054 2026-09-12 7374617475733a206f70656e
 
 ### DW-71: Outsider account cleanup ignores a returned deletion error when sign-in setup fails.
 origin: spec-deferred 588dd42563e8
@@ -726,7 +728,9 @@ location: tests/api/events-wire-contract.spec.ts:141
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: Zod objects strip unknown keys by default. Because `EventRowSchema` is not strict, a new PostgREST column returned by `select=*` is accepted even though the surrounding test prose says the schema mirrors the events table column for column.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-wire-contract-fidelity
+resolution-undo: c4828021067babf12116479690590415b10721d96a8ca12d9d16f45a0fc9e054 2026-09-12 7374617475733a206f70656e
 
 ### DW-73: The persistence suite header overstates reload coverage for the cleared-description case.
 origin: spec-deferred 5000b9059f98
