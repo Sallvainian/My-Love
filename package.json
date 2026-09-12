@@ -40,7 +40,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
     "dompurify": "^3.4.12",
-    "eventsource": "^4.1.0",
+    "eventsource": "^5.1.1",
     "framer-motion": "^13.0.0",
     "idb": "^8.0.3",
     "lucide-react": "^1.31.0",
