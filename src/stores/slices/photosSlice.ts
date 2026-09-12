@@ -91,12 +91,17 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
       }
 
       // Upload with progress callback (AC 6.2.2, 6.2.3)
-      const photo = await photoService.uploadPhoto(input, (percent) => {
-        set({ uploadProgress: percent });
-      });
+      let checkError: string | undefined;
+      const photo = await photoService.uploadPhoto(
+        input,
+        (percent) => set({ uploadProgress: percent }),
+        (message) => {
+          checkError = message;
+        }
+      );
 
       if (!photo) {
-        throw new Error('Upload failed - no photo returned');
+        throw new Error(checkError ?? 'Upload failed - no photo returned');
       }
 
       // Get signed URL for the uploaded photo

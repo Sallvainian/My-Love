@@ -38,6 +38,8 @@ export type SupabaseInteractionRecord = Database['public']['Tables']['interactio
  */
 export type InteractionType = 'poke' | 'kiss';
 
+export type InteractionSubscriptionStatus = 'SUBSCRIBED' | 'CHANNEL_ERROR' | 'TIMED_OUT';
+
 /**
  * Local Interaction interface
  */
@@ -208,15 +210,24 @@ export class InteractionService {
    * Listens for INSERT events on the interactions table filtered by current user ID.
    * Calls the provided callback whenever partner sends an interaction.
    *
+   * @param userId - Authenticated recipient's user ID used to filter incoming interactions
    * @param callback - Function called with new interaction record
+   * @param onStatusChange - Function called on subscription success, channel error, or timeout
    * @returns Promise resolving to unsubscribe function to stop listening
    *
    * @example
    * ```typescript
-   * const unsubscribe = await interactionService.subscribeInteractions((interaction) => {
-   *   console.log('Received interaction:', interaction.type);
-   *   // Show notification or update UI
-   * });
+   * const unsubscribe = await interactionService.subscribeInteractions(
+   *   userId,
+   *   (interaction) => {
+   *     console.log('Received interaction:', interaction.type);
+   *     // Show notification or update UI
+   *   },
+   *   (status) => {
+   *     console.log('Subscription status:', status);
+   *     // Update connection health in the UI
+   *   }
+   * );
    *
    * // Later, when component unmounts:
    * unsubscribe();
@@ -224,7 +235,8 @@ export class InteractionService {
    */
   async subscribeInteractions(
     userId: string,
-    callback: (interaction: SupabaseInteractionRecord) => void
+    callback: (interaction: SupabaseInteractionRecord) => void,
+    onStatusChange: (status: InteractionSubscriptionStatus) => void
   ): Promise<() => void> {
     // NOTE: this does NOT give each subscription its own channel, despite the
     // per-call shape. `supabase.channel(topic)` returns whatever is already
@@ -252,6 +264,13 @@ export class InteractionService {
       )
       .subscribe((status) => {
         logger.info('[InteractionService] Realtime subscription status:', status);
+        if (
+          status === 'SUBSCRIBED' ||
+          status === 'CHANNEL_ERROR' ||
+          status === 'TIMED_OUT'
+        ) {
+          onStatusChange(status);
+        }
       });
 
     let removed = false;

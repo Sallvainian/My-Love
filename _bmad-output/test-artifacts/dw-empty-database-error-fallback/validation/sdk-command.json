@@ -1,0 +1,11 @@
+{
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "--config",
+    "_bmad-output/test-artifacts/dw-empty-database-error-fallback/playwright.sdk.config.ts"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 4.74
+}

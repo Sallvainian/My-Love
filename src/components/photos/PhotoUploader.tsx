@@ -397,7 +397,7 @@ export function PhotoUploader({
             <button
               onClick={handleUpload}
               disabled={!selectedFile || !!error || isUploading} // AC-6.2.1: Disabled until photo selected
-              className="flex-1 rounded-lg bg-pink-500 px-4 py-2 text-sm text-white hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 rounded-lg bg-pink-600 px-4 py-2 text-sm text-white hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isUploading ? `Uploading... ${uploadProgress}%` : 'Upload Photo'}
             </button>

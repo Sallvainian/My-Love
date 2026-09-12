@@ -1,0 +1,14 @@
+[
+  {
+    "artifact": "api-solo-report.spec.ts",
+    "target": "tests/api/solo-report.spec.ts"
+  },
+  {
+    "artifact": "e2e-solo-report-synchronization.spec.ts",
+    "target": "tests/e2e/scripture/solo-report-synchronization.spec.ts"
+  },
+  {
+    "artifact": "support-solo-report.ts",
+    "target": "tests/support/factories/solo-report.ts"
+  }
+]

@@ -1,0 +1,6 @@
+
+> my-love@0.0.0 typecheck
+> tsc -b --force
+
+
+Exit code: 0

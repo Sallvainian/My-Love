@@ -1,0 +1,71 @@
+{
+  "success": true,
+  "subagent": "api-tests",
+  "confidence": 9,
+  "rationale": "Installed Supabase/PostgREST JS 2.112.3 source and the prior controlled probe show status-0 normalization for rejected fetch calls. src/api/errorHandlers.ts fixes the exact mapped message and copied diagnostics; tests/api/empty-database-error-fallback.spec.ts establishes this SDK-injection pattern.",
+  "unknowns": [
+    "Step 4 must validate generated code with the repository runner and generated factory. These are controlled SDK compatibility checks, not live server behavior or EventsService cause identity tests."
+  ],
+  "tests": [
+    {
+      "file": "tests/api/event-transport-error-cause.spec.ts",
+      "content": "/**\n * DW-53 compatibility at the installed SDK-to-error-mapper boundary.\n *\n * Supabase JS / PostgREST JS 2.112.3 normalizes rejected fetch calls into a\n * status-0 PostgREST-shaped envelope before EventsService receives them.\n * These tests verify that envelope and the real mapper's diagnostics; they do\n * not exercise EventWriteError or claim raw fetch Error identity survives.\n * Public service identity coverage remains in eventsService.test.ts.\n *\n * Source: @supabase/postgrest-js/src/PostgrestBuilder.ts:315-453 and\n * src/api/errorHandlers.ts:55-93. No response schema describes this local SDK\n * failure; assertions cover the specific compatibility fields under test.\n */\nimport { createClient } from '@supabase/supabase-js';\nimport { log } from '@seontechnologies/playwright-utils';\nimport { test, expect } from '../support/merged-fixtures';\nimport { createEventTransportFailure } from '../support/factories/event-transport-error';\nimport { handleSupabaseError, isPostgrestError } from '../../src/api/errorHandlers';\nimport type { Database } from '../../src/types/database.types';\n\nconst SYNTHETIC_URL = 'http://dw53.supabase.invalid';\n// These identifiers are request-shape inputs only: the controlled fetch never\n// contacts a server, authenticates an account, or creates rows.\nconst EVENT_ID = '00000000-0000-0000-0000-000000000053';\nconst USER_ID = '00000000-0000-0000-0000-000000000054';\nconst TRANSPORT_MESSAGE = 'DW53 API socket closed';\n\nconst scenarios = [\n  { id: 'DW53-API-001', method: 'POST', operation: 'createEvent' },\n  { id: 'DW53-API-002', method: 'PATCH', operation: 'updateEvent' },\n  { id: 'DW53-API-003', method: 'DELETE', operation: 'deleteEvent' },\n] as const;\n\ntest.describe('DW-53 SDK transport-error compatibility', () => {\n  // This SDK probe owns its in-memory transport, so no auth session is needed.\n  test.use({ authSessionEnabled: false });\n\n  for (const { id, method, operation } of scenarios) {\n    test(`[P2] ${id} ${method} retains stack diagnostics through SDK error mapping`, async () => {\n      const original = createEventTransportFailure({\n        message: TRANSPORT_MESSAGE,\n        code: 'ECONNRESET',\n      });\n      const originalStack = original.stack;\n      expect(originalStack).toEqual(expect.any(String));\n\n      const calls: Array<{\n        method: string | undefined;\n        path: string;\n        id: string | null;\n        selection: string | null;\n      }> = [];\n      const client = createClient<Database>(SYNTHETIC_URL, 'synthetic-test-key', {\n        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },\n        global: {\n          // playwright-utils deviation: injected SDK fetch exercises normalization; apiRequest bypasses it.\n          fetch: async (input, init) => {\n            const url = new URL(String(input));\n            calls.push({\n              method: init?.method,\n              path: url.pathname,\n              id: url.searchParams.get('id'),\n              selection: url.searchParams.get('select'),\n            });\n            throw original;\n          },\n        },\n      });\n\n      await log.step(`Reject the installed SDK's ${method} events request`);\n      const query =\n        method === 'POST'\n          ? client\n              .from('events')\n              .insert({ user_id: USER_ID, label: 'DW53 SDK probe', event_date: '2030-01-01' })\n              .select()\n              .single()\n          : method === 'PATCH'\n            ? client.from('events').update({ label: 'DW53 edited' }).eq('id', EVENT_ID).select()\n            : client.from('events').delete().eq('id', EVENT_ID).select();\n      const result = await query;\n\n      expect(calls).toEqual([\n        {\n          method,\n          path: '/rest/v1/events',\n          id: method === 'POST' ? null : `eq.${EVENT_ID}`,\n          selection: '*',\n        },\n      ]);\n      expect(result.status).toBe(0);\n      expect(result.data).toBeNull();\n      expect(result.error).toEqual({\n        message: `TypeError: ${TRANSPORT_MESSAGE}`,\n        details: originalStack,\n        hint: '',\n        code: '',\n      });\n      expect(isPostgrestError(result.error)).toBe(true);\n      if (!isPostgrestError(result.error)) {\n        throw new Error('The SDK failure no longer reaches the production database-error mapper');\n      }\n\n      await log.step('Map the SDK envelope and preserve the existing text and stack diagnostics');\n      const mapped = handleSupabaseError(result.error, `EventsService.${operation}`);\n\n      expect(mapped).toMatchObject({\n        name: 'SupabaseServiceError',\n        message: `[EventsService.${operation}] Database error: TypeError: ${TRANSPORT_MESSAGE}`,\n        code: '',\n        details: originalStack,\n        hint: '',\n        isNetworkError: false,\n      });\n    });\n  }\n});\n",
+      "description": "Three P2 SDK compatibility cases for event POST/PATCH/DELETE failures, single transport attempt, exact mapped message, and retained stack diagnostics.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 0,
+        "P2": 3,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    {
+      "file": "tests/support/factories/event-transport-error.ts",
+      "export": "createEventTransportFailure",
+      "signature": "createEventTransportFailure(options?: { message?: string; code?: string }): TypeError & { code: string }",
+      "behavior": "Returns a fresh TypeError with options.message or 'socket closed'; adds code options.code or 'ECONNRESET'. Preserve its original Error stack. Do not add a details property or nested cause by default.",
+      "consumers": [
+        "tests/api/event-transport-error-cause.spec.ts"
+      ]
+    }
+  ],
+  "knowledge_fragments_used": [
+    "playwright-utils-mandate",
+    "library-integration-mandate",
+    "api-request",
+    "data-factories",
+    "api-testing-patterns",
+    "log",
+    "confidence-gate"
+  ],
+  "playwright_utils_deviations": [
+    {
+      "file": "tests/api/event-transport-error-cause.spec.ts",
+      "line": 56,
+      "reason": "The SDK global.fetch injection is the boundary under test. apiRequest would bypass installed SDK normalization; no live HTTP, raw Playwright request context, manual login, custom retry, or polling is used."
+    }
+  ],
+  "pactjs_utils_deviations": [],
+  "provider_scrutiny": "not-applicable: no Pact artifacts; controlled SDK failure scope",
+  "provider_files_read": [
+    "node_modules/@supabase/postgrest-js/src/PostgrestBuilder.ts",
+    "node_modules/@supabase/supabase-js/src/lib/fetch.ts",
+    "src/api/errorHandlers.ts",
+    "src/services/eventsService.ts"
+  ],
+  "installed_versions": {
+    "@supabase/supabase-js": "2.112.3",
+    "@supabase/postgrest-js": "2.112.3"
+  },
+  "test_count": 3,
+  "self_check": {
+    "merged_fixtures": true,
+    "no_raw_playwright_endpoint_calls": true,
+    "no_fixed_waits": true,
+    "no_console_log": true,
+    "no_inline_auth": true,
+    "deviations_documented": true
+  },
+  "summary": "Generated exactly three P2 API compatibility cases in one spec. Existing CRUD/RLS tests own happy paths; existing public-service unit tests own original-cause acceptance. No tests executed by this worker, no fixtures emitted, and no framework/runtime changes made."
+}

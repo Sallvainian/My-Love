@@ -130,6 +130,9 @@ export default defineConfig({
     ['junit', { outputFile: 'test-results/junit.xml' }],
     ['list'],
     ['./tests/support/reporters/failure-summary-reporter.ts'],
+    // Only the full E2E CI shards feed the merged report. Keep local runs and
+    // burn-in's repeated invocations on their existing reporters.
+    ...(process.env.E2E_BLOB_REPORT === '1' ? [['blob'] as const] : []),
   ],
 
   outputDir: 'test-results',

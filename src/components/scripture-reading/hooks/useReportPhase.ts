@@ -5,6 +5,7 @@
  * report data loading, and related accessibility for the reading flow.
  */
 
+import { handleSupabaseError, isPostgrestError } from '../../../api/errorHandlers';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PartnerInfo } from '../../../api/partnerService';
 import { MAX_STEPS } from '../../../data/scriptureSteps';
@@ -138,7 +139,13 @@ export function useReportPhase({
             message: 'Failed to save reflection summary',
             details: error,
           });
-          setSummarySubmitError('We could not save your reflection. Tap Continue to try again.');
+          const details = typeof error === 'object' && error !== null && 'details' in error
+            ? error.details : undefined;
+          setSummarySubmitError(
+            isPostgrestError(details) && details.code === '23514'
+              ? handleSupabaseError(details).message
+              : 'We could not save your reflection. Tap Continue to try again.'
+          );
         } finally {
           setIsSubmittingSummary(false);
         }
