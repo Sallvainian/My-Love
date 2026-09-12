@@ -107,6 +107,15 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     // useScriptureBroadcast carries.
     let cancelled = false;
 
+    // Whether the partner snapshot can be trusted for the NEXT `SUBSCRIBED`.
+    //
+    // The IIFE below resolves it immediately before the first `subscribe`, so
+    // it is fresh for that join and re-taking it would only cost delivery.
+    // Every later join may span a relationship change, so it is marked stale
+    // both after a join is reported and before the retry path re-subscribes --
+    // a retry is a re-join even though the original join never reported
+    // SUBSCRIBED at all.
+    let snapshotFresh = true;
     // The signed-in user is captured here, for the life of this effect run.
     // A different account re-runs the effect with a different topic, and this
     // run's handlers are already inert by then.
@@ -156,10 +165,22 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // Reset retry count on successful subscription
       if (status === 'SUBSCRIBED') {
         retryCountRef.current = 0;
-        // A join is also a re-join. The relationship may have changed while the
-        // channel was down, so re-take the snapshot rather than trusting the
-        // one from the original join.
-        refreshPartnerSnapshot();
+        // Only a RE-join re-takes the snapshot. The relationship may have
+        // changed while the channel was down, so trusting the original join's
+        // value across a reconnect would be wrong.
+        //
+        // The FIRST join is not that case, and refreshing it costs delivery for
+        // nothing: the IIFE below resolved the snapshot and assigned it
+        // microseconds before calling `subscribe`, so clearing it here would
+        // discard a fresh value and re-fetch it over a new PostgREST
+        // round-trip. `parseLoveNoteBroadcast` drops every note for want of a
+        // partner id while that is in flight — and nothing re-fetches on a
+        // realtime miss, so a note the partner sends as this view opens would
+        // never appear until the user navigated away and came back.
+        if (!snapshotFresh) {
+          refreshPartnerSnapshot();
+        }
+        snapshotFresh = false;
         return;
       }
 
@@ -202,8 +223,12 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
         // and be denied again — five times, and then give up.
         retryTimeoutRef.current = setTimeout(() => {
           if (!subscriptionActive || !channelRef.current) return;
-          void supabase.realtime.setAuth().then(() => {
+          void supabase.realtime.setAuth()
+            .then(() => {
             if (!subscriptionActive || !channelRef.current) return;
+            // The backoff has elapsed since the snapshot was taken and this is
+            // a fresh join, so the SUBSCRIBED it produces must re-take it.
+            snapshotFresh = false;
             // `handleStatus` again, not a bare subscribe(). RealtimeChannel wires
             // the callback it is HANDED into _onError/_onClose and the joinPush
             // receives; a retry that passes none reports nothing, so neither the
@@ -211,7 +236,14 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
             // the rejoined channel keeps checking notes against the snapshot from
             // the original join.
             channelRef.current.subscribe(handleStatus);
-          });
+            })
+            // A rejected token install must not surface as an unhandled
+            // rejection. The retry is simply not made; the next CHANNEL_ERROR
+            // schedules another, and the channel stays closed meanwhile, which
+            // is the safe direction.
+            .catch((error) => {
+              console.error('[useRealtimeMessages] Retry token install failed:', error);
+            });
         }, delay);
       }
     };
@@ -229,7 +261,13 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       if (cancelled) return;
 
       channel.subscribe(handleStatus);
-    })();
+    })().catch((error) => {
+      // Same reason as the retry path: without this a rejected `setAuth` — or
+      // anything else thrown in here — becomes an unhandled rejection. The
+      // channel simply never joins, and the snapshot stays null, so nothing is
+      // dispatched that was not authorized.
+      console.error('[useRealtimeMessages] Subscription setup failed:', error);
+    });
 
     return () => {
       cancelled = true;

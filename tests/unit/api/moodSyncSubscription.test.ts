@@ -644,13 +644,44 @@ describe('subscribeMoodUpdates channel ownership', () => {
     unsubscribe();
   });
 
-  it('re-takes the partner snapshot on every SUBSCRIBED', async () => {
+  it('keeps the join-time snapshot on the FIRST SUBSCRIBED', async () => {
+    // `subscribeMoodUpdates` resolved the partner moments before the join and
+    // assigned it. Re-taking it here would null a fresh value and re-fetch it
+    // over a `users` round-trip, and `parseMoodBroadcast` drops everything for
+    // want of a partner id while that is in flight -- so a mood sent as the
+    // view opens would be lost, silently and for good.
     const onMood = vi.fn();
     const pending = moodSyncService.subscribeMoodUpdates(onMood);
     resolveNextSession();
     const unsubscribe = await pending;
 
     const channel = constructedChannels[0];
+    const lookupsAfterJoin = getPartnerId.mock.calls.length;
+
+    // Were this SUBSCRIBED to refresh, the mood below would land in the window
+    // where the snapshot is null and be dropped.
+    emitStatus(channel, 'SUBSCRIBED');
+    emitMood(channel, 'immediately-after-join');
+    expect(onMood).toHaveBeenCalledTimes(1);
+
+    await flush();
+    // And it cost no second round-trip.
+    expect(getPartnerId.mock.calls.length).toBe(lookupsAfterJoin);
+
+    unsubscribe();
+  });
+
+  it('re-takes the partner snapshot on a RE-join', async () => {
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    // The join itself. Everything after this is a re-join.
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
 
     // The relationship ended while the channel was up. RLS is re-evaluated at
     // the re-join, and so is this snapshot.
@@ -677,6 +708,11 @@ describe('subscribeMoodUpdates channel ownership', () => {
     const unsubscribeA = await pendingA;
 
     const channel = constructedChannels[0];
+
+    // The join, then the re-join whose lookup fails. Only a RE-join refreshes,
+    // so the failing lookup has to be the second SUBSCRIBED.
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
 
     getPartnerId.mockResolvedValue(null);
     emitStatus(channel, 'SUBSCRIBED');
