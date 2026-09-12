@@ -210,15 +210,24 @@ export class InteractionService {
    * Listens for INSERT events on the interactions table filtered by current user ID.
    * Calls the provided callback whenever partner sends an interaction.
    *
+   * @param userId - Authenticated recipient's user ID used to filter incoming interactions
    * @param callback - Function called with new interaction record
+   * @param onStatusChange - Function called on subscription success, channel error, or timeout
    * @returns Promise resolving to unsubscribe function to stop listening
    *
    * @example
    * ```typescript
-   * const unsubscribe = await interactionService.subscribeInteractions((interaction) => {
-   *   console.log('Received interaction:', interaction.type);
-   *   // Show notification or update UI
-   * });
+   * const unsubscribe = await interactionService.subscribeInteractions(
+   *   userId,
+   *   (interaction) => {
+   *     console.log('Received interaction:', interaction.type);
+   *     // Show notification or update UI
+   *   },
+   *   (status) => {
+   *     console.log('Subscription status:', status);
+   *     // Update connection health in the UI
+   *   }
+   * );
    *
    * // Later, when component unmounts:
    * unsubscribe();
