@@ -33,10 +33,16 @@ const PER_PAGE = 100;
 const MAX_PAGES = 100;
 
 export class StepError extends Error {
-  constructor(step, status) {
-    super(`provision-claude-bot: step "${step}" failed with HTTP ${status}`);
+  // `status` is always the numeric HTTP status. A failure the status alone does
+  // not describe passes `detail` instead of interpolating it into `status`,
+  // which would have made this field a string on exactly one throw path.
+  constructor(step, status, detail) {
+    super(
+      `provision-claude-bot: step "${step}" failed with HTTP ${status}${detail ? ` (${detail})` : ''}`
+    );
     this.step = step;
     this.status = status;
+    if (detail) this.detail = detail;
   }
 }
 
@@ -105,7 +111,7 @@ async function signIn({ url, serviceKey, email, password }) {
   if (!res.ok) throw new StepError('sign-in', res.status);
   const body = await res.json();
   if (typeof body.access_token !== 'string' || body.access_token.length === 0) {
-    throw new StepError('sign-in', `${res.status} (no access_token in response)`);
+    throw new StepError('sign-in', res.status, 'no access_token in response');
   }
   return { status: res.status, accessToken: body.access_token };
 }
