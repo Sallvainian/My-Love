@@ -95,10 +95,12 @@ export function signedOutState() {
     uploadProgress: 0,
     storageWarning: null,
 
-    // interactionsSlice
+    // interactionsSlice — the partner snapshot names the previous couple, and
+    // a stale one would let the next account accept that couple's traffic
     interactions: [],
     unviewedCount: 0,
     isSubscribed: false,
+    interactionPartnerId: null,
 
     // scriptureReadingSlice
     session: null,

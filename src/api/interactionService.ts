@@ -18,6 +18,7 @@
  * @module api/interactionService
  */
 
+import { NoPartnerError, validatePartnerId } from '../utils/interactionValidation';
 import { logger } from '../utils/logger';
 import {
   handleSupabaseError,
@@ -26,7 +27,7 @@ import {
   logSupabaseError,
 } from './errorHandlers';
 import type { Database } from './supabaseClient';
-import { supabase } from './supabaseClient';
+import { getPartnerId, supabase } from './supabaseClient';
 
 /**
  * Supabase interaction record type (from database schema)
@@ -92,10 +93,27 @@ function networkFailure(context: string, error: unknown): Error {
 export class InteractionService {
 
   /**
-   * Send a poke to partner
+   * Resolve the signed-in account's current partner.
    *
-   * @param partnerId - Partner's user ID
+   * A thin wrapper over `getPartnerId()`, and the only place the store reads
+   * the relationship from. It is a method rather than a direct import so the
+   * browser harness in `tests/support/harnesses/interaction-record-ownership.tsx`
+   * can supply a partner identity the same way it already supplies the
+   * subscription — that page runs without a Supabase session, where
+   * `getPartnerId()` can only answer `null`.
+   *
+   * @returns Partner user ID, or null when the account has no linked partner
+   */
+  async resolvePartnerId(): Promise<string | null> {
+    return getPartnerId();
+  }
+
+  /**
+   * Send a poke to the signed-in account's current partner
+   *
+   * @param userId - Authenticated sender's user ID
    * @returns Supabase interaction record
+   * @throws {NoPartnerError} if the account has no linked partner
    * @throws {InteractionWriteError} if offline, or if the insert created no
    *   row — no queue exists, so the interaction is lost rather than deferred
    * @throws an accurate network error if the request fails mid-flight
@@ -104,22 +122,23 @@ export class InteractionService {
    * @example
    * ```typescript
    * try {
-   *   const poke = await interactionService.sendPoke(partnerId);
+   *   const poke = await interactionService.sendPoke(userId);
    *   console.log('Poke sent:', poke.id);
    * } catch (error) {
    *   console.error('Failed to send poke:', error);
    * }
    * ```
    */
-  async sendPoke(partnerId: string, userId: string): Promise<SupabaseInteractionRecord> {
-    return this.sendInteraction('poke', partnerId, userId);
+  async sendPoke(userId: string): Promise<SupabaseInteractionRecord> {
+    return this.sendInteraction('poke', userId);
   }
 
   /**
-   * Send a kiss to partner
+   * Send a kiss to the signed-in account's current partner
    *
-   * @param partnerId - Partner's user ID
+   * @param userId - Authenticated sender's user ID
    * @returns Supabase interaction record
+   * @throws {NoPartnerError} if the account has no linked partner
    * @throws {InteractionWriteError} if offline, or if the insert created no
    *   row — no queue exists, so the interaction is lost rather than deferred
    * @throws an accurate network error if the request fails mid-flight
@@ -128,23 +147,32 @@ export class InteractionService {
    * @example
    * ```typescript
    * try {
-   *   const kiss = await interactionService.sendKiss(partnerId);
+   *   const kiss = await interactionService.sendKiss(userId);
    *   console.log('Kiss sent:', kiss.id);
    * } catch (error) {
    *   console.error('Failed to send kiss:', error);
    * }
    * ```
    */
-  async sendKiss(partnerId: string, userId: string): Promise<SupabaseInteractionRecord> {
-    return this.sendInteraction('kiss', partnerId, userId);
+  async sendKiss(userId: string): Promise<SupabaseInteractionRecord> {
+    return this.sendInteraction('kiss', userId);
   }
 
   /**
    * Internal method to send interaction of any type
    *
+   * **The recipient is never a parameter.** F4: a caller-supplied UUID let any
+   * authenticated user poke a stranger, so the target is derived here from the
+   * authenticated relationship instead. The database enforces the same rule
+   * independently — `interactions_sender_to_partner_insert` requires
+   * `to_user_id = public.get_my_partner_id()` — and that policy, not this
+   * lookup, is the boundary. This derivation exists so the app never *asks* for
+   * something the boundary would refuse.
+   *
    * @param type - Interaction type (poke or kiss)
-   * @param toUserId - Recipient user ID
+   * @param userId - Authenticated sender's user ID
    * @returns Supabase interaction record
+   * @throws {NoPartnerError} if the account has no linked partner
    * @throws {InteractionWriteError} if offline, or if the insert created no
    *   row — no queue exists, so the interaction is lost rather than deferred
    * @throws an accurate network error if the request fails mid-flight
@@ -152,13 +180,29 @@ export class InteractionService {
    */
   private async sendInteraction(
     type: InteractionType,
-    toUserId: string,
     userId: string
   ): Promise<SupabaseInteractionRecord> {
     if (!isOnline()) {
       // NOT handleNetworkError: no offline queue exists, so its "will be
       // synced when you're back online" promise is the opposite of the truth.
+      // Stays ahead of the partner lookup, which would otherwise report a
+      // missing partner for what is really a missing connection.
       throw new InteractionWriteError(`You are offline. A ${type} needs a connection to send.`);
+    }
+
+    const toUserId = await this.resolvePartnerId();
+    if (!toUserId) {
+      throw new NoPartnerError();
+    }
+
+    // Only the id is checked, not the type: `sendInteraction` is private and
+    // every caller passes a literal, so validateInteraction's type branch is
+    // unreachable here. The message says the truth -- this value came from the
+    // server, so there is nothing in the user's settings to correct.
+    if (!validatePartnerId(toUserId).isValid) {
+      throw new InteractionWriteError(
+        `The ${type} was not sent: the linked partner is not a valid account.`
+      );
     }
 
     try {

@@ -23,9 +23,10 @@ import {
   type FakePostgrestError,
 } from './fakeInteractionsBackend';
 
-const USER_ID = 'USER-A-ID';
-const PARTNER_ID = 'USER-B-ID';
-const STRANGER_ID = 'USER-C-ID';
+// UUID-shaped: the service validates the partner id it derives before inserting.
+const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const PARTNER_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const STRANGER_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 /** The sentence that must never come back for interactions. */
 const SYNC_PROMISE = "will be synced when you're back online";
@@ -71,12 +72,31 @@ const realtime = vi.hoisted(() => {
   };
 });
 
+/**
+ * The partner lookup the service now performs for itself (F4): the recipient is
+ * derived from the authenticated relationship, never handed in by the caller.
+ */
+const partnerLookup = vi.hoisted(() => {
+  let value: string | null = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  let calls = 0;
+  return {
+    resolve: async (): Promise<string | null> => {
+      calls += 1;
+      return value;
+    },
+    set: (next: string | null) => { value = next; },
+    calls: () => calls,
+    reset: () => { value = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'; calls = 0; },
+  };
+});
+
 vi.mock('@/api/supabaseClient', () => ({
   supabase: {
     from: (table: string) => backend.client().from(table),
     channel: realtime.channelFactory,
     removeChannel: realtime.removeChannel,
   },
+  getPartnerId: () => partnerLookup.resolve(),
 }));
 
 import { InteractionService } from '@/api/interactionService';
@@ -103,6 +123,7 @@ describe('interactionService', () => {
     realtime.channelFactory.mockClear();
     realtime.removeChannel.mockClear();
     setOnline(true);
+    partnerLookup.reset();
     // The catch tails log through logSupabaseError; the thrown error is what
     // is under test, not the noise.
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -203,7 +224,7 @@ describe('interactionService', () => {
 
   describe('sendPoke / sendKiss — the happy path', () => {
     it('returns the inserted record', async () => {
-      const poke = await interactionService.sendPoke(PARTNER_ID, USER_ID);
+      const poke = await interactionService.sendPoke(USER_ID);
 
       expect(poke.type).toBe('poke');
       expect(poke.from_user_id).toBe(USER_ID);
@@ -213,10 +234,68 @@ describe('interactionService', () => {
     });
 
     it('sends the requested interaction type', async () => {
-      const kiss = await interactionService.sendKiss(PARTNER_ID, USER_ID);
+      const kiss = await interactionService.sendKiss(USER_ID);
 
       expect(kiss.type).toBe('kiss');
       expect(backend.payloads[0]).toMatchObject({ type: 'kiss' });
+    });
+  });
+
+  describe('the recipient is derived, not supplied', () => {
+    it('inserts the partner the relationship names, whatever the caller knows', async () => {
+      await interactionService.sendPoke(USER_ID);
+
+      // The caller passes only its own id. `to_user_id` can therefore only have
+      // come from the partner lookup -- there is no parameter to forge.
+      expect(backend.payloads[0]).toMatchObject({
+        from_user_id: USER_ID,
+        to_user_id: PARTNER_ID,
+      });
+      expect(partnerLookup.calls()).toBe(1);
+    });
+
+    it('follows the relationship when the partner changes', async () => {
+      partnerLookup.set(STRANGER_ID);
+
+      const poke = await interactionService.sendPoke(USER_ID);
+
+      expect(poke.to_user_id).toBe(STRANGER_ID);
+    });
+
+    it('refuses with NoPartnerError, before any request, when there is no partner', async () => {
+      partnerLookup.set(null);
+
+      const failure = await rejection(interactionService.sendPoke(USER_ID));
+
+      expect(failure?.name).toBe('NoPartnerError');
+      expect(failure?.message).toBe(
+        'No partner configured. Please set up your partner in settings.'
+      );
+      expect(backend.fromCalls).toBe(0);
+    });
+
+    it('refuses a partner id that is not a UUID, before any request', async () => {
+      partnerLookup.set('not-a-uuid');
+
+      const failure = await rejection(interactionService.sendKiss(USER_ID));
+
+      expect(failure?.message).toBe(
+        'The kiss was not sent: the linked partner is not a valid account.'
+      );
+      expect(backend.fromCalls).toBe(0);
+    });
+
+    it('reports being offline rather than looking the partner up', async () => {
+      // The offline guard has to stay ahead of the lookup: every failure path
+      // of getPartnerId returns null, so offline would otherwise be reported as
+      // a missing partner.
+      setOnline(false);
+      partnerLookup.set(null);
+
+      const failure = await rejection(interactionService.sendPoke(USER_ID));
+
+      expect(failure?.message).toBe('You are offline. A poke needs a connection to send.');
+      expect(partnerLookup.calls()).toBe(0);
     });
   });
 
@@ -224,7 +303,7 @@ describe('interactionService', () => {
     it('refuses a poke before issuing a request, and says it was not sent', async () => {
       setOnline(false);
 
-      const failure = await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID));
+      const failure = await rejection(interactionService.sendPoke(USER_ID));
 
       expect(failure?.message).toBe('You are offline. A poke needs a connection to send.');
       expect(backend.fromCalls).toBe(0);
@@ -233,7 +312,7 @@ describe('interactionService', () => {
     it('names the interaction type it refused', async () => {
       setOnline(false);
 
-      const failure = await rejection(interactionService.sendKiss(PARTNER_ID, USER_ID));
+      const failure = await rejection(interactionService.sendKiss(USER_ID));
 
       expect(failure?.message).toBe('You are offline. A kiss needs a connection to send.');
     });
@@ -241,7 +320,7 @@ describe('interactionService', () => {
     it('does not promise a sync — interactions have no queue to sync from', async () => {
       setOnline(false);
 
-      const failure = await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID));
+      const failure = await rejection(interactionService.sendPoke(USER_ID));
 
       expect(failure?.message).not.toContain(SYNC_PROMISE);
     });
@@ -257,7 +336,7 @@ describe('interactionService', () => {
     it('reports no rows found when PostgREST refuses to coerce the empty result', async () => {
       backend.insertMatchesNoRow = true;
 
-      const failure = await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID));
+      const failure = await rejection(interactionService.sendPoke(USER_ID));
 
       expect(failure?.message).toBe('[InteractionService.sendInteraction] No rows found');
     });
@@ -265,7 +344,7 @@ describe('interactionService', () => {
     it('promises no sync on the PostgREST no-row path either', async () => {
       backend.insertMatchesNoRow = true;
 
-      const failure = await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID));
+      const failure = await rejection(interactionService.sendPoke(USER_ID));
 
       expect(failure?.message).not.toContain(SYNC_PROMISE);
     });
@@ -279,7 +358,7 @@ describe('interactionService', () => {
       // something that was never a network problem.
       backend.insertReturnsEmptyBody = true;
 
-      const failure = await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID));
+      const failure = await rejection(interactionService.sendPoke(USER_ID));
 
       expect(failure?.message).toBe('The poke was not sent');
       expect(failure?.message).not.toContain(SYNC_PROMISE);
@@ -291,7 +370,7 @@ describe('interactionService', () => {
       // nothing else in this file would notice.
       backend.insertReturnsEmptyBody = true;
 
-      await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID));
+      await rejection(interactionService.sendPoke(USER_ID));
 
       expect(console.error).not.toHaveBeenCalled();
     });
@@ -299,7 +378,7 @@ describe('interactionService', () => {
     it('logs, by contrast, when the failure really was mid-flight', async () => {
       backend.nextError = new TypeError('fetch failed');
 
-      await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID));
+      await rejection(interactionService.sendPoke(USER_ID));
 
       expect(console.error).toHaveBeenCalled();
     });
@@ -310,7 +389,7 @@ describe('interactionService', () => {
       // A dropped socket rejects with a plain TypeError, not a PostgREST error.
       backend.nextError = new TypeError('fetch failed');
 
-      const failure = await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID));
+      const failure = await rejection(interactionService.sendPoke(USER_ID));
 
       expect(failure?.message).toBe(
         '[InteractionService.sendInteraction] Network error: fetch failed. Check your internet connection.'
@@ -354,7 +433,7 @@ describe('interactionService', () => {
       // message must still describe what happened without inventing a detail.
       backend.nextError = 'socket hang up, unwrapped';
 
-      const failure = await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID));
+      const failure = await rejection(interactionService.sendPoke(USER_ID));
 
       expect(failure?.message).toBe(
         '[InteractionService.sendInteraction] Network error: Unknown network error. Check your internet connection.'
@@ -365,7 +444,7 @@ describe('interactionService', () => {
       backend.nextError = new TypeError('fetch failed');
 
       const failures = [
-        await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID)),
+        await rejection(interactionService.sendPoke(USER_ID)),
         await rejection(interactionService.getInteractionHistory(USER_ID)),
         await rejection(interactionService.getUnviewedInteractions(USER_ID)),
         await rejection(interactionService.markAsViewed('interaction-1')),
@@ -385,7 +464,7 @@ describe('interactionService', () => {
     it('still maps a send through handleSupabaseError, unchanged', async () => {
       backend.nextError = denied;
 
-      const failure = await rejection(interactionService.sendPoke(PARTNER_ID, USER_ID));
+      const failure = await rejection(interactionService.sendPoke(USER_ID));
 
       expect(failure?.message).toBe(
         '[InteractionService.sendInteraction] Permission denied - check Row Level Security policies'

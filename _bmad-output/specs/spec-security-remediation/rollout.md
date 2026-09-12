@@ -89,6 +89,20 @@ Open. The code half is done and verified; the hosted half is not.
 
 Full measurements are in `stories/3-require-browser-initiated-auth-callbacks.md` under **Operational Evidence**.
 
+### Database protections — status after story 5 (2026-09-12)
+
+Open. The code half is done and verified on the local stack; the hosted half is not.
+
+- **Done and verified locally.** `20260912020000_partner_only_immutable_interactions.sql` replaces the two weak `public.interactions` policies and narrows the ACL: INSERT now requires `from_user_id = (select auth.uid()) and to_user_id = public.get_my_partner_id()`; UPDATE is recipient-only with an explicit `with check`; `authenticated` holds `select, insert` plus `update (viewed)` and nothing else, and `anon` holds nothing. `service_role` is untouched, because the Playwright specs delete their fixtures with the service key.
+- **The narrow privilege configuration was the alternative selected**, per this file's F4/F5 row. It supports every write the app makes — `markAsViewed` sends `{ viewed: true }` alone — so no trigger and no RPC were added; an RPC would also have forced an edit to the exact-list assertion in `supabase/tests/database/18_function_execute_grants.sql`. The invoker trigger at `20260818000001_partner_scoped_together_sessions_and_seeder_guard.sql:278-317` is recorded as the fallback if a column grant ever stops fitting the API.
+- **Role-sensitive evidence exists at two real surfaces.** `supabase/tests/database/24_interactions_partner_only.sql` (48 assertions) runs as `authenticated` and as `anon` against the real database; `tests/api/interaction-authorization.spec.ts` runs the same rules through PostgREST with real user JWTs and a throwaway outsider account. Every refusal is followed by an admin read-back, so a silent zero-row update is not mistaken for immutability.
+- **Measured, and worth recording:** PostgREST returns **403** with SQLSTATE 42501 for an authenticated denial and **401** with the same SQLSTATE for an anonymous one. Both are asserted.
+- **The SELECT policy was deliberately not touched.** Interaction history is the user's own server-authorized record, including exchanges with a former partner; pgTAP asserts both sides still read it after the relationship moves on.
+- **Still outstanding for closure.** The migration applied to the hosted project through `.github/workflows/deploy.yml`; and a hosted check that `authenticated` holds no table-level UPDATE on `public.interactions` afterwards (`select privilege_type, column_name from information_schema.column_privileges where table_name = 'interactions' and grantee = 'authenticated'`). Code merged without deployment is not production closure.
+- **Not in this story, by contract:** `src/api/interactionService.ts`'s public `postgres_changes` channel is untouched — it remains the dependency recorded in the Realtime rollout row above.
+
+Full measurements are in `stories/5-enforce-partner-only-immutable-interactions.md` under **Verification**.
+
 ## Loop handoff
 
 The installed loop supports folder dispatch without creating a sprint-status file or changing the global policy:

@@ -7,6 +7,16 @@
  * - Marking interactions as viewed
  * - Interaction history retrieval
  *
+ * Recipient derivation (F4/CAP-4):
+ * - `sendPoke`/`sendKiss` take no recipient. The service derives it from the
+ *   authenticated relationship and the database refuses anything else, so no
+ *   caller-supplied UUID reaches the insert.
+ * - `interactionPartnerId` is the partner snapshot taken when a subscription
+ *   opens and refreshed on SUBSCRIBED. `addIncomingInteraction` rejects any row
+ *   that is not addressed to the signed-in user and sent by that partner,
+ *   before the feed or the badge move. It is account state, cleared by
+ *   `signedOutState()` rather than by a subscription teardown.
+ *
  * Cross-slice dependencies:
  * - authSlice.userId: sends, unviewed filtering, history loading,
  *   subscriptions and identity guards
@@ -27,7 +37,7 @@ import {
   type InteractionSubscriptionStatus,
 } from '../../api/interactionService';
 import type { Interaction, SupabaseInteractionRecord } from '../../types';
-import { INTERACTION_ERRORS, validateInteraction } from '../../utils/interactionValidation';
+import { validateIncomingInteraction } from '../../utils/interactionValidation';
 import { logger } from '../../utils/logger';
 import type { AppStateCreator } from '../types';
 
@@ -39,10 +49,12 @@ export interface InteractionsSlice {
   interactions: Interaction[];
   unviewedCount: number;
   isSubscribed: boolean;
+  /** The signed-in account's partner, resolved when a subscription opens; null when unlinked or not yet resolved */
+  interactionPartnerId: string | null;
 
   // Actions
-  sendPoke: (partnerId: string) => Promise<SupabaseInteractionRecord>;
-  sendKiss: (partnerId: string) => Promise<SupabaseInteractionRecord>;
+  sendPoke: () => Promise<SupabaseInteractionRecord>;
+  sendKiss: () => Promise<SupabaseInteractionRecord>;
   markInteractionViewed: (id: string) => Promise<void>;
   getUnviewedInteractions: () => Interaction[];
   getInteractionHistory: (days?: number) => Interaction[];
@@ -72,25 +84,25 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
   interactions: [],
   unviewedCount: 0,
   isSubscribed: false,
+  interactionPartnerId: null,
 
   // Actions
-  sendPoke: async (partnerId) => {
+  sendPoke: async () => {
     const currentUserId = get().userId;
     if (!currentUserId) {
       throw new Error('Cannot send poke: User not authenticated');
     }
 
-    // Validate interaction data before sending
-    const validation = validateInteraction(partnerId, 'poke');
-    if (!validation.isValid) {
-      const error = new Error(validation.error || INTERACTION_ERRORS.INVALID_TYPE);
-      console.error('[InteractionsSlice] Validation failed for poke:', validation.error);
-      throw error;
-    }
-
     try {
-      // Send poke via InteractionService
-      const pokeRecord = await interactionService.sendPoke(partnerId, currentUserId);
+      // Send poke via InteractionService — the recipient is derived there from
+      // the authenticated relationship, never passed in from the UI.
+      const pokeRecord = await interactionService.sendPoke(currentUserId);
+
+      // Sign Out sits on the same screen, and the send now waits on two round
+      // trips (the partner lookup and the insert). A poke that resolves after
+      // the switch belongs to the previous account: report it truthfully to its
+      // own caller, but never push it into the next account's feed.
+      if (get().userId !== currentUserId) return pokeRecord;
 
       // Add to local state immediately (optimistic UI)
       const localInteraction = toLocalInteraction(pokeRecord);
@@ -107,23 +119,19 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
     }
   },
 
-  sendKiss: async (partnerId) => {
+  sendKiss: async () => {
     const currentUserId = get().userId;
     if (!currentUserId) {
       throw new Error('Cannot send kiss: User not authenticated');
     }
 
-    // Validate interaction data before sending
-    const validation = validateInteraction(partnerId, 'kiss');
-    if (!validation.isValid) {
-      const error = new Error(validation.error || INTERACTION_ERRORS.INVALID_TYPE);
-      console.error('[InteractionsSlice] Validation failed for kiss:', validation.error);
-      throw error;
-    }
-
     try {
-      // Send kiss via InteractionService
-      const kissRecord = await interactionService.sendKiss(partnerId, currentUserId);
+      // Send kiss via InteractionService — recipient derived, see sendPoke.
+      const kissRecord = await interactionService.sendKiss(currentUserId);
+
+      // See sendPoke: a kiss that resolves after an account switch is still the
+      // true outcome for its caller, but not state for the new account.
+      if (get().userId !== currentUserId) return kissRecord;
 
       // Add to local state immediately (optimistic UI)
       const localInteraction = toLocalInteraction(kissRecord);
@@ -222,6 +230,15 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         throw new Error('Cannot subscribe: User not authenticated');
       }
 
+      // Partner snapshot, taken before the first record can arrive.
+      // addIncomingInteraction is synchronous and runs inside a Realtime
+      // callback, so it cannot await a lookup per row.
+      const partnerIdAtSubscribe = await interactionService.resolvePartnerId();
+      if (get().userId !== currentUserId || get().authSessionVersion !== subscribedInSession) {
+        throw new Error('Cannot subscribe: account changed during partner lookup');
+      }
+      set({ interactionPartnerId: partnerIdAtSubscribe });
+
       // Subscribe to incoming interactions
       let active = true;
       const unsubscribe = await interactionService.subscribeInteractions(
@@ -240,6 +257,18 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         (status) => {
           if (!active || get().userId !== currentUserId) return;
           set({ isSubscribed: status === 'SUBSCRIBED' });
+          if (status === 'SUBSCRIBED') {
+            // A reconnect re-fires SUBSCRIBED, which is the one moment the
+            // relationship can have changed under a live subscription.
+            void interactionService.resolvePartnerId().then((partnerId) => {
+              if (
+                !active ||
+                get().userId !== currentUserId ||
+                get().authSessionVersion !== subscribedInSession
+              ) return;
+              set({ interactionPartnerId: partnerId });
+            });
+          }
           onStatusChange(status);
         }
       );
@@ -251,6 +280,12 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         if (!active) return;
         active = false;
         unsubscribe();
+        // The snapshot is NOT cleared here. It belongs to the account, not to
+        // one subscription: under StrictMode the first effect's teardown runs
+        // after a second subscription has already taken its own snapshot, and
+        // clearing here would blank the live one and refuse every real record.
+        // signedOutState() clears it when the account changes, and each
+        // subscribe overwrites it.
         set({ isSubscribed: false });
         logger.debug('[InteractionsSlice] Unsubscribed from interactions');
       };
@@ -261,6 +296,22 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
   },
 
   addIncomingInteraction: (record) => {
+    // CAP-4: a row that is not addressed to this account and sent by its
+    // current partner never reaches the feed or the badge. Checked before the
+    // duplicate lookup so a rejected row cannot even consume an id.
+    const { userId: currentUserId, interactionPartnerId } = get();
+    const validation = validateIncomingInteraction(record, {
+      currentUserId,
+      partnerId: interactionPartnerId,
+    });
+    if (!validation.isValid) {
+      logger.debug('[InteractionsSlice] Rejecting incoming interaction:', {
+        id: record.id,
+        reason: validation.error,
+      });
+      return;
+    }
+
     // Convert to local format
     const localInteraction = toLocalInteraction(record);
 
