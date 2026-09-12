@@ -747,3 +747,8 @@ DW-75 completion: 4 new tests (2 P0, 2 P1), fixtures and source snapshots delive
 ## Subsequent run: DW-41 (2026-09-12)
 
 [Settings history pagination automation](automation-summary-dw-decision-dw-41.md): 6 P1 tests and 3 fixture/helper modules generated; 30/30 repeated executions, 240 focused unit regressions, and 15 existing browser regressions passed. Definition of Done and verification limits are linked there; prior reports are preserved.
+
+
+## Subsequent run: DW-83 (2026-09-12)
+
+[Events Unicode character limits automation](automation-summary-dw-events-unicode-character-limits.md): 8 API and 7 E2E tests (14 P1, 1 P2), shared fixtures and a runnable artifact configuration. All 90 executions passed; 177 component tests and 236 database assertions passed. The original UTF-16 behavior fails the isolated regression probe as intended. Evidence and Definition of Done are linked there; historical reports above are preserved.

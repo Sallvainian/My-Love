@@ -1,0 +1,52 @@
+{
+  "status": "passed",
+  "first_run": {
+    "startTime": "2026-09-12T12:39:57.948Z",
+    "duration": 18812.328,
+    "expected": 15,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "five_repetitions": {
+    "startTime": "2026-09-12T12:40:37.167Z",
+    "duration": 76591.31,
+    "expected": 75,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "existing_component_tests": 177,
+  "database_assertions": 236,
+  "postgres_fixture_counts": 10,
+  "typecheck_project_exit": 0,
+  "typecheck_artifacts_exit": 0,
+  "lint_project_exit": 0,
+  "lint_artifacts_exit": 0,
+  "preexisting_lint_warnings": 3,
+  "utf16_probe": {
+    "expected_exit": 1,
+    "actual_exit": 1,
+    "stats": {
+      "startTime": "2026-09-12T12:42:18.202Z",
+      "duration": 20252.372000000003,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "original_bug_detected": true,
+    "expected_field_errors_visible": true
+  },
+  "unchanged_baseline_files": {
+    "src/components/Settings/EventsSettings.tsx": true,
+    "src/components/Settings/__tests__/EventsSettings.test.tsx": true,
+    "supabase/tests/database/21_events_validation_contract.sql": true,
+    "supabase/migrations/20260818000002_create_events_table.sql": true,
+    "_bmad-output/implementation-artifacts/deferred-work.md": true
+  },
+  "normal_runner_config_validation": "Playwright discovery and execution; inherited root playwright.config.ts is outside project tsc scope",
+  "remaining_event_rows": 0,
+  "new_production_changes": false,
+  "sprint_board_written": false
+}
