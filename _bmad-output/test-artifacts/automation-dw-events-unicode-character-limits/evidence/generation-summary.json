@@ -1,0 +1,30 @@
+{
+  "requested_mode": "auto",
+  "execution_mode": "subagent",
+  "capability_probe": {
+    "subagent": true,
+    "agent_team": false
+  },
+  "detected_stack": "frontend",
+  "total_tests": 15,
+  "api_tests": 8,
+  "e2e_tests": 7,
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 14,
+    "P2": 1,
+    "P3": 0
+  },
+  "new_data_fixture_modules": 1,
+  "existing_fixture_entry_point": "tests/support/merged-fixtures.ts",
+  "playwright_utils_deviations": [
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts",
+      "line": 106,
+      "reason": "A page request listener counts zero events mutations across the synchronous validation boundary, persisted API read and correction; interceptNetworkCall can only await a first match or timeout. A subsequent real corrected save proves the observer works. Listener is removed in finally."
+    }
+  ],
+  "generation_started": "2026-09-12T12:31:25Z",
+  "parallel_gain": "not measured; no sequential comparison",
+  "aggregation_completed": "2026-09-12T12:38:54.798811+00:00"
+}

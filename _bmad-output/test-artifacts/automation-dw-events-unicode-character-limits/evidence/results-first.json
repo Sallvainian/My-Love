@@ -1,0 +1,1868 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/playwright.config.ts"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/playwright.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/tests/support/auth/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "api",
+        "name": "api",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/api",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/evidence/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": {
+      "command": "npx vite --mode test --host 127.0.0.1 --port 5183 --strictPort",
+      "cwd": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/",
+      "url": "http://127.0.0.1:5183",
+      "reuseExistingServer": false,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "e2e/events-unicode.spec.ts",
+      "file": "e2e/events-unicode.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Unicode event character limits",
+          "file": "e2e/events-unicode.spec.ts",
+          "line": 115,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] DW83-E2E-001 add emoji then edit decomposed at both limits",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5398,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:02] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:02] \u001b[1m\u001b[36m==== Given an empty event list and padded Unicode text at both limits ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:03] \u001b[1m\u001b[36m==== Polling: Wait for the initial events snapshot ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:03] \u001b[1m\u001b[36m==== ✅ Wait for the initial events snapshot - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:03] \u001b[1m\u001b[36m==== When Add persists the exact trimmed text, then reload restores its edit values ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:03] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:03] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:05] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:05] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:05] \u001b[1m\u001b[36m==== When Edit uses the other Unicode form, then another reload preserves every code point ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:05] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:05] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:07] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:07] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Given an empty event list and padded Unicode text at both limits",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 719,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the initial events snapshot",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the initial events snapshot - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "When Add persists the exact trimmed text, then reload restores its edit values",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe POST **/rest/v1/events*",
+                          "duration": 96,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe POST **/rest/v1/events* (201)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 444,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "When Edit uses the other Unicode form, then another reload preserves every code point",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe PATCH **/rest/v1/events*",
+                          "duration": 268,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe PATCH **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 385,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:02.363Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-afab6-t-decomposed-at-both-limits-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-afab6-t-decomposed-at-both-limits-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-7fd4dc3a72eee12ffdb5",
+              "file": "e2e/events-unicode.spec.ts",
+              "line": 118,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW83-E2E-002 add decomposed then edit emoji at both limits",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 5410,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:02] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:02] \u001b[1m\u001b[36m==== Given an empty event list and padded Unicode text at both limits ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:03] \u001b[1m\u001b[36m==== Polling: Wait for the initial events snapshot ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:03] \u001b[1m\u001b[36m==== ✅ Wait for the initial events snapshot - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:03] \u001b[1m\u001b[36m==== When Add persists the exact trimmed text, then reload restores its edit values ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:03] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:03] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:05] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:05] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:05] \u001b[1m\u001b[36m==== When Edit uses the other Unicode form, then another reload preserves every code point ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:05] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:05] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:07] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:07] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Given an empty event list and padded Unicode text at both limits",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 727,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the initial events snapshot",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the initial events snapshot - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "When Add persists the exact trimmed text, then reload restores its edit values",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe POST **/rest/v1/events*",
+                          "duration": 96,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe POST **/rest/v1/events* (201)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 422,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "When Edit uses the other Unicode form, then another reload preserves every code point",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe PATCH **/rest/v1/events*",
+                          "duration": 276,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe PATCH **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 370,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 1
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:02.354Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-89c00-n-edit-emoji-at-both-limits-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-89c00-n-edit-emoji-at-both-limits-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-a9b374259489188f20e3",
+              "file": "e2e/events-unicode.spec.ts",
+              "line": 118,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW83-E2E-003 add rejects emoji label above its limit and saves a correction",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2154,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:08] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:08] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:08] \u001b[1m\u001b[36m==== Given a add form with a label exactly one code point over its limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:08] \u001b[1m\u001b[36m==== Polling: Wait for the initial events snapshot ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:08] \u001b[1m\u001b[36m==== ✅ Wait for the initial events snapshot - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:09] \u001b[1m\u001b[36m==== When submitted, then the field error appears without a write or persisted change ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:09] \u001b[1m\u001b[36m==== When corrected to the limit, then the error clears and one real save succeeds ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:09] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:09] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.a85fed28-2651-43bd-9bbd-4744d611059b",
+                          "duration": 8
+                        },
+                        {
+                          "title": "Given a add form with a label exactly one code point over its limit",
+                          "duration": 1
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 566,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the initial events snapshot",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the initial events snapshot - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "When submitted, then the field error appears without a write or persisted change",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.a85fed28-2651-43bd-9bbd-4744d611059b",
+                          "duration": 6
+                        },
+                        {
+                          "title": "When corrected to the limit, then the error clears and one real save succeeds",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe POST **/rest/v1/events*",
+                          "duration": 86,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe POST **/rest/v1/events* (201)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.a85fed28-2651-43bd-9bbd-4744d611059b",
+                          "duration": 7
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:08.087Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-bc49b-imit-and-saves-a-correction-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-bc49b-imit-and-saves-a-correction-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-657b0abbf034b62415bb",
+              "file": "e2e/events-unicode.spec.ts",
+              "line": 150,
+              "column": 7
+            },
+            {
+              "title": "[P1] DW83-E2E-004 add rejects emoji description above its limit and saves a correction",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1622,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:08] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:08] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:08] \u001b[1m\u001b[36m==== Given a add form with a description exactly one code point over its limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:08] \u001b[1m\u001b[36m==== Polling: Wait for the initial events snapshot ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:08] \u001b[1m\u001b[36m==== ✅ Wait for the initial events snapshot - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:09] \u001b[1m\u001b[36m==== When submitted, then the field error appears without a write or persisted change ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:09] \u001b[1m\u001b[36m==== When corrected to the limit, then the error clears and one real save succeeds ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:09] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:09] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.f4d59870-cd74-4d1c-be18-0d53fe789f8c",
+                          "duration": 8
+                        },
+                        {
+                          "title": "Given a add form with a description exactly one code point over its limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 526,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the initial events snapshot",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the initial events snapshot - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "When submitted, then the field error appears without a write or persisted change",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.f4d59870-cd74-4d1c-be18-0d53fe789f8c",
+                          "duration": 5
+                        },
+                        {
+                          "title": "When corrected to the limit, then the error clears and one real save succeeds",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe POST **/rest/v1/events*",
+                          "duration": 86,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe POST **/rest/v1/events* (201)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.f4d59870-cd74-4d1c-be18-0d53fe789f8c",
+                          "duration": 7
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:08.101Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-bd053-imit-and-saves-a-correction-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-bd053-imit-and-saves-a-correction-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-ce7370bdccdfec07ce4c",
+              "file": "e2e/events-unicode.spec.ts",
+              "line": 150,
+              "column": 7
+            },
+            {
+              "title": "[P1] DW83-E2E-005 edit rejects decomposed label above its limit and saves a correction",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2413,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:09] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:10] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:10] \u001b[1m\u001b[36m==== Given a edit form with a label exactly one code point over its limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:10] \u001b[1m\u001b[36m==== Polling: Wait for the initial events snapshot ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:10] \u001b[1m\u001b[36m==== ✅ Wait for the initial events snapshot - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:10] \u001b[1m\u001b[36m==== When submitted, then the field error appears without a write or persisted change ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:11] \u001b[1m\u001b[36m==== When corrected to the limit, then the error clears and one real save succeeds ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:11] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:11] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.f4d59870-cd74-4d1c-be18-0d53fe789f8c",
+                          "duration": 4
+                        },
+                        {
+                          "title": "Given a edit form with a label exactly one code point over its limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 464,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the initial events snapshot",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the initial events snapshot - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "When submitted, then the field error appears without a write or persisted change",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.f4d59870-cd74-4d1c-be18-0d53fe789f8c",
+                          "duration": 5
+                        },
+                        {
+                          "title": "When corrected to the limit, then the error clears and one real save succeeds",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe PATCH **/rest/v1/events*",
+                          "duration": 56,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe PATCH **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.f4d59870-cd74-4d1c-be18-0d53fe789f8c",
+                          "duration": 6
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:09.767Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-d54ff-imit-and-saves-a-correction-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-d54ff-imit-and-saves-a-correction-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-824721090ee9b3509b93",
+              "file": "e2e/events-unicode.spec.ts",
+              "line": 150,
+              "column": 7
+            },
+            {
+              "title": "[P1] DW83-E2E-006 edit rejects decomposed description above its limit and saves a correction",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2441,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:10] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:10] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:10] \u001b[1m\u001b[36m==== Given a edit form with a description exactly one code point over its limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:11] \u001b[1m\u001b[36m==== Polling: Wait for the initial events snapshot ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:11] \u001b[1m\u001b[36m==== ✅ Wait for the initial events snapshot - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:11] \u001b[1m\u001b[36m==== When submitted, then the field error appears without a write or persisted change ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:11] \u001b[1m\u001b[36m==== When corrected to the limit, then the error clears and one real save succeeds ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:11] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:11] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.a85fed28-2651-43bd-9bbd-4744d611059b",
+                          "duration": 5
+                        },
+                        {
+                          "title": "Given a edit form with a description exactly one code point over its limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 471,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the initial events snapshot",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the initial events snapshot - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "When submitted, then the field error appears without a write or persisted change",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.a85fed28-2651-43bd-9bbd-4744d611059b",
+                          "duration": 8
+                        },
+                        {
+                          "title": "When corrected to the limit, then the error clears and one real save succeeds",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe PATCH **/rest/v1/events*",
+                          "duration": 55,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe PATCH **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*&user_id=eq.a85fed28-2651-43bd-9bbd-4744d611059b",
+                          "duration": 5
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:10.296Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-c965c-imit-and-saves-a-correction-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-c965c-imit-and-saves-a-correction-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-4940eb0045598c416517",
+              "file": "e2e/events-unicode.spec.ts",
+              "line": 150,
+              "column": 7
+            },
+            {
+              "title": "[P2] DW83-E2E-007 mixed ASCII, emoji, combining marks and ZWJ survive Add and reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 3037,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:12] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:12] \u001b[1m\u001b[36m==== Given mixed Unicode strings at both character limits ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:12] \u001b[1m\u001b[36m==== Polling: Wait for the initial events snapshot ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:12] \u001b[1m\u001b[36m==== ✅ Wait for the initial events snapshot - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:12] \u001b[1m\u001b[36m==== When Add completes, then reload and edit prefill preserve the exact text ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:13] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:13] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:14] \u001b[1m\u001b[36m==== Polling: Wait for the saved Unicode text in Zustand ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:14] \u001b[1m\u001b[36m==== ✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Given mixed Unicode strings at both character limits",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 468,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the initial events snapshot",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the initial events snapshot - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "When Add completes, then reload and edit prefill preserve the exact text",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe POST **/rest/v1/events*",
+                          "duration": 278,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe POST **/rest/v1/events* (201)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 385,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the saved Unicode text in Zustand",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the saved Unicode text in Zustand - completed successfully after 1 iterations",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:12.227Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-eec3a--ZWJ-survive-Add-and-reload-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-Unicode-eve-eec3a--ZWJ-survive-Add-and-reload-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-7577cfad50383d206074",
+              "file": "e2e/events-unicode.spec.ts",
+              "line": 219,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "api/events-unicode.spec.ts",
+      "file": "api/events-unicode.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "DW-83 events Unicode API limits",
+          "file": "api/events-unicode.spec.ts",
+          "line": 41,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] DW83-API-001 POST preserves emoji label at 100 code points and refuses one more",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 391,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:14] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:14] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:14] \u001b[1m\u001b[36m==== POST emoji label at the 100-code-point limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:14] \u001b[1m\u001b[36m==== POST one extra code point and verify events_label_check ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "POST emoji label at the 100-code-point limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API POST http://127.0.0.1:54321/rest/v1/events?select=*",
+                          "duration": 10
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.db9d6c8e-7c72-47b8-8f61-808313a92c79&select=*",
+                          "duration": 5
+                        },
+                        {
+                          "title": "POST one extra code point and verify events_label_check",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API POST http://127.0.0.1:54321/rest/v1/events?select=*",
+                          "duration": 5
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=in.(db9d6c8e-7c72-47b8-8f61-808313a92c79,07b85fe2-f9a0-484c-8c7b-53431a545fca)&select=*",
+                          "duration": 3
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:13.923Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-18395-points-and-refuses-one-more-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-18395-points-and-refuses-one-more-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-2512f7cd3fa1bff8d65e",
+              "file": "api/events-unicode.spec.ts",
+              "line": 47,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW83-API-002 PATCH preserves emoji label at 100 code points and leaves it unchanged after overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 299,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:14] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:14] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:14] \u001b[1m\u001b[36m==== PATCH emoji label at the 100-code-point limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:14] \u001b[1m\u001b[36m==== PATCH one extra code point and verify events_label_check ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "PATCH emoji label at the 100-code-point limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API PATCH http://127.0.0.1:54321/rest/v1/events?id=eq.aee55dd3-9fe3-4083-80a2-1bdbbe4eb88c&select=*",
+                          "duration": 6
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.aee55dd3-9fe3-4083-80a2-1bdbbe4eb88c&select=*",
+                          "duration": 4
+                        },
+                        {
+                          "title": "PATCH one extra code point and verify events_label_check",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API PATCH http://127.0.0.1:54321/rest/v1/events?id=eq.aee55dd3-9fe3-4083-80a2-1bdbbe4eb88c&select=*",
+                          "duration": 5
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.aee55dd3-9fe3-4083-80a2-1bdbbe4eb88c&select=*",
+                          "duration": 3
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:14.394Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-65263-it-unchanged-after-overflow-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-65263-it-unchanged-after-overflow-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-c90f0a954dfd667f2af0",
+              "file": "api/events-unicode.spec.ts",
+              "line": 115,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW83-API-003 POST preserves emoji description at 500 code points and refuses one more",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 263,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:14] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:14] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:14] \u001b[1m\u001b[36m==== POST emoji description at the 500-code-point limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:14] \u001b[1m\u001b[36m==== POST one extra code point and verify events_description_check ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "POST emoji description at the 500-code-point limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API POST http://127.0.0.1:54321/rest/v1/events?select=*",
+                          "duration": 7
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.09527346-2c42-4548-bbc6-da4269f29b19&select=*",
+                          "duration": 4
+                        },
+                        {
+                          "title": "POST one extra code point and verify events_description_check",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API POST http://127.0.0.1:54321/rest/v1/events?select=*",
+                          "duration": 5
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=in.(09527346-2c42-4548-bbc6-da4269f29b19,20de8a41-5e27-4604-8f9d-506fbe64f744)&select=*",
+                          "duration": 4
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:14.701Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-889ba-points-and-refuses-one-more-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-889ba-points-and-refuses-one-more-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-0beaa088105be93a36ce",
+              "file": "api/events-unicode.spec.ts",
+              "line": 47,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW83-API-004 PATCH preserves emoji description at 500 code points and leaves it unchanged after overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 277,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:15] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:15] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:15] \u001b[1m\u001b[36m==== PATCH emoji description at the 500-code-point limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:15] \u001b[1m\u001b[36m==== PATCH one extra code point and verify events_description_check ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "PATCH emoji description at the 500-code-point limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API PATCH http://127.0.0.1:54321/rest/v1/events?id=eq.068b6cd5-e294-4a71-b22a-eb1fdf665dc4&select=*",
+                          "duration": 10
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.068b6cd5-e294-4a71-b22a-eb1fdf665dc4&select=*",
+                          "duration": 4
+                        },
+                        {
+                          "title": "PATCH one extra code point and verify events_description_check",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API PATCH http://127.0.0.1:54321/rest/v1/events?id=eq.068b6cd5-e294-4a71-b22a-eb1fdf665dc4&select=*",
+                          "duration": 3
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.068b6cd5-e294-4a71-b22a-eb1fdf665dc4&select=*",
+                          "duration": 6
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:14.972Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-365ba-it-unchanged-after-overflow-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-365ba-it-unchanged-after-overflow-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-754927634efdfb6402ef",
+              "file": "api/events-unicode.spec.ts",
+              "line": 115,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW83-API-005 POST preserves decomposed label at 100 code points and refuses one more",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 274,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:15] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:15] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:15] \u001b[1m\u001b[36m==== POST decomposed label at the 100-code-point limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:15] \u001b[1m\u001b[36m==== POST one extra code point and verify events_label_check ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "POST decomposed label at the 100-code-point limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API POST http://127.0.0.1:54321/rest/v1/events?select=*",
+                          "duration": 7
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.e5fb8ac7-a0eb-4aee-8df0-b53d6644442f&select=*",
+                          "duration": 4
+                        },
+                        {
+                          "title": "POST one extra code point and verify events_label_check",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API POST http://127.0.0.1:54321/rest/v1/events?select=*",
+                          "duration": 4
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=in.(e5fb8ac7-a0eb-4aee-8df0-b53d6644442f,8730e968-0db4-4e2f-9e8a-2f36fede23ee)&select=*",
+                          "duration": 3
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:15.257Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-9da5e-points-and-refuses-one-more-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-9da5e-points-and-refuses-one-more-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-9b9bb5b2f72e371891ba",
+              "file": "api/events-unicode.spec.ts",
+              "line": 47,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW83-API-006 PATCH preserves decomposed label at 100 code points and leaves it unchanged after overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 357,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:16] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-3/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:16] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-3/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:16] \u001b[1m\u001b[36m==== PATCH decomposed label at the 100-code-point limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:16] \u001b[1m\u001b[36m==== PATCH one extra code point and verify events_label_check ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "PATCH decomposed label at the 100-code-point limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API PATCH http://127.0.0.1:54321/rest/v1/events?id=eq.02770cce-3d63-4857-b6b8-53f4e6736094&select=*",
+                          "duration": 9
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.02770cce-3d63-4857-b6b8-53f4e6736094&select=*",
+                          "duration": 4
+                        },
+                        {
+                          "title": "PATCH one extra code point and verify events_label_check",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API PATCH http://127.0.0.1:54321/rest/v1/events?id=eq.02770cce-3d63-4857-b6b8-53f4e6736094&select=*",
+                          "duration": 3
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.02770cce-3d63-4857-b6b8-53f4e6736094&select=*",
+                          "duration": 3
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:16.294Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-4b91b-it-unchanged-after-overflow-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-4b91b-it-unchanged-after-overflow-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-2f1a7795ed0f32cbe80e",
+              "file": "api/events-unicode.spec.ts",
+              "line": 115,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW83-API-007 POST preserves decomposed description at 500 code points and refuses one more",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 270,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:15] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:15] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:15] \u001b[1m\u001b[36m==== POST decomposed description at the 500-code-point limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:15] \u001b[1m\u001b[36m==== POST one extra code point and verify events_description_check ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "POST decomposed description at the 500-code-point limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API POST http://127.0.0.1:54321/rest/v1/events?select=*",
+                          "duration": 5
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.574b1f0c-d5cf-4277-b438-3d4210ff9f6f&select=*",
+                          "duration": 3
+                        },
+                        {
+                          "title": "POST one extra code point and verify events_description_check",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API POST http://127.0.0.1:54321/rest/v1/events?select=*",
+                          "duration": 3
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=in.(574b1f0c-d5cf-4277-b438-3d4210ff9f6f,353f153d-b972-4d7d-8e48-89459bc992e6)&select=*",
+                          "duration": 4
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:15.541Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-07e3a-points-and-refuses-one-more-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-07e3a-points-and-refuses-one-more-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-e8c3145299d3b9b057a8",
+              "file": "api/events-unicode.spec.ts",
+              "line": 47,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW83-API-008 PATCH preserves decomposed description at 500 code points and leaves it unchanged after overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 272,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[12:40:15] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:16] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:40:16] \u001b[1m\u001b[36m==== PATCH decomposed description at the 500-code-point limit ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:40:16] \u001b[1m\u001b[36m==== PATCH one extra code point and verify events_description_check ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "PATCH decomposed description at the 500-code-point limit",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API PATCH http://127.0.0.1:54321/rest/v1/events?id=eq.7419e432-09af-4c94-a17f-add704c0a6e6&select=*",
+                          "duration": 5
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.7419e432-09af-4c94-a17f-add704c0a6e6&select=*",
+                          "duration": 2
+                        },
+                        {
+                          "title": "PATCH one extra code point and verify events_description_check",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API PATCH http://127.0.0.1:54321/rest/v1/events?id=eq.7419e432-09af-4c94-a17f-add704c0a6e6&select=*",
+                          "duration": 3
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?id=eq.7419e432-09af-4c94-a17f-add704c0a6e6&select=*",
+                          "duration": 3
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:40:15.819Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-f7968-it-unchanged-after-overflow-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/events-unicode-DW-83-event-f7968-it-unchanged-after-overflow-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-f1a88727670c542dae9e",
+              "file": "api/events-unicode.spec.ts",
+              "line": 115,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T12:39:57.948Z",
+    "duration": 18812.328,
+    "expected": 15,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
