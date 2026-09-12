@@ -726,7 +726,8 @@ location: src/api/interactionService.ts:216
 source_spec: `spec-dw-35-interaction-subscribe-error-surfacing.md`
 severity: low
 reason: The example already omitted userId before this change and now also omits the status callback, so copied sample code does not typecheck. It is pre-existing documentation debt outside DW-35's runtime error surface.
-status: open
+status: done 2026-09-11
+resolution: already resolved: Commit fb19de6f89d8faa6861f622a40a2f8c425485805 (docs(api): correct interaction subscription example, 2026-09-11) updated src/api/interactionService.ts:220-230 to pass userId, the record callback, and the status callback, matching the required signature at src/api/interactionService.ts:236-240.
 
 ### DW-77: The existing error-handler test header incorrectly says four callers never import the handler.
 origin: spec-deferred daacdcd2980b
