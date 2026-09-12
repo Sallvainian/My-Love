@@ -778,7 +778,9 @@ location: src/App.tsx:checkAuth
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 severity: medium
 reason: App's checkAuth applies its awaited result whenever the component is mounted, without checking whether an auth notification arrived in the meantime. A stale null or different-user snapshot can overwrite the listener's newer state. Both this initialization branch and its missing notification guard are unchanged from the baseline.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-auth-bootstrap-notification-order
+resolution-undo: 30550be193d560a0999139ba0de7bc8c278b2e00d6da154dbe892975020e2218 2026-09-12 7374617475733a206f70656e
 
 ### DW-82: The interactions slice header incorrectly describes its cross-slice dependencies as self-contained.
 origin: spec-deferred 37d6cf07740f

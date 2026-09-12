@@ -1,0 +1,46 @@
+{
+  "source_files": [
+    {
+      "active": "tests/api/auth-bootstrap-identity.spec.ts",
+      "snapshot": "tests/api/auth-bootstrap-identity.spec.ts",
+      "sha256": "7446cd43424f5affcddbf6b657a33ff426e082f1dc24f7a83aa2b70a91c9324d",
+      "matches_exercised_source": true
+    },
+    {
+      "active": "tests/e2e/auth/bootstrap-notification-order.spec.ts",
+      "snapshot": "tests/e2e/auth/bootstrap-notification-order.spec.ts",
+      "sha256": "671f078692fa54aa49b03ee4f57ae265f4ec7017605b8e4d2c08155c0ca6f93d",
+      "matches_exercised_source": true
+    },
+    {
+      "active": "tests/support/factories/auth-bootstrap-notification-order.ts",
+      "snapshot": "tests/support/factories/auth-bootstrap-notification-order.ts",
+      "sha256": "6b20320d8f7bb791563d248383922ae97d2173bc10184d79fbfafc731fc0e9a4",
+      "matches_exercised_source": true
+    },
+    {
+      "active": "tests/support/harnesses/auth-bootstrap-notification-order.html",
+      "snapshot": "tests/support/harnesses/auth-bootstrap-notification-order.html",
+      "sha256": "162f818f42d828607549169f6abe432cffc7e9b05ddcc93c667b4336016d909b",
+      "matches_exercised_source": true
+    },
+    {
+      "active": "tests/support/harnesses/auth-bootstrap-notification-order.tsx",
+      "snapshot": "tests/support/harnesses/auth-bootstrap-notification-order.tsx",
+      "sha256": "685e5e1255ad3b2bbb9f25ae6c7f5303041ad8873f62dc07e059bef247fb552a",
+      "matches_exercised_source": true
+    },
+    {
+      "active": "tests/support/fixtures/auth-bootstrap-notification-order.ts",
+      "snapshot": "tests/support/fixtures/auth-bootstrap-notification-order.ts",
+      "sha256": "cebfc1a259d29baaf74c7285fc273c6c67a9384507a86e6f417031a997007842",
+      "matches_exercised_source": true
+    },
+    {
+      "active": "tests/support/merged-fixtures.ts",
+      "snapshot": "tests/support/merged-fixtures.ts",
+      "sha256": "9680c7ed99e59a70c352177479fa5fcbcedc0242ad4e9c6a660fc5bc08478a5c",
+      "matches_exercised_source": true
+    }
+  ]
+}
