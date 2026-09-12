@@ -1,0 +1,42 @@
+{
+  "success": true,
+  "subagent": "e2e-tests",
+  "tests": [
+    {
+      "file": "tests/e2e/errors/empty-database-error-fallback.spec.ts",
+      "content": "import { faker } from '@faker-js/faker';\nimport { log } from '@seontechnologies/playwright-utils';\nimport { test, expect } from '../../support/merged-fixtures';\nimport { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';\nimport { isoDateDaysFromNow } from '../../support/helpers/events';\n\ntest.describe('DW-39 empty database error fallback', () => {\n  test(\n    '[P1] DW39-E2E-001 a blank database error leaves the event form ready to retry',\n    // This test deliberately injects the 400 that the form must explain.\n    { annotation: [{ type: 'skipNetworkMonitoring' }] },\n    async ({ page, authToken, interceptNetworkCall, recurse }) => {\n      expect(authToken).not.toBe('');\n      const label = `DW39 event ${faker.string.uuid()}`;\n      const eventDate = isoDateDaysFromNow(10);\n      const errorEnvelope = createDatabaseErrorEnvelope();\n      const expectedMessage =\n        '[EventsService.createEvent] Database error: An unknown database error occurred';\n\n      await page.addInitScript(() => {\n        localStorage.setItem('lastWelcomeView', Date.now().toString());\n      });\n      // Fulfill the write before navigation. Existing worker-pool events stay\n      // untouched, and no seed, insertion, or cleanup reaches the database.\n      const rejectedCreate = interceptNetworkCall({\n        method: 'POST',\n        url: '**/rest/v1/events*',\n        fulfillResponse: { status: 400, body: errorEnvelope },\n      });\n\n      await log.step('Open the event form with a valid label and future date');\n      await page.goto('/settings');\n      const userId = await recurse(\n        () => page.evaluate(() => window.__APP_STORE__?.getState().userId),\n        (id) => typeof id === 'string' && id.length > 0,\n        { timeout: 10000 }\n      );\n      await page.getByTestId('events-settings-add').click();\n      const form = page.getByTestId('events-form');\n      const labelInput = page.getByTestId('events-form-label');\n      const dateInput = page.getByTestId('events-form-date');\n      const submit = page.getByTestId('events-form-submit');\n      await expect(form).toBeVisible();\n      await labelInput.fill(label);\n      await dateInput.fill(eventDate);\n\n      await log.step('Submit an event whose server error contains only whitespace');\n      await submit.click();\n      const response = await rejectedCreate;\n      expect(response.status).toBe(400);\n      expect(response.responseJson).toEqual(errorEnvelope);\n      expect(response.requestJson).toMatchObject({\n        user_id: userId,\n        label,\n        event_date: eventDate,\n      });\n\n      // A rejected create changes no store field. The form reenables submit\n      // only after addEvent returns its failure; eventsError is load-only.\n      await expect(submit).toBeEnabled();\n      const storedEvents = await page.evaluate((attemptedLabel) => {\n        const state = window.__APP_STORE__?.getState();\n        if (!state) throw new Error('The app store is unavailable');\n        return state.events.filter((event) => event.label === attemptedLabel);\n      }, label);\n      expect(storedEvents).toEqual([]);\n\n      await log.step('Verify the fallback and retained inputs allow another attempt');\n      const alert = page.getByTestId('events-form-error');\n      await expect(alert).toHaveAttribute('role', 'alert');\n      await expect(alert).toHaveText(expectedMessage);\n      await expect(form).toBeVisible();\n      await expect(labelInput).toHaveValue(label);\n      await expect(dateInput).toHaveValue(eventDate);\n      await expect(submit).toBeEnabled();\n      await expect(page.getByTestId('events-form-cancel')).toBeEnabled();\n      await expect(page.getByTestId('events-settings-load-region').getByText(label, { exact: true }))\n        .toHaveCount(0);\n    }\n  );\n});\n",
+      "description": "One authenticated Add Event journey follows a whitespace-only unmapped database error through the real service, store action, and form; verifies contextual fallback, retained input, retry readiness, and no failed row.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 1,
+        "P2": 0,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    "Existing authenticated page and authToken from tests/support/merged-fixtures.ts",
+    "Existing interceptNetworkCall, recurse, and network monitor composition",
+    "createDatabaseErrorEnvelope from tests/support/factories/database-error-envelope.ts (parent aggregation owns creation)",
+    "Existing isoDateDaysFromNow from tests/support/helpers/events.ts and installed faker UUID data"
+  ],
+  "knowledge_fragments_used": [
+    "playwright-utils-mandate",
+    "library-integration-mandate",
+    "intercept-network-call",
+    "network-error-monitor",
+    "fixtures-composition",
+    "selector-resilience",
+    "playwright-cli",
+    "network-first",
+    "fixture-architecture",
+    "network-recorder",
+    "file-utils",
+    "log",
+    "auth-session",
+    "overview"
+  ],
+  "playwright_utils_deviations": [],
+  "test_count": 1,
+  "summary": "Generated one P1 E2E case from current source selectors. Browser observation and runtime execution were not performed because the parent preflight found Docker/Supabase unavailable. The test uses the authenticated merged page and locally fulfills only its POST; it never seeds or clears worker-pool data. The error factory intentionally keeps message present because omitted-message classification is unchanged and belongs in direct handler coverage. Rejected create has no observable store transition: enabled submit marks completion of the returned action before checking unchanged store and final UI. No response schema exists for this deliberately malformed injected error; assertions cover status, injected body, and submitted fields. No Playwright Utils deviations. HAR recorder wiring is unnecessary for this focused fault injection; normal authentication and read traffic still require the local stack."
+}
