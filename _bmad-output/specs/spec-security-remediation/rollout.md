@@ -17,11 +17,13 @@ Sallvain approved these eight independently reviewable slices and their checkpoi
 | 7 | Partition custom messages by account | CAP-8 / F8 | IndexedDB ownership/upgrade and all service/store paths ship together. |
 | 8 | Separate profile names from auth identity | CAP-9 / F9 | Profile sync, write protection and all three client consumers ship together. |
 
-Approved checkpoint rule: `spec_checkpoint: true` on stories 2, 5, 7 and 8, `false` on the others; `done_checkpoint: false` on all eight; `invoke_dev_with: ""` on all eight. An operator action is distinct from either checkpoint. These choices do not waive review of the concrete migration plans.
+Sallvain's latest direction supersedes the earlier checkpoints: `spec_checkpoint: false`, `done_checkpoint: false` and `invoke_dev_with: ""` on all eight stories. The loop sessions handle the work automatically; no planned human review stop remains.
 
-## Migration alternatives to review before execution
+For this run only, Sallvain delegates routine planning, migration-alternative selection, implementation, testing, review-finding fixes and in-scope operational remediation to the loop sessions without additional approval. This direction supersedes the earlier approval requirements in this contract and the corresponding general AGENTS.md rules. Research, concrete plans, tests, review and evidence remain required; the loop performs them rather than waiting for a person.
 
-AGENTS.md requires proposing a config-level alternative and obtaining approval before migrations. This document prepares that review; it does not authorize schema changes.
+## Migration alternatives for the loop to evaluate
+
+The loop must evaluate the config-level alternatives below and document its selected plan before changing a schema. Sallvain's task-specific automation direction authorizes the loop to choose and execute the in-scope plan without another approval checkpoint.
 
 | Boundary | Config-level alternative | Proposed approach and reason |
 |---|---|---|
@@ -31,7 +33,7 @@ AGENTS.md requires proposing a config-level alternative and obtaining approval b
 | F8 IndexedDB | Hide AdminPanel, clear state on logout or move to separate per-account database names. | None establishes ownership for every persisted service path; separate databases duplicate schema/opening logic and still need a legacy decision. Use the shared database with owner fields/index and checks at the service boundary. |
 | F9 profiles | Revoke broad UPDATE and grant only supported profile columns. | This may be sufficient if all legitimate writes are inventoried. The report's proposed invoker email-immutability trigger preserves existing unrelated profile writes and allows the definer auth-sync path; separately stop sync from overwriting names. |
 
-Before implementing a database slice, turn the selected alternative into a concrete plan covering objects, current grants/policies, effective roles, backward compatibility and checks. After that plan is approved, implement step by step. Do not re-ask approval already explicitly given for that plan.
+Before implementing a database slice, document a concrete plan covering objects, current grants/policies, effective roles, backward compatibility and checks. Select the supported alternative and implement it step by step within this contract; do not stop for routine plan approval.
 
 Use forward migrations for live database behavior. F1 source sanitization is a deliberate edit to the old seed file because the literal itself is the defect; it cannot repair an already-applied production migration. Confirm replacements work before deleting code. Keep generated database types generated. Check latest definitions and actual policy sets, including `02_rls_policies.sql`, `16_photos_storage_update_policy.sql` and function-execute grant assertions, rather than relying on the report's earlier statement that a particular table lacks a test.
 
@@ -43,7 +45,7 @@ Use forward migrations for live database behavior. F1 source sanitization is a d
 - For private Realtime, use real subscription/send outcomes and state/UI assertions. Exercise a malicious public subscription to the same topic as well as private joins. Policies are evaluated at join/auth refresh, so test reconnection and explicit identity/relationship changes; do not claim per-message relationship revalidation from RLS alone.
 - For IndexedDB, test service calls directly, account-switch promise races and fresh/legacy database upgrades. For F10, assert body consumption/cancellation and Storage calls. For F13, use the installed SDK and real callback semantics with sanitized tokens.
 - Before release, run the required aggregate checks, including coverage if enforced by CI, and a secret-injected production build. Use `fnox exec -- npm run build`; the smoke script alone cannot prove the app loads. Exercise the built app and affected user journeys against the intended test environment.
-- Keep test results tied to the actual commit. If a PR is opened or pushed, immediately arm the commit-pinned Claude review waiter and read/triage the full matching-run comment as AGENTS.md specifies. Approval is required before editing or pushing in response to that review.
+- Keep test results tied to the actual commit. If a PR is opened or pushed, immediately arm the commit-pinned Claude review waiter and read/triage the full matching-run comment as AGENTS.md specifies. This run's automation authorization covers fixes and follow-up pushes for findings that hold within the agreed scope; the loop verifies those fixes without a routine approval stop.
 
 ## Operational completion
 
@@ -51,7 +53,7 @@ Use forward migrations for live database behavior. F1 source sanitization is a d
 |---|---|
 | Bot containment | Password rotated; old login rejected; intended consumers work; session/refresh-token revocation or bounded expiry explicitly accounted for. Never record credential values. |
 | Realtime rollout | Policies applied; updated clients use private topics; hosted public-access setting/old-client handling recorded; outsider denied and partner delivery confirmed after reconnect. |
-| Database protections | Approved forward migrations applied to the intended project; role-sensitive checks and existing-data compatibility verified. Code merged without deployment is not production closure. |
+| Database protections | Forward migrations selected under this run's authorization and applied to the intended project; role-sensitive checks and existing-data compatibility verified. Code merged without deployment is not production closure. |
 | PKCE | Real supported OAuth callback completes from the initiating browser; attacker-fragment callback rejected; Pages redirect/base path and enabled signup confirmation behavior verified. |
 | Edge Function | Bounded handler deployed separately from Pages; supported browser upload succeeds and an over-limit request is rejected without a Storage write. Record actual Content-Length behavior. |
 
@@ -59,7 +61,9 @@ Apply authorization policies before private clients rely on them. After valid pr
 
 Follow `.github/workflows/deploy.yml` for Pages/database shipping; never run `npm run deploy`. Inventory the Edge Function deployment mechanism independently. Determine any existing-data/grant incompatibility through read-only inspection before applying changes; do not silently delete or rewrite customer data to make a migration pass.
 
-When an external action cannot be completed by the implementing session, finish and commit the agent-doable work, then use the installed loop's `awaiting-operator` outcome with concrete `operator_actions` and evidence requirements. `bmad-loop confirm` is for actions already performed and verified, not a way to waive them. Overall remediation remains incomplete while any finding's operational acceptance is outstanding.
+The loop must first attempt in-scope external actions through available authorized integrations, including bot credential containment and the required deployments. Do not automatically classify them as human-only work. If access is unavailable or a required action cannot be performed by the session, finish and commit the agent-doable work, record the concrete access/action blocker, and use the installed loop's `awaiting-operator` outcome so independent stories can continue. `bmad-loop confirm` is for actions already performed and verified, not a way to waive them. Overall remediation remains incomplete while any finding's operational acceptance is outstanding.
+
+Resolve routine implementation and test failures within the loop's configured retries. Removing checkpoints does not disable verification or manufacture credentials/access: unresolved contradictions, exhausted retries and actions outside this contract can still require escalation. Report the specific blocker rather than asking for an approval already granted here.
 
 ## Loop handoff
 
@@ -73,7 +77,7 @@ bmad-loop run --project /Users/sallvain/Projects/My-Love --spec _bmad-output/spe
 
 Validate the agreed queue and inspect the dry-run plan before launch. Commit the contract separately from implementation before isolated worktrees consume it. Start from an appropriately named implementation branch, respecting the existing worktree-per-story configuration; do not launch onto main by accident. Sallvain will start bmad-loop personally; spec preparation does not launch a run.
 
-Existing adapter, review, TEA and worktree settings are retained. Baseline preflight found Codex, tmux and hooks installed; its only failure was the missing sprint-status queue, which explicit `--spec` mode replaces. Queue-specific validation is recorded in the spec memory log after the dispatch file is written.
+Existing adapter, review, TEA and worktree settings are retained. The installed flat stories queue assigns all entries the same epic, so the current `per-epic` policy creates no between-story pause; only `per-story-spec-approval` would add a global story gate. With both checkpoint flags false everywhere, no policy edit is required. Queue-specific validation is recorded in the spec memory log after the dispatch file is written.
 
 ## Verified external constraints
 
