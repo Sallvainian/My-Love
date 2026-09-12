@@ -1,0 +1,19 @@
+- generic [ref=f2e4]:
+  - generic [ref=f2e5]:
+    - heading "Welcome Back" [level=1] [ref=f2e6]
+    - paragraph [ref=f2e7]: Sign in to continue
+  - generic [ref=f2e8]:
+    - generic [ref=f2e9]:
+      - generic [ref=f2e10]: Email
+      - textbox "Email" [ref=f2e11]:
+        - /placeholder: you@example.com
+    - generic [ref=f2e12]:
+      - generic [ref=f2e13]: Password
+      - textbox "Password" [ref=f2e14]:
+        - /placeholder: Enter your password
+    - button "Sign In" [disabled] [ref=f2e15]
+  - generic [ref=f2e16]: OR
+  - button "Continue with Google" [ref=f2e20] [cursor=pointer]
+  - paragraph [ref=f2e27]:
+    - text: Don't have an account?
+    - button "Contact Admin" [ref=f2e28] [cursor=pointer]

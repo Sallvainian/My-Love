@@ -1,0 +1,57 @@
+{
+  "success": true,
+  "subagent": "api-tests",
+  "tests": [
+    {
+      "file": "tests/api/events-stale-refresh-precondition.spec.ts",
+      "content": "/**\n * DW-57: the API precondition behind stale edit/delete Refresh events controls.\n * A creator's row is really deleted before the stale write reaches PostgREST.\n * Component lifetime itself is asserted in EventsSettings.lifetime.test.tsx.\n *\n * Existing events-write-wire-shape tests cover partner RLS filtering instead.\n * All requests below use the owning worker's auth token; coupleEvents provides\n * generated row IDs, anchored dates, and cleanup limited to that worker pair.\n * There is no events response schema; assertions cover the fields under test.\n */\nimport { log } from '@seontechnologies/playwright-utils';\nimport type { Database } from '../../src/types/database.types';\nimport { test, expect } from '../support/merged-fixtures';\n\ntype EventRow = Database['public']['Tables']['events']['Row'];\ntype EventUpdate = Database['public']['Tables']['events']['Update'];\ntype EventRead = Pick<EventRow, 'id' | 'user_id' | 'label' | 'event_date'>;\n\nconst READ_COLUMNS = 'id,user_id,label,event_date';\n\ntest.describe('DW-57 stale-row refresh API preconditions', () => {\n  test('[P1] DW-57-API-001 creator PATCH returns zero rows after deletion and refresh retains the witness', async ({\n    apiRequest,\n    authToken,\n    coupleEvents,\n  }) => {\n    await log.step('Seed an owned event and a surviving refresh witness');\n    const [removed, witness] = await coupleEvents.seed([\n      { label: 'DW57 API edit stale row', dayOffset: 14 },\n      { label: 'DW57 API edit surviving row', dayOffset: 21 },\n    ]);\n    const headers = {\n      Authorization: `Bearer ${authToken}`,\n      Prefer: 'return=representation',\n    };\n    const writePath = `/rest/v1/events?id=eq.${removed.id}&select=*`;\n    const edit: EventUpdate = { label: 'DW57 API creator edit' };\n\n    await log.step('Prove the creator can edit the existing row before removing it');\n    const accepted = await apiRequest<EventRow[]>({\n      method: 'PATCH',\n      path: writePath,\n      headers,\n      body: edit,\n    });\n    expect(accepted.status).toBe(200);\n    expect(accepted.body).toEqual([\n      expect.objectContaining({ id: removed.id, user_id: coupleEvents.userId, label: edit.label }),\n    ]);\n\n    const deletion = await apiRequest<EventRow[]>({\n      method: 'DELETE',\n      path: writePath,\n      headers,\n    });\n    expect(deletion.status).toBe(200);\n    expect(deletion.body).toEqual([\n      expect.objectContaining({ id: removed.id, user_id: coupleEvents.userId }),\n    ]);\n\n    await log.step('Submit a stale creator edit after the successful deletion');\n    const staleEdit = await apiRequest<EventRow[]>({\n      method: 'PATCH',\n      path: writePath,\n      headers,\n      body: { label: 'DW57 API stale edit must not reappear' } satisfies EventUpdate,\n    });\n    expect(staleEdit.status).toBe(200);\n    expect(staleEdit.body).toEqual([]);\n\n    await log.step('Refresh as the creator and observe only the unchanged witness');\n    const refreshed = await apiRequest<EventRead[]>({\n      method: 'GET',\n      path: `/rest/v1/events?select=${READ_COLUMNS}&id=in.(${removed.id},${witness.id})`,\n      headers: { Authorization: `Bearer ${authToken}` },\n    });\n    expect(refreshed.status).toBe(200);\n    expect(refreshed.body).toEqual([{\n      id: witness.id,\n      user_id: coupleEvents.userId,\n      label: witness.label,\n      event_date: witness.eventDate,\n    }]);\n  });\n\n  test('[P1] DW-57-API-002 creator DELETE returns zero rows after deletion and refresh retains the witness', async ({\n    apiRequest,\n    authToken,\n    coupleEvents,\n  }) => {\n    await log.step('Seed an owned event and a surviving refresh witness');\n    const [removed, witness] = await coupleEvents.seed([\n      { label: 'DW57 API delete stale row', dayOffset: 14 },\n      { label: 'DW57 API delete surviving row', dayOffset: 21 },\n    ]);\n    const headers = {\n      Authorization: `Bearer ${authToken}`,\n      Prefer: 'return=representation',\n    };\n    const writePath = `/rest/v1/events?id=eq.${removed.id}&select=*`;\n\n    await log.step('Delete the owned row and confirm the creator affected exactly that row');\n    const deletion = await apiRequest<EventRow[]>({\n      method: 'DELETE',\n      path: writePath,\n      headers,\n    });\n    expect(deletion.status).toBe(200);\n    expect(deletion.body).toEqual([\n      expect.objectContaining({ id: removed.id, user_id: coupleEvents.userId }),\n    ]);\n\n    await log.step('Submit a stale creator delete against the now missing row');\n    const staleDelete = await apiRequest<EventRow[]>({\n      method: 'DELETE',\n      path: writePath,\n      headers,\n    });\n    expect(staleDelete.status).toBe(200);\n    expect(staleDelete.body).toEqual([]);\n\n    await log.step('Refresh as the creator and observe only the unchanged witness');\n    const refreshed = await apiRequest<EventRead[]>({\n      method: 'GET',\n      path: `/rest/v1/events?select=${READ_COLUMNS}&id=in.(${removed.id},${witness.id})`,\n      headers: { Authorization: `Bearer ${authToken}` },\n    });\n    expect(refreshed.status).toBe(200);\n    expect(refreshed.body).toEqual([{\n      id: witness.id,\n      user_id: coupleEvents.userId,\n      label: witness.label,\n      event_date: witness.eventDate,\n    }]);\n  });\n});\n",
+      "description": "Creator PATCH/DELETE after an actual row deletion return the zero-row stale-write contract; authenticated refresh excludes the missing row and retains an unchanged witness.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 2,
+        "P2": 0,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    "apiRequest (existing merged fixture)",
+    "authToken (existing SupabaseAuthProvider)",
+    "coupleEvents (existing worker-scoped pair seeding and test-scoped cleanup)"
+  ],
+  "knowledge_fragments_used": [
+    "playwright-utils-mandate",
+    "library-integration-mandate",
+    "api-request",
+    "auth-session",
+    "log",
+    "data-factories",
+    "api-testing-patterns"
+  ],
+  "playwright_utils_deviations": [],
+  "pactjs_utils_deviations": [],
+  "provider_scrutiny": "completed",
+  "provider_files_read": [
+    "src/services/eventsService.ts",
+    "src/stores/slices/eventsSlice.ts",
+    "src/types/database.types.ts",
+    "tests/api/events-write-wire-shape.spec.ts"
+  ],
+  "pact_mcp_reachable": false,
+  "pact_fallback_source": "Not applicable: CDC/Pact artifacts are outside this component-only change; existing service code and active HTTP tests provide the stale-write contract.",
+  "test_count": 2,
+  "summary": "Generated DW-57-API-001/002 (P1), without running tests or writing active files. Existing partner-RLS cases do not cover an actually deleted owned row. Each case proves creator DELETE success before the stale attempt; PATCH additionally has a positive PATCH control. Authenticated post-reads assert both absence and the surviving witness. No response schema found for /rest/v1/events; assertions cover fields under test using generated Database types. No fixture additions required. API cases verify the stale-refresh precondition, not component setter lifetime. No Pact artifacts or broker calls.",
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 2,
+    "P2": 0,
+    "P3": 0
+  },
+  "confidence": {
+    "score": 8,
+    "rationale": "Expected wire behavior follows src/services/eventsService.ts and existing tests/api/events-write-wire-shape.spec.ts. Types come from src/types/database.types.ts. Authentication and worker-pair isolation reuse tests/support/fixtures/auth.ts, tests/support/fixtures/index.ts, and tests/support/factories/events.ts. Positive creator mutation controls and an authenticated surviving-witness read protect the stale-row premise.",
+    "unknowns": [
+      "Actual local PostgREST execution of the two generated cases remains pending until root aggregation and validation."
+    ]
+  }
+}

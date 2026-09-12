@@ -155,9 +155,19 @@ export function EventsSettings() {
     target: 'retry' | 'add';
     owner: EventLoadOwner;
   } | null>(null);
+  const isMountedRef = useRef(false);
+
+  useEffect(() => {
+    // Re-arm on setup so StrictMode's cleanup/setup replay leaves the live
+    // component able to settle loads. Shared store requests continue on unmount.
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const recordLoadOutcome = useCallback((owner: EventLoadOwner, result: EventLoadResult) => {
-    if (result.status === 'stale' || !ownsCurrentSession(owner)) return;
+    if (!isMountedRef.current || result.status === 'stale' || !ownsCurrentSession(owner)) return;
     setLoadSettlement({ ...owner, failed: result.status === 'failure' });
   }, []);
 
@@ -237,12 +247,25 @@ export function EventsSettings() {
 
     const result = await refreshEvents().finally(() => {
       // A prior-session retry neither holds nor releases the current lock.
-      if (retryInFlightRef.current !== owner || !ownsCurrentSession(owner)) return;
+      if (
+        !isMountedRef.current ||
+        retryInFlightRef.current !== owner ||
+        !ownsCurrentSession(owner)
+      ) {
+        return;
+      }
       retryInFlightRef.current = null;
       setRetryingForSession(null);
     });
 
-    if (!result || result.status === 'stale' || !ownsCurrentSession(owner)) return;
+    if (
+      !isMountedRef.current ||
+      !result ||
+      result.status === 'stale' ||
+      !ownsCurrentSession(owner)
+    ) {
+      return;
+    }
 
     // An empty failed load removes Retry while its loading slot is mounted.
     // Restore focus only after the settled render: back to Retry on failure,
