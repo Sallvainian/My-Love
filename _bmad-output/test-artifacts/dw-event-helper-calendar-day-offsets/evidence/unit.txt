@@ -1,0 +1,18 @@
+
+> my-love@0.0.0 test:unit
+> vitest run tests/unit/helpers/events.test.ts
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:9:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-event-helper-calendar-day-offsets
+
+ ✓ tests/unit/helpers/events.test.ts (21 tests) 329ms
+
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  09:06:26
+   Duration  705ms (transform 40ms, setup 96ms, import 39ms, tests 329ms, environment 168ms)
+
+JUNIT report written to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-event-helper-calendar-day-offsets/test-results/vitest-junit.xml
