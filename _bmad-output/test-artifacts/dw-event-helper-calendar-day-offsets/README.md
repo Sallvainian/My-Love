@@ -26,4 +26,6 @@ The shared `createNuukGapCase({ label? })` factory gives unique faker labels by 
 
 The fixtures reuse the single `tests/support/merged-fixtures.ts` entry. `coupleEvents` checks worker-pair cleanup before and after each test. HTTP calls use `apiRequest` and schema validation; UI observations use `interceptNetworkCall` before each action and `recurse` for store settlement. No network stubs, inline login, hard waits, focus, or skips are generated.
 
-Default Playwright JSON and attachments are stored in `evidence/`. The canonical summaries are `automation-summary.md`, `definition-of-done.md`, and `evidence/verification.json`. Worker JSON preserves the original generation output; any validation repairs are recorded in the final summary, and the TypeScript files are the runnable source.
+Default Playwright JSON and attachments are written under `evidence/`. The `evidence/playwright-output/` capture directory is ignored and excluded from the published bundle: its traces contain authenticated local-test tokens. The original captures remain local; attachment paths in the retained JSON report refer to those local files. Do not force-add or upload the raw captures.
+
+The canonical summaries are `automation-summary.md`, `definition-of-done.md`, and `evidence/verification.json`. Worker JSON preserves the original generation output; any validation repairs are recorded in the final summary, and the TypeScript files are the runnable source.
