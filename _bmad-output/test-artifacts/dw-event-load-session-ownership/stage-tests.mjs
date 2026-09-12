@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -24,17 +24,18 @@ async function filesUnder(directory) {
 const files = await filesUnder('tests');
 if (files.length === 0) throw new Error('No generated tests to stage');
 
-// Validate the entire set before changing any target. Existing tests and edits
-// made after staging are never overwritten or silently removed.
+// Validate the entire set before changing any target; stage uses exclusive creation.
+// Cleanup requires an idle worktree: content checking and unlink are not atomic.
 const entries = await Promise.all(files.map(async (file) => {
   const source = await readFile(path.join(bundle, file), 'utf8');
   const target = path.join(root, file);
-  const exists = await access(target).then(() => true, (error) => {
-    if (error.code === 'ENOENT') return false;
+  const current = await (mode === 'stage' ? lstat(target) : readFile(target, 'utf8')).catch((error) => {
+    if (error.code === 'ENOENT') return null;
     throw error;
   });
+  const exists = current !== null;
   if (mode === 'stage' && exists) throw new Error(`Refusing to overwrite ${file}`);
-  if (mode === 'clean' && exists && await readFile(target, 'utf8') !== source) {
+  if (mode === 'clean' && exists && current !== source) {
     throw new Error(`Refusing to remove modified ${file}`);
   }
   return { source, target, exists };
