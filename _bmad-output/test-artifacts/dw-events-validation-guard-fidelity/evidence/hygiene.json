@@ -1,0 +1,17 @@
+{
+  "tracked_files_changed_since_start": [
+    "_bmad-output/test-artifacts/automation-summary.md"
+  ],
+  "tracked_files_missing": [],
+  "unexpected_tracked_changes": [],
+  "staged_copies_remaining": [],
+  "jwt_like_artifact_files": [],
+  "trailing_whitespace": [],
+  "generated_test_banned_patterns": [],
+  "event_cleanup": {
+    "query": "select count(*) from public.events where label like 'EVG%'",
+    "rows_remaining": 0
+  },
+  "diff_check_exit_code": 0,
+  "production_ledger_sprint_preserved": true
+}

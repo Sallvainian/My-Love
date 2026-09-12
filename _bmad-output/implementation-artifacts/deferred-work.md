@@ -419,6 +419,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: `EventsSettings.tsx` renders the store array unfiltered and calls `loadEvents()` with no arguments; `eventsSlice.loadEvents` calls `eventsService.getEvents()` bare, so both windows take the default `limit = 50, offset = 0`. Measured with `grep -rn "getEvents(" src tests`: the only production call site is `src/stores/slices/eventsSlice.ts:116`. The screen's own comment states why the list must stay unfiltered — a mistyped year is "the only place a mistyped year can be seen and corrected" — and a year typed wrong into the deep past is exactly the row the descending past window drops first. This change documents the bound in both files; closing it needs a "load more" control and a `loadEvents` that takes limit/offset, which the spec's Boundaries put out of scope.
 status: open
+decision: 2026-09-11 Keep pagination deferred
 decision: 2026-09-11 Defer pagination
 
 ### DW-42: A row whose date cannot be parsed still consumes a slot inside the capped window before it is dropped client-side, so garbage can push a real event off the page.
@@ -444,6 +445,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: Verified path, both halves read this session: `eventsSlice.addEvent` inserts the created row into the store unconditionally — `set((state) => ({ events: sortByDate([...state.events, created]) }))` — while `loadEvents` re-reads a bounded window (`getEvents()` bare, so `limit = 50` per side). A couple with more than 50 past events who corrects or adds a deep-past date therefore sees the row in Settings, and the next `loadEvents()` drops it because the descending past page no longer reaches it. The row is not lost — it is in the table — only invisible. Distinct from the "no way to reach truncated rows" item: that one is about rows the user never sees, this one is about a row the user just saw confirmed. Closing it needs the same "load more" plumbing, or an in-range check at save time.
 status: open
+decision: 2026-09-11 Keep pagination deferred
 decision: 2026-09-11 Defer pagination
 
 ### DW-45: The two-window read is two requests, so a row whose date is edited across today between them can come back in neither page, or come back as the pre-edit copy.
@@ -463,6 +465,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: Both reads are plain `.select('*')` with no `{ count: 'exact' }`, so the service, the store and any future affordance have no "there are more" signal; `logger.debug('[EventsService] Fetched events:', events.length)` cannot distinguish 50 events from 50 of 300. The already-recorded Settings "load more" item names the control and the `limit`/`offset` plumbing it needs, but not the fact that the data to drive its enabled state is not fetched. A count also cannot go anywhere today: the intent's Never list forbids a store-shape change and a second store action.
 status: open
+decision: 2026-09-11 Keep metadata deferred
 decision: 2026-09-11 Defer pagination
 
 ### DW-47: The new API spec re-issues the production query chain by hand, so the two copies can drift if a change is made to both.
@@ -492,6 +495,7 @@ source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: This behavior predates the bundle: every failure previously left Save enabled. The new `invalid-response` code now identifies it, but choosing a distinct safe affordance was not part of the events-only refresh-versus-retry decision. `createEvent` can throw after insert when the returned row cannot be converted, while Settings routes every code except `not-found` to Save/Delete.
 status: open
+decision: 2026-09-11 Keep recovery deferred
 decision: 2026-09-11 Defer the recovery choice
 
 ### DW-50: The EventsSlice interface comment says `eventsError` is raised only by loads even though writes also park messages there.
@@ -518,7 +522,9 @@ location: src/components/Settings/EventsSettings.tsx:872
 source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: The behavior predates this bundle, but the coded result makes the ambiguity explicit. Create and update can throw `invalid-response` only after a successful response is missing or cannot be converted; Settings routes every non-`not-found` code back to Save or Update, so create can duplicate a committed event and update can retry without reconciling the stale list.
-status: open
+status: done 2026-09-11
+resolution: closed by human decision: Duplicate recovery concern retained by open DW-49; consolidation does not approve implementation or accept the behavior.
+decision: 2026-09-11 Consolidate under DW-49 — Duplicate recovery concern retained by open DW-49; consolidation does not approve implementation or accept the behavior.
 decision: 2026-09-11 Defer the recovery choice
 
 ### DW-53: Transport wrapping drops the original non-PostgREST network error as an Error cause.
@@ -567,7 +573,9 @@ location: src/components/Settings/EventsSettings.tsx:185
 source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: low
 reason: The mount load has a cancellation flag, but `refreshEvents()` awaits `loadEvents()` and then calls `recordLoadOutcome()` without an unmount guard. Navigating away during that request therefore reaches `setLoadFailed` and `setSettledForUserId` after unmount. The path and navigation warning predate this bundle; React discards the update, so the verified consequence is limited to development/test noise.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-refresh-unmount-guard
+resolution-undo: 43f8322f8e9453ab7fae582d3293bad815aac27fdbba3dcfbf3ddf12734f027c 2026-09-12 7374617475733a206f70656e
 
 ### DW-58: Follow-up review still recommended for dw-events-error-attribution after the damping cap was spent
 origin: review-budget-followup
@@ -576,6 +584,7 @@ source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260819-202616-75cc; this entry preserves the lingering recommendation for a deliberate later review.
 status: open
+decision: 2026-09-11 Keep recommendation open
 decision: 2026-09-11 Keep the review recommendation
 
 ### DW-59: The translucent own-photo badge can still miss WCAG AA over a bright photo.
@@ -584,7 +593,9 @@ location: src/components/PhotoGallery/PhotoGridItem.tsx:100
 source_spec: `spec-dw-28-pink-primary-button-contrast.md`
 severity: medium
 reason: `bg-pink-600/90` composites to approximately `#e91a84` over white, which is about 4.27:1 against the badge's small white text. The same image-dependent contrast issue was pre-existing with `bg-pink-500/90`; DW-28 improves the token but does not make this non-button overlay opaque.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-own-photo-badge-contrast
+resolution-undo: ec432d0278a3fa08017a373672da1b3036f4a4639752cce7124810859e34903d 2026-09-12 7374617475733a206f70656e
 
 ### DW-60: The UI/SQL validation mirror test compares against the original create migration, not the effective constraint after all migrations have run.
 origin: spec-deferred eb5b0fb56687
@@ -592,7 +603,9 @@ location: tests/unit/components/eventsValidationMirrors.test.ts:23
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: `tests/unit/components/eventsValidationMirrors.test.ts` reads the constraint from `20260815010000_create_events.sql`. A future migration could tighten or replace that constraint while this guard remained green, allowing the UI and deployed database rules to drift. No later events migration currently changes the constraint, so this is a test-maintainability risk rather than a current behavior defect.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-validation-guard-fidelity
+resolution-undo: d8a7554e2a46ce41c0e9381203ae0d7309996f2e00c30fac38a2c24316f0fe6b 2026-09-12 7374617475733a206f70656e
 
 ### DW-61: Repeated date-helper calls can derive different calendar anchors if a seeding batch crosses local midnight.
 origin: spec-deferred 07bf0f3e8d6a
@@ -618,7 +631,9 @@ location: tests/unit/components/eventsValidationMirrors.test.ts:38
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: `tests/unit/components/eventsValidationMirrors.test.ts` extracts constraints from `20260818000002_create_events_table.sql`. A later migration could replace or tighten a constraint without changing that source file, leaving the guard green while the deployed database and UI differ. No later events migration currently changes these constraints.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-validation-guard-fidelity
+resolution-undo: d8a7554e2a46ce41c0e9381203ae0d7309996f2e00c30fac38a2c24316f0fe6b 2026-09-12 7374617475733a206f70656e
 
 ### DW-64: Repeated event-date helper calls can use different calendar anchors across local midnight.
 origin: spec-deferred f5a669342ad5
@@ -644,7 +659,9 @@ location: tests/unit/components/eventsValidationMirrors.test.ts:38
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: `tests/unit/components/eventsValidationMirrors.test.ts` compares UI constants with `20260818000002_create_events_table.sql`. If a later migration tightens or replaces a constraint, the guard still compares against the obsolete source and can stay green while the form accepts input that the deployed database rejects.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-validation-guard-fidelity
+resolution-undo: d8a7554e2a46ce41c0e9381203ae0d7309996f2e00c30fac38a2c24316f0fe6b 2026-09-12 7374617475733a206f70656e
 
 ### DW-67: The icon extractor can silently omit database values containing non-letter characters.
 origin: spec-deferred 0fdd766222cc
@@ -652,7 +669,9 @@ location: tests/unit/components/eventsValidationMirrors.test.ts:98
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: The drift guard extracts icons with `'([a-z]+)'`. A later value such as `party-hat` does not match, so a database-only addition can be absent from `dbIcons` and leave the equality assertion green even though the UI does not offer the admitted value.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-validation-guard-fidelity
+resolution-undo: d8a7554e2a46ce41c0e9381203ae0d7309996f2e00c30fac38a2c24316f0fe6b 2026-09-12 7374617475733a206f70656e
 
 ### DW-68: The validation mirror checks constant declarations but not the validation branches that consume them.
 origin: spec-deferred aa42fa28a662
@@ -660,7 +679,9 @@ location: tests/unit/components/eventsValidationMirrors.test.ts:68
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: The guard proves that `LABEL_MAX_LENGTH` and `DESCRIPTION_MAX_LENGTH` match the migration, but a future edit can validate against a different literal while retaining those constants for messages or another use. Existing boundary tests cover rejection at 101 and 501, not acceptance at the exact database limits.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-validation-guard-fidelity
+resolution-undo: d8a7554e2a46ce41c0e9381203ae0d7309996f2e00c30fac38a2c24316f0fe6b 2026-09-12 7374617475733a206f70656e
 
 ### DW-69: Repeated date-helper calls can anchor one setup batch to different local days at midnight.
 origin: spec-deferred 48f645dfe7e2
@@ -718,7 +739,9 @@ location: src/stores/slices/interactionsSlice.ts:223
 source_spec: `spec-dw-35-interaction-subscribe-error-surfacing.md`
 severity: high
 reason: The pre-existing record callback in interactionsSlice calls addIncomingInteraction without checking the captured user or the subscription's active flag. A queued record from the old channel can therefore repopulate shared store state after an account switch. This was not introduced by DW-35's new status callback.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-interaction-record-ownership
+resolution-undo: 36085192bfdd9a00d2e10275fcf8718ec07ee7b516b36fc6c20e3e9e0882adaa 2026-09-12 7374617475733a206f70656e
 
 ### DW-76: The subscribeInteractions JSDoc example does not match the method's required arguments.
 origin: spec-deferred 81acc5a7d387
@@ -726,7 +749,8 @@ location: src/api/interactionService.ts:216
 source_spec: `spec-dw-35-interaction-subscribe-error-surfacing.md`
 severity: low
 reason: The example already omitted userId before this change and now also omits the status callback, so copied sample code does not typecheck. It is pre-existing documentation debt outside DW-35's runtime error surface.
-status: open
+status: done 2026-09-11
+resolution: already resolved: Commit fb19de6f89d8faa6861f622a40a2f8c425485805 (docs(api): correct interaction subscription example, 2026-09-11) updated src/api/interactionService.ts:220-230 to pass userId, the record callback, and the status callback, matching the required signature at src/api/interactionService.ts:236-240.
 
 ### DW-77: The existing error-handler test header incorrectly says four callers never import the handler.
 origin: spec-deferred daacdcd2980b
@@ -750,6 +774,7 @@ location: src/api/auth/sessionService.ts:onAuthStateChange; src/api/auth/actionS
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 reason: sessionService and actionService both write/delete the current service-worker token, and neither associates those operations with a generation. Those writers and their asynchronous IndexedDB opens predate this bundle. Reversing mocked promise completion does not demonstrate reversed real IndexedDB commits; establishing the reported late-clear outcome requires a controlled trace of actual IndexedDB operations plus actionService signOut/signIn overlap. Earlier auth delivery alone does not establish the claimed regression.
 status: open
+decision: 2026-09-11 Keep pending stronger evidence
 
 ### DW-80: A replacement same-user session without an observed sign-out is not distinguished from a same-session update.
 origin: spec-deferred 883a7daa57da
@@ -757,7 +782,9 @@ location: src/stores/slices/authSlice.ts:setAuthUser; src/api/auth/sessionServic
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 severity: medium
 reason: setAuthUser receives user identity rather than a server session identifier, and same-user notifications deliberately preserve ownership. The previous implementation also accepted these loads. The bundle explicitly repairs requests crossing sign-out and same-account sign-in; replacement sessions without that transition are a separate pre-existing boundary.
-status: open
+status: done 2026-09-11
+resolution: closed by human decision: Accept user identity plus observed sign-out/account transitions as the ownership boundary; same-user notifications preserve load ownership and no incorrect same-account result has been demonstrated.
+decision: 2026-09-11 Preserve the current boundary — Accept user identity plus observed sign-out/account transitions as the ownership boundary; same-user notifications preserve load ownership and no incorrect same-account result has been demonstrated.
 
 ### DW-81: A delayed initial getSession result can overwrite a newer auth-listener identity.
 origin: spec-deferred 70b954c2c502
@@ -765,4 +792,22 @@ location: src/App.tsx:checkAuth
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 severity: medium
 reason: App's checkAuth applies its awaited result whenever the component is mounted, without checking whether an auth notification arrived in the meantime. A stale null or different-user snapshot can overwrite the listener's newer state. Both this initialization branch and its missing notification guard are unchanged from the baseline.
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-auth-bootstrap-notification-order
+resolution-undo: 30550be193d560a0999139ba0de7bc8c278b2e00d6da154dbe892975020e2218 2026-09-12 7374617475733a206f70656e
+
+### DW-82: The interactions slice header incorrectly describes its cross-slice dependencies as self-contained.
+origin: spec-deferred 37d6cf07740f
+location: src/stores/slices/interactionsSlice.ts:10
+source_spec: `spec-dw-75-interaction-record-ownership.md`
+severity: low
+reason: The baseline already read authSlice.userId for sends, history, and subscriptions while its header said "None (self-contained)". The record callback now also reads authSessionVersion. This pre-existing documentation mismatch can mislead a developer composing an isolated slice fixture about the auth state it requires; production behavior is unaffected.
+status: open
+
+### DW-83: EventsSettings counts UTF-16 code units while PostgreSQL char_length counts Unicode characters.
+origin: spec-deferred 40fa82030481
+location: src/components/Settings/EventsSettings.tsx:689
+source_spec: `spec-dw-60-63-66-67-68-events-validation-guard-fidelity.md`
+severity: medium
+reason: The unchanged submit handler uses trimmedLabel.length and trimmedDescription.length. Measured 100 repeated emoji have JavaScript length 200 and PostgreSQL char_length 100, so the form rejects some values admitted by the existing database CHECK. This predates this bundle, which explicitly preserves production validation. The new boundary tests characterize the existing limits with ASCII and do not establish Unicode equivalence.
 status: open

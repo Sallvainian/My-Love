@@ -1,0 +1,19 @@
+{
+  "node": "24.19.0",
+  "npm": "11.17.0",
+  "playwright": "1.63.0",
+  "typescript": "6.0.3",
+  "supabase_cli": "2.117.0",
+  "chromium_installed": true,
+  "supabase_already_running": true,
+  "auth_health": 200,
+  "migration_command": "supabase migration list --local",
+  "local_migrations": 34,
+  "applied_migrations": 34,
+  "missing": [],
+  "extra": [],
+  "browser_preflight": "Login screen; reusable cached auth was unavailable; generated tests use existing auth-session provider",
+  "owned_cli_session_closed": true,
+  "owned_vite_stopped": true,
+  "pact_mcp_reachable": false
+}

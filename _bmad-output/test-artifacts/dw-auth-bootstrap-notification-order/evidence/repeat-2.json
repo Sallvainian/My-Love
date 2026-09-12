@@ -1,0 +1,134 @@
+{
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "--config=_bmad-output/test-artifacts/dw-auth-bootstrap-notification-order/playwright.verify.config.ts",
+    "tests/api/auth-bootstrap-identity.spec.ts",
+    "tests/e2e/auth/bootstrap-notification-order.spec.ts"
+  ],
+  "exit_code": 0,
+  "duration_seconds": 6.24,
+  "stats": {
+    "startTime": "2026-09-12T05:03:09.181Z",
+    "duration": 5324.183,
+    "expected": 8,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "tests": [
+    {
+      "title": "[P0] DW-81-E2E-001 retains the notified user and event load after a stale null lookup",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 719,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P0] DW-81-E2E-002 retains the notified user and event load after a stale different-user lookup",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 738,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P0] DW-81-E2E-003 keeps the first null notification signed out after stale authenticated bootstrap",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 722,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P1] DW-81-E2E-004 preserves same-user email and display-name setup when notification beats the queued continuation",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 623,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P1] DW-81-E2E-005 retains the listener session when the SDK bootstrap rejects",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 668,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P1] DW-81-E2E-006 installs an authenticated bootstrap without a notification",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 751,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P1] DW-81-E2E-007 clears old store auth for null bootstrap without a notification",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 694,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P1] DW-81-API-001 resolves each worker token to its own identity and metadata",
+      "file": "api/auth-bootstrap-identity.spec.ts",
+      "project": "api",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 422,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    }
+  ]
+}

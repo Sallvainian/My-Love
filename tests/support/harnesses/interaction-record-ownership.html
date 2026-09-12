@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interaction record ownership harness</title>
+  </head>
+  <body>
+    <div id="root" style="padding: 4rem"></div>
+    <script type="module">
+      import { mountInteractionOwnershipHarness } from './interaction-record-ownership.tsx';
+
+      const userId = new URLSearchParams(window.location.search).get('userId');
+      if (!userId) throw new Error('Interaction ownership harness userId is missing');
+      mountInteractionOwnershipHarness(userId);
+    </script>
+  </body>
+</html>

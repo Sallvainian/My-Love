@@ -1,0 +1,11 @@
+{
+  "head": "96b03a2f",
+  "implementation": "6a70ad55",
+  "baseline": "172f1b5d42381f5c9f27def65b6488b305ce769e",
+  "protected_files": [
+    {
+      "path": "_bmad-output/implementation-artifacts/deferred-work.md",
+      "sha256": "509d408967e08949e786f5fa3c4af8b9cd8021df97447b74511a1777a479f48d"
+    }
+  ]
+}

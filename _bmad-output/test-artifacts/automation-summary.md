@@ -725,3 +725,20 @@ accessibility PASS.
 ## Subsequent run: DW-40 (2026-09-11)
 
 [DW-40 solo report synchronization automation](automation-summary-dw-solo-report-test-synchronization.md) records the current workflow's coverage plan, generated artifacts, validation evidence, and Definition of Done. Historical runs above are preserved.
+
+
+## Subsequent run: DW-75 (2026-09-12)
+
+[Interaction record ownership automation](automation-summary-dw-interaction-record-ownership.md) records this run; historical results above are preserved.
+
+DW-75 completion: 4 new tests (2 P0, 2 P1), fixtures and source snapshots delivered; 20/20 executions across five cold runs, 69 existing unit regressions and 2 neighboring Realtime tests passed. Both ownership mutation probes failed as intended. Definition of Done and limits are in the linked story summary.
+
+
+## Subsequent run: DW-81 (2026-09-12)
+
+[Auth bootstrap notification order automation](automation-summary-dw-auth-bootstrap-notification-order.md) records this run; prior reports are preserved.
+
+
+## Subsequent run: DW-60/63/66/67/68 (2026-09-12)
+
+[Events validation guard fidelity automation](automation-summary-dw-events-validation-guard-fidelity.md) records the completed run: 8/8 generated tests, 141 existing Vitest tests, and 236 pgTAP assertions passed; typecheck/lint passed. Runnable artifacts, evidence, and Definition of Done are linked there; historical results above are preserved.

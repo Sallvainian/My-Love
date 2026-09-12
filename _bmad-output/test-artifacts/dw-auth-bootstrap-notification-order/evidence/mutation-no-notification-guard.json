@@ -1,0 +1,78 @@
+{
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "--config=_bmad-output/test-artifacts/dw-auth-bootstrap-notification-order/playwright.verify.config.ts",
+    "tests/e2e/auth/bootstrap-notification-order.spec.ts",
+    "--project=chromium",
+    "--grep",
+    "DW-81-E2E-00[123]"
+  ],
+  "exit_code": 1,
+  "duration_seconds": 35.04,
+  "stats": {
+    "startTime": "2026-09-12T05:01:52.226Z",
+    "duration": 34000.50399999999,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 3,
+    "flaky": 0
+  },
+  "tests": [
+    {
+      "title": "[P0] DW-81-E2E-001 retains the notified user and event load after a stale null lookup",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "unexpected",
+      "results": [
+        {
+          "status": "failed",
+          "duration_ms": 15730,
+          "retry": 0,
+          "errors": [
+            {
+              "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('app-container')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('app-container') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('app-container')\u001b[22m\n\n\n  39 |       await authBootstrap.resolveLookup(stale);\n  40 |       await expect(page.getByText('Loading...', { exact: true })).not.toBeVisible();\n> 41 |       await expect(page.getByTestId('app-container')).toBeVisible();\n     |                                                       ^\n  42 |       await expect(page.getByTestId('login-screen')).not.toBeVisible();\n  43 |       await expect(page.getByRole('heading', { name: 'Cached current trip', exact: true })).toBeVisible();\n  44 |       const after = await authBootstrap.snapshot();\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-auth-bootstrap-notification-order/tests/e2e/auth/bootstrap-notification-order.spec.ts:41:55"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P0] DW-81-E2E-002 retains the notified user and event load after a stale different-user lookup",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "unexpected",
+      "results": [
+        {
+          "status": "failed",
+          "duration_ms": 15791,
+          "retry": 0,
+          "errors": [
+            {
+              "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('heading', { name: 'Cached current trip', exact: true })\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByRole('heading', { name: 'Cached current trip', exact: true }) with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('heading', { name: 'Cached current trip', exact: true })\u001b[22m\n\n\n  41 |       await expect(page.getByTestId('app-container')).toBeVisible();\n  42 |       await expect(page.getByTestId('login-screen')).not.toBeVisible();\n> 43 |       await expect(page.getByRole('heading', { name: 'Cached current trip', exact: true })).toBeVisible();\n     |                                                                                             ^\n  44 |       const after = await authBootstrap.snapshot();\n  45 |       expect(after).toMatchObject({\n  46 |         userId: current.user.id,\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-auth-bootstrap-notification-order/tests/e2e/auth/bootstrap-notification-order.spec.ts:43:93"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P0] DW-81-E2E-003 keeps the first null notification signed out after stale authenticated bootstrap",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "unexpected",
+      "results": [
+        {
+          "status": "failed",
+          "duration_ms": 15663,
+          "retry": 0,
+          "errors": [
+            {
+              "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('login-screen')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('login-screen') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('login-screen')\u001b[22m\n\n\n  89 |     await authBootstrap.resolveLookup(createAuthBootstrapSession());\n  90 |     await expect(page.getByText('Loading...', { exact: true })).not.toBeVisible();\n> 91 |     await expect(page.getByTestId('login-screen')).toBeVisible();\n     |                                                    ^\n  92 |     await expect(page.getByRole('heading', { name: 'Welcome Back' })).toBeVisible();\n  93 |     await expect(page.getByTestId('app-container')).not.toBeVisible();\n  94 |     expect(await authBootstrap.snapshot()).toMatchObject({\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-auth-bootstrap-notification-order/tests/e2e/auth/bootstrap-notification-order.spec.ts:91:52"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

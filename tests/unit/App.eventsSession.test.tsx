@@ -49,7 +49,9 @@ vi.mock('../../src/components/RelationshipTimers/TimeTogether', () => ({
 vi.mock('../../src/components/LoginScreen', () => ({
   LoginScreen: () => <p>Sign in</p>,
 }));
-vi.mock('../../src/components/DisplayNameSetup', () => ({ DisplayNameSetup: () => null }));
+vi.mock('../../src/components/DisplayNameSetup', () => ({
+  DisplayNameSetup: () => <p>Set your display name</p>,
+}));
 vi.mock('../../src/components/PhotoUpload/PhotoUpload', () => ({ PhotoUpload: () => null }));
 vi.mock('../../src/components/PhotoCarousel/PhotoCarousel', () => ({ PhotoCarousel: () => null }));
 vi.mock('../../src/components/shared', () => ({
@@ -93,17 +95,18 @@ vi.mock('framer-motion', () => ({
 }));
 
 const USER_ID = 'home-events-user';
+const OTHER_USER_ID = 'other-home-user';
 const success: EventLoadResult = { status: 'success' };
 const failure: EventLoadResult = { status: 'failure', error: 'Prior request failed' };
 
-function session(accessToken = 'initial-token'): Session {
+function session(accessToken = 'initial-token', userId = USER_ID): Session {
   return {
     access_token: accessToken,
     refresh_token: 'refresh-token',
     token_type: 'bearer',
     expires_in: 3600,
     user: {
-      id: USER_ID,
+      id: userId,
       email: 'home@example.com',
       app_metadata: {},
       user_metadata: { display_name: 'Home User' },
@@ -159,6 +162,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   localStorage.clear();
 });
 
@@ -206,6 +210,235 @@ function controlHomeLoads() {
   useAppStore.setState({ loadEvents });
   return { requests, loadEvents };
 }
+
+describe('Auth bootstrap notification ownership', () => {
+  it('installs the initial authenticated session when no notification supersedes it', async () => {
+    const lookup = deferred<Session | null>();
+    auth.getSession.mockReturnValueOnce(lookup.promise);
+    const { requests, loadEvents } = controlHomeLoads();
+    const ownership = useAppStore.getState().authSessionVersion;
+    render(<App />);
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+
+    await act(async () => lookup.resolve(session()));
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(useAppStore.getState()).toMatchObject({
+      userId: USER_ID,
+      isAuthenticated: true,
+      authSessionVersion: ownership + 1,
+    });
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+    await act(async () => requests[0].resolve(success));
+    expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
+  });
+
+  it('clears store auth for an initial null session without a notification', async () => {
+    const lookup = deferred<Session | null>();
+    auth.getSession.mockReturnValueOnce(lookup.promise);
+    controlHomeLoads();
+    useAppStore.getState().setAuthUser(USER_ID, 'home@example.com');
+    useAppStore.setState({ events: [event('Previous trip')] });
+    const ownership = useAppStore.getState().authSessionVersion;
+    render(<App />);
+
+    await act(async () => lookup.resolve(null));
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.getByText('Sign in')).toBeInTheDocument();
+    expect(useAppStore.getState()).toMatchObject({
+      userId: null,
+      userEmail: null,
+      isAuthenticated: false,
+      authSessionVersion: ownership + 1,
+      events: [],
+    });
+  });
+
+  it.each([
+    ['null', null],
+    ['different-user', session('stale-token', OTHER_USER_ID)],
+  ] as const)('discards a stale %s lookup without disturbing the listener-owned event load', async (_name, snapshot) => {
+    const lookup = deferred<Session | null>();
+    const response = deferred<CoupleEvent[]>();
+    auth.getSession.mockReturnValueOnce(lookup.promise);
+    vi.mocked(eventsService.getEvents).mockReturnValueOnce(response.promise);
+    const { syncPendingMoods } = useAppStore.getState();
+    render(<App />);
+
+    await act(async () => auth.listener!(session('listener-token')));
+    expect(syncPendingMoods).toHaveBeenCalledTimes(1);
+    const ownership = useAppStore.getState().authSessionVersion;
+    const cachedEvents = [event('Cached current trip')];
+    await act(async () => useAppStore.setState({ events: cachedEvents }));
+    expect(useAppStore.getState().userId).toBe(USER_ID);
+    expect(eventsService.getEvents).toHaveBeenCalledTimes(1);
+
+    await act(async () => lookup.resolve(snapshot));
+    expect(useAppStore.getState()).toMatchObject({
+      userId: USER_ID,
+      isAuthenticated: true,
+      authSessionVersion: ownership,
+      events: cachedEvents,
+      eventsIsLoading: true,
+    });
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(screen.queryByText('Sign in')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Cached current trip' })).toBeInTheDocument();
+    expect(eventsService.getEvents).toHaveBeenCalledTimes(1);
+    expect(syncPendingMoods).toHaveBeenCalledTimes(1);
+
+    await act(async () => response.resolve([event('Current trip')]));
+    expect(useAppStore.getState().eventsIsLoading).toBe(false);
+    expect(screen.getByRole('heading', { name: 'Current trip' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Cached current trip' })).not.toBeInTheDocument();
+  });
+
+  it('lets a first and only null notification supersede an authenticated lookup', async () => {
+    const lookup = deferred<Session | null>();
+    auth.getSession.mockReturnValueOnce(lookup.promise);
+    const { loadEvents } = controlHomeLoads();
+    const { initializeApp, syncPendingMoods } = useAppStore.getState();
+    render(<App />);
+    await act(async () => auth.listener!(null));
+    const ownership = useAppStore.getState().authSessionVersion;
+    expect(useAppStore.getState().userId).toBeNull();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+
+    await act(async () => lookup.resolve(session('stale-token', OTHER_USER_ID)));
+    expect(useAppStore.getState()).toMatchObject({
+      userId: null,
+      userEmail: null,
+      isAuthenticated: false,
+      authSessionVersion: ownership,
+    });
+    expect(screen.getByText('Sign in')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(loadEvents).not.toHaveBeenCalled();
+    expect(initializeApp).not.toHaveBeenCalled();
+    expect(syncPendingMoods).not.toHaveBeenCalled();
+  });
+
+  it('preserves a newer sign-out when the initial lookup returns a user', async () => {
+    const lookup = deferred<Session | null>();
+    auth.getSession.mockReturnValueOnce(lookup.promise);
+    const { requests, loadEvents } = controlHomeLoads();
+    render(<App />);
+    await act(async () => auth.listener!(session('listener-token')));
+    await act(async () => auth.listener!(null));
+    const ownership = useAppStore.getState().authSessionVersion;
+
+    await act(async () => lookup.resolve(session('stale-token', OTHER_USER_ID)));
+    expect(useAppStore.getState()).toMatchObject({
+      userId: null,
+      isAuthenticated: false,
+      authSessionVersion: ownership,
+      events: [],
+    });
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.getByText('Sign in')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+    await act(async () => requests[0].resolve(success));
+    expect(screen.getByText('Sign in')).toBeInTheDocument();
+  });
+
+  it.each([true, false])('preserves same-user updates and display-name handling (has name: %s)', async (hasDisplayName) => {
+    const lookup = deferred<Session | null>();
+    auth.getSession.mockReturnValueOnce(lookup.promise);
+    const { requests, loadEvents } = controlHomeLoads();
+    useAppStore.getState().setAuthUser(USER_ID, 'home@example.com');
+    render(<App />);
+    const ownership = useAppStore.getState().authSessionVersion;
+    const updated = session('updated-token');
+    updated.user.email = 'updated@example.com';
+    updated.user.user_metadata = hasDisplayName ? { display_name: 'Updated Name' } : {};
+
+    await act(async () => {
+      // Even a notification delivered after resolution but before the awaited
+      // continuation runs must take ownership synchronously.
+      lookup.resolve(session('stale-token'));
+      auth.listener!(updated);
+    });
+    expect(useAppStore.getState()).toMatchObject({
+      userId: USER_ID,
+      userEmail: 'updated@example.com',
+      authSessionVersion: ownership,
+    });
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+    if (hasDisplayName) {
+      expect(screen.getByTestId('app-container')).toBeInTheDocument();
+      expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    } else {
+      expect(screen.getByText('Set your display name')).toBeInTheDocument();
+      expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
+    }
+    await act(async () => requests[0].resolve(success));
+    if (hasDisplayName) {
+      expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
+    }
+  });
+
+  it.each([true, false])('finishes a rejected lookup while preserving listener state (notified: %s)', async (notified) => {
+    const lookup = deferred<Session | null>();
+    const error = new Error('Initial lookup failed');
+    const reportError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    auth.getSession.mockReturnValueOnce(lookup.promise);
+    controlHomeLoads();
+    render(<App />);
+    if (notified) {
+      await act(async () => auth.listener!(session('listener-token')));
+    }
+    const ownership = useAppStore.getState().authSessionVersion;
+
+    await act(async () => lookup.reject(error));
+    expect(reportError).toHaveBeenCalledWith('[App] Auth check failed:', error);
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(useAppStore.getState()).toMatchObject({
+      userId: notified ? USER_ID : null,
+      authSessionVersion: ownership,
+    });
+    if (notified) {
+      expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    } else {
+      expect(screen.getByText('Sign in')).toBeInTheDocument();
+    }
+  });
+
+  it.each(['null', 'different-user', 'rejection'] as const)('ignores a cleaned-up effect when its lookup settles with %s', async (outcome) => {
+    const lookup = deferred<Session | null>();
+    auth.getSession.mockReturnValueOnce(lookup.promise);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { requests, loadEvents } = controlHomeLoads();
+    const previousApp = render(<App />);
+    const oldListener = auth.listener!;
+    previousApp.unmount();
+    expect(auth.listener).toBeNull();
+
+    await renderHome();
+    const ownership = useAppStore.getState().authSessionVersion;
+    await act(async () => {
+      oldListener(null);
+      if (outcome === 'rejection') {
+        lookup.reject(new Error('Old lookup failed'));
+      } else {
+        lookup.resolve(outcome === 'null' ? null : session('stale-token', OTHER_USER_ID));
+      }
+    });
+    expect(useAppStore.getState()).toMatchObject({
+      userId: USER_ID,
+      isAuthenticated: true,
+      authSessionVersion: ownership,
+    });
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+    await act(async () => requests[0].resolve(success));
+    expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
+  });
+});
 
 describe('Home event-load session ownership', () => {
   it.each([
