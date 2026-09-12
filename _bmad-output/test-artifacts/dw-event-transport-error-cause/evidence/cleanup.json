@@ -1,0 +1,13 @@
+{
+  "staged_files_removed": [
+    "tests/api/event-transport-error-cause.spec.ts",
+    "tests/e2e/settings/event-transport-error-cause.spec.ts",
+    "tests/support/factories/event-transport-error.ts",
+    "tests/support/helpers/event-transport-error.ts"
+  ],
+  "artifact_hashes_verified": true,
+  "source_existing_tests_runner_unchanged": true,
+  "ledger_initial_diff_preserved": true,
+  "sprint_status_written": false,
+  "owned_browser_session_closed": true
+}

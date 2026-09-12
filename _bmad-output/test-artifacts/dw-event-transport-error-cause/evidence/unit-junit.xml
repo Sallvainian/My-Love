@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="131" failures="0" errors="0" time="0.037570333">
+    <testsuite name="tests/unit/api/checkConstraintMapping.test.ts" timestamp="2026-09-12T00:56:18.526Z" hostname="Sallvains-MacBook-Pro-587.local" tests="22" failures="0" errors="0" skipped="0" time="0.004756833">
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; fake fidelity — the envelope these tests inject &gt; the events envelope is one isPostgrestError accepts" time="0.00087175">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; fake fidelity — the envelope these tests inject &gt; the interactions envelope is one isPostgrestError accepts" time="0.000223291">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; fake fidelity — the envelope these tests inject &gt; the moods envelope is one isPostgrestError accepts" time="0.000108958">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; fake fidelity — the envelope these tests inject &gt; an envelope missing details is NOT accepted, which is why details is modelled" time="0.000112333">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;eventsService.createEvent&apos; &gt; surfaces the mapped sentence, context-prefixed" time="0.000700167">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;eventsService.createEvent&apos; &gt; leaks no part of the raw Postgres sentence" time="0.000262583">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;eventsService.createEvent&apos; &gt; does not dress the rejection as a network failure" time="0.000126042">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;eventsService.createEvent&apos; &gt; keeps the mapped code, details, hint and identity inspectable" time="0.00037575">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;eventsService.createEvent&apos; &gt; keeps the failing row out of the message when a caller IS shown one" time="0.000135875">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;interactionService.sendPoke&apos; &gt; surfaces the mapped sentence, context-prefixed" time="0.000155458">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;interactionService.sendPoke&apos; &gt; leaks no part of the raw Postgres sentence" time="0.00011875">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;interactionService.sendPoke&apos; &gt; does not dress the rejection as a network failure" time="0.000104917">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;interactionService.sendPoke&apos; &gt; keeps the mapped code, details, hint and identity inspectable" time="0.000088083">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;interactionService.sendPoke&apos; &gt; keeps the failing row out of the message when a caller IS shown one" time="0.000099792">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;moodApi.create&apos; &gt; surfaces the mapped sentence, context-prefixed" time="0.000136625">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;moodApi.create&apos; &gt; leaks no part of the raw Postgres sentence" time="0.00007825">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;moodApi.create&apos; &gt; does not dress the rejection as a network failure" time="0.000057333">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;moodApi.create&apos; &gt; keeps the mapped code, details, hint and identity inspectable" time="0.000059292">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; &apos;moodApi.create&apos; &gt; keeps the failing row out of the message when a caller IS shown one" time="0.000051">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; the mapping is keyed on 23514 and nothing else &gt; &apos;eventsService.createEvent&apos; falls back for an adjacent SQLSTATE" time="0.000106541">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; the mapping is keyed on 23514 and nothing else &gt; &apos;interactionService.sendPoke&apos; falls back for an adjacent SQLSTATE" time="0.000044584">
+        </testcase>
+        <testcase classname="tests/unit/api/checkConstraintMapping.test.ts" name="a 23514 reaching the caller that issued the write &gt; the mapping is keyed on 23514 and nothing else &gt; &apos;moodApi.create&apos; falls back for an adjacent SQLSTATE" time="0.000042292">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/services/eventsService.test.ts" timestamp="2026-09-12T00:56:18.528Z" hostname="Sallvains-MacBook-Pro-587.local" tests="74" failures="0" errors="0" skipped="0" time="0.02150275">
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; parseEventDate &gt; reads &quot;YYYY-MM-DD&quot; as LOCAL midnight in every timezone" time="0.001303125">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; parseEventDate &gt; keeps the year, unlike the countdownService split it is modelled on" time="0.000191333">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; parseEventDate &gt; keeps a year below 100 instead of mapping it into the 1900s" time="0.000097625">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; parseEventDate &gt; refuses anything that is not a bare calendar date" time="0.000156833">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; parseEventDate &gt; refuses a date that would roll over rather than accepting the roll" time="0.000110084">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; isEventIcon &gt; accepts exactly the three the CHECK constraint allows" time="0.000189208">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; returns the couple’s events soonest-first, each date at local midnight" time="0.003216584">
+            <system-out>
+[EventsService] Fetched events: 2
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; returns both sides of today in one ascending list" time="0.000988208">
+            <system-out>
+[EventsService] Fetched events: 5
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; caps each side of today at the limit, keeping the nearest events on both" time="0.00076275">
+            <system-out>
+[EventsService] Fetched events: 4
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; never lets accumulated history hide the next event" time="0.00047875">
+            <system-out>
+[EventsService] Fetched events: 3
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; pages outward from today on both sides" time="0.000352333">
+            <system-out>
+[EventsService] Fetched events: 4
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; clamps a nonsense limit or offset instead of sending a backwards range" time="0.000278875">
+            <system-out>
+[EventsService] Fetched events: 2
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; falls back to the default page size when limit is NaN" time="0.000320958">
+            <system-out>
+[EventsService] Fetched events: 1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; falls back to the default page size when limit is Infinity" time="0.000201125">
+            <system-out>
+[EventsService] Fetched events: 1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; falls back to offset zero when offset is not finite" time="0.000349583">
+            <system-out>
+[EventsService] Fetched events: 1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; issues both windows concurrently, not one after the other" time="0.000410792">
+            <system-out>
+[EventsService] Fetched events: 1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; counts an event dated today as upcoming, not past" time="0.000249">
+            <system-out>
+[EventsService] Fetched events: 1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; breaks same-day ties on creation time, so reloads cannot reshuffle" time="0.00016875">
+            <system-out>
+[EventsService] Fetched events: 2
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; breaks same-day ties on creation time in the PAST window too" time="0.000196334">
+            <system-out>
+[EventsService] Fetched events: 2
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; drops the stale copy when a row lands in both windows mid-read" time="0.000229">
+            <system-out>
+[EventsService] Fetched events: 1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; cuts the window on the LOCAL calendar day (late evening, west of UTC)" time="0.000162625">
+            <system-out>
+[EventsService] Fetched events: 1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; cuts the window on the LOCAL calendar day (just after midnight, east of UTC)" time="0.000128041">
+            <system-out>
+[EventsService] Fetched events: 1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; keeps a row whose icon is outside the union, falling back to the column default" time="0.0001705">
+            <system-out>
+[EventsService] Fetched events: 1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; returns an empty list rather than throwing when the couple has no events" time="0.000409708">
+            <system-out>
+[EventsService] Fetched events: 0
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; drops a row whose date cannot be read, and still orders the rest" time="0.00026525">
+            <system-out>
+[EventsService] Fetched events: 2
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; throws without issuing a request when the device is offline" time="0.000463875">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; throws the mapped message when the query is rejected" time="0.000278334">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; surfaces a rejection from the upcoming window even when the other window succeeds" time="0.000178625">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; surfaces a rejection from the already-passed window even when the other window succeeds" time="0.000131875">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; getEvents &gt; does not promise a sync when a load fails mid-flight — reads have no queue" time="0.000121166">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent &gt; writes the input date string through untouched and returns the created event" time="0.000467292">
+            <system-out>
+[EventsService] Created event: event-1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent &gt; omits icon so the column default applies when the caller does not choose one" time="0.000302333">
+            <system-out>
+[EventsService] Created event: event-1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent &gt; throws before any request when the device is offline" time="0.000148875">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent &gt; refuses an unreadable date before issuing any request" time="0.000085167">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent &gt; codes an empty successful insert response without changing its message" time="0.000078791">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent &gt; codes an unreadable created row as an invalid response" time="0.0000695">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent &gt; surfaces the reason when the insert is rejected" time="0.000098792">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent &gt; does not promise a sync when the insert fails mid-flight — writes have no queue either" time="0.001740583">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent &gt; stamps updated_at on every write and returns the updated event" time="0.000386291">
+            <system-out>
+[EventsService] Updated event: event-1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent &gt; writes only the fields the caller supplied" time="0.000168958">
+            <system-out>
+[EventsService] Updated event: event-1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent &gt; accepts an explicit null description" time="0.000090792">
+            <system-out>
+[EventsService] Updated event: event-1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent &gt; throws when the update matched no row — an RLS filter is silent" time="0.000082916">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent &gt; does not dress a zero-row write up as a network problem" time="0.000136083">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent &gt; throws before any request when the device is offline" time="0.000103875">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent &gt; refuses an unreadable date before issuing any request" time="0.000152042">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent &gt; codes an unreadable updated row as an invalid response" time="0.000101208">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent &gt; surfaces the reason when the update is rejected" time="0.00011575">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent &gt; codes a mid-flight network failure as transport" time="0.000249958">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent &gt; removes the row" time="0.000147833">
+            <system-out>
+[EventsService] Deleted event: event-1
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent &gt; throws when the delete matched no row — the same silent RLS filter" time="0.000232333">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent &gt; throws before any request when the device is offline" time="0.000091542">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent &gt; surfaces the reason when the delete is rejected" time="0.000090709">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent &gt; codes a mid-flight network failure as transport" time="0.000172667">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent transport rejections &gt; preserves a rejected TypeError and its diagnostics as the cause" time="0.000287333">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent transport rejections &gt; preserves a thrown object as the cause with the fallback message" time="0.000099708">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent transport rejections &gt; preserves a thrown string as the cause with the fallback message" time="0.000197792">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent transport rejections &gt; preserves a thrown number as the cause with the fallback message" time="0.000112791">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent transport rejections &gt; preserves a thrown boolean as the cause with the fallback message" time="0.000146416">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent transport rejections &gt; preserves a thrown null as the cause with the fallback message" time="0.000082459">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; createEvent transport rejections &gt; preserves a thrown undefined as the cause with the fallback message" time="0.00009825">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent transport rejections &gt; preserves a rejected TypeError and its diagnostics as the cause" time="0.000282416">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent transport rejections &gt; preserves a thrown object as the cause with the fallback message" time="0.00007675">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent transport rejections &gt; preserves a thrown string as the cause with the fallback message" time="0.000078792">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent transport rejections &gt; preserves a thrown number as the cause with the fallback message" time="0.000078333">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent transport rejections &gt; preserves a thrown boolean as the cause with the fallback message" time="0.000069375">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent transport rejections &gt; preserves a thrown null as the cause with the fallback message" time="0.000061959">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; updateEvent transport rejections &gt; preserves a thrown undefined as the cause with the fallback message" time="0.000062">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent transport rejections &gt; preserves a rejected TypeError and its diagnostics as the cause" time="0.000151417">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent transport rejections &gt; preserves a thrown object as the cause with the fallback message" time="0.000154">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent transport rejections &gt; preserves a thrown string as the cause with the fallback message" time="0.000072875">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent transport rejections &gt; preserves a thrown number as the cause with the fallback message" time="0.00006475">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent transport rejections &gt; preserves a thrown boolean as the cause with the fallback message" time="0.000068208">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent transport rejections &gt; preserves a thrown null as the cause with the fallback message" time="0.000066375">
+        </testcase>
+        <testcase classname="tests/unit/services/eventsService.test.ts" name="eventsService &gt; deleteEvent transport rejections &gt; preserves a thrown undefined as the cause with the fallback message" time="0.000173833">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/stores/eventsSlice.test.ts" timestamp="2026-09-12T00:56:18.533Z" hostname="Sallvains-MacBook-Pro-587.local" tests="35" failures="0" errors="0" skipped="0" time="0.01131075">
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; starts with an empty list, not loading, and no error" time="0.001355083">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; fills the list and releases the flag" time="0.000466042">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; raises the flag while the request is open" time="0.000175625">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; reports the failure, keeps the last-good list and releases the flag" time="0.000277167">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; clears a previous error when it starts" time="0.000105334">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; does nothing without a signed-in user, so no flag can strand" time="0.000198834">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; lets the newer of two overlapping same-user loads win, whatever the order" time="0.000263042">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; drops a stale same-user failure instead of parking its error over a live load" time="0.000170375">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; returns stale and touches no owned state when the account changes" time="0.00013275">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; does not replay account A&apos;s completed add into account B&apos;s active load" time="0.000196333">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; does not replay account A&apos;s completed edit into account B&apos;s active load" time="0.000132167">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; keeps a completed add for the newer same-user load after the older load settles stale" time="0.00081125">
+            <system-out>
+[EventsSlice] Added event: added-after-second-started
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; replays a completed add omitted by the older fetched list" time="0.000141125">
+            <system-out>
+[EventsSlice] Added event: added
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; does not duplicate an add already installed by the load before create resumes" time="0.000109834">
+            <system-out>
+[EventsSlice] Added event: already-observed
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; upserts an edited row omitted by a load that settles before the edit resumes" time="0.0001215">
+            <system-out>
+[EventsSlice] Edited event: edited
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; replays add then delete in completion order without resurrecting the transient row" time="0.000452792">
+            <system-out>
+[EventsSlice] Added event: transient
+
+[EventsSlice] Removed event: transient
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; replays an edit over the older row and restores date order" time="0.000262834">
+            <system-out>
+[EventsSlice] Edited event: edited
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; replays a delete tombstone so an older response cannot resurrect the row" time="0.000126375">
+            <system-out>
+[EventsSlice] Removed event: deleted
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; loadEvents &gt; keeps all write failures out of a successful load outcome and error channel" time="0.000609583">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; addEvent &gt; inserts the created event in date order and reports success" time="0.000212">
+            <system-out>
+[EventsSlice] Added event: middle
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; addEvent &gt; slots a same-day event after its earlier-created sibling, matching the server order" time="0.00013925">
+            <system-out>
+[EventsSlice] Added event: second-of-day
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; addEvent &gt; passes the signed-in user as the creator" time="0.000571625">
+            <system-out>
+[EventsSlice] Added event: new
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; addEvent &gt; hands the reason back without changing the load error, leaving the list alone" time="0.000532917">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; addEvent &gt; reports an offline create as a failure rather than presenting it as saved" time="0.000393">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; addEvent &gt; preserves the validation service code and leaves the list unchanged" time="0.000341542">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; addEvent &gt; preserves the invalid-response service code and leaves the list unchanged" time="0.000154917">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; addEvent &gt; refuses without a signed-in user and never reaches the service" time="0.000140041">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; editEvent &gt; replaces the event and re-sorts, because an edit can move the date" time="0.00028575">
+            <system-out>
+[EventsSlice] Edited event: a
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; editEvent &gt; orders by creation time when an edit moves a date onto an occupied day" time="0.000493458">
+            <system-out>
+[EventsSlice] Edited event: moved
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; editEvent &gt; refuses without a signed-in user and never reaches the service" time="0.000115541">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; editEvent &gt; reports a zero-row write as a failure and leaves the list untouched" time="0.00009775">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; removeEvent &gt; takes the event out of the list" time="0.000173792">
+            <system-out>
+[EventsSlice] Removed event: a
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; removeEvent &gt; refuses without a signed-in user and never reaches the service" time="0.000100542">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; removeEvent &gt; reports a zero-row delete as a failure and keeps the event on screen" time="0.000109875">
+        </testcase>
+        <testcase classname="tests/unit/stores/eventsSlice.test.ts" name="eventsSlice &gt; clearEventsError &gt; clears a dismissed banner without touching the list" time="0.000060917">
+        </testcase>
+    </testsuite>
+</testsuites>

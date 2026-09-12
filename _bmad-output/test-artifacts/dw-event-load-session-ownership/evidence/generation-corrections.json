@@ -1,0 +1,37 @@
+{
+  "initial_validation": {
+    "generated_collected": 6,
+    "api_passed": 1,
+    "e2e_failed": 5,
+    "cause": "Generated E2E used log.step on callable fixture, and assertion-only recurse predicates did not satisfy installed boolean type."
+  },
+  "corrections": [
+    "Import the installed log singleton; keep merged test/expect entry point.",
+    "Return true after predicate assertions; failed assertions continue to drive retries."
+  ],
+  "second_validation": {
+    "e2e_passed": 2,
+    "e2e_failed": 3,
+    "passed": [
+      "Home prior-success race",
+      "Real token refresh"
+    ],
+    "causes": [
+      "Actual Supabase client retries503 GETs inside one production load.",
+      "React development StrictMode invokes Settings mount load twice."
+    ]
+  },
+  "production_changes": false,
+  "completed": [
+    "Use nonretryable HTTP400 for the old failure; preserve production retry behavior.",
+    "Queue and assert both Settings load invocations, distinguishing supersession from the auth-session guard."
+  ],
+  "final_validation": {
+    "collected": 6,
+    "passed": 6,
+    "failed": 0,
+    "typecheck_exit_code": 0,
+    "lint_errors": 0,
+    "lint_existing_warnings": 3
+  }
+}

@@ -47,6 +47,10 @@ const backend = {
   /** Injected instead of running the query — a PostgREST error object, or a
    *  plain Error standing in for a mid-flight network failure. */
   nextError: null as FakePostgrestError | Error | null,
+  /** Reject the query with any thrown value, including null and undefined. */
+  nextRejection: null as { reason: unknown } | null,
+  /** Override a successful response, including `null`, for invalid-response tests. */
+  nextData: undefined as EventRow[] | null | undefined,
   /** Which side of `getEvents`' two-window read `nextError` applies to. `null`
    *  fails every query, which is what every write test wants; naming one bound
    *  fails only the window carrying it, so each window's own error check is
@@ -72,6 +76,8 @@ const backend = {
   reset() {
     this.rows = [];
     this.nextError = null;
+    this.nextRejection = null;
+    this.nextData = undefined;
     this.errorForBound = null;
     this.payloads = [];
     this.filters = [];
@@ -119,12 +125,14 @@ function eventsQuery() {
   };
 
   const run = (): { data: EventRow[] | null; error: FakePostgrestError | Error | null } => {
+    if (backend.nextRejection) throw backend.nextRejection.reason;
     if (operation === 'select') {
       backend.queries.push({ bounds: [...bounds], orderings: [...orderings], range });
     }
     const errorApplies =
       backend.errorForBound === null || bounds.some((b) => b.op === backend.errorForBound);
     if (backend.nextError && errorApplies) return { data: null, error: backend.nextError };
+    if (backend.nextData !== undefined) return { data: backend.nextData, error: null };
 
     if (operation === 'insert') {
       const inserted: EventRow = {
@@ -208,7 +216,7 @@ function eventsQuery() {
       return { data: result.data?.[0] ?? null, error: result.error };
     },
     then: (onFulfilled: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) =>
-      Promise.resolve(run()).then(onFulfilled, onRejected),
+      Promise.resolve().then(run).then(onFulfilled, onRejected),
   };
   return builder;
 }
@@ -223,7 +231,21 @@ vi.mock('@/api/supabaseClient', () => ({
   },
 }));
 
-import { eventsService, isEventIcon, parseEventDate } from '@/services/eventsService';
+import {
+  EventWriteError,
+  eventsService,
+  isEventIcon,
+  parseEventDate,
+} from '@/services/eventsService';
+
+async function eventWriteFailure(promise: Promise<unknown>): Promise<EventWriteError> {
+  const failure = await promise.then(
+    () => null,
+    (error: unknown) => error
+  );
+  expect(failure).toBeInstanceOf(EventWriteError);
+  return failure as EventWriteError;
+}
 
 function setOnline(online: boolean): void {
   Object.defineProperty(navigator, 'onLine', { value: online, configurable: true });
@@ -782,19 +804,53 @@ describe('eventsService', () => {
     it('throws before any request when the device is offline', async () => {
       setOnline(false);
 
-      await expect(
+      const failure = await eventWriteFailure(
         eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
-      ).rejects.toThrow('You are offline. Events need a connection to save.');
+      );
+      expect(failure).toMatchObject({
+        code: 'offline',
+        message: 'You are offline. Events need a connection to save.',
+      });
       expect(backend.fromCalls).toBe(0);
       expect(backend.rows).toEqual([]);
     });
 
     it('refuses an unreadable date before issuing any request', async () => {
-      await expect(
+      const failure = await eventWriteFailure(
         eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: 'infinity' })
-      ).rejects.toThrow('Not a valid calendar date: infinity');
+      );
+      expect(failure).toMatchObject({
+        code: 'validation',
+        message: 'Not a valid calendar date: infinity',
+      });
       expect(backend.fromCalls).toBe(0);
       expect(backend.rows).toEqual([]);
+    });
+
+    it('codes an empty successful insert response without changing its message', async () => {
+      backend.nextData = null;
+
+      const failure = await eventWriteFailure(
+        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
+      );
+
+      expect(failure).toMatchObject({
+        code: 'invalid-response',
+        message: 'The event was not created',
+      });
+    });
+
+    it('codes an unreadable created row as an invalid response', async () => {
+      backend.nextData = [row({ event_date: 'infinity' })];
+
+      const failure = await eventWriteFailure(
+        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
+      );
+
+      expect(failure).toMatchObject({
+        code: 'invalid-response',
+        message: 'The event was saved but its date could not be read',
+      });
     });
 
     it('surfaces the reason when the insert is rejected', async () => {
@@ -805,26 +861,30 @@ describe('eventsService', () => {
         hint: '',
       };
 
-      await expect(
+      const failure = await eventWriteFailure(
         eventsService.createEvent({ userId: PARTNER_ID, label: 'x', eventDate: '2026-10-01' })
-      ).rejects.toThrow(/Permission denied - check Row Level Security policies/);
+      );
+      expect(failure.code).toBe('transport');
+      expect(failure.message).toMatch(/Permission denied - check Row Level Security policies/);
     });
 
     it('does not promise a sync when the insert fails mid-flight — writes have no queue either', async () => {
       // Same trap as the read path: the write may or may not have landed, and
       // nothing will retry it, so the message must not claim a queue will.
-      backend.nextError = new TypeError('fetch failed');
+      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalStack = originalError.stack;
+      backend.nextError = originalError;
 
-      const failure = await eventsService
-        .createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
-        .then(
-          () => null,
-          (error: Error) => error
-        );
+      const failure = await eventWriteFailure(
+        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
+      );
 
-      expect(failure?.message).toBe(
+      expect(failure.message).toBe(
         '[EventsService.createEvent] Network error: fetch failed. Check your internet connection.'
       );
+      expect(failure.code).toBe('transport');
+      expect(failure.cause).toBe(originalError);
+      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
     });
   });
 
@@ -877,9 +937,13 @@ describe('eventsService', () => {
       // success here is what would tell the user their edit saved.
       backend.rows = [row({ id: 'someone-elses' })];
 
-      await expect(eventsService.updateEvent('event-1', { label: 'x' })).rejects.toThrow(
-        'Event not found or not yours to edit'
+      const failure = await eventWriteFailure(
+        eventsService.updateEvent('event-1', { label: 'x' })
       );
+      expect(failure).toMatchObject({
+        code: 'not-found',
+        message: 'Event not found or not yours to edit',
+      });
     });
 
     it('does not dress a zero-row write up as a network problem', async () => {
@@ -893,28 +957,69 @@ describe('eventsService', () => {
     it('throws before any request when the device is offline', async () => {
       setOnline(false);
 
-      await expect(eventsService.updateEvent('event-1', { label: 'x' })).rejects.toThrow(
-        'You are offline. Events need a connection to save.'
+      const failure = await eventWriteFailure(
+        eventsService.updateEvent('event-1', { label: 'x' })
       );
+      expect(failure).toMatchObject({
+        code: 'offline',
+        message: 'You are offline. Events need a connection to save.',
+      });
       expect(backend.fromCalls).toBe(0);
     });
 
     it('refuses an unreadable date before issuing any request', async () => {
       backend.rows = [row({ id: 'event-1' })];
 
-      await expect(
+      const failure = await eventWriteFailure(
         eventsService.updateEvent('event-1', { eventDate: '2026-02-30' })
-      ).rejects.toThrow('Not a valid calendar date: 2026-02-30');
+      );
+      expect(failure).toMatchObject({
+        code: 'validation',
+        message: 'Not a valid calendar date: 2026-02-30',
+      });
       expect(backend.fromCalls).toBe(0);
+    });
+
+    it('codes an unreadable updated row as an invalid response', async () => {
+      backend.rows = [row({ id: 'event-1', event_date: 'infinity' })];
+
+      const failure = await eventWriteFailure(
+        eventsService.updateEvent('event-1', { label: 'Renamed' })
+      );
+
+      expect(failure).toMatchObject({
+        code: 'invalid-response',
+        message: 'The event was saved but its date could not be read',
+      });
     });
 
     it('surfaces the reason when the update is rejected', async () => {
       backend.rows = [row({ id: 'event-1' })];
       backend.nextError = { code: '42501', message: 'permission denied', details: '', hint: '' };
 
-      await expect(eventsService.updateEvent('event-1', { label: 'x' })).rejects.toThrow(
-        /Permission denied - check Row Level Security policies/
+      const failure = await eventWriteFailure(
+        eventsService.updateEvent('event-1', { label: 'x' })
       );
+      expect(failure.code).toBe('transport');
+      expect(failure.message).toMatch(/Permission denied - check Row Level Security policies/);
+    });
+
+    it('codes a mid-flight network failure as transport', async () => {
+      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalStack = originalError.stack;
+      backend.nextError = originalError;
+
+      const failure = await eventWriteFailure(
+        eventsService.updateEvent('event-1', { label: 'x' })
+      );
+
+      expect(failure).toMatchObject({
+        code: 'transport',
+        message:
+          '[EventsService.updateEvent] Network error: fetch failed. Check your internet connection.',
+      });
+      expect(failure.cause).toBe(originalError);
+      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
     });
   });
 
@@ -934,25 +1039,91 @@ describe('eventsService', () => {
     it('throws when the delete matched no row — the same silent RLS filter', async () => {
       backend.rows = [row({ id: 'someone-elses' })];
 
-      await expect(eventsService.deleteEvent('event-1')).rejects.toThrow(
-        'Event not found or not yours to delete'
-      );
+      const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
+      expect(failure).toMatchObject({
+        code: 'not-found',
+        message: 'Event not found or not yours to delete',
+      });
       expect(backend.rows).toHaveLength(1);
     });
 
     it('throws before any request when the device is offline', async () => {
       setOnline(false);
 
-      await expect(eventsService.deleteEvent('event-1')).rejects.toThrow('You are offline. Events need a connection to save.');
+      const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
+      expect(failure).toMatchObject({
+        code: 'offline',
+        message: 'You are offline. Events need a connection to save.',
+      });
       expect(backend.fromCalls).toBe(0);
     });
 
     it('surfaces the reason when the delete is rejected', async () => {
       backend.nextError = { code: '42501', message: 'permission denied', details: '', hint: '' };
 
-      await expect(eventsService.deleteEvent('event-1')).rejects.toThrow(
-        /Permission denied - check Row Level Security policies/
+      const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
+      expect(failure.code).toBe('transport');
+      expect(failure.message).toMatch(/Permission denied - check Row Level Security policies/);
+    });
+
+    it('codes a mid-flight network failure as transport', async () => {
+      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalStack = originalError.stack;
+      backend.nextError = originalError;
+
+      const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
+
+      expect(failure).toMatchObject({
+        code: 'transport',
+        message:
+          '[EventsService.deleteEvent] Network error: fetch failed. Check your internet connection.',
+      });
+      expect(failure.cause).toBe(originalError);
+      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
+    });
+  });
+
+  describe.each([
+    [
+      'createEvent',
+      () => eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' }),
+    ],
+    ['updateEvent', () => eventsService.updateEvent('event-1', { label: 'x' })],
+    ['deleteEvent', () => eventsService.deleteEvent('event-1')],
+  ] as const)('%s transport rejections', (operation, write) => {
+    it('preserves a rejected TypeError and its diagnostics as the cause', async () => {
+      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalStack = originalError.stack;
+      backend.nextRejection = { reason: originalError };
+
+      const failure = await eventWriteFailure(write());
+
+      expect(failure.code).toBe('transport');
+      expect(failure.message).toBe(
+        `[EventsService.${operation}] Network error: fetch failed. Check your internet connection.`
       );
+      expect(failure.cause).toBe(originalError);
+      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
+    });
+
+    it.each([
+      ['object', { message: 'socket closed', retryable: true }],
+      ['string', 'socket closed'],
+      ['number', 0],
+      ['boolean', false],
+      ['null', null],
+      ['undefined', undefined],
+    ])('preserves a thrown %s as the cause with the fallback message', async (_kind, reason) => {
+      backend.nextRejection = { reason };
+
+      const failure = await eventWriteFailure(write());
+
+      expect(failure.code).toBe('transport');
+      expect(failure.message).toBe(
+        `[EventsService.${operation}] Network error: Unknown network error. Check your internet connection.`
+      );
+      expect(failure).toHaveProperty('cause');
+      expect(failure.cause).toBe(reason);
     });
   });
 });

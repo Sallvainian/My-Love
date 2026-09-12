@@ -1,0 +1,25 @@
+{
+  "generation": "complete",
+  "live_api_e2e": "not-run",
+  "runtime_blocker": "supabase start exited 1: Docker socket unavailable",
+  "discovered_tests": 8,
+  "new_api_tests": 4,
+  "new_e2e_tests": 4,
+  "priorities": {
+    "P0": 0,
+    "P1": 7,
+    "P2": 1,
+    "P3": 0
+  },
+  "unit_regressions": {
+    "files": 5,
+    "passed": 173,
+    "failed": 0
+  },
+  "typecheck_exit": 0,
+  "lint_exit": 0,
+  "lint_existing_warnings": 3,
+  "generated_lint_exit": 0,
+  "parallel_runtime": "not-run",
+  "burn_in": "not-run"
+}

@@ -93,13 +93,17 @@ const LAST_WELCOME_VIEW_KEY = 'lastWelcomeView';
 const HOME_MAX_EVENT_CARDS = 6;
 
 function App() {
-  const { settings, isLoading, currentView, isOnline, events } = useAppStore(
+  const {
+    settings, isLoading, currentView, isOnline, events, authUserId, authSessionVersion,
+  } = useAppStore(
     useShallow((s) => ({
       settings: s.settings,
       isLoading: s.isLoading,
       currentView: s.currentView,
       isOnline: s.syncStatus.isOnline,
       events: s.events,
+      authUserId: s.userId,
+      authSessionVersion: s.authSessionVersion,
     }))
   );
   const initializeApp = useAppStore((s) => s.initializeApp);
@@ -114,21 +118,13 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [needsDisplayName, setNeedsDisplayName] = useState(false);
 
-  // Story 3 (dynamic events): which account's first loadEvents() has come back.
-  // Home's events slot stays empty rather than showing the "no upcoming events"
-  // placeholder until this matches the current user, so the placeholder never
-  // flashes before the first response — and it re-arms both for the next
-  // account on a switch and, via the sign-out branch below, for a re-sign-in of
-  // the same account. Declared here, alongside the other auth state, because
-  // that sign-out reset runs in the auth listener further down.
-  const [eventsSettledForUserId, setEventsSettledForUserId] = useState<string | null>(null);
-  // Whether that settle was a FAILED load. loadEvents never rejects — it parks
-  // the reason in eventsError and resolves — so the .finally gate alone reads
-  // "settled" for a load that returned nothing, and Home would tell an offline
-  // user "No upcoming events yet.". Snapshotted at settle time rather than
-  // subscribed live, so a later write failure parking its own eventsError
-  // cannot flip a successfully-loaded slot into the error state.
-  const [eventsLoadFailed, setEventsLoadFailed] = useState(false);
+  // App survives sign-out. A settled result belongs to one authentication
+  // lifetime, even when the same account signs back in before React renders.
+  const [eventsSettlement, setEventsSettlement] = useState<{
+    userId: string;
+    authSessionVersion: number;
+    failed: boolean;
+  } | null>(null);
 
   // Helper function to check if welcome splash should be shown
   const shouldShowWelcome = (): boolean => {
@@ -283,17 +279,7 @@ function App() {
         } else {
           clearStoreAuth();
           setNeedsDisplayName(false);
-          // Re-arm Home's events gate. App stays mounted across a sign-out —
-          // the `!session` branch returns the login screen from inside this
-          // component — while clearStoreAuth empties `events` via
-          // signedOutState() (authSlice.ts). Without this reset, signing back
-          // in as the SAME account finds eventsSettledForUserId already equal
-          // to the user id, so firstEventsLoadSettled is true against an empty
-          // list and the "no upcoming events" placeholder paints before the
-          // refetch lands. Keying the load effect on the user id covers an
-          // account switch; only this covers a re-sign-in of the same account.
-          setEventsSettledForUserId(null);
-          setEventsLoadFailed(false);
+          setEventsSettlement(null);
           logger.debug('[App] Auth state changed: signed out');
         }
       }
@@ -424,33 +410,28 @@ function App() {
   // both "first load" and "B's next load of Home" (CAP-1). No live
   // subscription: freshness is reload-based only, by design.
   //
-  // Depends on the signed-in user's id, never `session` itself and never a
-  // bare boolean. onAuthStateChange (sessionService.ts) invokes its callback —
-  // and therefore setSession — on every auth event, including periodic
-  // TOKEN_REFRESHED, each producing a new Session object reference, so keying
-  // on `session` would re-fire loadEvents() on every token refresh. A bare
-  // Boolean(session) fixes that but breaks the opposite case: signing in over
-  // a live session routes through setAuthUser's account-switch branch
-  // (authSlice.ts), which empties `events` via signedOutState(), while
-  // `currentView` is left at 'home' — so with a boolean key neither dependency
-  // changes, loadEvents() never re-fires, and the new account sits on the
-  // empty-state placeholder until it navigates away and back. The user id is
-  // stable across token refreshes and changes on exactly that switch.
-  const authUserId = session?.user?.id ?? null;
-
+  // Store ownership changes synchronously at sign-out/account transitions;
+  // same-session token refreshes leave it stable and do not reload events.
   const firstEventsLoadSettled =
-    eventsSettledForUserId !== null && eventsSettledForUserId === authUserId;
+    eventsSettlement !== null &&
+    eventsSettlement.userId === authUserId &&
+    eventsSettlement.authSessionVersion === authSessionVersion;
+  const eventsLoadFailed = firstEventsLoadSettled && eventsSettlement.failed;
 
   useEffect(() => {
     if (!authUserId || currentView !== 'home') return;
 
     let cancelled = false;
-    void loadEvents().finally(() => {
-      if (cancelled) return;
-      // loadEvents cleared eventsError on entry, so non-null here means THIS
-      // load failed — the one signal the resolved-void promise cannot carry.
-      setEventsLoadFailed(useAppStore.getState().eventsError !== null);
-      setEventsSettledForUserId(authUserId);
+    void loadEvents().then((result) => {
+      if (cancelled || result.status === 'stale') return;
+      // A promise can finish after auth changes but before effect cleanup.
+      const state = useAppStore.getState();
+      if (state.userId !== authUserId || state.authSessionVersion !== authSessionVersion) return;
+      setEventsSettlement({
+        userId: authUserId,
+        authSessionVersion,
+        failed: result.status === 'failure',
+      });
     });
 
     return () => {
@@ -460,7 +441,7 @@ function App() {
     // the load, so the offline error card clears without leaving Home. The
     // offline-direction re-fire just fails fast into the same parked error,
     // and a failed refresh never blanks the last-good list (eventsSlice).
-  }, [authUserId, currentView, isOnline, loadEvents]);
+  }, [authUserId, authSessionVersion, currentView, isOnline, loadEvents]);
 
   // Bumped when a card retires itself at local midnight, purely to re-run the
   // filter and slot decision below. Not a timer of its own: it rides the

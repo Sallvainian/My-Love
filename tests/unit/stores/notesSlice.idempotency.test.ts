@@ -32,6 +32,8 @@ const USER_ID = '00000000-0000-4000-8000-0000000000a0';
 
 /** Rows the "server" holds, plus a switch to drop the next response */
 const backend = {
+  writeError: null as { code: string; message: string; details: string; hint: string } | null,
+  waitForWrite: null as Promise<void> | null,
   rows: [] as FakeRow[],
   seq: 0,
   /** Commit the next write, then fail the client's response path */
@@ -41,6 +43,8 @@ const backend = {
   /** Fail the next plain read, as a dead network would */
   failNextLookup: false,
   reset() {
+    this.writeError = null;
+    this.waitForWrite = null;
     this.rows = [];
     this.seq = 0;
     this.loseNextResponse = false;
@@ -107,6 +111,8 @@ function fakeFrom(table: string) {
     },
     async maybeSingle() {
       if (writeRejected) {
+        await backend.waitForWrite;
+        if (backend.writeError) return { data: null, error: backend.writeError };
         return { data: null, error: { message: 'insert rejected' } };
       }
       if (isInsert && backend.loseNextResponse) {
@@ -114,7 +120,10 @@ function fakeFrom(table: string) {
         // Row is committed; only the response is lost.
         return { data: null, error: { message: 'network error' } };
       }
-      if (isInsert) return { data: pending, error: null };
+      if (isInsert) {
+        await backend.waitForWrite;
+        return { data: pending, error: null };
+      }
 
       if (backend.failNextLookup) {
         backend.failNextLookup = false;
@@ -175,6 +184,117 @@ describe('notesSlice send idempotency', () => {
   beforeEach(() => {
     backend.reset();
     vi.clearAllMocks();
+  });
+
+  const friendly = 'Some values are not allowed - check length and format limits';
+  const checkError = { code: '23514', message: 'new row violates love_notes constraint', details: 'raw table', hint: '' };
+
+  it('shows CHECK failure for send and retry, then clears it on success with the same key and blob', async () => {
+    const store = createTestStore();
+    mockedUploadCompressedBlob.mockResolvedValue({ storagePath: `${USER_ID}/image.jpg`, compressedSize: 3 });
+    backend.failNextWrite = true;
+    backend.writeError = checkError;
+    await expect(store.getState().sendNote('hello', new File(['abc'], 'image.jpg', { type: 'image/jpeg' }))).resolves.toBeUndefined();
+    const failed = store.getState().notes[0];
+    expect(failed.error).toBe(true);
+    expect(failed.imageBlob).toBeDefined();
+    expect(store.getState().notesError).toBe(friendly);
+    expect(mockedDeleteLoveNoteImage).toHaveBeenCalledWith(`${USER_ID}/image.jpg`);
+    store.setState({ notesError: null });
+    backend.failNextWrite = true;
+    await expect(store.getState().retryFailedMessage(failed.tempId!)).resolves.toBeUndefined();
+    expect(store.getState().notesError).toBe(friendly);
+    expect(store.getState().notes[0].imageBlob).toBe(failed.imageBlob);
+    backend.writeError = null;
+    await store.getState().retryFailedMessage(failed.tempId!);
+    expect(store.getState().notesError).toBeNull();
+    expect(backend.rows).toHaveLength(1);
+    expect(backend.rows[0].idempotency_key).toBe(failed.tempId);
+    expect(store.getState().notes[0].error).toBe(false);
+  });
+
+  it.each(['send', 'retry'] as const)('ignores a delayed old-account CHECK response during %s', async (action) => {
+    const store = createTestStore();
+    backend.failNextWrite = true;
+    if (action === 'retry') await store.getState().sendNote('first');
+    backend.failNextWrite = true;
+    backend.writeError = checkError;
+    let resolve!: () => void;
+    backend.waitForWrite = new Promise<void>((done) => { resolve = done; });
+    const pending = action === 'send' ? store.getState().sendNote('hello') : store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
+    await vi.waitFor(() => expect(backend.failNextWrite).toBe(false));
+    store.setState({ userId: PARTNER_ID, notes: [], notesError: 'new account error' });
+    resolve();
+    await pending;
+    expect(store.getState().notesError).toBe('new account error');
+    expect(store.getState().notes).toEqual([]);
+  });
+
+  it.each(['send', 'retry'] as const)('ignores a delayed old-account successful response during %s', async (action) => {
+    const store = createTestStore();
+    if (action === 'retry') {
+      backend.failNextWrite = true;
+      await store.getState().sendNote('first');
+    }
+    let resolve!: () => void;
+    backend.waitForWrite = new Promise<void>((done) => { resolve = done; });
+    const pending = action === 'send'
+      ? store.getState().sendNote('hello')
+      : store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
+    await vi.waitFor(() => expect(backend.rows).toHaveLength(1));
+
+    const newAccountNotes = [{
+      id: 'new-account-note',
+      from_user_id: PARTNER_ID,
+      to_user_id: USER_ID,
+      content: 'new account message',
+      created_at: new Date().toISOString(),
+    }];
+    const newAccountTimestamps = [Date.now() - 100];
+    store.setState({
+      userId: PARTNER_ID,
+      notes: newAccountNotes,
+      notesError: friendly,
+      sentMessageTimestamps: newAccountTimestamps,
+    });
+    resolve();
+    await pending;
+
+    expect(store.getState().notesError).toBe(friendly);
+    expect(store.getState().notes).toBe(newAccountNotes);
+    expect(store.getState().sentMessageTimestamps).toBe(newAccountTimestamps);
+  });
+
+  it.each(['send', 'retry'] as const)('preserves unrelated errors on %s recovery', async (action) => {
+    const store = createTestStore();
+    backend.failNextWrite = true;
+    await store.getState().sendNote('first');
+    store.setState({ notesError: 'unrelated error' });
+    if (action === 'send') await store.getState().sendNote('second');
+    else await store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
+    expect(store.getState().notesError).toBe('unrelated error');
+  });
+
+  it('clears the CHECK banner on a successful new send', async () => {
+    const store = createTestStore();
+    backend.failNextWrite = true;
+    backend.writeError = checkError;
+    await store.getState().sendNote('first');
+    expect(store.getState().notesError).toBe(friendly);
+    await store.getState().sendNote('second');
+    expect(store.getState().notesError).toBeNull();
+  });
+
+  it('retains non-CHECK failure presentation on send and retry', async () => {
+    const store = createTestStore();
+    store.setState({ notesError: 'existing error' });
+    backend.writeError = { ...checkError, code: '23502' };
+    backend.failNextWrite = true;
+    await store.getState().sendNote('first');
+    backend.failNextWrite = true;
+    await store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
+    expect(store.getState().notesError).toBe('existing error');
+    expect(store.getState().notes[0].error).toBe(true);
   });
 
   it('sends a note with the composed message tempId as its idempotency key', async () => {

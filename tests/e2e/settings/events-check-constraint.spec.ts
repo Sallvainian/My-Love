@@ -43,10 +43,9 @@
  * a 101-character label at component level. Re-testing it through a browser
  * would be the same claim, slower and more brittle.
  *
- * User-id resolution and event clearing mirror
- * `tests/e2e/settings/events-crud.spec.ts:37-89`, which in turn mirrors
- * `tests/e2e/home/events.spec.ts`; kept self-contained here for the same reason
- * both of those are — the factory helper they mirror is not exported.
+ * User-id resolution and event clearing stay self-contained because this
+ * constraint-only case predates the shared lifecycle helper and does not need
+ * the broader seed/date surface used by the activated event suites.
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';

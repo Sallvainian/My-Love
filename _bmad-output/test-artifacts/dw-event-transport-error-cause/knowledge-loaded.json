@@ -1,0 +1,290 @@
+{
+  "run_key": "dw-event-transport-error-cause",
+  "workflow": "bmad-testarch-automate",
+  "created": "2026-09-11",
+  "artifact_status": "complete",
+  "test_validation_status": "passed",
+  "summary": "_bmad-output/test-artifacts/automation-summary-dw-event-transport-error-cause.md",
+  "configured_test_artifacts": "_bmad-output/test-artifacts",
+  "knowledge_fragment_count": 28,
+  "knowledge_fragments": [
+    {
+      "name": "test-levels-framework.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/test-levels-framework.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "80bbac7959a47a2e7e7de82613296f906954d571d2d64ece13381c1a0b480237"
+    },
+    {
+      "name": "test-priorities-matrix.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/test-priorities-matrix.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "69d8a0d4a717077dec08799630dfcd790342c86ff52dc43a31c5cdbcd03099a9"
+    },
+    {
+      "name": "data-factories.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/data-factories.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "036572ce6222b98829c681c9c2cebc54fa89d670356e4bc7d50e402af91f587d"
+    },
+    {
+      "name": "selective-testing.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/selective-testing.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "060651774648174fdbff0fe7b858bd81d7c3bce8ee5a53ed7c1ba56e4dd4bbe0"
+    },
+    {
+      "name": "ci-burn-in.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/ci-burn-in.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "cc9ca53c62b910872e399ec1d378542e211e70563ddbce9aba84af253e0c74ac"
+    },
+    {
+      "name": "test-quality.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/test-quality.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "d29d97571514d0c191200ed25047a0a5f68c23eeb8a99a4d0dfeff2c33d12fa9"
+    },
+    {
+      "name": "risk-governance.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/risk-governance.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "ec1da83d8d6a338b6c10160e2a1dfd5a03b4d2ec4c2f426844d4cc1bc8a0acdc"
+    },
+    {
+      "name": "probability-impact.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/probability-impact.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "3d301193efb3f466768289f108ae824aa9792b9aab1c8e97c61bb6422e2f895a"
+    },
+    {
+      "name": "confidence-gate.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/confidence-gate.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "7f1efe0240565332e0c0cecf62e2ef1882ef8d800b9be64a6f622cee9a8fdfab"
+    },
+    {
+      "name": "evidence-integrity.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/evidence-integrity.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "0fa16d90af59971f9d820b3db9ad8926ef87c70fd7675b365561954c65593633"
+    },
+    {
+      "name": "pact-mcp.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/pact-mcp.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "e84a339df5fdfacafed538fcc2f0f8386a02a135f51f810235a05b0caa184fcb"
+    },
+    {
+      "name": "playwright-cli.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/playwright-cli.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "provenance": "direct full read",
+      "sha256": "f0aaff215a5da05d900c7f6d1eef70a3ea97637788ac37aadf5779ec24d91c09"
+    },
+    {
+      "name": "playwright-utils-mandate.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/playwright-utils-mandate.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "d59b1a6e29d6b39dbf0dbf5e7b5f8d007a90cd979d47e437661a6fd85d8a73ed"
+    },
+    {
+      "name": "library-integration-mandate.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/library-integration-mandate.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "b38d83dff663fe8f5d2fcbd8d7108d316cdacb1c919b47a4b7a5ffee1e7c4c91"
+    },
+    {
+      "name": "overview.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/overview.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "eb9415d849698671b6fb763740d7b58ef9886911da895110da1ac73e2122c7e4"
+    },
+    {
+      "name": "api-request.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/api-request.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "28ef34b911b6d9cde3cb06367ecb6686f893236ed8f67975eaf6737f44f6e698"
+    },
+    {
+      "name": "network-recorder.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/network-recorder.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "6ae5ee35a9f1816dc4bf7c4573f6be931a16567d697ff463867819cc39a3268d"
+    },
+    {
+      "name": "auth-session.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/auth-session.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "3b2ba3cdd58cf3decb3d427623ed43e070ff926b1c45abc0e7d0823ea3b85b1f"
+    },
+    {
+      "name": "intercept-network-call.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/intercept-network-call.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "ac8213cc28a9f9c452a6fb419356dd1d66ce495d7f29d188fcb1bb51456ba869"
+    },
+    {
+      "name": "recurse.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/recurse.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "cf6e8fa4f0d40098004b36b79262773ae1ebe058a8275b3a6ec3ec4b9c1f6e8c"
+    },
+    {
+      "name": "log.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/log.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "ef73615ce4535d4571567191ee9dc382cb87fd1eb75d3ee7e62f8f5dc9ca4c46"
+    },
+    {
+      "name": "file-utils.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/file-utils.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "7d1092930118fb160b9c0a4a48c398d9b08bb909d1e2432662d8e81e1e3b0087"
+    },
+    {
+      "name": "burn-in.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/burn-in.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "8c305ebbc87d38c5a2787f2cd52133e43de400ad59b5adc6dd9aeca6ac89cbac"
+    },
+    {
+      "name": "network-error-monitor.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/network-error-monitor.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "4bb78d35d4607cdfacf19919b52d334ea96ffd7ef85e1537a3eb5c51cff91b43"
+    },
+    {
+      "name": "fixtures-composition.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/fixtures-composition.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "4a6e655e78ffeaedfa6f2919b14735c5d83d177db75745595bb3ab8d7a004c2b"
+    },
+    {
+      "name": "fixture-architecture.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/fixture-architecture.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "c0c62381e7a0385fe0d8b59861a3756994d3bbc673e4605ded9607d5217c7e55"
+    },
+    {
+      "name": "network-first.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/network-first.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "2920e58e145626f5505bcb75e263dbd0e6ac79a8c4c2ec138f5329e06a6ac014"
+    },
+    {
+      "name": "selector-resilience.md",
+      "path": ".agents/skills/bmad-testarch-automate/resources/knowledge/selector-resilience.md",
+      "read_status": "full-text-read",
+      "reader": "/root/fixture_research",
+      "provenance": "reader confirmation received in this run",
+      "sha256": "a55c25a340f1cd10811802665754a3f4eab0c82868fea61fea9cc61aa47ac179"
+    }
+  ],
+  "workflow_documents": [
+    {
+      "path": ".agents/skills/bmad-testarch-automate/steps-c/step-04-validate-and-summarize.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "sha256": "e95cf484ea9c958d8e5362e96f8ccdb3d3468067399ca856ecedf01d68b9ac71"
+    },
+    {
+      "path": ".agents/skills/bmad-testarch-automate/checklist.md",
+      "read_status": "full-text-read",
+      "reader": "/root/quality_requirements",
+      "sha256": "7d2ff94c027986b274d9ebf02b0606bcbb527937e2bfda7cbd944ff1db5d9d2b"
+    }
+  ],
+  "external_skill_reads": [
+    {
+      "path": "/Users/sallvain/.agents/skills/playwright-cli/SKILL.md",
+      "reader": "/root/fixture_research",
+      "read_status": "full-text-read",
+      "provenance": "reader confirmation received in this run"
+    }
+  ],
+  "checklist_reference_resolution": {
+    "test-priorities.md": "test-priorities-matrix.md"
+  },
+  "tooling": {
+    "tea_use_playwright_utils": true,
+    "tea_use_pactjs_utils": true,
+    "pact_mcp_reachable": false,
+    "pact_probe_source": "Saved workflow preflight: SmartBear MCP tools absent; no broker or credential probes performed.",
+    "pact_artifacts_in_scope": false,
+    "pact_scope_reason": "Diagnostic cause retention creates no new consumer/provider contract surface.",
+    "browser_cli_available": true,
+    "browser_mcp_available": true
+  },
+  "planned_tests": {
+    "generated_api": 3,
+    "generated_e2e": 1,
+    "generated_priority_counts": {
+      "P0": 0,
+      "P1": 0,
+      "P2": 4,
+      "P3": 0
+    },
+    "existing_unit_acceptance_expected": 131,
+    "executed_counts": null
+  },
+  "evidence_limitations": [
+    "The manifest records knowledge loading, not test execution or passing validation.",
+    "API coverage uses controlled installed-SDK transport and observes the service/SDK envelope boundary, not live HTTP.",
+    "Original caught-value identity is specified at the service boundary; upstream SDK transformations are outside that identity claim.",
+    "Generated tests are retained as artifacts; temporary active-test copies must be removed after validation."
+  ],
+  "validation_status": "passed"
+}

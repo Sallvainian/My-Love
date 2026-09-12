@@ -428,3 +428,20 @@ describe('scriptureReadingService', () => {
 // These tests exercise the actual scriptureReadingService singleton methods
 // with mocked Supabase, verifying write-through, cache-first, and error paths.
 // ============================================================================
+
+
+describe('reflection RPC error presentation', () => {
+  it.each(['23514', '23502'])('preserves wrapper and original diagnostics for %s', async (code) => {
+    const { supabase } = await import('../../../src/api/supabaseClient');
+    const { scriptureReadingService, ScriptureErrorCode } = await import('../../../src/services/scriptureReadingService');
+    const error = { code, message: 'raw reflection constraint', details: 'row details', hint: 'hint', name: 'PostgrestError' };
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error, count: null, status: 400, statusText: 'Bad Request' });
+    const cache = vi.spyOn(scriptureReadingService as unknown as { cacheReflection: () => Promise<void> }, 'cacheReflection');
+    const failure = await scriptureReadingService.addReflection('session-1', 1, 4, 'text', false).catch((err: unknown) => err);
+    expect(failure).toEqual({ code: ScriptureErrorCode.SYNC_FAILED, message: `Failed to submit reflection: ${code === '23514' ? 'Some values are not allowed - check length and format limits' : error.message}`, details: error });
+    expect((failure as { details: unknown }).details).toBe(error);
+    expect(failure).not.toBeInstanceOf(Error);
+    expect(cache).not.toHaveBeenCalled();
+    cache.mockRestore();
+  });
+});

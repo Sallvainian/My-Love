@@ -1,0 +1,23 @@
+{
+  "detected_stack": "frontend",
+  "execution_mode": "agent-team",
+  "total_tests": 8,
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 7,
+    "P2": 1,
+    "P3": 0
+  },
+  "files": [
+    "tests/api/check-error-write-boundaries.spec.ts",
+    "tests/e2e/errors/check-error-path-consistency.spec.ts",
+    "tests/support/factories/check-write-payloads.ts",
+    "tests/support/factories/check-error-path-data.ts"
+  ],
+  "api_tests": 4,
+  "e2e_tests": 4,
+  "fixtures_created": [
+    "tests/support/factories/check-write-payloads.ts",
+    "tests/support/factories/check-error-path-data.ts"
+  ]
+}

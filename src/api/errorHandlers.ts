@@ -9,6 +9,8 @@
 
 import { PostgrestError } from '@supabase/supabase-js';
 
+export const CHECK_CONSTRAINT_MESSAGE = 'Some values are not allowed - check length and format limits';
+
 /**
  * Internal error class for Supabase service errors
  * Used by error handlers in this module
@@ -63,14 +65,20 @@ export const handleSupabaseError = (
     '23505': 'This record already exists',
     '23503': 'Referenced record not found',
     '23502': 'Required field is missing',
-    '23514': 'Some values are not allowed - check length and format limits',
+    '23514': CHECK_CONSTRAINT_MESSAGE,
     '42501': 'Permission denied - check Row Level Security policies',
     '42P01': 'Table not found - database schema may be out of sync',
     PGRST116: 'No rows found',
     PGRST301: 'Invalid request parameters',
   };
 
-  const userMessage = errorMessages[error.code] || `Database error: ${error.message}`;
+  const userMessage =
+    errorMessages[error.code] ||
+    `Database error: ${
+      error.message == null || (typeof error.message === 'string' && !error.message.trim())
+        ? 'An unknown database error occurred'
+        : error.message
+    }`;
 
   return new SupabaseServiceError(
     `${contextPrefix}${userMessage}`,

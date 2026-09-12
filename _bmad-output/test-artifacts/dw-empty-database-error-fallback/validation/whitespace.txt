@@ -1,0 +1,2 @@
+git diff --check: exit 0.
+Source snapshot hashes, JSON, local document links, original ledger hash, and unchanged handler bytes verified.

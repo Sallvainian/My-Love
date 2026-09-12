@@ -1,0 +1,14 @@
+{
+  "rawApplicationRoute": true,
+  "rawResponseWait": true,
+  "rawRequest": true,
+  "hardWait": true,
+  "consoleLogging": true,
+  "focusedOrSkippedTest": true,
+  "directTestImport": true,
+  "interceptBeforeNavigation": true,
+  "newErrorBeforeStoreAssertion": true,
+  "sdkFetchDeviationDocumented": true,
+  "protectedFilesUnchanged": true,
+  "handlerMatchesHead": true
+}
