@@ -1,0 +1,90 @@
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+[global-setup] Provisioned 10 worker pairs + legacy users
+
+Running 2 tests using 1 worker
+
+(node:32140) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+[06:05:36] ==== Polling: Wait for both white PNGs, fonts, and image opacity transitions ====
+
+[06:05:37] ==== ✅ Wait for both white PNGs, fonts, and image opacity transitions - completed successfully after 4 iterations ====
+
+[06:05:37] ==== Measure the rendered own-photo badge over decoded white image pixels ====
+
+  ✘  1 [chromium] › tests/e2e/photos/own-photo-badge-contrast.spec.ts:35:5 › DW-59 own-photo badge (light) › [P1] DW59-E2E-001-light loaded white photo has opaque white-on-pink contrast >=4.5 (650ms)
+(node:32150) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ secrets for agents [www.dotenvx.com]
+[06:05:38] ==== Polling: Wait for both white PNGs, fonts, and image opacity transitions ====
+
+[06:05:38] ==== ✅ Wait for both white PNGs, fonts, and image opacity transitions - completed successfully after 4 iterations ====
+
+[06:05:38] ==== Measure the rendered own-photo badge over decoded white image pixels ====
+
+  ✘  2 [chromium] › tests/e2e/photos/own-photo-badge-contrast.spec.ts:35:5 › DW-59 own-photo badge (dark) › [P1] DW59-E2E-001-dark loaded white photo has opaque white-on-pink contrast >=4.5 (649ms)
+
+
+  1) [chromium] › tests/e2e/photos/own-photo-badge-contrast.spec.ts:35:5 › DW-59 own-photo badge (light) › [P1] DW59-E2E-001-light loaded white photo has opaque white-on-pink contrast >=4.5 
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 4.5
+    Received:    4.28750627651904
+
+      47 |         expect(measurement.image.opacity).toBe(1);
+      48 |         expect(measurement.foreground).toEqual([255, 255, 255, 255]);
+    > 49 |         expect(measurement.contrast).toBeGreaterThanOrEqual(4.5);
+         |                                      ^
+      50 |         expect(measurement.background).toEqual(measurement.palettePink);
+      51 |         expect(measurement.background[3]).toBe(255);
+      52 |         for (const opacity of measurement.ancestorOpacities) expect(opacity).toBe(1);
+        at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts:49:38
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/photos-own-photo-badge-con-a7daf--white-on-pink-contrast-4-5-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/photos-own-photo-badge-con-a7daf--white-on-pink-contrast-4-5-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/photos-own-photo-badge-con-a7daf--white-on-pink-contrast-4-5-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/photos-own-photo-badge-con-a7daf--white-on-pink-contrast-4-5-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › tests/e2e/photos/own-photo-badge-contrast.spec.ts:35:5 › DW-59 own-photo badge (dark) › [P1] DW59-E2E-001-dark loaded white photo has opaque white-on-pink contrast >=4.5 
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 4.5
+    Received:    4.28750627651904
+
+      47 |         expect(measurement.image.opacity).toBe(1);
+      48 |         expect(measurement.foreground).toEqual([255, 255, 255, 255]);
+    > 49 |         expect(measurement.contrast).toBeGreaterThanOrEqual(4.5);
+         |                                      ^
+      50 |         expect(measurement.background).toEqual(measurement.palettePink);
+      51 |         expect(measurement.background[3]).toBe(255);
+      52 |         for (const opacity of measurement.ancestorOpacities) expect(opacity).toBe(1);
+        at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts:49:38
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/photos-own-photo-badge-con-2370f--white-on-pink-contrast-4-5-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/photos-own-photo-badge-con-2370f--white-on-pink-contrast-4-5-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/photos-own-photo-badge-con-2370f--white-on-pink-contrast-4-5-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/photos-own-photo-badge-con-2370f--white-on-pink-contrast-4-5-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    [chromium] › tests/e2e/photos/own-photo-badge-contrast.spec.ts:35:5 › DW-59 own-photo badge (light) › [P1] DW59-E2E-001-light loaded white photo has opaque white-on-pink contrast >=4.5 
+    [chromium] › tests/e2e/photos/own-photo-badge-contrast.spec.ts:35:5 › DW-59 own-photo badge (dark) › [P1] DW59-E2E-001-dark loaded white photo has opaque white-on-pink contrast >=4.5 

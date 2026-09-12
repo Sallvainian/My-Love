@@ -1,0 +1,50 @@
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ secrets for agents [www.dotenvx.com]
+[global-setup] Provisioned 10 worker pairs + legacy users
+
+Running 4 tests using 1 worker
+
+(node:32042) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+[06:04:53] ==== Polling: Wait for both white PNGs, fonts, and image opacity transitions ====
+
+[06:04:53] ==== ✅ Wait for both white PNGs, fonts, and image opacity transitions - completed successfully after 4 iterations ====
+
+[06:04:53] ==== Measure the rendered own-photo badge over decoded white image pixels ====
+
+  ✓  1 [chromium] › tests/e2e/photos/own-photo-badge-contrast.spec.ts:35:5 › DW-59 own-photo badge (light) › [P1] DW59-E2E-001-light loaded white photo has opaque white-on-pink contrast >=4.5 (991ms)
+[06:04:53] ==== Polling: Wait for both white PNGs, fonts, and image opacity transitions ====
+
+[06:04:54] ==== ✅ Wait for both white PNGs, fonts, and image opacity transitions - completed successfully after 5 iterations ====
+
+[06:04:54] ==== Verify stable geometry, User glyph, and partner styling ====
+
+[06:04:54] ==== Reveal the caption, then select the own photo once per input action ====
+
+[06:04:54] ==== Polling: Wait for hover transitions ====
+
+[06:04:54] ==== ✅ Wait for hover transitions - completed successfully after 2 iterations ====
+
+  ✓  2 [chromium] › tests/e2e/photos/own-photo-badge-contrast.spec.ts:60:5 › DW-59 own-photo badge (light) › [P2] DW59-E2E-002-light preserves badge, partner, image, caption, and selection behavior (1.3s)
+[06:04:55] ==== Polling: Wait for both white PNGs, fonts, and image opacity transitions ====
+
+[06:04:55] ==== ✅ Wait for both white PNGs, fonts, and image opacity transitions - completed successfully after 4 iterations ====
+
+[06:04:55] ==== Measure the rendered own-photo badge over decoded white image pixels ====
+
+  ✓  3 [chromium] › tests/e2e/photos/own-photo-badge-contrast.spec.ts:35:5 › DW-59 own-photo badge (dark) › [P1] DW59-E2E-001-dark loaded white photo has opaque white-on-pink contrast >=4.5 (687ms)
+[06:04:55] ==== Polling: Wait for both white PNGs, fonts, and image opacity transitions ====
+
+[06:04:56] ==== ✅ Wait for both white PNGs, fonts, and image opacity transitions - completed successfully after 4 iterations ====
+
+[06:04:56] ==== Verify stable geometry, User glyph, and partner styling ====
+
+[06:04:56] ==== Reveal the caption, then select the own photo once per input action ====
+
+[06:04:56] ==== Polling: Wait for hover transitions ====
+
+[06:04:56] ==== ✅ Wait for hover transitions - completed successfully after 2 iterations ====
+
+  ✓  4 [chromium] › tests/e2e/photos/own-photo-badge-contrast.spec.ts:60:5 › DW-59 own-photo badge (dark) › [P2] DW59-E2E-002-dark preserves badge, partner, image, caption, and selection behavior (1.2s)
+
+  4 passed (9.1s)
