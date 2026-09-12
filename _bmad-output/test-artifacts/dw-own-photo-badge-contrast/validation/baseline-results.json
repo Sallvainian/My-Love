@@ -1,0 +1,331 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/node_modules/.bin/playwright",
+      "test",
+      "tests/e2e/photos/own-photo-badge-contrast.spec.ts",
+      "--project=chromium",
+      "--workers=1",
+      "--grep",
+      "\\[P1\\]",
+      "--reporter=list,json"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/playwright.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/support/auth/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "api",
+        "name": "api",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/api",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "integration",
+        "name": "integration",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/integration",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": {
+      "command": "npx vite --mode test",
+      "url": "http://localhost:5173",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "e2e/photos/own-photo-badge-contrast.spec.ts",
+      "file": "e2e/photos/own-photo-badge-contrast.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "DW-59 own-photo badge (light)",
+          "file": "e2e/photos/own-photo-badge-contrast.spec.ts",
+          "line": 14,
+          "column": 8,
+          "specs": [
+            {
+              "title": "[P1] DW59-E2E-001-light loaded white photo has opaque white-on-pink contrast >=4.5",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 650,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m4.5\u001b[39m\nReceived:    \u001b[31m4.28750627651904\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m4.5\u001b[39m\nReceived:    \u001b[31m4.28750627651904\u001b[39m\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts:49:38",
+                        "location": {
+                          "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts",
+                          "column": 38,
+                          "line": 49
+                        },
+                        "snippet": "  47 |         expect(measurement.image.opacity).toBe(1);\n  48 |         expect(measurement.foreground).toEqual([255, 255, 255, 255]);\n> 49 |         expect(measurement.contrast).toBeGreaterThanOrEqual(4.5);\n     |                                      ^\n  50 |         expect(measurement.background).toEqual(measurement.palettePink);\n  51 |         expect(measurement.background[3]).toBe(255);\n  52 |         for (const opacity of measurement.ancestorOpacities) expect(opacity).toBe(1);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts",
+                            "column": 38,
+                            "line": 49
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m4.5\u001b[39m\nReceived:    \u001b[31m4.28750627651904\u001b[39m\n\n  47 |         expect(measurement.image.opacity).toBe(1);\n  48 |         expect(measurement.foreground).toEqual([255, 255, 255, 255]);\n> 49 |         expect(measurement.contrast).toBeGreaterThanOrEqual(4.5);\n     |                                      ^\n  50 |         expect(measurement.background).toEqual(measurement.palettePink);\n  51 |         expect(measurement.background[3]).toBe(255);\n  52 |         for (const opacity of measurement.ancestorOpacities) expect(opacity).toBe(1);\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts:49:38"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[06:05:36] \u001b[1m\u001b[36m==== Polling: Wait for both white PNGs, fonts, and image opacity transitions ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[06:05:37] \u001b[1m\u001b[36m==== ✅ Wait for both white PNGs, fonts, and image opacity transitions - completed successfully after 4 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[06:05:37] \u001b[1m\u001b[36m==== Measure the rendered own-photo badge over decoded white image pixels ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Measure the rendered own-photo badge over decoded white image pixels",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T06:05:36.468Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "contrast-light",
+                          "contentType": "application/json",
+                          "body": "ewogICJmb3JlZ3JvdW5kIjogWwogICAgMjU1LAogICAgMjU1LAogICAgMjU1LAogICAgMjU1CiAgXSwKICAiYmFja2dyb3VuZCI6IFsKICAgIDIzMCwKICAgIDAsCiAgICAxMTgsCiAgICAyMzAKICBdLAogICJwYWxldHRlUGluayI6IFsKICAgIDIzMCwKICAgIDAsCiAgICAxMTgsCiAgICAyNTUKICBdLAogICJwYWxldHRlQmx1ZSI6IFsKICAgIDQzLAogICAgMTI3LAogICAgMjU1LAogICAgMjU1CiAgXSwKICAiY29tcG9zaXRlQmFja2dyb3VuZCI6IFsKICAgIDIzMiwKICAgIDI1LAogICAgMTMxLAogICAgMjU1CiAgXSwKICAiY29tcG9zaXRlRm9yZWdyb3VuZCI6IFsKICAgIDI1NSwKICAgIDI1NSwKICAgIDI1NSwKICAgIDI1NQogIF0sCiAgImNvbnRyYXN0IjogNC4yODc1MDYyNzY1MTkwNCwKICAiYW5jZXN0b3JPcGFjaXRpZXMiOiBbCiAgICAxLAogICAgMSwKICAgIDEsCiAgICAxLAogICAgMSwKICAgIDEsCiAgICAxLAogICAgMSwKICAgIDEsCiAgICAxCiAgXSwKICAiaW1hZ2UiOiB7CiAgICAiY29tcGxldGUiOiB0cnVlLAogICAgIm5hdHVyYWxTaXplIjogWwogICAgICAyNDAsCiAgICAgIDI0MAogICAgXSwKICAgICJyZW5kZXJlZFNpemUiOiBbCiAgICAgIDI0MCwKICAgICAgMjQwCiAgICBdLAogICAgInBpeGVsIjogWwogICAgICAyNTUsCiAgICAgIDI1NSwKICAgICAgMjU1LAogICAgICAyNTUKICAgIF0sCiAgICAib3BhY2l0eSI6IDEsCiAgICAib2JqZWN0Rml0IjogImNvdmVyIiwKICAgICJsb2FkaW5nIjogImxhenkiLAogICAgImFsdCI6ICJEVy01OSBicmlnaHQgb3duIHBob3RvIiwKICAgICJpc1BuZ0RhdGFVcmwiOiB0cnVlCiAgfSwKICAiZ2VvbWV0cnkiOiB7CiAgICAiaXRlbVNpemUiOiBbCiAgICAgIDI0MCwKICAgICAgMjQwCiAgICBdLAogICAgIndpZHRoIjogNTMuNDIxODc1LAogICAgImhlaWdodCI6IDI0LAogICAgIm9mZnNldHMiOiB7CiAgICAgICJ0b3AiOiA4LAogICAgICAicmlnaHQiOiA4CiAgICB9LAogICAgInBhZGRpbmciOiBbCiAgICAgIDQsCiAgICAgIDgsCiAgICAgIDQsCiAgICAgIDgKICAgIF0sCiAgICAiZ2FwIjogNCwKICAgICJpY29uU2l6ZSI6IFsKICAgICAgMTIsCiAgICAgIDEyCiAgICBdLAogICAgImZvbnRTaXplIjogMTIsCiAgICAibGluZUhlaWdodCI6IDE2LAogICAgImZvbnRXZWlnaHQiOiAiNTAwIiwKICAgICJyYWRpdXMiOiAzMzU1NDQwMCwKICAgICJkaXNwbGF5IjogImZsZXgiLAogICAgImFsaWduSXRlbXMiOiAiY2VudGVyIiwKICAgICJsYWJlbFdpZHRoIjogMjEuNDIxODc1CiAgfSwKICAiaWNvbiI6IHsKICAgICJ2aWV3Qm94IjogIjAgMCAyNCAyNCIsCiAgICAiZmlsbCI6ICJub25lIiwKICAgICJzdHJva2UiOiAiY3VycmVudENvbG9yIiwKICAgICJzdHJva2VXaWR0aCI6ICIyIiwKICAgICJwYXRoIjogIk0xOSAyMXYtMmE0IDQgMCAwIDAtNC00SDlhNCA0IDAgMCAwLTQgNHYyIiwKICAgICJjaXJjbGUiOiBbCiAgICAgICIxMiIsCiAgICAgICI3IiwKICAgICAgIjQiCiAgICBdCiAgfQp9"
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/test-results/photos-own-photo-badge-con-a7daf--white-on-pink-contrast-4-5-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/test-results/photos-own-photo-badge-con-a7daf--white-on-pink-contrast-4-5-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/test-results/photos-own-photo-badge-con-a7daf--white-on-pink-contrast-4-5-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts",
+                        "column": 38,
+                        "line": 49
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "b5b20664ca7b687d1b20-c1c0dc94b4ccf9914b47",
+              "file": "e2e/photos/own-photo-badge-contrast.spec.ts",
+              "line": 35,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "DW-59 own-photo badge (dark)",
+          "file": "e2e/photos/own-photo-badge-contrast.spec.ts",
+          "line": 14,
+          "column": 8,
+          "specs": [
+            {
+              "title": "[P1] DW59-E2E-001-dark loaded white photo has opaque white-on-pink contrast >=4.5",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 649,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m4.5\u001b[39m\nReceived:    \u001b[31m4.28750627651904\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m4.5\u001b[39m\nReceived:    \u001b[31m4.28750627651904\u001b[39m\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts:49:38",
+                        "location": {
+                          "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts",
+                          "column": 38,
+                          "line": 49
+                        },
+                        "snippet": "  47 |         expect(measurement.image.opacity).toBe(1);\n  48 |         expect(measurement.foreground).toEqual([255, 255, 255, 255]);\n> 49 |         expect(measurement.contrast).toBeGreaterThanOrEqual(4.5);\n     |                                      ^\n  50 |         expect(measurement.background).toEqual(measurement.palettePink);\n  51 |         expect(measurement.background[3]).toBe(255);\n  52 |         for (const opacity of measurement.ancestorOpacities) expect(opacity).toBe(1);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts",
+                            "column": 38,
+                            "line": 49
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m4.5\u001b[39m\nReceived:    \u001b[31m4.28750627651904\u001b[39m\n\n  47 |         expect(measurement.image.opacity).toBe(1);\n  48 |         expect(measurement.foreground).toEqual([255, 255, 255, 255]);\n> 49 |         expect(measurement.contrast).toBeGreaterThanOrEqual(4.5);\n     |                                      ^\n  50 |         expect(measurement.background).toEqual(measurement.palettePink);\n  51 |         expect(measurement.background[3]).toBe(255);\n  52 |         for (const opacity of measurement.ancestorOpacities) expect(opacity).toBe(1);\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts:49:38"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[06:05:38] \u001b[1m\u001b[36m==== Polling: Wait for both white PNGs, fonts, and image opacity transitions ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[06:05:38] \u001b[1m\u001b[36m==== ✅ Wait for both white PNGs, fonts, and image opacity transitions - completed successfully after 4 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[06:05:38] \u001b[1m\u001b[36m==== Measure the rendered own-photo badge over decoded white image pixels ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Measure the rendered own-photo badge over decoded white image pixels",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T06:05:38.093Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "contrast-dark",
+                          "contentType": "application/json",
+                          "body": "ewogICJmb3JlZ3JvdW5kIjogWwogICAgMjU1LAogICAgMjU1LAogICAgMjU1LAogICAgMjU1CiAgXSwKICAiYmFja2dyb3VuZCI6IFsKICAgIDIzMCwKICAgIDAsCiAgICAxMTgsCiAgICAyMzAKICBdLAogICJwYWxldHRlUGluayI6IFsKICAgIDIzMCwKICAgIDAsCiAgICAxMTgsCiAgICAyNTUKICBdLAogICJwYWxldHRlQmx1ZSI6IFsKICAgIDQzLAogICAgMTI3LAogICAgMjU1LAogICAgMjU1CiAgXSwKICAiY29tcG9zaXRlQmFja2dyb3VuZCI6IFsKICAgIDIzMiwKICAgIDI1LAogICAgMTMxLAogICAgMjU1CiAgXSwKICAiY29tcG9zaXRlRm9yZWdyb3VuZCI6IFsKICAgIDI1NSwKICAgIDI1NSwKICAgIDI1NSwKICAgIDI1NQogIF0sCiAgImNvbnRyYXN0IjogNC4yODc1MDYyNzY1MTkwNCwKICAiYW5jZXN0b3JPcGFjaXRpZXMiOiBbCiAgICAxLAogICAgMSwKICAgIDEsCiAgICAxLAogICAgMSwKICAgIDEsCiAgICAxLAogICAgMSwKICAgIDEsCiAgICAxCiAgXSwKICAiaW1hZ2UiOiB7CiAgICAiY29tcGxldGUiOiB0cnVlLAogICAgIm5hdHVyYWxTaXplIjogWwogICAgICAyNDAsCiAgICAgIDI0MAogICAgXSwKICAgICJyZW5kZXJlZFNpemUiOiBbCiAgICAgIDI0MCwKICAgICAgMjQwCiAgICBdLAogICAgInBpeGVsIjogWwogICAgICAyNTUsCiAgICAgIDI1NSwKICAgICAgMjU1LAogICAgICAyNTUKICAgIF0sCiAgICAib3BhY2l0eSI6IDEsCiAgICAib2JqZWN0Rml0IjogImNvdmVyIiwKICAgICJsb2FkaW5nIjogImxhenkiLAogICAgImFsdCI6ICJEVy01OSBicmlnaHQgb3duIHBob3RvIiwKICAgICJpc1BuZ0RhdGFVcmwiOiB0cnVlCiAgfSwKICAiZ2VvbWV0cnkiOiB7CiAgICAiaXRlbVNpemUiOiBbCiAgICAgIDI0MCwKICAgICAgMjQwCiAgICBdLAogICAgIndpZHRoIjogNTMuNDIxODc1LAogICAgImhlaWdodCI6IDI0LAogICAgIm9mZnNldHMiOiB7CiAgICAgICJ0b3AiOiA4LAogICAgICAicmlnaHQiOiA4CiAgICB9LAogICAgInBhZGRpbmciOiBbCiAgICAgIDQsCiAgICAgIDgsCiAgICAgIDQsCiAgICAgIDgKICAgIF0sCiAgICAiZ2FwIjogNCwKICAgICJpY29uU2l6ZSI6IFsKICAgICAgMTIsCiAgICAgIDEyCiAgICBdLAogICAgImZvbnRTaXplIjogMTIsCiAgICAibGluZUhlaWdodCI6IDE2LAogICAgImZvbnRXZWlnaHQiOiAiNTAwIiwKICAgICJyYWRpdXMiOiAzMzU1NDQwMCwKICAgICJkaXNwbGF5IjogImZsZXgiLAogICAgImFsaWduSXRlbXMiOiAiY2VudGVyIiwKICAgICJsYWJlbFdpZHRoIjogMjEuNDIxODc1CiAgfSwKICAiaWNvbiI6IHsKICAgICJ2aWV3Qm94IjogIjAgMCAyNCAyNCIsCiAgICAiZmlsbCI6ICJub25lIiwKICAgICJzdHJva2UiOiAiY3VycmVudENvbG9yIiwKICAgICJzdHJva2VXaWR0aCI6ICIyIiwKICAgICJwYXRoIjogIk0xOSAyMXYtMmE0IDQgMCAwIDAtNC00SDlhNCA0IDAgMCAwLTQgNHYyIiwKICAgICJjaXJjbGUiOiBbCiAgICAgICIxMiIsCiAgICAgICI3IiwKICAgICAgIjQiCiAgICBdCiAgfQp9"
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/test-results/photos-own-photo-badge-con-2370f--white-on-pink-contrast-4-5-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/test-results/photos-own-photo-badge-con-2370f--white-on-pink-contrast-4-5-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/test-results/photos-own-photo-badge-con-2370f--white-on-pink-contrast-4-5-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-own-photo-badge-contrast/tests/e2e/photos/own-photo-badge-contrast.spec.ts",
+                        "column": 38,
+                        "line": 49
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "b5b20664ca7b687d1b20-cc48a45d678084bac5ff",
+              "file": "e2e/photos/own-photo-badge-contrast.spec.ts",
+              "line": 35,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T06:05:33.335Z",
+    "duration": 5514.629,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}

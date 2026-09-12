@@ -1,0 +1,1 @@
+PASS: tracked git diff --check and all generated text files checked with git diff --no-index --check.
