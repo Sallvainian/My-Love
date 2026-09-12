@@ -855,4 +855,6 @@ location: tests/support/helpers/events.ts:180
 source_spec: `spec-dw-61-64-69-event-test-date-anchors.md`
 severity: low
 reason: Reproduced with TZ=America/Nuuk: local 2026-03-27 23:30 plus one day using the helper's unchanged setDate arithmetic yields 2026-03-29, while eventDateFrom's local-midnight constructor yields 2026-03-28. The target 23:30 falls in a skipped DST hour. Baseline revision 6afb20e2b69485307ecb25fac7c59f0e86ab45af uses the same time-preserving arithmetic, so this is a pre-existing calendar issue rather than the independent-clock defect resolved by this bundle. Current unit coverage runs in America/New_York, where its spring/fall DST cases pass.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-event-helper-calendar-day-offsets
+resolution-undo: f1f54829eeec8a92362ccf7d56827785f3782bece2e52d1232ce15cc31764d98 2026-09-12 7374617475733a206f70656e

@@ -1,0 +1,90 @@
+[WebServer] (node:22696) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+[WebServer] npm warn allow-scripts .npmrc allow-scripts setting is being ignored because --allow-scripts was passed on the command line
+
+[WebServer] (node:22743) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+[WebServer] (node:22743) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ encrypted .env [www.dotenvx.com]
+[WebServer] 
+[WebServer] A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+
+[global-setup] Provisioned 10 worker pairs + legacy users
+
+Running 2 tests using 2 workers
+
+(node:22745) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:22746) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+
+[1/2] [chromium] › tests/e2e/settings/event-helper-calendar-day-offsets.spec.ts:25:1 › [P1] DW84-E2E-001 Settings preserves the Nuuk gap date through save, reload, and edit
+[2/2] [api] › tests/api/event-helper-calendar-day-offsets.spec.ts:24:1 › [P1] DW84-API-001 the partner reads March 28 from the Nuuk +1 helper date
+[chromium] › tests/e2e/settings/event-helper-calendar-day-offsets.spec.ts:25:1 › [P1] DW84-E2E-001 Settings preserves the Nuuk gap date through save, reload, and edit
+[13:07:54] ℹ Storage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-event-helper-calendar-day-offsets/.auth/local/worker-0/storage-state.json
+
+[api] › tests/api/event-helper-calendar-day-offsets.spec.ts:24:1 › [P1] DW84-API-001 the partner reads March 28 from the Nuuk +1 helper date
+[13:07:54] ℹ Storage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-event-helper-calendar-day-offsets/.auth/local/worker-1/storage-state.json
+
+[13:07:55] ℹ Storage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-event-helper-calendar-day-offsets/.auth/local/worker-1/storage-state.json
+
+[chromium] › tests/e2e/settings/event-helper-calendar-day-offsets.spec.ts:25:1 › [P1] DW84-E2E-001 Settings preserves the Nuuk gap date through save, reload, and edit
+(node:22767) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[13:07:55] ==== Open Settings with the worker pair empty ====
+
+
+[api] › tests/api/event-helper-calendar-day-offsets.spec.ts:24:1 › [P1] DW84-API-001 the partner reads March 28 from the Nuuk +1 helper date
+[13:07:55] ℹ Storage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-event-helper-calendar-day-offsets/.auth/local/worker-1-partner/storage-state.json
+
+(node:22768) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[13:07:55] ==== Create the event using the actual Nuuk helper result ====
+
+
+[13:07:55] ==== Read the persisted calendar date with the partner bearer ====
+
+
+[WebServer] 9:07:55 AM [vite] (client) [console.error] Can't perform a React state update on a component that hasn't mounted yet. This indicates that you have a side-effect in your render function that asynchronously tries to update the component. Move this work to useEffect instead.
+
+[chromium] › tests/e2e/settings/event-helper-calendar-day-offsets.spec.ts:25:1 › [P1] DW84-E2E-001 Settings preserves the Nuuk gap date through save, reload, and edit
+[13:07:55] ==== Submit the actual helper date and verify the server response ====
+
+
+[13:07:56] ==== Wait for the exact local calendar date in Zustand, then verify the row ====
+
+
+[13:07:56] ==== Polling: Waiting for March 28, 2026 in Zustand after save ====
+
+
+[13:07:56] ==== ✅ Waiting for March 28, 2026 in Zustand after save - completed successfully after 1 iterations ====
+
+
+[13:07:56] ==== Reload Settings and verify the persisted date in store and UI ====
+
+
+[WebServer] 9:07:57 AM [vite] (client) [console.error] Can't perform a React state update on a component that hasn't mounted yet. This indicates that you have a side-effect in your render function that asynchronously tries to update the component. Move this work to useEffect instead.
+
+[13:07:57] ==== Polling: Waiting for the reloaded March 28, 2026 event ====
+
+
+[13:07:57] ==== ✅ Waiting for the reloaded March 28, 2026 event - completed successfully after 1 iterations ====
+
+
+[13:07:57] ==== Open the saved event and verify its date input ====
+
+
+  2 passed (8.6s)

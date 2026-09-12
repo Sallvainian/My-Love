@@ -1,0 +1,46 @@
+{
+  "success": true,
+  "subagent": "api-tests",
+  "tests": [
+    {
+      "file": "tests/api/event-helper-calendar-day-offsets.spec.ts",
+      "content": "/**\n * DW-84: the Nuuk calendar-day result survives persistence and a partner read.\n *\n * Provider evidence: supabase/migrations/20260818000002_create_events_table.sql\n * declares event_date as date, creator-only INSERT and couple-shared SELECT.\n * tests/api/events-wire-contract.spec.ts records POST 201 with an array for\n * return=representation and GET 200 with the same bare YYYY-MM-DD value.\n */\nimport { log } from '@seontechnologies/playwright-utils';\nimport { z } from 'zod';\nimport { test, expect } from '../support/merged-fixtures';\nimport { createNuukGapCase } from '../support/factories/event-helper-calendar-day-offsets';\n\n// Test-local schema for precisely the table columns selected below.\nconst EventRowsSchema = z.array(z.strictObject({\n  id: z.string().uuid(),\n  user_id: z.string().uuid(),\n  label: z.string().max(100),\n  event_date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/),\n}));\ntype EventRows = z.infer<typeof EventRowsSchema>;\nconst EVENT_PROJECTION = 'id,user_id,label,event_date';\n\ntest('[P1] DW84-API-001 the partner reads March 28 from the Nuuk +1 helper date', async ({\n  apiRequest,\n  authToken,\n  partnerAuthToken,\n  coupleEvents,\n}) => {\n  // GIVEN: actual helper output from local March 27, 2026 at 23:30 in Nuuk.\n  // The factory isolates its timezone in a child and returns the computed date;\n  // the literal response assertion below is independent of that calculation.\n  // coupleEvents owns checked cleanup before and after, including failures.\n  const gap = createNuukGapCase();\n\n  await log.step('Create the event using the actual Nuuk helper result');\n  const created = await apiRequest<EventRows>({\n    method: 'POST',\n    path: `/rest/v1/events?select=${EVENT_PROJECTION}`,\n    headers: { Authorization: `Bearer ${authToken}`, Prefer: 'return=representation' },\n    // INSERT has no idempotency key: an ambiguous 5xx must not duplicate the row.\n    retryConfig: { maxRetries: 0 },\n    body: {\n      user_id: coupleEvents.userId,\n      label: gap.label,\n      event_date: gap.date,\n    },\n  }).validateSchema<EventRows>(EventRowsSchema);\n  expect(created.status).toBe(201);\n  expect(created.body).toHaveLength(1);\n  const expectedEvent = {\n    id: created.body[0].id,\n    user_id: coupleEvents.userId,\n    label: gap.label,\n    event_date: '2026-03-28',\n  };\n  expect(created.body).toEqual([expectedEvent]);\n\n  // WHEN: the other half of this worker's couple reads the committed row.\n  await log.step('Read the persisted calendar date with the partner bearer');\n  const listed = await apiRequest<EventRows>({\n    method: 'GET',\n    path: `/rest/v1/events?select=${EVENT_PROJECTION}&id=eq.${expectedEvent.id}`,\n    headers: { Authorization: `Bearer ${partnerAuthToken}` },\n  }).validateSchema<EventRows>(EventRowsSchema);\n\n  // THEN: a separate authenticated read retains the intended calendar day.\n  expect(listed.status).toBe(200);\n  expect(listed.body).toEqual([expectedEvent]);\n});\n",
+      "description": "DW84-API-001: real Nuuk +1 helper output is created by the owner and read by the partner with literal March 28 response assertions.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 1,
+        "P2": 0,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    "existing merged apiRequest",
+    "existing authToken",
+    "existing partnerAuthToken",
+    "existing coupleEvents checked cleanup",
+    "createNuukGapCase in tests/support/factories/event-helper-calendar-day-offsets.ts"
+  ],
+  "knowledge_fragments_used": [
+    "library-integration-mandate",
+    "playwright-utils-mandate",
+    "overview",
+    "api-request",
+    "auth-session",
+    "recurse",
+    "log",
+    "data-factories",
+    "api-testing-patterns",
+    "fixtures-composition",
+    "pact-mcp"
+  ],
+  "playwright_utils_deviations": [],
+  "pactjs_utils_deviations": [],
+  "provider_scrutiny": "completed",
+  "provider_files_read": [
+    "supabase/migrations/20260818000002_create_events_table.sql",
+    "tests/api/events-wire-contract.spec.ts"
+  ],
+  "test_count": 1,
+  "summary": "Generated one P1 API integration case in the approved coverage plan. It uses merged fixtures, real worker-pair auth, Zod projection validation, apiRequest for every HTTP operation, no retry on non-idempotent INSERT, and literal 2026-03-28 expectations at POST and partner GET. Arithmetic and error matrices remain with existing coverage; no new API rejection behavior changed. No tests run and no real test/fixture files written. Pact artifacts are out of scope; broker tools were unavailable per parent probe, with provider source used as evidence."
+}
