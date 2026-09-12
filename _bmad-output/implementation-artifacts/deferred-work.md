@@ -583,7 +583,8 @@ location: n/a
 source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260819-202616-75cc; this entry preserves the lingering recommendation for a deliberate later review.
-status: open
+status: done 2026-09-12
+resolution: already resolved: Independent Claude review on PR #270 explicitly traced eventsSlice mutation replay, overlapping loads, and account transitions: https://github.com/Sallvainian/My-Love/pull/270#issuecomment-5351724351. Its embedded run 34668191072 completed successfully on 2026-09-12 at head f5a9fa62dd7df285e867cddb1e1df061852c787a, after the 2026-09-11 keep-open decisions; verified run metadata and read the complete matching review. The reviewed implementation includes src/stores/slices/eventsSlice.ts:169 (ordered replay), :248 (load reconciliation), and src/components/Settings/EventsSettings.tsx:169 (call-owned load outcome); PR #270 merged as 5b755b14.
 decision: 2026-09-11 Keep recommendation open
 decision: 2026-09-11 Keep the review recommendation
 
