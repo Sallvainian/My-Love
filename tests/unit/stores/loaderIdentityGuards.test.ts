@@ -79,7 +79,14 @@ vi.mock('../../../src/services/photoService', () => ({
 
 vi.mock('../../../src/services/eventsService', () => ({
   eventsService: {
-    getEvents: () => getEvents(),
+    getEventsPage: async () => ({
+      events: await getEvents(),
+      pagination: {
+        todayISO: '2026-09-12',
+        upcoming: { cursor: null, hasMore: false },
+        past: { cursor: null, hasMore: false },
+      },
+    }),
     createEvent: (input: unknown) => createEvent(input),
     updateEvent: (eventId: string, updates: unknown) => updateEvent(eventId, updates),
     deleteEvent: (eventId: string) => deleteEvent(eventId),
@@ -782,6 +789,68 @@ describe('loader identity guards', () => {
   // ==========================================================================
   // eventsSlice
   // ==========================================================================
+
+  describe('loadMoreEvents session ownership', () => {
+    const pagination = {
+      todayISO: '2026-09-12',
+      upcoming: { cursor: null, hasMore: false },
+      past: {
+        cursor: { event_date: '2026-08-01', created_at: '2026-01-01T00:00:00.123456+00:00', id: 'edge' },
+        hasMore: true,
+      },
+    };
+
+    it.each(['success', 'failure'] as const)('discards old page %s after real same-user reauthentication', async (outcome) => {
+      const pending = deferred<unknown[]>();
+      getEvents.mockReturnValueOnce(pending.promise);
+      useAppStore.setState({ eventsPagination: pagination });
+      const page = useAppStore.getState().loadMoreEvents();
+      expect(useAppStore.getState().eventsIsLoadingMore).toBe(true);
+      useAppStore.getState().clearAuth();
+      useAppStore.getState().setAuthUser(A);
+      const reset = useAppStore.getState();
+      expect(reset).toMatchObject({
+        events: [], eventsPagination: null, eventsIsLoadingMore: false, eventsHistoryError: null,
+      });
+      if (outcome === 'success') pending.settle([{ id: 'previous-session' }]);
+      else pending.fail(new Error('previous page failed'));
+      expect(await page).toEqual({ status: 'stale' });
+      expect(useAppStore.getState()).toBe(reset);
+    });
+
+    it.each(['success', 'failure'] as const)('cannot overwrite successor page state when old page %s settles', async (outcome) => {
+      const previous = deferred<unknown[]>();
+      getEvents.mockReturnValueOnce(previous.promise);
+      useAppStore.setState({ eventsPagination: pagination });
+      const oldPage = useAppStore.getState().loadMoreEvents();
+      useAppStore.getState().clearAuth();
+      useAppStore.getState().setAuthUser(C);
+      useAppStore.setState({ eventsPagination: pagination });
+      const current = deferred<unknown[]>();
+      getEvents.mockReturnValueOnce(current.promise);
+      const currentPage = useAppStore.getState().loadMoreEvents();
+      const currentState = useAppStore.getState();
+      if (outcome === 'success') previous.settle([{ id: 'previous-session' }]);
+      else previous.fail(new Error('previous page failed'));
+      expect(await oldPage).toEqual({ status: 'stale' });
+      expect(useAppStore.getState()).toBe(currentState);
+      expect(currentState.eventsIsLoadingMore).toBe(true);
+      current.fail(new Error('current page failed'));
+      expect(await currentPage).toEqual({ status: 'failure', error: 'current page failed' });
+      expect(useAppStore.getState().eventsPagination).toBe(pagination);
+      expect(useAppStore.getState().eventsHistoryError).toBe('current page failed');
+    });
+
+    it('resets metadata and continuation errors on a direct account switch', () => {
+      useAppStore.setState({
+        eventsPagination: pagination, eventsIsLoadingMore: true, eventsHistoryError: 'private history failure',
+      });
+      useAppStore.getState().setAuthUser(C);
+      expect(useAppStore.getState()).toMatchObject({
+        eventsPagination: null, eventsIsLoadingMore: false, eventsHistoryError: null,
+      });
+    });
+  });
 
   describe('loadEvents', () => {
     const aEvent = {

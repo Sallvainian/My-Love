@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="26" failures="0" errors="0" time="0.008385667">
+    <testsuite name="tests/unit/helpers/rls-security.test.ts" timestamp="2026-09-12T09:30:29.848Z" hostname="Sallvains-MacBook-Pro-587.local" tests="26" failures="0" errors="0" skipped="0" time="0.008385667">
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; returns the authenticated client and account cleanup without eager deletion" time="0.002177125">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; forwards returned cleanup errors after successful setup without changing the response" time="0.000273542">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; forwards cleanup rejections after successful setup unchanged" time="0.000258666">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves the exact user lookup failure when cleanup succeeds" time="0.000162833">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves the exact client construction failure when cleanup succeeds" time="0.000130584">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves the exact sign-in failure when cleanup succeeds" time="0.000126541">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; returned user lookup AuthError &gt; preserves the setup wrapper when cleanup succeeds" time="0.00027875">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; returned user lookup AuthError &gt; reports the setup wrapper and returned AuthError cleanup failure" time="0.000383292">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; returned user lookup AuthError &gt; reports the setup wrapper and rejected non-Error cleanup failure" time="0.000252709">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; returned sign-in AuthError &gt; preserves the setup wrapper when cleanup succeeds" time="0.000137083">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; returned sign-in AuthError &gt; reports the setup wrapper and returned AuthError cleanup failure" time="0.00015025">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; returned sign-in AuthError &gt; reports the setup wrapper and rejected non-Error cleanup failure" time="0.000141291">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; waits for cleanup to finish before rejecting with the original setup failure" time="0.001306416">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves setup and returned AuthError failures in account-specific diagnostics" time="0.000231375">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves setup and thrown Error cleanup failures in order" time="0.000166166">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves setup and thrown object cleanup failures in order" time="0.000121125">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves setup and thrown string cleanup failures in order" time="0.000105042">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves setup and thrown undefined cleanup failures in order" time="0.000107666">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves setup and thrown null cleanup failures in order" time="0.000136041">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves setup and thrown false cleanup failures in order" time="0.000137208">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves setup and thrown zero cleanup failures in order" time="0.000109292">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves setup and thrown empty string cleanup failures in order" time="0.000104459">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; skips setup and cleanup after creation returns returned error" time="0.00033775">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; skips setup and cleanup after creation returns missing user" time="0.000107958">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; skips setup and cleanup after creation returns missing data" time="0.00009825">
+        </testcase>
+        <testcase classname="tests/unit/helpers/rls-security.test.ts" name="createOutsiderClient &gt; preserves creation rejection and skips setup and cleanup" time="0.000095958">
+        </testcase>
+    </testsuite>
+</testsuites>

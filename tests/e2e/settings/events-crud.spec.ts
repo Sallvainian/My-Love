@@ -102,8 +102,9 @@ test.describe('Managing events from Settings', () => {
     // half of the couple — the SELECT policy returns own + partner.
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const addedDate = isoDateDaysFromNow(30);
-    const editedDate = isoDateDaysFromNow(45);
+    const anchor = new Date();
+    const addedDate = isoDateDaysFromNow(30, anchor);
+    const editedDate = isoDateDaysFromNow(45, anchor);
 
     await page.goto('/');
     await navigateTo(page, 'settings');
@@ -256,9 +257,10 @@ test.describe('Managing events from Settings', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const originalDate = isoDateDaysFromNow(20);
-    const orderWitnessDate = isoDateDaysFromNow(28);
-    const editedDate = isoDateDaysFromNow(35);
+    const anchor = new Date();
+    const originalDate = isoDateDaysFromNow(20, anchor);
+    const orderWitnessDate = isoDateDaysFromNow(28, anchor);
+    const editedDate = isoDateDaysFromNow(35, anchor);
     await Promise.all([
       seedEvent(supabaseAdmin, {
         userId,
@@ -371,12 +373,13 @@ test.describe('Managing events from Settings', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const pastDate = isoDateDaysFromNow(-14);
+    const anchor = new Date();
+    const pastDate = isoDateDaysFromNow(-14, anchor);
     // A future event is seeded alongside it purely as a load witness: without
     // one, `toHaveCount(0)` on the past card runs before loadEvents can have
     // resolved and passes vacuously — it would still pass if Home rendered
     // every past event it was given.
-    const futureWitnessDate = isoDateDaysFromNow(9);
+    const futureWitnessDate = isoDateDaysFromNow(9, anchor);
     await Promise.all([
       seedEvent(supabaseAdmin, {
         userId,

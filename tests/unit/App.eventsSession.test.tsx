@@ -31,9 +31,20 @@ vi.mock('../../src/api/auth/sessionService', () => ({
     };
   }),
 }));
-vi.mock('../../src/services/eventsService', () => ({
-  eventsService: { getEvents: vi.fn() },
-}));
+vi.mock('../../src/services/eventsService', () => {
+  const eventsService = {
+    getEvents: vi.fn(),
+    getEventsPage: async () => ({
+      events: await eventsService.getEvents(),
+      pagination: {
+        todayISO: '2026-09-12',
+        upcoming: { cursor: null, hasMore: false },
+        past: { cursor: null, hasMore: false },
+      },
+    }),
+  };
+  return { eventsService };
+});
 vi.mock('../../src/components/DailyMessage/DailyMessage', () => ({
   DailyMessage: () => null,
 }));

@@ -418,7 +418,10 @@ location: src/components/Settings/EventsSettings.tsx, src/stores/slices/eventsSl
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: `EventsSettings.tsx` renders the store array unfiltered and calls `loadEvents()` with no arguments; `eventsSlice.loadEvents` calls `eventsService.getEvents()` bare, so both windows take the default `limit = 50, offset = 0`. Measured with `grep -rn "getEvents(" src tests`: the only production call site is `src/stores/slices/eventsSlice.ts:116`. The screen's own comment states why the list must stay unfiltered — a mistyped year is "the only place a mistyped year can be seen and corrected" — and a year typed wrong into the deep past is exactly the row the descending past window drops first. This change documents the bound in both files; closing it needs a "load more" control and a `loadEvents` that takes limit/offset, which the spec's Boundaries put out of scope.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-decision-dw-41
+resolution-undo: 11a3495e84f703f2c798e725ed4ccea80dcb1f63e9048f8904475ed7271cc247 2026-09-12 7374617475733a206f70656e
+decision: 2026-09-12 Build Settings pagination — Add an explicit Settings history-loading control with store/service paging and a reliable indication that more rows exist. Preserve Home's upcoming-event behavior, ownership guards, and mutation replay, and prove that an event beyond 50 past rows can be loaded and edited. Coordinate the associated visibility and metadata behavior described by DW-44 and DW-46.
 decision: 2026-09-11 Keep pagination deferred
 decision: 2026-09-11 Defer pagination
 
@@ -428,7 +431,9 @@ location: src/services/eventsService.ts
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: `getEvents` caps in the database (`.range`) and drops unreadable rows in JS afterwards (the `toCoupleEvent`/`filter` pair), so an `event_date` of `infinity` — a value a Postgres `date` column accepts, and which `parseEventDate` is written to reject — counts against `limit` and returns one fewer usable event. The covering test for unreadable rows runs at the default limit of 50, where the effect is invisible. Same shape as `photoService.getPhotos`, which also caps server-side and filters after. Closing it means over-fetching and re-capping client-side.
-status: open
+status: done 2026-09-12
+resolution: closed by human decision: Retain the strict raw-row read budget and accept that dates rejected during conversion can leave a partially filled page.
+decision: 2026-09-12 Accept sparse capped pages — Retain the strict raw-row read budget and accept that dates rejected during conversion can leave a partially filled page.
 
 ### DW-43: Three separate literals encode the single product decision "how many countdown cards a column shows".
 origin: spec-deferred 9fcc81a217ea
@@ -445,6 +450,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: Verified path, both halves read this session: `eventsSlice.addEvent` inserts the created row into the store unconditionally — `set((state) => ({ events: sortByDate([...state.events, created]) }))` — while `loadEvents` re-reads a bounded window (`getEvents()` bare, so `limit = 50` per side). A couple with more than 50 past events who corrects or adds a deep-past date therefore sees the row in Settings, and the next `loadEvents()` drops it because the descending past page no longer reaches it. The row is not lost — it is in the table — only invisible. Distinct from the "no way to reach truncated rows" item: that one is about rows the user never sees, this one is about a row the user just saw confirmed. Closing it needs the same "load more" plumbing, or an in-range check at save time.
 status: open
+decision: 2026-09-12 Preserve saved-row access — Add Settings paging and post-save reconciliation that keeps an out-of-window saved event reachable after reload without rejecting valid past dates. Coordinate the history-loading path with DW-41 and truncation metadata with DW-46, preserving bounded Home reads and session ownership. Verify adding and editing a row beyond 50 past events, then reloading and locating it for another edit.
 decision: 2026-09-11 Keep pagination deferred
 decision: 2026-09-11 Defer pagination
 
@@ -465,6 +471,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: Both reads are plain `.select('*')` with no `{ count: 'exact' }`, so the service, the store and any future affordance have no "there are more" signal; `logger.debug('[EventsService] Fetched events:', events.length)` cannot distinguish 50 events from 50 of 300. The already-recorded Settings "load more" item names the control and the `limit`/`offset` plumbing it needs, but not the fact that the data to drive its enabled state is not fetched. A count also cannot go anywhere today: the intent's Never list forbids a store-shape change and a second store action.
 status: open
+decision: 2026-09-12 Add paging metadata and consumer — Define per-window continuation metadata and carry it through the events service and store to a Settings paging control. Choose a count or bounded lookahead strategy with explicit semantics, preserve existing ordering and Home behavior, and verify empty, exact-limit, and truncated windows. Coordinate this contract change with the history-access behavior in DW-41 and DW-44.
 decision: 2026-09-11 Keep metadata deferred
 decision: 2026-09-11 Defer pagination
 
@@ -495,6 +502,7 @@ source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: This behavior predates the bundle: every failure previously left Save enabled. The new `invalid-response` code now identifies it, but choosing a distinct safe affordance was not part of the events-only refresh-versus-retry decision. `createEvent` can throw after insert when the returned row cannot be converted, while Settings routes every code except `not-found` to Save/Delete.
 status: open
+decision: 2026-09-12 Keep recovery deferred
 decision: 2026-09-11 Keep recovery deferred
 decision: 2026-09-11 Defer the recovery choice
 
@@ -583,7 +591,8 @@ location: n/a
 source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260819-202616-75cc; this entry preserves the lingering recommendation for a deliberate later review.
-status: open
+status: done 2026-09-12
+resolution: already resolved: Independent Claude review on PR #270 explicitly traced eventsSlice mutation replay, overlapping loads, and account transitions: https://github.com/Sallvainian/My-Love/pull/270#issuecomment-5351724351. Its embedded run 34668191072 completed successfully on 2026-09-12 at head f5a9fa62dd7df285e867cddb1e1df061852c787a, after the 2026-09-11 keep-open decisions; verified run metadata and read the complete matching review. The reviewed implementation includes src/stores/slices/eventsSlice.ts:169 (ordered replay), :248 (load reconciliation), and src/components/Settings/EventsSettings.tsx:169 (call-owned load outcome); PR #270 merged as 5b755b14.
 decision: 2026-09-11 Keep recommendation open
 decision: 2026-09-11 Keep the review recommendation
 
@@ -613,7 +622,9 @@ location: tests/support/helpers/events.ts:179
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: `isoDateDaysFromNow` creates a fresh `Date` on every call. Multi-row tests call it repeatedly, so a run spanning midnight could produce dates based on different days. The older factory avoids this by accepting one shared anchor, but consolidating these helper APIs is outside the bundle's explicit move-and-rewire surface.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-event-test-date-anchors
+resolution-undo: 97b97851d902cda684f6d7a952dfa833a050c31e1b11ef4ff6bbc3cda802a21c 2026-09-12 7374617475733a206f70656e
 
 ### DW-62: Historical story acceptance criteria AC4 and AC6 still pin obsolete test totals and the pre-activation file boundary.
 origin: spec-deferred 0bff1e60324b
@@ -641,7 +652,9 @@ location: tests/support/helpers/events.ts:177
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: `isoDateDaysFromNow` creates a new `Date` on each invocation. A multi-row setup that crosses local midnight can therefore derive rows from different base days. The anchored `coupleEvents` factory avoids this, but consolidating both helper contracts is separate work.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-event-test-date-anchors
+resolution-undo: 97b97851d902cda684f6d7a952dfa833a050c31e1b11ef4ff6bbc3cda802a21c 2026-09-12 7374617475733a206f70656e
 
 ### DW-65: Story 5 acceptance criteria AC4 and AC6 describe the pre-activation test totals and file boundary.
 origin: spec-deferred 7792fe01375e
@@ -689,7 +702,9 @@ location: tests/support/helpers/events.ts:177
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: `isoDateDaysFromNow` creates a new `Date` for every call. Multi-row setup in the activated API and E2E suites invokes it repeatedly, so a batch crossing local midnight can receive dates derived from different calendar anchors.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-event-test-date-anchors
+resolution-undo: 97b97851d902cda684f6d7a952dfa833a050c31e1b11ef4ff6bbc3cda802a21c 2026-09-12 7374617475733a206f70656e
 
 ### DW-70: The anonymous-write isolation check can fail on a stale row from an interrupted prior run.
 origin: spec-deferred 1f8f5181ea11
@@ -697,7 +712,9 @@ location: tests/api/events-wire-contract.spec.ts:247
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: The first wire-contract test queries the fixed `ANON_ATTEMPT_LABEL` without clearing the worker pair first. A prior run terminated before teardown can leave that label behind, so the final zero-row assertion can fail even though the anonymous POST wrote nothing.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-wire-contract-fidelity
+resolution-undo: c4828021067babf12116479690590415b10721d96a8ca12d9d16f45a0fc9e054 2026-09-12 7374617475733a206f70656e
 
 ### DW-71: Outsider account cleanup ignores a returned deletion error when sign-in setup fails.
 origin: spec-deferred 588dd42563e8
@@ -705,7 +722,9 @@ location: tests/support/helpers/rls-security.ts:64
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: `createOutsiderClient` catches a failed sign-in and awaits `cleanup()`, but the Supabase admin deletion reports ordinary failures through its returned `error` field. That response is not checked on this setup-failure path, so the throwaway auth account can remain while only the sign-in error is reported.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-outsider-setup-cleanup-errors
+resolution-undo: 0ff32d336aaa8e746d9aea6f42cd2b250588938c82ff6e059de3598a09c53c07 2026-09-12 7374617475733a206f70656e
 
 ### DW-72: The test-local event row schema accepts undeclared response columns despite its exact-schema claim.
 origin: spec-deferred ebb7963b5d9c
@@ -713,7 +732,9 @@ location: tests/api/events-wire-contract.spec.ts:141
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: Zod objects strip unknown keys by default. Because `EventRowSchema` is not strict, a new PostgREST column returned by `select=*` is accepted even though the surrounding test prose says the schema mirrors the events table column for column.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-wire-contract-fidelity
+resolution-undo: c4828021067babf12116479690590415b10721d96a8ca12d9d16f45a0fc9e054 2026-09-12 7374617475733a206f70656e
 
 ### DW-73: The persistence suite header overstates reload coverage for the cleared-description case.
 origin: spec-deferred 5000b9059f98
@@ -721,7 +742,9 @@ location: tests/e2e/settings/events-persistence.spec.ts:6
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: The file header says every row is read after a real reload, but DE.5-E2E-006 observes the pass-through PATCH response and resulting Settings and Home state without reloading. The behavior assertion remains valid, but the suite-level description is inaccurate.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-source-test-contract-comments
+resolution-undo: a76a4c8413ab1f9522820a2ace3807a71cfccc9190e72bb3e41b1435e26c2a3c 2026-09-12 7374617475733a206f70656e
 
 ### DW-74: Story 5 acceptance criteria AC4 and AC6 remain pinned to the pre-activation test inventory and file boundary.
 origin: spec-deferred 41994f83a590
@@ -758,7 +781,9 @@ location: tests/unit/api/errorHandlers.test.ts:16-20
 source_spec: `spec-dw-39-empty-database-error-fallback.md`
 severity: low
 reason: tests/unit/api/errorHandlers.test.ts:16-20 contains this unchanged inventory. photoService.ts:396-397, partnerService.ts:192-193, scriptureReadingService.ts:332-333, and notesSlice.ts:519-520 now use handleSupabaseError for selected CHECK errors. The stale inventory can mislead maintainers assessing existing coverage; it predates DW-39.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-source-test-contract-comments
+resolution-undo: a76a4c8413ab1f9522820a2ace3807a71cfccc9190e72bb3e41b1435e26c2a3c 2026-09-12 7374617475733a206f70656e
 
 ### DW-78: Errors that omit message or code entirely can bypass database classification in service callers.
 origin: spec-deferred e6d9258059df
@@ -766,7 +791,9 @@ location: src/api/errorHandlers.ts:122-130
 source_spec: `spec-dw-39-empty-database-error-fallback.md`
 severity: low
 reason: isPostgrestError requires code, message, and details properties to exist. MoodApi.create and EventsService.createEvent use that unchanged guard before conversion. An omitted-message object therefore bypasses handleSupabaseError, while an explicitly present undefined, null, empty, or whitespace message reaches the fixed fallback. This pre-existing classifier behavior is distinct from DW-39's specifically identified unconditional interpolation in handleSupabaseError; the change does not claim to fix routing.
-status: open
+status: done 2026-09-12
+resolution: closed by human decision: Treat malformed omitted-field database responses as unsupported without a demonstrated project response, consistent with prior exclusions of synthetic server-error scenarios.
+decision: 2026-09-12 Exclude malformed envelopes — Treat malformed omitted-field database responses as unsupported without a demonstrated project response, consistent with prior exclusions of synthetic server-error scenarios.
 
 ### DW-79: Auth token persistence may race between overlapping auth events and the duplicate action-service writes.
 origin: spec-deferred 5d23934f706e
@@ -774,6 +801,7 @@ location: src/api/auth/sessionService.ts:onAuthStateChange; src/api/auth/actionS
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 reason: sessionService and actionService both write/delete the current service-worker token, and neither associates those operations with a generation. Those writers and their asynchronous IndexedDB opens predate this bundle. Reversing mocked promise completion does not demonstrate reversed real IndexedDB commits; establishing the reported late-clear outcome requires a controlled trace of actual IndexedDB operations plus actionService signOut/signIn overlap. Earlier auth delivery alone does not establish the claimed regression.
 status: open
+decision: 2026-09-12 Keep pending stronger evidence
 decision: 2026-09-11 Keep pending stronger evidence
 
 ### DW-80: A replacement same-user session without an observed sign-out is not distinguished from a same-session update.
@@ -802,7 +830,9 @@ location: src/stores/slices/interactionsSlice.ts:10
 source_spec: `spec-dw-75-interaction-record-ownership.md`
 severity: low
 reason: The baseline already read authSlice.userId for sends, history, and subscriptions while its header said "None (self-contained)". The record callback now also reads authSessionVersion. This pre-existing documentation mismatch can mislead a developer composing an isolated slice fixture about the auth state it requires; production behavior is unaffected.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-source-test-contract-comments
+resolution-undo: a76a4c8413ab1f9522820a2ace3807a71cfccc9190e72bb3e41b1435e26c2a3c 2026-09-12 7374617475733a206f70656e
 
 ### DW-83: EventsSettings counts UTF-16 code units while PostgreSQL char_length counts Unicode characters.
 origin: spec-deferred 40fa82030481
@@ -810,4 +840,13 @@ location: src/components/Settings/EventsSettings.tsx:689
 source_spec: `spec-dw-60-63-66-67-68-events-validation-guard-fidelity.md`
 severity: medium
 reason: The unchanged submit handler uses trimmedLabel.length and trimmedDescription.length. Measured 100 repeated emoji have JavaScript length 200 and PostgreSQL char_length 100, so the form rejects some values admitted by the existing database CHECK. This predates this bundle, which explicitly preserves production validation. The new boundary tests characterize the existing limits with ASCII and do not establish Unicode equivalence.
+status: open
+decision: 2026-09-12 Match PostgreSQL character counts — Count Unicode code points in the event form's trimmed label and description validation while retaining the existing 100/500 database limits, icons, and trimming behavior. Align any counters or input restrictions with that rule and add exact-limit and limit-plus-one tests using supplementary-plane emoji and combining characters for the shared add/edit submission path. Keep the database schema unchanged and verify the form accepts the same character counts as PostgreSQL.
+
+### DW-84: The helper's existing time-of-day arithmetic can skip a calendar day in a late-evening DST gap.
+origin: spec-deferred 7ad2fd885b7b
+location: tests/support/helpers/events.ts:180
+source_spec: `spec-dw-61-64-69-event-test-date-anchors.md`
+severity: low
+reason: Reproduced with TZ=America/Nuuk: local 2026-03-27 23:30 plus one day using the helper's unchanged setDate arithmetic yields 2026-03-29, while eventDateFrom's local-midnight constructor yields 2026-03-28. The target 23:30 falls in a skipped DST hour. Baseline revision 6afb20e2b69485307ecb25fac7c59f0e86ab45af uses the same time-preserving arithmetic, so this is a pre-existing calendar issue rather than the independent-clock defect resolved by this bundle. Current unit coverage runs in America/New_York, where its spring/fall DST cases pass.
 status: open

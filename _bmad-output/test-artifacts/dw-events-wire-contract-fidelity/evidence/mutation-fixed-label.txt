@@ -1,0 +1,61 @@
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+[global-setup] Provisioned 10 worker pairs + legacy users
+
+Running 1 test using 1 worker
+
+(node:80441) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+
+[1/1] [api] › tests/api/events-wire-contract-fidelity.spec.ts:200:3 › Events wire contract over PostgREST — story 5 › [P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events
+[api] › tests/api/events-wire-contract-fidelity.spec.ts:200:3 › Events wire contract over PostgREST — story 5 › [P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events
+[08:59:58] ℹ Storage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/.auth/local/worker-0/storage-state.json
+
+[08:59:58] ==== Seed abandoned attempts and a same-label partner witness ====
+
+
+[08:59:58] ==== GET /rest/v1/events as anon — apikey header only, no Authorization bearer ====
+
+
+[08:59:58] ==== POST /rest/v1/events as anon — same headers, a well-formed row ====
+
+
+[08:59:58] ==== Confirm the refused POST wrote nothing ====
+
+
+  1) [api] › tests/api/events-wire-contract-fidelity.spec.ts:200:3 › Events wire contract over PostgREST — story 5 › [P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events 
+
+    Error: expect(received).toHaveLength(expected)
+
+    Expected length: 0
+    Received length: 1
+    Received array:  [{"id": "96ce6f09-3a4f-45da-9976-a4df916dcd74"}]
+
+      273 |
+      274 |     expect(leakError).toBeNull();
+    > 275 |     expect(leaked).toHaveLength(0);
+          |                    ^
+      276 |
+      277 |     // An always-empty verifier must fail: a real creator row with this attempt's
+      278 |     // identity is visible to the same query after the refusal has been checked.
+        at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/api/events-wire-contract-fidelity.spec.ts:275:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/events-wire-contract-fidel-67254-GET-and-POST-rest-v1-events-api/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/events-wire-contract-fidel-67254-GET-and-POST-rest-v1-events-api/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/events-wire-contract-fidel-67254-GET-and-POST-rest-v1-events-api/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/events-wire-contract-fidel-67254-GET-and-POST-rest-v1-events-api/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  1 failed
+    [api] › tests/api/events-wire-contract-fidelity.spec.ts:200:3 › Events wire contract over PostgREST — story 5 › [P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events 

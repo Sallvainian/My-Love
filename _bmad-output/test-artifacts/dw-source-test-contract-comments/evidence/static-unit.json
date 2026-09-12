@@ -1,0 +1,165 @@
+{
+  "recorded_at_utc": "2026-09-12T09:55:18.616333+00:00",
+  "baseline_revision": "04ce556cad49a915ed324a1379e6ffdaae709b60",
+  "head_revision": "6fab749c9c6340ee4f7743a8e60246d2ea6a13af",
+  "scope": "Three canonical leading comment corrections; existing targeted unit tests only; no live services or broad coverage measurement.",
+  "checklist_read": ".agents/skills/bmad-testarch-automate/checklist.md",
+  "byte_check": {
+    "method": "git show BASE:path versus current bytes; remove exactly the first leading /** ... */ block through its closing */ and compare every remaining byte without normalization.",
+    "files": [
+      {
+        "file": "tests/e2e/settings/events-persistence.spec.ts",
+        "baseline_body_bytes": 13350,
+        "current_body_bytes": 13350,
+        "baseline_body_sha256": "4c53d5929efba50320b50fd61e499dcc41b905a5e6dcda0675f8b84e6ccc0e9a",
+        "current_body_sha256": "4c53d5929efba50320b50fd61e499dcc41b905a5e6dcda0675f8b84e6ccc0e9a",
+        "body_identical": true,
+        "header_changed": true
+      },
+      {
+        "file": "tests/unit/api/errorHandlers.test.ts",
+        "baseline_body_bytes": 8383,
+        "current_body_bytes": 8383,
+        "baseline_body_sha256": "97a521b1145907c7d69edb4d5854f40d8febb7f5cac9f4e5ddb9976aee967e40",
+        "current_body_sha256": "97a521b1145907c7d69edb4d5854f40d8febb7f5cac9f4e5ddb9976aee967e40",
+        "body_identical": true,
+        "header_changed": true
+      },
+      {
+        "file": "src/stores/slices/interactionsSlice.ts",
+        "baseline_body_bytes": 8908,
+        "current_body_bytes": 8908,
+        "baseline_body_sha256": "3e6c307784601876b5c80dfae8766f3fe5d288e433af2cd15cc6ceeaca74b804",
+        "current_body_sha256": "3e6c307784601876b5c80dfae8766f3fe5d288e433af2cd15cc6ceeaca74b804",
+        "body_identical": true,
+        "header_changed": true
+      }
+    ],
+    "status": "pass",
+    "command_template": [
+      "git",
+      "show",
+      "04ce556cad49a915ed324a1379e6ffdaae709b60:<file>"
+    ]
+  },
+  "claims": [
+    {
+      "id": "DW-73",
+      "status": "verified_by_source_inspection",
+      "claim": "004/005 reload; 005 uses three distinct dates and cannot isolate server sorting or equal-date tiebreaks; 006 observes null-description PATCH, HTTP 200 and Settings/Home removal without reload.",
+      "evidence": [
+        "tests/e2e/settings/events-persistence.spec.ts:172-354",
+        "src/services/eventsService.ts:356-424,558-564",
+        "src/stores/slices/eventsSlice.ts:77-86,169-186,248",
+        "src/components/Settings/EventsSettings.tsx:307-313,723-727",
+        "src/components/RelationshipTimers/EventCountdown.tsx:32-43"
+      ]
+    },
+    {
+      "id": "DW-77",
+      "status": "verified_by_source_inspection",
+      "claim": "Mapper keys include SQLSTATE and PostgREST codes; photos, notes, partner requests and reflections selectively map only guarded 23514 failures; direct unit tests do not exercise every caller integration.",
+      "evidence": [
+        "src/api/errorHandlers.ts:69-99",
+        "src/api/moodApi.ts:114-118",
+        "src/api/interactionService.ts:199-203",
+        "src/services/eventsService.ts:152-157,430-434",
+        "src/services/photoService.ts:394-398",
+        "src/stores/slices/notesSlice.ts:519-521,667-669",
+        "src/api/partnerService.ts:192-195,301-305,329-333",
+        "src/services/scriptureReadingService.ts:332-337",
+        "src/components/Settings/EventsSettings.tsx:981",
+        "tests/api/empty-database-error-fallback.spec.ts:61-147",
+        "tests/unit/api/errorHandlers.test.ts:88-268"
+      ]
+    },
+    {
+      "id": "DW-82",
+      "status": "verified_by_source_inspection",
+      "claim": "Identity is used for sends, unread filtering, history loading and subscriptions; record callbacks additionally capture/compare the auth lifetime version, status callbacks check only activity/identity; auth version advances on sign-out or identity changes and persists through same-user refresh.",
+      "evidence": [
+        "src/stores/slices/interactionsSlice.ts:78,111,164-166,180-193,220-244",
+        "src/stores/slices/authSlice.ts:201-204,219,222-275",
+        "tests/unit/stores/interactionsSubscription.test.ts:97-278"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "diff",
+        "04ce556cad49a915ed324a1379e6ffdaae709b60",
+        "--check",
+        "--",
+        "tests/e2e/settings/events-persistence.spec.ts",
+        "tests/unit/api/errorHandlers.test.ts",
+        "src/stores/slices/interactionsSlice.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.008,
+      "output": ""
+    },
+    {
+      "argv": [
+        "npx",
+        "eslint",
+        "tests/e2e/settings/events-persistence.spec.ts",
+        "tests/unit/api/errorHandlers.test.ts",
+        "src/stores/slices/interactionsSlice.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.984,
+      "output": ""
+    },
+    {
+      "argv": [
+        "npm",
+        "run",
+        "test:unit",
+        "--",
+        "tests/unit/api/errorHandlers.test.ts",
+        "tests/unit/stores/interactionsSubscription.test.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.878,
+      "raw_log": "_bmad-output/test-artifacts/dw-source-test-contract-comments/evidence/unit.log",
+      "summary_lines": [
+        "\u2713 tests/unit/api/errorHandlers.test.ts (84 tests) 5ms",
+        "\u2713 tests/unit/stores/interactionsSubscription.test.ts (6 tests) 4ms",
+        "Test Files  2 passed (2)",
+        "Tests  90 passed (90)",
+        "Duration  546ms (transform 94ms, setup 169ms, import 158ms, tests 9ms, environment 322ms)"
+      ],
+      "counts": {
+        "files_passed": 2,
+        "files_total": 2,
+        "tests_passed": 90,
+        "tests_total": 90,
+        "tests_failed": 0,
+        "tests_skipped": 0
+      },
+      "per_file": [
+        {
+          "file": "tests/unit/api/errorHandlers.test.ts",
+          "tests": 84,
+          "status": "passed"
+        },
+        {
+          "file": "tests/unit/stores/interactionsSubscription.test.ts",
+          "tests": 6,
+          "status": "passed"
+        }
+      ],
+      "warnings": [
+        "Vite warns vitest.config.ts uses __dirname, which configLoader: 'native' will not support; existing configuration warning, exit remained 0."
+      ]
+    }
+  ],
+  "status": "pass",
+  "limitations": [
+    "The unit run executes only the two explicitly selected canonical suites.",
+    "No browser, live API, production build, coverage measurement, or service lifecycle operation was performed by this validation subtask.",
+    "Existing comments below the leading headers and test assertions remain byte-identical to the spec baseline."
+  ]
+}

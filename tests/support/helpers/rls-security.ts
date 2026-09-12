@@ -59,10 +59,34 @@ export async function createOutsiderClient(
   const userId = newUser.user.id;
   const cleanup = () => supabaseAdmin.auth.admin.deleteUser(userId);
 
-  // The account already exists at this point, so a sign-in failure below would
-  // leave the caller with no cleanup handle and leak the user into auth.users.
+  // Setup can fail after the account exists but before the caller gets a cleanup
+  // handle. Attempt deletion here, preserving both failures if cleanup also fails.
   const client = await createUserClient(supabaseAdmin, userId).catch(async (error) => {
-    await cleanup();
+    try {
+      const { error: cleanupError } = await cleanup();
+      if (cleanupError) throw cleanupError;
+    } catch (cleanupError) {
+      const describeFailure = (failure: unknown): string => {
+        if (failure instanceof Error) return `${failure.name}: ${failure.message}`;
+        try {
+          return JSON.stringify(failure) ?? String(failure);
+        } catch {
+          try {
+            return String(failure);
+          } catch {
+            return '<unprintable rejection>';
+          }
+        }
+      };
+
+      // Playwright reports omit AggregateError.errors, so include both details here.
+      throw new AggregateError(
+        [error, cleanupError],
+        `Failed to set up and clean up outsider account ${userId}. ` +
+          `Setup: ${describeFailure(error)}. Cleanup: ${describeFailure(cleanupError)}`,
+        { cause: cleanupError }
+      );
+    }
     throw error;
   });
 

@@ -70,6 +70,7 @@ const backend = {
     bounds: { column: string; op: 'gte' | 'lt'; value: string }[];
     orderings: { column: string; ascending: boolean }[];
     range: { from: number; to: number } | null;
+    or?: string;
   }[],
   /** Bumped on every `from()` — an offline guard must leave this at 0. */
   fromCalls: 0,
@@ -100,6 +101,35 @@ function row(overrides: Partial<EventRow> = {}): EventRow {
   };
 }
 
+/** Evaluate the supported PostgREST boolean grammar independently of page logic. */
+function matchesExpression(candidate: EventRow, expression: string): boolean {
+  const group = /^(and|or)\((.*)\)$/.exec(expression);
+  if (group) {
+    const clauses: string[] = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < group[2].length; i += 1) {
+      const char = group[2][i];
+      if (char === '(') depth += 1;
+      if (char === ')') depth -= 1;
+      if (char === ',' && depth === 0) {
+        clauses.push(group[2].slice(start, i));
+        start = i + 1;
+      }
+    }
+    clauses.push(group[2].slice(start));
+    return group[1] === 'and'
+      ? clauses.every((clause) => matchesExpression(candidate, clause))
+      : clauses.some((clause) => matchesExpression(candidate, clause));
+  }
+  const comparison = /^(\w+)\.(eq|gt|lt)\.(.*)$/.exec(expression);
+  if (!comparison) throw new Error(`Unsupported filter: ${expression}`);
+  const actual = String(candidate[comparison[1] as keyof EventRow]);
+  const expected = comparison[3];
+  return comparison[2] === 'eq' ? actual === expected
+    : comparison[2] === 'gt' ? actual > expected : actual < expected;
+}
+
 /**
  * The PostgREST builder is chainable and thenable: every method returns itself,
  * and awaiting it runs the query.
@@ -111,10 +141,12 @@ function eventsQuery() {
   const orderings: { column: string; ascending: boolean }[] = [];
   const bounds: { column: string; op: 'gte' | 'lt'; value: string }[] = [];
   let range: { from: number; to: number } | null = null;
+  let or: string | undefined;
 
   const matches = (candidate: EventRow): boolean => {
     const record = candidate as unknown as Record<string, unknown>;
     if (!filters.every((f) => record[f.column] === f.value)) return false;
+    if (or && !matchesExpression(candidate, `or(${or})`)) return false;
     // `event_date` is a Postgres `date`, so its "YYYY-MM-DD" text compares the
     // same way lexicographically as it does chronologically — which is what
     // lets this stand in for a real range predicate.
@@ -127,7 +159,7 @@ function eventsQuery() {
   const run = (): { data: EventRow[] | null; error: FakePostgrestError | Error | null } => {
     if (backend.nextRejection) throw backend.nextRejection.reason;
     if (operation === 'select') {
-      backend.queries.push({ bounds: [...bounds], orderings: [...orderings], range });
+      backend.queries.push({ bounds: [...bounds], orderings: [...orderings], range, ...(or ? { or } : {}) });
     }
     const errorApplies =
       backend.errorForBound === null || bounds.some((b) => b.op === backend.errorForBound);
@@ -200,6 +232,10 @@ function eventsQuery() {
     },
     lt: (column: string, value: string) => {
       bounds.push({ column, op: 'lt', value });
+      return builder;
+    },
+    or: (expression: string) => {
+      or = expression;
       return builder;
     },
     range: (from: number, to: number) => {
@@ -334,6 +370,138 @@ describe('eventsService', () => {
   // ==========================================================================
   // getEvents
   // ==========================================================================
+
+  describe('getEventsPage', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2026, 8, 12, 23, 59));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it.each([0, 50, 51])('returns truthful raw continuation for %i rows in each window', async (count) => {
+      backend.rows = ['2026-09-11', '2026-09-12'].flatMap((date, side) =>
+        Array.from({ length: count }, (_, index) => row({
+          id: `${side}-${String(index).padStart(3, '0')}`, event_date: date,
+        }))
+      );
+      const page = await eventsService.getEventsPage();
+      expect(page.events).toHaveLength(Math.min(count, 50) * 2);
+      expect(page.pagination.upcoming.hasMore).toBe(count > 50);
+      expect(page.pagination.past.hasMore).toBe(count > 50);
+      expect(backend.queries).toHaveLength(2);
+      for (const query of backend.queries) {
+        expect(query.range).toEqual({ from: 0, to: 50 });
+        expect(query.orderings.map((order) => order.column)).toEqual(['event_date', 'created_at', 'id']);
+      }
+      expect(backend.filters).toEqual([]);
+      expect(page.pagination.todayISO).toBe('2026-09-12');
+    });
+
+    it('continues only unfinished windows, with fixed local today across midnight', async () => {
+      backend.rows = Array.from({ length: 101 }, (_, index) => row({
+        id: `past-${String(index).padStart(3, '0')}`, event_date: '2026-09-11',
+      })).concat(row({ id: 'upcoming', event_date: '2026-09-12' }));
+      const first = await eventsService.getEventsPage();
+      vi.setSystemTime(new Date(2026, 8, 13, 1));
+      const second = await eventsService.getEventsPage(first.pagination);
+      const last = await eventsService.getEventsPage(second.pagination);
+      const all = [...first.events, ...second.events, ...last.events];
+      expect(all).toHaveLength(102);
+      expect(new Set(all.map((event) => event.id)).size).toBe(102);
+      expect(second.events).toHaveLength(50);
+      expect(last.events).toHaveLength(1);
+      expect(last.pagination.past.hasMore).toBe(false);
+      expect(backend.queries).toHaveLength(4);
+      expect(backend.queries.slice(2).every((query) =>
+        query.bounds[0].op === 'lt' && query.bounds[0].value === '2026-09-12'
+      )).toBe(true);
+      await eventsService.getEventsPage(last.pagination);
+      expect(backend.queries).toHaveLength(4);
+    });
+
+    it.each(['2026-09-11', '2026-09-12'])('preserves microseconds and ID ties across the %s boundary', async (eventDate) => {
+      backend.rows = Array.from({ length: 103 }, (_, index) => row({
+        id: `event-${String(index).padStart(3, '0')}`,
+        event_date: eventDate,
+        // Deliberately repeat instants, while all rows share one JS millisecond.
+        created_at: `2026-08-18T00:00:00.123${String(Math.floor(index / 2)).padStart(3, '0')}+00:00`,
+      })).reverse();
+      const first = await eventsService.getEventsPage();
+      const cursor = (eventDate < first.pagination.todayISO ? first.pagination.past : first.pagination.upcoming).cursor!;
+      expect(cursor.created_at).toMatch(/\.123\d{3}\+00:00/);
+      const second = await eventsService.getEventsPage(first.pagination);
+      const third = await eventsService.getEventsPage(second.pagination);
+      const ids = [...first.events, ...second.events, ...third.events].map((event) => event.id);
+      expect(ids).toHaveLength(103);
+      expect(new Set(ids).size).toBe(103);
+      expect(backend.queries[2].or).toContain(`created_at.eq.${cursor.created_at},id.`);
+    });
+
+    it('does not shift a page after a previously read row is deleted', async () => {
+      backend.rows = Array.from({ length: 51 }, (_, index) => row({
+        id: `event-${String(index).padStart(3, '0')}`, event_date: '2026-09-11',
+      }));
+      const first = await eventsService.getEventsPage();
+      backend.rows = backend.rows.filter((event) => event.id !== first.events[0].id);
+      const second = await eventsService.getEventsPage(first.pagination);
+      expect(second.events.map((event) => event.id)).toEqual(['event-000']);
+    });
+
+    it('advances raw cursors even when an entire page cannot convert', async () => {
+      backend.rows = Array.from({ length: 51 }, (_, index) => row({
+        id: `event-${String(index).padStart(3, '0')}`, event_date: 'infinity',
+      }));
+      const first = await eventsService.getEventsPage();
+      expect(first.events).toEqual([]);
+      expect(first.pagination.upcoming.hasMore).toBe(true);
+      expect(first.pagination.upcoming.cursor?.event_date).toBe('infinity');
+      const last = await eventsService.getEventsPage(first.pagination);
+      expect(last.events).toEqual([]);
+      expect(last.pagination.upcoming.hasMore).toBe(false);
+      expect(console.error).toHaveBeenCalledTimes(51);
+    });
+
+    it('keeps lookahead truthful before cross-window deduplication', async () => {
+      backend.nextData = Array.from({ length: 51 }, (_, index) => row({ id: String(index) }));
+      const page = await eventsService.getEventsPage();
+      expect(page.events).toHaveLength(50);
+      expect(new Set(page.events.map((event) => event.id)).size).toBe(50);
+      expect(page.pagination.past.hasMore).toBe(true);
+      expect(page.pagination.upcoming.hasMore).toBe(true);
+    });
+
+    it.each(['gte', 'lt'] as const)('retries both unfinished windows after the %s window fails', async (bound) => {
+      backend.rows = ['2026-09-11', '2026-09-12'].flatMap((eventDate, side) =>
+        Array.from({ length: 51 }, (_, index) => row({
+          id: `event-${side}-${index}`, event_date: eventDate,
+        }))
+      );
+      const first = await eventsService.getEventsPage();
+      const originalPagination = structuredClone(first.pagination);
+      expect(first.pagination.upcoming.hasMore).toBe(true);
+      expect(first.pagination.past.hasMore).toBe(true);
+      backend.errorForBound = bound;
+      backend.nextError = new Error('page disconnected');
+      // Upcoming completes first in this fake: failing gte covers failure
+      // before the other success, and failing lt covers success before failure.
+      await expect(eventsService.getEventsPage(first.pagination)).rejects.toThrow('page disconnected');
+      const failedQueries = backend.queries.slice(-2);
+      expect(failedQueries).toHaveLength(2);
+      expect(first.pagination).toEqual(originalPagination);
+      backend.nextError = null;
+      const retry = await eventsService.getEventsPage(first.pagination);
+      expect(backend.queries.slice(-2)).toEqual(failedQueries);
+      expect(retry.events).toHaveLength(2);
+      expect(retry.pagination.upcoming.hasMore).toBe(false);
+      expect(retry.pagination.past.hasMore).toBe(false);
+    });
+
+    it('does not query offline', async () => {
+      setOnline(false);
+      await expect(eventsService.getEventsPage()).rejects.toThrow('Events need a connection to load');
+      expect(backend.fromCalls).toBe(0);
+    });
+  });
 
   describe('getEvents', () => {
     // The read now cuts its window at the viewer's own calendar day, so every

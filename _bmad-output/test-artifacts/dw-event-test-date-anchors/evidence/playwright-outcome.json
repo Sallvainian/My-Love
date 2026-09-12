@@ -1,0 +1,181 @@
+{
+  "exit_code": 0,
+  "stats": {
+    "startTime": "2026-09-12T08:29:14.555Z",
+    "duration": 86980.92599999999,
+    "expected": 24,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "tests": [
+    {
+      "project": "chromium",
+      "file": "e2e/home/events.spec.ts",
+      "title": "[P0] shows own and partner future events, hides a past one, and leaves other cards unchanged",
+      "status": "expected",
+      "duration_ms": 1112
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/home/events.spec.ts",
+      "title": "[P0] shows the empty-state placeholder for an account with zero events",
+      "status": "expected",
+      "duration_ms": 753
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/home/events.spec.ts",
+      "title": "[P0] does not flash the empty-state placeholder before the first load settles",
+      "status": "expected",
+      "duration_ms": 808
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/home/events.spec.ts",
+      "title": "[P0] shows the placeholder when every stored event has already passed",
+      "status": "expected",
+      "duration_ms": 733
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/home/events.spec.ts",
+      "title": "[P0] renders an event dated today, with a null description",
+      "status": "expected",
+      "duration_ms": 708
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/home/events.spec.ts",
+      "title": "[P0] caps the events column at six cards, keeping the soonest",
+      "status": "expected",
+      "duration_ms": 805
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/home/events.spec.ts",
+      "title": "[P0] a background reload never blanks a card already on screen",
+      "status": "expected",
+      "duration_ms": 4306
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/home/events.spec.ts",
+      "title": "[P0] renders the load error and recovers on a later successful Home load",
+      "status": "expected",
+      "duration_ms": 11712
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/settings/event-test-date-anchors.spec.ts",
+      "title": "[P1] DW.DATE-E2E-001 shared setup dates survive Settings writes, reload, and Home ordering",
+      "status": "expected",
+      "duration_ms": 5371
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/settings/events-crud.spec.ts",
+      "title": "[P0] adds, shows on Home, edits, deletes, and lands on the empty state",
+      "status": "expected",
+      "duration_ms": 12809
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/settings/events-crud.spec.ts",
+      "title": "[P0] loads the list on a direct reload of /settings, without visiting Home",
+      "status": "expected",
+      "duration_ms": 2953
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/settings/events-crud.spec.ts",
+      "title": "[P0] keeps a successful edit when Settings mount returns an older snapshot",
+      "status": "expected",
+      "duration_ms": 3567
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/settings/events-crud.spec.ts",
+      "title": "[P0] lists a past event with its controls, where Home hides it",
+      "status": "expected",
+      "duration_ms": 2528
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/settings/events-crud.spec.ts",
+      "title": "[P0] offers no Edit or Delete on a partner's event",
+      "status": "expected",
+      "duration_ms": 2531
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/settings/events-crud.spec.ts",
+      "title": "[P0] shows the message the write returned and leaves the list untouched",
+      "status": "expected",
+      "duration_ms": 2953
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/settings/events-persistence.spec.ts",
+      "title": "[P1] DE.5-E2E-004 the icon a user picks comes back on reload and reaches the Home card",
+      "status": "expected",
+      "duration_ms": 7478
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/settings/events-persistence.spec.ts",
+      "title": "[P1] DE.5-E2E-005 rows render in server order after a reload, not in creation order",
+      "status": "expected",
+      "duration_ms": 6193
+    },
+    {
+      "project": "chromium",
+      "file": "e2e/settings/events-persistence.spec.ts",
+      "title": "[P2] DE.5-E2E-006 clearing a description writes null and removes it from the row and Home",
+      "status": "expected",
+      "duration_ms": 9955
+    },
+    {
+      "project": "api",
+      "file": "api/event-test-date-anchors.spec.ts",
+      "title": "[P1] DW.DATE-API-001 one anchor keeps own and partner dates tied across setup midnight",
+      "status": "expected",
+      "duration_ms": 449
+    },
+    {
+      "project": "api",
+      "file": "api/events-wire-contract.spec.ts",
+      "title": "[P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events",
+      "status": "expected",
+      "duration_ms": 209
+    },
+    {
+      "project": "api",
+      "file": "api/events-wire-contract.spec.ts",
+      "title": "[P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults",
+      "status": "expected",
+      "duration_ms": 278
+    },
+    {
+      "project": "api",
+      "file": "api/events-wire-contract.spec.ts",
+      "title": "[P1] DE.5-API-005 a raw ascending GET returns both halves of the pair in event_date then created_at order",
+      "status": "expected",
+      "duration_ms": 278
+    },
+    {
+      "project": "api",
+      "file": "api/events-wire-contract.spec.ts",
+      "title": "[P1] DE.5-API-008 an authenticated but unlinked outsider reads none of the couple's events",
+      "status": "expected",
+      "duration_ms": 556
+    },
+    {
+      "project": "api",
+      "file": "api/events-wire-contract.spec.ts",
+      "title": "[P1] DE.5-API-006 a 101-character label is refused with the CHECK violation the client mirrors",
+      "status": "expected",
+      "duration_ms": 273
+    }
+  ]
+}

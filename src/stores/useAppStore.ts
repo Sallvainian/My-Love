@@ -71,7 +71,10 @@ function validateHydratedState(state: Partial<AppState> | undefined): {
  * already omits them. The next slice that needs the same protection extends
  * this array rather than adding a second branch in `getItem`.
  */
-const STALE_PERSISTED_KEYS = ['moods', 'events'] as const;
+const STALE_PERSISTED_KEYS = [
+  'moods', 'events', 'eventsIsLoading', 'eventsError',
+  'eventsPagination', 'eventsIsLoadingMore', 'eventsHistoryError',
+] as const;
 
 export const useAppStore = create<AppState>()(
   persist(

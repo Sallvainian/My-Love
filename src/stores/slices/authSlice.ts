@@ -134,6 +134,9 @@ export function signedOutState() {
     events: [],
     eventsIsLoading: false,
     eventsError: null,
+    eventsPagination: null,
+    eventsIsLoadingMore: false,
+    eventsHistoryError: null,
   } satisfies Partial<AppState>;
 }
 

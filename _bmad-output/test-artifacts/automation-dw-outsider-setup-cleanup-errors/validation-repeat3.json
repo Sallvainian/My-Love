@@ -1,0 +1,237 @@
+{
+  "stats": {
+    "startTime": "2026-09-12T09:32:21.981Z",
+    "duration": 3016.553,
+    "expected": 15,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "tests": [
+    {
+      "title": "[P1] DW71-API-001 preserves setup and returned deletion errors from the real SDK",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 30,
+              "workerIndex": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] DW71-API-002 returns only the setup error after the SDK confirms deletion",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 39,
+              "workerIndex": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] DW71-API-001 preserves setup and returned deletion errors from the real SDK",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 27,
+              "workerIndex": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] DW71-API-002 returns only the setup error after the SDK confirms deletion",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 31,
+              "workerIndex": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] DW71-API-001 preserves setup and returned deletion errors from the real SDK",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 25,
+              "workerIndex": 6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] DW71-API-002 returns only the setup error after the SDK confirms deletion",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 31,
+              "workerIndex": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] preserves both failures in JSON and Markdown for returned AuthError",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 593,
+              "workerIndex": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] preserves both failures in JSON and Markdown for rejected string",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 577,
+              "workerIndex": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] preserves both failures in JSON and Markdown for rejected object",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 591,
+              "workerIndex": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] preserves both failures in JSON and Markdown for returned AuthError",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 604,
+              "workerIndex": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] preserves both failures in JSON and Markdown for rejected string",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 594,
+              "workerIndex": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] preserves both failures in JSON and Markdown for rejected object",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 594,
+              "workerIndex": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] preserves both failures in JSON and Markdown for returned AuthError",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 590,
+              "workerIndex": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] preserves both failures in JSON and Markdown for rejected string",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 592,
+              "workerIndex": 6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "[P1] preserves both failures in JSON and Markdown for rejected object",
+      "runs": [
+        {
+          "outcome": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 565,
+              "workerIndex": 7
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

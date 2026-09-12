@@ -1,0 +1,29 @@
+{
+  "runKey": "dw-decision-dw-41",
+  "status": "done",
+  "newTests": 6,
+  "priority": {
+    "P1": 6
+  },
+  "repeatedRun": {
+    "executions": 30,
+    "passed": 30,
+    "skipped": 0,
+    "failed": 0,
+    "flaky": 0,
+    "repetitions": 5,
+    "workers": 4,
+    "maxDurationMs": 4346
+  },
+  "unitRegressions": {
+    "files": 6,
+    "passed": 240
+  },
+  "browserRegressions": {
+    "passed": 15
+  },
+  "artifactTestsAndFixturesTypecheck": "passed",
+  "artifactLint": "passed",
+  "projectTypecheck": "passed",
+  "configTypingLimitation": "Inherited root Playwright config has 3 pre-existing diagnostics; wrapper runtime verified."
+}

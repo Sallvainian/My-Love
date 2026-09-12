@@ -74,6 +74,8 @@ export interface CoupleEvent {
   date: Date;
   /** Server insert instant, used ONLY as the same-day tiebreak — never for calendar display. */
   createdAt: Date;
+  /** Original server precision for ordering rows within the same millisecond. */
+  createdAtRaw?: string;
   description: string | null;
   icon: EventIcon;
 }
@@ -241,6 +243,7 @@ function toCoupleEvent(row: SupabaseEventRecord): CoupleEvent | null {
     // An absolute instant compared ordinally, so `new Date(iso)` is safe here —
     // the calendar-date trap above applies only to `event_date`.
     createdAt: new Date(row.created_at),
+    createdAtRaw: row.created_at,
     description: row.description,
     icon: isEventIcon(row.icon) ? row.icon : 'calendar',
   };
@@ -255,6 +258,54 @@ function toCoupleEvent(row: SupabaseEventRecord): CoupleEvent | null {
  */
 const DEFAULT_EVENTS_PAGE_SIZE = 50;
 
+/** Server values must survive Date conversion, which truncates microseconds. */
+export interface EventPageCursor {
+  event_date: string;
+  created_at: string;
+  id: string;
+}
+
+export interface EventWindowContinuation {
+  cursor: EventPageCursor | null;
+  hasMore: boolean;
+}
+
+export interface EventsPagination {
+  /** Local calendar boundary fixed for the whole traversal, including midnight. */
+  todayISO: string;
+  upcoming: EventWindowContinuation;
+  past: EventWindowContinuation;
+}
+
+export interface EventsPage {
+  events: CoupleEvent[];
+  pagination: EventsPagination;
+}
+
+function windowPage(rows: SupabaseEventRecord[]) {
+  const page = rows.slice(0, DEFAULT_EVENTS_PAGE_SIZE);
+  const last = page.at(-1);
+  return {
+    rows: page,
+    continuation: {
+      hasMore: rows.length > DEFAULT_EVENTS_PAGE_SIZE,
+      cursor: last
+        ? { event_date: last.event_date, created_at: last.created_at, id: last.id }
+        : null,
+    },
+  };
+}
+
+/** These values come from typed Postgres columns, not user-entered filter text. */
+function afterCursor(cursor: EventPageCursor, ascending: boolean): string {
+  const op = ascending ? 'gt' : 'lt';
+  return [
+    `event_date.${op}.${cursor.event_date}`,
+    `and(event_date.eq.${cursor.event_date},created_at.${op}.${cursor.created_at})`,
+    `and(event_date.eq.${cursor.event_date},created_at.eq.${cursor.created_at},id.${op}.${cursor.id})`,
+  ].join(',');
+}
+
 /**
  * Events Service Class
  *
@@ -264,6 +315,58 @@ const DEFAULT_EVENTS_PAGE_SIZE = 50;
  * - Convert every row to the `CoupleEvent` domain type
  */
 class EventsService {
+  /**
+   * Read 50 rows plus one raw lookahead per unfinished window. Continuation is
+   * computed before conversion or deduplication, so even an unreadable page
+   * can advance. The caller commits both cursors only after both reads succeed.
+   * RLS supplies own/partner visibility; no client user filter is applied.
+   */
+  async getEventsPage(pagination?: EventsPagination | null): Promise<EventsPage> {
+    if (!isOnline()) {
+      throw new Error('You are offline. Events need a connection to load.');
+    }
+    const todayISO = pagination?.todayISO ?? formatDateISO(new Date());
+    const readWindow = async (ascending: boolean, previous?: EventWindowContinuation) => {
+      if (previous && !previous.hasMore) return { rows: [], continuation: previous };
+      let query = supabase.from('events').select('*');
+      query = ascending ? query.gte('event_date', todayISO) : query.lt('event_date', todayISO);
+      if (previous?.cursor) query = query.or(afterCursor(previous.cursor, ascending));
+      const { data, error } = await query
+        .order('event_date', { ascending })
+        .order('created_at', { ascending })
+        .order('id', { ascending })
+        .range(0, DEFAULT_EVENTS_PAGE_SIZE);
+      if (error) throw error;
+      return windowPage(data ?? []);
+    };
+
+    try {
+      const [upcoming, past] = await Promise.all([
+        readWindow(true, pagination?.upcoming),
+        readWindow(false, pagination?.past),
+      ]);
+      const upcomingIds = new Set(upcoming.rows.map((row) => row.id));
+      const rows = [...past.rows]
+        .reverse()
+        .filter((row) => !upcomingIds.has(row.id))
+        .concat(upcoming.rows);
+      return {
+        events: rows.map(toCoupleEvent).filter((event): event is CoupleEvent => event !== null),
+        pagination: {
+          todayISO,
+          upcoming: upcoming.continuation,
+          past: past.continuation,
+        },
+      };
+    } catch (error) {
+      logSupabaseError('EventsService.getEventsPage', error);
+      if (isPostgrestError(error)) {
+        throw handleSupabaseError(error, 'EventsService.getEventsPage');
+      }
+      throw networkFailure('EventsService.getEventsPage', error);
+    }
+  }
+
   /**
    * Fetch the couple's events in a bounded window centred on today.
    *
@@ -294,15 +397,9 @@ class EventsService {
    * walk the index in `event_date` order. It sorts. That is fine at a couple's
    * scale, and the index still serves the RLS predicate's `user_id` lookups.
    *
-   * **What the cap drops, and where that shows.** Past `limit` events on a
-   * side, the far ends go: the most distant future and the OLDEST past. The
-   * oldest-past end is the one with a consumer — `EventsSettings` lists the
-   * array unfiltered so a mistyped year can be corrected there, and a year
-   * typed wrong into the deep past is exactly such a row. At the default 50 a
-   * couple reaches that only after 50 past events; there is no "load more"
-   * control, so beyond it those rows are reachable only by passing a larger
-   * `limit` or a non-zero `offset`. Callers that must show everything have to
-   * page; today's single caller does not.
+   * Compatibility API for callers that still supply a limit/offset. Settings
+   * and Home use `getEventsPage` so truncation is explicit and continuation
+   * stays bounded regardless of history size.
    *
    * @param limit - Maximum rows read from EACH side of today: up to `limit`
    *   upcoming (today included) and up to `limit` already-passed, so a call can

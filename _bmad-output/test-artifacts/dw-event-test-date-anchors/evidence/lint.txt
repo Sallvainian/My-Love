@@ -1,0 +1,12 @@
+
+> my-love@0.0.0 lint
+> eslint src tests scripts --no-error-on-unmatched-pattern --ignore-pattern 'tests/playwright-report/**' --ignore-pattern 'tests/test-results/**' --ignore-pattern 'playwright-report/**' --ignore-pattern 'test-results/**' --ignore-pattern '_bmad-output/**' --ignore-pattern '_bmad/**' --ignore-pattern '.codex/**'
+
+
+/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-event-test-date-anchors/src/components/RelationshipTimers/EventCountdown.tsx
+   68:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   91:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  132:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+✖ 3 problems (0 errors, 3 warnings)
+
