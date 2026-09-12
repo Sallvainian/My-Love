@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-09-12T09-25-36-911Z",
+  "story": "dw-outsider-setup-cleanup-errors",
+  "stack": "frontend",
+  "mode": "BMad-Integrated",
+  "execution": {
+    "requestedMode": "subagent",
+    "resolvedMode": "subagent",
+    "probeEnabled": true,
+    "supports": {
+      "subagent": true,
+      "agentTeam": false
+    }
+  },
+  "pact_mcp_reachable": false,
+  "browser_cli_available": true,
+  "browser_mcp_available": true,
+  "baseline": "14cd1ceca2efa510671b0fe6da5e76e6a2e87f8f",
+  "implementation": [
+    "d3780e33",
+    "1fbe262d"
+  ],
+  "ledger_sha256": "b507c277d214b970e37defe929e9f5a245adb638c6691cd79fd97a7050cd3a41"
+}

@@ -720,7 +720,9 @@ location: tests/support/helpers/rls-security.ts:64
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: `createOutsiderClient` catches a failed sign-in and awaits `cleanup()`, but the Supabase admin deletion reports ordinary failures through its returned `error` field. That response is not checked on this setup-failure path, so the throwaway auth account can remain while only the sign-in error is reported.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-outsider-setup-cleanup-errors
+resolution-undo: 0ff32d336aaa8e746d9aea6f42cd2b250588938c82ff6e059de3598a09c53c07 2026-09-12 7374617475733a206f70656e
 
 ### DW-72: The test-local event row schema accepts undeclared response columns despite its exact-schema claim.
 origin: spec-deferred ebb7963b5d9c
