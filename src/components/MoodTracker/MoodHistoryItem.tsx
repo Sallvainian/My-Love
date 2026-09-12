@@ -35,9 +35,13 @@ const NOTE_TRUNCATE_LENGTH = 100;
 export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Read mood_types array, fall back to [mood_type] for legacy entries
+  // Read mood_types array, fall back to [mood_type] for legacy entries.
+  //
+  // Array.isArray, not a truthy check: a non-array `mood_types` is truthy and
+  // a string even has a length, so the legacy fallback would be skipped and the
+  // value mapped character by character.
   const allMoods: MoodType[] =
-    mood.mood_types && mood.mood_types.length > 0
+    Array.isArray(mood.mood_types) && mood.mood_types.length > 0
       ? (mood.mood_types as MoodType[])
       : [mood.mood_type as MoodType];
 
