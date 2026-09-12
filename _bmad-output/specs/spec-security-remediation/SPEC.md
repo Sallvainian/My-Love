@@ -64,9 +64,9 @@ The September 12 security report identifies credential exposure, unauthorized co
 - Enforce authorization and integrity at the server or account-scoped persistence boundary. UI filtering and payload identity claims cannot substitute for that boundary.
 - Preserve the F9 product decision: editable profile names, an auth-owned email mirror and the existing partner-link protections; no email-change feature.
 - Preserve legitimate delivery, offline custom messages, upload retries and account switching. Finding-specific invariants and tests are in `remediation.md`.
-- Follow the adopted `AGENTS.md`, including secret handling, migration-plan approval, centralized IndexedDB upgrades, generated types, Realtime lifecycle management and account-state resets.
+- Follow the adopted `AGENTS.md`, including secret handling, centralized IndexedDB upgrades, generated types, Realtime lifecycle management and account-state resets. For this run, Sallvain delegates routine migration-plan selection and review-finding fixes to the loop without additional approval; retain the research, planning and verification requirements.
 - Scripture exclusion depends on separate removal of its app surface, database objects and local cached data; hiding its screen is insufficient. Recheck shared references if that removal changes the implementation baseline.
-- Implement through bmad-loop using the agreed story queue. Keep operational work open until its verification evidence exists, as specified in `rollout.md`.
+- Run all eight bmad-loop stories without planned human checkpoints. Loop sessions handle in-scope planning, implementation, review, fixes and operational work using available authorized tools; keep incomplete operational work open until its verification evidence exists, as specified in `rollout.md`.
 
 ## Non-goals
 

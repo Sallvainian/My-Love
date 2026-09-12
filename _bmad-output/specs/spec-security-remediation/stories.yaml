@@ -14,7 +14,7 @@
     Implement CAP-2 and CAP-3 in SPEC.md and the F2/F3 contracts in remediation.md,
     including private send/receive channels, directional authorization and receiver validation.
     Verify denied outsider traffic, safe rendering and legitimate delivery while preserving shared channel lifecycle behavior.
-  spec_checkpoint: true
+  spec_checkpoint: false
   done_checkpoint: false
   invoke_dev_with: ""
 
@@ -44,7 +44,7 @@
     Implement CAP-4 and CAP-5 in SPEC.md and the F4/F5 contracts in remediation.md,
     enforcing partner-derived recipients, viewed-only client updates and incoming-row validation.
     Verify direct API authorization and immutability alongside legitimate poke/kiss delivery and badge behavior.
-  spec_checkpoint: true
+  spec_checkpoint: false
   done_checkpoint: false
   invoke_dev_with: ""
 
@@ -64,7 +64,7 @@
     Implement CAP-8 in SPEC.md and the F8 contract in remediation.md with immutable
     userId ownership, a centralized IndexedDB upgrade and ownership checks on every service/store access path.
     Verify shared-browser isolation, imports, delayed operations, legacy ownerless rows and unaffected public daily messages.
-  spec_checkpoint: true
+  spec_checkpoint: false
   done_checkpoint: false
   invoke_dev_with: ""
 
@@ -74,6 +74,6 @@
     Implement CAP-9 in SPEC.md and the F9 contract in remediation.md, preserving
     chosen profile names during auth sync and preventing client changes to the email mirror.
     Update setup and name consumers to read profiles and verify role-sensitive protections, bootstrap and account switching.
-  spec_checkpoint: true
+  spec_checkpoint: false
   done_checkpoint: false
   invoke_dev_with: ""
