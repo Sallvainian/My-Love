@@ -1,5 +1,5 @@
 /**
- * `handleSupabaseError` — the SQLSTATE → user-message map
+ * `handleSupabaseError` — SQLSTATE/PostgREST `error.code` → user-message map
  *
  * The map in `src/api/errorHandlers.ts` is a bare object literal, and every
  * code it does NOT list falls through to `Database error: ` followed by the
@@ -10,21 +10,24 @@
  *
  *   new row for relation "events" violates check constraint "events_label_check"
  *
- * `EventsSettings.tsx` renders `error.message` and nothing else
- * (`src/components/Settings/EventsSettings.tsx:789-795`), so mapping on `code`
- * is what closes that leak. The map is keyed on SQLSTATE alone, so the one
- * entry covers every caller that routes through this function — which is
- * `src/api/moodApi.ts:14`, `src/api/interactionService.ts:23` and
- * `src/services/eventsService.ts:39`, and nothing else. `photoService.ts`,
- * `notesSlice.ts`, `partnerService.ts` and `scriptureReadingService.ts` never
- * import it and handle their own rejections, so they are NOT covered here.
+ * `EventsSettings.tsx` displays a failed save's `saveFailure.error`, so
+ * mapping on `code` keeps the raw CHECK message out of that error text.
+ * The map is keyed on `error.code`, covering SQLSTATE and PostgREST codes.
+ * `src/api/moodApi.ts`,
+ * `src/api/interactionService.ts` and `src/services/eventsService.ts` route
+ * database errors through it. Four other callers use it selectively, gated
+ * by `isPostgrestError(error)` and SQLSTATE `23514`: `photoService.ts`
+ * reports the mapped metadata-write message through an optional callback;
+ * `notesSlice.ts` sets `notesError` for send/retry failures;
+ * `partnerService.ts` replaces the original error's message for
+ * send/accept/decline failures; and `scriptureReadingService.ts` wraps the
+ * mapped message for reflection submission failures. Other errors retain
+ * those callers' existing handling.
  *
- * Nothing else in the repo asserts the map's contents, so a future edit could
- * silently drop a key. This file pins the new `23514` entry, the codes that
- * were already mapped, and the `Database error: ` fallback — which nothing
- * else pins: `tests/e2e/settings/events-crud.spec.ts:413-439` injects `XX000`
- * but asserts only that the surfaced text contains `Injected create failure`,
- * so it would still pass with the prefix removed.
+ * This suite calls the mapper directly, pinning the `23514` entry, the other
+ * mapped codes and the `Database error: ` fallback. It does not exercise
+ * each caller's integration. `tests/api/empty-database-error-fallback.spec.ts`
+ * also asserts CHECK mapping and fallback messages after SDK error parsing.
  *
  * `SupabaseServiceError` is module-private, so assertions are on the returned
  * object's public fields (`message`, `code`, `details`, `hint`,

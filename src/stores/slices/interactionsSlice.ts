@@ -8,7 +8,13 @@
  * - Interaction history retrieval
  *
  * Cross-slice dependencies:
- * - None (self-contained)
+ * - authSlice.userId: sends, unviewed filtering, history loading,
+ *   subscriptions and identity guards
+ * - authSlice.authSessionVersion: captured at subscription creation and
+ *   checked for incoming records to enforce session ownership; the status
+ *   callback checks only user identity and subscription activity. authSlice
+ *   advances the version on sign-out or identity change and retains it on
+ *   same-user refresh
  *
  * Persistence:
  * - Interactions are ephemeral (not persisted to LocalStorage/IndexedDB)
