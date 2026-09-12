@@ -1,0 +1,30 @@
+{
+  "total_tests": 8,
+  "api_tests": 7,
+  "e2e_tests": 1,
+  "detected_stack": "frontend",
+  "execution_mode": "subagent",
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 4,
+    "P2": 4,
+    "P3": 0
+  },
+  "generated_test_files": [
+    "tests/api/events-validation-fidelity.spec.ts",
+    "tests/e2e/settings/events-validation-fidelity.spec.ts"
+  ],
+  "fixtures_created": 1,
+  "existing_fixtures_reused": [
+    "authToken",
+    "coupleEvents",
+    "apiRequest",
+    "interceptNetworkCall",
+    "recurse",
+    "authenticated page",
+    "network monitor"
+  ],
+  "playwright_utils_deviations": [],
+  "pact_artifacts": false,
+  "performance_gain": "not measured; API and E2E workers ran concurrently"
+}

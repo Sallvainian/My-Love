@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "_bmad-output/test-artifacts/dw-events-validation-guard-fidelity/run.py",
+    "npx",
+    "playwright",
+    "test",
+    "tests/api/events-validation-fidelity.spec.ts",
+    "tests/e2e/settings/events-validation-fidelity.spec.ts",
+    "--project=api",
+    "--project=chromium",
+    "--workers=1",
+    "--retries=0",
+    "--reporter=line,json"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 13.65
+}

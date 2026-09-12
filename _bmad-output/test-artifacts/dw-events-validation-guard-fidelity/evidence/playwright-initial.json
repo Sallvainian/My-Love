@@ -1,0 +1,125 @@
+{
+  "stats": {
+    "startTime": "2026-09-12T06:43:17.132Z",
+    "duration": 12098.442,
+    "expected": 8,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "tests": [
+    {
+      "title": "[P1] EVG-E2E-001 padded 100/500 boundaries save exactly and survive reload",
+      "file": "e2e/settings/events-validation-fidelity.spec.ts",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 4240,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P1] EVG-API-001 description POST accepts the exact limit and rejects one more without insertion",
+      "file": "api/events-validation-fidelity.spec.ts",
+      "project": "api",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 387,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P1] EVG-API-002-label PATCH accepts the exact limit and preserves the saved row after rejecting one more",
+      "file": "api/events-validation-fidelity.spec.ts",
+      "project": "api",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 249,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P1] EVG-API-002-description PATCH accepts the exact limit and preserves the saved row after rejecting one more",
+      "file": "api/events-validation-fidelity.spec.ts",
+      "project": "api",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 245,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P2] EVG-API-003-ring preserves the complete allowed icon through POST and GET",
+      "file": "api/events-validation-fidelity.spec.ts",
+      "project": "api",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 241,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P2] EVG-API-003-plane preserves the complete allowed icon through POST and GET",
+      "file": "api/events-validation-fidelity.spec.ts",
+      "project": "api",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 238,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P2] EVG-API-003-calendar preserves the complete allowed icon through POST and GET",
+      "file": "api/events-validation-fidelity.spec.ts",
+      "project": "api",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 237,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "title": "[P2] EVG-API-004 an unknown full icon is rejected without changing the saved row",
+      "file": "api/events-validation-fidelity.spec.ts",
+      "project": "api",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 238,
+          "retry": 0,
+          "errors": []
+        }
+      ]
+    }
+  ],
+  "errors": []
+}
