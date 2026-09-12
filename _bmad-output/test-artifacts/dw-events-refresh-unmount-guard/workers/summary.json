@@ -1,0 +1,27 @@
+{
+  "detected_stack": "frontend",
+  "total_tests": 7,
+  "api_tests": 2,
+  "e2e_tests": 5,
+  "fixtures_created": 1,
+  "api_test_files": 1,
+  "e2e_test_files": 1,
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 6,
+    "P2": 1,
+    "P3": 0
+  },
+  "subagent_execution": "subagent",
+  "performance_gain": "not measured",
+  "validation": {
+    "new_tests_passed": 7,
+    "repeat_passed": 35,
+    "repeat_retries": 0,
+    "component_passed": 94,
+    "typecheck": "passed",
+    "lint": "passed with 3 existing warnings",
+    "diff_check": "passed"
+  },
+  "workflow_status": "completed"
+}

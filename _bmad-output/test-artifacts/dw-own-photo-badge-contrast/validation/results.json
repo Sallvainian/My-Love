@@ -1,0 +1,56 @@
+{
+  "unique_tests": 4,
+  "api_tests": 0,
+  "priorities": {
+    "P1": 2,
+    "P2": 2
+  },
+  "initial": {
+    "passed": 4,
+    "duration_ms": 9050.506,
+    "workers": 1
+  },
+  "baseline_control": {
+    "expected_failures": 2,
+    "reason": "Both fail contrast >=4.5 against original baseline component",
+    "ratio": 4.28750627651904,
+    "duration_ms": 5514.629
+  },
+  "final": {
+    "startTime": "2026-09-12T06:06:12.876Z",
+    "duration": 6329.508,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0,
+    "workers": 2
+  },
+  "tests": [
+    {
+      "title": "[P1] DW59-E2E-001-light loaded white photo has opaque white-on-pink contrast >=4.5",
+      "project": "chromium",
+      "status": "passed",
+      "duration_ms": 914
+    },
+    {
+      "title": "[P2] DW59-E2E-002-light preserves badge, partner, image, caption, and selection behavior",
+      "project": "chromium",
+      "status": "passed",
+      "duration_ms": 1570
+    },
+    {
+      "title": "[P1] DW59-E2E-001-dark loaded white photo has opaque white-on-pink contrast >=4.5",
+      "project": "chromium",
+      "status": "passed",
+      "duration_ms": 696
+    },
+    {
+      "title": "[P2] DW59-E2E-002-dark preserves badge, partner, image, caption, and selection behavior",
+      "project": "chromium",
+      "status": "passed",
+      "duration_ms": 1210
+    }
+  ],
+  "current_ratio_both_themes": 4.5393627491477275,
+  "method": "Browser sRGB canvas source-over composite over decoded white PNG, WCAG relative luminance; 8-bit channel rounding."
+}

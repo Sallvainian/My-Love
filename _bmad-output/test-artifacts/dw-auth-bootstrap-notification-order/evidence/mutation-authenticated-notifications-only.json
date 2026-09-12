@@ -1,0 +1,42 @@
+{
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "--config=_bmad-output/test-artifacts/dw-auth-bootstrap-notification-order/playwright.verify.config.ts",
+    "tests/e2e/auth/bootstrap-notification-order.spec.ts",
+    "--project=chromium",
+    "--grep",
+    "DW-81-E2E-003"
+  ],
+  "exit_code": 1,
+  "duration_seconds": 18.25,
+  "stats": {
+    "startTime": "2026-09-12T05:02:27.247Z",
+    "duration": 17255.223,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "tests": [
+    {
+      "title": "[P0] DW-81-E2E-003 keeps the first null notification signed out after stale authenticated bootstrap",
+      "file": "e2e/auth/bootstrap-notification-order.spec.ts",
+      "project": "chromium",
+      "status": "unexpected",
+      "results": [
+        {
+          "status": "failed",
+          "duration_ms": 15702,
+          "retry": 0,
+          "errors": [
+            {
+              "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('login-screen')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('login-screen') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('login-screen')\u001b[22m\n\n\n  89 |     await authBootstrap.resolveLookup(createAuthBootstrapSession());\n  90 |     await expect(page.getByText('Loading...', { exact: true })).not.toBeVisible();\n> 91 |     await expect(page.getByTestId('login-screen')).toBeVisible();\n     |                                                    ^\n  92 |     await expect(page.getByRole('heading', { name: 'Welcome Back' })).toBeVisible();\n  93 |     await expect(page.getByTestId('app-container')).not.toBeVisible();\n  94 |     expect(await authBootstrap.snapshot()).toMatchObject({\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-auth-bootstrap-notification-order/tests/e2e/auth/bootstrap-notification-order.spec.ts:91:52"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
