@@ -1,0 +1,39 @@
+{
+  "mutation": "Remove authSessionVersion comparison from both event load result branches; retain user and latest-load guards",
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "event-load-session-ownership.spec.ts",
+    "--project=chromium",
+    "--workers=1",
+    "--retries=0",
+    "--grep",
+    "home ignores previous-session",
+    "--reporter=line"
+  ],
+  "exit_code": 1,
+  "guards_removed": 2,
+  "source_restored": true,
+  "original_sha256": "02f9cdabba6a5bdae86aed445c90357cecc5c304db64f94f55556097b90d8b6a",
+  "failed_tests": 2,
+  "failure_location": "Both Home cases timed out at the assertion that the original production load outcome is stale.",
+  "success_case_trace_witness": {
+    "invocations": 1,
+    "results": [
+      {
+        "invocation": 1,
+        "status": "success"
+      }
+    ],
+    "authSessionVersion": 3,
+    "events": [
+      {
+        "label": "Previous home success session"
+      }
+    ],
+    "eventsIsLoading": false,
+    "eventsError": null
+  },
+  "witness_note": "Read from captured browser evaluate result in the mutation trace before subsequent execution replaced test-results."
+}

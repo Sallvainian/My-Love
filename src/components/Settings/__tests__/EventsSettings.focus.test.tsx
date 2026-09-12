@@ -126,6 +126,7 @@ function setStore(overrides: Partial<AppState> = {}) {
       isSyncing: false,
     },
     userId: OWN_USER_ID,
+    authSessionVersion: 1,
     loadEvents: vi.fn(async () => loadOk),
     clearEventsError: vi.fn(() => store.patch({ eventsError: null })),
     addEvent: vi.fn(async (input: NewEventInput) => {

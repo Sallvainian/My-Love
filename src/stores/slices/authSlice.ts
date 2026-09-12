@@ -144,6 +144,8 @@ export interface AuthSlice {
   userEmail: string | null;
   /** Whether the user is authenticated */
   isAuthenticated: boolean;
+  /** Runtime ownership for one auth lifetime; stable across same-user refreshes. */
+  authSessionVersion: number;
 
   /** Set authenticated user (called from onAuthStateChange in App.tsx) */
   setAuthUser: (userId: string | null, email?: string | null) => void;
@@ -197,6 +199,9 @@ function discardAccountState(
   set({
     ...identity,
     ...signedOutState(),
+    // Advance with the reset, even for a repeated sign-out. A later sign-in
+    // by the same user must never reclaim ownership of an earlier request.
+    authSessionVersion: get().authSessionVersion + 1,
     ...(settings
       ? {
           settings: {
@@ -212,8 +217,14 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => (
   userId: null,
   userEmail: null,
   isAuthenticated: false,
+  authSessionVersion: 0,
 
   setAuthUser: (userId, email) => {
+    if (userId === null) {
+      get().clearAuth();
+      return;
+    }
+
     // An account switch that never passes through a null session -- signing in
     // over a live one -- reaches here without clearAuth ever running, and would
     // otherwise carry the previous account's data into the new one. Route it
@@ -227,6 +238,7 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => (
       userId,
       userEmail: email ?? null,
       isAuthenticated: !!userId,
+      authSessionVersion: get().authSessionVersion + (previous !== userId ? 1 : 0),
     };
 
     if (switchedAccount) {

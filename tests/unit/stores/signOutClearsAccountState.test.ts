@@ -195,6 +195,65 @@ describe('clearAuth on sign-out', () => {
     expect(useAppStore.getState().isAuthenticated).toBe(false);
   });
 
+  it('starts with an unpersisted ownership version', () => {
+    expect(useAppStore.getInitialState().authSessionVersion).toBe(0);
+    const persisted = JSON.parse(localStorage.getItem('my-love-storage')!);
+    expect(persisted.state).not.toHaveProperty('authSessionVersion');
+  });
+
+  it('advances ownership atomically with every sign-out and identity transition', () => {
+    const version = useAppStore.getState().authSessionVersion;
+    useAppStore.setState({ eventsIsLoading: true, eventsError: 'old-session-error' });
+    const snapshots: Array<{
+      userId: string | null;
+      authSessionVersion: number;
+      eventsIsLoading: boolean;
+      eventsError: string | null;
+    }> = [];
+    const unsubscribe = useAppStore.subscribe((state) => {
+      snapshots.push({
+        userId: state.userId,
+        authSessionVersion: state.authSessionVersion,
+        eventsIsLoading: state.eventsIsLoading,
+        eventsError: state.eventsError,
+      });
+    });
+
+    useAppStore.getState().clearAuth();
+    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
+    useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
+    useAppStore.getState().clearAuth();
+    useAppStore.getState().clearAuth();
+    unsubscribe();
+
+    expect(snapshots).toEqual(
+      [null, SECRETS.userId, 'USER-B-ID', null, null].map((userId, index) => ({
+        userId,
+        authSessionVersion: version + index + 1,
+        eventsIsLoading: false,
+        eventsError: null,
+      }))
+    );
+  });
+
+  it('routes the null-user setter through sign-out, including identity and anniversary cleanup', () => {
+    const version = useAppStore.getState().authSessionVersion;
+
+    useAppStore.getState().setAuthUser(null, 'ignored@example.com');
+
+    expect(useAppStore.getState()).toMatchObject({
+      userId: null,
+      userEmail: null,
+      isAuthenticated: false,
+      authSessionVersion: version + 1,
+    });
+    expect(JSON.stringify(useAppStore.getState())).not.toContain(SECRETS.anniversaryLabel);
+    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
+    expect(useAppStore.getState().settings!.relationship.anniversaries[0]!.label).toBe(
+      SECRETS.anniversaryLabel
+    );
+  });
+
   it('clears both mood arrays', () => {
     useAppStore.getState().clearAuth();
 
@@ -245,7 +304,7 @@ describe('clearAuth on sign-out', () => {
     }
   });
 
-  it('resets every field the reset is supposed to cover', () => {
+  it.each(['clearAuth', 'setAuthUser'] as const)('%s resets every account field', (action) => {
     // Deliberately duplicated from the source rather than derived from it.
     // Iterating signedOutState() itself is circular — deleting a field removes
     // its own assertion, which is why the first attempt at this test still let
@@ -263,11 +322,12 @@ describe('clearAuth on sign-out', () => {
     }
     useAppStore.setState(dirty as unknown as Parameters<typeof useAppStore.setState>[0]);
 
-    useAppStore.getState().clearAuth();
+    if (action === 'clearAuth') useAppStore.getState().clearAuth();
+    else useAppStore.getState().setAuthUser(null);
 
     const after = useAppStore.getState() as unknown as Record<string, unknown>;
     for (const [key, resetValue] of Object.entries(EXPECTED_RESET)) {
-      expect(after[key], `${key} was not reset by clearAuth`).toEqual(resetValue);
+      expect(after[key], `${key} was not reset by ${action}`).toEqual(resetValue);
     }
   });
 
@@ -466,11 +526,14 @@ describe('clearAuth on sign-out', () => {
     // same user. Resetting on those would wipe the screen mid-session.
     seedSignedInSession();
     const before = useAppStore.getState().notes;
+    const version = useAppStore.getState().authSessionVersion;
 
-    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
+    useAppStore.getState().setAuthUser(SECRETS.userId, 'updated@example.com');
 
     expect(useAppStore.getState().notes).toBe(before);
     expect(useAppStore.getState().userId).toBe(SECRETS.userId);
+    expect(useAppStore.getState().userEmail).toBe('updated@example.com');
+    expect(useAppStore.getState().authSessionVersion).toBe(version);
   });
 
   it('signedOutState() and this test agree on which fields exist', () => {

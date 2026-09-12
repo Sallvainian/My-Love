@@ -20,6 +20,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAuthSlice } from '../../../stores/slices/authSlice';
 import type { AppState } from '../../../stores/types';
 import { EventsSettings } from '../EventsSettings';
 
@@ -117,6 +118,16 @@ function currentEvents(): CoupleEvent[] {
 const ok: EventWriteResult = { success: true };
 const loadOk: EventLoadResult = { status: 'success' };
 
+// Use the real auth transitions against the subscribable double: in particular,
+// clearAuth must synchronously reset event state and invalidate load ownership.
+const authSlice = createAuthSlice(
+  (partial) => store.patch(
+    typeof partial === 'function' ? partial(store.state as unknown as AppState) : partial
+  ),
+  () => store.state as unknown as AppState,
+  {} as Parameters<typeof createAuthSlice>[2]
+);
+
 /**
  * Install a fresh store state. The three write actions mirror what eventsSlice
  * does to `events` on success, so what a test sees after a write is what
@@ -126,6 +137,8 @@ function setStore(overrides: Partial<AppState> = {}) {
   let created = 0;
 
   store.replace({
+    ...authSlice,
+    notes: [],
     events: [],
     eventsIsLoading: false,
     eventsError: null,
@@ -136,6 +149,7 @@ function setStore(overrides: Partial<AppState> = {}) {
       isSyncing: false,
     },
     userId: OWN_USER_ID,
+    authSessionVersion: 1,
     loadEvents: vi.fn(async () => loadOk),
     clearEventsError: vi.fn(() => store.patch({ eventsError: null })),
     addEvent: vi.fn(async (input: NewEventInput) => {
@@ -1408,5 +1422,202 @@ describe('EventsSettings dismissal guards', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('events-delete-confirmation')).not.toBeInTheDocument()
     );
+  });
+});
+
+function deferredLoad(onDelivery?: () => void) {
+  let resolve!: (result: EventLoadResult) => void;
+  const promise = new Promise<EventLoadResult>((release) => { resolve = release; });
+  const originalThen = promise.then.bind(promise);
+  // Observe the component continuation, before React can flush work between
+  // this callback and the test's own await continuation.
+  promise.then = function <TResult1 = EventLoadResult, TResult2 = never>(
+    onFulfilled?: ((result: EventLoadResult) => TResult1 | PromiseLike<TResult1>) | null,
+    onRejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): Promise<TResult1 | TResult2> {
+    return originalThen((result) => {
+      onDelivery?.();
+      return onFulfilled ? onFulfilled(result) : (result as TResult1);
+    }, onRejected);
+  };
+  return { promise, resolve };
+}
+
+function reauthenticate() {
+  const { clearAuth, setAuthUser } = store.state as unknown as AppState;
+  clearAuth();
+  setAuthUser(OWN_USER_ID, 'again@example.com');
+}
+
+function expectUnsettledSession() {
+  expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument();
+  expect(screen.queryByTestId('events-settings-empty')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('events-settings-list')).not.toBeInTheDocument();
+}
+
+const oldOutcomes: EventLoadResult[] = [
+  { status: 'success' },
+  { status: 'failure', error: 'Previous session failed' },
+];
+
+describe('EventsSettings authentication session ownership', () => {
+  it.each(oldOutcomes)('ignores a queued $status before old effect cleanup and re-arms the mount load', async (outcome) => {
+    let deliveredAtLoadCount: number | null = null;
+    const previous = deferredLoad(() => { deliveredAtLoadCount ??= loadEvents.mock.calls.length; });
+    const current = deferredLoad();
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>()
+      .mockReturnValueOnce(previous.promise)
+      .mockReturnValueOnce(current.promise);
+    setStore({ loadEvents });
+    await renderSection();
+
+    await act(async () => {
+      previous.resolve(outcome);
+      reauthenticate();
+      await previous.promise;
+    });
+
+    expect(deliveredAtLoadCount).toBe(1);
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+    expectUnsettledSession();
+    await act(async () => { current.resolve(loadOk); });
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+  });
+
+  it.each(oldOutcomes)('keeps the current load and its error after an old $status', async (outcome) => {
+    const previous = deferredLoad();
+    const current = deferredLoad();
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>()
+      .mockReturnValueOnce(previous.promise)
+      .mockReturnValueOnce(current.promise);
+    setStore({ loadEvents });
+    render(<EventsSettings />);
+    await act(async () => { reauthenticate(); });
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+    expectUnsettledSession();
+    await act(async () => { current.resolve({ status: 'failure', error: 'Current failure' }); });
+    expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
+    await act(async () => { previous.resolve(outcome); });
+    expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('events-settings-empty')).not.toBeInTheDocument();
+  });
+
+  it('hides an already settled empty state on reauthentication and renders current events', async () => {
+    const current = deferredLoad();
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>()
+      .mockResolvedValueOnce(loadOk)
+      .mockReturnValueOnce(current.promise);
+    setStore({ loadEvents });
+    await renderSection();
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+    await act(async () => { reauthenticate(); });
+    expectUnsettledSession();
+    await act(async () => {
+      store.patch({ events: [makeEvent({ id: 'current', label: 'Current session event' })] });
+      current.resolve(loadOk);
+    });
+    expect(screen.getByTestId('event-row-current')).toBeInTheDocument();
+    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+  });
+
+  it('does not reload or discard a pending load on same-session user updates', async () => {
+    const pending = deferredLoad();
+    const loadEvents = vi.fn(() => pending.promise);
+    setStore({ loadEvents });
+    render(<EventsSettings />);
+    const { authSessionVersion, setAuthUser } = store.state as unknown as AppState;
+    await act(async () => { setAuthUser(OWN_USER_ID, 'updated@example.com'); });
+    expect(store.state.authSessionVersion).toBe(authSessionVersion);
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+    await act(async () => { pending.resolve(loadOk); });
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+  });
+
+  it.each(oldOutcomes)('ignores an old reconnect $status after same-account reauthentication', async (outcome) => {
+    let deliveredAtLoadCount: number | null = null;
+    const reconnect = deferredLoad(() => { deliveredAtLoadCount ??= loadEvents.mock.calls.length; });
+    const current = deferredLoad();
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>()
+      .mockResolvedValueOnce({ status: 'failure', error: 'Offline' })
+      .mockReturnValueOnce(reconnect.promise)
+      .mockReturnValueOnce(current.promise);
+    setStore({ loadEvents, syncStatus: { isOnline: false, isSyncing: false, pendingMoods: 0 } });
+    await renderSection();
+    await act(async () => { store.patch({ syncStatus: { isOnline: true } }); });
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      reconnect.resolve(outcome);
+      reauthenticate();
+      await reconnect.promise;
+    });
+    expect(deliveredAtLoadCount).toBe(2);
+    expect(loadEvents).toHaveBeenCalledTimes(3);
+    expectUnsettledSession();
+    await act(async () => { current.resolve(loadOk); });
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+  });
+
+  it.each(['edit', 'delete'] as const)('does not settle the new session from a stale-row %s refresh', async (kind) => {
+    const refresh = deferredLoad();
+    const current = deferredLoad();
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>()
+      .mockResolvedValueOnce(loadOk)
+      .mockReturnValueOnce(refresh.promise)
+      .mockReturnValueOnce(current.promise);
+    const missing: EventWriteResult = { success: false, code: 'not-found', error: 'Event removed' };
+    setStore({
+      events: [makeEvent({ id: 'mine' })],
+      loadEvents,
+      editEvent: vi.fn(async () => missing),
+      removeEvent: vi.fn(async () => missing),
+    });
+    await renderSection();
+    fireEvent.click(screen.getByTestId(`event-${kind}-mine`));
+    fireEvent.click(screen.getByTestId(kind === 'edit' ? 'events-form-submit' : 'events-delete-confirm'));
+    const refreshButton = kind === 'edit' ? 'events-form-refresh' : 'events-delete-refresh';
+    await waitFor(() => expect(screen.getByTestId(refreshButton)).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId(refreshButton));
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+    await act(async () => { reauthenticate(); });
+    expect(loadEvents).toHaveBeenCalledTimes(3);
+    expectUnsettledSession();
+    await act(async () => { current.resolve(loadOk); });
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+    await act(async () => { refresh.resolve({ status: 'failure', error: 'Old refresh failed' }); });
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+  });
+
+  it.each(oldOutcomes)('ignores old retry $status and focus while a new-session retry is pending', async (outcome) => {
+    const oldRetry = deferredLoad();
+    const newRetry = deferredLoad();
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>()
+      .mockResolvedValueOnce({ status: 'failure', error: 'Initial failure' })
+      .mockReturnValueOnce(oldRetry.promise)
+      .mockResolvedValueOnce({ status: 'failure', error: 'Current initial failure' })
+      .mockReturnValueOnce(newRetry.promise);
+    setStore({ loadEvents });
+    await renderSection();
+    fireEvent.click(screen.getByTestId('events-settings-retry'));
+    await act(async () => { reauthenticate(); });
+    const retry = screen.getByTestId('events-settings-retry');
+    expect(retry).toBeEnabled();
+    fireEvent.click(retry);
+    expect(loadEvents).toHaveBeenCalledTimes(4);
+    expect(retry).toBeDisabled();
+
+    // Give the user somewhere meaningful to focus while the load is pending.
+    openAddForm();
+    const input = screen.getByTestId('events-form-label');
+    input.focus();
+    await act(async () => { oldRetry.resolve(outcome); });
+    expect(input).toHaveFocus();
+    expect(retry).toBeDisabled();
+    expect(retry).toHaveTextContent('Retrying');
+    fireEvent.click(screen.getByTestId('events-form-close'));
+    await act(async () => { newRetry.resolve(loadOk); });
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-add')).toHaveFocus();
   });
 });

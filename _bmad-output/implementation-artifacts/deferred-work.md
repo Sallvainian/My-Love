@@ -537,7 +537,9 @@ location: src/stores/slices/eventsSlice.ts:210; src/App.tsx:441
 source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: medium
 reason: `loadEvents` validates only `requestedBy` and `latestLoadId`. If account A signs out, signs back in as A, and the old request settles before the new mount effect increments the load id, both guards match and the prior-session response can own the reset list. App's local settled marker is also keyed only by user id. This path predates the bundle; the change preserves rather than introduces those guards.
-status: open
+status: done 2026-09-11
+resolution: resolved by sweep bundle dw-event-load-session-ownership
+resolution-undo: 3b9cbe14c278fe58eeb36f2bec269a9c112a29bf26ee5e0dbaacf33079abba46 2026-09-11 7374617475733a206f70656e
 
 ### DW-55: A prior-session event load can still own state after signing back into the same account.
 origin: spec-deferred d08cc52656ce
@@ -545,7 +547,9 @@ location: src/stores/slices/eventsSlice.ts:210; src/App.tsx:441
 source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: medium
 reason: `loadEvents` continues to identify ownership with `requestedBy` and `latestLoadId`. If account A signs out and signs back in as A before the old request settles and before a successor load allocates a new id, both guards still match. The user-id-only guard predates this bundle; the reviewed change preserves it while adding call-owned outcomes and mutation replay.
-status: open
+status: done 2026-09-11
+resolution: resolved by sweep bundle dw-event-load-session-ownership
+resolution-undo: 3b9cbe14c278fe58eeb36f2bec269a9c112a29bf26ee5e0dbaacf33079abba46 2026-09-11 7374617475733a206f70656e
 
 ### DW-56: A prior-session event load can still own the reset list after signing back into the same account.
 origin: spec-deferred a52c0c10748d
@@ -553,7 +557,9 @@ location: src/stores/slices/eventsSlice.ts:210; src/App.tsx:441
 source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: medium
 reason: `loadEvents` captures only `userId` and `latestLoadId`. A request started before sign-out can therefore pass both guards after the same user signs in again if the successor Home effect has not allocated a new load id yet. This ownership gap predates the reviewed change, which preserves the existing identity guards while adding per-call results and mutation replay.
-status: open
+status: done 2026-09-11
+resolution: resolved by sweep bundle dw-event-load-session-ownership
+resolution-undo: 3b9cbe14c278fe58eeb36f2bec269a9c112a29bf26ee5e0dbaacf33079abba46 2026-09-11 7374617475733a206f70656e
 
 ### DW-57: A manual stale-row refresh can settle after Events Settings unmounts and call its local state setters.
 origin: spec-deferred 0c21a7d01775
@@ -736,4 +742,27 @@ location: src/api/errorHandlers.ts:122-130
 source_spec: `spec-dw-39-empty-database-error-fallback.md`
 severity: low
 reason: isPostgrestError requires code, message, and details properties to exist. MoodApi.create and EventsService.createEvent use that unchanged guard before conversion. An omitted-message object therefore bypasses handleSupabaseError, while an explicitly present undefined, null, empty, or whitespace message reaches the fixed fallback. This pre-existing classifier behavior is distinct from DW-39's specifically identified unconditional interpolation in handleSupabaseError; the change does not claim to fix routing.
+status: open
+
+### DW-79: Auth token persistence may race between overlapping auth events and the duplicate action-service writes.
+origin: spec-deferred 5d23934f706e
+location: src/api/auth/sessionService.ts:onAuthStateChange; src/api/auth/actionService.ts:signIn,signOut; src/sw-db.ts:storeAuthToken,clearAuthToken
+source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
+reason: sessionService and actionService both write/delete the current service-worker token, and neither associates those operations with a generation. Those writers and their asynchronous IndexedDB opens predate this bundle. Reversing mocked promise completion does not demonstrate reversed real IndexedDB commits; establishing the reported late-clear outcome requires a controlled trace of actual IndexedDB operations plus actionService signOut/signIn overlap. Earlier auth delivery alone does not establish the claimed regression.
+status: open
+
+### DW-80: A replacement same-user session without an observed sign-out is not distinguished from a same-session update.
+origin: spec-deferred 883a7daa57da
+location: src/stores/slices/authSlice.ts:setAuthUser; src/api/auth/sessionService.ts:onAuthStateChange
+source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
+severity: medium
+reason: setAuthUser receives user identity rather than a server session identifier, and same-user notifications deliberately preserve ownership. The previous implementation also accepted these loads. The bundle explicitly repairs requests crossing sign-out and same-account sign-in; replacement sessions without that transition are a separate pre-existing boundary.
+status: open
+
+### DW-81: A delayed initial getSession result can overwrite a newer auth-listener identity.
+origin: spec-deferred 70b954c2c502
+location: src/App.tsx:checkAuth
+source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
+severity: medium
+reason: App's checkAuth applies its awaited result whenever the component is mounted, without checking whether an auth notification arrived in the meantime. A stale null or different-user snapshot can overwrite the listener's newer state. Both this initialization branch and its missing notification guard are unchanged from the baseline.
 status: open
