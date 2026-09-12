@@ -721,3 +721,7 @@ accessibility PASS.
 ## Subsequent run: DW-39 (2026-09-11)
 
 [DW-39 empty database error fallback automation](automation-summary-dw-empty-database-error-fallback.md): 5 API client tests, 1 E2E test, and 1 shared factory; 3 P1 and 3 P2 cases. All 5 SDK tests and 184 affected unit tests passed, as did typecheck and lint. The previous handler fails the two new fallback assertions. Authenticated E2E execution remains unverified because Docker/Supabase is unavailable. Source snapshots, commands, validation evidence, and the Definition of Done are in the linked artifact package.
+
+## Subsequent run: DW-40 (2026-09-11)
+
+[DW-40 solo report synchronization automation](automation-summary-dw-solo-report-test-synchronization.md) records the current workflow's coverage plan, generated artifacts, validation evidence, and Definition of Done. Historical runs above are preserved.
