@@ -152,6 +152,10 @@ vi.mock('@/api/supabaseClient', () => ({
     },
   },
   getPartnerId: (...args: unknown[]) => getPartnerId(...args),
+  // Both names at one mock: the receive paths read the snapshot through the
+  // retrying lookup and the send path through the plain one, but they wrap the
+  // same round-trip, so every existing setup in this file keeps its meaning.
+  resolvePartnerIdForDelivery: (...args: unknown[]) => getPartnerId(...args),
   getSignedInUserId: (...args: unknown[]) => getSignedInUserId(...args),
 }));
 
