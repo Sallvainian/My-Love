@@ -419,6 +419,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: `EventsSettings.tsx` renders the store array unfiltered and calls `loadEvents()` with no arguments; `eventsSlice.loadEvents` calls `eventsService.getEvents()` bare, so both windows take the default `limit = 50, offset = 0`. Measured with `grep -rn "getEvents(" src tests`: the only production call site is `src/stores/slices/eventsSlice.ts:116`. The screen's own comment states why the list must stay unfiltered — a mistyped year is "the only place a mistyped year can be seen and corrected" — and a year typed wrong into the deep past is exactly the row the descending past window drops first. This change documents the bound in both files; closing it needs a "load more" control and a `loadEvents` that takes limit/offset, which the spec's Boundaries put out of scope.
 status: open
+decision: 2026-09-11 Keep pagination deferred
 decision: 2026-09-11 Defer pagination
 
 ### DW-42: A row whose date cannot be parsed still consumes a slot inside the capped window before it is dropped client-side, so garbage can push a real event off the page.
@@ -444,6 +445,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: Verified path, both halves read this session: `eventsSlice.addEvent` inserts the created row into the store unconditionally — `set((state) => ({ events: sortByDate([...state.events, created]) }))` — while `loadEvents` re-reads a bounded window (`getEvents()` bare, so `limit = 50` per side). A couple with more than 50 past events who corrects or adds a deep-past date therefore sees the row in Settings, and the next `loadEvents()` drops it because the descending past page no longer reaches it. The row is not lost — it is in the table — only invisible. Distinct from the "no way to reach truncated rows" item: that one is about rows the user never sees, this one is about a row the user just saw confirmed. Closing it needs the same "load more" plumbing, or an in-range check at save time.
 status: open
+decision: 2026-09-11 Keep pagination deferred
 decision: 2026-09-11 Defer pagination
 
 ### DW-45: The two-window read is two requests, so a row whose date is edited across today between them can come back in neither page, or come back as the pre-edit copy.
@@ -463,6 +465,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: Both reads are plain `.select('*')` with no `{ count: 'exact' }`, so the service, the store and any future affordance have no "there are more" signal; `logger.debug('[EventsService] Fetched events:', events.length)` cannot distinguish 50 events from 50 of 300. The already-recorded Settings "load more" item names the control and the `limit`/`offset` plumbing it needs, but not the fact that the data to drive its enabled state is not fetched. A count also cannot go anywhere today: the intent's Never list forbids a store-shape change and a second store action.
 status: open
+decision: 2026-09-11 Keep metadata deferred
 decision: 2026-09-11 Defer pagination
 
 ### DW-47: The new API spec re-issues the production query chain by hand, so the two copies can drift if a change is made to both.
@@ -492,6 +495,7 @@ source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: This behavior predates the bundle: every failure previously left Save enabled. The new `invalid-response` code now identifies it, but choosing a distinct safe affordance was not part of the events-only refresh-versus-retry decision. `createEvent` can throw after insert when the returned row cannot be converted, while Settings routes every code except `not-found` to Save/Delete.
 status: open
+decision: 2026-09-11 Keep recovery deferred
 decision: 2026-09-11 Defer the recovery choice
 
 ### DW-50: The EventsSlice interface comment says `eventsError` is raised only by loads even though writes also park messages there.
@@ -518,7 +522,9 @@ location: src/components/Settings/EventsSettings.tsx:872
 source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: The behavior predates this bundle, but the coded result makes the ambiguity explicit. Create and update can throw `invalid-response` only after a successful response is missing or cannot be converted; Settings routes every non-`not-found` code back to Save or Update, so create can duplicate a committed event and update can retry without reconciling the stale list.
-status: open
+status: done 2026-09-11
+resolution: closed by human decision: Duplicate recovery concern retained by open DW-49; consolidation does not approve implementation or accept the behavior.
+decision: 2026-09-11 Consolidate under DW-49 — Duplicate recovery concern retained by open DW-49; consolidation does not approve implementation or accept the behavior.
 decision: 2026-09-11 Defer the recovery choice
 
 ### DW-53: Transport wrapping drops the original non-PostgREST network error as an Error cause.
@@ -576,6 +582,7 @@ source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260819-202616-75cc; this entry preserves the lingering recommendation for a deliberate later review.
 status: open
+decision: 2026-09-11 Keep recommendation open
 decision: 2026-09-11 Keep the review recommendation
 
 ### DW-59: The translucent own-photo badge can still miss WCAG AA over a bright photo.
@@ -751,6 +758,7 @@ location: src/api/auth/sessionService.ts:onAuthStateChange; src/api/auth/actionS
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 reason: sessionService and actionService both write/delete the current service-worker token, and neither associates those operations with a generation. Those writers and their asynchronous IndexedDB opens predate this bundle. Reversing mocked promise completion does not demonstrate reversed real IndexedDB commits; establishing the reported late-clear outcome requires a controlled trace of actual IndexedDB operations plus actionService signOut/signIn overlap. Earlier auth delivery alone does not establish the claimed regression.
 status: open
+decision: 2026-09-11 Keep pending stronger evidence
 
 ### DW-80: A replacement same-user session without an observed sign-out is not distinguished from a same-session update.
 origin: spec-deferred 883a7daa57da
@@ -758,7 +766,9 @@ location: src/stores/slices/authSlice.ts:setAuthUser; src/api/auth/sessionServic
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 severity: medium
 reason: setAuthUser receives user identity rather than a server session identifier, and same-user notifications deliberately preserve ownership. The previous implementation also accepted these loads. The bundle explicitly repairs requests crossing sign-out and same-account sign-in; replacement sessions without that transition are a separate pre-existing boundary.
-status: open
+status: done 2026-09-11
+resolution: closed by human decision: Accept user identity plus observed sign-out/account transitions as the ownership boundary; same-user notifications preserve load ownership and no incorrect same-account result has been demonstrated.
+decision: 2026-09-11 Preserve the current boundary — Accept user identity plus observed sign-out/account transitions as the ownership boundary; same-user notifications preserve load ownership and no incorrect same-account result has been demonstrated.
 
 ### DW-81: A delayed initial getSession result can overwrite a newer auth-listener identity.
 origin: spec-deferred 70b954c2c502
