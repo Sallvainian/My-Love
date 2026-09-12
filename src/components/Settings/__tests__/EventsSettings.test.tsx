@@ -778,6 +778,127 @@ describe('EventsSettings validation', () => {
   });
 });
 
+describe.each(['Add', 'Edit'] as const)('EventsSettings %s Unicode validation', (mode) => {
+  it.each([
+    { name: '100 emoji label', label: '💖'.repeat(100), description: 'At the label limit' },
+    {
+      name: '500 emoji description',
+      label: 'At the description limit',
+      description: '💖'.repeat(500),
+    },
+    {
+      name: '100 decomposed label code points',
+      label: 'e\u0301'.repeat(50),
+      description: 'At the label limit',
+    },
+    {
+      name: '500 decomposed description code points',
+      label: 'At the description limit',
+      description: 'e\u0301'.repeat(250),
+    },
+  ])('saves a whitespace-padded $name without normalization', async ({ label, description }) => {
+    setStore({ events: mode === 'Edit' ? [makeEvent({ id: 'mine', label: 'Original event' })] : [] });
+    await renderSection();
+    if (mode === 'Edit') {
+      fireEvent.click(screen.getByTestId('event-edit-mine'));
+    } else {
+      openAddForm();
+    }
+
+    fillForm({ label: `  ${label}  `, date: '2026-10-01', description: `  ${description}  ` });
+    fireEvent.click(screen.getByTestId('events-form-icon-plane'));
+    expect(screen.getByTestId('events-form-label')).toHaveValue(`  ${label}  `);
+    expect(screen.getByTestId('events-form-description')).toHaveValue(`  ${description}  `);
+    expect(screen.getByTestId('events-form-label')).not.toHaveAttribute('maxlength');
+    expect(screen.getByTestId('events-form-description')).not.toHaveAttribute('maxlength');
+    submitForm();
+
+    expect(screen.queryByTestId('events-form-label-error')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('events-form-description-error')).not.toBeInTheDocument();
+    const payload = { label, eventDate: '2026-10-01', description, icon: 'plane' };
+    if (mode === 'Edit') {
+      await waitFor(() => expect(store.state.editEvent).toHaveBeenCalledTimes(1));
+      expect(store.state.editEvent).toHaveBeenCalledWith('mine', payload);
+      expect(store.state.addEvent).not.toHaveBeenCalled();
+    } else {
+      await waitFor(() => expect(store.state.addEvent).toHaveBeenCalledTimes(1));
+      expect(store.state.addEvent).toHaveBeenCalledWith(payload);
+      expect(store.state.editEvent).not.toHaveBeenCalled();
+    }
+    const savedId = mode === 'Edit' ? 'mine' : 'created-1';
+    await waitFor(() =>
+      expect(currentEvents()).toMatchObject([
+        { id: savedId, label, date: dateFromISO('2026-10-01'), description, icon: 'plane' },
+      ])
+    );
+    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
+    expect(screen.getByTestId(`event-label-${savedId}`).textContent).toBe(label);
+    expect(screen.getByTestId(`event-description-${savedId}`).textContent).toBe(description);
+  });
+
+  it.each([
+    {
+      name: '101 emoji label',
+      field: 'label',
+      label: '💖'.repeat(101),
+      description: 'Valid description',
+      error: 'Label must be 100 characters or fewer',
+    },
+    {
+      name: '501 emoji description',
+      field: 'description',
+      label: 'Valid label',
+      description: '💖'.repeat(501),
+      error: 'Description must be 500 characters or fewer',
+    },
+    {
+      name: '101 decomposed label code points',
+      field: 'label',
+      label: 'e\u0301'.repeat(50) + '\u0301',
+      description: 'Valid description',
+      error: 'Label must be 100 characters or fewer',
+    },
+    {
+      name: '501 decomposed description code points',
+      field: 'description',
+      label: 'Valid label',
+      description: 'e\u0301'.repeat(250) + '\u0301',
+      error: 'Description must be 500 characters or fewer',
+    },
+  ])('rejects a $name without either write or changing events', async (fixture) => {
+    const { field, label, description, error } = fixture;
+    const events = mode === 'Edit'
+      ? [makeEvent({ id: 'mine', label: 'Original event', description: 'Original description' })]
+      : [];
+    setStore({ events });
+    await renderSection();
+    if (mode === 'Edit') {
+      fireEvent.click(screen.getByTestId('event-edit-mine'));
+    } else {
+      openAddForm();
+    }
+
+    fillForm({ label, date: '2026-10-01', description });
+    const eventsBeforeSubmission = structuredClone(currentEvents());
+    submitForm();
+
+    expect(screen.getByTestId(`events-form-${field}-error`)).toHaveTextContent(error);
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(store.state.addEvent).not.toHaveBeenCalled();
+    expect(store.state.editEvent).not.toHaveBeenCalled();
+    expect(currentEvents()).toEqual(eventsBeforeSubmission);
+    expect(screen.getByTestId('events-form')).toBeInTheDocument();
+    expect(screen.getByTestId('events-form-label')).toHaveValue(label);
+    expect(screen.getByTestId('events-form-description')).toHaveValue(description);
+    if (mode === 'Edit') {
+      expect(screen.getByTestId('event-label-mine').textContent).toBe('Original event');
+      expect(screen.getByTestId('event-description-mine').textContent).toBe('Original description');
+    } else {
+      expect(screen.queryByTestId('events-settings-list')).not.toBeInTheDocument();
+    }
+  });
+});
+
 describe('EventsSettings add', () => {
   it('sends the trimmed label and the date input value verbatim, then closes', async () => {
     await renderSection();
