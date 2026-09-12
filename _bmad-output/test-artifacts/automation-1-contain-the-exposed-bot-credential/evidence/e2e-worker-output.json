@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "subagent": "e2e-tests",
+  "executed_as": "sequential (in-session worker; see summary Step 3)",
+  "tests": [],
+  "fixture_needs": [],
+  "knowledge_fragments_used": [
+    "test-levels-framework"
+  ],
+  "playwright_utils_deviations": [],
+  "test_count": 0,
+  "summary": "No E2E tests generated: no UI surface reads public.claude_bot_config or the bot login (grep over src/ matches only the generated src/types/database.types.ts:37), so a browser journey has nothing to observe. Browser exploration skipped for the same reason."
+}

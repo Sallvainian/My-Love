@@ -864,3 +864,19 @@ reason: Reproduced with TZ=America/Nuuk: local 2026-03-27 23:30 plus one day usi
 status: done 2026-09-12
 resolution: resolved by sweep bundle dw-event-helper-calendar-day-offsets
 resolution-undo: f1f54829eeec8a92362ccf7d56827785f3782bece2e52d1232ce15cc31764d98 2026-09-12 7374617475733a206f70656e
+
+### DW-85: The forward DELETE migration is only ever verified on a fresh replay, where the row it deletes never exists.
+origin: spec-deferred ee22b3cb6330
+location: supabase/migrations/20260912000000_remove_claude_bot_password_row.sql:13
+source_spec: `1-contain-the-exposed-bot-credential.md`
+severity: low
+reason: supabase/tests/database/22_claude_bot_config_no_secret.sql runs against a db reset database whose edited seed never inserts test_password, so the DELETE in 20260912000000_remove_claude_bot_password_row.sql matches nothing there; the migration was hand-verified inside a rolled-back transaction (insert placeholder row, apply, before=1 after=0) and the repo has no pattern for replaying one migration against pre-seeded state. Settle by running `select count(*) from public.claude_bot_config where key = 'test_password'` against the linked project after the next deploy and expecting 0.
+status: open
+
+### DW-86: AGENTS.md carries no durable prose about the bot credential being provisioned out of band or the rotation command.
+origin: spec-deferred 77116e136280
+location: AGENTS.md (Running and verifying)
+source_spec: `1-contain-the-exposed-bot-credential.md`
+severity: low
+reason: AGENTS.md says durable prose goes in that block, but the rotation procedure (fnox set -p age CLAUDE_BOT_PASSWORD, then fnox exec -- node scripts/provision-claude-bot.mjs) lives only in script and migration comments and an out-of-repo memory note. Fix edits an agent-context file, so it is recorded rather than applied here.
+status: open
