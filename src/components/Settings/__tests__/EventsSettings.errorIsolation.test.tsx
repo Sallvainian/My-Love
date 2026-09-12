@@ -135,6 +135,7 @@ function setStore(overrides: Record<string, unknown> = {}) {
     eventsIsLoading: false,
     eventsError: null,
     userId: OWN_USER_ID,
+    authSessionVersion: 1,
     syncStatus: { isOnline: true },
     loadEvents: vi.fn(async () => loadOk),
     addEvent: vi.fn(async () => ok),

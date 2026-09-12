@@ -61,30 +61,36 @@ export const onAuthStateChange = (callback: (session: Session | null) => void): 
   const {
     data: { subscription },
   } = supabase.auth.onAuthStateChange(async (event, session) => {
-    if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-      try {
-        await storeAuthToken({
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token,
-          expiresAt: session.expires_at ?? 0,
-          userId: session.user?.id ?? '',
-        });
-        logger.debug(`[AuthService] Updated stored auth token (${event})`);
-      } catch (tokenError) {
-        console.error('[AuthService] Failed to update stored auth token:', tokenError);
+    // Invalidate the app's previous session before token persistence can
+    // yield. Slow storage must not delay or reorder auth transitions.
+    try {
+      callback(session);
+    } finally {
+      // Attempt token persistence even if app delivery throws, while letting
+      // that original error propagate after these best-effort side effects.
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        try {
+          await storeAuthToken({
+            accessToken: session.access_token,
+            refreshToken: session.refresh_token,
+            expiresAt: session.expires_at ?? 0,
+            userId: session.user?.id ?? '',
+          });
+          logger.debug(`[AuthService] Updated stored auth token (${event})`);
+        } catch (tokenError) {
+          console.error('[AuthService] Failed to update stored auth token:', tokenError);
+        }
+      }
+
+      if (event === 'SIGNED_OUT') {
+        try {
+          await clearAuthToken();
+          logger.debug('[AuthService] Cleared stored auth token (SIGNED_OUT)');
+        } catch (tokenError) {
+          console.error('[AuthService] Failed to clear stored auth token:', tokenError);
+        }
       }
     }
-
-    if (event === 'SIGNED_OUT') {
-      try {
-        await clearAuthToken();
-        logger.debug('[AuthService] Cleared stored auth token (SIGNED_OUT)');
-      } catch (tokenError) {
-        console.error('[AuthService] Failed to clear stored auth token:', tokenError);
-      }
-    }
-
-    callback(session);
   });
 
   return () => {

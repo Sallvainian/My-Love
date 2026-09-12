@@ -1,0 +1,48 @@
+{
+  "status": "passed",
+  "generated": {
+    "collected": 6,
+    "passed": 6,
+    "failed": 0,
+    "command": "npx playwright test event-load-session-ownership.spec.ts --project=api --project=chromium --workers=1 --retries=0 --reporter=line"
+  },
+  "regressions": {
+    "files": 8,
+    "passed": 211,
+    "log": "focused-vitest.log"
+  },
+  "typecheck": {
+    "exit_code": 0,
+    "log": "typecheck-final.log"
+  },
+  "lint": {
+    "exit_code": 0,
+    "errors": 0,
+    "existing_warnings": 3,
+    "log": "lint-final.log"
+  },
+  "burn_in": {
+    "tests": 25,
+    "passed": 25,
+    "failed": 0,
+    "repetitions": 5,
+    "workers": 2,
+    "retries": 0,
+    "duration_reported": "1.7m"
+  },
+  "mutation_check": {
+    "tests": 2,
+    "expected_failures": 2,
+    "source_restored": true
+  },
+  "cleanup": {
+    "staged_files_removed": 4,
+    "generated_api_rows_remaining": 0,
+    "named_cli_browser_closed": true,
+    "task_vite_server_stopped": true
+  },
+  "source_and_initial_ledger_unchanged": true,
+  "sprint_board_written": false,
+  "prohibited_test_patterns_found": false,
+  "jwt_values_in_evidence_logs": false
+}

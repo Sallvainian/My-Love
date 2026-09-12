@@ -1,0 +1,89 @@
+{
+  "success": true,
+  "subagent": "api-tests",
+  "tests": [
+    {
+      "file": "_bmad-output/test-artifacts/dw-event-load-session-ownership/tests/api/event-load-session-ownership.spec.ts",
+      "staging_file": "tests/api/event-load-session-ownership.spec.ts",
+      "content": "/**\n * Supporting live API evidence for DW-54/55/56.\n *\n * This verifies that a new authentication session for the same account can read\n * current server data. Client load ownership is asserted by the browser/store\n * suite; a direct API test cannot observe authSessionVersion or stale callers.\n *\n * Sources: auth-js/src/GoTrueClient.ts signInWithPassword (password grant),\n * auth-js/src/GoTrueAdminApi.ts signOut (scoped logout), auth-js/src/lib/types.ts\n * RequiredClaims (sub/session_id), and src/types/database.types.ts events.Row.\n * No auth/events response schema exists in the project; assertions constrain\n * the identity, generated session, and event values this scenario is about.\n */\nimport type { JwtPayload, Session } from '@supabase/supabase-js';\nimport { log } from '@seontechnologies/playwright-utils';\nimport { test, expect } from '../support/merged-fixtures';\nimport { getWorkerPairEmails } from '../support/auth/worker-pool';\nimport { resolveOwnPair } from '../support/helpers/events';\nimport { createSessionEventRow } from '../support/factories/event-load-session-ownership';\nimport { TEST_USER_PASSWORD } from '../support/test-credentials';\nimport type { Database } from '../../src/types/database.types';\n\ntype EventRow = Database['public']['Tables']['events']['Row'];\ntype SessionIdentity = Pick<JwtPayload, 'sub' | 'session_id'>;\ntype PasswordLoginResponse = Pick<Session, 'access_token' | 'user'>;\n\n// Decode only the claims under test. Server acceptance of each token is checked\n// by authenticated reads below; this helper makes no signature-validation claim.\nfunction sessionIdentity(token: string): SessionIdentity {\n  const payload = token.split('.')[1];\n  if (!payload) throw new Error('Expected a JWT payload from the auth provider');\n  return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as SessionIdentity;\n}\n\ntest.describe('Same-account event reads after reauthentication', () => {\n  test('[P1] DW-54-56-API-001 a new session reads current event data for the same account', async ({\n    apiRequest,\n    authToken,\n    supabaseAdmin,\n  }) => {\n    const { userId } = await resolveOwnPair(supabaseAdmin);\n    const pair = getWorkerPairEmails();\n    if (!pair) throw new Error('Expected this worker to own an authentication pair');\n\n    const beforeIdentity = sessionIdentity(authToken);\n    const event = createSessionEventRow(userId);\n    const changedLabel = `Updated ${event.label}`;\n    const eventPath = `/rest/v1/events?id=eq.${event.id}`;\n    const initialHeaders = { Authorization: `Bearer ${authToken}` };\n    // Admin access is confined to modifying and cleaning this generated row.\n    const adminHeaders = {\n      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,\n    };\n    const createdSessionTokens: string[] = [];\n\n    expect(beforeIdentity.sub).toBe(userId);\n    // The server generates session_id; assert it exists before comparing lifetimes.\n    expect(beforeIdentity.session_id).toEqual(expect.any(String));\n    expect(beforeIdentity.session_id).not.toBe('');\n\n    try {\n      await log.step('Create one isolated event and establish the original session read');\n      const inserted = await apiRequest<EventRow[]>({\n        method: 'POST',\n        path: '/rest/v1/events',\n        headers: { ...initialHeaders, Prefer: 'return=representation' },\n        body: event,\n      });\n      expect(inserted.status).toBe(201);\n      expect(inserted.body).toHaveLength(1);\n      expect(inserted.body[0]).toMatchObject({\n        id: event.id, user_id: userId, label: event.label, event_date: event.event_date,\n      });\n\n      const beforeRead = await apiRequest<EventRow[]>({\n        method: 'GET',\n        path: `${eventPath}&select=*`,\n        headers: initialHeaders,\n      });\n      expect(beforeRead.status).toBe(200);\n      expect(beforeRead.body).toHaveLength(1);\n      expect(beforeRead.body[0]).toMatchObject({ id: event.id, user_id: userId, label: event.label });\n\n      await log.step('End only the original session and change the isolated server row');\n      const signedOut = await apiRequest({\n        method: 'POST',\n        path: '/auth/v1/logout?scope=local',\n        headers: initialHeaders,\n        retryConfig: { maxRetries: 0 },\n      });\n      expect(signedOut.status).toBe(204);\n\n      const changed = await apiRequest<EventRow[]>({\n        method: 'PATCH',\n        path: eventPath,\n        headers: { ...adminHeaders, Prefer: 'return=representation' },\n        body: { label: changedLabel },\n      });\n      expect(changed.status).toBe(200);\n      expect(changed.body).toHaveLength(1);\n      expect(changed.body[0]).toMatchObject({ id: event.id, user_id: userId, label: changedLabel });\n\n      await log.step('Authenticate the same worker account in a new session');\n      // playwright-utils deviation: reauthentication is the behavior under test; initial setup uses authToken.\n      const signedIn = await apiRequest<PasswordLoginResponse>({\n        method: 'POST',\n        path: '/auth/v1/token?grant_type=password',\n        body: {\n          email: pair.user1Email,\n          password: TEST_USER_PASSWORD,\n          gotrue_meta_security: {},\n        },\n        retryConfig: { maxRetries: 0 },\n      });\n      expect(signedIn.status).toBe(200);\n      createdSessionTokens.push(signedIn.body.access_token);\n      expect(signedIn.body.user.id).toBe(userId);\n\n      const afterIdentity = sessionIdentity(signedIn.body.access_token);\n      expect(afterIdentity.sub).toBe(beforeIdentity.sub);\n      expect(afterIdentity.session_id).toEqual(expect.any(String));\n      expect(afterIdentity.session_id).not.toBe('');\n      expect(afterIdentity.session_id).not.toBe(beforeIdentity.session_id);\n\n      await log.step('Read the changed row using the new session credentials');\n      const currentRead = await apiRequest<EventRow[]>({\n        method: 'GET',\n        path: `${eventPath}&select=*`,\n        headers: { Authorization: `Bearer ${signedIn.body.access_token}` },\n      });\n      expect(currentRead.status).toBe(200);\n      expect(currentRead.body).toHaveLength(1);\n      expect(currentRead.body[0]).toMatchObject({\n        id: event.id,\n        user_id: userId,\n        label: changedLabel,\n        event_date: event.event_date,\n      });\n      expect(currentRead.body[0].label).not.toBe(beforeRead.body[0].label);\n    } finally {\n      // Both cleanups are awaited even when an assertion fails. No pair-wide\n      // deletion or global logout can affect another worker's state.\n      const cleanupResults = await Promise.allSettled([\n        apiRequest({ method: 'DELETE', path: eventPath, headers: adminHeaders }),\n        ...createdSessionTokens.map((token) => apiRequest({\n          method: 'POST',\n          path: '/auth/v1/logout?scope=local',\n          headers: { Authorization: `Bearer ${token}` },\n          retryConfig: { maxRetries: 0 },\n        })),\n      ]);\n      for (const result of cleanupResults) {\n        expect(result.status).toBe('fulfilled');\n        if (result.status === 'fulfilled') expect(result.value.status).toBe(204);\n      }\n    }\n  });\n});\n",
+      "description": "Supporting live API evidence: a fresh same-account session reads a changed, isolated event; client session ownership remains browser/store scope.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 1,
+        "P2": 0,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    "Existing apiRequest/authToken/supabaseAdmin from tests/support/merged-fixtures.ts",
+    "Existing resolveOwnPair, getWorkerPairEmails, TEST_USER_PASSWORD",
+    "Pure createSessionEventRow(userId, overrides?) factory in tests/support/factories/event-load-session-ownership.ts"
+  ],
+  "factory_interface": {
+    "path": "tests/support/factories/event-load-session-ownership.ts",
+    "signature": "export function createSessionEventRow(userId: string, overrides?: Partial<Database['public']['Tables']['events']['Row']>): Database['public']['Tables']['events']['Row']",
+    "requirements": [
+      "Generate UUID id and short unique label (at most 90 characters so the Updated prefix remains under the 100-character limit)",
+      "Populate every events.Row field: id, user_id, label, event_date, created_at, description, icon",
+      "Use anchored local calendar date, valid icon default calendar, description null",
+      "Pure data only; perform no server writes or cleanup",
+      "No new merged fixture entry needed"
+    ]
+  },
+  "knowledge_fragments_used": [
+    "test-levels-framework",
+    "test-priorities-matrix",
+    "data-factories",
+    "selective-testing",
+    "ci-burn-in",
+    "test-quality",
+    "confidence-gate",
+    "evidence-integrity",
+    "library-integration-mandate",
+    "playwright-utils-mandate",
+    "api-request",
+    "log",
+    "api-testing-patterns"
+  ],
+  "playwright_utils_deviations": [
+    {
+      "file": "_bmad-output/test-artifacts/dw-event-load-session-ownership/tests/api/event-load-session-ownership.spec.ts",
+      "line": 104,
+      "reason": "Reauthentication is the behavior under test; initial setup uses the existing authToken provider fixture. The token endpoint still uses mandated apiRequest."
+    }
+  ],
+  "pactjs_utils_deviations": [],
+  "provider_scrutiny": "not-applicable: live API integration; no Pact artifacts",
+  "provider_files_read": [
+    "src/api/auth/actionService.ts",
+    "src/types/database.types.ts",
+    "node_modules/@supabase/auth-js/src/GoTrueClient.ts",
+    "node_modules/@supabase/auth-js/src/GoTrueAdminApi.ts",
+    "node_modules/@supabase/auth-js/src/lib/types.ts"
+  ],
+  "pact_mcp_reachable": false,
+  "pact_fallback_source": "Existing project schema and pinned Supabase auth-js source; no broker calls or retry probe",
+  "confidence": {
+    "score": 8,
+    "rationale": "Existing fixtures and worker identity helpers, generated events.Row, and pinned auth-js request/JWT definitions establish every used interface.",
+    "unknowns": [
+      "Spec not executed in this generation worker",
+      "No auth/events response validation schema exists; only fields under test are asserted",
+      "Client stale load ownership cannot be observed by direct API requests"
+    ]
+  },
+  "test_count": 1,
+  "summary": "Generated one P1 supporting API regression with checked identity, distinct session lifetime, changed server data, exact-ID cleanup and local-only session logout. No E2E, fixture implementation, Pact artifacts, or test execution performed. No claim of immediate old access-token revocation. Failure ownership permutations remain covered by the existing store/component suites and the separately generated browser tests.",
+  "core_knowledge_summary": {
+    "levels": "Select the lowest useful level; this API test proves server/auth integration, not client ownership. Avoid repeating unchanged RLS/read-window/write permutations.",
+    "priorities": "P0 for auth/data-isolation regressions, P1 for supporting live integration and core browser journeys. Priority follows impact rather than an invented risk score.",
+    "data": "Use explicit factory overrides, unique IDs, API setup, worker isolation, and checked generated-ID cleanup. No broad reset.",
+    "quality": "Deterministic synchronization; explicit falsifiable assertions; no hard waits, silent errors, focus or bare skips; focused tests under 90 seconds.",
+    "evidence": "Report generated/collected/executed separately, reconcile counts, and label missing measurements rather than passing them. A successor-load-only race already passes the old latestLoadId guard.",
+    "confidence": "State evidence and unknowns before nontrivial generation. Current interface evidence supports 8/10; runtime results remain pending.",
+    "libraries": "Flag plus installed package binds apiRequest, merged fixtures, log and recurse if polling is needed. Document each surviving deviation.",
+    "execution": "Run changed P0/P1 first; collect full failure evidence. Recommend five to ten repeat runs for race-sensitive browser tests before merge and report only repeats actually executed."
+  },
+  "finalized_after_validation": true
+}
