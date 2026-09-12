@@ -737,3 +737,8 @@ DW-75 completion: 4 new tests (2 P0, 2 P1), fixtures and source snapshots delive
 ## Subsequent run: DW-81 (2026-09-12)
 
 [Auth bootstrap notification order automation](automation-summary-dw-auth-bootstrap-notification-order.md) records this run; prior reports are preserved.
+
+
+## Subsequent run: DW-60/63/66/67/68 (2026-09-12)
+
+[Events validation guard fidelity automation](automation-summary-dw-events-validation-guard-fidelity.md) records the completed run: 8/8 generated tests, 141 existing Vitest tests, and 236 pgTAP assertions passed; typecheck/lint passed. Runnable artifacts, evidence, and Definition of Done are linked there; historical results above are preserved.

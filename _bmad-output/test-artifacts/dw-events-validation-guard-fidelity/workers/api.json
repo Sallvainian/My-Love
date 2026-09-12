@@ -1,0 +1,127 @@
+{
+  "success": true,
+  "subagent": "api-tests",
+  "tests": [
+    {
+      "file": "tests/api/events-validation-fidelity.spec.ts",
+      "content": "/**\n * EVG API additions for dw-events-validation-guard-fidelity.\n * Run through the existing Playwright api project after artifact staging.\n *\n * Authority: public.events migration, the tagged EV-DB-037 contract, generated\n * database types, and measured PostgREST shapes in events-wire-contract.spec.ts.\n * POST/PATCH use return=representation; GET checks committed row state.\n * Existing DE.5-API-006 owns POST label 100/101, so it is not repeated here.\n * ASCII fixtures intentionally leave the existing Unicode counting gap to DW-83.\n * coupleEvents owns worker-pair cleanup even when a request/assertion fails.\n */\nimport { log } from '@seontechnologies/playwright-utils';\nimport { z } from 'zod';\nimport { test, expect } from '../support/merged-fixtures';\nimport {\n  boundaryText,\n  EventRowSchema,\n  validationContract,\n  validationEvent,\n} from '../support/factories/events-validation';\n\nconst EventRowsSchema = z.array(EventRowSchema);\nconst PostgrestErrorSchema = z.object({\n  code: z.string(),\n  details: z.string().nullable(),\n  hint: z.string().nullable(),\n  message: z.string(),\n});\ntype EventRows = z.infer<typeof EventRowsSchema>;\ntype PostgrestError = z.infer<typeof PostgrestErrorSchema>;\n\nconst lengthCases = [\n  { field: 'label', limit: validationContract.labelMaxLength },\n  { field: 'description', limit: validationContract.descriptionMaxLength },\n] as const;\n\ntest.describe('Events validation contract over PostgREST', () => {\n  test('[P1] EVG-API-001 description POST accepts the exact limit and rejects one more without insertion', async ({\n    apiRequest,\n    authToken,\n    coupleEvents,\n  }) => {\n    // GIVEN an authenticated creator and a description at the shared limit.\n    const description = boundaryText(validationContract.descriptionMaxLength);\n    const acceptedInput = validationEvent(coupleEvents.userId, coupleEvents.anchor, { description });\n    const rejectedInput = validationEvent(coupleEvents.userId, coupleEvents.anchor, {\n      description: `${description}x`,\n    });\n    const headers = { Authorization: `Bearer ${authToken}`, Prefer: 'return=representation' };\n\n    await log.step('POST the exact description limit as the positive control');\n    const accepted = await apiRequest({\n      method: 'POST', path: '/rest/v1/events', headers, body: acceptedInput,\n    }).validateSchema<EventRows>(EventRowsSchema);\n    expect(accepted.status).toBe(201);\n    expect(accepted.body).toEqual([expect.objectContaining(acceptedInput)]);\n\n    // WHEN the same owner submits one character beyond the description limit.\n    await log.step('POST one character beyond the description limit');\n    const refused = await apiRequest({\n      method: 'POST', path: '/rest/v1/events', headers, body: rejectedInput,\n    }).validateSchema<PostgrestError>(PostgrestErrorSchema);\n\n    // THEN the description CHECK refuses it and only the accepted row exists.\n    expect(refused.status).toBe(400);\n    expect(refused.body.code).toBe('23514');\n    expect(refused.body.message).toContain('events_description_check');\n    const stored = await apiRequest({\n      method: 'GET',\n      path: `/rest/v1/events?select=*&id=in.(${acceptedInput.id},${rejectedInput.id})`,\n      headers,\n    }).validateSchema<EventRows>(EventRowsSchema);\n    expect(stored.status).toBe(200);\n    expect(stored.body).toEqual(accepted.body);\n  });\n\n  for (const { field, limit } of lengthCases) {\n    test(`[P1] EVG-API-002-${field} PATCH accepts the exact limit and preserves the saved row after rejecting one more`, async ({\n      apiRequest,\n      authToken,\n      coupleEvents,\n    }) => {\n      // GIVEN one valid creator-owned row and an exact boundary update.\n      const input = validationEvent(coupleEvents.userId, coupleEvents.anchor);\n      const boundary = boundaryText(limit);\n      const headers = { Authorization: `Bearer ${authToken}`, Prefer: 'return=representation' };\n      const path = `/rest/v1/events?select=*&id=eq.${input.id}`;\n      const created = await apiRequest({\n        method: 'POST', path: '/rest/v1/events', headers, body: input,\n      }).validateSchema<EventRows>(EventRowsSchema);\n      expect(created.status).toBe(201);\n      expect(created.body).toEqual([expect.objectContaining(input)]);\n\n      await log.step(`PATCH ${field} to the exact shared limit`);\n      const saved = await apiRequest({\n        method: 'PATCH', path, headers, body: { [field]: boundary },\n      }).validateSchema<EventRows>(EventRowsSchema);\n      expect(saved.status).toBe(200);\n      expect(saved.body).toEqual([{ ...created.body[0], [field]: boundary }]);\n\n      // WHEN a later edit exceeds that same limit by one character.\n      await log.step(`PATCH ${field} beyond the limit`);\n      const refused = await apiRequest({\n        method: 'PATCH', path, headers, body: { [field]: `${boundary}x` },\n      }).validateSchema<PostgrestError>(PostgrestErrorSchema);\n\n      // THEN the CHECK rejects the edit and an independent GET retains the row.\n      expect(refused.status).toBe(400);\n      expect(refused.body.code).toBe('23514');\n      expect(refused.body.message).toContain(`events_${field}_check`);\n      const stored = await apiRequest({ method: 'GET', path, headers })\n        .validateSchema<EventRows>(EventRowsSchema);\n      expect(stored.status).toBe(200);\n      expect(stored.body).toEqual(saved.body);\n    });\n  }\n\n  for (const icon of validationContract.icons) {\n    test(`[P2] EVG-API-003-${icon} preserves the complete allowed icon through POST and GET`, async ({\n      apiRequest,\n      authToken,\n      coupleEvents,\n    }) => {\n      // GIVEN an exact icon literal from the same contract the guard reads.\n      const input = validationEvent(coupleEvents.userId, coupleEvents.anchor, { icon });\n      const headers = { Authorization: `Bearer ${authToken}`, Prefer: 'return=representation' };\n\n      // WHEN the authenticated creator posts the event.\n      await log.step(`POST the complete allowed icon: ${icon}`);\n      const created = await apiRequest({\n        method: 'POST', path: '/rest/v1/events', headers, body: input,\n      }).validateSchema<EventRows>(EventRowsSchema);\n      expect(created.status).toBe(201);\n      expect(created.body).toEqual([expect.objectContaining(input)]);\n      expect(created.body[0].icon).toBe(icon);\n\n      // THEN the committed row still contains that exact string.\n      const stored = await apiRequest({\n        method: 'GET', path: `/rest/v1/events?select=*&id=eq.${input.id}`, headers,\n      }).validateSchema<EventRows>(EventRowsSchema);\n      expect(stored.status).toBe(200);\n      expect(stored.body).toEqual(created.body);\n    });\n  }\n\n  test('[P2] EVG-API-004 an unknown full icon is rejected without changing the saved row', async ({\n    apiRequest,\n    authToken,\n    coupleEvents,\n  }) => {\n    // GIVEN a valid saved row and an icon outside the shared contract.\n    const unsupportedIcon = 'party-hat';\n    expect(validationContract.icons).not.toContain(unsupportedIcon);\n    const input = validationEvent(coupleEvents.userId, coupleEvents.anchor, {\n      icon: validationContract.icons[0],\n    });\n    const headers = { Authorization: `Bearer ${authToken}`, Prefer: 'return=representation' };\n    const path = `/rest/v1/events?select=*&id=eq.${input.id}`;\n    const created = await apiRequest({\n      method: 'POST', path: '/rest/v1/events', headers, body: input,\n    }).validateSchema<EventRows>(EventRowsSchema);\n    expect(created.status).toBe(201);\n    expect(created.body).toEqual([expect.objectContaining(input)]);\n\n    // WHEN the creator attempts to replace the icon with the whole unknown value.\n    await log.step('PATCH an unsupported icon containing punctuation');\n    const refused = await apiRequest({\n      method: 'PATCH', path, headers, body: { icon: unsupportedIcon },\n    }).validateSchema<PostgrestError>(PostgrestErrorSchema);\n\n    // THEN the icon CHECK refuses it and preserves every saved field.\n    expect(refused.status).toBe(400);\n    expect(refused.body.code).toBe('23514');\n    expect(refused.body.message).toContain('events_icon_check');\n    const stored = await apiRequest({ method: 'GET', path, headers })\n      .validateSchema<EventRows>(EventRowsSchema);\n    expect(stored.status).toBe(200);\n    expect(stored.body).toEqual(created.body);\n  });\n});\n",
+      "description": "Seven authenticated PostgREST cases for shared event description, PATCH length, and complete icon contracts.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 3,
+        "P2": 4,
+        "P3": 0
+      },
+      "case_ids": [
+        "EVG-API-001",
+        "EVG-API-002-label",
+        "EVG-API-002-description",
+        "EVG-API-003-ring",
+        "EVG-API-003-plane",
+        "EVG-API-003-calendar",
+        "EVG-API-004"
+      ]
+    }
+  ],
+  "fixture_needs": [
+    {
+      "name": "authToken",
+      "source": "tests/support/merged-fixtures.ts",
+      "status": "existing",
+      "purpose": "Cached worker identity token from the configured Supabase auth provider."
+    },
+    {
+      "name": "coupleEvents",
+      "source": "tests/support/merged-fixtures.ts",
+      "status": "existing",
+      "purpose": "Worker-scoped userId/anchor and checked pair-only cleanup before/after each test."
+    },
+    {
+      "name": "validationContract",
+      "source": "tests/support/factories/events-validation.ts",
+      "status": "aggregation-required",
+      "signature": "EventsValidationContract",
+      "purpose": "Extract tagged JSON from supabase/tests/database/21_events_validation_contract.sql using existing strict parser."
+    },
+    {
+      "name": "boundaryText",
+      "source": "tests/support/factories/events-validation.ts",
+      "status": "aggregation-required",
+      "signature": "(length: number, prefix?: string) => string",
+      "purpose": "Unique ASCII string padded to exactly the requested length."
+    },
+    {
+      "name": "validationEvent",
+      "source": "tests/support/factories/events-validation.ts",
+      "status": "aggregation-required",
+      "signature": "(userId: string, anchor: Date, overrides?: Partial<EventInsert>) => EventInsert",
+      "purpose": "Valid complete event payload with fresh client-generated id and label, future calendar date derived from anchor, explicit description/icon defaults; omit timestamps so defaults are server-generated."
+    },
+    {
+      "name": "EventRowSchema",
+      "source": "tests/support/factories/events-validation.ts",
+      "status": "aggregation-required",
+      "purpose": "Full wire-row Zod schema; passed through apiRequest.validateSchema. Do not coerce or transform timestamps, since GET snapshot equality must preserve raw wire values."
+    }
+  ],
+  "knowledge_fragments_used": [
+    "playwright-utils-mandate",
+    "library-integration-mandate",
+    "overview",
+    "api-request",
+    "auth-session",
+    "recurse",
+    "log",
+    "data-factories",
+    "api-testing-patterns",
+    "test-levels-framework",
+    "test-priorities-matrix",
+    "selective-testing",
+    "ci-burn-in",
+    "test-quality"
+  ],
+  "playwright_utils_deviations": [],
+  "pactjs_utils_deviations": [],
+  "provider_scrutiny": "completed",
+  "provider_files_read": [
+    "supabase/migrations/20260818000002_create_events_table.sql",
+    "supabase/tests/database/21_events_validation_contract.sql",
+    "src/types/database.types.ts",
+    "src/services/eventsService.ts",
+    "tests/api/events-wire-contract.spec.ts",
+    "tests/api/events-write-wire-shape.spec.ts",
+    "tests/support/eventsValidationContract.ts"
+  ],
+  "provider_contract": {
+    "endpoint": "/rest/v1/events",
+    "methods": [
+      "POST",
+      "PATCH",
+      "GET"
+    ],
+    "success_status": {
+      "POST": 201,
+      "PATCH": 200,
+      "GET": 200
+    },
+    "check_violation": {
+      "status": 400,
+      "code": "23514"
+    },
+    "headers": [
+      "Authorization: Bearer <authToken>",
+      "Prefer: return=representation",
+      "apikey: supplied by api project"
+    ],
+    "response": "Array of full snake_case rows; error envelope code/details/hint/message",
+    "constraints": "label <= tagged labelMaxLength, description <= tagged descriptionMaxLength, complete icon in tagged icons"
+  },
+  "test_count": 7,
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 3,
+    "P2": 4,
+    "P3": 0
+  },
+  "summary": "Generated one API spec in JSON only: 7 cases (3 P1, 4 P2). Authenticated positive controls distinguish validation failures from broken auth/write paths. Independent GETs prove refused POST inserts no row and refused PATCH preserves the last valid full row. No retries, browser fixtures, hard waits, local fixture creation, or test execution introduced. Production, ledger and sprint files remain untouched. Pact artifacts excluded by parent relevance gate; broker unavailable and provider source used."
+}
