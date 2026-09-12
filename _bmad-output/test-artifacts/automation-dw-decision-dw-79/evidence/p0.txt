@@ -1,0 +1,24 @@
+Exit code: 0
+[WebServer] (node:4206) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] npm warn allow-scripts .npmrc allow-scripts setting is being ignored because --allow-scripts was passed on the command line
+[WebServer] (node:4252) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:4252) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ suppress logs { quiet: true }
+
+Running 1 test using 1 worker
+
+(node:4254) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+[14:23:22] ==== Run real auth services and native IndexedDB with a newer sign-out notification ====
+
+[14:23:22] ==== Polling until condition is met (timeout: 10000ms, interval: 250ms) ====
+
+[14:23:22] ==== Assert committed deletion followed by stale token resurrection ====
+
+  ✓  1 [chromium] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/e2e/token-persistence-resurrection.spec.ts:9:1 › [P0] DW79-E2E-006 late sign-in persistence resurrects A after independent sign-out (258ms)
+
+  1 passed (2.6s)

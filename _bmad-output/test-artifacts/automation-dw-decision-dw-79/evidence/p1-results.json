@@ -1,0 +1,236 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/node_modules/.bin/playwright",
+      "test",
+      "-c",
+      "_bmad-output/test-artifacts/automation-dw-decision-dw-79/playwright.config.ts",
+      "--grep",
+      "\\[P1\\]"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/_bmad-output/test-artifacts/automation-dw-decision-dw-79/playwright.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/_bmad-output/test-artifacts/automation-dw-decision-dw-79",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/test-results/dw79-tea-automate",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "api",
+        "name": "api",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/_bmad-output/test-artifacts/automation-dw-decision-dw-79/api",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/test-results/dw79-tea-automate",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/_bmad-output/test-artifacts/automation-dw-decision-dw-79/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/test-results/dw79-tea-automate",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "baseline",
+        "name": "baseline",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/tests/e2e/auth",
+        "testIgnore": [],
+        "testMatch": [
+          "token-persistence-overlap.spec.ts"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/_bmad-output/test-artifacts/automation-dw-decision-dw-79/evidence/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": {
+      "command": "npx vite --mode test --host 127.0.0.1 --port 5189 --strictPort",
+      "cwd": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-79/",
+      "url": "http://127.0.0.1:5189/tests/support/harnesses/auth-token-persistence.html",
+      "reuseExistingServer": false,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "api/auth-sdk-notification-completion.spec.ts",
+      "file": "api/auth-sdk-notification-completion.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "DW-79 actual SDK originating notification completion",
+          "file": "api/auth-sdk-notification-completion.spec.ts",
+          "line": 18,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] DW79-API-001 sign-in waits for its SIGNED_IN notification",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 147,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[14:24:07] \u001b[1m\u001b[36m==== Run real SDK password sign-in against the controlled HTTP response ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run real SDK password sign-in against the controlled HTTP response",
+                          "duration": 1
+                        }
+                      ],
+                      "startTime": "2026-09-12T14:24:07.617Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "sdk-sign-in-phases",
+                          "contentType": "application/json",
+                          "body": "eyJhY3Rpb24iOiJzaWduLWluIiwicGhhc2VzIjpbImh0dHAtcmVzcG9uc2UiLCJub3RpZmljYXRpb24tZW50ZXJlZCIsIm5vdGlmaWNhdGlvbi1jb21wbGV0ZSIsImFjdGlvbi1jb21wbGV0ZSJdfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "85d8662dbfc89bdc5592-f34ec4c4b865c183b743",
+              "file": "api/auth-sdk-notification-completion.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW79-API-002 sign-out waits for its SIGNED_OUT notification",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 141,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[14:24:07] \u001b[1m\u001b[36m==== Run real SDK sign-out after an isolated in-memory sign-in ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run real SDK sign-out after an isolated in-memory sign-in",
+                          "duration": 1
+                        }
+                      ],
+                      "startTime": "2026-09-12T14:24:07.612Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "sdk-sign-out-phases",
+                          "contentType": "application/json",
+                          "body": "eyJhY3Rpb24iOiJzaWduLW91dCIsInBoYXNlcyI6WyJodHRwLXJlc3BvbnNlIiwibm90aWZpY2F0aW9uLWVudGVyZWQiLCJub3RpZmljYXRpb24tY29tcGxldGUiLCJhY3Rpb24tY29tcGxldGUiXX0="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "85d8662dbfc89bdc5592-cf3ab8b45bbea60b6078",
+              "file": "api/auth-sdk-notification-completion.spec.ts",
+              "line": 49,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T14:24:05.036Z",
+    "duration": 2988.8900000000003,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
