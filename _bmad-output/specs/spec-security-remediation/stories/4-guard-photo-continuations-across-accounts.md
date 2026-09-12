@@ -2,8 +2,8 @@
 title: 'Guard photo continuations across accounts'
 type: 'bugfix'
 created: '2026-09-12'
-status: 'blocked'
-baseline_revision: '9ce70d04549705a177a80da8e16916b2c8370a76'
+status: ready-for-dev
+baseline_revision: 63e9029a6434eb9cbfbe8d647f29714318f46b4a
 review_loop_iteration: 0
 followup_review_recommended: false
 context: []
@@ -189,42 +189,3 @@ Then **verify and correct** the applied change against the corrected intent abov
 | update catch write | `does not paint the previous account's thrown save onto the new one` |
 
 Two rows needed rewriting before they discriminated at all, and both are recorded rather than quietly fixed: the post-upload warning is unreachable when the switch lands at call time (the success guard returns first), so its case now switches *after* the insert; and a delete resolving after sign-out filters an already-empty gallery, a no-op with or without the guard, so that case now settles `false` and holds on `error`, which `signedOutState()` does not reset.
-
-## Auto Run Result
-
-Status: blocked
-Blocking condition: intent gap
-
-**The gap.** Two authoritative statements of CAP-12 disagree about whether the *compression* window is in scope, and they select observably different implementations:
-
-- `SPEC.md:55` — success: "After A switches to B during a pending success, failure or retry, A's continuation changes none of B's gallery, error or loading state." Compression is none of those three; under this reading the store slice is the whole job.
-- `remediation.md:108` — regression evidence: "Pause compression/upload/signing or deletion, switch A to B, then resolve and reject the pending work. B's full relevant state remains unchanged." Compression is named as a first-class pause point; under this reading B's gallery must be unchanged after it.
-
-Measured, not inferred: `src/components/PhotoUpload/PhotoUpload.tsx:86` and `src/components/photos/PhotoUploader.tsx:171` both `await imageCompressionService.compressImage(selectedFile)` **before** calling into the store (`PhotoUpload.tsx:100`, `PhotoUploader.tsx:184`). So a switch landing during compression enters `uploadPhoto` fresh under B, `photoService` binds the request to B's token, and B's gallery gains a photo B never chose — while nothing of A's continuation crosses over.
-
-**The unresolved questions for a human:**
-
-1. Does CAP-12 require an upload whose compression outlived the session to be **abandoned** (remediation.md's reading), or is it correct for it to proceed as B's own upload, correctly attributed and authorized (SPEC.md's reading)?
-2. If abandoned: `AGENTS.md`/`SPEC.md` name `photosSlice.ts` as the site, but the fix must live in `PhotoUpload.tsx` and `PhotoUploader.tsx`. Is widening the story to those two components approved, and should the user see anything when their upload is dropped, or is silence correct?
-3. If it proceeds as B's: `remediation.md:108`'s "Pause compression" clause needs amending so the next reader does not re-open this, and the behaviour should be recorded rather than left implicit.
-
-I did not pick a reading. Three of the four review layers flagged this independently as the material divergence, and `rollout.md` reserves escalation for exactly this: "unresolved contradictions ... can still require escalation."
-
-**Attempted change (reverted, recoverable).** `_bmad-output/implementation-artifacts/story-4-guard-photo-continuations.attempted.patch` — 731 lines, reverse-applies cleanly against `9ce70d04`. It contained:
-
-- `src/stores/slices/photosSlice.ts` — ten identity rechecks across `uploadPhoto`, `deletePhoto` and `updatePhoto`, capturing `userId` + `authSessionVersion` at entry on the `eventsSlice` pattern.
-- `tests/unit/stores/loaderIdentityGuards.test.ts` — 23 cases covering every I/O-matrix row. Suite went 2008 → 2031; typecheck, lint (0 errors) and `fnox exec -- npm run build` all passed.
-
-**KEEP for re-derivation** (these survived review and cost real measurement):
-
-- The `userId` + `authSessionVersion` pair, not `userId` alone. `loadPhotos`' weaker in-file precedent misses A → signed out → A.
-- Guarding the `onProgress` callback: it is a post-await write with no `await` in front of it, invoked from inside `photoService.uploadPhoto` (`photoService.ts:336`, `:357`, `:459`).
-- Returning the true outcome to the caller on a stale continuation; withhold the store write, never falsify the result.
-- The post-upload quota warning is unreachable when the switch lands at call time (the success guard returns first), so its test must switch *after* the insert. A delete resolving after sign-out filters an already-empty gallery, so that case must settle `false` and assert on `error`.
-- `photoService.idempotency.test.ts` drives the slice from an isolated store where `authSessionVersion` is `undefined`; the guard must stay a plain equality compare, with no `!requestedBy` bail.
-
-**Carry into the re-derivation** (verified this pass, not yet fixed): the `authSessionVersion` conjunct of the delete/update guards was pinned by no test — both mutants survived at 78 passed; the new slice docblock overclaimed by saying "every action" when `loadPhotos` is not retrofitted; and the `isOwn` comment claimed a mislabel it cannot reach.
-
-**Review findings:** 27 reported — 0 high, 5 medium, 18 low, 4 false. One entry (2 findings) routed `intent_gap` and is the blocker; 13 routed `patch` and are moot under the cascade; 7 routed `defer` (all pre-existing: `loadPhotos`' weaker guard, `error` never reset by `signedOutState()`, the unhandled `exceeded` quota level, concurrent same-account uploads, the missing `finally`, and `PhotoUploader`'s success toast on a failed upload); 5 rejected. Every finding has a row in the Review Triage Log with its evidence.
-
-**Residual risk:** CAP-12 is unremediated on `main` — the shipped `photosSlice` still writes A's photo, signed URL and failure banner into B's session. The reverted patch closes that for the store surface as soon as question 1 is answered.
