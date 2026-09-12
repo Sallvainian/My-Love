@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, unlink, access } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, unlink, lstat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -13,14 +13,18 @@ const files = [
 const mode = process.argv[2];
 if (!['stage', 'clean'].includes(mode)) throw new Error('Usage: node stage-tests.mjs stage|clean');
 
-// Check the entire set before mutating anything. Never overwrite existing tests
-// or remove a staged file whose content someone has changed in the meantime.
+// Check the entire set before mutating anything; staging uses exclusive creation.
+// Cleanup requires an idle worktree: content checking and unlink are not atomic.
 const entries = await Promise.all(files.map(async (file) => {
   const source = await readFile(path.join(bundle, file), 'utf8');
   const target = path.join(root, file);
-  const exists = await access(target).then(() => true, () => false);
+  const current = await (mode === 'stage' ? lstat(target) : readFile(target, 'utf8')).catch((error) => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  });
+  const exists = current !== null;
   if (mode === 'stage' && exists) throw new Error(`Refusing to overwrite ${file}`);
-  if (mode === 'clean' && exists && await readFile(target, 'utf8') !== source) {
+  if (mode === 'clean' && exists && current !== source) {
     throw new Error(`Refusing to remove modified ${file}`);
   }
   return { source, target, exists };
