@@ -573,7 +573,9 @@ location: src/components/Settings/EventsSettings.tsx:185
 source_spec: `spec-dw-26-29-events-error-attribution.md`
 severity: low
 reason: The mount load has a cancellation flag, but `refreshEvents()` awaits `loadEvents()` and then calls `recordLoadOutcome()` without an unmount guard. Navigating away during that request therefore reaches `setLoadFailed` and `setSettledForUserId` after unmount. The path and navigation warning predate this bundle; React discards the update, so the verified consequence is limited to development/test noise.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-refresh-unmount-guard
+resolution-undo: 43f8322f8e9453ab7fae582d3293bad815aac27fdbba3dcfbf3ddf12734f027c 2026-09-12 7374617475733a206f70656e
 
 ### DW-58: Follow-up review still recommended for dw-events-error-attribution after the damping cap was spent
 origin: review-budget-followup

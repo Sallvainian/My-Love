@@ -1,0 +1,22 @@
+[
+  {
+    "active_path": "tests/api/events-stale-refresh-precondition.spec.ts",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-events-refresh-unmount-guard/tests/api/events-stale-refresh-precondition.spec.ts",
+    "sha256": "efab9a46a50f443a91a83a2e7b003ab8381e46ec191495e53bb834b17aa524c5"
+  },
+  {
+    "active_path": "tests/e2e/settings/events-refresh-unmount.spec.ts",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+    "sha256": "1a67645bbcd1ab22de296306fe2f5b0be3e006eb5ca4fc3e49ce8227ceec3e23"
+  },
+  {
+    "active_path": "tests/support/fixtures/events-refresh-control.ts",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-events-refresh-unmount-guard/tests/support/fixtures/events-refresh-control.ts",
+    "sha256": "f3a9f0cdbe00ff4ae765f8471695db6479f7f16eab5d7b262843c763ebc1aca7"
+  },
+  {
+    "active_path": "tests/support/merged-fixtures.ts",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-events-refresh-unmount-guard/tests/support/merged-fixtures.ts",
+    "sha256": "b9e68997eb89ac3716e78fe10c3ff6bf3835b7d2bf0b57821f9a7cdcc0430a83"
+  }
+]

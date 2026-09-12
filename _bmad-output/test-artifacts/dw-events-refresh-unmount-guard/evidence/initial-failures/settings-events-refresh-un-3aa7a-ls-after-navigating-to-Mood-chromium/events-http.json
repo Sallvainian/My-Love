@@ -1,0 +1,62 @@
+[
+  {
+    "time": "2026-09-12T05:33:04.759Z",
+    "method": "DELETE",
+    "url": "http://127.0.0.1:54321/rest/v1/events?id=eq.c1c0905c-cc01-4db0-9458-0f5ae907139c",
+    "status": 204
+  },
+  {
+    "time": "2026-09-12T05:33:04.658Z",
+    "method": "GET",
+    "url": "http://127.0.0.1:54321/rest/v1/events?select=*&event_date=lt.2026-09-12&order=event_date.desc%2Ccreated_at.desc&offset=0&limit=50",
+    "status": 200
+  },
+  {
+    "time": "2026-09-12T05:33:04.658Z",
+    "method": "GET",
+    "url": "http://127.0.0.1:54321/rest/v1/events?select=*&event_date=gte.2026-09-12&order=event_date.asc%2Ccreated_at.asc&offset=0&limit=50",
+    "status": 200
+  },
+  {
+    "time": "2026-09-12T05:33:04.658Z",
+    "method": "GET",
+    "url": "http://127.0.0.1:54321/rest/v1/events?select=*&event_date=gte.2026-09-12&order=event_date.asc%2Ccreated_at.asc&offset=0&limit=50",
+    "status": 200
+  },
+  {
+    "time": "2026-09-12T05:33:04.658Z",
+    "method": "GET",
+    "url": "http://127.0.0.1:54321/rest/v1/events?select=*&event_date=lt.2026-09-12&order=event_date.desc%2Ccreated_at.desc&offset=0&limit=50",
+    "status": 200
+  },
+  {
+    "time": "2026-09-12T05:33:05.452Z",
+    "method": "DELETE",
+    "url": "http://127.0.0.1:54321/rest/v1/events?id=eq.c1c0905c-cc01-4db0-9458-0f5ae907139c&select=*",
+    "status": 200
+  },
+  {
+    "time": "2026-09-12T05:33:05.503Z",
+    "method": "GET",
+    "url": "http://127.0.0.1:54321/rest/v1/events?select=*&event_date=gte.2026-09-12&order=event_date.asc%2Ccreated_at.asc&offset=0&limit=50",
+    "status": 503
+  },
+  {
+    "time": "2026-09-12T05:33:05.503Z",
+    "method": "GET",
+    "url": "http://127.0.0.1:54321/rest/v1/events?select=*&event_date=lt.2026-09-12&order=event_date.desc%2Ccreated_at.desc&offset=0&limit=50",
+    "status": 503
+  },
+  {
+    "time": "2026-09-12T05:33:09.038Z",
+    "method": "GET",
+    "url": "http://127.0.0.1:54321/rest/v1/events?select=*&event_date=lt.2026-09-12&order=event_date.desc%2Ccreated_at.desc&offset=0&limit=50",
+    "status": 200
+  },
+  {
+    "time": "2026-09-12T05:33:09.038Z",
+    "method": "GET",
+    "url": "http://127.0.0.1:54321/rest/v1/events?select=*&event_date=gte.2026-09-12&order=event_date.asc%2Ccreated_at.asc&offset=0&limit=50",
+    "status": 200
+  }
+]
