@@ -1161,7 +1161,7 @@ function EventDeleteConfirmation({
               type="button"
               onClick={handleRefresh}
               data-testid="events-delete-refresh"
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-600"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700"
             >
               <Calendar className="h-4 w-4" />
               Refresh events

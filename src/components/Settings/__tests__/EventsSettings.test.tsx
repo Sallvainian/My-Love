@@ -1159,7 +1159,11 @@ describe('EventsSettings delete', () => {
     );
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
     expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
-    expect(screen.getByTestId('events-delete-refresh')).toHaveClass('bg-blue-500');
+    expect(screen.getByTestId('events-delete-refresh')).toHaveClass(
+      'bg-blue-600',
+      'hover:bg-blue-700',
+      'text-white'
+    );
     expect(screen.getByTestId('events-delete-refresh')).not.toHaveClass('bg-red-500');
     expect(screen.queryByTestId('events-delete-confirm')).not.toBeInTheDocument();
   });
