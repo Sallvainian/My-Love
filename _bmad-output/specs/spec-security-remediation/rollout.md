@@ -49,6 +49,14 @@ Use forward migrations for live database behavior. F1 source sanitization is a d
 
 ## Operational completion
 
+Apply authorization policies before private clients rely on them. After valid private delivery is verified, disable public Realtime access if compatible with all remaining consumers, reconnect clients and address installed PWA versions still broadcasting publicly. Do not briefly restore public fallback to make a failed deployment appear healthy. If a global setting conflicts with another live consumer, report the concrete dependency before changing it and keep rollout completion open.
+
+Follow `.github/workflows/deploy.yml` for Pages/database shipping; never run `npm run deploy`. Inventory the Edge Function deployment mechanism independently. Determine any existing-data/grant incompatibility through read-only inspection before applying changes; do not silently delete or rewrite customer data to make a migration pass.
+
+The loop must first attempt in-scope external actions through available authorized integrations, including bot credential containment and the required deployments. Do not automatically classify them as human-only work. If access is unavailable or a required action cannot be performed by the session, finish and commit the agent-doable work, record the concrete access/action blocker, and use the installed loop's `awaiting-operator` outcome so independent stories can continue. `bmad-loop confirm` is for actions already performed and verified, not a way to waive them. Overall remediation remains incomplete while any finding's operational acceptance is outstanding.
+
+Resolve routine implementation and test failures within the loop's configured retries. Removing checkpoints does not disable verification or manufacture credentials/access: unresolved contradictions, exhausted retries and actions outside this contract can still require escalation. Report the specific blocker rather than asking for an approval already granted here.
+
 | Work | Required evidence before closure |
 |---|---|
 | Bot containment | Password rotated; old login rejected; intended consumers work; session/refresh-token revocation or bounded expiry explicitly accounted for. Never record credential values. |
@@ -69,13 +77,17 @@ Open. The code half is done and verified on the local stack; the operational hal
 
 Full measurements, with the log lines they came from, are in `stories/2-authorize-and-validate-couple-broadcasts.md` under **Operational Evidence**.
 
-Apply authorization policies before private clients rely on them. After valid private delivery is verified, disable public Realtime access if compatible with all remaining consumers, reconnect clients and address installed PWA versions still broadcasting publicly. Do not briefly restore public fallback to make a failed deployment appear healthy. If a global setting conflicts with another live consumer, report the concrete dependency before changing it and keep rollout completion open.
+### PKCE — status after story 3 (2026-09-12)
 
-Follow `.github/workflows/deploy.yml` for Pages/database shipping; never run `npm run deploy`. Inventory the Edge Function deployment mechanism independently. Determine any existing-data/grant incompatibility through read-only inspection before applying changes; do not silently delete or rewrite customer data to make a migration pass.
+Open. The code half is done and verified; the hosted half is not.
 
-The loop must first attempt in-scope external actions through available authorized integrations, including bot credential containment and the required deployments. Do not automatically classify them as human-only work. If access is unavailable or a required action cannot be performed by the session, finish and commit the agent-doable work, record the concrete access/action blocker, and use the installed loop's `awaiting-operator` outcome so independent stories can continue. `bmad-loop confirm` is for actions already performed and verified, not a way to waive them. Overall remediation remains incomplete while any finding's operational acceptance is outstanding.
+- **Done and verified locally.** `src/api/supabaseClient.ts` sets `flowType: 'pkce'`. A foreign implicit fragment is refused before any network call, and an existing session survives it — measured in a real browser with a real second account's complete token set (`tests/e2e/auth/implicit-fragment-rejection.spec.ts`, both signed out and signed in) and against the app's own client module (`tests/unit/api/supabaseClientAuthFlow.test.ts`, which asserts zero requests, the discriminator that fails under the implicit default). The app's client also redeems a `?code=` for a flow it started, so the acceptance path is pinned rather than assumed. `tests/api/pkce-code-exchange.spec.ts` mints a real GoTrue code and shows only the initiating client redeems it; a client with no verifier is refused locally without burning the code, and one with a wrong verifier is refused by the server.
+- **The hosted project issues the PKCE authorize redirect.** `GET /auth/v1/authorize?provider=google&…&code_challenge_method=s256` returned HTTP 302 to `accounts.google.com/o/oauth2/v2/auth` with `response_type=code`, `access_type=offline`, `prompt=consent`. `/auth/v1/settings` reads `"google": true`, `"mailer_autoconfirm": false`, `"disable_signup": false`.
+- **PKCE does not change the redirect URL.** `experimental.appendPkceFlowIdToRedirects` defaults off, so `redirect_to` stays exactly `${origin}${BASE_URL}` — asserted both in the unit case and on the real button click. Whatever allow-list entry makes today's Google sign-in work keeps matching.
+- **Still outstanding for closure.** One real Google sign-in completed from the initiating browser on the deployed site (the consent step needs Google credentials this session does not hold); the hosted redirect-URL allow list actually read (the authorize endpoint does not validate `redirect_to` up front — a bogus value returned the same 302 with no error — and the MCP project endpoint exposes no auth settings); and the change shipped to Pages through `deploy.yml`.
+- **Recorded consequence, not a regression to fix.** With `mailer_autoconfirm: false`, a hosted signup-confirmation link opened in a *different* browser than the one that signed up no longer establishes a session. The account is still confirmed server-side and password sign-in works. This is CAP-13's intent, and it reaches no user today: nothing in `src/components/` calls `signUp`, and there is no `/reset-password` route.
 
-Resolve routine implementation and test failures within the loop's configured retries. Removing checkpoints does not disable verification or manufacture credentials/access: unresolved contradictions, exhausted retries and actions outside this contract can still require escalation. Report the specific blocker rather than asking for an approval already granted here.
+Full measurements are in `stories/3-require-browser-initiated-auth-callbacks.md` under **Operational Evidence**.
 
 ## Loop handoff
 

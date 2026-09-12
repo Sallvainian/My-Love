@@ -926,3 +926,50 @@ location: src/api/supabaseClient.ts:81-92
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 reason: src/api/supabaseClient.ts:81-92 returns null on any getSession error or throw, and refreshChannelIdentity (src/api/moodSyncService.ts:455-460) treats `null !== entry.ownerUserId` as an account change and nulls the partner snapshot. Only the next SUBSCRIBED or a new subscriber's `entry.partnerId = partnerIdAtJoin` restores it, and an already-joined channel emits no further SUBSCRIBED. I could not show the program reaches this: refreshChannelIdentity runs only from the SUBSCRIBED arm, i.e. moments after the same session authorized the private join, so a session read that fails while that join succeeds is not demonstrated. Same shape as the getPartnerId ambiguity already recorded. Settle by injecting a getSession failure while the websocket stays healthy and observing whether partner moods stop arriving.
 status: open
+
+### DW-93: The PKCE callback is never exercised against the deployed site: no real Google consent round-trip, and the hosted redirect-URL allow list was not read.
+origin: spec-deferred 5ada678c7e15
+location: src/api/auth/actionService.ts:119 (redirectTo) / hosted project xojempkrugifnaveqtqc
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+severity: medium
+reason: The hosted project issues the PKCE authorize redirect (measured: HTTP 302 to accounts.google.com with response_type=code), but completing consent needs a Google account this session does not hold and no authorized integration provides. Separately, /auth/v1/authorize does not validate redirect_to up front -- a deliberately bogus https://not-allowed.example.com/steal returned the same 302 with no error parameter -- so the allow list is not readable from here and the Supabase MCP exposes no auth settings endpoint. The local substitute (tests/api/pkce-code-exchange.spec.ts) mints a real GoTrue code and proves only the initiating client redeems it. Settle by completing one real Google sign-in on https://sallvainian.github.io/My-Love/ after deploy.yml ships this, confirming the session lands and the URL returns with ?code=.
+status: open
+
+### DW-94: A PKCE sign-in cannot complete where localStorage is unavailable, which the previous implicit flow tolerated.
+origin: spec-deferred 33150c174af6
+location: src/api/supabaseClient.ts:59
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+severity: low
+reason: With site data blocked or in a private window, supportsLocalStorage() is false and the SDK falls back to an in-memory store, which a full-page redirect to the provider wipes along with the verifier; the returning ?code= then finds nothing and is ignored. Under the old implicit flow the fragment carried the tokens, so the same browser signed in for that tab. Password sign-in is unaffected either way. Not fixed here: a cookie or sessionStorage adapter is new storage surface rather than a direct correction. Settle by deciding whether a private-window Google sign-in is supported, then adding an adapter or a stated limitation.
+status: open
+
+### DW-95: A code callback that finds no verifier is ignored in silence, with nothing shown to the person who just came back from the provider.
+origin: spec-deferred f540b6e377f9
+location: src/App.tsx:229-296
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+severity: low
+reason: GoTrueClient.js:3356-3366 classifies such a URL as not-a-callback, so _initialize falls through to _recoverAndRefresh and the app renders the login screen with no explanation; measured in tests/unit/api/supabaseClientAuthFlow.test.ts, which asserts exactly that silence. Recoverable -- signing in again from this browser works -- and the fix is user-facing callback handling, which the story's contract excludes ("Never: add ... an exchangeCodeForSession call of our own"). Settle by deciding whether a "finish sign-in in the browser you started in" message is wanted, and where it would live given that the SDK owns callback classification.
+status: open
+
+### DW-96: The provider-denial callback is as silent as the missing-verifier one, and only the second was recorded.
+origin: spec-deferred 34a72182aa5f
+location: src/App.tsx:229-296
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+severity: low
+reason: GoTrueClient.js:3252-3259 throws AuthImplicitGrantRedirectError for any `#error=` URL before the flowType switch, _initialize returns it at :417, and nothing in src/App.tsx:229-296 reads _initialize's return value -- so a user who declines Google consent lands on the login screen with no explanation. Pre-existing: the implicit flow behaved identically, so this story neither caused nor changed it. The unit case "preserves an existing session for an error callback" asserts the session and the request count, never the returned error. Settle together with the missing-verifier silence: decide whether a "sign-in was cancelled" message is wanted, and where it lives given that the SDK owns callback classification.
+status: open
+
+### DW-97: Every redirect_to assertion runs where BASE_URL is "/", so the production "/My-Love/" base path is pinned nowhere.
+origin: spec-deferred 90661930e678
+location: tests/unit/api/supabaseClientAuthFlow.test.ts / tests/e2e/auth/google-oauth.spec.ts
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+severity: low
+reason: vite.config.ts:11 is `base: mode === 'production' ? '/My-Love/' : '/'` and playwright.config.ts:178 boots the dev server with `npx vite --mode test`, so both new assertions -- the unit case's `redirect_to` equality and the E2E's `appBaseUrl + '/'` -- only ever observe `/`. The byte-for-byte requirement the story pins is therefore verified at local origins alone. Not fixable from this session for the same reason the deployed-site verification is not. Recorded separately rather than folded into that entry, because the triage log of the previous pass said it had been grouped there and the text does not carry it. Settle by asserting the authorize URL's `redirect_to` once against a production-mode build, or by reading it during the outstanding deployed-site sign-in.
+status: open
+
+### DW-98: Whether an installed PWA returns from Google consent into the same storage partition that wrote the verifier was not established.
+origin: spec-deferred 194da630c317
+location: src/api/supabaseClient.ts:59-77
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+reason: Unverified. vite.config.ts:71 declares `display: 'standalone'`, and signInWithGoogle navigates the current context with window.location.href, which on the platforms checked keeps the round trip inside the app's own context and storage. What was not measured is an actual installed-PWA Google sign-in on a platform that hands OAuth to a separate browser context: there the returning `?code=` would find no verifier and be ignored, where the old implicit fragment carried the tokens themselves. Same failure mode as the private-window entry, a different trigger. Settle by completing one Google sign-in from the installed PWA on iOS and Android after deploy; if it fails, the fix is a storage adapter or a stated limitation, not a change to the flow type.
+status: open
