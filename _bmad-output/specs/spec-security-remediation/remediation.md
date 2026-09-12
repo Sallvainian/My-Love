@@ -105,7 +105,9 @@ The actual client uses `application/octet-stream`; reject the unused multipart f
 
 **Required change:** Capture the initiating user and recheck it immediately before every post-await state mutation, including success, catch and finally. Preserve the original account context of authorized upload/delete operations; a response for A cannot insert a photo or signed URL into B's gallery, remove B's row, or change B's error/loading state.
 
-**Regression evidence:** Pause compression/upload/signing or deletion, switch A to B, then resolve and reject the pending work. B's full relevant state remains unchanged; signed-out completion is also harmless. Same-account success/failure and retry still behave correctly. This finding covers a shared-device timing window, not a remote account takeover.
+**Regression evidence:** Pause the upload, signing or deletion request, switch A to B, then resolve and reject the pending work. B's full relevant state remains unchanged; signed-out completion is also harmless. Same-account success/failure and retry still behave correctly. This finding covers a shared-device timing window, not a remote account takeover.
+
+**Out of scope — the compression window:** `src/components/PhotoUpload/PhotoUpload.tsx:86` and `src/components/photos/PhotoUploader.tsx:171` both `await imageCompressionService.compressImage(selectedFile)` *before* calling into the store (`PhotoUpload.tsx:100`, `PhotoUploader.tsx:184`). A switch that lands during compression therefore enters `uploadPhoto` fresh under B; `photoService` binds the request to B's token and the photo is stored, attributed and authorized as B's own. That is the accepted behaviour, not a CAP-12 violation: nothing of A's continuation crosses into B's state. `SPEC.md` CAP-12 **success** is authoritative for this finding's scope — only a continuation of A's that changes B's gallery, error or loading state is in scope — and the fix stays inside `photosSlice.ts`. Do not widen this finding into `PhotoUpload.tsx` or `PhotoUploader.tsx`, and do not add a compression pause point to the evidence above.
 
 ## F13 / CAP-13 — Browser-initiated authentication callbacks (MEDIUM)
 
