@@ -79,7 +79,7 @@
     "globals": "^17.11.0",
     "happy-dom": "^20.11.2",
     "postcss": "^8.5.26",
-    "rollup-plugin-visualizer": "^6.0.5",
+    "rollup-plugin-visualizer": "^7.1.1",
     "tailwindcss": "^4.1.17",
     "tsx": "^4.23.12",
     "typescript": "~6.0.3",
