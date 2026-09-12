@@ -725,7 +725,9 @@ location: src/stores/slices/interactionsSlice.ts:223
 source_spec: `spec-dw-35-interaction-subscribe-error-surfacing.md`
 severity: high
 reason: The pre-existing record callback in interactionsSlice calls addIncomingInteraction without checking the captured user or the subscription's active flag. A queued record from the old channel can therefore repopulate shared store state after an account switch. This was not introduced by DW-35's new status callback.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-interaction-record-ownership
+resolution-undo: 36085192bfdd9a00d2e10275fcf8718ec07ee7b516b36fc6c20e3e9e0882adaa 2026-09-12 7374617475733a206f70656e
 
 ### DW-76: The subscribeInteractions JSDoc example does not match the method's required arguments.
 origin: spec-deferred 81acc5a7d387
@@ -776,4 +778,12 @@ location: src/App.tsx:checkAuth
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 severity: medium
 reason: App's checkAuth applies its awaited result whenever the component is mounted, without checking whether an auth notification arrived in the meantime. A stale null or different-user snapshot can overwrite the listener's newer state. Both this initialization branch and its missing notification guard are unchanged from the baseline.
+status: open
+
+### DW-82: The interactions slice header incorrectly describes its cross-slice dependencies as self-contained.
+origin: spec-deferred 37d6cf07740f
+location: src/stores/slices/interactionsSlice.ts:10
+source_spec: `spec-dw-75-interaction-record-ownership.md`
+severity: low
+reason: The baseline already read authSlice.userId for sends, history, and subscriptions while its header said "None (self-contained)". The record callback now also reads authSessionVersion. This pre-existing documentation mismatch can mislead a developer composing an isolated slice fixture about the auth state it requires; production behavior is unaffected.
 status: open

@@ -1,0 +1,365 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/node_modules/.bin/playwright",
+      "test",
+      "tests/api/interaction-record-ownership.spec.ts",
+      "tests/e2e/partner/interaction-record-ownership.spec.ts",
+      "--config=_bmad-output/test-artifacts/dw-interaction-record-ownership/playwright.verify.config.ts",
+      "--workers=2"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/_bmad-output/test-artifacts/dw-interaction-record-ownership/playwright.verify.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "api",
+        "name": "api",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/api",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "integration",
+        "name": "integration",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/integration",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/_bmad-output/test-artifacts/dw-interaction-record-ownership/evidence/playwright-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": {
+      "command": "npx vite --mode test --host 127.0.0.1 --port 5185 --strictPort",
+      "cwd": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/",
+      "url": "http://127.0.0.1:5185",
+      "reuseExistingServer": false,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "e2e/partner/interaction-record-ownership.spec.ts",
+      "file": "e2e/partner/interaction-record-ownership.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Interaction record ownership",
+          "file": "e2e/partner/interaction-record-ownership.spec.ts",
+          "line": 11,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P0] DW-75-E2E-001 rejects old records while signed out and after the same account returns",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 0,
+                      "error": {
+                        "message": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝",
+                        "stack": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+                      },
+                      "errors": [
+                        {
+                          "message": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-12T04:28:13.492Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/partner-interaction-record-84dd5-er-the-same-account-returns-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/partner-interaction-record-84dd5-er-the-same-account-returns-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "ca6660b392ecc0593066-a7a002fb3341e37265d1",
+              "file": "e2e/partner/interaction-record-ownership.spec.ts",
+              "line": 15,
+              "column": 3
+            },
+            {
+              "title": "[P0] DW-75-E2E-002 keeps the new account badge and store free of the old account records",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 0,
+                      "error": {
+                        "message": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝",
+                        "stack": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+                      },
+                      "errors": [
+                        {
+                          "message": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-12T04:28:13.469Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/partner-interaction-record-56aa0--of-the-old-account-records-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/partner-interaction-record-56aa0--of-the-old-account-records-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "ca6660b392ecc0593066-fffa68eb478a3a65b26a",
+              "file": "e2e/partner/interaction-record-ownership.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW-75-E2E-003 preserves records and delivery through same-user refresh without duplicate counts",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 1,
+                      "error": {
+                        "message": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝",
+                        "stack": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+                      },
+                      "errors": [
+                        {
+                          "message": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-12T04:28:14.613Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/partner-interaction-record-64e2d-sh-without-duplicate-counts-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/partner-interaction-record-64e2d-sh-without-duplicate-counts-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "ca6660b392ecc0593066-e6da79a6d69a56fa2520",
+              "file": "e2e/partner/interaction-record-ownership.spec.ts",
+              "line": 135,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "api/interaction-record-ownership.spec.ts",
+      "file": "api/interaction-record-ownership.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Interaction record contract",
+          "file": "api/interaction-record-ownership.spec.ts",
+          "line": 34,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] DW-75-API-001 returns the persisted partner record to its authenticated receiver",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 1,
+                      "error": {
+                        "message": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝",
+                        "stack": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+                      },
+                      "errors": [
+                        {
+                          "message": "Error: browserType.launch: Executable doesn't exist at /Users/sallvain/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-12T04:28:14.633Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/interaction-record-ownersh-de703--its-authenticated-receiver-api/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/interaction-record-ownersh-de703--its-authenticated-receiver-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "26ac8ae2b2d24575efe1-91a0827a9400636c70dd",
+              "file": "api/interaction-record-ownership.spec.ts",
+              "line": 35,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T04:28:10.948Z",
+    "duration": 3749.156,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 4,
+    "flaky": 0
+  }
+}

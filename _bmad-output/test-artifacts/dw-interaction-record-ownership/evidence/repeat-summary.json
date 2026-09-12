@@ -1,0 +1,75 @@
+{
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "tests/api/interaction-record-ownership.spec.ts",
+    "tests/e2e/partner/interaction-record-ownership.spec.ts",
+    "--config=_bmad-output/test-artifacts/dw-interaction-record-ownership/playwright.verify.config.ts",
+    "--workers=2",
+    "--retries=0"
+  ],
+  "cold_process_runs": true,
+  "results": [
+    {
+      "iteration": 1,
+      "exit_code": 0,
+      "stats": {
+        "startTime": "2026-09-12T04:31:04.257Z",
+        "duration": 3969.7700000000004,
+        "expected": 4,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "iteration": 2,
+      "exit_code": 0,
+      "stats": {
+        "startTime": "2026-09-12T04:31:09.167Z",
+        "duration": 3858.527,
+        "expected": 4,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "iteration": 3,
+      "exit_code": 0,
+      "stats": {
+        "startTime": "2026-09-12T04:31:13.997Z",
+        "duration": 3800.6679999999997,
+        "expected": 4,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "iteration": 4,
+      "exit_code": 0,
+      "stats": {
+        "startTime": "2026-09-12T04:31:18.771Z",
+        "duration": 3957.2370000000005,
+        "expected": 4,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "iteration": 5,
+      "exit_code": 0,
+      "stats": {
+        "startTime": "2026-09-12T04:31:23.677Z",
+        "duration": 3749.9619999999995,
+        "expected": 4,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    }
+  ]
+}
