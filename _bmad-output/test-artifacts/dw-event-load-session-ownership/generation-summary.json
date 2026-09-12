@@ -1,0 +1,69 @@
+{
+  "detected_stack": "frontend",
+  "execution_mode": "subagent",
+  "test_count": 6,
+  "api_tests": 1,
+  "e2e_tests": 5,
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 5,
+    "P2": 1,
+    "P3": 0
+  },
+  "tests": [
+    "_bmad-output/test-artifacts/dw-event-load-session-ownership/tests/api/event-load-session-ownership.spec.ts",
+    "_bmad-output/test-artifacts/dw-event-load-session-ownership/tests/e2e/events/event-load-session-ownership.spec.ts"
+  ],
+  "fixtures": [
+    "_bmad-output/test-artifacts/dw-event-load-session-ownership/tests/support/factories/event-load-session-ownership.ts",
+    "_bmad-output/test-artifacts/dw-event-load-session-ownership/tests/support/helpers/event-load-session-ownership.ts"
+  ],
+  "playwright_utils_deviations": [
+    {
+      "file": "_bmad-output/test-artifacts/dw-event-load-session-ownership/tests/api/event-load-session-ownership.spec.ts",
+      "line": 104,
+      "reason": "reauthentication is the behavior under test; initial setup uses authToken."
+    },
+    {
+      "file": "_bmad-output/test-artifacts/dw-event-load-session-ownership/tests/e2e/events/event-load-session-ownership.spec.ts",
+      "line": 107,
+      "reason": "this second login is the auth-lifetime transition under test; the initial session uses the configured auth fixture."
+    },
+    {
+      "file": "_bmad-output/test-artifacts/dw-event-load-session-ownership/tests/support/helpers/event-load-session-ownership.ts",
+      "line": 126,
+      "reason": "handler mode resolves at capture with a synthetic status; captured requests witness actual fulfillment of both event windows."
+    },
+    {
+      "file": "_bmad-output/test-artifacts/dw-event-load-session-ownership/tests/support/helpers/event-load-session-ownership.ts",
+      "line": 212,
+      "reason": "the installed interceptor exposes no disposer; this test owns the only route for its exact events pattern."
+    }
+  ],
+  "validation": "passed",
+  "worker_timestamp": "2026-09-12T01-34-31-673Z",
+  "api_test_files": 1,
+  "e2e_test_files": 1,
+  "fixtures_created": 2,
+  "collected_tests": 6,
+  "passed_tests": 6,
+  "failed_tests": 0,
+  "focused_regression_tests_passed": 211,
+  "schema_validation": "No published response schema found for events/auth endpoints; generated Database events.Row type plus fields-under-test assertions.",
+  "pact_artifacts": 0,
+  "burn_in": {
+    "tests": 25,
+    "passed": 25,
+    "failed": 0,
+    "repetitions": 5,
+    "workers": 2,
+    "retries": 0,
+    "duration_reported": "1.7m"
+  },
+  "mutation_check": {
+    "tests": 2,
+    "expected_failures": 2,
+    "source_restored": true
+  },
+  "staged_files_cleaned": true
+}

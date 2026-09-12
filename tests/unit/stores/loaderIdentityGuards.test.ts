@@ -14,6 +14,8 @@
  * assertion is satisfied by the reset alone. That is not hypothetical: an
  * earlier version of this file did exactly that, and the entire suite of 1050
  * tests passed with five of the guards deleted.
+ * Event session tests also drive real auth actions: their stale outcomes and
+ * post-reset settlements distinguish the ownership guard from the reset.
  *
  * `useAppStore.setState({ userId: 'USER-C-ID' })` models the other real
  * transition — `onAuthStateChange` resolving to a different user while a load
@@ -172,7 +174,8 @@ describe('loader identity guards', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     useAppStore.getState().clearAuth();
-    useAppStore.setState({ userId: A, isAuthenticated: true, error: null });
+    useAppStore.getState().setAuthUser(A);
+    useAppStore.setState({ error: null });
 
     const { getPartnerId } = await import('../../../src/api/supabaseClient');
     vi.mocked(getPartnerId).mockResolvedValue('USER-B-ID');
@@ -781,6 +784,123 @@ describe('loader identity guards', () => {
   // ==========================================================================
 
   describe('loadEvents', () => {
+    const aEvent = {
+      id: 'a-event',
+      userId: A,
+      label: 'A-PRIVATE-EVENT-LABEL',
+      date: new Date(2026, 9, 31),
+      createdAt: new Date(2026, 0, 1),
+      description: null,
+      icon: 'calendar',
+    };
+
+    it.each(['success', 'failure'])(
+      'discards old-session %s after the same user signs back in without a successor load',
+      async (outcome) => {
+        const pending = deferred<unknown[]>();
+        getEvents.mockReturnValue(pending.promise);
+        const inFlight = useAppStore.getState().loadEvents();
+
+        useAppStore.getState().clearAuth();
+        useAppStore.getState().setAuthUser(A);
+        const reset = useAppStore.getState();
+        expect(reset).toMatchObject({ events: [], eventsIsLoading: false, eventsError: null });
+
+        if (outcome === 'success') pending.settle([aEvent]);
+        else pending.fail(new Error('PREVIOUS-SESSION-FAILURE'));
+
+        expect(await inFlight).toEqual({ status: 'stale' });
+        expect(useAppStore.getState()).toBe(reset);
+        expect(getEvents).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it.each(['success', 'failure'])(
+      'leaves the new session spinner intact when old-session %s settles',
+      async (outcome) => {
+        const previous = deferred<unknown[]>();
+        const current = deferred<unknown[]>();
+        getEvents.mockReturnValueOnce(previous.promise).mockReturnValueOnce(current.promise);
+        const oldLoad = useAppStore.getState().loadEvents();
+        useAppStore.getState().clearAuth();
+        useAppStore.getState().setAuthUser(A);
+        const newLoad = useAppStore.getState().loadEvents();
+        const loading = useAppStore.getState();
+
+        if (outcome === 'success') previous.settle([aEvent]);
+        else previous.fail(new Error('PREVIOUS-SESSION-FAILURE'));
+
+        expect(await oldLoad).toEqual({ status: 'stale' });
+        expect(useAppStore.getState()).toBe(loading);
+        expect(loading).toMatchObject({ events: [], eventsIsLoading: true, eventsError: null });
+
+        const currentEvent = { ...aEvent, id: 'current-event', label: 'CURRENT-SESSION-EVENT' };
+        current.settle([currentEvent]);
+        expect(await newLoad).toEqual({ status: 'success' });
+        expect(useAppStore.getState()).toMatchObject({
+          events: [currentEvent],
+          eventsIsLoading: false,
+          eventsError: null,
+        });
+      }
+    );
+
+    it.each(['success', 'failure'])(
+      'preserves the new session failure after old-session %s settles',
+      async (outcome) => {
+        const previous = deferred<unknown[]>();
+        getEvents.mockReturnValueOnce(previous.promise);
+        const oldLoad = useAppStore.getState().loadEvents();
+        useAppStore.getState().clearAuth();
+        useAppStore.getState().setAuthUser(A);
+        getEvents.mockRejectedValueOnce(new Error('CURRENT-SESSION-FAILURE'));
+
+        expect(await useAppStore.getState().loadEvents()).toEqual({
+          status: 'failure',
+          error: 'CURRENT-SESSION-FAILURE',
+        });
+        const failed = useAppStore.getState();
+
+        if (outcome === 'success') previous.settle([aEvent]);
+        else previous.fail(new Error('PREVIOUS-SESSION-FAILURE'));
+
+        expect(await oldLoad).toEqual({ status: 'stale' });
+        expect(useAppStore.getState()).toBe(failed);
+        expect(failed).toMatchObject({
+          events: [],
+          eventsIsLoading: false,
+          eventsError: 'CURRENT-SESSION-FAILURE',
+        });
+      }
+    );
+
+    it.each(['success', 'failure'])(
+      'allows current-session %s after a same-user auth refresh',
+      async (outcome) => {
+        const pending = deferred<unknown[]>();
+        getEvents.mockReturnValue(pending.promise);
+        const inFlight = useAppStore.getState().loadEvents();
+        const version = useAppStore.getState().authSessionVersion;
+
+        useAppStore.getState().setAuthUser(A, 'refreshed@example.com');
+        expect(useAppStore.getState().authSessionVersion).toBe(version);
+        if (outcome === 'success') pending.settle([aEvent]);
+        else pending.fail(new Error('CURRENT-SESSION-FAILURE'));
+
+        expect(await inFlight).toEqual(
+          outcome === 'success'
+            ? { status: 'success' }
+            : { status: 'failure', error: 'CURRENT-SESSION-FAILURE' }
+        );
+        expect(useAppStore.getState().eventsIsLoading).toBe(false);
+        expect(useAppStore.getState().events).toEqual(outcome === 'success' ? [aEvent] : []);
+        expect(useAppStore.getState().eventsError).toBe(
+          outcome === 'success' ? null : 'CURRENT-SESSION-FAILURE'
+        );
+        expect(getEvents).toHaveBeenCalledTimes(1);
+      }
+    );
+
     it('discards the couple’s events when the account changed', async () => {
       const pending = deferred<unknown[]>();
       getEvents.mockReturnValue(pending.promise);

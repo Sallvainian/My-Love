@@ -7,6 +7,8 @@
  * Cross-slice dependencies:
  * - Reads `userId` from authSlice — for the creator of a new event, and for the
  *   identity guard every action needs around its await.
+ * - Loads also capture `authSessionVersion`, so signing back in as the same
+ *   account cannot revive a request from its previous session.
  *
  * Persistence:
  * - Supabase only. NOT persisted to localStorage and NOT mirrored to IndexedDB:
@@ -207,7 +209,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     // screen that fires this, and the request goes out with a still-valid token
     // — so it succeeds and its write lands after clearAuth, putting the previous
     // account's events back on screen for whoever signs in next.
-    const requestedBy = get().userId;
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     // Bail before raising the flag: the null -> signed-in transition is the
     // one auth path that never passes through signedOutState() (authSlice
     // resets only on an account switch or a sign-out), so a load captured at
@@ -233,8 +235,14 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       // events key, flag included. Writing the flag here instead would clear a
       // successor account's own live spinner mid-load. The early null bail is
       // what makes this sound: with a non-null requestedBy, every mismatch
-      // crossed a sign-out or an account switch, and both run that reset.
-      if (get().userId !== requestedBy) return { status: 'stale' };
+      // crossed a sign-out or an account switch, and both run that reset. The
+      // version also catches sign-out followed by sign-in as the same user.
+      if (
+        get().userId !== requestedBy ||
+        get().authSessionVersion !== requestedInSession
+      ) {
+        return { status: 'stale' };
+      }
       // A newer same-user load owns the flag and the list now.
       if (loadId !== latestLoadId) return { status: 'stale' };
       const reconciled = replayCompletedMutations(events, activeLoad);
@@ -244,7 +252,12 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       const errorMsg = messageOf(error, 'Failed to load events');
       console.error('[EventsSlice] Error loading events:', error);
       // Touch nothing here either — same reasoning as the success branch.
-      if (get().userId !== requestedBy) return { status: 'stale' };
+      if (
+        get().userId !== requestedBy ||
+        get().authSessionVersion !== requestedInSession
+      ) {
+        return { status: 'stale' };
+      }
       // A newer same-user load owns the flag now; parking this stale failure
       // would slap an error banner over a refresh that may yet succeed.
       if (loadId !== latestLoadId) return { status: 'stale' };
