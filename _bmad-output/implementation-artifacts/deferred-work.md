@@ -408,7 +408,9 @@ location: src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx
 source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
 severity: low
 reason: Measured during this story's verification. `npm run test:unit` was run five times: four reported 91 files / 1358 tests passed; one reported "1 failed | 1357 passed" on "SoloReadingFlow > Story 2.3: Daily Prayer Report > treats partner as complete when session-level reflection exists". The file run alone (`npx vitest run src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`) passed 113/113 three times consecutively. This story touches only src/api/errorHandlers.ts and tests/unit/api/errorHandlers.test.ts, neither of which SoloReadingFlow imports.
-status: open
+status: done 2026-09-11
+resolution: resolved by sweep bundle dw-solo-report-test-synchronization
+resolution-undo: 1fab1f23a7e64ee869a98f06387b24c37f5d019856a0b920ead1e0a39c18af1f 2026-09-11 7374617475733a206f70656e
 
 ### DW-41: Settings has no way to reach events the read cap truncates, so past roughly 50 past events the oldest ones become uneditable from the UI.
 origin: spec-deferred 9ee0fff5525a
