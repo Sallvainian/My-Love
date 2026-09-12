@@ -247,6 +247,8 @@ jobs:
         uses: ./.github/actions/setup-playwright-e2e
 
       - name: Run E2E tests (shard ${{ matrix.shard }}/4)
+        env:
+          E2E_BLOB_REPORT: '1'
         run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/4
 
       - name: Stop Supabase
@@ -261,6 +263,15 @@ jobs:
           path: |
             test-results/
             playwright-report/
+          retention-days: 30
+
+      - name: Upload shard blob report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-blob-report-shard-${{ matrix.shard }}
+          path: blob-report/
+          if-no-files-found: error
           retention-days: 30
 
   # ============================================
@@ -436,29 +447,33 @@ jobs:
           cache: 'npm'
 
       - name: Install Playwright for report merge
-        run: npm install --no-save @playwright/test
+        run: npm ci
 
-      - name: Download shard results
+      - name: Download shard blob reports
         uses: actions/download-artifact@v8
         with:
-          pattern: e2e-results-shard-*
-          path: all-results/
+          pattern: e2e-blob-report-shard-*
+          path: all-blob-reports/
           merge-multiple: true
 
       - name: Merge Playwright reports
         run: |
-          if [ -d "all-results" ] && [ "$(ls -A all-results 2>/dev/null)" ]; then
-            npx playwright merge-reports --reporter=html all-results/ || echo "Merge skipped"
-          else
-            echo "No results to merge"
+          # Every shard must contribute; never publish a silently partial report.
+          shopt -s nullglob
+          reports=(all-blob-reports/*.zip)
+          if (( ${#reports[@]} != 4 )); then
+            echo "::error::Expected 4 shard blob reports, found ${#reports[@]}."
+            printf 'Available blob reports: %s\n' "${reports[@]}"
+            exit 1
           fi
+          npx playwright merge-reports --reporter=html all-blob-reports/
 
       - name: Upload merged report
         uses: actions/upload-artifact@v7
-        if: always()
         with:
           name: merged-playwright-report
           path: playwright-report/
+          if-no-files-found: error
           retention-days: 30
 
   # ============================================
