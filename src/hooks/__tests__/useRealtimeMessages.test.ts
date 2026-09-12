@@ -443,6 +443,17 @@ describe('useRealtimeMessages', () => {
       // One lookup before the join.
       expect(mocks.getPartnerId).toHaveBeenCalledTimes(1);
 
+      // The join itself. Its snapshot is the one resolved just above, so this
+      // must NOT re-fetch: clearing it here would drop every note arriving
+      // during the replacement round-trip, and a note missed live is never
+      // re-fetched -- nothing reloads on a realtime miss.
+      await act(async () => {
+        subscribeCallback?.('SUBSCRIBED');
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      expect(mocks.getPartnerId).toHaveBeenCalledTimes(1);
+
       // A reconnect re-joins, and RLS is re-evaluated there; the relationship
       // may have changed while the channel was down.
       await act(async () => {
@@ -451,6 +462,48 @@ describe('useRealtimeMessages', () => {
       });
 
       expect(mocks.getPartnerId).toHaveBeenCalledTimes(2);
+    });
+
+    it('delivers a note that arrives immediately after the first SUBSCRIBED', async () => {
+      // The user-visible half of the case above: a note the partner sends as
+      // the Love Notes view opens. Re-taking the snapshot on the first join
+      // nulls it for one PostgREST round-trip, and `parseLoveNoteBroadcast`
+      // drops everything without a partner id -- so the note never reaches
+      // `addNote` and never appears until the view is left and re-entered.
+      const { supabase } = await import('../../api/supabaseClient');
+
+      let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
+      let broadcastHandler: ((payload: unknown) => void) | null = null;
+      const mockChannel = {
+        on: vi.fn((_event: string, _filter: unknown, handler: (payload: unknown) => void) => {
+          broadcastHandler = handler;
+          return mockChannel;
+        }),
+        subscribe: vi.fn((callback?) => {
+          if (callback) subscribeCallback = callback;
+          return mockChannel;
+        }),
+      };
+
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
+      await act(async () => {
+        renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      const addNote = mockStoreState.addNote as ReturnType<typeof vi.fn>;
+      addNote.mockClear();
+
+      const note = validNote();
+      await act(async () => {
+        subscribeCallback?.('SUBSCRIBED');
+        // No timer flush between the join and the note: it lands in the very
+        // window a first-join refresh would have opened.
+        broadcastHandler?.({ payload: { message: note } });
+      });
+
+      expect(addNote).toHaveBeenCalledWith(note);
     });
 
     it('re-installs the Realtime token before every retry', async () => {

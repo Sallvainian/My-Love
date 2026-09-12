@@ -56,6 +56,16 @@ interface MoodChannelEntry {
    */
   lastStatus: string | null;
   /**
+   * Whether this entry has already completed a join.
+   *
+   * The first `SUBSCRIBED` arrives with `partnerId` already set to
+   * `partnerIdAtJoin`, resolved moments earlier by `subscribeMoodUpdates`.
+   * Refreshing it there would null a fresh value and re-fetch it, dropping
+   * every broadcast that arrives during the round-trip. Only a re-join needs
+   * the snapshot re-taken.
+   */
+  joinedOnce: boolean;
+  /**
    * The account this topic belongs to: the signed-in user at the moment the
    * channel was opened. Compared against the live session on every
    * `SUBSCRIBED` so that a channel outliving its account stops dispatching.
@@ -462,20 +472,39 @@ class MoodSyncService {
     // ex-partner, which is exactly who this refresh exists to stop.
     entry.partnerId = null;
 
+    if (!(await this.verifyChannelOwner(entry))) return;
+
+    // Retried on a transient failure; a genuine unlink still resolves null on
+    // the first attempt. Without the retry this refresh turned one failed
+    // `users` read into a permanently muted channel.
+    entry.partnerId = await resolvePartnerIdForDelivery();
+  }
+
+  /**
+   * Confirm the channel still belongs to the account that opened it, muting it
+   * if not. Returns whether the owner still holds it.
+   *
+   * Split out of `refreshChannelIdentity` so the FIRST `SUBSCRIBED` can run
+   * this half alone. The account check is a local session read and is worth
+   * making on every join; the partner re-fetch is a `users` round-trip that, on
+   * a first join, would only discard the snapshot `subscribeMoodUpdates`
+   * resolved moments earlier and drop every mood arriving while it is in
+   * flight.
+   */
+  private async verifyChannelOwner(entry: MoodChannelEntry): Promise<boolean> {
     const signedInUserId = await getSignedInUserId();
 
     if (signedInUserId !== entry.ownerUserId) {
       logger.debug(
         '[MoodSyncService] Signed-in account changed under a mood channel; dropping its broadcasts'
       );
-      // Already null from the clear above, and nothing has assigned since.
-      return;
+      // Mute explicitly: on the first-join path nothing has cleared it, and
+      // this entry's snapshot belongs to an account that is no longer here.
+      entry.partnerId = null;
+      return false;
     }
 
-    // Retried on a transient failure; a genuine unlink still resolves null on
-    // the first attempt. Without the retry this refresh turned one failed
-    // `users` read into a permanently muted channel.
-    entry.partnerId = await resolvePartnerIdForDelivery();
+    return true;
   }
 
   /**
@@ -577,6 +606,7 @@ class MoodSyncService {
         channel: undefined as unknown as MoodChannelEntry['channel'],
         subscribers,
         lastStatus: null,
+        joinedOnce: false,
         ownerUserId: currentUserId,
         partnerId: partnerIdAtJoin,
       };
@@ -614,15 +644,29 @@ class MoodSyncService {
 
           newEntry.lastStatus = status;
 
-          // A join is also a re-join: Realtime re-evaluates RLS here, and the
-          // relationship may have changed since the channel was first opened.
+          // Only a RE-join re-takes the snapshot: Realtime re-evaluates RLS
+          // here, and the relationship may have changed since the channel was
+          // first opened. The FIRST SUBSCRIBED already holds `partnerIdAtJoin`,
+          // assigned before this callback could fire, so refreshing it there
+          // would discard a fresh value and drop every mood arriving during the
+          // replacement round-trip.
           if (status === 'SUBSCRIBED') {
             // Caught, not merely voided: a failed lookup leaves the snapshot
             // null, which drops broadcasts until the next SUBSCRIBED — the safe
             // direction — and must not surface as an unhandled rejection.
-            void this.refreshChannelIdentity(newEntry).catch((error) => {
+            const settled = newEntry.joinedOnce
+              ? this.refreshChannelIdentity(newEntry)
+              : // First join: the partner snapshot is already fresh, so only the
+                // account half runs. Skipping it entirely would let a channel
+                // opened microseconds before an account switch keep dispatching
+                // the previous couple's moods.
+                this.verifyChannelOwner(newEntry).then(() => undefined);
+
+            void settled.catch((error) => {
               logger.debug('[MoodSyncService] Mood channel identity refresh failed:', error);
             });
+
+            newEntry.joinedOnce = true;
           }
 
           Array.from(subscribers).forEach((s) => s.onStatus?.(status));
