@@ -1,0 +1,51 @@
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌁ auth for agents [www.vestauth.com]
+[global-setup] Provisioned 10 worker pairs + legacy users
+
+Running 1 test using 1 worker
+
+(node:80330) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ encrypted .env [www.dotenvx.com]
+
+[1/1] [api] › tests/api/events-wire-contract-fidelity.spec.ts:308:3 › Events wire contract over PostgREST — story 5 › [P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults
+[api] › tests/api/events-wire-contract-fidelity.spec.ts:308:3 › Events wire contract over PostgREST — story 5 › [P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults
+[08:59:48] ℹ Storage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/.auth/local/worker-0/storage-state.json
+
+[08:59:48] ==== Sign in as the creator and POST an event with icon and description omitted ====
+
+
+  1) [api] › tests/api/events-wire-contract-fidelity.spec.ts:308:3 › Events wire contract over PostgREST — story 5 › [P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      374 |     const arrayWithExtraColumn = EventRowsSchema.safeParse([extraColumnRow]);
+      375 |
+    > 376 |     expect(rowWithExtraColumn.success).toBe(false);
+          |                                        ^
+      377 |     expect(rowWithExtraColumn.error?.issues).toEqual([
+      378 |       expect.objectContaining({ code: 'unrecognized_keys', keys: ['unexpected_column'], path: [] }),
+      379 |     ]);
+        at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/api/events-wire-contract-fidelity.spec.ts:376:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/events-wire-contract-fidel-47f95-applies-the-column-defaults-api/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/events-wire-contract-fidel-47f95-applies-the-column-defaults-api/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/events-wire-contract-fidel-47f95-applies-the-column-defaults-api/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/events-wire-contract-fidel-47f95-applies-the-column-defaults-api/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  1 failed
+    [api] › tests/api/events-wire-contract-fidelity.spec.ts:308:3 › Events wire contract over PostgREST — story 5 › [P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults 
