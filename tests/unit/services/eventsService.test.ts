@@ -47,6 +47,8 @@ const backend = {
   /** Injected instead of running the query — a PostgREST error object, or a
    *  plain Error standing in for a mid-flight network failure. */
   nextError: null as FakePostgrestError | Error | null,
+  /** Reject the query with any thrown value, including null and undefined. */
+  nextRejection: null as { reason: unknown } | null,
   /** Override a successful response, including `null`, for invalid-response tests. */
   nextData: undefined as EventRow[] | null | undefined,
   /** Which side of `getEvents`' two-window read `nextError` applies to. `null`
@@ -74,6 +76,7 @@ const backend = {
   reset() {
     this.rows = [];
     this.nextError = null;
+    this.nextRejection = null;
     this.nextData = undefined;
     this.errorForBound = null;
     this.payloads = [];
@@ -122,6 +125,7 @@ function eventsQuery() {
   };
 
   const run = (): { data: EventRow[] | null; error: FakePostgrestError | Error | null } => {
+    if (backend.nextRejection) throw backend.nextRejection.reason;
     if (operation === 'select') {
       backend.queries.push({ bounds: [...bounds], orderings: [...orderings], range });
     }
@@ -212,7 +216,7 @@ function eventsQuery() {
       return { data: result.data?.[0] ?? null, error: result.error };
     },
     then: (onFulfilled: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) =>
-      Promise.resolve(run()).then(onFulfilled, onRejected),
+      Promise.resolve().then(run).then(onFulfilled, onRejected),
   };
   return builder;
 }
@@ -867,20 +871,20 @@ describe('eventsService', () => {
     it('does not promise a sync when the insert fails mid-flight — writes have no queue either', async () => {
       // Same trap as the read path: the write may or may not have landed, and
       // nothing will retry it, so the message must not claim a queue will.
-      backend.nextError = new TypeError('fetch failed');
+      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalStack = originalError.stack;
+      backend.nextError = originalError;
 
-      const failure = await eventsService
-        .createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
-        .then(
-          () => null,
-          (error: Error) => error
-        );
+      const failure = await eventWriteFailure(
+        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
+      );
 
-      expect(failure?.message).toBe(
+      expect(failure.message).toBe(
         '[EventsService.createEvent] Network error: fetch failed. Check your internet connection.'
       );
-      expect(failure).toBeInstanceOf(EventWriteError);
-      expect((failure as EventWriteError | null)?.code).toBe('transport');
+      expect(failure.code).toBe('transport');
+      expect(failure.cause).toBe(originalError);
+      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
     });
   });
 
@@ -1001,7 +1005,9 @@ describe('eventsService', () => {
     });
 
     it('codes a mid-flight network failure as transport', async () => {
-      backend.nextError = new TypeError('fetch failed');
+      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalStack = originalError.stack;
+      backend.nextError = originalError;
 
       const failure = await eventWriteFailure(
         eventsService.updateEvent('event-1', { label: 'x' })
@@ -1012,6 +1018,8 @@ describe('eventsService', () => {
         message:
           '[EventsService.updateEvent] Network error: fetch failed. Check your internet connection.',
       });
+      expect(failure.cause).toBe(originalError);
+      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
     });
   });
 
@@ -1059,7 +1067,9 @@ describe('eventsService', () => {
     });
 
     it('codes a mid-flight network failure as transport', async () => {
-      backend.nextError = new TypeError('fetch failed');
+      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalStack = originalError.stack;
+      backend.nextError = originalError;
 
       const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
 
@@ -1068,6 +1078,52 @@ describe('eventsService', () => {
         message:
           '[EventsService.deleteEvent] Network error: fetch failed. Check your internet connection.',
       });
+      expect(failure.cause).toBe(originalError);
+      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
+    });
+  });
+
+  describe.each([
+    [
+      'createEvent',
+      () => eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' }),
+    ],
+    ['updateEvent', () => eventsService.updateEvent('event-1', { label: 'x' })],
+    ['deleteEvent', () => eventsService.deleteEvent('event-1')],
+  ] as const)('%s transport rejections', (operation, write) => {
+    it('preserves a rejected TypeError and its diagnostics as the cause', async () => {
+      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalStack = originalError.stack;
+      backend.nextRejection = { reason: originalError };
+
+      const failure = await eventWriteFailure(write());
+
+      expect(failure.code).toBe('transport');
+      expect(failure.message).toBe(
+        `[EventsService.${operation}] Network error: fetch failed. Check your internet connection.`
+      );
+      expect(failure.cause).toBe(originalError);
+      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
+    });
+
+    it.each([
+      ['object', { message: 'socket closed', retryable: true }],
+      ['string', 'socket closed'],
+      ['number', 0],
+      ['boolean', false],
+      ['null', null],
+      ['undefined', undefined],
+    ])('preserves a thrown %s as the cause with the fallback message', async (_kind, reason) => {
+      backend.nextRejection = { reason };
+
+      const failure = await eventWriteFailure(write());
+
+      expect(failure.code).toBe('transport');
+      expect(failure.message).toBe(
+        `[EventsService.${operation}] Network error: Unknown network error. Check your internet connection.`
+      );
+      expect(failure).toHaveProperty('cause');
+      expect(failure.cause).toBe(reason);
     });
   });
 });

@@ -143,9 +143,9 @@ function networkFailure(context: string, error: unknown): Error {
   return new Error(`[${context}] Network error: ${detail}. Check your internet connection.`);
 }
 
-/** Preserve the truthful write-network message while adding its stable code. */
+/** Preserve the truthful write-network message and original cause with a stable code. */
 function writeTransportFailure(context: string, error: unknown): EventWriteError {
-  return new EventWriteError('transport', networkFailure(context, error).message);
+  return new EventWriteError('transport', networkFailure(context, error).message, { cause: error });
 }
 
 /** Preserve the existing friendly PostgREST message while adding its stable code. */

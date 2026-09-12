@@ -1,0 +1,25 @@
+{
+  "run_key": "dw-event-transport-error-cause",
+  "files": [
+    {
+      "artifact": "_bmad-output/test-artifacts/dw-event-transport-error-cause/tests/api/event-transport-error-cause.spec.ts",
+      "target": "tests/api/event-transport-error-cause.spec.ts",
+      "sha256": "f795af0034a4545dbfa11a9ec8421ff95b89081ebd32c00155b6144ae441989b"
+    },
+    {
+      "artifact": "_bmad-output/test-artifacts/dw-event-transport-error-cause/tests/e2e/settings/event-transport-error-cause.spec.ts",
+      "target": "tests/e2e/settings/event-transport-error-cause.spec.ts",
+      "sha256": "cdd128661fd16643f85a5b580468c50e494b128736673d8778402ed618fe8e9b"
+    },
+    {
+      "artifact": "_bmad-output/test-artifacts/dw-event-transport-error-cause/tests/support/factories/event-transport-error.ts",
+      "target": "tests/support/factories/event-transport-error.ts",
+      "sha256": "a6de6f49162c877a57f1c9ddbe84cc55672c665e700224d68b58e1953b34ec5d"
+    },
+    {
+      "artifact": "_bmad-output/test-artifacts/dw-event-transport-error-cause/tests/support/helpers/event-transport-error.ts",
+      "target": "tests/support/helpers/event-transport-error.ts",
+      "sha256": "57efb14dfcb88d10f2bf1c01c9f8160c6d66e4cd8224985fec7351baf0f55a46"
+    }
+  ]
+}
