@@ -1,0 +1,40 @@
+{
+  "detected_stack": "frontend",
+  "total_tests": 6,
+  "api_tests": 5,
+  "e2e_tests": 1,
+  "backend_tests": 0,
+  "fixtures_created": 1,
+  "api_test_files": 1,
+  "e2e_test_files": 1,
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 3,
+    "P2": 3,
+    "P3": 0
+  },
+  "knowledge_fragments_used": [
+    "api-request",
+    "api-testing-patterns",
+    "auth-session",
+    "data-factories",
+    "file-utils",
+    "fixture-architecture",
+    "fixtures-composition",
+    "intercept-network-call",
+    "library-integration-mandate",
+    "log",
+    "network-error-monitor",
+    "network-first",
+    "network-recorder",
+    "overview",
+    "playwright-cli",
+    "playwright-utils-mandate",
+    "recurse",
+    "selector-resilience",
+    "test-levels-framework",
+    "test-priorities-matrix"
+  ],
+  "subagent_execution": "agent-team",
+  "performance_gain": "not measured"
+}

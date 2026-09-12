@@ -72,7 +72,13 @@ export const handleSupabaseError = (
     PGRST301: 'Invalid request parameters',
   };
 
-  const userMessage = errorMessages[error.code] || `Database error: ${error.message}`;
+  const userMessage =
+    errorMessages[error.code] ||
+    `Database error: ${
+      error.message == null || (typeof error.message === 'string' && !error.message.trim())
+        ? 'An unknown database error occurred'
+        : error.message
+    }`;
 
   return new SupabaseServiceError(
     `${contextPrefix}${userMessage}`,

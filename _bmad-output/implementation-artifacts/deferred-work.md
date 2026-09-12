@@ -398,7 +398,9 @@ location: src/api/errorHandlers.ts:72
 source_spec: `spec-dw-8-16-check-constraint-error-mapping.md`
 severity: low
 reason: The fallback at src/api/errorHandlers.ts:72 interpolates error.message unconditionally. tsconfig.app.json sets no noUncheckedIndexedAccess, so an absent code is typed as string and silently takes the same branch. Nothing in the repo covers either case. Pre-existing; the new tests scope to 23514 per the story intent.
-status: open
+status: done 2026-09-11
+resolution: resolved by sweep bundle dw-empty-database-error-fallback
+resolution-undo: e3a692278d474f40ee244679eb6d6ad33513dc3e08354984bb02e9c81c6da4b3 2026-09-11 7374617475733a206f70656e
 
 ### DW-40: SoloReadingFlow.test.tsx is flaky under the full suite, failing about one run in five while passing in isolation.
 origin: spec-deferred ef241b3821d3
@@ -714,4 +716,20 @@ location: src/api/interactionService.ts:216
 source_spec: `spec-dw-35-interaction-subscribe-error-surfacing.md`
 severity: low
 reason: The example already omitted userId before this change and now also omits the status callback, so copied sample code does not typecheck. It is pre-existing documentation debt outside DW-35's runtime error surface.
+status: open
+
+### DW-77: The existing error-handler test header incorrectly says four callers never import the handler.
+origin: spec-deferred daacdcd2980b
+location: tests/unit/api/errorHandlers.test.ts:16-20
+source_spec: `spec-dw-39-empty-database-error-fallback.md`
+severity: low
+reason: tests/unit/api/errorHandlers.test.ts:16-20 contains this unchanged inventory. photoService.ts:396-397, partnerService.ts:192-193, scriptureReadingService.ts:332-333, and notesSlice.ts:519-520 now use handleSupabaseError for selected CHECK errors. The stale inventory can mislead maintainers assessing existing coverage; it predates DW-39.
+status: open
+
+### DW-78: Errors that omit message or code entirely can bypass database classification in service callers.
+origin: spec-deferred e6d9258059df
+location: src/api/errorHandlers.ts:122-130
+source_spec: `spec-dw-39-empty-database-error-fallback.md`
+severity: low
+reason: isPostgrestError requires code, message, and details properties to exist. MoodApi.create and EventsService.createEvent use that unchanged guard before conversion. An omitted-message object therefore bypasses handleSupabaseError, while an explicitly present undefined, null, empty, or whitespace message reaches the fixed fallback. This pre-existing classifier behavior is distinct from DW-39's specifically identified unconditional interpolation in handleSupabaseError; the change does not claim to fix routing.
 status: open

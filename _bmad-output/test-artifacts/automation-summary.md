@@ -717,3 +717,7 @@ accessibility PASS.
 ## Subsequent run: DW-38 (2026-09-11)
 
 [DW-38 CHECK error path consistency automation](automation-summary-dw-check-error-path-consistency.md): 8 generated tests (7 P1, 1 P2), 2 data factories; static checks and 173 affected regression tests passed. Live API/E2E verification requires the unavailable Docker-backed local Supabase. This entry preserves the historical report above.
+
+## Subsequent run: DW-39 (2026-09-11)
+
+[DW-39 empty database error fallback automation](automation-summary-dw-empty-database-error-fallback.md): 5 API client tests, 1 E2E test, and 1 shared factory; 3 P1 and 3 P2 cases. All 5 SDK tests and 184 affected unit tests passed, as did typecheck and lint. The previous handler fails the two new fallback assertions. Authenticated E2E execution remains unverified because Docker/Supabase is unavailable. Source snapshots, commands, validation evidence, and the Definition of Done are in the linked artifact package.

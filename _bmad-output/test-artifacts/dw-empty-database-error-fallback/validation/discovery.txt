@@ -1,0 +1,9 @@
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ suppress logs { quiet: true }
+Listing tests:
+  [chromium] › e2e/errors/empty-database-error-fallback.spec.ts:8:3 › DW-39 empty database error fallback › [P1] DW39-E2E-001 a blank database error leaves the event form ready to retry
+  [api] › api/empty-database-error-fallback.spec.ts:65:3 › DW-39 empty database error fallback through SDK parsing › [P1] DW39-API-001 a null message produces a contextual database fallback
+  [api] › api/empty-database-error-fallback.spec.ts:88:3 › DW-39 empty database error fallback through SDK parsing › [P1] DW39-API-002 Unicode whitespace uses the fallback and retains null diagnostics
+  [api] › api/empty-database-error-fallback.spec.ts:105:3 › DW-39 empty database error fallback through SDK parsing › [P2] DW39-API-003 CHECK mapping takes precedence over an empty SDK message
+  [api] › api/empty-database-error-fallback.spec.ts:119:3 › DW-39 empty database error fallback through SDK parsing › [P2] DW39-API-004 meaningful message whitespace survives SDK parsing and conversion
+  [api] › api/empty-database-error-fallback.spec.ts:133:3 › DW-39 empty database error fallback through SDK parsing › [P2] DW39-API-005 a numeric SDK message retains compatibility without throwing
+Total: 6 tests in 2 files
