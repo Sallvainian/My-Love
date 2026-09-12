@@ -504,6 +504,7 @@ source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: This behavior predates the bundle: every failure previously left Save enabled. The new `invalid-response` code now identifies it, but choosing a distinct safe affordance was not part of the events-only refresh-versus-retry decision. `createEvent` can throw after insert when the returned row cannot be converted, while Settings routes every code except `not-found` to Save/Delete.
 status: open
+decision: 2026-09-12 Refresh before another write — Give invalid-response save failures an explicit uncertain-save explanation and replace immediate Add/Update retry with reconciliation through the existing events refresh flow. Prevent resubmission from that failed form, preserve offline and transport retry behavior, and cover create/update recovery and refresh failure.
 decision: 2026-09-12 Keep recovery deferred
 decision: 2026-09-11 Keep recovery deferred
 decision: 2026-09-11 Defer the recovery choice
@@ -803,6 +804,7 @@ location: src/api/auth/sessionService.ts:onAuthStateChange; src/api/auth/actionS
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 reason: sessionService and actionService both write/delete the current service-worker token, and neither associates those operations with a generation. Those writers and their asynchronous IndexedDB opens predate this bundle. Reversing mocked promise completion does not demonstrate reversed real IndexedDB commits; establishing the reported late-clear outcome requires a controlled trace of actual IndexedDB operations plus actionService signOut/signIn overlap. Earlier auth delivery alone does not establish the claimed regression.
 status: open
+decision: 2026-09-12 Trace real token persistence overlap — Build a controlled browser regression harness that exercises the actual sw-db IndexedDB implementation alongside overlapping actionService signOut/signIn and auth notifications. Record operation dispatch, transaction creation, commit order, and the final current-token owner without exposing token contents. Establish whether a stale operation can overwrite or delete the newer token before choosing a persistence-coordination change.
 decision: 2026-09-12 Keep pending stronger evidence
 decision: 2026-09-11 Keep pending stronger evidence
 
