@@ -527,7 +527,9 @@ location: src/services/eventsService.ts:147
 source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: low
 reason: The pre-existing `networkFailure` helper creates a new message-only Error. `writeTransportFailure` now wraps only that message, so the original error identity, stack, and transport metadata remain unavailable for diagnostics even though PostgREST wrapping preserves its mapped error as `cause`.
-status: open
+status: done 2026-09-11
+resolution: resolved by sweep bundle dw-event-transport-error-cause
+resolution-undo: 3dd40b40769bee717376c7b1b12a8e1da3afdbc2619c849abc2abf476b1e51bf 2026-09-11 7374617475733a206f70656e
 
 ### DW-54: User-id-only event load ownership can admit a pre-sign-out response after signing back into the same account.
 origin: spec-deferred f281396e181b
