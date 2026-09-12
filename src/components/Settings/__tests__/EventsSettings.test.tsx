@@ -644,6 +644,56 @@ describe('EventsSettings validation', () => {
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
   });
 
+  it.each(['', '  '])('accepts a 100-character label with %j padding', async (padding) => {
+    const label = 'x'.repeat(100);
+    const description = 'At the label limit';
+    await renderSection();
+    openAddForm();
+
+    fillForm({ label: `${padding}${label}${padding}`, date: '2026-09-12', description });
+    submitForm();
+
+    expect(screen.queryByTestId('events-form-label-error')).not.toBeInTheDocument();
+    await waitFor(() => expect(store.state.addEvent).toHaveBeenCalledTimes(1));
+    expect(store.state.addEvent).toHaveBeenCalledWith({
+      label,
+      eventDate: '2026-09-12',
+      description,
+      icon: 'calendar',
+    });
+    expect(currentEvents()).toMatchObject([
+      { label, date: dateFromISO('2026-09-12'), description, icon: 'calendar' },
+    ]);
+    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
+    expect(screen.getByTestId('event-label-created-1').textContent).toBe(label);
+    expect(screen.getByTestId('event-description-created-1').textContent).toBe(description);
+  });
+
+  it.each(['', '  '])('accepts a 500-character description with %j padding', async (padding) => {
+    const label = 'At the description limit';
+    const description = 'y'.repeat(500);
+    await renderSection();
+    openAddForm();
+
+    fillForm({ label, date: '2026-09-12', description: `${padding}${description}${padding}` });
+    submitForm();
+
+    expect(screen.queryByTestId('events-form-description-error')).not.toBeInTheDocument();
+    await waitFor(() => expect(store.state.addEvent).toHaveBeenCalledTimes(1));
+    expect(store.state.addEvent).toHaveBeenCalledWith({
+      label,
+      eventDate: '2026-09-12',
+      description,
+      icon: 'calendar',
+    });
+    expect(currentEvents()).toMatchObject([
+      { label, date: dateFromISO('2026-09-12'), description, icon: 'calendar' },
+    ]);
+    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
+    expect(screen.getByTestId('event-label-created-1').textContent).toBe(label);
+    expect(screen.getByTestId('event-description-created-1').textContent).toBe(description);
+  });
+
   it('rejects a 101-character label, naming the 100-character limit', async () => {
     await renderSection();
     openAddForm();
@@ -655,6 +705,8 @@ describe('EventsSettings validation', () => {
       'Label must be 100 characters or fewer'
     );
     expect(store.state.addEvent).not.toHaveBeenCalled();
+    expect(currentEvents()).toEqual([]);
+    expect(screen.getByTestId('events-form')).toBeInTheDocument();
   });
 
   it('rejects a 501-character description, naming the 500-character limit', async () => {
@@ -668,6 +720,8 @@ describe('EventsSettings validation', () => {
       'Description must be 500 characters or fewer'
     );
     expect(store.state.addEvent).not.toHaveBeenCalled();
+    expect(currentEvents()).toEqual([]);
+    expect(screen.getByTestId('events-form')).toBeInTheDocument();
   });
 
   it('rejects a missing date without issuing a request', async () => {

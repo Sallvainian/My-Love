@@ -603,7 +603,9 @@ location: tests/unit/components/eventsValidationMirrors.test.ts:23
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: `tests/unit/components/eventsValidationMirrors.test.ts` reads the constraint from `20260815010000_create_events.sql`. A future migration could tighten or replace that constraint while this guard remained green, allowing the UI and deployed database rules to drift. No later events migration currently changes the constraint, so this is a test-maintainability risk rather than a current behavior defect.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-validation-guard-fidelity
+resolution-undo: d8a7554e2a46ce41c0e9381203ae0d7309996f2e00c30fac38a2c24316f0fe6b 2026-09-12 7374617475733a206f70656e
 
 ### DW-61: Repeated date-helper calls can derive different calendar anchors if a seeding batch crosses local midnight.
 origin: spec-deferred 07bf0f3e8d6a
@@ -629,7 +631,9 @@ location: tests/unit/components/eventsValidationMirrors.test.ts:38
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: `tests/unit/components/eventsValidationMirrors.test.ts` extracts constraints from `20260818000002_create_events_table.sql`. A later migration could replace or tighten a constraint without changing that source file, leaving the guard green while the deployed database and UI differ. No later events migration currently changes these constraints.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-validation-guard-fidelity
+resolution-undo: d8a7554e2a46ce41c0e9381203ae0d7309996f2e00c30fac38a2c24316f0fe6b 2026-09-12 7374617475733a206f70656e
 
 ### DW-64: Repeated event-date helper calls can use different calendar anchors across local midnight.
 origin: spec-deferred f5a669342ad5
@@ -655,7 +659,9 @@ location: tests/unit/components/eventsValidationMirrors.test.ts:38
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: `tests/unit/components/eventsValidationMirrors.test.ts` compares UI constants with `20260818000002_create_events_table.sql`. If a later migration tightens or replaces a constraint, the guard still compares against the obsolete source and can stay green while the form accepts input that the deployed database rejects.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-validation-guard-fidelity
+resolution-undo: d8a7554e2a46ce41c0e9381203ae0d7309996f2e00c30fac38a2c24316f0fe6b 2026-09-12 7374617475733a206f70656e
 
 ### DW-67: The icon extractor can silently omit database values containing non-letter characters.
 origin: spec-deferred 0fdd766222cc
@@ -663,7 +669,9 @@ location: tests/unit/components/eventsValidationMirrors.test.ts:98
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: The drift guard extracts icons with `'([a-z]+)'`. A later value such as `party-hat` does not match, so a database-only addition can be absent from `dbIcons` and leave the equality assertion green even though the UI does not offer the admitted value.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-validation-guard-fidelity
+resolution-undo: d8a7554e2a46ce41c0e9381203ae0d7309996f2e00c30fac38a2c24316f0fe6b 2026-09-12 7374617475733a206f70656e
 
 ### DW-68: The validation mirror checks constant declarations but not the validation branches that consume them.
 origin: spec-deferred aa42fa28a662
@@ -671,7 +679,9 @@ location: tests/unit/components/eventsValidationMirrors.test.ts:68
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: medium
 reason: The guard proves that `LABEL_MAX_LENGTH` and `DESCRIPTION_MAX_LENGTH` match the migration, but a future edit can validate against a different literal while retaining those constants for messages or another use. Existing boundary tests cover rejection at 101 and 501, not acceptance at the exact database limits.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-validation-guard-fidelity
+resolution-undo: d8a7554e2a46ce41c0e9381203ae0d7309996f2e00c30fac38a2c24316f0fe6b 2026-09-12 7374617475733a206f70656e
 
 ### DW-69: Repeated date-helper calls can anchor one setup batch to different local days at midnight.
 origin: spec-deferred 48f645dfe7e2
@@ -792,4 +802,12 @@ location: src/stores/slices/interactionsSlice.ts:10
 source_spec: `spec-dw-75-interaction-record-ownership.md`
 severity: low
 reason: The baseline already read authSlice.userId for sends, history, and subscriptions while its header said "None (self-contained)". The record callback now also reads authSessionVersion. This pre-existing documentation mismatch can mislead a developer composing an isolated slice fixture about the auth state it requires; production behavior is unaffected.
+status: open
+
+### DW-83: EventsSettings counts UTF-16 code units while PostgreSQL char_length counts Unicode characters.
+origin: spec-deferred 40fa82030481
+location: src/components/Settings/EventsSettings.tsx:689
+source_spec: `spec-dw-60-63-66-67-68-events-validation-guard-fidelity.md`
+severity: medium
+reason: The unchanged submit handler uses trimmedLabel.length and trimmedDescription.length. Measured 100 repeated emoji have JavaScript length 200 and PostgreSQL char_length 100, so the form rejects some values admitted by the existing database CHECK. This predates this bundle, which explicitly preserves production validation. The new boundary tests characterize the existing limits with ASCII and do not establish Unicode equivalence.
 status: open
