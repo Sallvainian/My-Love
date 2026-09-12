@@ -4,24 +4,45 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRealtimeMessages } from '../useRealtimeMessages';
 
+const USER_ID = '11111111-1111-4111-8111-111111111111';
+const PARTNER_ID = '22222222-2222-4222-8222-222222222222';
+const OUTSIDER_ID = '33333333-3333-4333-8333-333333333333';
+
+/**
+ * Hoisted so the vi.mock factory below can reach them: the factory runs when
+ * the hook first imports supabaseClient, which is before any `const` in this
+ * file has been initialised.
+ */
+const mocks = vi.hoisted(() => ({
+  getPartnerId: vi.fn(),
+  setAuth: vi.fn(),
+  /** Ordered record of the calls whose ORDER is load-bearing */
+  order: [] as string[],
+}));
+
 // Mock Supabase
 vi.mock('../../api/supabaseClient', () => ({
   supabase: {
     channel: vi.fn(() => ({
       on: vi.fn().mockReturnThis(),
       subscribe: vi.fn((callback) => {
-        callback('SUBSCRIBED');
+        mocks.order.push('subscribe');
+        callback?.('SUBSCRIBED');
         return { unsubscribe: vi.fn() };
       }),
     })),
     removeChannel: vi.fn(),
+    realtime: {
+      setAuth: (...args: unknown[]) => mocks.setAuth(...args),
+    },
   },
+  getPartnerId: (...args: unknown[]) => mocks.getPartnerId(...args),
 }));
 
 // Mock app store
 const mockStoreState: Record<string, unknown> = {
   addNote: vi.fn(),
-  userId: 'user-123',
+  userId: USER_ID,
 };
 
 vi.mock('../../stores/useAppStore', () => ({
@@ -30,26 +51,139 @@ vi.mock('../../stores/useAppStore', () => ({
   }),
 }));
 
+/** A well-formed note from the partner to this user, as the server row looks. */
+function validNote(overrides: Record<string, unknown> = {}) {
+  return {
+    id: '44444444-4444-4444-8444-444444444444',
+    from_user_id: PARTNER_ID,
+    to_user_id: USER_ID,
+    content: 'Hello!',
+    created_at: '2024-01-01T10:00:00Z',
+    ...overrides,
+  };
+}
+
 describe('useRealtimeMessages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.order.length = 0;
+    mocks.getPartnerId.mockResolvedValue(PARTNER_ID);
+    mocks.setAuth.mockImplementation(async () => {
+      mocks.order.push('setAuth');
+    });
   });
 
-  it('should subscribe to broadcast channel on mount', async () => {
+  it('should subscribe to a PRIVATE broadcast channel on mount', async () => {
     const { supabase } = await import('../../api/supabaseClient');
 
     renderHook(() => useRealtimeMessages());
 
     await waitFor(() => {
-      expect(supabase.channel).toHaveBeenCalledWith('love-notes:user-123');
+      // The second argument is the whole point: a public join to this topic is
+      // open to anyone holding the anon key.
+      expect(supabase.channel).toHaveBeenCalledWith(`love-notes:${USER_ID}`, {
+        config: { private: true },
+      });
     });
+  });
+
+  it('sets the Realtime auth token before subscribing', async () => {
+    const { supabase } = await import('../../api/supabaseClient');
+
+    renderHook(() => useRealtimeMessages());
+
+    await waitFor(() => {
+      expect(mocks.order).toContain('subscribe');
+    });
+
+    // Subscribing first would join with the anon key and the SELECT policy on
+    // realtime.messages would reject it.
+    expect(mocks.order.indexOf('setAuth')).toBeGreaterThanOrEqual(0);
+    expect(mocks.order.indexOf('setAuth')).toBeLessThan(mocks.order.indexOf('subscribe'));
+    expect(supabase.channel).toHaveBeenCalled();
+  });
+
+  /**
+   * A channel that is claimed but never subscribed, with the async setup parked
+   * mid-flight.
+   *
+   * `supabase.channel()` registers synchronously, so the cleanup can remove it;
+   * `subscribe()` happens two awaits later, and by then the effect run may no
+   * longer own it. A superseded run that subscribes anyway re-joins a private
+   * topic the hook has already released, and no later cleanup can remove it —
+   * `channelRef.current` is null by then.
+   */
+  function parkedChannel() {
+    return { on: vi.fn().mockReturnThis(), subscribe: vi.fn() };
+  }
+
+  it('does not subscribe when unmounted during the partner lookup', async () => {
+    const { supabase } = await import('../../api/supabaseClient');
+    const mockChannel = parkedChannel();
+    vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
+    let releasePartner: (id: string | null) => void = () => {};
+    mocks.getPartnerId.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releasePartner = resolve;
+        })
+    );
+
+    const { unmount } = renderHook(() => useRealtimeMessages());
+
+    await waitFor(() => {
+      expect(supabase.channel).toHaveBeenCalled();
+    });
+    expect(mockChannel.subscribe).not.toHaveBeenCalled();
+
+    unmount();
+    expect(supabase.removeChannel).toHaveBeenCalledWith(mockChannel);
+
+    await act(async () => {
+      releasePartner(PARTNER_ID);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockChannel.subscribe).not.toHaveBeenCalled();
+  });
+
+  it('does not subscribe when unmounted during setAuth', async () => {
+    const { supabase } = await import('../../api/supabaseClient');
+    const mockChannel = parkedChannel();
+    vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
+    let releaseAuth: () => void = () => {};
+    mocks.setAuth.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseAuth = resolve;
+        })
+    );
+
+    const { unmount } = renderHook(() => useRealtimeMessages());
+
+    // The partner lookup resolves on its own; this run is parked on setAuth.
+    await waitFor(() => {
+      expect(mocks.setAuth).toHaveBeenCalled();
+    });
+    expect(mockChannel.subscribe).not.toHaveBeenCalled();
+
+    unmount();
+
+    await act(async () => {
+      releaseAuth();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockChannel.subscribe).not.toHaveBeenCalled();
   });
 
   it('should listen for broadcast new_message events', async () => {
     const mockChannel = {
       on: vi.fn().mockReturnThis(),
       subscribe: vi.fn((callback) => {
-        callback('SUBSCRIBED');
+        callback?.('SUBSCRIBED');
         return { unsubscribe: vi.fn() };
       }),
     };
@@ -281,6 +415,103 @@ describe('useRealtimeMessages', () => {
       expect(mockSubscribe).toHaveBeenCalledTimes(3);
     });
 
+    it('re-takes the partner snapshot on every SUBSCRIBED', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+
+      let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
+      const mockChannel = {
+        on: vi.fn().mockReturnThis(),
+        subscribe: vi.fn((callback?) => {
+          if (callback) subscribeCallback = callback;
+          return mockChannel;
+        }),
+      };
+
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
+      await act(async () => {
+        renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // One lookup before the join.
+      expect(mocks.getPartnerId).toHaveBeenCalledTimes(1);
+
+      // A reconnect re-joins, and RLS is re-evaluated there; the relationship
+      // may have changed while the channel was down.
+      await act(async () => {
+        subscribeCallback?.('SUBSCRIBED');
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      expect(mocks.getPartnerId).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-installs the Realtime token before every retry', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+
+      // Every subscribe call's callback ARGUMENT, in call order — not a single
+      // variable that keeps the previous one. RealtimeChannel wires the
+      // callback it is handed into _onError/_onClose and the joinPush receives,
+      // so a retry that passes none reports nothing; a fake that retains the
+      // first callback reports anyway and hides exactly that.
+      const subscribeCallbacks: Array<((status: string, err?: Error) => void) | undefined> = [];
+      const mockChannel = {
+        on: vi.fn().mockReturnThis(),
+        subscribe: vi.fn((callback?) => {
+          subscribeCallbacks.push(callback);
+          mocks.order.push('subscribe');
+          return mockChannel;
+        }),
+      };
+
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
+      await act(async () => {
+        renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      await act(async () => {
+        subscribeCallbacks[0]?.('CHANNEL_ERROR');
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      // A retry is a re-join, and a private join is authorized against the
+      // token on the socket. A retry scheduled because that token had gone
+      // stale would otherwise re-join with the same stale token and be denied
+      // again, five times over, before giving up.
+      expect(mocks.order).toEqual(['setAuth', 'subscribe', 'setAuth', 'subscribe']);
+
+      // The retry must hand the status callback back. Without it the rejoined
+      // channel reports nothing, so neither the retry-count reset nor the
+      // partner-snapshot refresh below ever runs again.
+      expect(subscribeCallbacks).toHaveLength(2);
+      expect(subscribeCallbacks[1]).toBeTypeOf('function');
+
+      const partnerLookupsBefore = mocks.getPartnerId.mock.calls.length;
+      await act(async () => {
+        subscribeCallbacks[1]?.('SUBSCRIBED');
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // Proof it actually reached handleStatus: only that path re-takes the
+      // snapshot, and a stale snapshot is the staleness this refresh closes.
+      expect(mocks.getPartnerId.mock.calls.length).toBe(partnerLookupsBefore + 1);
+
+      // And the counter was reset, so the next failure starts the backoff over
+      // rather than continuing toward the five-retry give-up.
+      await act(async () => {
+        subscribeCallbacks[1]?.('CHANNEL_ERROR');
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(subscribeCallbacks).toHaveLength(3);
+    });
+
     it('should clear retry timeout on unmount', async () => {
       const { supabase } = await import('../../api/supabaseClient');
 
@@ -323,9 +554,12 @@ describe('useRealtimeMessages', () => {
   });
 
   describe('Message Handling', () => {
-    it('should call onNewMessage callback when message received', async () => {
+    /**
+     * Mount the hook and hand back the broadcast handler the channel
+     * registered, once the async setAuth/partner-lookup path has subscribed.
+     */
+    async function mountAndCaptureBroadcast(onNewMessage?: (m: unknown) => void) {
       const { supabase } = await import('../../api/supabaseClient');
-      const onNewMessage = vi.fn();
 
       let broadcastCallback: ((payload: unknown) => void) | null = null;
       const mockChannel = {
@@ -336,38 +570,95 @@ describe('useRealtimeMessages', () => {
           return mockChannel;
         }),
         subscribe: vi.fn((callback) => {
-          callback('SUBSCRIBED');
+          callback?.('SUBSCRIBED');
           return { unsubscribe: vi.fn() };
         }),
       };
 
       vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
 
-      renderHook(() => useRealtimeMessages({ onNewMessage }));
+      renderHook(() =>
+        useRealtimeMessages(onNewMessage ? { onNewMessage: onNewMessage as never } : {})
+      );
 
-      // Wait for async setup to complete
+      // The partner snapshot has to have landed, or every broadcast is dropped
+      // for want of an identity to check against — which is correct behaviour,
+      // but not what these cases are about.
+      await waitFor(() => {
+        expect(mockChannel.subscribe).toHaveBeenCalled();
+      });
       await waitFor(() => {
         expect(broadcastCallback).not.toBeNull();
       });
 
-      // Simulate receiving a message
-      const mockMessage = {
-        id: 'msg-1',
-        from_user_id: 'partner-123',
-        to_user_id: 'user-123',
-        content: 'Hello!',
-        created_at: '2024-01-01T10:00:00Z',
-      };
+      return (payload: unknown) => act(() => broadcastCallback?.(payload));
+    }
 
-      act(() => {
-        broadcastCallback?.({
-          type: 'broadcast',
-          event: 'new_message',
-          payload: { message: mockMessage },
-        });
+    it('should call onNewMessage callback when message received', async () => {
+      const onNewMessage = vi.fn();
+      const emit = await mountAndCaptureBroadcast(onNewMessage);
+
+      const mockMessage = validNote();
+
+      await emit({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: { message: mockMessage },
       });
 
       expect(onNewMessage).toHaveBeenCalledWith(mockMessage);
+      expect(mockStoreState.addNote).toHaveBeenCalledWith(mockMessage);
+    });
+
+    it('strips a forged imagePreviewUrl rather than rendering it', async () => {
+      const onNewMessage = vi.fn();
+      const emit = await mountAndCaptureBroadcast(onNewMessage);
+
+      await emit({
+        payload: {
+          message: validNote({ imagePreviewUrl: 'https://attacker.example/x.png' }),
+        },
+      });
+
+      // LoveNoteMessage prefers imagePreviewUrl over the signed Storage URL and
+      // puts it straight into an <img src>, so the field surviving the wire is
+      // a request to the attacker's host.
+      const stored = vi.mocked(mockStoreState.addNote as (n: unknown) => void).mock.calls[0][0];
+      expect(stored).not.toHaveProperty('imagePreviewUrl');
+      expect(onNewMessage).toHaveBeenCalledWith(expect.not.objectContaining({ imagePreviewUrl: expect.anything() }));
+    });
+
+    it('drops a note whose sender is not the partner', async () => {
+      const onNewMessage = vi.fn();
+      const emit = await mountAndCaptureBroadcast(onNewMessage);
+
+      await emit({ payload: { message: validNote({ from_user_id: OUTSIDER_ID }) } });
+
+      expect(mockStoreState.addNote).not.toHaveBeenCalled();
+      expect(onNewMessage).not.toHaveBeenCalled();
+    });
+
+    it('drops a note addressed to somebody else', async () => {
+      const onNewMessage = vi.fn();
+      const emit = await mountAndCaptureBroadcast(onNewMessage);
+
+      await emit({ payload: { message: validNote({ to_user_id: OUTSIDER_ID }) } });
+
+      expect(mockStoreState.addNote).not.toHaveBeenCalled();
+      expect(onNewMessage).not.toHaveBeenCalled();
+    });
+
+    it('drops a malformed or non-object payload without throwing', async () => {
+      const onNewMessage = vi.fn();
+      const emit = await mountAndCaptureBroadcast(onNewMessage);
+
+      await emit({ payload: { message: { content: 'no id' } } });
+      await emit({ payload: { message: 'not an object' } });
+      await emit({ payload: null });
+      await emit(undefined);
+
+      expect(mockStoreState.addNote).not.toHaveBeenCalled();
+      expect(onNewMessage).not.toHaveBeenCalled();
     });
   });
 });

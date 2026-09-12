@@ -18,7 +18,8 @@ import { sendEphemeralBroadcast } from './ephemeralBroadcast';
 import { handleNetworkError, isOnline } from './errorHandlers';
 import { waitForSocketReady } from './realtimeSocket';
 import { moodApi } from './moodApi';
-import { getPartnerId, supabase } from './supabaseClient';
+import { getPartnerId, getSignedInUserId, supabase } from './supabaseClient';
+import { parseMoodBroadcast } from './validation/broadcastSchemas';
 import type { MoodInsert, SupabaseMood } from './validation/supabaseSchemas';
 
 /**
@@ -49,6 +50,22 @@ interface MoodChannelEntry {
    * the channel is already open — their callback would otherwise never fire.
    */
   lastStatus: string | null;
+  /**
+   * The account this topic belongs to: the signed-in user at the moment the
+   * channel was opened. Compared against the live session on every
+   * `SUBSCRIBED` so that a channel outliving its account stops dispatching.
+   */
+  ownerUserId: string;
+  /**
+   * Who is allowed to broadcast here, snapshotted at join and refreshed on
+   * `SUBSCRIBED`.
+   *
+   * RLS on `realtime.messages` is evaluated at join and cached until the JWT
+   * refreshes, so it cannot catch a relationship that ends mid-session — this
+   * snapshot is what does. `null` drops every broadcast, which is the wanted
+   * behaviour for an unlinked or signed-out account.
+   */
+  partnerId: string | null;
 }
 
 /**
@@ -187,8 +204,13 @@ class MoodSyncService {
   /**
    * Broadcast a mood update to partner's channel
    *
-   * Uses Supabase Broadcast API (client-to-client messaging) which
-   * doesn't require RLS permissions. Called after successful mood sync.
+   * Uses the Supabase Broadcast API (client-to-client messaging) over a
+   * PRIVATE topic, so it is authorized: the INSERT policy
+   * `couple_broadcast_partner_can_send` on `realtime.messages` admits a send
+   * only to the caller's current partner's topic. The send goes over the REST
+   * broadcast endpoint and never joins a channel, so an unlinked or signed-out
+   * caller is rejected by that request — `httpSend` answers 403 and rejects
+   * with `Unauthorized`. Called after a successful mood sync.
    *
    * @param mood - The synced mood record from Supabase
    * @param partnerId - Partner's user ID to broadcast to
@@ -411,6 +433,38 @@ class MoodSyncService {
   }
 
   /**
+   * Re-resolve who this channel is allowed to hear from
+   *
+   * Called on every `SUBSCRIBED`, which includes a reconnect: a channel can
+   * outlive both the relationship it was opened for and the account that
+   * opened it.
+   *
+   * The account check comes first. If the device is now signed in as someone
+   * else — or signed out — the topic belongs to a user this session no longer
+   * is, so nothing arriving on it can be authorized. A null snapshot is the
+   * drop: `parseMoodBroadcast` rejects every payload without a partner id.
+   */
+  private async refreshChannelIdentity(entry: MoodChannelEntry): Promise<void> {
+    // Cleared BEFORE the first await, not after the last. Two round-trips pass
+    // between here and the new value, and a broadcast arriving in that window
+    // would otherwise be authorized against the snapshot being replaced — the
+    // ex-partner, which is exactly who this refresh exists to stop.
+    entry.partnerId = null;
+
+    const signedInUserId = await getSignedInUserId();
+
+    if (signedInUserId !== entry.ownerUserId) {
+      logger.debug(
+        '[MoodSyncService] Signed-in account changed under a mood channel; dropping its broadcasts'
+      );
+      // Already null from the clear above, and nothing has assigned since.
+      return;
+    }
+
+    entry.partnerId = await getPartnerId();
+  }
+
+  /**
    * Subscribe to real-time partner mood updates via Broadcast API
    *
    * Listens for broadcast events on the current user's mood-updates channel.
@@ -460,6 +514,17 @@ class MoodSyncService {
     const topic = `mood-updates:${currentUserId}`;
     logger.debug(`[MoodSyncService] Subscribing to ${topic}`);
 
+    // Both awaits sit here, ahead of the channel bookkeeping, on purpose: the
+    // block that creates the entry below must stay free of awaits or two
+    // concurrent subscribers can both miss and both open a channel.
+    //
+    // The partner snapshot is what every incoming broadcast is checked against.
+    const partnerIdAtJoin = await getPartnerId();
+    // Private channels are authorized against the caller's JWT, which Realtime
+    // reads from the socket's access token. Without this the join carries the
+    // anon key and the SELECT policy denies it.
+    await supabase.realtime.setAuth();
+
     const subscriber: MoodSubscriber = { onMood: callback, onStatus: onStatusChange };
 
     let entry = this.moodChannels.get(topic);
@@ -498,27 +563,33 @@ class MoodSyncService {
         channel: undefined as unknown as MoodChannelEntry['channel'],
         subscribers,
         lastStatus: null,
+        ownerUserId: currentUserId,
+        partnerId: partnerIdAtJoin,
       };
 
       const channel = supabase
         .channel(topic, {
           config: {
             broadcast: { self: false }, // Don't receive own broadcasts
+            // Authorized by the SELECT policy `couple_broadcast_recipient_can_receive`
+            // on `realtime.messages`: receive only on your own topic. Public
+            // joins to this topic used to let anyone holding the anon key read
+            // and forge a couple's moods.
+            private: true,
           },
         })
         .on('broadcast', { event: 'new_mood' }, (payload) => {
           logger.debug('[MoodSyncService] Received partner mood broadcast:', payload);
 
-          // Transform broadcast payload to SupabaseMoodRecord format
-          const mood: SupabaseMoodRecord = {
-            id: payload.payload.id,
-            user_id: payload.payload.user_id,
-            mood_type: payload.payload.mood_type,
-            mood_types: payload.payload.mood_types,
-            note: payload.payload.note,
-            created_at: payload.payload.created_at,
-            updated_at: payload.payload.created_at, // Use created_at as fallback
-          };
+          // The identity check lives HERE rather than in each consumer.
+          // usePartnerMood already filtered on the sender, but PartnerMoodView
+          // raised a toast for any broadcast at all — so a malformed or
+          // non-partner payload has to be dropped where both of them share it.
+          const mood = parseMoodBroadcast(payload?.payload, { partnerId: newEntry.partnerId });
+          if (!mood) {
+            logger.debug('[MoodSyncService] Dropped an unauthorized or malformed mood broadcast');
+            return;
+          }
 
           // Snapshot first: a consumer may unsubscribe from inside its own
           // handler, and that mutates the set being iterated.
@@ -528,6 +599,18 @@ class MoodSyncService {
           logger.debug('[MoodSyncService] Broadcast subscription status:', status);
 
           newEntry.lastStatus = status;
+
+          // A join is also a re-join: Realtime re-evaluates RLS here, and the
+          // relationship may have changed since the channel was first opened.
+          if (status === 'SUBSCRIBED') {
+            // Caught, not merely voided: a failed lookup leaves the snapshot
+            // null, which drops broadcasts until the next SUBSCRIBED — the safe
+            // direction — and must not surface as an unhandled rejection.
+            void this.refreshChannelIdentity(newEntry).catch((error) => {
+              logger.debug('[MoodSyncService] Mood channel identity refresh failed:', error);
+            });
+          }
+
           Array.from(subscribers).forEach((s) => s.onStatus?.(status));
         });
 
@@ -540,6 +623,13 @@ class MoodSyncService {
       // it rather than opening a second one.
       this.moodChannels.set(topic, entry);
     }
+
+    // The lookup above ran for every caller, so use it for every caller. A
+    // consumer attaching to an already-open channel would otherwise pay for a
+    // `users` round-trip nobody reads — and, worse, an entry whose snapshot was
+    // nulled by a failed refresh or a vanished session would never recover, and
+    // would silently drop every partner mood for the life of the page.
+    entry.partnerId = partnerIdAtJoin;
 
     entry.subscribers.add(subscriber);
 
