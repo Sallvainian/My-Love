@@ -71,6 +71,15 @@ deferred: []
 ## Tasks & Acceptance
 
 **Execution:**
+
+**Start from the previous attempt, not from scratch.** The first run's implementation is committed at `_bmad-output/implementation-artifacts/story-4-guard-photo-continuations.attempted.patch` (731 lines, touching `src/stores/slices/photosSlice.ts` and `tests/unit/stores/loaderIdentityGuards.test.ts`). It applies **forward** cleanly onto this story's baseline — `git apply --check` on that patch exits 0, measured at commit `94e25194` on `fix/security-remediation`. Begin by applying it:
+
+```
+git apply _bmad-output/implementation-artifacts/story-4-guard-photo-continuations.attempted.patch
+```
+
+Then **verify and correct** the applied change against the corrected intent above — do not re-implement it. The attempt was reverted for the compression-scope intent gap, which the Spec Change Log now resolves in the attempt's favour: it already confined itself to `photosSlice.ts` and already excluded the compression window, so its scope matches the resolved decision. Treat the bullets below as the checklist to verify the applied diff against, and work the open `[patch]` findings in the **Review Triage Log** — in particular the `[medium]` one recording that the `authSessionVersion` conjunct of `ownsDelete`/`ownsUpdate` is pinned by no test (proved by mutation: weakening either closure to a `userId`-only compare left the suite at 78 passed). Re-run the full **Verification** section on the corrected tree regardless of how little changes.
+
 - `src/stores/slices/photosSlice.ts` — edit `uploadPhoto` — capture `{ userId: requestedBy, authSessionVersion: requestedInSession }` before the first `set()`, add a local `ownsUpload()` predicate, and gate all six post-await writes on it (including the `onProgress` arrow at `:97`). Use `requestedBy` instead of `get().userId` for `isOwn`. Stale paths still `return` the real result. Update the slice docblock to record the cross-slice dependency on `authSlice` that this introduces.
 - `src/stores/slices/photosSlice.ts` — edit `deletePhoto` and `updatePhoto` — same capture and the same recheck before their success and catch writes. See **Design Notes** for why `updatePhoto` is in scope alongside the two actions `remediation.md` names.
 - `tests/unit/stores/loaderIdentityGuards.test.ts` — edit — extend the `photoService` mock with the four new methods; add `describe('uploadPhoto')`, `describe('deletePhoto')` and `describe('updatePhoto')` blocks covering every stale row of the I/O matrix, plus a `signs back in as the same account` case that drives `clearAuth()` + `setAuthUser(A)` (the only row `switchToUserC` cannot express, and the one that discriminates the `authSessionVersion` half of the guard). Seed C's own `photos`/`error` first, so a guard that fails to discard is caught by C's data being overwritten. Add the same-account success, failure-then-retry and progress rows to the existing `when the identity has not changed` block.
@@ -91,6 +100,7 @@ deferred: []
 - **Decision (Sallvain):** the compression window is out of scope. `SPEC.md` CAP-12 **success** is authoritative over `remediation.md`'s former "Pause compression/…" clause: only a continuation of A's that changes B's gallery, error or loading state is in scope. An upload whose compression outlives the session proceeds as the newly signed-in account's own upload, correctly attributed and authorized. Rationale: the app is two people on separate phones, and the window is about one second after tapping a photo.
 - **Scope:** `src/stores/slices/photosSlice.ts` only. `PhotoUpload.tsx` and `PhotoUploader.tsx` are not widened into.
 - **Encoded at:** the new **Never** bullet in `<intent-contract>`, and `remediation.md` → F12 → **Out of scope — the compression window** (whose `**Regression evidence:**` line no longer names compression as a pause point).
+- **The first attempt is preserved and is the starting point.** Its diff is committed at `_bmad-output/implementation-artifacts/story-4-guard-photo-continuations.attempted.patch` and applies forward cleanly (`git apply --check` exit 0 at `94e25194`). See **Tasks & Acceptance → Execution**; the re-drive applies and corrects it rather than re-implementing.
 - Supersedes the two `[intent_gap]` findings in the Review Triage Log below and the open questions under **Auto Run Result**; both are closed by this decision. The `[low]` `[patch]` finding about the residual risk having no ledger entry is closed too — the behaviour is recorded in `remediation.md` as accepted, not deferred.
 
 ## Review Triage Log
