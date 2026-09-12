@@ -1,0 +1,27 @@
+{
+  "detected_stack": "frontend",
+  "total_tests": 2,
+  "api_tests": 1,
+  "e2e_tests": 1,
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 2,
+    "P2": 0,
+    "P3": 0
+  },
+  "fixtures_created": 0,
+  "fixtures_reused": [
+    "coupleEvents",
+    "authToken",
+    "partnerAuthToken",
+    "page",
+    "apiRequest",
+    "interceptNetworkCall",
+    "recurse",
+    "network-error-monitor"
+  ],
+  "subagent_execution": "subagent",
+  "performance_gain": "Not measured; API and E2E generation ran concurrently.",
+  "playwright_utils_deviations": [],
+  "data_factories_created": 1
+}

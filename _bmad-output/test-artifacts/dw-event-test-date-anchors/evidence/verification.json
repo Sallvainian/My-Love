@@ -1,0 +1,51 @@
+{
+  "status": "passed",
+  "new_tests": {
+    "P1": 2,
+    "API": 1,
+    "E2E": 1,
+    "passed": 2
+  },
+  "playwright": {
+    "total": 24,
+    "passed": 24,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "duration_ms": 86980.926,
+    "new_api_duration_ms": 449,
+    "new_e2e_duration_ms": 5371
+  },
+  "unit": {
+    "total": 16,
+    "passed": 16,
+    "duration_ms": 380
+  },
+  "checks": [
+    {
+      "command": "python3 _bmad-output/test-artifacts/dw-event-test-date-anchors/run.py npm run typecheck",
+      "exit_code": 0,
+      "evidence": "typecheck.txt"
+    },
+    {
+      "command": "python3 _bmad-output/test-artifacts/dw-event-test-date-anchors/run.py npm run lint",
+      "exit_code": 0,
+      "evidence": "lint.txt",
+      "existing_warnings": 3
+    },
+    {
+      "command": "npm run test:unit -- tests/unit/helpers/events.test.ts",
+      "exit_code": 0,
+      "evidence": "unit.txt"
+    },
+    {
+      "command": "python3 _bmad-output/test-artifacts/dw-event-test-date-anchors/run.py npx playwright test tests/api/event-test-date-anchors.spec.ts tests/e2e/settings/event-test-date-anchors.spec.ts tests/api/events-wire-contract.spec.ts tests/e2e/home/events.spec.ts tests/e2e/settings/events-crud.spec.ts tests/e2e/settings/events-persistence.spec.ts --project=api --project=chromium --workers=1 --reporter=json",
+      "exit_code": 0,
+      "evidence": "playwright.json"
+    }
+  ],
+  "auto_heal_failures": false,
+  "healing_iterations": 0,
+  "coverage_percentage": "not measured: no production code changed",
+  "node_version": "v24.19.0"
+}

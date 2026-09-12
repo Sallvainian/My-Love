@@ -620,7 +620,9 @@ location: tests/support/helpers/events.ts:179
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: `isoDateDaysFromNow` creates a fresh `Date` on every call. Multi-row tests call it repeatedly, so a run spanning midnight could produce dates based on different days. The older factory avoids this by accepting one shared anchor, but consolidating these helper APIs is outside the bundle's explicit move-and-rewire surface.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-event-test-date-anchors
+resolution-undo: 97b97851d902cda684f6d7a952dfa833a050c31e1b11ef4ff6bbc3cda802a21c 2026-09-12 7374617475733a206f70656e
 
 ### DW-62: Historical story acceptance criteria AC4 and AC6 still pin obsolete test totals and the pre-activation file boundary.
 origin: spec-deferred 0bff1e60324b
@@ -648,7 +650,9 @@ location: tests/support/helpers/events.ts:177
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: `isoDateDaysFromNow` creates a new `Date` on each invocation. A multi-row setup that crosses local midnight can therefore derive rows from different base days. The anchored `coupleEvents` factory avoids this, but consolidating both helper contracts is separate work.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-event-test-date-anchors
+resolution-undo: 97b97851d902cda684f6d7a952dfa833a050c31e1b11ef4ff6bbc3cda802a21c 2026-09-12 7374617475733a206f70656e
 
 ### DW-65: Story 5 acceptance criteria AC4 and AC6 describe the pre-activation test totals and file boundary.
 origin: spec-deferred 7792fe01375e
@@ -696,7 +700,9 @@ location: tests/support/helpers/events.ts:177
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: `isoDateDaysFromNow` creates a new `Date` for every call. Multi-row setup in the activated API and E2E suites invokes it repeatedly, so a batch crossing local midnight can receive dates derived from different calendar anchors.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-event-test-date-anchors
+resolution-undo: 97b97851d902cda684f6d7a952dfa833a050c31e1b11ef4ff6bbc3cda802a21c 2026-09-12 7374617475733a206f70656e
 
 ### DW-70: The anonymous-write isolation check can fail on a stale row from an interrupted prior run.
 origin: spec-deferred 1f8f5181ea11
@@ -822,3 +828,11 @@ severity: medium
 reason: The unchanged submit handler uses trimmedLabel.length and trimmedDescription.length. Measured 100 repeated emoji have JavaScript length 200 and PostgreSQL char_length 100, so the form rejects some values admitted by the existing database CHECK. This predates this bundle, which explicitly preserves production validation. The new boundary tests characterize the existing limits with ASCII and do not establish Unicode equivalence.
 status: open
 decision: 2026-09-12 Match PostgreSQL character counts — Count Unicode code points in the event form's trimmed label and description validation while retaining the existing 100/500 database limits, icons, and trimming behavior. Align any counters or input restrictions with that rule and add exact-limit and limit-plus-one tests using supplementary-plane emoji and combining characters for the shared add/edit submission path. Keep the database schema unchanged and verify the form accepts the same character counts as PostgreSQL.
+
+### DW-84: The helper's existing time-of-day arithmetic can skip a calendar day in a late-evening DST gap.
+origin: spec-deferred 7ad2fd885b7b
+location: tests/support/helpers/events.ts:180
+source_spec: `spec-dw-61-64-69-event-test-date-anchors.md`
+severity: low
+reason: Reproduced with TZ=America/Nuuk: local 2026-03-27 23:30 plus one day using the helper's unchanged setDate arithmetic yields 2026-03-29, while eventDateFrom's local-midnight constructor yields 2026-03-28. The target 23:30 falls in a skipped DST hour. Baseline revision 6afb20e2b69485307ecb25fac7c59f0e86ab45af uses the same time-preserving arithmetic, so this is a pre-existing calendar issue rather than the independent-clock defect resolved by this bundle. Current unit coverage runs in America/New_York, where its spring/fall DST cases pass.
+status: open
