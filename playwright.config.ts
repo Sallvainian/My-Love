@@ -71,6 +71,11 @@ try {
   process.env.SUPABASE_URL ??= vars.API_URL;
   process.env.SUPABASE_SERVICE_ROLE_KEY ??= serviceRoleKey;
   process.env.SUPABASE_ANON_KEY ??= anonKey;
+  // The local mail catcher, so a spec can read a real auth email. Assigned only
+  // when the parse actually found it: `process.env.X ??= undefined` stores the
+  // STRING "undefined", which is truthy, so a spec's `test.skip(!MAILPIT_URL)`
+  // would not fire and it would fetch against a host named "undefined" instead.
+  if (vars.MAILPIT_URL) process.env.MAILPIT_URL ??= vars.MAILPIT_URL;
 
   // Force-set VITE_ variants so the Vite dev server connects to local Supabase.
   // Must use `=` (not `??=`) because fnox may inject production values

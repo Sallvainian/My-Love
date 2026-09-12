@@ -59,7 +59,22 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true, // Enable OAuth callback detection
+      // Accept a callback only for a flow this browser started. With PKCE the
+      // SDK takes a `?code=` back only when a code verifier this browser wrote
+      // is in its storage, and refuses a `#access_token=...` fragment outright
+      // -- before any network call and without touching the stored session --
+      // so a link carrying someone else's tokens cannot establish or replace
+      // the session here.
+      //
+      // "a verifier", not "the matching verifier": our redirects carry no
+      // `sb_flow_id`, so the exchange reads the SDK's single legacy slot, which
+      // every new flow overwrites. Two sign-ins started concurrently in
+      // different tabs therefore leave the first one unredeemable -- it fails
+      // closed, and retrying signs in. Enabling the SDK's per-flow slots would
+      // append that parameter to the redirect URL and risk the project's
+      // exact-match allow list, which is why it stays off.
+      detectSessionInUrl: true,
+      flowType: 'pkce',
     },
     realtime: {
       params: {
