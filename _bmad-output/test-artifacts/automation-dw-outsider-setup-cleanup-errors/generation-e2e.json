@@ -1,0 +1,47 @@
+{
+  "success": true,
+  "subagent": "e2e-tests",
+  "tests": [
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/e2e-outsider-reporting.spec.ts",
+      "content": "import { test, expect } from '../../../tests/support/merged-fixtures';\nimport { log } from '@seontechnologies/playwright-utils';\nimport { runReporterProbe } from './support-reporter-probe';\nimport { nodeOnlyFixtures } from './support-node-only';\n\n// These journeys exercise the actual Playwright runner and repository reporter.\n// The helper runs in Node, so product navigation and authenticated users add no coverage.\ntest.use(nodeOnlyFixtures);\ntest.setTimeout(60_000);\n\nconst cleanupFailures = [\n  { kind: 'returned-error', label: 'returned AuthError' },\n  { kind: 'rejected-string', label: 'rejected string' },\n  { kind: 'rejected-object', label: 'rejected object' },\n] as const;\n\ntest.describe('Outsider setup and cleanup diagnostics through Playwright reporting', () => {\n  for (const failure of cleanupFailures) {\n    test(`[P1] preserves both failures in JSON and Markdown for ${failure.label}`, async (\n      {},\n      testInfo\n    ) => {\n      await log.step(`Run an isolated failing helper with ${failure.label} cleanup`);\n      const probe = await runReporterProbe(failure.kind, testInfo.outputPath('probe'));\n\n      // The child deliberately fails once; this outer test verifies its real reporters.\n      expect(probe.exitCode, probe.stderr || probe.stdout).toBe(1);\n      expect(probe.report.stats).toMatchObject({\n        expected: 0,\n        unexpected: 1,\n        skipped: 0,\n        flaky: 0,\n      });\n\n      await log.step('Verify the same aggregate failure contains both diagnostics');\n      const aggregate = probe.errors.find(({ message }) =>\n        message?.includes('Failed to set up and clean up outsider account')\n      );\n      expect(aggregate, 'JSON report must retain the outsider aggregate failure').toBeDefined();\n      expect(aggregate?.message).toContain('Setup:');\n      expect(aggregate?.message).toContain('Cleanup:');\n      expect(probe.markdown).toContain('**1 failed** out of 1 tests');\n\n      for (const detail of [probe.userId, probe.setupMessage, probe.cleanupMessage]) {\n        expect(detail, 'The fixture must provide a nonempty expected diagnostic').not.toBe('');\n        expect(aggregate?.message).toContain(detail);\n        expect(probe.markdown).toContain(detail);\n      }\n    });\n  }\n});\n",
+      "description": "Three runner/reporting E2E cases verify the actual Playwright JSON reporter and repository failure-summary reporter preserve outsider account ID plus setup and cleanup details for returned AuthError, rejected string, and rejected object cleanup failures.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 3,
+        "P2": 0,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    "support-node-only.ts: shared fixture override passed to existing merged test.use",
+    "support-reporter-probe.ts: runReporterProbe(kind, outputDirectory), awaits real child and reads JSON/Markdown",
+    "probe/failure-probe.spec.ts and probe/playwright.config.ts: isolated one-case intentional failure"
+  ],
+  "knowledge_fragments_used": [
+    "playwright-utils-mandate",
+    "library-integration-mandate",
+    "overview",
+    "api-request",
+    "network-recorder",
+    "auth-session",
+    "intercept-network-call",
+    "recurse",
+    "log",
+    "file-utils",
+    "burn-in",
+    "network-error-monitor",
+    "fixtures-composition"
+  ],
+  "playwright_utils_deviations": [
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/support-node-only.ts",
+      "line": 1,
+      "reason": "these Node SDK/reporting tests have no browser"
+    }
+  ],
+  "test_count": 3,
+  "summary": "3 P1 real worker/reporter E2E tests generated and validated; see README.md and story automation summary for final results and fixture contract.",
+  "validation_corrections": "Final contents after installed logging API/typecheck corrections. Shared Node-only fixture: support-node-only.ts. Runtime and typecheck passed."
+}

@@ -1,0 +1,53 @@
+{
+  "success": true,
+  "subagent": "api-tests",
+  "tests": [
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+      "content": "import { AuthApiError } from '@supabase/supabase-js';\nimport { log } from '@seontechnologies/playwright-utils';\nimport { test, expect } from '../../../tests/support/merged-fixtures';\nimport { createOutsiderClient } from '../../../tests/support/helpers/rls-security';\nimport { withAuthServer } from './support-outsider-cleanup';\nimport { nodeOnlyFixtures } from './support-node-only';\n\n// playwright-utils deviation: Node SDK traffic has no page; disable the browser monitor's page dependency.\ntest.use(nodeOnlyFixtures);\n\nconst intentionalAuthFailure = {\n  annotation: [{ type: 'skipNetworkMonitoring', description: 'Loopback Auth faults are the inputs under test.' }],\n};\n\ntest.describe('DW-71 outsider cleanup across the Supabase Auth HTTP boundary', () => {\n  test('[P1] DW71-API-001 preserves setup and returned deletion errors from the real SDK', intentionalAuthFailure, async () => {\n    await log.step('Reject password sign-in and account deletion at an isolated Auth server');\n    await withAuthServer('denied', async ({ admin, userId, requests, setupMessage, cleanupMessage }) => {\n      // playwright-utils deviation: invoke the SDK under test; apiRequest/authToken would bypass Auth error conversion.\n      const failure = await createOutsiderClient(admin, 'dw71-api-denied').catch((error: unknown) => error);\n\n      expect(failure).toBeInstanceOf(AggregateError);\n      const aggregate = failure as AggregateError;\n      expect(aggregate.errors).toHaveLength(2);\n      const [setupFailure, cleanupFailure] = aggregate.errors;\n      expect(setupFailure).toBeInstanceOf(Error);\n      expect(setupFailure).not.toBeInstanceOf(AggregateError);\n      expect(setupFailure.message).toBe(`Failed to sign in as ${userId}: ${setupMessage}`);\n      expect(cleanupFailure).toBeInstanceOf(AuthApiError);\n      expect(cleanupFailure).toMatchObject({\n        status: 403,\n        code: 'not_admin',\n        message: cleanupMessage,\n      });\n      expect(aggregate.cause).toBe(cleanupFailure);\n      expect(aggregate.message).toContain(userId);\n      expect(aggregate.message).toContain(`Setup: Error: ${setupFailure.message}`);\n      expect(aggregate.message).toContain(`Cleanup: AuthApiError: ${cleanupMessage}`);\n      expect(requests).toEqual([\n        { method: 'POST', path: '/auth/v1/admin/users' },\n        { method: 'GET', path: `/auth/v1/admin/users/${userId}` },\n        { method: 'POST', path: '/auth/v1/token?grant_type=password' },\n        { method: 'DELETE', path: `/auth/v1/admin/users/${userId}` },\n      ]);\n    });\n  });\n\n  test('[P1] DW71-API-002 returns only the setup error after the SDK confirms deletion', intentionalAuthFailure, async () => {\n    await log.step('Reject password sign-in, then successfully delete the created outsider');\n    await withAuthServer('success', async ({ admin, userId, requests, setupMessage, cleanupMessage }) => {\n      // playwright-utils deviation: invoke the SDK under test; apiRequest/authToken would bypass Auth error conversion.\n      const failure = await createOutsiderClient(admin, 'dw71-api-success').catch((error: unknown) => error);\n\n      expect(failure).toBeInstanceOf(Error);\n      expect(failure).not.toBeInstanceOf(AggregateError);\n      expect(failure).toHaveProperty('message', `Failed to sign in as ${userId}: ${setupMessage}`);\n      expect(failure).not.toHaveProperty('errors');\n      expect(failure).not.toHaveProperty('cause');\n      expect((failure as Error).message).not.toContain(cleanupMessage);\n      expect(requests).toEqual([\n        { method: 'POST', path: '/auth/v1/admin/users' },\n        { method: 'GET', path: `/auth/v1/admin/users/${userId}` },\n        { method: 'POST', path: '/auth/v1/token?grant_type=password' },\n        { method: 'DELETE', path: `/auth/v1/admin/users/${userId}` },\n      ]);\n    });\n  });\n});\n",
+      "description": "Two P1 real-Supabase-SDK Auth HTTP integration cases using an isolated loopback server: returned deletion AuthError and successful cleanup after failed sign-in.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 2,
+        "P2": 0,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    "support-node-only.ts: shared fixture override passed to existing merged test.use",
+    "support-outsider-cleanup.ts: withAuthServer(outcome, callback), real SDK against loopback Auth; env/socket cleanup in finally"
+  ],
+  "knowledge_fragments_used": [
+    "playwright-utils-mandate",
+    "library-integration-mandate"
+  ],
+  "playwright_utils_deviations": [
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+      "line": 8,
+      "reason": "Node SDK traffic has no page; disable the browser monitor's page dependency."
+    },
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+      "line": 19,
+      "reason": "invoke the SDK under test; apiRequest/authToken would bypass Auth error conversion."
+    },
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+      "line": 51,
+      "reason": "invoke the SDK under test; apiRequest/authToken would bypass Auth error conversion."
+    }
+  ],
+  "pactjs_utils_deviations": [],
+  "provider_scrutiny": "not_applicable_no_pact_artifacts",
+  "provider_files_read": [
+    "tests/support/helpers/rls-security.ts",
+    "tests/unit/helpers/rls-security.test.ts",
+    "/Users/sallvain/Projects/My-Love/node_modules/@supabase/auth-js/src/lib/fetch.ts",
+    "/Users/sallvain/Projects/My-Love/node_modules/@supabase/auth-js/src/GoTrueAdminApi.ts"
+  ],
+  "test_count": 2,
+  "summary": "2 P1 real SDK/API integration tests generated and validated; see README.md and story automation summary for final results and fixture contract.",
+  "validation_corrections": "Final contents after installed logging API/typecheck corrections. Shared Node-only fixture: support-node-only.ts. Runtime and typecheck passed."
+}
