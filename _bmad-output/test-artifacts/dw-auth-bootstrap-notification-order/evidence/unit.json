@@ -1,0 +1,36 @@
+{
+  "command": [
+    "npx",
+    "vitest",
+    "run",
+    "tests/unit/App.eventsSession.test.tsx",
+    "src/api/auth/__tests__/authServices.test.ts",
+    "tests/unit/stores/signOutClearsAccountState.test.ts"
+  ],
+  "exit_code": 0,
+  "duration_seconds": 2.09,
+  "suites": [
+    {
+      "name": "tests/unit/App.eventsSession.test.tsx",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "tests/unit/stores/signOutClearsAccountState.test.ts",
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "src/api/auth/__tests__/authServices.test.ts",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "tests_total": 59
+}
