@@ -1,0 +1,14 @@
+[
+  {
+    "path": "tests/support/factories/event-helper-calendar-day-offsets.ts",
+    "status": "removed"
+  },
+  {
+    "path": "tests/e2e/settings/event-helper-calendar-day-offsets.spec.ts",
+    "status": "removed"
+  },
+  {
+    "path": "tests/api/event-helper-calendar-day-offsets.spec.ts",
+    "status": "removed"
+  }
+]

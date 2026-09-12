@@ -1,0 +1,14 @@
+{
+  "head": "e01b8bc4f09cd88bd7ba8f8b461c4c99e472cf19",
+  "baseline": "8abeb6a2da4d61245864e1674ca7b0de946e4e94",
+  "initial_status": " M _bmad-output/implementation-artifacts/deferred-work.md\n",
+  "protected_sha256": {
+    "_bmad-output/implementation-artifacts/deferred-work.md": "4243e2abda8bd2e476be3d788e3eb20270e317cf2e46a57fe8f655842a8caa51",
+    "tests/support/helpers/events.ts": "48c2229ddf41c39acd2948ea934ca8cbb3edb647b702b9eaf37e341986277ed3",
+    "tests/unit/helpers/events.test.ts": "55a04fa93378f49c7000c6821f3d0ec045314e00ac6793499d9fa79af015efb3",
+    "tests/support/factories/events.ts": "2b397dcb801f61fa239ed5eac34d50ebfd2165734ae55e201dbefd134c299569",
+    "playwright.config.ts": "a4b7b87d738e21345a46eb7b790b58ac22ec10953ae4caa63b66f573d688f86a",
+    "vitest.config.ts": "58176f86fefe71c6014b5cda6fd77846902f8dbf39866f7b432492b9019455bf",
+    "package.json": "4efc7236f38533650a6f89bff166e6347c7afad1f81a690dba21c9d0c52baf7c"
+  }
+}

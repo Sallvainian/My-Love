@@ -1,0 +1,235 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/probe/playwright.config.ts"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/probe/playwright.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/tests/support/auth/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/utf16-probe",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/evidence/utf16-probe-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": {
+      "command": "npx vite --config _bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/probe/vite.config.ts --mode test --host 127.0.0.1 --port 5183 --strictPort",
+      "cwd": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/",
+      "url": "http://127.0.0.1:5183",
+      "reuseExistingServer": false,
+      "timeout": 120000,
+      "stdout": "pipe"
+    }
+  },
+  "suites": [
+    {
+      "title": "e2e/events-unicode.spec.ts",
+      "file": "e2e/events-unicode.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Unicode event character limits",
+          "file": "e2e/events-unicode.spec.ts",
+          "line": 115,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] DW83-E2E-001 add emoji then edit decomposed at both limits",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 15989,
+                      "error": {
+                        "message": "NetworkTimeoutError: Request timeout while observing network call",
+                        "stack": "NetworkTimeoutError: Request timeout while observing network call\n    at observeNetworkCall (/Users/sallvain/Projects/My-Love/node_modules/@seontechnologies/playwright-utils/src/intercept-network-call/core/observe-network-call.ts:68:13)\n    at /Users/sallvain/Projects/My-Love/node_modules/@seontechnologies/playwright-utils/src/intercept-network-call/intercept-network-call.ts:108:20\n    at submitEvent (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts:63:18)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts:131:23",
+                        "location": {
+                          "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts",
+                          "column": 18,
+                          "line": 63
+                        },
+                        "snippet": "  61 |   const write = interceptNetworkCall({ method, url: EVENTS_URL });\n  62 |   await page.getByTestId('events-form-submit').click();\n> 63 |   const result = await write;\n     |                  ^\n  64 |   expect(result.status).toBe(method === 'POST' ? 201 : 200);\n  65 |   const rows = method === 'POST'\n  66 |     ? [EventRowSchema.parse(result.responseJson)]"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts",
+                            "column": 18,
+                            "line": 63
+                          },
+                          "message": "NetworkTimeoutError: Request timeout while observing network call\n\n  61 |   const write = interceptNetworkCall({ method, url: EVENTS_URL });\n  62 |   await page.getByTestId('events-form-submit').click();\n> 63 |   const result = await write;\n     |                  ^\n  64 |   expect(result.status).toBe(method === 'POST' ? 201 : 200);\n  65 |   const rows = method === 'POST'\n  66 |     ? [EventRowSchema.parse(result.responseJson)]\n    at observeNetworkCall (/Users/sallvain/Projects/My-Love/node_modules/@seontechnologies/playwright-utils/src/intercept-network-call/core/observe-network-call.ts:68:13)\n    at /Users/sallvain/Projects/My-Love/node_modules/@seontechnologies/playwright-utils/src/intercept-network-call/intercept-network-call.ts:108:20\n    at submitEvent (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts:63:18)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts:131:23"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[12:42:22] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[12:42:22] \u001b[1m\u001b[36m==== Given an empty event list and padded Unicode text at both limits ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:42:23] \u001b[1m\u001b[36m==== Polling: Wait for the initial events snapshot ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:42:23] \u001b[1m\u001b[36m==== ✅ Wait for the initial events snapshot - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[12:42:23] \u001b[1m\u001b[36m==== When Add persists the exact trimmed text, then reload restores its edit values ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Given an empty event list and padded Unicode text at both limits",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe GET **/rest/v1/events*",
+                          "duration": 472,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe GET **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Polling: Wait for the initial events snapshot",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for the initial events snapshot - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "When Add persists the exact trimmed text, then reload restores its edit values",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Observe POST **/rest/v1/events*",
+                          "duration": 15004,
+                          "error": {
+                            "message": "NetworkTimeoutError: Request timeout while observing network call",
+                            "stack": "NetworkTimeoutError: Request timeout while observing network call\n    at observeNetworkCall (/Users/sallvain/Projects/My-Love/node_modules/@seontechnologies/playwright-utils/src/intercept-network-call/core/observe-network-call.ts:68:13)\n    at /Users/sallvain/Projects/My-Love/node_modules/@seontechnologies/playwright-utils/src/intercept-network-call/intercept-network-call.ts:108:20\n    at submitEvent (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts:63:18)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts:131:23",
+                            "location": {
+                              "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts",
+                              "column": 18,
+                              "line": 63
+                            },
+                            "snippet": "  61 |   const write = interceptNetworkCall({ method, url: EVENTS_URL });\n  62 |   await page.getByTestId('events-form-submit').click();\n> 63 |   const result = await write;\n     |                  ^\n  64 |   expect(result.status).toBe(method === 'POST' ? 201 : 200);\n  65 |   const rows = method === 'POST'\n  66 |     ? [EventRowSchema.parse(result.responseJson)]"
+                          }
+                        }
+                      ],
+                      "startTime": "2026-09-12T12:42:22.325Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/utf16-probe/events-unicode-Unicode-eve-afab6-t-decomposed-at-both-limits-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/utf16-probe/events-unicode-Unicode-eve-afab6-t-decomposed-at-both-limits-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/test-results/utf16-probe/events-unicode-Unicode-eve-afab6-t-decomposed-at-both-limits-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-events-unicode-character-limits/_bmad-output/test-artifacts/automation-dw-events-unicode-character-limits/e2e/events-unicode.spec.ts",
+                        "column": 18,
+                        "line": 63
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d886bdc77a41063475f6-7fd4dc3a72eee12ffdb5",
+              "file": "e2e/events-unicode.spec.ts",
+              "line": 118,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T12:42:18.202Z",
+    "duration": 20252.372000000003,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

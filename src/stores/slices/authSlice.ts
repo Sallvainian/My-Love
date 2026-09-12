@@ -236,7 +236,7 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => (
     // cleared. A repeat call for the SAME user (TOKEN_REFRESHED,
     // INITIAL_SESSION, USER_UPDATED) must not reset anything.
     const previous = get().userId;
-    const switchedAccount = previous !== null && userId !== null && previous !== userId;
+    const switchedAccount = previous !== null && previous !== userId;
     const identity = {
       userId,
       userEmail: email ?? null,
@@ -255,7 +255,7 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => (
     // vault only holds an entry when this user's last session ended in
     // sign-out, so a live persisted list is never overwritten by a stale
     // stash. Repeat calls for the same user (previous === userId) skip this.
-    if (previous === null && userId !== null) {
+    if (previous === null) {
       const settings = get().settings;
       const restored = settings ? takeAnniversaries(userId) : null;
       setAnniversaryOwner(userId);

@@ -177,8 +177,9 @@ export async function seedEvent(
  * `AnniversarySettings.tsx:103`).
  */
 export function isoDateDaysFromNow(dayOffset: number, anchor: Date = new Date()): string {
-  const date = new Date(anchor.getTime());
-  date.setDate(date.getDate() + dayOffset);
+  // Carry only calendar components: the anchor's time can fall in a DST gap
+  // on the target day and normalize into the following date.
+  const date = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + dayOffset);
   return formatDateISO(date);
 }
 

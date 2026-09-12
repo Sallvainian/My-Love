@@ -1,0 +1,175 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:9:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadMoreEvents > replays a completed add over the page snapshot without duplicate IDs
+[EventsSlice] Added event: target
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadMoreEvents > replays a completed edit over the page snapshot without duplicate IDs
+[EventsSlice] Edited event: target
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadMoreEvents > replays a completed delete over the page snapshot without duplicate IDs
+[EventsSlice] Removed event: target
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadMoreEvents > preserves a saved deep row during a failed refresh without changing its write result
+[EventsSlice] Added event: saved
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadMoreEvents > does not indefinitely pin saved rows through a successful refresh
+[EventsSlice] Added event: saved
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadEvents > keeps a completed add for the newer same-user load after the older load settles stale
+[EventsSlice] Added event: added-after-second-started
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadEvents > replays a completed add omitted by the older fetched list
+[EventsSlice] Added event: added
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadEvents > does not duplicate an add already installed by the load before create resumes
+[EventsSlice] Added event: already-observed
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadEvents > upserts an edited row omitted by a load that settles before the edit resumes
+[EventsSlice] Edited event: edited
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadEvents > replays add then delete in completion order without resurrecting the transient row
+[EventsSlice] Added event: transient
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadEvents > replays add then delete in completion order without resurrecting the transient row
+[EventsSlice] Removed event: transient
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadEvents > replays an edit over the older row and restores date order
+[EventsSlice] Edited event: edited
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > loadEvents > replays a delete tombstone so an older response cannot resurrect the row
+[EventsSlice] Removed event: deleted
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > addEvent > inserts the created event in date order and reports success
+[EventsSlice] Added event: middle
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > addEvent > slots a same-day event after its earlier-created sibling, matching the server order
+[EventsSlice] Added event: second-of-day
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > addEvent > passes the signed-in user as the creator
+[EventsSlice] Added event: new
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > editEvent > replaces the event and re-sorts, because an edit can move the date
+[EventsSlice] Edited event: a
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > editEvent > orders by creation time when an edit moves a date onto an occupied day
+[EventsSlice] Edited event: moved
+
+stdout | tests/unit/stores/eventsSlice.test.ts > eventsSlice > removeEvent > takes the event out of the list
+[EventsSlice] Removed event: a
+
+ ✓ tests/unit/stores/eventsSlice.test.ts (48 tests) 23ms
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > returns the couple’s events soonest-first, each date at local midnight
+[EventsService] Fetched events: 2
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > returns both sides of today in one ascending list
+[EventsService] Fetched events: 5
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > caps each side of today at the limit, keeping the nearest events on both
+[EventsService] Fetched events: 4
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > never lets accumulated history hide the next event
+[EventsService] Fetched events: 3
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > pages outward from today on both sides
+[EventsService] Fetched events: 4
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > clamps a nonsense limit or offset instead of sending a backwards range
+[EventsService] Fetched events: 2
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > falls back to the default page size when limit is NaN
+[EventsService] Fetched events: 1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > falls back to the default page size when limit is Infinity
+[EventsService] Fetched events: 1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > falls back to offset zero when offset is not finite
+[EventsService] Fetched events: 1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > issues both windows concurrently, not one after the other
+[EventsService] Fetched events: 1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > counts an event dated today as upcoming, not past
+[EventsService] Fetched events: 1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > breaks same-day ties on creation time, so reloads cannot reshuffle
+[EventsService] Fetched events: 2
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > breaks same-day ties on creation time in the PAST window too
+[EventsService] Fetched events: 2
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > drops the stale copy when a row lands in both windows mid-read
+[EventsService] Fetched events: 1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > cuts the window on the LOCAL calendar day (late evening, west of UTC)
+[EventsService] Fetched events: 1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > cuts the window on the LOCAL calendar day (just after midnight, east of UTC)
+[EventsService] Fetched events: 1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > keeps a row whose icon is outside the union, falling back to the column default
+[EventsService] Fetched events: 1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > returns an empty list rather than throwing when the couple has no events
+[EventsService] Fetched events: 0
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > getEvents > drops a row whose date cannot be read, and still orders the rest
+[EventsService] Fetched events: 2
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > createEvent > writes the input date string through untouched and returns the created event
+[EventsService] Created event: event-1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > createEvent > omits icon so the column default applies when the caller does not choose one
+[EventsService] Created event: event-1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > updateEvent > stamps updated_at on every write and returns the updated event
+[EventsService] Updated event: event-1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > updateEvent > writes only the fields the caller supplied
+[EventsService] Updated event: event-1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > updateEvent > accepts an explicit null description
+[EventsService] Updated event: event-1
+
+stdout | tests/unit/services/eventsService.test.ts > eventsService > deleteEvent > removes the row
+[EventsService] Deleted event: event-1
+
+ ✓ tests/unit/services/eventsService.test.ts (86 tests) 48ms
+ ✓ src/components/Settings/__tests__/EventsSettings.focus.test.tsx (15 tests) 339ms
+stderr | src/components/Settings/__tests__/EventsSettings.test.tsx > EventsSettings add > keeps save retry available when the action unexpectedly rejects
+[EventsSettings] Unexpected save failure: Error: Unexpected save rejection
+    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/src/components/Settings/__tests__/EventsSettings.test.tsx:987:15
+    at Mock (file:///Users/sallvain/Projects/My-Love/node_modules/@vitest/spy/dist/index.js:332:34)
+    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/src/components/Settings/EventsSettings.tsx:384:14
+    at handleSubmit (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/src/components/Settings/EventsSettings.tsx:868:28)
+    at executeDispatch (/Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:19116:9)
+    at runWithFiberInDEV (/Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+    at processDispatchQueue (/Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:19166:19)
+    at /Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:19767:9
+    at batchedUpdates$1 (/Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:3255:40)
+    at dispatchEventForPluginEventSystem (/Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:19320:7)
+
+stderr | src/components/Settings/__tests__/EventsSettings.test.tsx > EventsSettings delete > keeps delete retry available when the action unexpectedly rejects
+[EventsSettings] Unexpected delete failure: Error: Unexpected delete rejection
+    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/src/components/Settings/__tests__/EventsSettings.test.tsx:1626:15
+    at Mock (file:///Users/sallvain/Projects/My-Love/node_modules/@vitest/spy/dist/index.js:332:34)
+    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/src/components/Settings/EventsSettings.tsx:390:53
+    at handleDelete (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/src/components/Settings/EventsSettings.tsx:1257:28)
+    at executeDispatch (/Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:19116:9)
+    at runWithFiberInDEV (/Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+    at processDispatchQueue (/Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:19166:19)
+    at /Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:19767:9
+    at batchedUpdates$1 (/Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:3255:40)
+    at dispatchEventForPluginEventSystem (/Users/sallvain/Projects/My-Love/node_modules/react-dom/cjs/react-dom-client.development.js:19320:7)
+
+ ✓ src/components/Settings/__tests__/EventsSettings.test.tsx (106 tests) 883ms
+
+ Test Files  4 passed (4)
+      Tests  255 passed (255)
+   Start at  09:40:53
+   Duration  1.79s (transform 568ms, setup 593ms, import 916ms, tests 1.29s, environment 1.01s)
+
+JUNIT report written to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/test-results/vitest-junit.xml

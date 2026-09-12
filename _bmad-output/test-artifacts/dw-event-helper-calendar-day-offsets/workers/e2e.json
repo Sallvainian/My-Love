@@ -1,0 +1,63 @@
+{
+  "success": true,
+  "subagent": "e2e-tests",
+  "tests": [
+    {
+      "file": "tests/e2e/settings/event-helper-calendar-day-offsets.spec.ts",
+      "content": "/**\n * DW-84: a calendar date produced across Nuuk's late-evening DST gap\n * survives the real Settings write, reload, display, and edit prefill.\n * Only the factory's child process uses Nuuk; browser and auth clocks stay real.\n */\nimport type { Page } from '@playwright/test';\nimport { log } from '@seontechnologies/playwright-utils';\nimport { test, expect } from '../../support/merged-fixtures';\nimport { createNuukGapCase } from '../../support/factories/event-helper-calendar-day-offsets';\n\nasync function eventSnapshot(page: Page) {\n  return page.evaluate(() => {\n    const state = window.__APP_STORE__!.getState();\n    return {\n      loading: state.eventsIsLoading,\n      rows: state.events.map((event) => ({\n        label: event.label,\n        userId: event.userId,\n        calendar: [event.date.getFullYear(), event.date.getMonth() + 1, event.date.getDate()],\n      })),\n    };\n  });\n}\n\ntest('[P1] DW84-E2E-001 Settings preserves the Nuuk gap date through save, reload, and edit', async ({\n  page,\n  coupleEvents,\n  interceptNetworkCall,\n  recurse,\n}) => {\n  const gap = createNuukGapCase();\n  // The existing fixture clears this worker's pair before and after the test,\n  // including rows created through the form. No rows are seeded for this journey.\n  const expectedRows = [{\n    label: gap.label,\n    userId: coupleEvents.userId,\n    calendar: [2026, 3, 28],\n  }];\n\n  await page.addInitScript(() => {\n    localStorage.setItem('lastWelcomeView', Date.now().toString());\n  });\n\n  await log.step('Open Settings with the worker pair empty');\n  const initialRead = interceptNetworkCall({ method: 'GET', url: '**/rest/v1/events*' });\n  await page.goto('/settings');\n  expect((await initialRead).status).toBe(200);\n  await expect(page.getByTestId('settings-view')).toBeVisible();\n  await expect(page.getByTestId('events-settings-empty')).toBeVisible();\n\n  await log.step('Submit the actual helper date and verify the server response');\n  await page.getByTestId('events-settings-empty-add').click();\n  await expect(page.getByTestId('events-form')).toBeVisible();\n  await page.getByTestId('events-form-label').fill(gap.label);\n  await page.getByTestId('events-form-date').fill(gap.date);\n  const write = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/events*' });\n  await page.getByTestId('events-form-submit').click();\n\n  const created = await write;\n  expect(created.status).toBe(201);\n  expect(created.requestJson).toMatchObject({\n    user_id: coupleEvents.userId,\n    label: gap.label,\n    event_date: gap.expectedDate,\n  });\n  expect(created.responseJson).toMatchObject({\n    user_id: coupleEvents.userId,\n    label: gap.label,\n    event_date: gap.expectedDate,\n  });\n\n  await log.step('Wait for the exact local calendar date in Zustand, then verify the row');\n  await recurse(\n    () => eventSnapshot(page),\n    (snapshot) => {\n      expect(snapshot.loading).toBe(false);\n      expect(snapshot.rows).toEqual(expectedRows);\n    },\n    { timeout: 15000, interval: 100, log: 'Waiting for March 28, 2026 in Zustand after save' }\n  );\n  await expect(page.getByTestId('events-form')).toHaveCount(0);\n  const row = page.getByTestId(/^event-row-/).filter({ hasText: gap.label });\n  await expect(row).toBeVisible();\n  await expect(row.getByTestId(/^event-label-/)).toHaveText(gap.label);\n  await expect(row.getByTestId(/^event-date-/)).toHaveText(gap.expectedLongDate);\n\n  await log.step('Reload Settings and verify the persisted date in store and UI');\n  const reloadRead = interceptNetworkCall({ method: 'GET', url: '**/rest/v1/events*' });\n  await page.reload();\n  expect((await reloadRead).status).toBe(200);\n  await expect(page.getByTestId('settings-view')).toBeVisible();\n  await recurse(\n    () => eventSnapshot(page),\n    (snapshot) => {\n      expect(snapshot.loading).toBe(false);\n      expect(snapshot.rows).toEqual(expectedRows);\n    },\n    { timeout: 15000, interval: 100, log: 'Waiting for the reloaded March 28, 2026 event' }\n  );\n  await expect(row).toBeVisible();\n  await expect(row.getByTestId(/^event-date-/)).toHaveText(gap.expectedLongDate);\n\n  await log.step('Open the saved event and verify its date input');\n  await row.getByRole('button', { name: 'Edit ' + gap.label, exact: true }).click();\n  await expect(page.getByTestId('events-form')).toBeVisible();\n  await expect(page.getByTestId('events-form-label')).toHaveValue(gap.label);\n  await expect(page.getByTestId('events-form-date')).toHaveValue('2026-03-28');\n  await page.getByTestId('events-form-close').click();\n  await expect(page.getByTestId('events-form')).toHaveCount(0);\n});\n",
+      "description": "Settings submits the actual Nuuk +1 date, verifies POST request/response, waits for the exact local date in Zustand, checks display, reloads, and verifies literal March 28 edit prefill.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 1,
+        "P2": 0,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    "Existing merged fixtures: authenticated page, coupleEvents, interceptNetworkCall, recurse, networkErrorMonitor.",
+    "Parent-generated createNuukGapCase from tests/support/factories/event-helper-calendar-day-offsets.ts returning label, date, literal expectedDate and expectedLongDate."
+  ],
+  "knowledge_fragments_used": [
+    "test-levels-framework",
+    "test-priorities-matrix",
+    "data-factories",
+    "test-quality",
+    "selective-testing",
+    "ci-burn-in",
+    "fixture-architecture",
+    "network-first",
+    "intercept-network-call",
+    "test-healing-patterns",
+    "selector-resilience",
+    "timing-debugging",
+    "playwright-cli",
+    "confidence-gate",
+    "evidence-integrity",
+    "playwright-utils-mandate",
+    "log",
+    "network-error-monitor",
+    "library-integration-mandate",
+    "recurse"
+  ],
+  "playwright_utils_deviations": [],
+  "test_count": 1,
+  "confidence": {
+    "score": 9,
+    "rationale": "Selectors and behavior are confirmed in src/components/Settings/EventsSettings.tsx, tests/e2e/settings/events-crud.spec.ts, predecessor artifact E2E, and tests/support/merged-fixtures.ts. The existing coupleEvents fixture owns checked worker-pair cleanup.",
+    "unknowns": [
+      "Live execution is pending parent validation; the parent browser preflight found no server listening yet."
+    ]
+  },
+  "browser_verification": {
+    "mode": "auto",
+    "status": "source-backed-after-parent-probe",
+    "observation": "Parent CLI launch succeeded; localhost:5173/settings returned ERR_CONNECTION_REFUSED before the test server started. This worker did not repeat the probe.",
+    "sources": [
+      "src/components/Settings/EventsSettings.tsx",
+      "tests/e2e/settings/events-crud.spec.ts",
+      "_bmad-output/test-artifacts/dw-event-test-date-anchors/tests/e2e/settings/event-test-date-anchors.spec.ts"
+    ]
+  },
+  "summary": "Generated one P1 Settings E2E journey. Uses merged fixtures, interceptNetworkCall, recurse, and log.step with no deviations. Browser clocks and timezone remain real. Factory child alone reproduces Nuuk. No tests run and no fixture or active spec files written."
+}
