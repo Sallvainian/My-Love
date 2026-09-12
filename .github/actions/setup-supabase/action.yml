@@ -39,19 +39,55 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        base="https://github.com/supabase/cli/releases/download/v${{ inputs.supabase-version }}"
+        ver="${{ inputs.supabase-version }}"
+        base="https://github.com/supabase/cli/releases/download/v$ver"
+
+        # The release layout is not stable across versions, so probe instead of
+        # assuming. v2.77.1 publishes an UNversioned tarball
+        # (supabase_linux_amd64.tar.gz) beside a VERSIONED checksums file
+        # (supabase_2.77.1_checksums.txt); v2.117.0 inverts both -- versioned
+        # tarball, plain checksums.txt -- and a hardcoded pair 404s on one
+        # version or the other. The 404 is silent under -fsSL, so it surfaces
+        # three jobs later as `supabase: command not found`.
+        #
         # --max-time bounds a single attempt; --retry-max-time bounds the
         # whole retry loop. Without the latter, 5 retries of a hanging
         # endpoint could outlast the 15-minute job timeout this defends.
-        curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
-          --max-time 60 --retry-max-time 180 \
-          -o /tmp/supabase_linux_amd64.tar.gz "$base/supabase_linux_amd64.tar.gz"
-        curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
-          --max-time 20 --retry-max-time 60 \
-          -o /tmp/supabase_checksums.txt "$base/supabase_${{ inputs.supabase-version }}_checksums.txt"
-        (cd /tmp && grep 'supabase_linux_amd64.tar.gz$' supabase_checksums.txt | sha256sum -c -)
+        dl() {
+          curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
+            --max-time "$2" --retry-max-time "$3" -o "$4" "$base/$1"
+        }
+
+        tarball=""
+        for name in "supabase_${ver}_linux_amd64.tar.gz" "supabase_linux_amd64.tar.gz"; do
+          if dl "$name" 60 180 /tmp/supabase_cli.tar.gz; then tarball="$name"; break; fi
+        done
+        if [ -z "$tarball" ]; then
+          echo "::error::No linux_amd64 tarball found in supabase/cli release v$ver under either known name."
+          exit 1
+        fi
+
+        sums=""
+        for name in "checksums.txt" "supabase_${ver}_checksums.txt"; do
+          if dl "$name" 20 60 /tmp/supabase_checksums.txt; then sums="$name"; break; fi
+        done
+        if [ -z "$sums" ]; then
+          echo "::error::No checksums file found in supabase/cli release v$ver under either known name."
+          exit 1
+        fi
+
+        # The checksums file names the asset exactly as published, so match on
+        # the tarball name that actually downloaded, and fail loudly if that
+        # name is absent rather than piping an empty list into sha256sum.
+        if ! grep -q "  ${tarball}\$" /tmp/supabase_checksums.txt; then
+          echo "::error::$sums does not list $tarball; refusing to install an unverified binary."
+          exit 1
+        fi
+        cp /tmp/supabase_cli.tar.gz "/tmp/$tarball"
+        (cd /tmp && grep "  ${tarball}\$" supabase_checksums.txt | sha256sum -c -)
+
         mkdir -p ~/.local/bin
-        tar -xzf /tmp/supabase_linux_amd64.tar.gz -C ~/.local/bin supabase
+        tar -xzf /tmp/supabase_cli.tar.gz -C ~/.local/bin supabase
         chmod +x ~/.local/bin/supabase
 
     - name: Add Supabase CLI to PATH
