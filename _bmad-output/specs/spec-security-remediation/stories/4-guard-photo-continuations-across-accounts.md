@@ -2,8 +2,8 @@
 title: 'Guard photo continuations across accounts'
 type: 'bugfix'
 created: '2026-09-12'
-status: ready-for-dev
-baseline_revision: 63e9029a6434eb9cbfbe8d647f29714318f46b4a
+status: done
+baseline_revision: 2056ed1b0eb209dad29fdef3da72448dcc30889c
 review_loop_iteration: 0
 followup_review_recommended: false
 context: []
@@ -137,6 +137,36 @@ Then **verify and correct** the applied change against the corrected intent abov
   - `[low]` `[reject]` (intent-alignment D5) "B's full relevant state" is satisfied by key enumeration plus three marker strings rather than a structural whole-state comparison — the fix is a whole-state snapshot harness, more than a direct correction, for a gap not met in everyday use.
   - `[false]` `[reject]` (intent-alignment D6) A client-only change with `photoService` mocked conflicts with `SPEC.md:64`'s server-boundary constraint — refuted by F12's own framing at `remediation.md:108`: "This finding covers a shared-device timing window, not a remote account takeover."
 
+### 2026-09-12 — Review pass (re-drive)
+- verdicts: 26 findings — high 0, medium 1, low 13, false 12, maybe-false 0
+- findings:
+  - `[low]` `[patch]` `deletePhoto`'s success-guard comment justified itself with the one case where the skipped write was correct — verified: `photoService.getPhotos` is RLS-scoped to own+partner rows (`photoService.ts:249-273`), so the id is present in the next account's list only when that account is A's partner, and for a partner the row really is gone. Fixed: the comment now says the write is withheld because the session ended, and that reconciling the row is the new session's own `loadPhotos`' job.
+  - `[false]` `[reject]` The guard leaves a phantom row with nothing to reconcile it — refuted: every real account change runs `signedOutState()` (`authSlice.ts:207` via `clearAuth`, `:244-250` via `discardAccountState` when `setAuthUser` sees a different id), which empties `photos` outright, so no stale row survives into the next session.
+  - `[false]` `[reject]` `uploadPhoto` hands the next account a success UI — refuted at the cited location: the claim rests on `PhotoUploader.tsx:184`'s unconditional success toast, and `grep -rn "PhotoUploader" src tests` returns exactly one hit outside the file itself (a test comment). Nothing imports it. The mounted caller `PhotoUpload.tsx:100-106` does read `uploadResult.success`, and returning the true outcome there is what the intent's Always list mandates.
+  - `[low]` `[patch]` The three same-account-resignin cases asserted against a store state no app path produces — verified: `clearAuth()` empties `photos`, so a store holding C's row after A signs back in is unreachable. Fixed: `uploadPhoto` now asserts the reachable empty gallery, and the delete/update cases seed `aGalleryRow()` — A's own re-loaded row, which is what the dead session's continuation would really corrupt. Re-measured: all three still fail only their own case when the `authSessionVersion` conjunct is weakened.
+  - `[low]` `[patch]` The `>= 80` pre-upload warning branch was not pinned by the test that claimed it — verified: the same-account case used an every-call quota mock at 85%, so both warning writes produced a byte-identical string and either could be deleted. Fixed: split into two cases with distinct percentages (85% pre-upload, 87% post-upload). Deleting either write now fails exactly its own case.
+  - `[false]` `[reject]` Only one of three branches of the changed `isOwn` expression is exercised — refuted: `photoService.uploadPhoto` inserts `user_id: userId` for the authenticated caller (`photoService.ts:367`), so `photo.user_id === requestedBy` always holds on this path, and `App.tsx` renders `<LoginScreen/>` with no session, so `requestedBy === null` is unreachable. The untested branches cannot occur.
+  - `[low]` `[patch]` Every new fixture was an untyped literal, so type drift would be invisible — verified: a rename on `SupabasePhoto` would leave the fixtures silently wrong with typecheck green. Fixed: `uploadInput()`, `aPhoto()` and `cPhoto()` now carry `PhotoUploadInput` / `SupabasePhoto` / `PhotoWithUrls` return types via a type-only import.
+  - `[low]` `[patch]` The docblock said `loadPhotos` keeps the weaker guard deliberately but gave no reason — verified: it pointed at an explanation of why the pair is stronger, not why one writer may stay weaker. Fixed: the docblock now records that `loadPhotos` writes only `photos`, so the case the weaker form misses repopulates A's own gallery with A's own rows.
+  - `[false]` `[reject]` The guard-idiom finding was only half-fixed; three shapes remain — refuted: the logged row was specifically about the `&&` form fusing identity into a business predicate, which is fixed. The remaining early-return/block variance mirrors `eventsSlice` and every one of the ten sites names an `owns*()` predicate, so nothing is missed by a reader scanning for guards.
+  - `[low]` `[defer]` carried — `loadPhotos` keeps the weaker `userId`-only guard, so a dead session's catch can write `photos: []` over the new one. Same claim and location as the row logged on 2026-09-12; code still reads as described. Not re-deferred per the carry rule; see the ledger note under **Auto Run Result**.
+  - `[medium]` `[defer]` carried — `signedOutState()` never resets the app-wide `error` key, so a failure banner outlives sign-out. Same claim and location as the logged row; `grep -c error src/stores/slices/authSlice.ts` still returns 0. Not re-deferred per the carry rule.
+  - `[low]` `[defer]` carried — the post-upload warning ignores `warning === 'exceeded'`, so the worst quota state shows no warning. Same claim and location as the logged row; pre-existing at `9ce70d04`.
+  - `[low]` `[defer]` carried — two concurrent same-account uploads let the first completion zero `isUploading`/`uploadProgress` under the second. Same claim and location as the logged row; a consequence of the single shared flag, untouched here.
+  - `[low]` `[patch]` (verification-gap, pre-verified) The post-upload storage warning's only owner-path assertion was already satisfied by the pre-upload write — filed with a mutation demonstration (`if (false && ownsUpload())` left 80/80 green). Grouped with the `>= 80` row above; the same two-case split fixes both.
+  - `[low]` `[patch]` (verification-gap, pre-verified) `deletePhoto` and `updatePhoto` owner-path error writes were pinned only in the negative — re-measured here: widening both catch guards so the write never runs left the file at 80/80 and the full suite at 2033. Fixed: added `deletePhoto surfaces a failure` and `updatePhoto surfaces a rejected save and a thrown one`, which also pins the previously untested `!persisted` write.
+  - `[low]` `[patch]` (verification-gap, pre-verified) The quota-rejection flag reset was unasserted on the owner path — re-measured: reducing the write to `set({ error: quotaError })` left the file green while stranding `isUploading: true`. Fixed: the rejection case now asserts `isUploading` false and `uploadProgress` 0.
+  - `[false]` `[reject]` (verification-gap, other) `flush()` depends on real timers — the layer filed it as "a live constraint on the file, not a defect today", and `grep -n "useFakeTimers"` on the file returns nothing. The doc-comment added this pass already records the constraint.
+  - `[false]` `[reject]` (verification-gap, other) `loadPhotos` non-adoption of the pair guard — the layer explicitly declined to file it, having checked that `loadPhotos` writes only `photos` and so leaks nothing across accounts. Same conclusion the docblock now records.
+  - `[low]` `[patch]` (intent-alignment D1) The matrix's expectations are written at the sign-out surface while 13 cross-account cases measure at the raw-`setState` surface — verified: `switchToUserC` bumps no `authSessionVersion` and resets nothing, whereas a real handoff runs `signedOutState()`. Grouped with the resignin-seed row above; the synthetic transition is retained deliberately (the file header at `:10-16` records that driving it through `clearAuth` made the suite pass with five guards deleted), and the reachable-state fix was applied where it does not destroy discrimination.
+  - `[false]` `[reject]` (intent-alignment D2) `error` is the only field that genuinely leaks across a real handoff, yet the flags are foregrounded — refuted as a defect: the diff does cover `error` on every catch and sign-out case, and the flags are asserted in addition, not instead.
+  - `[low]` `[patch]` (intent-alignment D3) The flag assertions were justified by a comment citing unmounted code — verified: `usePhotos` is imported only by `src/components/photos/PhotoUploader.tsx`, which nothing imports, so `isUploading`/`uploadProgress` reach no mounted UI. Fixed: the block comment now states that plainly and gives the real reason the keys are asserted.
+  - `[false]` `[reject]` (intent-alignment D4) The caller-contract premise holds at only one of two call sites — refuted as a defect: the second site is the unimported `PhotoUploader.tsx`, so no live behaviour depends on it.
+  - `[false]` `[reject]` (intent-alignment D5) Named closures were used where the cited `eventsSlice.ts:292-376` range shows only the inline form — refuted: the spec's own Code Map blesses the closure form, citing `eventsSlice.ts:239-242`'s `ownsLoad()` for exactly the case of several writes sharing one guard.
+  - `[false]` `[reject]` (intent-alignment D6) Ten checks cover eleven write paths — refuted: the layer itself records the arrangement is outcome-identical on every matrix row, and the mutation matrix confirms each of the ten fails only cases in its own block.
+  - `[false]` `[reject]` (intent-alignment D7) The two conjuncts are never exercised at the same surface — refuted as a defect: both halves are independently pinned. Weakening any of the three closures to a `userId`-only compare fails exactly its own same-account-resignin case, and the 13 `switchToUserC` cases pin the id half.
+  - `[false]` `[reject]` (intent-alignment D8) The docblock characterises `loadPhotos` though its code is untouched — refuted as a defect: describing a neighbouring guard is documentation, not a code-surface widening, and it is the fix a prior logged row asked for.
+
 ## Design Notes
 
 **Why both `userId` and `authSessionVersion`.** `loadPhotos` compares `userId` alone, which is enough for A→B but not for A→signed-out→A: the same id returns and a request from the dead session writes as if it were live. `eventsSlice` already pairs the id with `authSessionVersion`, which `clearAuth` bumps unconditionally (`authSlice.ts:207`). This story adopts the stronger pair rather than the weaker in-file precedent, and does not retrofit `loadPhotos` — that is a different action with its own contract.
@@ -165,27 +195,199 @@ Then **verify and correct** the applied change against the corrected intent abov
 - `git diff src/stores/slices/photosSlice.ts` shows changes confined to `uploadPhoto`, `deletePhoto`, `updatePhoto` and the slice docblock — `loadPhotos`, `selectPhoto`, `clearPhotoSelection`, `clearError` and `clearStorageWarning` untouched.
 - `grep -n "get().userId" src/stores/slices/photosSlice.ts` shows no remaining read of the *live* user inside a post-await path of the three edited actions.
 
-### Results (2026-09-12)
+### Results (2026-09-12, re-drive from the saved patch)
 
-- `npm run typecheck` — pass. `npm run lint` — 0 errors, 3 pre-existing `EventCountdown.tsx` warnings.
-- `npm run test:unit` — 111 files, **2031** tests pass (2008 before; +23).
-- `npx vitest run tests/unit/services/photoService.idempotency.test.ts tests/unit/stores/loaderIdentityGuards.test.ts` — 89 pass. The idempotency file's isolated store (no `authSessionVersion`) still works, as predicted.
+The first attempt's patch applied forward cleanly onto baseline `2056ed1b`
+(`git apply` exit 0) and was then corrected against the resolved intent rather
+than re-implemented. The open `[patch]` findings in the Review Triage Log were
+worked; every `[defer]` and `[reject]` finding was left alone.
+
+- `npm run typecheck` — exit 0 (`tsc -b --force`, all three projects).
+- `npm run lint` — 0 errors, 3 warnings, all three the pre-existing
+  `react-refresh/only-export-components` warnings in `EventCountdown.tsx`.
+- `npm run test:unit` — 111 files, **2033** tests pass (2008 before; +25).
+- `npx vitest run tests/unit/services/photoService.idempotency.test.ts tests/unit/stores/loaderIdentityGuards.test.ts` — 91 pass. The idempotency
+  file's isolated store, which has no `authSessionVersion`, still works: the
+  guard is a plain equality compare, so `undefined === undefined` holds.
 - `fnox exec -- npm run build` — exit 0.
-- Manual checks both hold: the diff touches only the three actions and the docblock, and the only remaining `get().userId` reads are `loadPhotos`' own guard and the three `owns*()` comparisons.
 
-**Red-then-green, one guard at a time.** Each of the ten rechecks was reverted individually and the suite re-run; every one failed only its own cases:
+Manual checks both hold. The diff touches only the slice docblock and the three
+edited actions — `loadPhotos`, `selectPhoto`, `clearPhotoSelection`, `clearError`
+and `clearStorageWarning` are untouched. The only remaining reads of the live
+`get().userId` are `loadPhotos`' own pre-existing guard (`photosSlice.ts:189`,
+`:196`, `:200`) and the three `owns*()` comparisons (`:88`, `:215`, `:268`).
+
+**Red-then-green, one guard at a time.** Each of the ten rechecks was reverted
+individually and the file re-run. Every one fails only cases inside its own
+`describe` block — no guard is proved by another's assertions:
 
 | Guard | Cases that go red when it is reverted |
 |---|---|
-| quota-reject write | `does not reject the new account's session over the previous one's quota` |
-| 80% warning write | `does not raise the pre-upload storage warning against the new account` |
-| `onProgress` write | `does not move the new account's progress bar` |
-| success early-return | the gallery, signing, sign-out and same-account-resignin cases (4) |
-| post-upload warning write | `does not raise the post-upload storage warning against the new account` |
-| upload catch write | `does not paint the previous account's failure onto the new one` |
-| delete success write | `does not remove a row from the new account's gallery` |
-| delete catch write | the delete-failure and delete-after-sign-out cases (2) |
-| update success write | the caption, rejected-save and save-after-sign-out cases (3) |
-| update catch write | `does not paint the previous account's thrown save onto the new one` |
+| quota-reject write (`:102`) | `does not reject the new account's session over the previous one's quota` |
+| 80% warning write (`:109`) | `does not raise the pre-upload storage warning against the new account` |
+| `onProgress` write (`:122`) | `does not move the new account's progress bar` |
+| success early-return (`:138`) | the gallery, signing, sign-out and same-account-resignin cases (4) |
+| post-upload warning write (`:162`) | `does not raise the post-upload storage warning against the new account` |
+| upload catch write (`:172`) | `does not paint the previous account's failure onto the new one` |
+| delete success write (`:227`) | the shared-gallery and same-account-resignin cases (2) |
+| delete catch write (`:235`) | the delete-failure and delete-after-sign-out cases (2) |
+| update success write (`:276`) | the caption, rejected-save, sign-out and same-account-resignin cases (4) |
+| update catch write (`:292`) | `does not paint the previous account's thrown save onto the new one` |
 
-Two rows needed rewriting before they discriminated at all, and both are recorded rather than quietly fixed: the post-upload warning is unreachable when the switch lands at call time (the success guard returns first), so its case now switches *after* the insert; and a delete resolving after sign-out filters an already-empty gallery, a no-op with or without the guard, so that case now settles `false` and holds on `error`, which `signedOutState()` does not reset.
+**What changed relative to the saved patch.** Nine of the ten guards are the
+patch's own, verified unmodified against the resolved intent. The corrections
+are the open `[patch]` findings:
+
+- `deletePhoto` and `updatePhoto` each gained a
+  `writes nothing when the SAME account signs back in mid-flight` case
+  (`clearAuth()` + `setAuthUser(A)`), closing the `[medium]` finding that the
+  `authSessionVersion` conjunct of `ownsDelete`/`ownsUpdate` was pinned by no
+  test. Re-measured by mutation: weakening either closure to a `userId`-only
+  compare now fails exactly its own new case and nothing else.
+- The two `&& ownsUpload()` sites (`:109`, `:162`) were split into a plain
+  `if (ownsUpload())` so identity is never fused into a business predicate.
+- The `isOwn` comment no longer claims a behaviour the guard above makes
+  unreachable; it now says plainly that this is not a behaviour change.
+- The slice docblock names the three guarded actions instead of claiming
+  "every action that writes after an await", and records that `loadPhotos`
+  keeps the weaker `userId`-only form deliberately.
+- The signing and pre-upload-warning cases now also assert
+  `isUploading`/`uploadProgress`, which the block header promised were caught
+  separately. The pre-upload-warning case parks the upload and asserts before
+  the success path is reached, so those flags stay provable against its own
+  guard alone.
+- The same-account retry case reuses one input carrying a fixed
+  `idempotencyKey`, so it encodes a retry of one logical upload rather than the
+  double-write `PhotoUploadInput.idempotencyKey` exists to prevent.
+- `flush()` carries a doc-comment line recording its dependency on real timers.
+
+## Auto Run Result
+
+Status: done
+
+### Summary of implemented change
+
+`uploadPhoto`, `deletePhoto` and `updatePhoto` in `src/stores/slices/photosSlice.ts`
+now capture `{ userId, authSessionVersion }` at action entry and recheck the pair
+before every post-await `set()` — ten sites in all, including the `onProgress`
+callback `photoService.uploadPhoto` fires from inside its own await. A stale
+continuation writes nothing to the shared store but still returns its true
+outcome to its own caller. The in-flight Supabase request is untouched, and so
+are `loadPhotos`, the photo components, `photoService`, and every policy.
+
+The run began by applying the first attempt's saved patch
+(`../../implementation-artifacts/story-4-guard-photo-continuations.attempted.patch`),
+which applies forward cleanly onto baseline `2056ed1b`, then corrected it against
+the resolved compression-scope intent rather than re-implementing it.
+
+### Files changed
+
+- `src/stores/slices/photosSlice.ts` — three identity guards (`ownsUpload`,
+  `ownsDelete`, `ownsUpdate`) gating ten post-await writes, plus a slice docblock
+  recording the new cross-slice dependency on `authSlice`.
+- `tests/unit/stores/loaderIdentityGuards.test.ts` — the `photoService` mock
+  gained four methods; 29 new cases across `uploadPhoto`, `deletePhoto`,
+  `updatePhoto` and the same-account block.
+- `_bmad-output/specs/spec-security-remediation/stories/4-guard-photo-continuations-across-accounts.md` —
+  this spec: verification results, review triage log, and this section.
+
+### Review findings breakdown
+
+26 findings across four layers — high 0, medium 1, low 13, false 12, maybe-false 0.
+Eight entries were patched, all at verdict `low`; four `defer` rows were carried
+from the previous pass; twelve findings were rejected.
+
+**Patches applied (8, all `low`):**
+
+1. The two storage-warning writes were split into two owner-path cases with
+   distinct percentages (85% pre-upload, 87% post-upload) — the previous single
+   case used an every-call quota mock, so both writes produced an identical
+   string and either could be deleted with the suite green.
+2. Added `deletePhoto surfaces a failure` and `updatePhoto surfaces a rejected
+   save and a thrown one` — the owner-path error writes were asserted only in
+   the negative, and making them unreachable left the whole suite passing.
+3. The quota-rejection case now asserts `isUploading` false and `uploadProgress`
+   0; dropping the flag reset previously went undetected.
+4. `uploadInput()`, `aPhoto()` and `cPhoto()` gained real return types
+   (`PhotoUploadInput`, `SupabasePhoto`, `PhotoWithUrls`).
+5. The three same-account-resignin cases now model reachable state — an empty
+   gallery for upload, A's own re-loaded row for delete and update — instead of
+   a store holding another account's row after A has signed back in.
+6. `deletePhoto`'s success-guard comment no longer justifies itself with the one
+   case in which the skipped write would have been correct.
+7. The slice docblock now gives the reason `loadPhotos` stays on the weaker
+   `userId`-only guard rather than only asserting that it does.
+8. The photo block's test comment no longer cites `PhotoUploader.tsx` as the
+   renderer of a stranded progress bar; that component is imported by nothing.
+
+**Rejected findings, with reasons:** twelve, each recorded with its refutation in
+the triage-log entry above. In outline: the phantom-row and success-UI findings
+are refuted by `signedOutState()` emptying `photos` on every real account change
+and by `PhotoUploader.tsx` being unimported; the `isOwn` branch-coverage finding
+is refuted because `photoService` inserts the caller's own `user_id`; the guard-
+idiom, closure-shape, check-count, conjunct-surface and docblock-surface findings
+describe arrangements that produce no bad outcome, each confirmed by the mutation
+matrix; and the two verification-gap `Other` notes were filed by their own layer
+as non-defects.
+
+**Deferred: none added this pass.** The four `defer` rows are all carries of rows
+already logged on 2026-09-12, and the carry rule forbids deferring a carried row
+again, so `deferred` stays `[]`.
+
+> **Ledger note for a human.** Those four carried rows have **no** entry in
+> `implementation-artifacts/deferred-work.md` and none in this frontmatter,
+> because the previous pass halted on `intent gap` before its defer branch ever
+> ran. They are real and pre-existing: (a) `loadPhotos` keeps the weaker
+> `userId`-only guard; (b) `signedOutState()` never resets the app-wide `error`
+> key — **medium**, and the cause behind several symptoms this story works
+> around; (c) the post-upload warning ignores `warning === 'exceeded'`; (d) two
+> concurrent same-account uploads let the first completion zero the shared
+> `isUploading`/`uploadProgress`. If they should be tracked, they need adding to
+> the ledger by hand.
+
+### Follow-up review recommendation
+
+`false`. This was a first pass; of the eight patched entries none was `high` and
+none was `medium` — patched by verdict: high 0, medium 0, low 8.
+
+### Verification performed
+
+- `npm run typecheck` — exit 0 (`tsc -b --force`, all three projects).
+- `npm run lint` — 0 errors, 3 warnings, all pre-existing in `EventCountdown.tsx`.
+- `npm run test:unit` — 111 files, **2037** tests pass (2008 at baseline; +29).
+- `npx vitest run tests/unit/services/photoService.idempotency.test.ts tests/unit/stores/loaderIdentityGuards.test.ts` — 95 pass. The idempotency file's
+  isolated store, which has no `authSessionVersion`, still works.
+- `fnox exec -- npm run build` — exit 0.
+- Manual checks hold: the diff touches only the slice docblock and the three
+  edited actions, and the only live `get().userId` reads left are `loadPhotos`'
+  own guard (`:191`, `:198`, `:202`) and the three `owns*()` comparisons
+  (`:90`, `:217`, `:272`).
+- **Mutation matrix, re-run after patching.** Each of the ten identity rechecks
+  was reverted individually: every one fails only cases inside its own `describe`
+  block. Each of the three closures weakened to a `userId`-only compare fails
+  only its own same-account-resignin case. Each of the six owner-path writes that
+  review found unpinned — both warning writes, the quota-rejection flag reset,
+  the delete catch write, the `!persisted` write and the update catch write —
+  now fails exactly one case when removed.
+
+### Residual risks
+
+- **`error` outlives sign-out.** `signedOutState()` does not reset the app-wide
+  `error` key, so a banner raised just *before* a switch still crosses into the
+  next session. This story stops continuations from writing it; it does not stop
+  a write that already landed. Carried `defer`, no ledger entry — see the note
+  above.
+- **The compression window is accepted behaviour, by decision.** A switch landing
+  during `compressImage` enters `uploadPhoto` fresh under the new account, and the
+  upload proceeds as that account's own. Resolved by Sallvain on 2026-09-12 and
+  recorded in `remediation.md`; not a deferred item.
+- **`isUploading` and `uploadProgress` reach no mounted UI today.** `usePhotos` is
+  imported only by the unimported `PhotoUploader.tsx`, so guarding those two keys
+  is protection for a consumer that does not yet exist. They are store keys the
+  matrix names, so they are guarded and asserted, but no user-visible symptom
+  currently depends on them.
+- **Cross-account transitions are exercised at the store, not through the real
+  auth path.** 13 cases drive the switch with a raw `setState`, deliberately:
+  the file header records that routing them through `clearAuth` made the suite
+  pass with five guards deleted. The six cases that do use real auth actions are
+  what pin the `authSessionVersion` half.
