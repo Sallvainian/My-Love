@@ -211,7 +211,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
   subscribeToInteractions: async (onStatusChange) => {
     try {
-      const currentUserId = get().userId;
+      const { userId: currentUserId, authSessionVersion: subscribedInSession } = get();
       if (!currentUserId) {
         throw new Error('Cannot subscribe: User not authenticated');
       }
@@ -221,6 +221,13 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
       const unsubscribe = await interactionService.subscribeInteractions(
         currentUserId,
         (record) => {
+          // Queued records can outlive teardown or a new sign-in by the same user.
+          if (
+            !active ||
+            get().userId !== currentUserId ||
+            get().authSessionVersion !== subscribedInSession
+          ) return;
+
           // Add incoming interaction to state
           get().addIncomingInteraction(record);
         },

@@ -1,0 +1,42 @@
+[
+  {
+    "active_path": "tests/api/interaction-record-ownership.spec.ts",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-interaction-record-ownership/tests/api/interaction-record-ownership.spec.ts",
+    "sha256": "d429117671018a4a74b97e07fb40cb095df2066e9042abe0f485f9a286cb5449"
+  },
+  {
+    "active_path": "tests/e2e/partner/interaction-record-ownership.spec.ts",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-interaction-record-ownership/tests/e2e/partner/interaction-record-ownership.spec.ts",
+    "sha256": "2906dc92f62b4ba22f43704206c6adecc8f0f544b188f0c24db58cf40d9aac65"
+  },
+  {
+    "active_path": "tests/support/factories/interaction-record-ownership.ts",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-interaction-record-ownership/tests/support/factories/interaction-record-ownership.ts",
+    "sha256": "4c3298659b5402fa9e406155aca08d1a8493fe420ee1d62e9805361db16e539d"
+  },
+  {
+    "active_path": "tests/support/fixtures/interaction-record-ownership.ts",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-interaction-record-ownership/tests/support/fixtures/interaction-record-ownership.ts",
+    "sha256": "fc52927844d8837e33c2a35e80a7441177c90bf943f94b7cb218a82790400f63"
+  },
+  {
+    "active_path": "tests/support/harnesses/interaction-record-ownership.html",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-interaction-record-ownership/tests/support/harnesses/interaction-record-ownership.html",
+    "sha256": "ef662bf0f1db7b90361f4751222124410aa99a51f0266bf61bdd953e7b9c3733"
+  },
+  {
+    "active_path": "tests/support/harnesses/interaction-record-ownership.tsx",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-interaction-record-ownership/tests/support/harnesses/interaction-record-ownership.tsx",
+    "sha256": "36d8152f93d9bc8b7dd3c66289fb7868bb1f5bd1aa5ee6cad7e1ed11d698f29e"
+  },
+  {
+    "active_path": "tests/support/fixtures/auth.ts",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-interaction-record-ownership/tests/support/fixtures/auth.ts",
+    "sha256": "18fbd34b7264242abf15c3eb75ec34ea1714bf623c87dbdf4335446e105f9e8d"
+  },
+  {
+    "active_path": "tests/support/merged-fixtures.ts",
+    "snapshot_path": "_bmad-output/test-artifacts/dw-interaction-record-ownership/tests/support/merged-fixtures.ts",
+    "sha256": "c4287b7bf8443114e743f0f7f24a5f31068f7caf10c856f4143b579d46f705a9"
+  }
+]

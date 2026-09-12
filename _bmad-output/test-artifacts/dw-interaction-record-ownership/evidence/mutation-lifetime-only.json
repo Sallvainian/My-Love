@@ -1,0 +1,250 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/node_modules/.bin/playwright",
+      "test",
+      "tests/e2e/partner/interaction-record-ownership.spec.ts",
+      "--config=_bmad-output/test-artifacts/dw-interaction-record-ownership/playwright.verify.config.ts",
+      "--project=chromium",
+      "--workers=1",
+      "--grep",
+      "DW-75-E2E-001"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/_bmad-output/test-artifacts/dw-interaction-record-ownership/playwright.verify.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "api",
+        "name": "api",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/api",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "integration",
+        "name": "integration",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/integration",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/_bmad-output/test-artifacts/dw-interaction-record-ownership/evidence/playwright-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": {
+      "command": "npx vite --mode test --host 127.0.0.1 --port 5185 --strictPort",
+      "cwd": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/",
+      "url": "http://127.0.0.1:5185",
+      "reuseExistingServer": false,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "e2e/partner/interaction-record-ownership.spec.ts",
+      "file": "e2e/partner/interaction-record-ownership.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Interaction record ownership",
+          "file": "e2e/partner/interaction-record-ownership.spec.ts",
+          "line": 11,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P0] DW-75-E2E-001 rejects old records while signed out and after the same account returns",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 576,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatchObject\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\n\u001b[32m- Expected  -  2\u001b[39m\n\u001b[31m+ Received  + 11\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"authSessionVersion\": 3,\u001b[22m\n\u001b[32m-   \"interactions\": Array [],\u001b[39m\n\u001b[31m+   \"interactions\": Array [\u001b[39m\n\u001b[31m+     Object {\u001b[39m\n\u001b[31m+       \"createdAt\": \"2026-09-12T12:00:00.000Z\",\u001b[39m\n\u001b[31m+       \"fromUserId\": \"4935a667-50df-4ded-9117-7f38c5fa0e83\",\u001b[39m\n\u001b[31m+       \"id\": \"cf7d1a92-b514-41ca-9e0b-d402262af355\",\u001b[39m\n\u001b[31m+       \"toUserId\": \"ccb3d977-f9a7-4c19-8411-0dc46ae1eb1c\",\u001b[39m\n\u001b[31m+       \"type\": \"poke\",\u001b[39m\n\u001b[31m+       \"viewed\": false,\u001b[39m\n\u001b[31m+     },\u001b[39m\n\u001b[31m+   ],\u001b[39m\n\u001b[2m    \"subscriptions\": Array [\u001b[22m\n\u001b[2m      Object {\u001b[22m\n\u001b[2m        \"cleanupCalls\": 0,\u001b[22m\n\u001b[2m        \"userId\": \"ccb3d977-f9a7-4c19-8411-0dc46ae1eb1c\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m    ],\u001b[22m\n\u001b[32m-   \"unviewedCount\": 0,\u001b[39m\n\u001b[31m+   \"unviewedCount\": 1,\u001b[39m\n\u001b[2m    \"userId\": \"ccb3d977-f9a7-4c19-8411-0dc46ae1eb1c\",\u001b[22m\n\u001b[2m  }\u001b[22m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatchObject\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\n\u001b[32m- Expected  -  2\u001b[39m\n\u001b[31m+ Received  + 11\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"authSessionVersion\": 3,\u001b[22m\n\u001b[32m-   \"interactions\": Array [],\u001b[39m\n\u001b[31m+   \"interactions\": Array [\u001b[39m\n\u001b[31m+     Object {\u001b[39m\n\u001b[31m+       \"createdAt\": \"2026-09-12T12:00:00.000Z\",\u001b[39m\n\u001b[31m+       \"fromUserId\": \"4935a667-50df-4ded-9117-7f38c5fa0e83\",\u001b[39m\n\u001b[31m+       \"id\": \"cf7d1a92-b514-41ca-9e0b-d402262af355\",\u001b[39m\n\u001b[31m+       \"toUserId\": \"ccb3d977-f9a7-4c19-8411-0dc46ae1eb1c\",\u001b[39m\n\u001b[31m+       \"type\": \"poke\",\u001b[39m\n\u001b[31m+       \"viewed\": false,\u001b[39m\n\u001b[31m+     },\u001b[39m\n\u001b[31m+   ],\u001b[39m\n\u001b[2m    \"subscriptions\": Array [\u001b[22m\n\u001b[2m      Object {\u001b[22m\n\u001b[2m        \"cleanupCalls\": 0,\u001b[22m\n\u001b[2m        \"userId\": \"ccb3d977-f9a7-4c19-8411-0dc46ae1eb1c\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m    ],\u001b[22m\n\u001b[32m-   \"unviewedCount\": 0,\u001b[39m\n\u001b[31m+   \"unviewedCount\": 1,\u001b[39m\n\u001b[2m    \"userId\": \"ccb3d977-f9a7-4c19-8411-0dc46ae1eb1c\",\u001b[22m\n\u001b[2m  }\u001b[22m\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/e2e/partner/interaction-record-ownership.spec.ts:48:53",
+                        "location": {
+                          "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/e2e/partner/interaction-record-ownership.spec.ts",
+                          "column": 53,
+                          "line": 48
+                        },
+                        "snippet": "  46 |       await interactionOwnership.setAuthUser(userId);\n  47 |       await interactionOwnership.dispatch(0, createInteractionRecord({ to_user_id: userId }));\n> 48 |       expect(await interactionOwnership.snapshot()).toMatchObject({\n     |                                                     ^\n  49 |         userId,\n  50 |         authSessionVersion: initial.authSessionVersion + 2,\n  51 |         interactions: [],"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/e2e/partner/interaction-record-ownership.spec.ts",
+                            "column": 53,
+                            "line": 48
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatchObject\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\n\u001b[32m- Expected  -  2\u001b[39m\n\u001b[31m+ Received  + 11\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"authSessionVersion\": 3,\u001b[22m\n\u001b[32m-   \"interactions\": Array [],\u001b[39m\n\u001b[31m+   \"interactions\": Array [\u001b[39m\n\u001b[31m+     Object {\u001b[39m\n\u001b[31m+       \"createdAt\": \"2026-09-12T12:00:00.000Z\",\u001b[39m\n\u001b[31m+       \"fromUserId\": \"4935a667-50df-4ded-9117-7f38c5fa0e83\",\u001b[39m\n\u001b[31m+       \"id\": \"cf7d1a92-b514-41ca-9e0b-d402262af355\",\u001b[39m\n\u001b[31m+       \"toUserId\": \"ccb3d977-f9a7-4c19-8411-0dc46ae1eb1c\",\u001b[39m\n\u001b[31m+       \"type\": \"poke\",\u001b[39m\n\u001b[31m+       \"viewed\": false,\u001b[39m\n\u001b[31m+     },\u001b[39m\n\u001b[31m+   ],\u001b[39m\n\u001b[2m    \"subscriptions\": Array [\u001b[22m\n\u001b[2m      Object {\u001b[22m\n\u001b[2m        \"cleanupCalls\": 0,\u001b[22m\n\u001b[2m        \"userId\": \"ccb3d977-f9a7-4c19-8411-0dc46ae1eb1c\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m    ],\u001b[22m\n\u001b[32m-   \"unviewedCount\": 0,\u001b[39m\n\u001b[31m+   \"unviewedCount\": 1,\u001b[39m\n\u001b[2m    \"userId\": \"ccb3d977-f9a7-4c19-8411-0dc46ae1eb1c\",\u001b[22m\n\u001b[2m  }\u001b[22m\n\n  46 |       await interactionOwnership.setAuthUser(userId);\n  47 |       await interactionOwnership.dispatch(0, createInteractionRecord({ to_user_id: userId }));\n> 48 |       expect(await interactionOwnership.snapshot()).toMatchObject({\n     |                                                     ^\n  49 |         userId,\n  50 |         authSessionVersion: initial.authSessionVersion + 2,\n  51 |         interactions: [],\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/e2e/partner/interaction-record-ownership.spec.ts:48:53"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[04:30:46] \u001b[1m\u001b[36m==== Show an interaction from the initial authentication lifetime ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[04:30:47] \u001b[1m\u001b[36m==== Polling: Waiting for the ownership harness ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[04:30:47] \u001b[1m\u001b[36m==== ✅ Waiting for the ownership harness - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[04:30:47] \u001b[1m\u001b[36m==== Sign out through authSlice and deliver a still-callable old record ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[04:30:47] \u001b[1m\u001b[36m==== Return to the same account without cleaning up its old callback ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Show an interaction from the initial authentication lifetime",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for the ownership harness",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for the ownership harness - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Sign out through authSlice and deliver a still-callable old record",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Return to the same account without cleaning up its old callback",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T04:30:46.808Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/partner-interaction-record-84dd5-er-the-same-account-returns-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/partner-interaction-record-84dd5-er-the-same-account-returns-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/test-results/dw-interaction-record-ownership/partner-interaction-record-84dd5-er-the-same-account-returns-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-interaction-record-ownership/tests/e2e/partner/interaction-record-ownership.spec.ts",
+                        "column": 53,
+                        "line": 48
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "ca6660b392ecc0593066-a7a002fb3341e37265d1",
+              "file": "e2e/partner/interaction-record-ownership.spec.ts",
+              "line": 15,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T04:30:45.425Z",
+    "duration": 2071.562,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}
