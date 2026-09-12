@@ -740,7 +740,9 @@ location: tests/e2e/settings/events-persistence.spec.ts:6
 source_spec: `spec-dw-30-activate-parked-event-tests.md`
 severity: low
 reason: The file header says every row is read after a real reload, but DE.5-E2E-006 observes the pass-through PATCH response and resulting Settings and Home state without reloading. The behavior assertion remains valid, but the suite-level description is inaccurate.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-source-test-contract-comments
+resolution-undo: a76a4c8413ab1f9522820a2ace3807a71cfccc9190e72bb3e41b1435e26c2a3c 2026-09-12 7374617475733a206f70656e
 
 ### DW-74: Story 5 acceptance criteria AC4 and AC6 remain pinned to the pre-activation test inventory and file boundary.
 origin: spec-deferred 41994f83a590
@@ -777,7 +779,9 @@ location: tests/unit/api/errorHandlers.test.ts:16-20
 source_spec: `spec-dw-39-empty-database-error-fallback.md`
 severity: low
 reason: tests/unit/api/errorHandlers.test.ts:16-20 contains this unchanged inventory. photoService.ts:396-397, partnerService.ts:192-193, scriptureReadingService.ts:332-333, and notesSlice.ts:519-520 now use handleSupabaseError for selected CHECK errors. The stale inventory can mislead maintainers assessing existing coverage; it predates DW-39.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-source-test-contract-comments
+resolution-undo: a76a4c8413ab1f9522820a2ace3807a71cfccc9190e72bb3e41b1435e26c2a3c 2026-09-12 7374617475733a206f70656e
 
 ### DW-78: Errors that omit message or code entirely can bypass database classification in service callers.
 origin: spec-deferred e6d9258059df
@@ -824,7 +828,9 @@ location: src/stores/slices/interactionsSlice.ts:10
 source_spec: `spec-dw-75-interaction-record-ownership.md`
 severity: low
 reason: The baseline already read authSlice.userId for sends, history, and subscriptions while its header said "None (self-contained)". The record callback now also reads authSessionVersion. This pre-existing documentation mismatch can mislead a developer composing an isolated slice fixture about the auth state it requires; production behavior is unaffected.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-source-test-contract-comments
+resolution-undo: a76a4c8413ab1f9522820a2ace3807a71cfccc9190e72bb3e41b1435e26c2a3c 2026-09-12 7374617475733a206f70656e
 
 ### DW-83: EventsSettings counts UTF-16 code units while PostgreSQL char_length counts Unicode characters.
 origin: spec-deferred 40fa82030481

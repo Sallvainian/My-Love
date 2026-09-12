@@ -1,0 +1,94 @@
+{
+  "exit_code": 0,
+  "test_count": 11,
+  "cases": [
+    {
+      "file": "e2e/partner/interaction-record-ownership.spec.ts",
+      "line": 15,
+      "title": "[P0] DW-75-E2E-001 rejects old records while signed out and after the same account returns",
+      "project": "chromium",
+      "status": "skipped",
+      "results": []
+    },
+    {
+      "file": "e2e/partner/interaction-record-ownership.spec.ts",
+      "line": 78,
+      "title": "[P0] DW-75-E2E-002 keeps the new account badge and store free of the old account records",
+      "project": "chromium",
+      "status": "skipped",
+      "results": []
+    },
+    {
+      "file": "e2e/partner/interaction-record-ownership.spec.ts",
+      "line": 135,
+      "title": "[P1] DW-75-E2E-003 preserves records and delivery through same-user refresh without duplicate counts",
+      "project": "chromium",
+      "status": "skipped",
+      "results": []
+    },
+    {
+      "file": "e2e/settings/events-persistence.spec.ts",
+      "line": 161,
+      "title": "[P1] DE.5-E2E-004 the icon a user picks comes back on reload and reaches the Home card",
+      "project": "chromium",
+      "status": "skipped",
+      "results": []
+    },
+    {
+      "file": "e2e/settings/events-persistence.spec.ts",
+      "line": 227,
+      "title": "[P1] DE.5-E2E-005 rows render in server order after a reload, not in creation order",
+      "project": "chromium",
+      "status": "skipped",
+      "results": []
+    },
+    {
+      "file": "e2e/settings/events-persistence.spec.ts",
+      "line": 286,
+      "title": "[P2] DE.5-E2E-006 clearing a description writes null and removes it from the row and Home",
+      "project": "chromium",
+      "status": "skipped",
+      "results": []
+    },
+    {
+      "file": "api/empty-database-error-fallback.spec.ts",
+      "line": 65,
+      "title": "[P1] DW39-API-001 a null message produces a contextual database fallback",
+      "project": "api",
+      "status": "skipped",
+      "results": []
+    },
+    {
+      "file": "api/empty-database-error-fallback.spec.ts",
+      "line": 88,
+      "title": "[P1] DW39-API-002 Unicode whitespace uses the fallback and retains null diagnostics",
+      "project": "api",
+      "status": "skipped",
+      "results": []
+    },
+    {
+      "file": "api/empty-database-error-fallback.spec.ts",
+      "line": 105,
+      "title": "[P2] DW39-API-003 CHECK mapping takes precedence over an empty SDK message",
+      "project": "api",
+      "status": "skipped",
+      "results": []
+    },
+    {
+      "file": "api/empty-database-error-fallback.spec.ts",
+      "line": 119,
+      "title": "[P2] DW39-API-004 meaningful message whitespace survives SDK parsing and conversion",
+      "project": "api",
+      "status": "skipped",
+      "results": []
+    },
+    {
+      "file": "api/empty-database-error-fallback.spec.ts",
+      "line": 133,
+      "title": "[P2] DW39-API-005 a numeric SDK message retains compatibility without throwing",
+      "project": "api",
+      "status": "skipped",
+      "results": []
+    }
+  ]
+}

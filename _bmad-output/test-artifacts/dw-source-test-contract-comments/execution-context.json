@@ -1,0 +1,13 @@
+{
+  "requestedMode": "auto",
+  "resolvedMode": "subagent",
+  "probeEnabled": true,
+  "supports": {
+    "subagent": true,
+    "agentTeam": false
+  },
+  "evidence": "collaboration.spawn_agent launches succeeded; no separate team lifecycle tool available",
+  "detected_stack": "frontend",
+  "pact_mcp_reachable": false,
+  "playwright_utils_mandate": true
+}

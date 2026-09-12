@@ -1,0 +1,48 @@
+{
+  "format_version": 1,
+  "execution": "verify snapshot and canonical bytes, then execute canonical suites in original import context",
+  "files": [
+    {
+      "source": "tests/api/empty-database-error-fallback.spec.ts",
+      "artifact": "tests/api/empty-database-error-fallback.spec.ts",
+      "sha256": "44d9b931ae7628c8486bb02041ef303c9f21479ee9d1eef4c0ba06e8ab86f059",
+      "kind": "test"
+    },
+    {
+      "source": "tests/e2e/settings/events-persistence.spec.ts",
+      "artifact": "tests/e2e/settings/events-persistence.spec.ts",
+      "sha256": "c1b317059519b2a86928ac7cff63bd6b700431d20d4d36ee81165d88f4ce9249",
+      "kind": "test"
+    },
+    {
+      "source": "tests/e2e/partner/interaction-record-ownership.spec.ts",
+      "artifact": "tests/e2e/partner/interaction-record-ownership.spec.ts",
+      "sha256": "2906dc92f62b4ba22f43704206c6adecc8f0f544b188f0c24db58cf40d9aac65",
+      "kind": "test"
+    },
+    {
+      "source": "tests/support/factories/database-error-envelope.ts",
+      "artifact": "tests/support/factories/database-error-envelope.ts",
+      "sha256": "f8afa2eee370ba3593a0d1cbdca671cdb95e4806538b8f73576d427db4a25d7e",
+      "kind": "factory"
+    },
+    {
+      "source": "tests/support/factories/interaction-record-ownership.ts",
+      "artifact": "tests/support/factories/interaction-record-ownership.ts",
+      "sha256": "4c3298659b5402fa9e406155aca08d1a8493fe420ee1d62e9805361db16e539d",
+      "kind": "factory"
+    },
+    {
+      "source": "tests/support/fixtures/interaction-record-ownership.ts",
+      "artifact": "tests/support/fixtures/interaction-record-ownership.ts",
+      "sha256": "fc52927844d8837e33c2a35e80a7441177c90bf943f94b7cb218a82790400f63",
+      "kind": "fixture"
+    },
+    {
+      "source": "tests/support/helpers/events.ts",
+      "artifact": "tests/support/helpers/events.ts",
+      "sha256": "01133078b830026a1c80e8c4b066379d32254188fb6451108c5d2ad79c82c181",
+      "kind": "helper"
+    }
+  ]
+}
