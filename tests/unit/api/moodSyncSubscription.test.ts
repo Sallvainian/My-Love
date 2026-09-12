@@ -699,6 +699,43 @@ describe('subscribeMoodUpdates channel ownership', () => {
     unsubscribeB();
   });
 
+  it('a later subscriber whose lookup fails does not mute a working channel', async () => {
+    // The other half of the line above. `entry.partnerId = partnerIdAtJoin`
+    // must not run when the lookup FAILED: getPartnerId answers null for a
+    // transient `users` error exactly as it does for an unlink, so an
+    // unguarded write here lets the second consumer's failed round-trip
+    // silently stop partner moods for the first one too — and nothing
+    // re-arms it, because refreshChannelIdentity fires only on SUBSCRIBED
+    // and an already-joined channel emits no further one.
+    const onMoodA = vi.fn();
+    const pendingA = moodSyncService.subscribeMoodUpdates(onMoodA);
+    resolveNextSession();
+    const unsubscribeA = await pendingA;
+
+    const channel = constructedChannels[0];
+
+    emitMood(channel, 'before');
+    expect(onMoodA).toHaveBeenCalledTimes(1);
+
+    // The Partner tab mounts while the websocket is healthy, but its `users`
+    // round-trip fails.
+    getPartnerId.mockResolvedValue(null);
+    const onMoodB = vi.fn();
+    const pendingB = moodSyncService.subscribeMoodUpdates(onMoodB);
+    resolveNextSession();
+    const unsubscribeB = await pendingB;
+
+    expect(constructedChannels).toHaveLength(1);
+
+    // Both consumers still receive the partner's mood.
+    emitMood(channel, 'after');
+    expect(onMoodA).toHaveBeenCalledTimes(2);
+    expect(onMoodB).toHaveBeenCalledTimes(1);
+
+    unsubscribeA();
+    unsubscribeB();
+  });
+
   it('returns a no-op unsubscribe when there is no session', async () => {
     const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
     const resolve = sessionQueue.shift();
