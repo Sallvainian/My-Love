@@ -8,6 +8,8 @@ The narrow race requires the previous load to finish **before** a successor load
 
 Tests are delivered under TEA's configured artifacts directory as requested. They are not automatically collected by the repository's normal test projects. The staging script copies them into their configured `tests/api`, `tests/e2e`, and `tests/support` locations without overwriting existing files.
 
+Use a dedicated worktree with no concurrent process editing the generated paths.
+
 ```sh
 supabase start
 node _bmad-output/test-artifacts/dw-event-load-session-ownership/stage-tests.mjs stage
@@ -19,7 +21,17 @@ node _bmad-output/test-artifacts/dw-event-load-session-ownership/stage-tests.mjs
 
 Use `--grep '\[P1\]'` for the five high-priority cases. The token-refresh case is P2. For a repeat run, add `--repeat-each=5 --retries=0`. Playwright config supplies local Supabase keys to the test Vite server; do not start a bare production-mode dev server or put decrypted secrets into files.
 
-The script's `clean` operation removes only byte-identical staged files. If a staged file has changed, it stops for inspection. To activate this pack permanently, stage it and retain those test copies through the normal development process; this workflow keeps the requested deliverables in the artifacts directory.
+The script's `clean` operation compares every staged file to its retained source before deleting any. If a staged file differs, it stops for inspection. Content comparison and deletion are not atomic against concurrent writers. To activate this pack permanently, stage it and retain those test copies through the normal development process; this workflow keeps the requested deliverables in the artifacts directory.
+
+## Check the staging helper only
+
+The helper regressions require only Node 24 and use disposable synthetic directories;
+they need no Supabase server, dependencies, or staging into this worktree. Vitest
+does not discover this Node test file; run it explicitly:
+
+```sh
+node --test _bmad-output/test-artifacts/dw-event-load-session-ownership/stage-tests.test.mjs
+```
 
 ## Fixtures and evidence
 
