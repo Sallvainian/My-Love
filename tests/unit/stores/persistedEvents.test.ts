@@ -125,6 +125,9 @@ describe('persisted events', () => {
       events: [IN_MEMORY_EVENT],
       eventsIsLoading: true,
       eventsError: 'a failure worth not persisting',
+      eventsPagination: { todayISO: '2026-09-12', upcoming: {cursor: null, hasMore: true}, past: {cursor: null, hasMore: true} },
+      eventsIsLoadingMore: true,
+      eventsHistoryError: 'private history failure',
       isOnboarded: true,
     });
 
@@ -134,6 +137,9 @@ describe('persisted events', () => {
     expect(parsed.state).not.toHaveProperty('events');
     expect(parsed.state).not.toHaveProperty('eventsIsLoading');
     expect(parsed.state).not.toHaveProperty('eventsError');
+    expect(parsed.state).not.toHaveProperty('eventsPagination');
+    expect(parsed.state).not.toHaveProperty('eventsIsLoadingMore');
+    expect(parsed.state).not.toHaveProperty('eventsHistoryError');
 
     // Not just absent by key — absent by content, so a rename cannot smuggle it.
     expect(raw).not.toContain('PRIVATE-EVENT-LABEL');
@@ -152,6 +158,23 @@ describe('persisted events', () => {
     // The disclosure path: this array is what `EventCountdown` renders, and the
     // previous account's dates would be on screen before `loadEvents` resolves.
     expect(useAppStore.getState().events).toEqual([]);
+  });
+
+  it('does not hydrate pagination, loading flags, or errors', async () => {
+    const useAppStore = await hydrateFrom(persistedBlob({
+      eventsPagination: { todayISO: '2026-09-12', past: { hasMore: true } },
+      eventsIsLoading: true,
+      eventsError: 'old initial failure',
+      eventsIsLoadingMore: true,
+      eventsHistoryError: 'old history failure',
+    }));
+    expect(useAppStore.getState()).toMatchObject({
+      eventsPagination: null,
+      eventsIsLoading: false,
+      eventsError: null,
+      eventsIsLoadingMore: false,
+      eventsHistoryError: null,
+    });
   });
 
   it('leaves the surrounding persisted keys intact when it strips events', async () => {

@@ -86,6 +86,9 @@ const EXPECTED_RESET: Record<string, unknown> = {
   events: [],
   eventsIsLoading: false,
   eventsError: null,
+  eventsPagination: null,
+  eventsIsLoadingMore: false,
+  eventsHistoryError: null,
 };
 
 /** Identifiers that must not survive a sign-out */

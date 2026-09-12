@@ -18,12 +18,9 @@
  *    seen and corrected. Filtering here would make a wrong-year event both
  *    invisible and uneditable.
  *
- *    Unfiltered is not unbounded. `eventsService.getEvents` reads a capped
- *    window on each side of today (50 by default), so past roughly 50 past
- *    events the OLDEST ones stop arriving — and a year typed wrong into the
- *    deep past is exactly such a row. This screen has no "load more" control to
- *    reach them; adding one means giving `loadEvents` a limit/offset it does
- *    not take today.
+ *    Unfiltered is not unbounded. Initial reads cap each side of today at 50
+ *    rows. Explicit history loading appends bounded pages from either side
+ *    that still has more, including deep-past rows that need a date correction.
  *
  * 3. **Every async action reports its own outcome.** `eventsError` belongs to
  *    the active load only, while writes return `EventWriteResult` directly.
@@ -117,10 +114,14 @@ export function EventsSettings() {
   const {
     events,
     eventsIsLoading,
+    eventsIsLoadingMore,
+    eventsPagination,
+    eventsHistoryError,
     syncStatus,
     userId,
     authSessionVersion,
     loadEvents,
+    loadMoreEvents,
     addEvent,
     editEvent,
     removeEvent,
@@ -144,12 +145,18 @@ export function EventsSettings() {
   const [retryingForSession, setRetryingForSession] = useState<number | null>(null);
   const isRetrying = retryingForSession === authSessionVersion;
   const [retryFocusRequest, setRetryFocusRequest] = useState(0);
+  const [loadingHistoryForSession, setLoadingHistoryForSession] = useState<number | null>(null);
+  const isLoadingHistory = loadingHistoryForSession === authSessionVersion;
+  const [historyFocusRequest, setHistoryFocusRequest] = useState(0);
 
   // The header Add button: the one control that outlives a delete, an
   // add-from-empty, and a stale-row refresh, so it is where focus goes when the
   // opener does not survive.
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const retryButtonRef = useRef<HTMLButtonElement>(null);
+  const historyButtonRef = useRef<HTMLButtonElement>(null);
+  const historyInFlightRef = useRef<EventLoadOwner | null>(null);
+  const historyFocusOwnerRef = useRef<EventLoadOwner | null>(null);
   const retryInFlightRef = useRef<EventLoadOwner | null>(null);
   const retryFocusTargetRef = useRef<{
     target: 'retry' | 'add';
@@ -291,6 +298,68 @@ export function EventsSettings() {
     if (target?.isConnected) target.focus();
   }, [isRetrying, retryFocusRequest]);
 
+  const hasMoreHistory = Boolean(
+    eventsPagination?.upcoming.hasMore || eventsPagination?.past.hasMore
+  );
+
+  useEffect(() => {
+    if (!eventsIsLoading || !historyInFlightRef.current) return;
+    // A full refresh supersedes paging in the store. Release our matching
+    // local lock now, even if the abandoned page request never settles.
+    historyInFlightRef.current = null;
+    historyFocusOwnerRef.current = null;
+    setLoadingHistoryForSession(null);
+  }, [eventsIsLoading]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (
+      !userId ||
+      !hasMoreHistory ||
+      eventsIsLoading ||
+      eventsIsLoadingMore ||
+      historyInFlightRef.current?.authSessionVersion === authSessionVersion
+    ) {
+      return;
+    }
+
+    const owner = { userId, authSessionVersion };
+    if (!ownsCurrentSession(owner)) return;
+    const ownedFocus = document.activeElement === historyButtonRef.current;
+    historyInFlightRef.current = owner;
+    setLoadingHistoryForSession(authSessionVersion);
+
+    const result = await loadMoreEvents();
+    if (
+      !isMountedRef.current ||
+      historyInFlightRef.current !== owner ||
+      !ownsCurrentSession(owner)
+    ) {
+      return;
+    }
+
+    // Keep the control mounted until this point, even if the final page has
+    // exhausted both windows. Chromium blurs a disabled button to body, so
+    // retain its pre-request focus ownership. Any other focused control,
+    // including a form opened during the request, keeps its own focus.
+    const restoreFocus = ownedFocus && (
+      document.activeElement === historyButtonRef.current || document.activeElement === document.body
+    );
+    historyInFlightRef.current = null;
+    setLoadingHistoryForSession(null);
+    if (result.status === 'stale' || !restoreFocus) return;
+    historyFocusOwnerRef.current = owner;
+    setHistoryFocusRequest((request) => request + 1);
+  }, [userId, hasMoreHistory, eventsIsLoading, eventsIsLoadingMore, authSessionVersion, loadMoreEvents]);
+
+  useEffect(() => {
+    if (historyFocusRequest === 0 || isLoadingHistory) return;
+    const owner = historyFocusOwnerRef.current;
+    historyFocusOwnerRef.current = null;
+    if (!owner || !ownsCurrentSession(owner)) return;
+    const target = historyButtonRef.current ?? addButtonRef.current;
+    if (target?.isConnected) target.focus();
+  }, [historyFocusRequest, isLoadingHistory]);
+
   const handleFormRefresh = useCallback(() => {
     handleFormClose();
     void refreshEvents();
@@ -344,6 +413,7 @@ export function EventsSettings() {
   // failed refresh is indistinguishable from "nothing changed".
   const showLoadErrorBanner = firstLoadSettled && loadFailed && slot === 'list';
   const retryIsActive = eventsIsLoading || isRetrying;
+  const historyIsActive = eventsIsLoading || eventsIsLoadingMore || isLoadingHistory;
 
   // One notice, one testid, mounted in whichever of the two positions applies.
   const loadErrorNotice = (
@@ -416,7 +486,7 @@ export function EventsSettings() {
       <div
         className="space-y-3"
         data-testid="events-settings-load-region"
-        aria-busy={eventsIsLoading}
+        aria-busy={eventsIsLoading || eventsIsLoadingMore || isLoadingHistory}
       >
         {slot === 'error' && loadErrorNotice}
 
@@ -439,7 +509,9 @@ export function EventsSettings() {
           >
             <Calendar className="mx-auto mb-3 h-12 w-12 text-gray-400" />
             <p className="text-gray-600 dark:text-gray-400">
-              No events yet. Add one you are both counting down to.
+              {hasMoreHistory
+                ? 'No events to display in this part of your history.'
+                : 'No events yet. Add one you are both counting down to.'}
             </p>
             <button
               type="button"
@@ -448,7 +520,7 @@ export function EventsSettings() {
               className="mt-4 inline-flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-700 hover:shadow-lg"
             >
               <Plus className="h-4 w-4" />
-              Add your first event
+              {hasMoreHistory ? 'Add an event' : 'Add your first event'}
             </button>
           </div>
         )}
@@ -533,7 +605,70 @@ export function EventsSettings() {
             </AnimatePresence>
           </div>
         )}
+
+        {(hasMoreHistory || isLoadingHistory) && (
+          <div className="space-y-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+            {hasMoreHistory && (
+              <p
+                id="events-settings-history-notice"
+                data-testid="events-settings-history-notice"
+                className="text-sm text-gray-600 dark:text-gray-400"
+              >
+                More events are available. Load more history to find older dates or later upcoming
+                events. After a refresh or reload, saved events outside this list may need to be
+                loaded again.
+              </p>
+            )}
+            {eventsHistoryError && (
+              <p
+                id="events-settings-history-error"
+                data-testid="events-settings-history-error"
+                role="status"
+                aria-live="polite"
+                className="text-sm text-amber-800 dark:text-amber-300"
+              >
+                We couldn&apos;t load more history. Your loaded events are still here. Check your
+                connection and try again.
+              </p>
+            )}
+            <button
+              ref={historyButtonRef}
+              type="button"
+              onClick={() => void handleLoadMore()}
+              disabled={historyIsActive}
+              data-testid="events-settings-load-more"
+              aria-describedby={[
+                hasMoreHistory ? 'events-settings-history-notice' : '',
+                eventsHistoryError ? 'events-settings-history-error' : '',
+              ].filter(Boolean).join(' ') || undefined}
+              className="inline-flex items-center gap-2 rounded-lg border border-purple-500 px-4 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-purple-300 dark:hover:bg-purple-900/30"
+            >
+              {historyIsActive && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {historyIsActive
+                ? 'Loading history…'
+                : eventsHistoryError
+                  ? 'Retry loading history'
+                  : 'Load more history'}
+            </button>
+          </div>
+        )}
       </div>
+
+      <p
+        className="sr-only"
+        data-testid="events-settings-history-status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {eventsIsLoading
+          ? ''
+          : eventsIsLoadingMore || isLoadingHistory
+            ? 'Loading history…'
+            : eventsPagination && !eventsHistoryError && !loadFailed
+              ? `${events.length} ${events.length === 1 ? 'event' : 'events'} loaded. ${hasMoreHistory ? 'More history is available.' : 'No more history to load.'}`
+              : ''}
+      </p>
 
       {/* Add / Edit form modal */}
       <AnimatePresence>
@@ -587,6 +722,9 @@ function EventForm({
   fallbackFocusRef,
   refreshFocusRef,
 }: EventFormProps) {
+  // The fields and save target survive a refresh that drops this paged row.
+  // Keep the form's mode with those initial values until its key changes too.
+  const [isEditing] = useState(Boolean(event));
   const [label, setLabel] = useState(event?.label ?? '');
   // formatDateISO, never toISOString().split('T')[0]: the latter is UTC-based
   // and pre-fills the previous day for anyone west of UTC.
@@ -604,7 +742,6 @@ function EventForm({
   const saveSucceededRef = useRef(false);
   const refreshRequestedRef = useRef(false);
 
-  const isEditing = Boolean(event);
   const titleId = 'events-form-title';
 
   // useFocusTrap lists onEscape in its deps and re-focuses initialFocusRef on
