@@ -85,6 +85,9 @@ let nextSendFailureShape: { status: number; error: string } | null = null;
 /** When true, httpSend honours its timeout option instead of resolving */
 let hangNextSend = false;
 
+/** When set, the next `setAuth()` rejects with this message instead of installing a token. */
+let nextAuthFailure: string | null = null;
+
 /**
  * The shared socket, modelled the way RealtimeClient actually behaves:
  * removing the LAST channel calls disconnect(), which parks the socket in
@@ -156,6 +159,11 @@ vi.mock('@/api/supabaseClient', () => ({
       isDisconnecting: () => socket.state === 'disconnecting',
       setAuth: async () => {
         opOrder.push('setAuth');
+        if (nextAuthFailure !== null) {
+          const message = nextAuthFailure;
+          nextAuthFailure = null;
+          throw new Error(message);
+        }
         socketToken = nextAuthToken;
       },
     },
@@ -238,6 +246,7 @@ describe('sendEphemeralBroadcast', () => {
     nextSendFailure = null;
     nextSendFailureShape = null;
     hangNextSend = false;
+    nextAuthFailure = null;
     socket.state = 'connected';
     socket.windowMs = 40;
     socket.modelDisconnectWindow = true;
@@ -469,6 +478,30 @@ describe('sendEphemeralBroadcast', () => {
     expect(delivered).toEqual(['mood-1', 'mood-2', 'mood-3']);
     // None left stranded.
     expect(constructedChannels.every((c) => c.state === 'closed')).toBe(true);
+  });
+
+  it('releases the claimed topic when installing the caller JWT fails', async () => {
+    // The claim is synchronous and the token install is not, so a rejecting
+    // `setAuth` used to return through a path with no `removeChannel` at all --
+    // leaving the topic in the client's registry for the life of the page. The
+    // next send to that topic was then handed the stranded channel, and because
+    // a non-empty registry blocks `removeChannel`'s socket teardown, the leak
+    // also pinned the shared socket open.
+    nextAuthFailure = 'refresh failed';
+
+    const send = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    await settle();
+
+    await expect(send).rejects.toThrow('refresh failed');
+    expect(openChannels.has(TOPIC)).toBe(false);
+
+    // And the queue is not wedged: the topic is sendable again afterwards.
+    const next = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-2' });
+    await settle();
+    await expect(next).resolves.toBeUndefined();
+    expect(constructedChannels.at(-1)?.sent).toEqual([
+      { event: 'new_mood', payload: { id: 'mood-2' } },
+    ]);
   });
 
   it('rejects rather than hanging when the endpoint never answers', async () => {
