@@ -4,6 +4,16 @@ Three P2 API compatibility cases and one P2 browser failure/retry scenario.
 Generated tests and fixtures are retained here as requested. They are **not
 automatically discovered by CI** until placed at their matching `tests/**` paths.
 
+## Check the staging helper only
+
+These checks require only Node 24. They use disposable synthetic directories,
+not the current worktree's tests, and need no Supabase server or dependencies.
+Vitest does not discover this Node test file; run it explicitly:
+
+```sh
+node --test _bmad-output/test-artifacts/dw-event-transport-error-cause/stage-tests.test.mjs
+```
+
 ## Run from the repository root
 
 Node 24, project dependencies, Playwright Chromium and running local Supabase are
@@ -20,9 +30,12 @@ npm run lint
 node _bmad-output/test-artifacts/dw-event-transport-error-cause/stage-tests.mjs clean
 ```
 
-Run `clean` even if validation fails. It removes only byte-identical staged files;
-it refuses to delete a file edited after staging. `stage` refuses to overwrite any
-existing target. Both modes check the entire file set before modifying it.
+Run these commands only in a dedicated worktree with no other process editing
+the generated paths. Run `clean` even if validation fails: it checks every staged
+file against its retained source and refuses cleanup if any differs. The content
+check and deletion are not atomic against concurrent writers. `stage` uses
+exclusive creation and refuses to overwrite existing targets. Both modes check
+the entire file set before modifying it.
 For permanent suite integration, keep the staged files and include them in the
 normal test changes. Existing runner discovery and merged fixtures need no edits.
 
