@@ -314,6 +314,60 @@ describe('EventsSettings form focus', () => {
     expect(document.activeElement).toBe(screen.getByTestId('events-form-submit'));
   });
 
+  it.each(['add', 'edit'] as const)('focuses Refresh after an uncertain %s and the header after reconciliation', async (kind) => {
+    let finishRefresh!: () => void;
+    const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
+    const uncertain = vi.fn<() => Promise<EventWriteResult>>(async () => ({
+      success: false, code: 'invalid-response', error: 'Unreadable response',
+    }));
+    setStore({
+      events: kind === 'edit' ? [makeEvent({ id: 'mine' })] : [],
+      loadEvents,
+      ...(kind === 'add' ? { addEvent: uncertain } : { editEvent: uncertain }),
+    });
+    await renderSection();
+    loadEvents.mockImplementationOnce(() => {
+      store.patch({ eventsIsLoading: true, eventsError: null });
+      return new Promise<EventLoadResult>((resolve) => {
+        finishRefresh = () => {
+          store.patch({
+            eventsIsLoading: false,
+            eventsError: null,
+            events: [makeEvent({ id: 'mine', label: 'Saved event' })],
+          });
+          resolve(loadOk);
+        };
+      });
+    });
+
+    const opener = openBy(kind === 'add' ? 'events-settings-empty-add' : 'event-edit-mine');
+    fireEvent.change(screen.getByTestId('events-form-label'), { target: { value: 'Saved event' } });
+    fireEvent.change(screen.getByTestId('events-form-date'), { target: { value: '2026-10-01' } });
+    fireEvent.click(screen.getByTestId('events-form-submit'));
+
+    await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toHaveFocus());
+    const refresh = screen.getByRole('button', { name: 'Refresh events' });
+    expect(refresh).toBeEnabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/may already have been saved/i);
+    fireEvent.keyDown(refresh, { key: 'Tab' });
+    expect(screen.getByTestId('events-form-close')).toHaveFocus();
+    fireEvent.keyDown(screen.getByTestId('events-form-close'), { key: 'Tab', shiftKey: true });
+    expect(refresh).toHaveFocus();
+    expect(opener.isConnected).toBe(true);
+    fireEvent.click(refresh);
+
+    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
+    expect(opener.isConnected).toBe(kind === 'edit');
+    if (kind === 'add') expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-add')).toHaveFocus();
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+    await act(async () => { finishRefresh(); });
+    expect(screen.getByTestId('event-row-mine')).toHaveTextContent('Saved event');
+    expect(opener.isConnected).toBe(kind === 'edit');
+    expect(screen.getByTestId('events-settings-add')).toHaveFocus();
+    expect(uncertain).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps focus on the header after refresh later removes the stale edit opener', async () => {
     let finishRefresh: () => void = () => {};
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);

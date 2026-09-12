@@ -503,7 +503,9 @@ location: src/components/Settings/EventsSettings.tsx:872
 source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: This behavior predates the bundle: every failure previously left Save enabled. The new `invalid-response` code now identifies it, but choosing a distinct safe affordance was not part of the events-only refresh-versus-retry decision. `createEvent` can throw after insert when the returned row cannot be converted, while Settings routes every code except `not-found` to Save/Delete.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-decision-dw-49
+resolution-undo: 5978483b28512c6b5e1f3ce7a7cecad6eb9f4cce3c4aa2f746285eb1c55c8e39 2026-09-12 7374617475733a206f70656e
 decision: 2026-09-12 Refresh before another write — Give invalid-response save failures an explicit uncertain-save explanation and replace immediate Add/Update retry with reconciliation through the existing events refresh flow. Prevent resubmission from that failed form, preserve offline and transport retry behavior, and cover create/update recovery and refresh failure.
 decision: 2026-09-12 Keep recovery deferred
 decision: 2026-09-11 Keep recovery deferred

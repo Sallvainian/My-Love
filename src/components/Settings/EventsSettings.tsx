@@ -733,11 +733,13 @@ function EventForm({
   const [icon, setIcon] = useState<EventIcon>(event?.icon ?? 'calendar');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saveFailure, setSaveFailure] = useState<EventWriteFailure | null>(null);
+  const isSaveUncertain = saveFailure?.code === 'invalid-response';
   const [isSaving, setIsSaving] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const labelInputRef = useRef<HTMLInputElement>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
+  const isSaveUncertainRef = useRef(false);
   const isSavingRef = useRef(false);
   const saveSucceededRef = useRef(false);
   const refreshRequestedRef = useRef(false);
@@ -789,8 +791,8 @@ function EventForm({
   }, [fallbackFocusRef, refreshFocusRef]);
 
   // Hand focus to the enabled primary action after a failure: Save for a
-  // retryable write, Refresh events for a stale row. Doing it inside the await
-  // would focus a still-disabled button, which the DOM ignores.
+  // retryable write, Refresh events for a stale row or an uncertain save. Doing
+  // it inside the await would focus a still-disabled button, which the DOM ignores.
   useEffect(() => {
     if (saveFailure && !isSaving) {
       submitButtonRef.current?.focus();
@@ -816,6 +818,10 @@ function EventForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // A write with an unreadable response may have committed. Keep this form
+    // refresh-only even after field edits or a submission that bypasses its button.
+    // The ref latches before React renders the failure and replaces the action.
+    if (isSaveUncertainRef.current) return;
 
     const trimmedLabel = label.trim();
     const trimmedDescription = description.trim();
@@ -868,6 +874,9 @@ function EventForm({
       });
 
       if (!result.success) {
+        if (result.code === 'invalid-response') {
+          isSaveUncertainRef.current = true;
+        }
         // The message for THIS write, off its own returned result — not off the
         // load-only `eventsError` key, which a background load owns.
         setSaveFailure(result);
@@ -1117,7 +1126,9 @@ function EventForm({
               data-testid="events-form-error"
               role="alert"
             >
-              {saveFailure.error}
+              {isSaveUncertain
+                ? "This event may already have been saved. We couldn't read the response. Refresh events to check the latest list before making another change."
+                : saveFailure.error}
             </p>
           )}
 
@@ -1132,7 +1143,7 @@ function EventForm({
               <X className="h-4 w-4" />
               Cancel
             </button>
-            {saveFailure?.code === 'not-found' ? (
+            {saveFailure?.code === 'not-found' || isSaveUncertain ? (
               <button
                 ref={submitButtonRef}
                 type="button"
