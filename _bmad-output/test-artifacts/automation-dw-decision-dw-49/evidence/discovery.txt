@@ -1,0 +1,11 @@
+◇ injected env (0) from ../../../../../node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌁ auth for agents [www.vestauth.com]
+Listing tests:
+  [chromium] › e2e/uncertain-event-save.spec.ts:112:5 › DW-49 uncertain event saves › [P1] DW49-E2E-001 committed create blocks resubmission and reconciles by refresh
+  [chromium] › e2e/uncertain-event-save.spec.ts:112:5 › DW-49 uncertain event saves › [P1] DW49-E2E-002 committed update blocks resubmission and reconciles by refresh
+  [chromium] › e2e/uncertain-event-save.spec.ts:178:5 › DW-49 uncertain event saves › [P1] DW49-E2E-003 failed create reconciliation preserves the list and Retry only reads
+  [chromium] › e2e/uncertain-event-save.spec.ts:178:5 › DW-49 uncertain event saves › [P1] DW49-E2E-004 failed update reconciliation preserves the list and Retry only reads
+  [chromium] › e2e/uncertain-event-save.spec.ts:259:3 › DW-49 uncertain event saves › [P2] DW49-E2E-005 a committed create outside bounded history stays absent without replay
+  [chromium] › e2e/uncertain-event-save.spec.ts:316:3 › DW-49 uncertain event saves › [P2] DW49-E2E-006 an ordinary transport failure keeps deliberate create retry available
+  [api] › api/events-save-reconciliation.spec.ts:24:3 › DW-49 event save reconciliation API › [P2] DW49-API-001 single-object create remains exactly one row across reconciliation reads
+  [api] › api/events-save-reconciliation.spec.ts:75:3 › DW-49 event save reconciliation API › [P2] DW49-API-002 array update preserves identity and timestamp across reconciliation reads
+Total: 8 tests in 2 files

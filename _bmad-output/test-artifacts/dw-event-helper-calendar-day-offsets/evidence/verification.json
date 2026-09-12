@@ -1,0 +1,55 @@
+{
+  "status": "passed",
+  "playwright": {
+    "exit_code": 0,
+    "tests": 2,
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "workers": 2,
+    "duration_ms": 8633.104,
+    "projects": [
+      "api",
+      "chromium"
+    ],
+    "report": "evidence/playwright.json"
+  },
+  "unit": {
+    "exit_code": 0,
+    "tests": 21,
+    "passed": 21,
+    "failed": 0,
+    "report": "evidence/unit.txt"
+  },
+  "typecheck": {
+    "initial_exit_code": 2,
+    "final_exit_code": 0,
+    "repair": "Use a boolean recurse predicate and assert the returned snapshot; installed fixture requires (value) => boolean.",
+    "report": "evidence/typecheck.txt"
+  },
+  "lint": {
+    "exit_code": 0,
+    "errors": 0,
+    "existing_warnings": 3,
+    "report": "evidence/lint.txt"
+  },
+  "cleanup": {
+    "staged_files_remaining": 0,
+    "event_rows_with_generated_label_prefix": 0,
+    "database_query": "select count(*) from public.events where label like 'nuuk-gap-%';",
+    "cli_session_closed": "dw84-preflight",
+    "test_webserver_remaining": false
+  },
+  "diff_check": {
+    "exit_code": 0
+  },
+  "limitations": [
+    "Single local runtime pass; no reliability rate, burn-in or CI parity claim.",
+    "Browser clock/timezone and server clock remain real; only date fixture child uses America/Nuuk.",
+    "Vite emitted a React state-update-before-mount warning during reload; no runtime assertion or network-monitor failure.",
+    "Generated files are artifact copies; use run.py for discovery, typecheck and lint.",
+    "No production build or broad DB/Playwright suite was required for this test-helper change."
+  ],
+  "post_validation_edits": "Given/When/Then comments only; executable statements unchanged."
+}

@@ -1,0 +1,38 @@
+{
+  "profile": "full UI+API",
+  "read_by": [
+    "parent",
+    "api_context",
+    "quality_context"
+  ],
+  "fragments": [
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/playwright-utils-mandate.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/library-integration-mandate.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/overview.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/api-request.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/auth-session.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/recurse.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/log.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/file-utils.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/burn-in.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/network-recorder.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/network-error-monitor.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/fixtures-composition.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/pact-mcp.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/test-levels-framework.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/test-priorities-matrix.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/data-factories.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/test-quality.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/selective-testing.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/ci-burn-in.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/fixture-architecture.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/network-first.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/intercept-network-call.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/test-healing-patterns.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/selector-resilience.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/timing-debugging.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/playwright-cli.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/confidence-gate.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/evidence-integrity.md"
+  ]
+}

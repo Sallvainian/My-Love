@@ -441,7 +441,9 @@ location: src/App.tsx, src/components/DailyMessage/DailyMessage.tsx:366, src/uti
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: `HOME_MAX_EVENT_CARDS = 3` in `src/App.tsx`, `maxDisplay={3}` passed at `src/components/DailyMessage/DailyMessage.tsx:366`, and `count: number = 3` in `getUpcomingAnniversaries` (`src/utils/countdownService.ts:49-51`). The new constant's JSDoc cites the other two as its precedent but does not share a value with them, so changing the product decision means finding all three. Unifying them is a cross-feature refactor the intent does not reach.
-status: open
+status: done 2026-09-12
+resolution: closed by human decision as obsolete: Commit 32c583f8fe021a93a74e11c91aefbde77835ca8c intentionally raised Home to six event cards while anniversary countdowns retain three (src/App.tsx:84-93; src/components/DailyMessage/DailyMessage.tsx:366; src/utils/countdownService.ts:51). These are distinct display choices, so the original single-limit consolidation is no longer needed. No runtime change.
+decision: 2026-09-12 Close as obsolete — Preserve six Home event cards and three anniversary countdowns; do not unify the limits.
 
 ### DW-44: An event saved with a date beyond the past read window appears in Settings immediately and then silently disappears on the next load.
 origin: spec-deferred 6e4344fda920
@@ -449,7 +451,8 @@ location: src/stores/slices/eventsSlice.ts (addEvent), src/components/Settings/E
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: Verified path, both halves read this session: `eventsSlice.addEvent` inserts the created row into the store unconditionally — `set((state) => ({ events: sortByDate([...state.events, created]) }))` — while `loadEvents` re-reads a bounded window (`getEvents()` bare, so `limit = 50` per side). A couple with more than 50 past events who corrects or adds a deep-past date therefore sees the row in Settings, and the next `loadEvents()` drops it because the descending past page no longer reaches it. The row is not lost — it is in the table — only invisible. Distinct from the "no way to reach truncated rows" item: that one is about rows the user never sees, this one is about a row the user just saw confirmed. Closing it needs the same "load more" plumbing, or an in-range check at save time.
-status: open
+status: done 2026-09-12
+resolution: already resolved: Commit 690cfcad3c4a248856e34dd778c73bb09bf70d78 (2026-09-12) implements the approved saved-row reachability: src/stores/slices/eventsSlice.ts:245 appends history pages and :307/:336 records successful add/edit upserts; src/components/Settings/EventsSettings.tsx:609 exposes the partial-list notice and Load more history control. tests/e2e/settings/events-history-pagination.spec.ts:55 and :93 cover editing and adding beyond 50 past rows, reloading, loading history, and editing saved values again. Reload returns to initial windows, with an explicit path back to saved rows, as approved and documented at _bmad-output/implementation-artifacts/spec-dw-41-settings-event-history-pagination.md:102.
 decision: 2026-09-12 Preserve saved-row access — Add Settings paging and post-save reconciliation that keeps an out-of-window saved event reachable after reload without rejecting valid past dates. Coordinate the history-loading path with DW-41 and truncation metadata with DW-46, preserving bounded Home reads and session ownership. Verify adding and editing a row beyond 50 past events, then reloading and locating it for another edit.
 decision: 2026-09-11 Keep pagination deferred
 decision: 2026-09-11 Defer pagination
@@ -470,7 +473,8 @@ location: src/services/eventsService.ts (both window queries)
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: Both reads are plain `.select('*')` with no `{ count: 'exact' }`, so the service, the store and any future affordance have no "there are more" signal; `logger.debug('[EventsService] Fetched events:', events.length)` cannot distinguish 50 events from 50 of 300. The already-recorded Settings "load more" item names the control and the `limit`/`offset` plumbing it needs, but not the fact that the data to drive its enabled state is not fetched. A count also cannot go anywhere today: the intent's Never list forbids a store-shape change and a second store action.
-status: open
+status: done 2026-09-12
+resolution: already resolved: Commit 690cfcad3c4a248856e34dd778c73bb09bf70d78 (2026-09-12) adds the approved bounded-lookahead metadata and consumer: src/services/eventsService.ts:268 defines per-window cursor/hasMore, :285 derives continuation from the raw 51st row, and :324 returns bounded pages with metadata; src/stores/slices/eventsSlice.ts:253 stores pagination and src/components/Settings/EventsSettings.tsx:301 consumes both hasMore flags for the history control. tests/unit/services/eventsService.test.ts:381 verifies empty, exact-50, and truncated-51 windows on both sides.
 decision: 2026-09-12 Add paging metadata and consumer — Define per-window continuation metadata and carry it through the events service and store to a Settings paging control. Choose a count or bounded lookahead strategy with explicit semantics, preserve existing ordering and Home behavior, and verify empty, exact-limit, and truncated windows. Coordinate this contract change with the history-access behavior in DW-41 and DW-44.
 decision: 2026-09-11 Keep metadata deferred
 decision: 2026-09-11 Defer pagination
@@ -501,7 +505,10 @@ location: src/components/Settings/EventsSettings.tsx:872
 source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: This behavior predates the bundle: every failure previously left Save enabled. The new `invalid-response` code now identifies it, but choosing a distinct safe affordance was not part of the events-only refresh-versus-retry decision. `createEvent` can throw after insert when the returned row cannot be converted, while Settings routes every code except `not-found` to Save/Delete.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-decision-dw-49
+resolution-undo: 5978483b28512c6b5e1f3ce7a7cecad6eb9f4cce3c4aa2f746285eb1c55c8e39 2026-09-12 7374617475733a206f70656e
+decision: 2026-09-12 Refresh before another write — Give invalid-response save failures an explicit uncertain-save explanation and replace immediate Add/Update retry with reconciliation through the existing events refresh flow. Prevent resubmission from that failed form, preserve offline and transport retry behavior, and cover create/update recovery and refresh failure.
 decision: 2026-09-12 Keep recovery deferred
 decision: 2026-09-11 Keep recovery deferred
 decision: 2026-09-11 Defer the recovery choice
@@ -800,7 +807,10 @@ origin: spec-deferred 5d23934f706e
 location: src/api/auth/sessionService.ts:onAuthStateChange; src/api/auth/actionService.ts:signIn,signOut; src/sw-db.ts:storeAuthToken,clearAuthToken
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 reason: sessionService and actionService both write/delete the current service-worker token, and neither associates those operations with a generation. Those writers and their asynchronous IndexedDB opens predate this bundle. Reversing mocked promise completion does not demonstrate reversed real IndexedDB commits; establishing the reported late-clear outcome requires a controlled trace of actual IndexedDB operations plus actionService signOut/signIn overlap. Earlier auth delivery alone does not establish the claimed regression.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-decision-dw-79
+resolution-undo: 977f0a57bd3de369e757ae7c4e0d16f435a03d43904b8da6a9062c4a084f34f8 2026-09-12 7374617475733a206f70656e
+decision: 2026-09-12 Trace real token persistence overlap — Build a controlled browser regression harness that exercises the actual sw-db IndexedDB implementation alongside overlapping actionService signOut/signIn and auth notifications. Record operation dispatch, transaction creation, commit order, and the final current-token owner without exposing token contents. Establish whether a stale operation can overwrite or delete the newer token before choosing a persistence-coordination change.
 decision: 2026-09-12 Keep pending stronger evidence
 decision: 2026-09-11 Keep pending stronger evidence
 
@@ -840,7 +850,9 @@ location: src/components/Settings/EventsSettings.tsx:689
 source_spec: `spec-dw-60-63-66-67-68-events-validation-guard-fidelity.md`
 severity: medium
 reason: The unchanged submit handler uses trimmedLabel.length and trimmedDescription.length. Measured 100 repeated emoji have JavaScript length 200 and PostgreSQL char_length 100, so the form rejects some values admitted by the existing database CHECK. This predates this bundle, which explicitly preserves production validation. The new boundary tests characterize the existing limits with ASCII and do not establish Unicode equivalence.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-unicode-character-limits
+resolution-undo: 0be197926a87be6e2c1fbbaed78db765bec7e69a592d2449494dfec36cb22e27 2026-09-12 7374617475733a206f70656e
 decision: 2026-09-12 Match PostgreSQL character counts — Count Unicode code points in the event form's trimmed label and description validation while retaining the existing 100/500 database limits, icons, and trimming behavior. Align any counters or input restrictions with that rule and add exact-limit and limit-plus-one tests using supplementary-plane emoji and combining characters for the shared add/edit submission path. Keep the database schema unchanged and verify the form accepts the same character counts as PostgreSQL.
 
 ### DW-84: The helper's existing time-of-day arithmetic can skip a calendar day in a late-evening DST gap.
@@ -849,4 +861,6 @@ location: tests/support/helpers/events.ts:180
 source_spec: `spec-dw-61-64-69-event-test-date-anchors.md`
 severity: low
 reason: Reproduced with TZ=America/Nuuk: local 2026-03-27 23:30 plus one day using the helper's unchanged setDate arithmetic yields 2026-03-29, while eventDateFrom's local-midnight constructor yields 2026-03-28. The target 23:30 falls in a skipped DST hour. Baseline revision 6afb20e2b69485307ecb25fac7c59f0e86ab45af uses the same time-preserving arithmetic, so this is a pre-existing calendar issue rather than the independent-clock defect resolved by this bundle. Current unit coverage runs in America/New_York, where its spring/fall DST cases pass.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-event-helper-calendar-day-offsets
+resolution-undo: f1f54829eeec8a92362ccf7d56827785f3782bece2e52d1232ce15cc31764d98 2026-09-12 7374617475733a206f70656e
