@@ -4,9 +4,6 @@
 # run `mise upgrade node` to move the lock to a newer 24.x.
 node = "24"
 
-[env]
-CODEX_HOME = "{{config_root}}/.codex"
-
 [settings]
 # Read and update mise.lock alongside this file.
 lockfile = true
