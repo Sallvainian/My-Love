@@ -1511,8 +1511,8 @@ describe('SoloReadingFlow', () => {
 
       await vi.waitFor(() => {
         expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
+        expect(screen.queryByTestId('scripture-report-partner-waiting')).toBeNull();
       });
-      expect(screen.queryByTestId('scripture-report-partner-waiting')).toBeNull();
     });
 
     it('focuses compose/report headings and announces transitions', async () => {
