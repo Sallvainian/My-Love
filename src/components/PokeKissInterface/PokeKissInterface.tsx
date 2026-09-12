@@ -24,9 +24,9 @@ import { Hand, Heart, History, Wind, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import type { InteractionSubscriptionStatus } from '../../api/interactionService';
-import { getPartnerId } from '../../api/supabaseClient';
 import { useAppStore } from '../../stores/useAppStore';
 import type { Interaction } from '../../types';
+import { NoPartnerError } from '../../utils/interactionValidation';
 import { logger } from '../../utils/logger';
 import { InteractionHistory } from '../InteractionHistory';
 
@@ -175,21 +175,14 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
       return;
     }
 
-    // Ahead of getPartnerId, not in the catch below: getPartnerId queries the
-    // users table, and every failure path returns null (supabaseClient.ts:99-112),
-    // so offline it reports "Partner not configured" and returns before sendPoke
-    // is ever called. interactionService.ts:159's honest sentence is unreachable
-    // from there. Interactions are Supabase-only -- no queue, no retry -- so say so.
+    // Ahead of the send, not in the catch below: the recipient is resolved
+    // inside the service (F4), and every failure path of that lookup returns
+    // null (supabaseClient.ts:99-112), so offline it would report "Partner not
+    // configured" for what is really a missing connection.
+    // interactionService.ts's honest sentence is unreachable from there.
+    // Interactions are Supabase-only -- no queue, no retry -- so say so.
     if (!isOnline()) {
       setShowToast('You are offline. A poke needs a connection to send.');
-      setTimeout(() => setShowToast(null), 3000);
-      return;
-    }
-
-    const partnerId = await getPartnerId();
-    if (!partnerId) {
-      console.error('[PokeKissInterface] No partner ID configured');
-      setShowToast('Error: Partner not configured');
       setTimeout(() => setShowToast(null), 3000);
       return;
     }
@@ -198,14 +191,18 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
     setIsExpanded(false);
 
     try {
-      await sendPoke(partnerId);
+      await sendPoke();
       recordInteractionTime('poke');
       setPokeCooldown(RATE_LIMIT_MS);
       setShowToast('Poke sent! 👆');
       setTimeout(() => setShowToast(null), 2000);
     } catch (error) {
       console.error('[PokeKissInterface] Failed to send poke:', error);
-      setShowToast('Failed to send poke. Try again.');
+      setShowToast(
+        error instanceof NoPartnerError
+          ? 'Error: Partner not configured'
+          : 'Failed to send poke. Try again.'
+      );
       setTimeout(() => setShowToast(null), 3000);
     } finally {
       setIsPoking(false);
@@ -220,17 +217,9 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
       return;
     }
 
-    // See the note in handlePoke: the offline guard has to precede getPartnerId.
+    // See the note in handlePoke: the offline guard has to precede the send.
     if (!isOnline()) {
       setShowToast('You are offline. A kiss needs a connection to send.');
-      setTimeout(() => setShowToast(null), 3000);
-      return;
-    }
-
-    const partnerId = await getPartnerId();
-    if (!partnerId) {
-      console.error('[PokeKissInterface] No partner ID configured');
-      setShowToast('Error: Partner not configured');
       setTimeout(() => setShowToast(null), 3000);
       return;
     }
@@ -239,14 +228,18 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
     setIsExpanded(false);
 
     try {
-      await sendKiss(partnerId);
+      await sendKiss();
       recordInteractionTime('kiss');
       setKissCooldown(RATE_LIMIT_MS);
       setShowToast('Kiss sent! 💋');
       setTimeout(() => setShowToast(null), 2000);
     } catch (error) {
       console.error('[PokeKissInterface] Failed to send kiss:', error);
-      setShowToast('Failed to send kiss. Try again.');
+      setShowToast(
+        error instanceof NoPartnerError
+          ? 'Error: Partner not configured'
+          : 'Failed to send kiss. Try again.'
+      );
       setTimeout(() => setShowToast(null), 3000);
     } finally {
       setIsKissing(false);
