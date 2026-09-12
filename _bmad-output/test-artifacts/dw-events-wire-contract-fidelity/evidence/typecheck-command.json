@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "_bmad-output/test-artifacts/dw-events-wire-contract-fidelity/run.py",
+    "npm",
+    "run",
+    "typecheck"
+  ],
+  "exit_code": 0,
+  "duration_seconds": 6.06
+}

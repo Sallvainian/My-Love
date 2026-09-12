@@ -1,0 +1,246 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/node_modules/.bin/playwright",
+      "test",
+      "tests/api/events-wire-contract-fidelity.spec.ts",
+      "--project=api",
+      "--workers=2",
+      "--grep",
+      "DE.5-API-007",
+      "--reporter=json"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/playwright.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/support/auth/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "api",
+        "name": "api",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/api",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "integration",
+        "name": "integration",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/integration",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": {
+      "command": "npx vite --mode test",
+      "url": "http://localhost:5173",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "api/events-wire-contract-fidelity.spec.ts",
+      "file": "api/events-wire-contract-fidelity.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Events wire contract over PostgREST — story 5",
+          "file": "api/events-wire-contract-fidelity.spec.ts",
+          "line": 188,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 291,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoHaveLength\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected length: \u001b[32m0\u001b[39m\nReceived length: \u001b[31m1\u001b[39m\nReceived array:  \u001b[31m[{\"id\": \"96ce6f09-3a4f-45da-9976-a4df916dcd74\"}]\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoHaveLength\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected length: \u001b[32m0\u001b[39m\nReceived length: \u001b[31m1\u001b[39m\nReceived array:  \u001b[31m[{\"id\": \"96ce6f09-3a4f-45da-9976-a4df916dcd74\"}]\u001b[39m\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/api/events-wire-contract-fidelity.spec.ts:275:20",
+                        "location": {
+                          "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/api/events-wire-contract-fidelity.spec.ts",
+                          "column": 20,
+                          "line": 275
+                        },
+                        "snippet": "  273 |\n  274 |     expect(leakError).toBeNull();\n> 275 |     expect(leaked).toHaveLength(0);\n      |                    ^\n  276 |\n  277 |     // An always-empty verifier must fail: a real creator row with this attempt's\n  278 |     // identity is visible to the same query after the refusal has been checked."
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/api/events-wire-contract-fidelity.spec.ts",
+                            "column": 20,
+                            "line": 275
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoHaveLength\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected length: \u001b[32m0\u001b[39m\nReceived length: \u001b[31m1\u001b[39m\nReceived array:  \u001b[31m[{\"id\": \"96ce6f09-3a4f-45da-9976-a4df916dcd74\"}]\u001b[39m\n\n  273 |\n  274 |     expect(leakError).toBeNull();\n> 275 |     expect(leaked).toHaveLength(0);\n      |                    ^\n  276 |\n  277 |     // An always-empty verifier must fail: a real creator row with this attempt's\n  278 |     // identity is visible to the same query after the refusal has been checked.\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/api/events-wire-contract-fidelity.spec.ts:275:20"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[08:59:58] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[08:59:58] \u001b[1m\u001b[36m==== Seed abandoned attempts and a same-label partner witness ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[08:59:58] \u001b[1m\u001b[36m==== GET /rest/v1/events as anon — apikey header only, no Authorization bearer ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[08:59:58] \u001b[1m\u001b[36m==== POST /rest/v1/events as anon — same headers, a well-formed row ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[08:59:58] \u001b[1m\u001b[36m==== Confirm the refused POST wrote nothing ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Seed abandoned attempts and a same-label partner witness",
+                          "duration": 0
+                        },
+                        {
+                          "title": "GET /rest/v1/events as anon — apikey header only, no Authorization bearer",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=*",
+                          "duration": 6
+                        },
+                        {
+                          "title": "POST /rest/v1/events as anon — same headers, a well-formed row",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API POST http://127.0.0.1:54321/rest/v1/events",
+                          "duration": 3
+                        },
+                        {
+                          "title": "Confirm the refused POST wrote nothing",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T08:59:58.200Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/test-results/events-wire-contract-fidel-67254-GET-and-POST-rest-v1-events-api/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/test-results/events-wire-contract-fidel-67254-GET-and-POST-rest-v1-events-api/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/test-results/events-wire-contract-fidel-67254-GET-and-POST-rest-v1-events-api/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-events-wire-contract-fidelity/tests/api/events-wire-contract-fidelity.spec.ts",
+                        "column": 20,
+                        "line": 275
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "4ab2e00682d709de5ff1-50af89f5b2f5227077d4",
+              "file": "api/events-wire-contract-fidelity.spec.ts",
+              "line": 200,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T08:59:54.729Z",
+    "duration": 3888.487,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-09-12T08-52-11-374Z",
+  "features": [
+    "DW-70 anonymous attempt identity and ownership",
+    "DW-72 strict PostgREST row/array schema",
+    "same-label own/partner UI read compatibility"
+  ],
+  "config": {
+    "test_framework": "playwright",
+    "use_playwright_utils": true,
+    "use_pactjs_utils": true,
+    "pact_mcp": "mcp",
+    "pact_mcp_reachable": false,
+    "pact_fallback_source": "provider-source",
+    "pact_relevant": false,
+    "browser_automation": "auto",
+    "playwright_utils_mandate": true,
+    "detected_stack": "frontend",
+    "execution_mode": "auto",
+    "capability_probe": true
+  },
+  "execution": {
+    "requestedMode": "subagent",
+    "resolvedMode": "subagent",
+    "probeEnabled": true,
+    "supports": {
+      "subagent": true,
+      "agentTeam": false
+    }
+  },
+  "outputRoot": "_bmad-output/test-artifacts/dw-events-wire-contract-fidelity",
+  "coveragePlan": "_bmad-output/test-artifacts/dw-events-wire-contract-fidelity/coverage-plan.md",
+  "workerOutputs": {
+    "api": "/tmp/tea-automate-api-tests-2026-09-12T08-52-11-374Z.json",
+    "e2e": "/tmp/tea-automate-e2e-tests-2026-09-12T08-52-11-374Z.json"
+  },
+  "knowledge_fragments_loaded": [
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/api-request.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/auth-session.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/burn-in.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/ci-burn-in.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/confidence-gate.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/data-factories.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/file-utils.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/fixture-architecture.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/fixtures-composition.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/intercept-network-call.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/library-integration-mandate.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/log.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/network-error-monitor.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/network-first.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/network-recorder.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/overview.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/pact-mcp.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/playwright-cli.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/playwright-utils-mandate.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/recurse.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/selective-testing.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/test-levels-framework.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/test-priorities-matrix.md",
+    ".agents/skills/bmad-testarch-automate/resources/knowledge/test-quality.md"
+  ]
+}

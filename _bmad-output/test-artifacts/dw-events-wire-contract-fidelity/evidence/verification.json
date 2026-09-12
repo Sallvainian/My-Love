@@ -1,0 +1,373 @@
+{
+  "status": "passed",
+  "runs": {
+    "playwright": {
+      "stats": {
+        "startTime": "2026-09-12T08:57:50.629Z",
+        "duration": 7281.667,
+        "expected": 6,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "title": "[P2] DW.WIRE-E2E-001 same-label couple rows retain identity and controls after reload",
+          "project": "chromium",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 1938
+            }
+          ]
+        },
+        {
+          "title": "[P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 547
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 488
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-005 a raw ascending GET returns both halves of the pair in event_date then created_at order",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 349
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-008 an authenticated but unlinked outsider reads none of the couple's events",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 645
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-006 a 101-character label is refused with the CHECK violation the client mirrors",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 354
+            }
+          ]
+        }
+      ]
+    },
+    "repeat": {
+      "stats": {
+        "startTime": "2026-09-12T08:58:47.497Z",
+        "duration": 10307.333,
+        "expected": 10,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "title": "[P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 473
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 571
+            }
+          ]
+        },
+        {
+          "title": "[P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 335
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 419
+            }
+          ]
+        },
+        {
+          "title": "[P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 321
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 388
+            }
+          ]
+        },
+        {
+          "title": "[P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 332
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 395
+            }
+          ]
+        },
+        {
+          "title": "[P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 320
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 350
+            }
+          ]
+        }
+      ]
+    },
+    "final-playwright": {
+      "stats": {
+        "startTime": "2026-09-12T09:00:26.216Z",
+        "duration": 6849.673,
+        "expected": 6,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "title": "[P2] DW.WIRE-E2E-001 same-label couple rows retain identity and controls after reload",
+          "project": "chromium",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 1551
+            }
+          ]
+        },
+        {
+          "title": "[P0] DE.5-API-007 the anon role is refused on both GET and POST /rest/v1/events",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 506
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-004 POST with return=representation echoes event_date verbatim and applies the column defaults",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 441
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-005 a raw ascending GET returns both halves of the pair in event_date then created_at order",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 350
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-008 an authenticated but unlinked outsider reads none of the couple's events",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 635
+            }
+          ]
+        },
+        {
+          "title": "[P1] DE.5-API-006 a 101-character label is refused with the CHECK violation the client mirrors",
+          "project": "api",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "retry": 0,
+              "duration_ms": 359
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "static": {
+    "typecheck": {
+      "command": [
+        "python3",
+        "_bmad-output/test-artifacts/dw-events-wire-contract-fidelity/run.py",
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 6.06
+    },
+    "lint": {
+      "command": [
+        "python3",
+        "_bmad-output/test-artifacts/dw-events-wire-contract-fidelity/run.py",
+        "npm",
+        "run",
+        "lint"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 4.96
+    }
+  },
+  "mutations": [
+    {
+      "name": "loose-schema",
+      "detected": true,
+      "assertion": "rowWithExtraColumn.success is true instead of false",
+      "stats": {
+        "startTime": "2026-09-12T08:59:44.095Z",
+        "duration": 4905.468,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "report": "mutation-loose-schema.json"
+    },
+    {
+      "name": "missing-owner",
+      "detected": true,
+      "assertion": "current-attempt query returns one partner row instead of zero",
+      "stats": {
+        "startTime": "2026-09-12T08:59:49.979Z",
+        "duration": 3778.118,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "report": "mutation-missing-owner.json"
+    },
+    {
+      "name": "fixed-label",
+      "detected": true,
+      "assertion": "current-attempt query returns one historical creator row instead of zero",
+      "stats": {
+        "startTime": "2026-09-12T08:59:54.729Z",
+        "duration": 3888.487,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "report": "mutation-fixed-label.json"
+    }
+  ]
+}
