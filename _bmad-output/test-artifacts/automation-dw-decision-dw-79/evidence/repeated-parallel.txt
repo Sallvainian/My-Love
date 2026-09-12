@@ -1,0 +1,206 @@
+Exit code: 0
+[WebServer] (node:5400) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] npm warn allow-scripts .npmrc allow-scripts setting is being ignored because --allow-scripts was passed on the command line
+[WebServer] (node:5446) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:5446) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ encrypted .env [www.dotenvx.com]
+
+Running 40 tests using 4 workers
+
+(node:5448) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5449) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5450) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5447) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+[14:24:39] ==== Run real SDK password sign-in against the controlled HTTP response ====
+
+[14:24:39] ==== Run real SDK password sign-in against the controlled HTTP response ====
+
+[14:24:39] ==== Run real SDK sign-out after an isolated in-memory sign-in ====
+
+[14:24:39] ==== Run real SDK sign-out after an isolated in-memory sign-in ====
+
+  ✓   1 [api] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/api/auth-sdk-notification-completion.spec.ts:49:3 › DW-79 actual SDK originating notification completion › [P1] DW79-API-002 sign-out waits for its SIGNED_OUT notification (158ms)
+  ✓   4 [api] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/api/auth-sdk-notification-completion.spec.ts:19:3 › DW-79 actual SDK originating notification completion › [P1] DW79-API-001 sign-in waits for its SIGNED_IN notification (158ms)
+  ✓   2 [api] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/api/auth-sdk-notification-completion.spec.ts:49:3 › DW-79 actual SDK originating notification completion › [P1] DW79-API-002 sign-out waits for its SIGNED_OUT notification (161ms)
+  ✓   3 [api] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/api/auth-sdk-notification-completion.spec.ts:19:3 › DW-79 actual SDK originating notification completion › [P1] DW79-API-001 sign-in waits for its SIGNED_IN notification (160ms)
+(node:5487) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5486) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5485) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5488) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ secrets for agents [www.dotenvx.com]
+[14:24:40] ==== Run real SDK password sign-in against the controlled HTTP response ====
+
+[14:24:40] ==== Run real SDK sign-out after an isolated in-memory sign-in ====
+
+[14:24:40] ==== Run real SDK sign-out after an isolated in-memory sign-in ====
+
+  ✓   5 [api] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/api/auth-sdk-notification-completion.spec.ts:49:3 › DW-79 actual SDK originating notification completion › [P1] DW79-API-002 sign-out waits for its SIGNED_OUT notification (106ms)
+  ✓   6 [api] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/api/auth-sdk-notification-completion.spec.ts:49:3 › DW-79 actual SDK originating notification completion › [P1] DW79-API-002 sign-out waits for its SIGNED_OUT notification (109ms)
+  ✓   7 [api] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/api/auth-sdk-notification-completion.spec.ts:19:3 › DW-79 actual SDK originating notification completion › [P1] DW79-API-001 sign-in waits for its SIGNED_IN notification (112ms)
+[14:24:40] ==== Run real SDK password sign-in against the controlled HTTP response ====
+
+  ✓   8 [api] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/api/auth-sdk-notification-completion.spec.ts:19:3 › DW-79 actual SDK originating notification completion › [P1] DW79-API-001 sign-in waits for its SIGNED_IN notification (71ms)
+(node:5533) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5531) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5532) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5534) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ encrypted .env [www.dotenvx.com]
+[14:24:42] ==== Run real auth services and native IndexedDB with a newer sign-out notification ====
+
+[14:24:42] ==== Run real auth services and native IndexedDB with a newer sign-out notification ====
+
+[14:24:42] ==== Run real SDK password sign-in against the controlled HTTP response ====
+
+[14:24:42] ==== Run real SDK sign-out after an isolated in-memory sign-in ====
+
+  ✓  10 [api] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/api/auth-sdk-notification-completion.spec.ts:19:3 › DW-79 actual SDK originating notification completion › [P1] DW79-API-001 sign-in waits for its SIGNED_IN notification (122ms)
+  ✓   9 [api] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/api/auth-sdk-notification-completion.spec.ts:49:3 › DW-79 actual SDK originating notification completion › [P1] DW79-API-002 sign-out waits for its SIGNED_OUT notification (117ms)
+[14:24:42] ==== Polling until condition is met (timeout: 10000ms, interval: 250ms) ====
+
+[14:24:42] ==== Polling until condition is met (timeout: 10000ms, interval: 250ms) ====
+
+[14:24:42] ==== Assert committed deletion followed by stale token resurrection ====
+
+[14:24:42] ==== Assert committed deletion followed by stale token resurrection ====
+
+  ✓  12 [chromium] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/e2e/token-persistence-resurrection.spec.ts:9:1 › [P0] DW79-E2E-006 late sign-in persistence resurrects A after independent sign-out (293ms)
+  ✓  11 [chromium] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/e2e/token-persistence-resurrection.spec.ts:9:1 › [P0] DW79-E2E-006 late sign-in persistence resurrects A after independent sign-out (324ms)
+(node:5568) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5569) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5571) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5570) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+[14:24:43] ==== Run real auth services and native IndexedDB with a newer sign-out notification ====
+
+[14:24:43] ==== Run real auth services and native IndexedDB with a newer sign-out notification ====
+
+[14:24:43] ==== Polling until condition is met (timeout: 10000ms, interval: 250ms) ====
+
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+[14:24:43] ==== Polling until condition is met (timeout: 10000ms, interval: 250ms) ====
+
+[14:24:43] ==== Assert committed deletion followed by stale token resurrection ====
+
+[14:24:43] ==== Assert committed deletion followed by stale token resurrection ====
+
+  ✓  14 [chromium] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/e2e/token-persistence-resurrection.spec.ts:9:1 › [P0] DW79-E2E-006 late sign-in persistence resurrects A after independent sign-out (307ms)
+  ✓  13 [chromium] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/e2e/token-persistence-resurrection.spec.ts:9:1 › [P0] DW79-E2E-006 late sign-in persistence resurrects A after independent sign-out (322ms)
+  ✓  15 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: sequential (236ms)
+[14:24:43] ==== Run real auth services and native IndexedDB with a newer sign-out notification ====
+
+[14:24:43] ==== Polling until condition is met (timeout: 10000ms, interval: 250ms) ====
+
+  ✓  17 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: stale-overwrite (198ms)
+[14:24:43] ==== Assert committed deletion followed by stale token resurrection ====
+
+  ✓  16 [chromium] › _bmad-output/test-artifacts/automation-dw-decision-dw-79/e2e/token-persistence-resurrection.spec.ts:9:1 › [P0] DW79-E2E-006 late sign-in persistence resurrects A after independent sign-out (271ms)
+(node:5603) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5606) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  18 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: same-owner-refresh (156ms)
+(node:5618) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5621) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+  ✓  20 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: stale-clear (219ms)
+  ✓  19 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: local-actions (230ms)
+  ✓  21 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: sequential (208ms)
+(node:5647) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5648) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  22 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: local-actions (258ms)
+  ✓  23 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: same-owner-refresh (150ms)
+(node:5658) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5659) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ encrypted .env [www.dotenvx.com]
+  ✓  24 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: stale-overwrite (209ms)
+  ✓  25 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: stale-clear (226ms)
+  ✓  26 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: sequential (239ms)
+(node:5684) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5683) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  27 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: local-actions (235ms)
+  ✓  28 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: same-owner-refresh (149ms)
+(node:5695) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5696) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+  ✓  29 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: stale-clear (281ms)
+  ✓  30 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: stale-overwrite (285ms)
+  ✓  31 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: sequential (259ms)
+(node:5757) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5756) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  32 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: local-actions (306ms)
+  ✓  33 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: same-owner-refresh (181ms)
+(node:5800) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5803) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ enable debugging { debug: true }
+  ✓  34 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: stale-clear (202ms)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌁ auth for agents [www.vestauth.com]
+  ✓  35 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: stale-overwrite (219ms)
+(node:5833) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  36 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: sequential (220ms)
+(node:5835) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  37 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: local-actions (243ms)
+  ✓  38 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: same-owner-refresh (149ms)
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from node_modules/@seontechnologies/playwright-utils/dist/esm/.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+  ✓  39 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: stale-clear (186ms)
+  ✓  40 [baseline] › tests/e2e/auth/token-persistence-overlap.spec.ts:93:3 › characterizes native auth token persistence: stale-overwrite (212ms)
+
+  40 passed (13.3s)

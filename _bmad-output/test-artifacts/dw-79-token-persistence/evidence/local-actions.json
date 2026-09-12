@@ -1,0 +1,830 @@
+{
+  "formatVersion": 1,
+  "runtime": {
+    "node": "v24.19.0",
+    "playwright": "1.63.0",
+    "idb": "8.0.3",
+    "supabaseJs": "2.116.0",
+    "authJs": "2.116.0",
+    "vite": "8.2.2",
+    "chromium": "153.0.8010.12"
+  },
+  "externalRequests": 0,
+  "pageErrors": 0,
+  "scenario": "local-actions",
+  "trace": [
+    {
+      "sequence": 1,
+      "phase": "notification-dispatched",
+      "actor": "seed-A",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 2,
+      "phase": "identity-delivered",
+      "actor": "seed-A",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 3,
+      "phase": "persistence-dispatched",
+      "actor": "seed-A",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      },
+      "operation": 1
+    },
+    {
+      "sequence": 4,
+      "phase": "open-success",
+      "actor": "seed-A",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      },
+      "operation": 1
+    },
+    {
+      "sequence": 5,
+      "phase": "transaction-created",
+      "actor": "seed-A",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      },
+      "operation": 1,
+      "transaction": 1
+    },
+    {
+      "sequence": 6,
+      "phase": "request-dispatched",
+      "actor": "seed-A",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      },
+      "operation": 1,
+      "transaction": 1
+    },
+    {
+      "sequence": 7,
+      "phase": "request-success",
+      "actor": "seed-A",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      },
+      "operation": 1,
+      "transaction": 1
+    },
+    {
+      "sequence": 8,
+      "phase": "native-complete",
+      "actor": "seed-A",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      },
+      "operation": 1,
+      "transaction": 1
+    },
+    {
+      "sequence": 9,
+      "phase": "connection-closed",
+      "actor": "seed-A",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      },
+      "operation": 1,
+      "transaction": 1
+    },
+    {
+      "sequence": 10,
+      "phase": "notification-complete",
+      "actor": "seed-A",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 11,
+      "phase": "persistence-dispatched",
+      "actor": "before-overlap",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 2
+    },
+    {
+      "sequence": 12,
+      "phase": "open-success",
+      "actor": "before-overlap",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 2
+    },
+    {
+      "sequence": 13,
+      "phase": "transaction-created",
+      "actor": "before-overlap",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 2,
+      "transaction": 2
+    },
+    {
+      "sequence": 14,
+      "phase": "request-dispatched",
+      "actor": "before-overlap",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 2,
+      "transaction": 2
+    },
+    {
+      "sequence": 15,
+      "phase": "request-success",
+      "actor": "before-overlap",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 2,
+      "transaction": 2
+    },
+    {
+      "sequence": 16,
+      "phase": "connection-closed",
+      "actor": "before-overlap",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 2,
+      "transaction": 2
+    },
+    {
+      "sequence": 17,
+      "phase": "native-complete",
+      "actor": "before-overlap",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 2,
+      "transaction": 2
+    },
+    {
+      "sequence": 18,
+      "phase": "storage-observed",
+      "actor": "before-overlap",
+      "source": "read",
+      "method": "get",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 19,
+      "phase": "transaction-created",
+      "actor": "blocker",
+      "source": "blocker",
+      "method": "hold",
+      "token": null,
+      "operation": 3,
+      "transaction": 3
+    },
+    {
+      "sequence": 20,
+      "phase": "action-started",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null
+    },
+    {
+      "sequence": 21,
+      "phase": "sdk-called",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null
+    },
+    {
+      "sequence": 22,
+      "phase": "notification-dispatched",
+      "actor": "sign-out-listener",
+      "source": "listener",
+      "event": "SIGNED_OUT",
+      "method": "delete",
+      "token": null
+    },
+    {
+      "sequence": 23,
+      "phase": "identity-delivered",
+      "actor": "sign-out-listener",
+      "source": "listener",
+      "event": "SIGNED_OUT",
+      "method": "delete",
+      "token": null
+    },
+    {
+      "sequence": 24,
+      "phase": "persistence-dispatched",
+      "actor": "sign-out-listener",
+      "source": "listener",
+      "event": "SIGNED_OUT",
+      "method": "delete",
+      "token": null,
+      "operation": 4
+    },
+    {
+      "sequence": 25,
+      "phase": "open-success",
+      "actor": "sign-out-listener",
+      "source": "listener",
+      "event": "SIGNED_OUT",
+      "method": "delete",
+      "token": null,
+      "operation": 4
+    },
+    {
+      "sequence": 26,
+      "phase": "transaction-created",
+      "actor": "sign-out-listener",
+      "source": "listener",
+      "event": "SIGNED_OUT",
+      "method": "delete",
+      "token": null,
+      "operation": 4,
+      "transaction": 4
+    },
+    {
+      "sequence": 27,
+      "phase": "request-dispatched",
+      "actor": "sign-out-listener",
+      "source": "listener",
+      "event": "SIGNED_OUT",
+      "method": "delete",
+      "token": null,
+      "operation": 4,
+      "transaction": 4
+    },
+    {
+      "sequence": 28,
+      "phase": "action-started",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 29,
+      "phase": "sdk-called",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 30,
+      "phase": "notification-dispatched",
+      "actor": "sign-in-B-listener",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 31,
+      "phase": "identity-delivered",
+      "actor": "sign-in-B-listener",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 32,
+      "phase": "persistence-dispatched",
+      "actor": "sign-in-B-listener",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 5
+    },
+    {
+      "sequence": 33,
+      "phase": "open-success",
+      "actor": "sign-in-B-listener",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 5
+    },
+    {
+      "sequence": 34,
+      "phase": "transaction-created",
+      "actor": "sign-in-B-listener",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 5,
+      "transaction": 5
+    },
+    {
+      "sequence": 35,
+      "phase": "request-dispatched",
+      "actor": "sign-in-B-listener",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 5,
+      "transaction": 5
+    },
+    {
+      "sequence": 36,
+      "phase": "blocker-released",
+      "actor": "blocker",
+      "source": "blocker",
+      "method": "hold",
+      "token": null,
+      "operation": 3,
+      "transaction": 3
+    },
+    {
+      "sequence": 37,
+      "phase": "native-complete",
+      "actor": "blocker",
+      "source": "blocker",
+      "method": "hold",
+      "token": null,
+      "operation": 3,
+      "transaction": 3
+    },
+    {
+      "sequence": 38,
+      "phase": "request-success",
+      "actor": "sign-out-listener",
+      "source": "listener",
+      "event": "SIGNED_OUT",
+      "method": "delete",
+      "token": null,
+      "operation": 4,
+      "transaction": 4
+    },
+    {
+      "sequence": 39,
+      "phase": "native-complete",
+      "actor": "sign-out-listener",
+      "source": "listener",
+      "event": "SIGNED_OUT",
+      "method": "delete",
+      "token": null,
+      "operation": 4,
+      "transaction": 4
+    },
+    {
+      "sequence": 40,
+      "phase": "connection-closed",
+      "actor": "sign-out-listener",
+      "source": "listener",
+      "event": "SIGNED_OUT",
+      "method": "delete",
+      "token": null,
+      "operation": 4,
+      "transaction": 4
+    },
+    {
+      "sequence": 41,
+      "phase": "notification-complete",
+      "actor": "sign-out-listener",
+      "source": "listener",
+      "event": "SIGNED_OUT",
+      "method": "delete",
+      "token": null
+    },
+    {
+      "sequence": 42,
+      "phase": "sdk-response",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null
+    },
+    {
+      "sequence": 43,
+      "phase": "persistence-dispatched",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null,
+      "operation": 6
+    },
+    {
+      "sequence": 44,
+      "phase": "request-success",
+      "actor": "sign-in-B-listener",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 5,
+      "transaction": 5
+    },
+    {
+      "sequence": 45,
+      "phase": "open-success",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null,
+      "operation": 6
+    },
+    {
+      "sequence": 46,
+      "phase": "transaction-created",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null,
+      "operation": 6,
+      "transaction": 6
+    },
+    {
+      "sequence": 47,
+      "phase": "request-dispatched",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null,
+      "operation": 6,
+      "transaction": 6
+    },
+    {
+      "sequence": 48,
+      "phase": "native-complete",
+      "actor": "sign-in-B-listener",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 5,
+      "transaction": 5
+    },
+    {
+      "sequence": 49,
+      "phase": "connection-closed",
+      "actor": "sign-in-B-listener",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 5,
+      "transaction": 5
+    },
+    {
+      "sequence": 50,
+      "phase": "notification-complete",
+      "actor": "sign-in-B-listener",
+      "source": "listener",
+      "event": "SIGNED_IN",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 51,
+      "phase": "sdk-response",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 52,
+      "phase": "persistence-dispatched",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 7
+    },
+    {
+      "sequence": 53,
+      "phase": "request-success",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null,
+      "operation": 6,
+      "transaction": 6
+    },
+    {
+      "sequence": 54,
+      "phase": "open-success",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 7
+    },
+    {
+      "sequence": 55,
+      "phase": "transaction-created",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 7,
+      "transaction": 7
+    },
+    {
+      "sequence": 56,
+      "phase": "request-dispatched",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 7,
+      "transaction": 7
+    },
+    {
+      "sequence": 57,
+      "phase": "native-complete",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null,
+      "operation": 6,
+      "transaction": 6
+    },
+    {
+      "sequence": 58,
+      "phase": "connection-closed",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null,
+      "operation": 6,
+      "transaction": 6
+    },
+    {
+      "sequence": 59,
+      "phase": "action-complete",
+      "actor": "sign-out",
+      "source": "action",
+      "method": "delete",
+      "token": null
+    },
+    {
+      "sequence": 60,
+      "phase": "request-success",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 7,
+      "transaction": 7
+    },
+    {
+      "sequence": 61,
+      "phase": "native-complete",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 7,
+      "transaction": 7
+    },
+    {
+      "sequence": 62,
+      "phase": "connection-closed",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      },
+      "operation": 7,
+      "transaction": 7
+    },
+    {
+      "sequence": 63,
+      "phase": "action-complete",
+      "actor": "sign-in-B",
+      "source": "action",
+      "method": "put",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      }
+    },
+    {
+      "sequence": 64,
+      "phase": "persistence-dispatched",
+      "actor": "final",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 8
+    },
+    {
+      "sequence": 65,
+      "phase": "open-success",
+      "actor": "final",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 8
+    },
+    {
+      "sequence": 66,
+      "phase": "transaction-created",
+      "actor": "final",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 8,
+      "transaction": 8
+    },
+    {
+      "sequence": 67,
+      "phase": "request-dispatched",
+      "actor": "final",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 8,
+      "transaction": 8
+    },
+    {
+      "sequence": 68,
+      "phase": "request-success",
+      "actor": "final",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 8,
+      "transaction": 8
+    },
+    {
+      "sequence": 69,
+      "phase": "connection-closed",
+      "actor": "final",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 8,
+      "transaction": 8
+    },
+    {
+      "sequence": 70,
+      "phase": "native-complete",
+      "actor": "final",
+      "source": "read",
+      "method": "get",
+      "token": null,
+      "operation": 8,
+      "transaction": 8
+    },
+    {
+      "sequence": 71,
+      "phase": "storage-observed",
+      "actor": "final",
+      "source": "read",
+      "method": "get",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      }
+    }
+  ],
+  "checkpoints": [
+    {
+      "name": "before-overlap",
+      "token": {
+        "owner": "A",
+        "version": "v1"
+      }
+    },
+    {
+      "name": "final",
+      "token": {
+        "owner": "B",
+        "version": "v1"
+      }
+    }
+  ],
+  "finalToken": {
+    "owner": "B",
+    "version": "v1"
+  },
+  "errors": [],
+  "cleanup": {
+    "drained": true,
+    "restored": true,
+    "databaseDeleted": true
+  }
+}

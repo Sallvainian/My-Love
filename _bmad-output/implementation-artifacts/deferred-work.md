@@ -805,7 +805,9 @@ origin: spec-deferred 5d23934f706e
 location: src/api/auth/sessionService.ts:onAuthStateChange; src/api/auth/actionService.ts:signIn,signOut; src/sw-db.ts:storeAuthToken,clearAuthToken
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 reason: sessionService and actionService both write/delete the current service-worker token, and neither associates those operations with a generation. Those writers and their asynchronous IndexedDB opens predate this bundle. Reversing mocked promise completion does not demonstrate reversed real IndexedDB commits; establishing the reported late-clear outcome requires a controlled trace of actual IndexedDB operations plus actionService signOut/signIn overlap. Earlier auth delivery alone does not establish the claimed regression.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-decision-dw-79
+resolution-undo: 977f0a57bd3de369e757ae7c4e0d16f435a03d43904b8da6a9062c4a084f34f8 2026-09-12 7374617475733a206f70656e
 decision: 2026-09-12 Trace real token persistence overlap — Build a controlled browser regression harness that exercises the actual sw-db IndexedDB implementation alongside overlapping actionService signOut/signIn and auth notifications. Record operation dispatch, transaction creation, commit order, and the final current-token owner without exposing token contents. Establish whether a stale operation can overwrite or delete the newer token before choosing a persistence-coordination change.
 decision: 2026-09-12 Keep pending stronger evidence
 decision: 2026-09-11 Keep pending stronger evidence
