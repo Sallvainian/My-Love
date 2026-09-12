@@ -844,7 +844,9 @@ location: src/components/Settings/EventsSettings.tsx:689
 source_spec: `spec-dw-60-63-66-67-68-events-validation-guard-fidelity.md`
 severity: medium
 reason: The unchanged submit handler uses trimmedLabel.length and trimmedDescription.length. Measured 100 repeated emoji have JavaScript length 200 and PostgreSQL char_length 100, so the form rejects some values admitted by the existing database CHECK. This predates this bundle, which explicitly preserves production validation. The new boundary tests characterize the existing limits with ASCII and do not establish Unicode equivalence.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-events-unicode-character-limits
+resolution-undo: 0be197926a87be6e2c1fbbaed78db765bec7e69a592d2449494dfec36cb22e27 2026-09-12 7374617475733a206f70656e
 decision: 2026-09-12 Match PostgreSQL character counts — Count Unicode code points in the event form's trimmed label and description validation while retaining the existing 100/500 database limits, icons, and trimming behavior. Align any counters or input restrictions with that rule and add exact-limit and limit-plus-one tests using supplementary-plane emoji and combining characters for the shared add/edit submission path. Keep the database schema unchanged and verify the form accepts the same character counts as PostgreSQL.
 
 ### DW-84: The helper's existing time-of-day arithmetic can skip a calendar day in a late-evening DST gap.
