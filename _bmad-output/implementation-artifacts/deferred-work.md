@@ -419,6 +419,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: `EventsSettings.tsx` renders the store array unfiltered and calls `loadEvents()` with no arguments; `eventsSlice.loadEvents` calls `eventsService.getEvents()` bare, so both windows take the default `limit = 50, offset = 0`. Measured with `grep -rn "getEvents(" src tests`: the only production call site is `src/stores/slices/eventsSlice.ts:116`. The screen's own comment states why the list must stay unfiltered — a mistyped year is "the only place a mistyped year can be seen and corrected" — and a year typed wrong into the deep past is exactly the row the descending past window drops first. This change documents the bound in both files; closing it needs a "load more" control and a `loadEvents` that takes limit/offset, which the spec's Boundaries put out of scope.
 status: open
+decision: 2026-09-12 Build Settings pagination — Add an explicit Settings history-loading control with store/service paging and a reliable indication that more rows exist. Preserve Home's upcoming-event behavior, ownership guards, and mutation replay, and prove that an event beyond 50 past rows can be loaded and edited. Coordinate the associated visibility and metadata behavior described by DW-44 and DW-46.
 decision: 2026-09-11 Keep pagination deferred
 decision: 2026-09-11 Defer pagination
 
@@ -428,7 +429,9 @@ location: src/services/eventsService.ts
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: `getEvents` caps in the database (`.range`) and drops unreadable rows in JS afterwards (the `toCoupleEvent`/`filter` pair), so an `event_date` of `infinity` — a value a Postgres `date` column accepts, and which `parseEventDate` is written to reject — counts against `limit` and returns one fewer usable event. The covering test for unreadable rows runs at the default limit of 50, where the effect is invisible. Same shape as `photoService.getPhotos`, which also caps server-side and filters after. Closing it means over-fetching and re-capping client-side.
-status: open
+status: done 2026-09-12
+resolution: closed by human decision: Retain the strict raw-row read budget and accept that dates rejected during conversion can leave a partially filled page.
+decision: 2026-09-12 Accept sparse capped pages — Retain the strict raw-row read budget and accept that dates rejected during conversion can leave a partially filled page.
 
 ### DW-43: Three separate literals encode the single product decision "how many countdown cards a column shows".
 origin: spec-deferred 9fcc81a217ea
@@ -445,6 +448,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: Verified path, both halves read this session: `eventsSlice.addEvent` inserts the created row into the store unconditionally — `set((state) => ({ events: sortByDate([...state.events, created]) }))` — while `loadEvents` re-reads a bounded window (`getEvents()` bare, so `limit = 50` per side). A couple with more than 50 past events who corrects or adds a deep-past date therefore sees the row in Settings, and the next `loadEvents()` drops it because the descending past page no longer reaches it. The row is not lost — it is in the table — only invisible. Distinct from the "no way to reach truncated rows" item: that one is about rows the user never sees, this one is about a row the user just saw confirmed. Closing it needs the same "load more" plumbing, or an in-range check at save time.
 status: open
+decision: 2026-09-12 Preserve saved-row access — Add Settings paging and post-save reconciliation that keeps an out-of-window saved event reachable after reload without rejecting valid past dates. Coordinate the history-loading path with DW-41 and truncation metadata with DW-46, preserving bounded Home reads and session ownership. Verify adding and editing a row beyond 50 past events, then reloading and locating it for another edit.
 decision: 2026-09-11 Keep pagination deferred
 decision: 2026-09-11 Defer pagination
 
@@ -465,6 +469,7 @@ source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: low
 reason: Both reads are plain `.select('*')` with no `{ count: 'exact' }`, so the service, the store and any future affordance have no "there are more" signal; `logger.debug('[EventsService] Fetched events:', events.length)` cannot distinguish 50 events from 50 of 300. The already-recorded Settings "load more" item names the control and the `limit`/`offset` plumbing it needs, but not the fact that the data to drive its enabled state is not fetched. A count also cannot go anywhere today: the intent's Never list forbids a store-shape change and a second store action.
 status: open
+decision: 2026-09-12 Add paging metadata and consumer — Define per-window continuation metadata and carry it through the events service and store to a Settings paging control. Choose a count or bounded lookahead strategy with explicit semantics, preserve existing ordering and Home behavior, and verify empty, exact-limit, and truncated windows. Coordinate this contract change with the history-access behavior in DW-41 and DW-44.
 decision: 2026-09-11 Keep metadata deferred
 decision: 2026-09-11 Defer pagination
 
@@ -495,6 +500,7 @@ source_spec: `spec-dw-13-19-events-write-error-codes-2.md`
 severity: medium
 reason: This behavior predates the bundle: every failure previously left Save enabled. The new `invalid-response` code now identifies it, but choosing a distinct safe affordance was not part of the events-only refresh-versus-retry decision. `createEvent` can throw after insert when the returned row cannot be converted, while Settings routes every code except `not-found` to Save/Delete.
 status: open
+decision: 2026-09-12 Keep recovery deferred
 decision: 2026-09-11 Keep recovery deferred
 decision: 2026-09-11 Defer the recovery choice
 
@@ -767,7 +773,9 @@ location: src/api/errorHandlers.ts:122-130
 source_spec: `spec-dw-39-empty-database-error-fallback.md`
 severity: low
 reason: isPostgrestError requires code, message, and details properties to exist. MoodApi.create and EventsService.createEvent use that unchanged guard before conversion. An omitted-message object therefore bypasses handleSupabaseError, while an explicitly present undefined, null, empty, or whitespace message reaches the fixed fallback. This pre-existing classifier behavior is distinct from DW-39's specifically identified unconditional interpolation in handleSupabaseError; the change does not claim to fix routing.
-status: open
+status: done 2026-09-12
+resolution: closed by human decision: Treat malformed omitted-field database responses as unsupported without a demonstrated project response, consistent with prior exclusions of synthetic server-error scenarios.
+decision: 2026-09-12 Exclude malformed envelopes — Treat malformed omitted-field database responses as unsupported without a demonstrated project response, consistent with prior exclusions of synthetic server-error scenarios.
 
 ### DW-79: Auth token persistence may race between overlapping auth events and the duplicate action-service writes.
 origin: spec-deferred 5d23934f706e
@@ -775,6 +783,7 @@ location: src/api/auth/sessionService.ts:onAuthStateChange; src/api/auth/actionS
 source_spec: `spec-dw-54-55-56-event-load-session-ownership.md`
 reason: sessionService and actionService both write/delete the current service-worker token, and neither associates those operations with a generation. Those writers and their asynchronous IndexedDB opens predate this bundle. Reversing mocked promise completion does not demonstrate reversed real IndexedDB commits; establishing the reported late-clear outcome requires a controlled trace of actual IndexedDB operations plus actionService signOut/signIn overlap. Earlier auth delivery alone does not establish the claimed regression.
 status: open
+decision: 2026-09-12 Keep pending stronger evidence
 decision: 2026-09-11 Keep pending stronger evidence
 
 ### DW-80: A replacement same-user session without an observed sign-out is not distinguished from a same-session update.
@@ -812,3 +821,4 @@ source_spec: `spec-dw-60-63-66-67-68-events-validation-guard-fidelity.md`
 severity: medium
 reason: The unchanged submit handler uses trimmedLabel.length and trimmedDescription.length. Measured 100 repeated emoji have JavaScript length 200 and PostgreSQL char_length 100, so the form rejects some values admitted by the existing database CHECK. This predates this bundle, which explicitly preserves production validation. The new boundary tests characterize the existing limits with ASCII and do not establish Unicode equivalence.
 status: open
+decision: 2026-09-12 Match PostgreSQL character counts — Count Unicode code points in the event form's trimmed label and description validation while retaining the existing 100/500 database limits, icons, and trimming behavior. Align any counters or input restrictions with that rule and add exact-limit and limit-plus-one tests using supplementary-plane emoji and combining characters for the shared add/edit submission path. Keep the database schema unchanged and verify the form accepts the same character counts as PostgreSQL.
