@@ -98,21 +98,29 @@ async function openSendClose(
   // shared.
   const channel = supabase.channel(topic, { config: { private: true } });
 
-  // The REST endpoint authorizes against the socket's access token, which is
-  // the anon key until this runs -- and an anon caller holds no EXECUTE on
-  // get_my_partner_id, so the policy would never even be reached. It only sets
-  // the token, so it slots between the claim above and the wait below without
-  // disturbing either.
-  await supabase.realtime.setAuth();
-
-  // Retained deliberately. The REST send below does not need the socket, but
-  // the `removeChannel` in the `finally` still drives the shared socket's
-  // disconnect when it takes the last channel out, and the claim-then-wait
-  // order this queue was built around is unchanged. Dropping it would be a
-  // change to the socket lifecycle that this story did not measure.
-  await waitForSocketReady();
-
+  // Everything after the claim runs inside the `try`, so that every path out of
+  // this function goes through the `removeChannel` below. Both awaits here can
+  // reject -- `setAuth` on a refresh failure, `waitForSocketReady` on its own
+  // timeout -- and before this block was widened either rejection left the topic
+  // in the client's registry for the life of the page. The claim itself stays
+  // outside: it is synchronous and cannot throw past the registry push, and
+  // moving it in would buy nothing while blurring the claim-then-wait order the
+  // comment above depends on.
   try {
+    // The REST endpoint authorizes against the socket's access token, which is
+    // the anon key until this runs -- and an anon caller holds no EXECUTE on
+    // get_my_partner_id, so the policy would never even be reached. It only sets
+    // the token, so it slots between the claim above and the wait below without
+    // disturbing either.
+    await supabase.realtime.setAuth();
+
+    // Retained deliberately. The REST send below does not need the socket, but
+    // the `removeChannel` in the `finally` still drives the shared socket's
+    // disconnect when it takes the last channel out, and the claim-then-wait
+    // order this queue was built around is unchanged. Dropping it would be a
+    // change to the socket lifecycle that this story did not measure.
+    await waitForSocketReady();
+
     // `httpSend` resolves only on a 202 and rejects on anything else, including
     // the 'Unauthorized' an RLS denial produces. There is no status callback to
     // wait on and no join to time out, so the 15s bound is handed to the fetch
