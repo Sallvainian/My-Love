@@ -45,7 +45,7 @@ fnox.local.toml
 .env.keys
 
 # Playwright test artifacts
-/test-results/
+**/test-results/
 **/playwright-report/
 /playwright/.cache/
 tests/e2e/.auth/storageState.json

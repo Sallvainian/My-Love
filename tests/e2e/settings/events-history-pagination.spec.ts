@@ -1,0 +1,230 @@
+/** Real Settings pagination, including dates saved beyond its initial history window. */
+import type { Page } from '@playwright/test';
+import { test, expect } from '../../support/merged-fixtures';
+import { eventDateFrom } from '../../support/factories/events';
+import { navigateTo } from '../../support/helpers/navigation';
+
+const history = (size: number) => Array.from({ length: size }, (_, index) => ({
+  dayOffset: -(index + 1),
+  label: `Paged history ${String(index + 1).padStart(2, '0')}`,
+}));
+
+async function openSettings(page: Page) {
+  await page.goto('/settings');
+  await expect(page.getByTestId('settings-view')).toBeVisible();
+  await expect(page.getByTestId('events-settings-load-region')).toHaveAttribute('aria-busy', 'false');
+}
+
+async function loadHistory(page: Page, expectedCount: number) {
+  const response = page.waitForResponse((reply) => {
+    const url = new URL(reply.url());
+    return url.pathname.endsWith('/rest/v1/events') &&
+      reply.request().method() === 'GET' && url.searchParams.has('or');
+  });
+  await page.getByTestId('events-settings-load-more').click();
+  expect((await response).ok()).toBe(true);
+  await expect.poll(() => page.evaluate(() =>
+    window.__APP_STORE__!.getState().events.length
+  )).toBe(expectedCount);
+  await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(expectedCount);
+}
+
+async function submitEvent(page: Page, method: 'POST' | 'PATCH', label: string) {
+  const response = page.waitForResponse((reply) =>
+    new URL(reply.url()).pathname.endsWith('/rest/v1/events') &&
+    reply.request().method() === method
+  );
+  await page.getByTestId('events-form-submit').click();
+  const reply = await response;
+  expect(reply.status()).toBe(method === 'POST' ? 201 : 200);
+  const body = await reply.json() as { id: string } | { id: string }[];
+  const saved = Array.isArray(body) ? body[0] : body;
+  expect(saved.id).toBeTruthy();
+  await expect.poll(() => page.evaluate((id) =>
+    window.__APP_STORE__!.getState().events.find((event) => event.id === id)?.label,
+  saved.id)).toBe(label);
+  await expect(page.getByTestId('events-form')).toHaveCount(0);
+  await expect(page.getByTestId(`event-label-${saved.id}`)).toHaveText(label);
+  return saved.id;
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('lastWelcomeView', String(Date.now())));
+});
+
+test('[P0] loads and edits omitted history, then finds the saved deep date after reload', async ({
+  page,
+  coupleEvents,
+}) => {
+  const seeded = await coupleEvents.seed([
+    ...history(51),
+    { dayOffset: 7, label: 'Paging upcoming survivor' },
+  ]);
+  const oldest = seeded[50];
+  const correctedDate = eventDateFrom(coupleEvents.anchor, -500);
+  await openSettings(page);
+  await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(51);
+  await expect(page.getByTestId(`event-row-${oldest.id}`)).toHaveCount(0);
+  await expect(page.getByTestId('events-settings-history-notice')).toBeVisible();
+
+  await loadHistory(page, 52);
+  await expect(page.getByTestId('events-settings-load-more')).toHaveCount(0);
+  await page.getByTestId(`event-edit-${oldest.id}`).click();
+  await expect(page.getByTestId('events-form-date')).toHaveValue(oldest.eventDate);
+  await page.getByTestId('events-form-label').fill('Corrected deep history');
+  await page.getByTestId('events-form-date').fill(correctedDate);
+  await submitEvent(page, 'PATCH', 'Corrected deep history');
+
+  await page.reload();
+  await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(51);
+  await expect(page.getByTestId(`event-row-${oldest.id}`)).toHaveCount(0);
+  await loadHistory(page, 52);
+  await page.getByTestId(`event-edit-${oldest.id}`).click();
+  await expect(page.getByTestId('events-form-label')).toHaveValue('Corrected deep history');
+  await expect(page.getByTestId('events-form-date')).toHaveValue(correctedDate);
+  await page.getByTestId('events-form-label').fill('Edited history again');
+  await submitEvent(page, 'PATCH', 'Edited history again');
+
+  await navigateTo(page, 'home');
+  await expect(page.getByTestId('event-countdown-paging-upcoming-survivor')).toBeVisible();
+  await expect(page.getByTestId('event-countdown-edited-history-again')).toHaveCount(0);
+});
+
+test('[P0] adds a deep-past date and can load and edit it again after each reload', async ({
+  page,
+  coupleEvents,
+}) => {
+  await coupleEvents.seed(history(51));
+  const savedDate = eventDateFrom(coupleEvents.anchor, -1000);
+  await openSettings(page);
+  await page.getByTestId('events-settings-add').click();
+  await page.getByTestId('events-form-label').fill('New deep-past event');
+  await page.getByTestId('events-form-date').fill(savedDate);
+  await page.getByTestId('events-form-description').fill('Saved outside the first page');
+  const id = await submitEvent(page, 'POST', 'New deep-past event');
+
+  await page.reload();
+  await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(50);
+  await expect(page.getByTestId(`event-row-${id}`)).toHaveCount(0);
+  await loadHistory(page, 52);
+  await page.getByTestId(`event-edit-${id}`).click();
+  await expect(page.getByTestId('events-form-date')).toHaveValue(savedDate);
+  await expect(page.getByTestId('events-form-description'))
+    .toHaveValue('Saved outside the first page');
+  await page.getByTestId('events-form-label').fill('Deep-past event edited');
+  await submitEvent(page, 'PATCH', 'Deep-past event edited');
+
+  await page.reload();
+  await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(50);
+  await loadHistory(page, 52);
+  await page.getByTestId(`event-edit-${id}`).click();
+  await expect(page.getByTestId('events-form-label')).toHaveValue('Deep-past event edited');
+  await expect(page.getByTestId('events-form-date')).toHaveValue(savedDate);
+});
+
+for (const size of [0, 50]) {
+  test(`[P1] ${size} past rows do not advertise another page`, async ({ page, coupleEvents }) => {
+    await coupleEvents.seed(history(size));
+    await openSettings(page);
+    if (size === 0) {
+      await expect(page.getByTestId('events-settings-empty')).toBeVisible();
+    } else {
+      await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(size);
+    }
+    await expect(page.getByTestId('events-settings-load-more')).toHaveCount(0);
+    await expect(page.getByTestId('events-settings-history-notice')).toHaveCount(0);
+  });
+}
+
+test('[P1] tied dates and microseconds stay ordered through repeated pages and Home keeps six nearest cards', async ({
+  page,
+  coupleEvents,
+}) => {
+  // Each window spans three pages. Most timestamps form tied pairs; singleton
+  // ends put pairs across both 50-row boundaries. Every instant is in the
+  // same millisecond, so Date conversion alone cannot preserve this order.
+  const specs = Array.from({ length: 208 }, (_, index) => ({
+    dayOffset: index < 104 ? -10 : 10,
+    label: `Tied paging ${index}`,
+    createdAt: `2026-01-01T12:00:00.123${String(Math.floor(((index % 104) + 1) / 2)).padStart(3, '0')}Z`,
+    owner: index % 2 ? 'partner' as const : 'self' as const,
+  }));
+  const seeded = await coupleEvents.seed(specs);
+  const expected = seeded.map((row, index) => ({ ...row, createdAt: specs[index].createdAt }))
+    .sort((a, b) => a.eventDate.localeCompare(b.eventDate) ||
+      a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  await openSettings(page);
+  await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(100);
+  await loadHistory(page, 200);
+  await expect(page.getByTestId('events-settings-load-more')).toBeEnabled();
+  await expect(page.getByTestId('events-settings-history-notice')).toBeVisible();
+  await loadHistory(page, 208);
+  await expect(page.getByTestId('events-settings-load-more')).toHaveCount(0);
+  const actualIds = await page.locator('[data-testid^="event-row-"]')
+    .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-testid')!.slice(10)));
+  expect(actualIds).toEqual(expected.map((row) => row.id));
+  for (const row of seeded.slice(0, 2)) {
+    await expect(page.getByTestId(`event-edit-${row.id}`))
+      .toHaveCount(row.ownerId === coupleEvents.userId ? 1 : 0);
+  }
+
+  const homeRead = page.waitForResponse((reply) => {
+    const url = new URL(reply.url());
+    return url.pathname.endsWith('/rest/v1/events') &&
+      reply.request().method() === 'GET' && !url.searchParams.has('or');
+  });
+  await navigateTo(page, 'home');
+  expect((await homeRead).ok()).toBe(true);
+  await expect.poll(() => page.evaluate(() => ({
+    loading: window.__APP_STORE__!.getState().eventsIsLoading,
+    count: window.__APP_STORE__!.getState().events.length,
+  }))).toEqual({ loading: false, count: 100 });
+  const cards = page.getByTestId(/^event-countdown-tied-paging-\d+$/);
+  await expect(cards).toHaveCount(6);
+  await expect(cards.locator('h3')).toHaveText(expected.filter((row) =>
+    row.eventDate === seeded[104].eventDate
+  ).slice(0, 6).map((row) => row.label));
+});
+
+test('[P1] restores Chromium keyboard focus to history retry and then Add after the final page', async ({
+  page,
+  coupleEvents,
+}) => {
+  await coupleEvents.seed(history(51));
+  await openSettings(page);
+  let releaseFailure!: () => void;
+  const failureGate = new Promise<void>((resolve) => { releaseFailure = resolve; });
+  let shouldFail = true;
+  await page.route('**/rest/v1/events*', async (route) => {
+    const request = route.request();
+    if (shouldFail && request.method() === 'GET' && new URL(request.url()).searchParams.has('or')) {
+      await failureGate;
+      await route.abort('failed');
+      return;
+    }
+    await route.continue();
+  });
+  const button = page.getByTestId('events-settings-load-more');
+  const failedRequest = page.waitForEvent('requestfailed', {
+    predicate: (request) => new URL(request.url()).pathname.endsWith('/rest/v1/events'),
+  });
+  await button.focus();
+  await button.press('Enter');
+  await expect(button).toBeDisabled();
+  // Confirm the browser blur that happy-dom misses before allowing settlement.
+  await expect(page.locator('body')).toBeFocused();
+  releaseFailure();
+  await failedRequest;
+  await expect.poll(() => page.evaluate(() => ({
+    loading: window.__APP_STORE__!.getState().eventsIsLoadingMore,
+    failed: Boolean(window.__APP_STORE__!.getState().eventsHistoryError),
+    count: window.__APP_STORE__!.getState().events.length,
+  }))).toEqual({ loading: false, failed: true, count: 50 });
+  await expect(button).toHaveText('Retry loading history');
+  await expect(button).toBeFocused();
+
+  shouldFail = false;
+  await loadHistory(page, 51);
+  await expect(button).toHaveCount(0);
+  await expect(page.getByTestId('events-settings-add')).toBeFocused();
+});

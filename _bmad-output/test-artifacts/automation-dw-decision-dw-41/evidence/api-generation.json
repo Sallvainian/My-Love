@@ -1,0 +1,75 @@
+{
+  "success": true,
+  "subagent": "api-tests",
+  "confidence": {
+    "score": 9,
+    "rationale": "Production getEventsPage at src/services/eventsService.ts:285-359, migration table/RLS at supabase/migrations/20260818000002_create_events_table.sql:17-26,96-101, existing factory and API evidence, and story coverage plan read before generation."
+  },
+  "tests": [
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-decision-dw-41/api/events-history-keyset.spec.ts",
+      "content": "/**\n * DW-41: production keyset service against the worker's real PostgREST API.\n * Provider evidence: src/services/eventsService.ts:285-359 (50 + lookahead,\n * raw date/timestamp/ID cursor); events table and creator-only DELETE policy in\n * supabase/migrations/20260818000002_create_events_table.sql:17-26,96-101.\n *\n * The reader loads the real service through Vite SSR and replaces only its\n * client singleton with supabaseAsUser. No query or paging algorithm is copied.\n * No reusable events response schema exists; assertions cover paging, ordering,\n * ownership and DELETE fields under test. Existing event wire tests own shape.\n * coupleEvents owns batch setup and cleanup for this worker's pair only.\n */\nimport { log } from '@seontechnologies/playwright-utils';\nimport type { EventsPagination } from '../../../../src/services/eventsService';\nimport type { EventSpec } from '../../../../tests/support/factories/events';\nimport { formatDateISO } from '../../../../src/utils/dateUtils';\nimport { test, expect } from '../../../../tests/support/merged-fixtures';\nimport { createEventsPageReader } from '../fixtures/events-page-reader';\n\n/** Fix the read boundary to the same local calendar day as the seed factory. */\nfunction startingAt(anchor: Date): EventsPagination {\n  return {\n    todayISO: formatDateISO(anchor),\n    upcoming: { cursor: null, hasMore: true },\n    past: { cursor: null, hasMore: true },\n  };\n}\n\nfor (const direction of [\n  { window: 'upcoming', other: 'past', sign: 1, testId: 'DW-41-API-001' },\n  { window: 'past', other: 'upcoming', sign: -1, testId: 'DW-41-API-002' },\n] as const) {\n  test(`[P1] ${direction.testId} ${direction.window} continuation keeps every unread row after consumed-row deletion`, async ({\n    apiRequest,\n    authToken,\n    coupleEvents,\n    supabaseAsUser,\n  }) => {\n    await log.step(`Seed three ${direction.window} pages for this worker pair`);\n    const seeded = await coupleEvents.seed(Array.from({ length: 103 }, (_, index) => ({\n      label: `DW41 ${direction.window} deletion ${index}`,\n      dayOffset: direction.sign * (index + 1),\n      owner: index % 2 ? 'partner' as const : 'self' as const,\n    })));\n    const displayIds = (from: number, to: number) => {\n      const ids = seeded.slice(from, to).map((row) => row.id);\n      return direction.sign === 1 ? ids : ids.reverse();\n    };\n    // playwright-utils deviation: the production service uses the authenticated\n    // Supabase SDK so its actual keyset query and serialization are exercised.\n    const reader = await createEventsPageReader(supabaseAsUser);\n    try {\n      const first = await reader.getEventsPage(startingAt(coupleEvents.anchor));\n      expect(first.events.map((event) => event.id)).toEqual(displayIds(0, 50));\n      expect(first.pagination[direction.window]).toMatchObject({\n        hasMore: true,\n        cursor: { id: seeded[49].id, event_date: seeded[49].eventDate },\n      });\n      expect(first.pagination[direction.other]).toEqual({ cursor: null, hasMore: false });\n      const savedPagination = structuredClone(first.pagination);\n      const consumed = seeded[10];\n      expect(consumed.ownerId).toBe(coupleEvents.userId);\n\n      await log.step('Delete an already-consumed own row before the next page');\n      const deletion = await apiRequest<{ id: string }[]>({\n        method: 'DELETE',\n        path: `/rest/v1/events?id=eq.${consumed.id}&select=id`,\n        headers: { Authorization: `Bearer ${authToken}`, Prefer: 'return=representation' },\n      });\n      expect(deletion.status).toBe(200);\n      expect(deletion.body).toEqual([{ id: consumed.id }]);\n\n      await log.step('Continue using the original cursor through both remaining pages');\n      const second = await reader.getEventsPage(first.pagination);\n      expect(first.pagination).toEqual(savedPagination);\n      expect(second.events.map((event) => event.id)).toEqual(displayIds(50, 100));\n      expect(second.pagination[direction.window]).toMatchObject({\n        hasMore: true,\n        cursor: { id: seeded[99].id },\n      });\n      expect(second.pagination[direction.other]).toEqual(first.pagination[direction.other]);\n\n      const third = await reader.getEventsPage(second.pagination);\n      expect(third.events.map((event) => event.id)).toEqual(displayIds(100, 103));\n      expect(third.pagination[direction.window]).toMatchObject({\n        hasMore: false,\n        cursor: { id: seeded[102].id },\n      });\n      expect(third.pagination.todayISO).toBe(first.pagination.todayISO);\n      expect(third.pagination[direction.other]).toEqual(first.pagination[direction.other]);\n      const unreadIds = [...second.events, ...third.events].map((event) => event.id);\n      expect(new Set(unreadIds).size).toBe(53);\n      expect(unreadIds).not.toContain(consumed.id);\n      expect(new Set([...second.events, ...third.events].map((event) => event.userId)))\n        .toEqual(new Set([coupleEvents.userId, coupleEvents.partnerId]));\n    } finally {\n      await reader.close();\n    }\n  });\n}\n\ntest('[P1] DW-41-API-003 raw microseconds and ID ties cross both page boundaries without dropping partner rows', async ({\n  apiRequest,\n  authToken,\n  coupleEvents,\n  supabaseAsUser,\n}) => {\n  await log.step('Seed tied pairs within one JavaScript millisecond in both date windows');\n  // At 54 rows per side, the 50-row ascending boundary cuts the pair at\n  // indexes 49/50; descending cuts indexes 3/4. Each tail also contains rows\n  // with different microseconds, requiring the created_at cursor branch.\n  const specs: EventSpec[] = Array.from({ length: 108 }, (_, index) => ({\n    label: `DW41 precision ${index}`,\n    dayOffset: index < 54 ? -10 : 10,\n    createdAt: `2026-01-01T12:00:00.123${String(Math.floor(((index % 54) + 1) / 2)).padStart(3, '0')}Z`,\n    owner: index % 2 ? 'partner' : 'self',\n  }));\n  const seeded = await coupleEvents.seed(specs);\n  const expected = seeded.map((row, index) => ({ ...row, createdAt: specs[index].createdAt! }))\n    .sort((a, b) => a.eventDate.localeCompare(b.eventDate) ||\n      a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));\n  const past = expected.slice(0, 54);\n  const upcoming = expected.slice(54);\n  const firstIds = [...past.slice(4), ...upcoming.slice(0, 50)].map((row) => row.id);\n  const remaining = [...past.slice(0, 4), ...upcoming.slice(50)];\n  // playwright-utils deviation: exercise production Supabase serialization;\n  // direct apiRequest below remains the HTTP client for the DELETE operation.\n  const reader = await createEventsPageReader(supabaseAsUser);\n  try {\n    const first = await reader.getEventsPage(startingAt(coupleEvents.anchor));\n    expect(first.events.map((event) => event.id)).toEqual(firstIds);\n    expect(first.pagination.upcoming).toMatchObject({\n      hasMore: true,\n      cursor: { id: upcoming[49].id, event_date: upcoming[49].eventDate },\n    });\n    expect(first.pagination.past).toMatchObject({\n      hasMore: true,\n      cursor: { id: past[4].id, event_date: past[4].eventDate },\n    });\n    expect(first.pagination.upcoming.cursor!.created_at.replace(/\\+00:00$/, 'Z'))\n      .toBe(upcoming[49].createdAt);\n    expect(first.pagination.past.cursor!.created_at.replace(/\\+00:00$/, 'Z'))\n      .toBe(past[4].createdAt);\n    expect(upcoming[49].createdAt).toBe(upcoming[50].createdAt);\n    expect(past[3].createdAt).toBe(past[4].createdAt);\n\n    await log.step('A partner-owned unread row rejects DELETE and remains discoverable');\n    const partnerTail = remaining.find((row) => row.ownerId === coupleEvents.partnerId)!;\n    expect(partnerTail).toBeDefined();\n    const refused = await apiRequest<{ id: string }[]>({\n      method: 'DELETE',\n      path: `/rest/v1/events?id=eq.${partnerTail.id}&select=id`,\n      headers: { Authorization: `Bearer ${authToken}`, Prefer: 'return=representation' },\n    });\n    // PostgREST filters a forbidden creator-only DELETE to a successful empty\n    // representation; the later page provides the unchanged-row witness.\n    expect(refused.status).toBe(200);\n    expect(refused.body).toEqual([]);\n\n    await log.step('Read both tails in exact server order and exhaust both windows');\n    const second = await reader.getEventsPage(first.pagination);\n    expect(second.events.map((event) => event.id)).toEqual(remaining.map((row) => row.id));\n    expect(second.events.find((event) => event.id === partnerTail.id)).toMatchObject({\n      userId: coupleEvents.partnerId,\n      label: partnerTail.label,\n    });\n    expect(second.pagination.upcoming.hasMore).toBe(false);\n    expect(second.pagination.past.hasMore).toBe(false);\n    expect(new Set([...first.events, ...second.events].map((event) => event.id)).size).toBe(108);\n  } finally {\n    await reader.close();\n  }\n});\n",
+      "description": "Three production-service API cases covering post-deletion keyset continuity in both directions, full timestamp/ID boundary semantics, raw continuation, exhaustion, partner visibility and creator-only deletion.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 3,
+        "P2": 0,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    "apiRequest (existing merged fixture)",
+    "authToken (existing merged fixture)",
+    "supabaseAsUser (existing authenticated SDK fixture)",
+    "coupleEvents (existing anchored worker-pair seeding/cleanup fixture)",
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-decision-dw-41/fixtures/events-page-reader.ts",
+      "interface": "createEventsPageReader(client: TypedSupabaseClient): Promise<{ getEventsPage: (pagination?: EventsPagination | null) => Promise<EventsPage>; close: () => Promise<void> }>",
+      "requirements": [
+        "Load real src/services/eventsService.ts through Vite SSR without app plugins",
+        "Replace only the Supabase singleton import with the given authenticated SDK client",
+        "Scope and restore navigator.onLine=true shim",
+        "close() cleans Vite server, injection and navigator descriptor; creation must clean up too on failure",
+        "No copied query, filtering, continuation or conversion logic"
+      ]
+    }
+  ],
+  "knowledge_fragments_used": [
+    "playwright-utils-mandate",
+    "library-integration-mandate",
+    "api-request",
+    "api-testing-patterns",
+    "data-factories"
+  ],
+  "playwright_utils_deviations": [
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-decision-dw-41/api/events-history-keyset.spec.ts",
+      "reason": "Production getEventsPage sends authenticated SDK requests through its real query chain. apiRequest cannot execute that SDK serialization; re-creating URLs would replace the behavior under test. Mutations use apiRequest. The reader injects only the client, never query/service logic."
+    }
+  ],
+  "response_schema_note": "No reusable response schema exists for /rest/v1/events; assertions cover fields under test; pre-existing events-wire-contract owns the complete wire shape.",
+  "pactjs_utils_deviations": [],
+  "pact_mcp_reachable": false,
+  "pact_fallback_source": "provider-source",
+  "provider_scrutiny": "not-applicable-no-pact-artifacts",
+  "provider_files_read": [
+    "src/services/eventsService.ts",
+    "supabase/migrations/20260818000002_create_events_table.sql",
+    "src/api/supabaseClient.ts",
+    "tests/support/factories/events.ts",
+    "tests/support/fixtures/index.ts"
+  ],
+  "mandate_self_check": {
+    "imports_merged_fixtures": true,
+    "raw_request_calls": false,
+    "page_route_or_wait_for_response": false,
+    "arbitrary_waits": false,
+    "console_log": false,
+    "inline_login": false,
+    "download_parsing": false,
+    "documented_sdk_deviation": true
+  },
+  "test_count": 3,
+  "summary": "Generated 3 P1 API tests as JSON only. No tests run, no fixtures generated, no source or existing tests edited. Root will supply the agreed production-service SSR reader and materialize/verify the artifact."
+}

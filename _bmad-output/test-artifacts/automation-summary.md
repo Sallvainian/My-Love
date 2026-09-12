@@ -742,3 +742,8 @@ DW-75 completion: 4 new tests (2 P0, 2 P1), fixtures and source snapshots delive
 ## Subsequent run: DW-60/63/66/67/68 (2026-09-12)
 
 [Events validation guard fidelity automation](automation-summary-dw-events-validation-guard-fidelity.md) records the completed run: 8/8 generated tests, 141 existing Vitest tests, and 236 pgTAP assertions passed; typecheck/lint passed. Runnable artifacts, evidence, and Definition of Done are linked there; historical results above are preserved.
+
+
+## Subsequent run: DW-41 (2026-09-12)
+
+[Settings history pagination automation](automation-summary-dw-decision-dw-41.md): 6 P1 tests and 3 fixture/helper modules generated; 30/30 repeated executions, 240 focused unit regressions, and 15 existing browser regressions passed. Definition of Done and verification limits are linked there; prior reports are preserved.

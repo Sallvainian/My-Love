@@ -16,13 +16,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { create, type StateCreator } from 'zustand';
 
 const getEvents = vi.fn();
+const getEventsPage = vi.fn();
 const createEvent = vi.fn();
 const updateEvent = vi.fn();
 const deleteEvent = vi.fn();
 
 vi.mock('../../../src/services/eventsService', () => ({
   eventsService: {
-    getEvents: () => getEvents(),
+    getEventsPage: (pagination: unknown) => getEventsPage(pagination),
     createEvent: (input: unknown) => createEvent(input),
     updateEvent: (eventId: string, updates: unknown) => updateEvent(eventId, updates),
     deleteEvent: (eventId: string) => deleteEvent(eventId),
@@ -31,6 +32,8 @@ vi.mock('../../../src/services/eventsService', () => ({
 
 import type {
   CoupleEvent,
+  EventsPage,
+  EventsPagination,
   EventWriteErrorCode,
 } from '../../../src/services/eventsService';
 import { createEventsSlice, type EventsSlice } from '../../../src/stores/slices/eventsSlice';
@@ -59,6 +62,17 @@ function event(id: string, isoDate: string, overrides: Partial<CoupleEvent> = {}
   };
 }
 
+function pagination(hasMore = true): EventsPagination {
+  return {
+    todayISO: '2026-09-12',
+    upcoming: { cursor: null, hasMore: false },
+    past: {
+      cursor: { event_date: '2026-08-01', created_at: '2026-01-01T00:00:00.123456+00:00', id: 'edge' },
+      hasMore,
+    },
+  };
+}
+
 function codedWriteError(code: EventWriteErrorCode, message: string): Error {
   return Object.assign(new Error(message), { code });
 }
@@ -75,7 +89,11 @@ function deferred<T>() {
 
 describe('eventsSlice', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    getEventsPage.mockReset().mockImplementation(async () => ({
+      events: await getEvents(),
+      pagination: pagination(false),
+    }));
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -91,6 +109,152 @@ describe('eventsSlice', () => {
   // ==========================================================================
   // loadEvents
   // ==========================================================================
+
+  describe('loadMoreEvents', () => {
+    it('merges unique IDs in global date, raw timestamp, and ID order', async () => {
+      const store = createTestStore();
+      const saved = event('saved', '1900-01-01');
+      store.setState({ events: [event('future', '2026-12-01'), saved], eventsPagination: pagination() });
+      getEventsPage.mockResolvedValue({
+        events: [
+          event('z', '2026-08-01', { createdAtRaw: '2026-01-01T00:00:00.000001Z' }),
+          event('a', '2026-08-01', { createdAtRaw: '2026-01-01T00:00:00.000002Z' }),
+          event('b', '2026-08-01', { createdAtRaw: '2026-01-01T00:00:00.000002Z' }),
+          saved,
+        ],
+        pagination: pagination(false),
+      });
+      expect(await store.getState().loadMoreEvents()).toEqual({ status: 'success' });
+      expect(getEventsPage).toHaveBeenCalledWith(pagination());
+      expect(store.getState().events.map((event) => event.id)).toEqual(['saved', 'z', 'a', 'b', 'future']);
+      expect(store.getState().eventsPagination).toEqual(pagination(false));
+    });
+
+    it('keeps rows and cursors on failure, retries the same page, and isolates write errors', async () => {
+      const store = createTestStore();
+      const initialEvents = [event('current', '2026-09-12')];
+      const initialPagination = pagination();
+      store.setState({ events: initialEvents, eventsPagination: initialPagination });
+      getEventsPage.mockRejectedValueOnce(new Error('history failed'));
+      expect(await store.getState().loadMoreEvents()).toEqual({ status: 'failure', error: 'history failed' });
+      expect(store.getState().events).toBe(initialEvents);
+      expect(store.getState().eventsPagination).toBe(initialPagination);
+      expect(store.getState().eventsError).toBeNull();
+      expect(store.getState().eventsHistoryError).toBe('history failed');
+      createEvent.mockRejectedValue(new Error('write failed'));
+      await store.getState().addEvent({ label: 'deep', eventDate: '1900-01-01' });
+      expect(store.getState().eventsHistoryError).toBe('history failed');
+      getEventsPage.mockResolvedValueOnce({ events: [event('older', '1900-01-01')], pagination: pagination(false) });
+      await store.getState().loadMoreEvents();
+      expect(getEventsPage.mock.calls).toEqual([[initialPagination], [initialPagination]]);
+      expect(store.getState().eventsHistoryError).toBeNull();
+      expect(store.getState().eventsIsLoadingMore).toBe(false);
+    });
+
+    it('blocks repeated activation and does not automatically crawl or load missing metadata', async () => {
+      const store = createTestStore();
+      expect(await store.getState().loadMoreEvents()).toEqual({ status: 'stale' });
+      expect(getEventsPage).not.toHaveBeenCalled();
+      store.setState({ eventsPagination: pagination() });
+      const pending = deferred<EventsPage>();
+      getEventsPage.mockReturnValueOnce(pending.promise);
+      const inFlight = store.getState().loadMoreEvents();
+      expect(store.getState().eventsIsLoadingMore).toBe(true);
+      expect(await store.getState().loadMoreEvents()).toEqual({ status: 'stale' });
+      expect(getEventsPage).toHaveBeenCalledTimes(1);
+      pending.resolve({ events: [], pagination: pagination(false) });
+      await inFlight;
+      expect(await store.getState().loadMoreEvents()).toEqual({ status: 'success' });
+      expect(getEventsPage).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['add', 'edit', 'delete'] as const)('replays a completed %s over the page snapshot without duplicate IDs', async (kind) => {
+      const store = createTestStore();
+      const original = event('target', '2026-08-01');
+      const saved = event('target', '1900-01-01', { label: 'Saved deep date' });
+      store.setState({ events: [original], eventsPagination: pagination() });
+      const pending = deferred<EventsPage>();
+      getEventsPage.mockReturnValueOnce(pending.promise);
+      const inFlight = store.getState().loadMoreEvents();
+      if (kind === 'add') {
+        createEvent.mockResolvedValueOnce(saved);
+        expect(await store.getState().addEvent({ label: saved.label, eventDate: '1900-01-01' })).toEqual({ success: true });
+      } else if (kind === 'edit') {
+        updateEvent.mockResolvedValueOnce(saved);
+        expect(await store.getState().editEvent(original.id, { eventDate: '1900-01-01' })).toEqual({ success: true });
+      } else {
+        deleteEvent.mockResolvedValueOnce(undefined);
+        expect(await store.getState().removeEvent(original.id)).toEqual({ success: true });
+      }
+      pending.resolve({ events: [original, original], pagination: pagination(false) });
+      expect(await inFlight).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual(kind === 'delete' ? [] : [saved]);
+    });
+
+    it.each(['success', 'failure'] as const)('a refresh supersedes page %s and owns its loading state and metadata', async (outcome) => {
+      const store = createTestStore();
+      store.setState({ events: [event('last-good', '2026-09-12')], eventsPagination: pagination() });
+      const page = deferred<EventsPage>();
+      const refresh = deferred<EventsPage>();
+      getEventsPage.mockReturnValueOnce(page.promise).mockReturnValueOnce(refresh.promise);
+      const oldLoad = store.getState().loadMoreEvents();
+      const newLoad = store.getState().loadEvents();
+      expect(store.getState().eventsIsLoadingMore).toBe(false);
+      expect(await store.getState().loadMoreEvents()).toEqual({ status: 'stale' });
+      const loading = store.getState();
+      if (outcome === 'success') page.resolve({ events: [], pagination: pagination(false) });
+      else page.reject(new Error('old page failed'));
+      expect(await oldLoad).toEqual({ status: 'stale' });
+      expect(store.getState()).toBe(loading);
+      refresh.resolve({ events: [event('nearest', '2026-09-12')], pagination: pagination() });
+      expect(await newLoad).toEqual({ status: 'success' });
+      expect(store.getState().events.map((event) => event.id)).toEqual(['nearest']);
+      expect(getEventsPage.mock.calls[1]).toEqual([undefined]);
+    });
+
+    it('preserves a saved deep row during a failed refresh without changing its write result', async () => {
+      const store = createTestStore();
+      const saved = event('saved', '1900-01-01');
+      createEvent.mockResolvedValueOnce(saved);
+      const result = await store.getState().addEvent({ label: saved.label, eventDate: '1900-01-01' });
+      getEventsPage.mockRejectedValueOnce(new Error('refresh failed'));
+      await store.getState().loadEvents();
+      expect(result).toEqual({ success: true });
+      expect(store.getState().events).toEqual([saved]);
+    });
+
+    it('does not indefinitely pin saved rows through a successful refresh', async () => {
+      const store = createTestStore();
+      createEvent.mockResolvedValueOnce(event('saved', '1900-01-01'));
+      await store.getState().addEvent({ label: 'saved', eventDate: '1900-01-01' });
+      getEventsPage.mockResolvedValueOnce({ events: [], pagination: pagination() });
+      await store.getState().loadEvents();
+      expect(store.getState().events).toEqual([]);
+      expect(store.getState().eventsPagination?.past.hasMore).toBe(true);
+    });
+
+    it.each(['add', 'edit', 'delete'] as const)('does not apply or replay an old-session %s into a new same-user page', async (kind) => {
+      const store = createTestStore();
+      const pendingMutation = deferred<CoupleEvent>();
+      createEvent.mockReturnValueOnce(pendingMutation.promise);
+      updateEvent.mockReturnValueOnce(pendingMutation.promise);
+      deleteEvent.mockReturnValueOnce(pendingMutation.promise);
+      const write = kind === 'add'
+        ? store.getState().addEvent({ label: 'target', eventDate: '1900-01-01' })
+        : kind === 'edit' ? store.getState().editEvent('target', {}) : store.getState().removeEvent('target');
+      store.setState({ authSessionVersion: 2, events: [], eventsPagination: pagination() });
+      const pendingPage = deferred<EventsPage>();
+      getEventsPage.mockReturnValueOnce(pendingPage.promise);
+      const page = store.getState().loadMoreEvents();
+      pendingMutation.resolve(event('target', '1900-01-01'));
+      expect(await write).toEqual({ success: true });
+      expect(store.getState().events).toEqual([]);
+      const current = event('target', '2026-09-12', { label: 'Current session value' });
+      pendingPage.resolve({ events: [current], pagination: pagination(false) });
+      await page;
+      expect(store.getState().events).toEqual([current]);
+    });
+  });
 
   describe('loadEvents', () => {
     it('fills the list and releases the flag', async () => {

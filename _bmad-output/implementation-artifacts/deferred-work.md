@@ -418,7 +418,9 @@ location: src/components/Settings/EventsSettings.tsx, src/stores/slices/eventsSl
 source_spec: `spec-dw-9-22-events-read-cap-and-pagination.md`
 severity: medium
 reason: `EventsSettings.tsx` renders the store array unfiltered and calls `loadEvents()` with no arguments; `eventsSlice.loadEvents` calls `eventsService.getEvents()` bare, so both windows take the default `limit = 50, offset = 0`. Measured with `grep -rn "getEvents(" src tests`: the only production call site is `src/stores/slices/eventsSlice.ts:116`. The screen's own comment states why the list must stay unfiltered — a mistyped year is "the only place a mistyped year can be seen and corrected" — and a year typed wrong into the deep past is exactly the row the descending past window drops first. This change documents the bound in both files; closing it needs a "load more" control and a `loadEvents` that takes limit/offset, which the spec's Boundaries put out of scope.
-status: open
+status: done 2026-09-12
+resolution: resolved by sweep bundle dw-decision-dw-41
+resolution-undo: 11a3495e84f703f2c798e725ed4ccea80dcb1f63e9048f8904475ed7271cc247 2026-09-12 7374617475733a206f70656e
 decision: 2026-09-12 Build Settings pagination — Add an explicit Settings history-loading control with store/service paging and a reliable indication that more rows exist. Preserve Home's upcoming-event behavior, ownership guards, and mutation replay, and prove that an event beyond 50 past rows can be loaded and edited. Coordinate the associated visibility and metadata behavior described by DW-44 and DW-46.
 decision: 2026-09-11 Keep pagination deferred
 decision: 2026-09-11 Defer pagination
