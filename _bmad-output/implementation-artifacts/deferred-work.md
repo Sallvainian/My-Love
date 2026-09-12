@@ -880,3 +880,49 @@ source_spec: `1-contain-the-exposed-bot-credential.md`
 severity: low
 reason: AGENTS.md says durable prose goes in that block, but the rotation procedure (fnox set -p age CLAUDE_BOT_PASSWORD, then fnox exec -- node scripts/provision-claude-bot.mjs) lives only in script and migration comments and an out-of-repo memory note. Fix edits an agent-context file, so it is recorded rather than applied here.
 status: open
+
+### DW-87: The retry's re-subscribe cannot rejoin an errored channel at all, because the SDK gates the whole of subscribe() on the channel already being closed.
+origin: spec-deferred 7f2be02c1cc5
+location: src/hooks/useRealtimeMessages.ts:190-196
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+severity: medium
+reason: node_modules/@supabase/realtime-js/dist/module/RealtimeChannel.js:134 wraps the entire join body in `if (this.channelAdapter.isClosed())` and otherwise returns `this`. After a CHANNEL_ERROR the state is `errored`, not closed, so the retry at useRealtimeMessages.ts is a no-op however many times it fires. Pre-existing and untouched by this story: the baseline retry had the identical shape, and passing `handleStatus` (patched this pass) fixes only the reporting half. Settle by removing and reopening the channel on retry rather than re-subscribing the same object, with a test that drives a real CHANNEL_ERROR.
+status: open
+
+### DW-88: getPartnerId() returning null for a transient error is indistinguishable from "unlinked", and would drop every note and mood for the life of the channel.
+origin: spec-deferred 2f395306ff06
+location: src/api/supabaseClient.ts:128-136
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+reason: src/api/supabaseClient.ts:128-136 returns null on any PostgREST error, and both receivers treat a null snapshot as "trust nothing". A snapshot taken at join would then stay null until the next SUBSCRIBED. I could not show the program reaches this: the users query and the Realtime socket address the same host, so a network failure denies the join too and the retry path runs. Settle by reproducing a PostgREST-only failure (for example a 500 injected at /rest/v1/users) while the websocket stays healthy, and observing whether notes stop arriving.
+status: open
+
+### DW-89: The Array.isArray guard was adopted at the three broadcast-facing mood sites and not at the four siblings that share the identical idiom.
+origin: spec-deferred c4d4e08547c9
+location: src/stores/slices/moodSlice.ts:384
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+severity: low
+reason: src/stores/slices/moodSlice.ts:384, src/components/MoodHistory/MoodDetailModal.tsx:91, src/components/MoodHistory/CalendarDay.tsx:72 and src/components/MoodTracker/MoodTracker.tsx:170 still use `x && x.length > 0` ahead of an unconditional MOOD_CONFIG[allMoods[0]] deref. No broadcast reaches them: moodSlice's transform consumes moodApi.fetchByUser output, already parsed by MoodArraySchema, and the MoodHistory pair read the offline-first IndexedDB path. Pre-existing hardening rather than a hole this story opened. Settle by deciding whether the IndexedDB read path needs the same guard and covering it in the shape of src/components/MoodTracker/__tests__/moodArrayGuards.test.tsx.
+status: open
+
+### DW-90: No E2E drives the app's own Realtime clients in a browser against the new policies; live evidence stops at the raw SDK.
+origin: spec-deferred 4e2d371094d1
+location: tests/e2e/notes/love-notes.spec.ts
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+severity: low
+reason: tests/api/couple-broadcast-authorization.spec.ts builds its own createClient identities and calls join()/httpSend() directly; it imports neither useRealtimeMessages, moodSyncService, sendEphemeralBroadcast nor the store, and tests/e2e/notes/love-notes.spec.ts and tests/e2e/partner/partner-mood.spec.ts mention neither realtime nor broadcast. The policy predicates themselves are measured because the spec builds the same topic strings and the same session-based clients, but the composition shipped to users is covered only by mocked unit tests. Pre-existing for both features. Settle with a two-context E2E in the shape of the togetherMode scripture specs.
+status: open
+
+### DW-91: An effect re-run that lands while the previous run's un-awaited removeChannel is still deregistering is handed the dying channel.
+origin: spec-deferred 76257cdda80f
+location: src/hooks/useRealtimeMessages.ts:215-232
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+severity: low
+reason: useRealtimeMessages' cleanup calls supabase.removeChannel without awaiting it, and src/api/realtimeSocket.ts documents that the registry entry is dropped later still, from the _onClose hook, so supabase.channel(topic) in the replacement run can return the leaving object whose subscribe() is a silent no-op. Pre-existing: the baseline cleanup had the same shape, and the new `cancelled` guard covers only the subscribe-after-unmount half. Settle by awaiting the leave the way moodSyncService's closingMoodChannels registry does.
+status: open
+
+### DW-92: getSignedInUserId() returning null for a transient getSession error is read as "the account changed", which mutes the mood channel until a fresh subscriber re-arms it.
+origin: spec-deferred e08d417d905d
+location: src/api/supabaseClient.ts:81-92
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+reason: src/api/supabaseClient.ts:81-92 returns null on any getSession error or throw, and refreshChannelIdentity (src/api/moodSyncService.ts:455-460) treats `null !== entry.ownerUserId` as an account change and nulls the partner snapshot. Only the next SUBSCRIBED or a new subscriber's `entry.partnerId = partnerIdAtJoin` restores it, and an already-joined channel emits no further SUBSCRIBED. I could not show the program reaches this: refreshChannelIdentity runs only from the SUBSCRIBED arm, i.e. moments after the same session authorized the private join, so a session read that fails while that join succeeds is not demonstrated. Same shape as the getPartnerId ambiguity already recorded. Settle by injecting a getSession failure while the websocket stays healthy and observing whether partner moods stop arriving.
+status: open

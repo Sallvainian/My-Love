@@ -30,8 +30,23 @@ vi.mock('@/services/moodService', () => ({
   },
 }));
 
+/** Every (topic, event, payload) the service handed to the broadcast queue. */
+const sentBroadcasts: Array<{ topic: string; event: string; payload: Record<string, unknown> }> =
+  [];
+
+vi.mock('@/api/ephemeralBroadcast', () => ({
+  sendEphemeralBroadcast: async (
+    topic: string,
+    event: string,
+    payload: Record<string, unknown>
+  ) => {
+    sentBroadcasts.push({ topic, event, payload });
+  },
+}));
+
 import { moodSyncService } from '@/api/moodSyncService';
 import { getPartnerId } from '@/api/supabaseClient';
+import { parseMoodBroadcast } from '@/api/validation/broadcastSchemas';
 import { moodSyncFingerprint } from '@/services/moodSyncPayload';
 import { moodService } from '@/services/moodService';
 import type { MoodEntry } from '@/types';
@@ -73,6 +88,7 @@ describe('moodSyncService.syncPendingMoods', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     backend.reset();
+    sentBroadcasts.length = 0;
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     currentSession = { user: { id: USER_ID } };
     mockedGetPartnerId.mockResolvedValue(null);
@@ -239,5 +255,59 @@ describe('moodSyncService.syncPendingMoods', () => {
       // pass with a real session will take them.
       expect(result).toMatchObject({ synced: 0, failed: 0, deferred: 0 });
     });
+  });
+});
+
+/**
+ * The mood wire contract, end to end.
+ *
+ * `broadcastMoodToPartner` hand-lists the six fields it puts on the wire and
+ * `MoodBroadcastSchema` hand-lists the fields it requires. Nothing joined the
+ * two: every other test on either side builds its own payload, so dropping a
+ * field from the producer left 1998 tests green while `parseMoodBroadcast`
+ * rejected every real mood and the partner silently stopped receiving them.
+ */
+describe('mood broadcast producer/receiver round trip', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    backend.reset();
+    sentBroadcasts.length = 0;
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    currentSession = { user: { id: USER_ID } };
+    mockedMoodService.markAsSynced.mockResolvedValue('cleared');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('what the producer sends is what the receiver accepts', async () => {
+    const PARTNER_ID = fakeUuid(910003);
+    mockedGetPartnerId.mockResolvedValue(PARTNER_ID);
+    mockedMoodService.getUnsyncedMoods.mockResolvedValue([
+      pendingMood({ moods: ['happy', 'tired'], note: 'a real note' }),
+    ]);
+
+    await runSync();
+
+    expect(sentBroadcasts).toHaveLength(1);
+    const [sent] = sentBroadcasts;
+    expect(sent.topic).toBe(`mood-updates:${PARTNER_ID}`);
+    expect(sent.event).toBe('new_mood');
+
+    // The receiver's own identity check: the sender is the partner's partner,
+    // which from the recipient's side is this user.
+    const parsed = parseMoodBroadcast(sent.payload, { partnerId: USER_ID });
+
+    expect(parsed).not.toBeNull();
+    expect(parsed).toMatchObject({
+      user_id: USER_ID,
+      mood_type: 'happy',
+      mood_types: ['happy', 'tired'],
+      note: 'a real note',
+    });
+    // Not on the wire, and substituted from `created_at` by the receiver.
+    expect(parsed?.updated_at).toBe(parsed?.created_at);
   });
 });

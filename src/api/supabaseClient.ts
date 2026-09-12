@@ -70,6 +70,29 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
 );
 
 /**
+ * Get the id of the account this device is currently signed in as
+ *
+ * A session read rather than a cached value on purpose: it is used to notice
+ * that the signed-in account CHANGED under a long-lived Realtime channel, and a
+ * cache of the id would be exactly the thing that cannot see that.
+ *
+ * @returns The signed-in user's id, or null when there is no session
+ */
+export const getSignedInUserId = async (): Promise<string | null> => {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('[Supabase] Failed to read the current session:', error);
+      return null;
+    }
+    return data.session?.user?.id ?? null;
+  } catch (error) {
+    console.error('[Supabase] Error reading the current session:', error);
+    return null;
+  }
+};
+
+/**
  * Get partner user ID
  * Queries the users table to get the partner_id for the current user.
  * Uses the proper partner_id column that stores the established partner relationship.
