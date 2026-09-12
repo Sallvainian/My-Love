@@ -13,7 +13,7 @@
  */
 
 import { logger } from '../utils/logger';
-import { handleSupabaseError, isPostgrestError } from './errorHandlers';
+import { handleSupabaseError, isPostgrestError, logSupabaseError } from './errorHandlers';
 import { supabase } from './supabaseClient';
 
 export interface UserSearchResult {
@@ -190,6 +190,7 @@ class PartnerService {
 
       if (error) {
         if (isPostgrestError(error) && error.code === '23514') {
+          logSupabaseError('PartnerService.sendPartnerRequest', error);
           error.message = handleSupabaseError(error).message;
           throw error;
         }
@@ -298,6 +299,7 @@ class PartnerService {
 
       if (error) {
         if (isPostgrestError(error) && error.code === '23514') {
+          logSupabaseError('PartnerService.acceptPartnerRequest', error);
           error.message = handleSupabaseError(error).message;
         }
         throw error;
@@ -325,6 +327,7 @@ class PartnerService {
 
       if (error) {
         if (isPostgrestError(error) && error.code === '23514') {
+          logSupabaseError('PartnerService.declinePartnerRequest', error);
           error.message = handleSupabaseError(error).message;
         }
         throw error;

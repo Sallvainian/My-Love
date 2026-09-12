@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { PostgrestError } from '@supabase/supabase-js';
 
@@ -41,6 +41,36 @@ const raw = { code: '23514', message: 'raw constraint with incidental duplicate 
 
 describe('partner request CHECK presentation', () => {
   beforeEach(() => { cleanup(); backend.error = null; });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it.each(actions)('%s logs an independent raw CHECK diagnostic before mapping its message', async (method) => {
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    for (const error of [{ ...raw }, new PostgrestError(raw), { ...raw, details: null, hint: null }]) {
+      logError.mockClear();
+      const originalDiagnostics = { code: error.code, message: error.message, details: error.details, hint: error.hint };
+      backend.error = error;
+      const result = await partnerService[method]('target').catch((failure: unknown) => failure);
+      expect(result).toBe(error);
+      expect(error.message).toBe(friendly);
+      expect(logError).toHaveBeenCalledTimes(2);
+      expect(logError).toHaveBeenNthCalledWith(1, `[Supabase] PartnerService.${method}:`, originalDiagnostics);
+      expect(logError.mock.calls[0]?.[1]).not.toBe(error);
+      expect(logError.mock.calls[1]?.[0]).toMatch(/^\[PartnerService\] Error (sending|accepting|declining) partner request:$/);
+      expect(logError.mock.calls[1]?.[1]).toBe(error);
+    }
+  });
+
+  it.each(actions)('%s leaves non-CHECK diagnostics unchanged', async (method) => {
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = { ...raw, code: '23502', message: 'original database message' };
+    backend.error = error;
+    const result = await partnerService[method]('target').catch((failure: unknown) => failure);
+    expect(result).toBe(error);
+    expect(error.message).toBe('original database message');
+    expect(logError).toHaveBeenCalledTimes(1);
+    expect(logError.mock.calls[0]?.[1]).toBe(error);
+    expect(logError.mock.calls[0]?.[0]).not.toContain('[Supabase]');
+  });
 
   it.each(actions)('%s keeps the original error object and diagnostics', async (method) => {
     for (const error of [{ ...raw }, new PostgrestError(raw)]) {
@@ -77,7 +107,13 @@ describe('partner request CHECK presentation', () => {
   });
 
   it('retains duplicate request special handling', async () => {
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
     backend.error = { ...raw, code: '23505' };
     await expect(partnerService.sendPartnerRequest('target')).rejects.toThrow('You already have a pending request to this user');
+    expect(logError).toHaveBeenCalledExactlyOnceWith(
+      '[PartnerService] Error sending partner request:',
+      expect.objectContaining({ message: 'You already have a pending request to this user' })
+    );
+    expect(backend.error).toEqual({ ...raw, code: '23505' });
   });
 });
