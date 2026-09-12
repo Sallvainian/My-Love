@@ -1,0 +1,79 @@
+- id: "1"
+  title: Contain the exposed bot credential
+  description: >-
+    Implement CAP-1 in SPEC.md and the F1 contract in remediation.md, removing live
+    credential literals and establishing secret-backed bot provisioning.
+    Record rotation and session-containment evidence or the outstanding operator actions defined in rollout.md.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: ""
+
+- id: "2"
+  title: Authorize and validate couple broadcasts
+  description: >-
+    Implement CAP-2 and CAP-3 in SPEC.md and the F2/F3 contracts in remediation.md,
+    including private send/receive channels, directional authorization and receiver validation.
+    Verify denied outsider traffic, safe rendering and legitimate delivery while preserving shared channel lifecycle behavior.
+  spec_checkpoint: true
+  done_checkpoint: false
+  invoke_dev_with: ""
+
+- id: "3"
+  title: Require browser-initiated auth callbacks
+  description: >-
+    Implement CAP-13 in SPEC.md and the F13 contract in remediation.md using PKCE
+    and rejecting attacker-supplied implicit token fragments.
+    Verify existing-session preservation and supported password, signup and Google OAuth flows.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: ""
+
+- id: "4"
+  title: Guard photo continuations across accounts
+  description: >-
+    Implement CAP-12 in SPEC.md and the F12 contract in remediation.md for photo
+    upload and deletion success, failure and retry continuations.
+    Verify that stale work cannot mutate the next account's gallery, errors or loading state.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: ""
+
+- id: "5"
+  title: Enforce partner-only immutable interactions
+  description: >-
+    Implement CAP-4 and CAP-5 in SPEC.md and the F4/F5 contracts in remediation.md,
+    enforcing partner-derived recipients, viewed-only client updates and incoming-row validation.
+    Verify direct API authorization and immutability alongside legitimate poke/kiss delivery and badge behavior.
+  spec_checkpoint: true
+  done_checkpoint: false
+  invoke_dev_with: ""
+
+- id: "6"
+  title: Bound image upload request buffering
+  description: >-
+    Implement CAP-10 in SPEC.md and the F10 contract in remediation.md with early
+    length checks, bounded streaming and cancellation before any oversized Storage write.
+    Verify supported uploads and record separate Edge Function deployment evidence or outstanding operator actions per rollout.md.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: ""
+
+- id: "7"
+  title: Partition custom messages by account
+  description: >-
+    Implement CAP-8 in SPEC.md and the F8 contract in remediation.md with immutable
+    userId ownership, a centralized IndexedDB upgrade and ownership checks on every service/store access path.
+    Verify shared-browser isolation, imports, delayed operations, legacy ownerless rows and unaffected public daily messages.
+  spec_checkpoint: true
+  done_checkpoint: false
+  invoke_dev_with: ""
+
+- id: "8"
+  title: Separate profile names from auth identity
+  description: >-
+    Implement CAP-9 in SPEC.md and the F9 contract in remediation.md, preserving
+    chosen profile names during auth sync and preventing client changes to the email mirror.
+    Update setup and name consumers to read profiles and verify role-sensitive protections, bootstrap and account switching.
+  spec_checkpoint: true
+  done_checkpoint: false
+  invoke_dev_with: ""
