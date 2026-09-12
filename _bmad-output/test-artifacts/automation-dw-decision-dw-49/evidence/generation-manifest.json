@@ -1,0 +1,41 @@
+{
+  "detected_stack": "frontend",
+  "execution_mode": "subagent",
+  "total_tests": 8,
+  "api_tests": 2,
+  "e2e_tests": 6,
+  "priority_coverage": {
+    "P0": 0,
+    "P1": 4,
+    "P2": 4,
+    "P3": 0
+  },
+  "api_test_files": 1,
+  "e2e_test_files": 1,
+  "fixture_modules_created": 1,
+  "new_factories": 1,
+  "new_network_controls": 2,
+  "pact_mcp_reachable": false,
+  "playwright_utils_deviations": [
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-decision-dw-49/api/events-save-reconciliation.spec.ts",
+      "line": 33,
+      "reason": "Single-object POST uses raw request.post/response.json because installed apiRequest's contentType.includes('application/json') parser discards application/vnd.pgrst.object+json. Preserving production .single() negotiation is required. maxRetries: 0 prevents implicit replay; all other endpoint calls use apiRequest."
+    },
+    {
+      "file": "_bmad-output/test-artifacts/automation-dw-decision-dw-49/fixtures/uncertain-events.ts",
+      "line": 84,
+      "reason": "Read actual route.fetch vendor JSON to preserve server commit and corrupt only delivered response."
+    }
+  ],
+  "files": [
+    "_bmad-output/test-artifacts/automation-dw-decision-dw-49/README.md",
+    "_bmad-output/test-artifacts/automation-dw-decision-dw-49/playwright.config.ts",
+    "_bmad-output/test-artifacts/automation-dw-decision-dw-49/definition-of-done.md",
+    "_bmad-output/test-artifacts/automation-dw-decision-dw-49/api/events-save-reconciliation.spec.ts",
+    "_bmad-output/test-artifacts/automation-dw-decision-dw-49/fixtures/uncertain-events.ts",
+    "_bmad-output/test-artifacts/automation-dw-decision-dw-49/e2e/uncertain-event-save.spec.ts"
+  ],
+  "validated": true,
+  "generation_timestamp": "2026-09-12T13-31-53Z"
+}

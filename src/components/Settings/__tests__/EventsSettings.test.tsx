@@ -18,6 +18,7 @@
  * following the house standard of a dedicated focus test per dialog.
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAuthSlice } from '../../../stores/slices/authSlice';
@@ -1005,6 +1006,7 @@ describe('EventsSettings add', () => {
 
   it.each([
     ['not-found', true],
+    ['invalid-response', true],
     ['validation', false],
     ['transport', false],
   ] as const)(
@@ -1025,7 +1027,7 @@ describe('EventsSettings add', () => {
 
       await waitFor(() =>
         expect(screen.getByTestId('events-form-error')).toHaveTextContent(
-          'The same returned message'
+          code === 'invalid-response' ? /may already have been saved/i : 'The same returned message'
         )
       );
       expect(screen.getByTestId('events-form-label')).toHaveValue('Doomed');
@@ -1282,6 +1284,245 @@ describe('EventsSettings edit', () => {
     });
 
     expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
+  });
+});
+
+describe.each(['add', 'edit'] as const)('EventsSettings %s save reconciliation', (kind) => {
+  function prepareForm() {
+    fireEvent.click(screen.getByTestId(kind === 'add' ? 'events-settings-add' : 'event-edit-mine'));
+    fillForm({ label: 'Trip together', date: '2026-10-01', description: 'Two weeks away' });
+    fireEvent.click(screen.getByTestId('events-form-icon-plane'));
+  }
+
+  function saveAction() {
+    return kind === 'add'
+      ? vi.mocked(store.state.addEvent as AppState['addEvent'])
+      : vi.mocked(store.state.editEvent as AppState['editEvent']);
+  }
+
+  function expectWrites(count: number) {
+    expect(saveAction()).toHaveBeenCalledTimes(count);
+    expect(store.state[kind === 'add' ? 'editEvent' : 'addEvent']).not.toHaveBeenCalled();
+    expect(store.state.removeEvent).not.toHaveBeenCalled();
+  }
+
+  beforeEach(() => {
+    setStore({ events: kind === 'edit' ? [makeEvent({ id: 'mine', label: 'Original event' })] : [] });
+  });
+
+  it.each([
+    'The event was not created',
+    'The event was saved but its date could not be read',
+    'An arbitrary returned message',
+  ])('explains uncertainty and preserves the fields for invalid-response: %s', async (error) => {
+    saveAction().mockResolvedValueOnce({ success: false, code: 'invalid-response', error });
+    await renderSection();
+    prepareForm();
+    submitForm();
+
+    await waitFor(() => expect(screen.getByTestId('events-form-error')).toHaveTextContent(
+      /may already have been saved/i
+    ));
+    expect(screen.getByRole('alert')).not.toHaveTextContent(error);
+    expect(screen.getByTestId('events-form-label')).toHaveValue('Trip together');
+    expect(screen.getByTestId('events-form-date')).toHaveValue('2026-10-01');
+    expect(screen.getByTestId('events-form-description')).toHaveValue('Two weeks away');
+    expect(screen.getByTestId('events-form-icon-plane')).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Refresh events' })).toBeEnabled();
+    expect(screen.queryByTestId('events-form-submit')).not.toBeInTheDocument();
+    expect(store.state.loadEvents).toHaveBeenCalledTimes(1);
+    expectWrites(1);
+  });
+
+  it('blocks a direct submit after an uncertain result before React commits the failure', async () => {
+    let finishSave!: (result: EventWriteResult) => void;
+    const pendingSave = new Promise<EventWriteResult>((resolve) => { finishSave = resolve; });
+    const failure: EventWriteResult = {
+      success: false, code: 'invalid-response', error: 'Unreadable response',
+    };
+    saveAction().mockReturnValueOnce(pendingSave).mockResolvedValue(failure);
+    await renderSection();
+    prepareForm();
+    submitForm();
+    const form = screen.getByTestId('events-form-label').closest('form')!;
+
+    await act(async () => {
+      finishSave(failure);
+      // The save continuation has received invalid-response, but React still
+      // exposes the previous render's submit handler during this microtask.
+      await Promise.resolve();
+      expect(screen.queryByTestId('events-form-error')).not.toBeInTheDocument();
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expectWrites(1);
+    expect(screen.getByTestId('events-form-error')).toHaveTextContent(/may already have been saved/i);
+    expect(screen.getByRole('button', { name: 'Refresh events' })).toBeEnabled();
+    expect(store.state.loadEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks direct and keyboard submissions, including after field edits', async () => {
+    const user = userEvent.setup();
+    saveAction().mockResolvedValue({
+      success: false, code: 'invalid-response', error: 'Unreadable response',
+    });
+    await renderSection();
+    prepareForm();
+    submitForm();
+    await waitFor(() => expect(screen.getByTestId('events-form-error')).toBeInTheDocument());
+    const form = screen.getByTestId('events-form-label').closest('form')!;
+
+    // A submit event bypasses the missing button, as an implicit submission can.
+    await act(async () => { fireEvent.submit(form); });
+    expectWrites(1);
+
+    fillForm({ label: '', date: '', description: 'Changed after the response' });
+    fireEvent.click(screen.getByTestId('events-form-icon-ring'));
+    await act(async () => { fireEvent.submit(form); });
+    expect(screen.getByTestId('events-form-error')).toHaveTextContent(/may already have been saved/i);
+    expect(screen.queryByTestId('events-form-label-error')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('events-form-date-error')).not.toBeInTheDocument();
+
+    fillForm({ label: 'Another label', date: '2026-11-01' });
+    screen.getByTestId('events-form-label').focus();
+    await user.keyboard('{Enter}');
+    await act(async () => { fireEvent.submit(form); });
+    expectWrites(1);
+    expect(screen.getByTestId('events-form-error')).toHaveTextContent(/may already have been saved/i);
+    expect(screen.getByRole('button', { name: 'Refresh events' })).toBeEnabled();
+    expect(screen.queryByTestId('events-form-submit')).not.toBeInTheDocument();
+    expect(store.state.loadEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([true, false])('reconciles with a read when the bounded refresh contains the saved row: %s', async (hasSavedRow) => {
+    const pending = deferredLoad();
+    const loadEvents = vi.mocked(store.state.loadEvents as AppState['loadEvents']);
+    saveAction().mockResolvedValueOnce({
+      success: false, code: 'invalid-response', error: 'Unreadable response',
+    });
+    await renderSection();
+    loadEvents.mockImplementationOnce(() => {
+      store.patch({ eventsIsLoading: true, eventsError: null });
+      return pending.promise;
+    });
+    prepareForm();
+    submitForm();
+    await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
+    const refresh = screen.getByTestId('events-form-refresh');
+    act(() => {
+      refresh.click();
+      refresh.click();
+    });
+    expect(screen.queryByTestId('events-form')).not.toBeInTheDocument();
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+    expectWrites(1);
+
+    await act(async () => {
+      store.patch({
+        eventsIsLoading: false,
+        events: hasSavedRow ? [makeEvent({ id: 'mine', label: 'Authoritative saved event' })] : [],
+        eventsPagination: {
+          todayISO: '2026-09-12',
+          upcoming: { cursor: null, hasMore: false },
+          past: { cursor: null, hasMore: true },
+        },
+      });
+      pending.resolve(loadOk);
+    });
+    if (hasSavedRow) {
+      expect(renderedLabels()).toEqual(['Authoritative saved event']);
+    } else {
+      expect(screen.getByTestId('events-settings-empty')).toHaveTextContent(
+        'No events to display in this part of your history.'
+      );
+    }
+    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('events-form')).not.toBeInTheDocument();
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+    expectWrites(1);
+  });
+
+  it('keeps the form closed after refresh fails and recovers through the list Retry', async () => {
+    const refresh = deferredLoad();
+    const retry = deferredLoad();
+    const loadEvents = vi.mocked(store.state.loadEvents as AppState['loadEvents']);
+    saveAction().mockResolvedValueOnce({
+      success: false, code: 'invalid-response', error: 'Unreadable response',
+    });
+    await renderSection();
+    loadEvents.mockImplementationOnce(() => {
+      store.patch({ eventsIsLoading: true, eventsError: null });
+      return refresh.promise;
+    }).mockImplementationOnce(() => {
+      store.patch({ eventsIsLoading: true, eventsError: null });
+      return retry.promise;
+    });
+    prepareForm();
+    submitForm();
+    await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('events-form-refresh'));
+    expect(screen.queryByTestId('events-form')).not.toBeInTheDocument();
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      store.patch({ eventsIsLoading: false, eventsError: 'Refresh failed' });
+      refresh.resolve({ status: 'failure', error: 'Refresh failed' });
+    });
+
+    expect(screen.getAllByTestId('events-settings-load-error')).toHaveLength(1);
+    expect(screen.getByTestId('events-settings-load-error')).toHaveTextContent(
+      "We couldn't load your events. Check your connection and try again."
+    );
+    expect(screen.queryByTestId('events-form')).not.toBeInTheDocument();
+    if (kind === 'edit') expect(renderedLabels()).toEqual(['Original event']);
+    else expect(screen.queryByTestId('events-settings-list')).not.toBeInTheDocument();
+    expectWrites(1);
+
+    const retryButton = screen.getByRole('button', { name: 'Retry' });
+    expect(retryButton).toBeEnabled();
+    fireEvent.click(retryButton);
+    expect(loadEvents).toHaveBeenCalledTimes(3);
+    if (kind === 'edit') expect(renderedLabels()).toEqual(['Original event']);
+    await act(async () => {
+      store.patch({
+        eventsIsLoading: false,
+        eventsError: null,
+        events: [makeEvent({ id: 'mine', label: 'Recovered saved event' })],
+      });
+      retry.resolve(loadOk);
+    });
+
+    expect(renderedLabels()).toEqual(['Recovered saved event']);
+    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('events-settings-retry')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('events-form')).not.toBeInTheDocument();
+    expect(loadEvents).toHaveBeenCalledTimes(3);
+    expectWrites(1);
+  });
+
+  it.each(['offline', 'transport'] as const)('allows a deliberate %s retry with the entered fields', async (code) => {
+    const error = `Returned ${code} message`;
+    saveAction().mockResolvedValueOnce({ success: false, code, error });
+    await renderSection();
+    prepareForm();
+    submitForm();
+    await waitFor(() => expect(screen.getByTestId('events-form-error')).toHaveTextContent(error));
+    expect(screen.getByTestId('events-form-label')).toHaveValue('Trip together');
+    expect(screen.getByTestId('events-form-date')).toHaveValue('2026-10-01');
+    expect(screen.getByTestId('events-form-description')).toHaveValue('Two weeks away');
+    expect(screen.getByTestId('events-form-icon-plane')).toBeChecked();
+    expect(screen.getByRole('button', { name: kind === 'add' ? 'Add' : 'Update' })).toBeEnabled();
+    expect(screen.queryByTestId('events-form-refresh')).not.toBeInTheDocument();
+    expectWrites(1);
+
+    submitForm();
+    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
+    const input = {
+      label: 'Trip together', eventDate: '2026-10-01', description: 'Two weeks away', icon: 'plane',
+    };
+    expect(saveAction()).toHaveBeenNthCalledWith(2, ...(kind === 'add' ? [input] : ['mine', input]));
+    expectWrites(2);
+    expect(renderedLabels()).toEqual(['Trip together']);
+    expect(store.state.loadEvents).toHaveBeenCalledTimes(1);
   });
 });
 

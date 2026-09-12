@@ -1,0 +1,1130 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/node_modules/.bin/playwright",
+      "test",
+      "-c",
+      "_bmad-output/test-artifacts/automation-dw-decision-dw-49/playwright.config.ts",
+      "--grep",
+      "\\[P1\\]"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/playwright.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/tests/support/auth/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "api",
+        "name": "api",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/api",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/evidence/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": {
+      "command": "npx vite --mode test",
+      "url": "http://localhost:5173",
+      "reuseExistingServer": true,
+      "timeout": 120000,
+      "cwd": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/"
+    }
+  },
+  "suites": [
+    {
+      "title": "e2e/uncertain-event-save.spec.ts",
+      "file": "e2e/uncertain-event-save.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "DW-49 uncertain event saves",
+          "file": "e2e/uncertain-event-save.spec.ts",
+          "line": 92,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] DW49-E2E-001 committed create blocks resubmission and reconciles by refresh",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3241,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[13:41:41] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[13:41:41] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[13:41:41] \u001b[1m\u001b[36m==== Commit a real create, then corrupt only its returned date ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== ✅ Waiting for events mount requests to settle - completed successfully after 4 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Polling: Waiting for events write 1 completion ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== ✅ Waiting for events write 1 completion - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Edit every field and attempt native Enter and direct form submission ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== ✅ Waiting for events mount requests to settle - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== ✅ Waiting for both held events GET windows - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:44] \u001b[1m\u001b[36m==== ✅ Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:44] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:44] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Modify  **/rest/v1/events*",
+                          "duration": 936,
+                          "steps": [
+                            {
+                              "title": "Received response for Modify  **/rest/v1/events* (200)",
+                              "duration": 8
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Commit a real create, then corrupt only its returned date",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events mount requests to settle - completed successfully after 4 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events write 1 completion",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events write 1 completion - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?user_id=eq.a85fed28-2651-43bd-9bbd-4744d611059b&select=*",
+                          "duration": 10
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 1
+                        },
+                        {
+                          "title": "Edit every field and attempt native Enter and direct form submission",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events mount requests to settle - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for both held events GET windows - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?user_id=eq.a85fed28-2651-43bd-9bbd-4744d611059b&select=*",
+                          "duration": 11
+                        }
+                      ],
+                      "startTime": "2026-09-12T13:41:40.633Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/test-results/uncertain-event-save-DW-49-d4dc5-n-and-reconciles-by-refresh-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/test-results/uncertain-event-save-DW-49-d4dc5-n-and-reconciles-by-refresh-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "511fc787f1d0b2276ebd-5cb2431ef89abb90ed16",
+              "file": "e2e/uncertain-event-save.spec.ts",
+              "line": 96,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW49-E2E-002 committed update blocks resubmission and reconciles by refresh",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 4301,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[13:41:41] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[13:41:41] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[13:41:41] \u001b[1m\u001b[36m==== Commit a real update, then corrupt only its returned date ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== ✅ Waiting for events mount requests to settle - completed successfully after 3 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:42] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Polling: Waiting for events write 1 completion ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== ✅ Waiting for events write 1 completion - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Edit every field and attempt native Enter and direct form submission ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== ✅ Waiting for events mount requests to settle - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:43] \u001b[1m\u001b[36m==== ✅ Waiting for both held events GET windows - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== ✅ Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Modify  **/rest/v1/events*",
+                          "duration": 1143,
+                          "steps": [
+                            {
+                              "title": "Received response for Modify  **/rest/v1/events* (200)",
+                              "duration": 1
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Commit a real update, then corrupt only its returned date",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events mount requests to settle - completed successfully after 3 iterations",
+                          "duration": 1
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events write 1 completion",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events write 1 completion - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?user_id=eq.f4d59870-cd74-4d1c-be18-0d53fe789f8c&select=*",
+                          "duration": 9
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Edit every field and attempt native Enter and direct form submission",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events mount requests to settle - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for both held events GET windows - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?user_id=eq.f4d59870-cd74-4d1c-be18-0d53fe789f8c&select=*",
+                          "duration": 4
+                        }
+                      ],
+                      "startTime": "2026-09-12T13:41:40.635Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/test-results/uncertain-event-save-DW-49-c49a3-n-and-reconciles-by-refresh-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/test-results/uncertain-event-save-DW-49-c49a3-n-and-reconciles-by-refresh-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "511fc787f1d0b2276ebd-2d0ce055b83e1a95083a",
+              "file": "e2e/uncertain-event-save.spec.ts",
+              "line": 96,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW49-E2E-003 failed create reconciliation preserves the list and Retry only reads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/e2e/uncertain-event-save.spec.ts",
+                        "line": 180,
+                        "column": 5
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2473,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[13:41:44] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[13:41:44] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[13:41:44] \u001b[1m\u001b[36m==== Establish an uncertain server commit with the original list still loaded ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== ✅ Waiting for events mount requests to settle - completed successfully after 3 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Polling: Waiting for events write 1 completion ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== ✅ Waiting for events write 1 completion - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Fail both refresh windows after closing the failed form ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== ✅ Waiting for events mount requests to settle - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== ✅ Waiting for both held events GET windows - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Recover through the list Retry without replaying the committed write ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Waiting for events mount requests to settle - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Waiting for both held events GET windows - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Modify  **/rest/v1/events*",
+                          "duration": 528,
+                          "steps": [
+                            {
+                              "title": "Received response for Modify  **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Establish an uncertain server commit with the original list still loaded",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events mount requests to settle - completed successfully after 3 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events write 1 completion",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events write 1 completion - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?user_id=eq.a85fed28-2651-43bd-9bbd-4744d611059b&select=*",
+                          "duration": 7
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Fail both refresh windows after closing the failed form",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events mount requests to settle - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 1
+                        },
+                        {
+                          "title": "✅ Waiting for both held events GET windows - completed successfully after 1 iterations",
+                          "duration": 1
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Recover through the list Retry without replaying the committed write",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events mount requests to settle - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for both held events GET windows - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?user_id=eq.a85fed28-2651-43bd-9bbd-4744d611059b&select=*",
+                          "duration": 7
+                        }
+                      ],
+                      "startTime": "2026-09-12T13:41:44.250Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/e2e/uncertain-event-save.spec.ts",
+                            "line": 180,
+                            "column": 5
+                          }
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/test-results/uncertain-event-save-DW-49-231bd-e-list-and-Retry-only-reads-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/test-results/uncertain-event-save-DW-49-231bd-e-list-and-Retry-only-reads-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "511fc787f1d0b2276ebd-b4d109bcaeadfaf022c6",
+              "file": "e2e/uncertain-event-save.spec.ts",
+              "line": 180,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW49-E2E-004 failed update reconciliation preserves the list and Retry only reads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/e2e/uncertain-event-save.spec.ts",
+                        "line": 180,
+                        "column": 5
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2761,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[13:41:45] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[13:41:45] ℹ \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[13:41:45] \u001b[1m\u001b[36m==== Establish an uncertain server commit with the original list still loaded ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Waiting for events mount requests to settle - completed successfully after 3 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Waiting for events write 1 completion ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Waiting for events write 1 completion - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Fail both refresh windows after closing the failed form ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Waiting for events mount requests to settle - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:46] \u001b[1m\u001b[36m==== ✅ Waiting for both held events GET windows - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== ✅ Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== Recover through the list Retry without replaying the committed write ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== ✅ Waiting for events mount requests to settle - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== ✅ Waiting for both held events GET windows - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== ✅ Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== Polling: Wait for authoritative events state ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[13:41:47] \u001b[1m\u001b[36m==== ✅ Wait for authoritative events state - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Modify  **/rest/v1/events*",
+                          "duration": 581,
+                          "steps": [
+                            {
+                              "title": "Received response for Modify  **/rest/v1/events* (200)",
+                              "duration": 1
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Establish an uncertain server commit with the original list still loaded",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events mount requests to settle - completed successfully after 3 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events write 1 completion",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events write 1 completion - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?user_id=eq.f4d59870-cd74-4d1c-be18-0d53fe789f8c&select=*",
+                          "duration": 7
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Fail both refresh windows after closing the failed form",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events mount requests to settle - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for both held events GET windows - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Recover through the list Retry without replaying the committed write",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for events mount requests to settle - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for both held events GET windows - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Wait for authoritative events state",
+                          "duration": 0
+                        },
+                        {
+                          "title": "✅ Wait for authoritative events state - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?user_id=eq.f4d59870-cd74-4d1c-be18-0d53fe789f8c&select=*",
+                          "duration": 9
+                        }
+                      ],
+                      "startTime": "2026-09-12T13:41:45.289Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/e2e/uncertain-event-save.spec.ts",
+                            "line": 180,
+                            "column": 5
+                          }
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/test-results/uncertain-event-save-DW-49-ff784-e-list-and-Retry-only-reads-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-075025-0dd3/worktrees/dw-decision-dw-49/_bmad-output/test-artifacts/automation-dw-decision-dw-49/test-results/uncertain-event-save-DW-49-ff784-e-list-and-Retry-only-reads-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "511fc787f1d0b2276ebd-276c376d3d5f5ece772c",
+              "file": "e2e/uncertain-event-save.spec.ts",
+              "line": 180,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T13:41:36.689Z",
+    "duration": 11445.719000000001,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

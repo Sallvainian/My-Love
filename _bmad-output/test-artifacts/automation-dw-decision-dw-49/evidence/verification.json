@@ -1,0 +1,84 @@
+{
+  "status": "done",
+  "verified_at": "2026-09-12T13:46:36.645213+00:00",
+  "head": "22208f24c9e289926a29ae60886d93dfe8acb4d1",
+  "baseline": "a48e4f56e0aed00d5af719fb83b023db2e039f38",
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "24.19.0",
+    "playwright": "1.63.0",
+    "backend": "local Supabase"
+  },
+  "commands": [
+    {
+      "command": "npx playwright test -c _bmad-output/test-artifacts/automation-dw-decision-dw-49/playwright.config.ts --list",
+      "exit_code": 0,
+      "result": "8 cases in 2 files",
+      "log": "discovery.txt"
+    },
+    {
+      "command": "npx playwright test -c _bmad-output/test-artifacts/automation-dw-decision-dw-49/playwright.config.ts --grep '\\[P1\\]'",
+      "exit_code": 0,
+      "result": "4 passed",
+      "log": "p1.txt"
+    },
+    {
+      "command": "npx playwright test -c _bmad-output/test-artifacts/automation-dw-decision-dw-49/playwright.config.ts --grep '\\[P2\\]'",
+      "exit_code": 0,
+      "result": "4 passed",
+      "log": "p2.txt"
+    },
+    {
+      "command": "npx playwright test -c _bmad-output/test-artifacts/automation-dw-decision-dw-49/playwright.config.ts --repeat-each=3 --workers=4",
+      "exit_code": 0,
+      "result": "24 passed; 0 skipped/flaky/unexpected",
+      "log": "repeated-parallel.txt"
+    },
+    {
+      "command": "npx vitest run src/components/Settings/__tests__/EventsSettings.test.tsx src/components/Settings/__tests__/EventsSettings.focus.test.tsx tests/unit/services/eventsService.test.ts tests/unit/stores/eventsSlice.test.ts",
+      "exit_code": 0,
+      "result": "255 passed in 4 files",
+      "log": "component-service-store.txt"
+    },
+    {
+      "command": "npm run typecheck",
+      "exit_code": 0,
+      "result": "passed",
+      "log": "project-typecheck.txt"
+    },
+    {
+      "command": "npx tsc -p _bmad-output/test-artifacts/automation-dw-decision-dw-49/tsconfig.json",
+      "exit_code": 0,
+      "result": "passed",
+      "log": "typecheck.txt"
+    },
+    {
+      "command": "npx eslint _bmad-output/test-artifacts/automation-dw-decision-dw-49/api _bmad-output/test-artifacts/automation-dw-decision-dw-49/e2e _bmad-output/test-artifacts/automation-dw-decision-dw-49/fixtures",
+      "exit_code": 0,
+      "result": "passed",
+      "log": "lint.txt"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "passed",
+      "log": null
+    }
+  ],
+  "owned_files_unchanged": {
+    "_bmad-output/implementation-artifacts/deferred-work.md": "df7292ba690ca82ca0032df4df12722a08bbab4b7ef968f9fd2697e06b0f1754"
+  },
+  "cleanup": {
+    "query": "select count(*) from public.events where label like 'DW49%';",
+    "database": "supabase_db_My-Love",
+    "remaining_rows": 0
+  },
+  "generated_code_sha256": {
+    "_bmad-output/test-artifacts/automation-dw-decision-dw-49/playwright.config.ts": "b3b34bf78388fa62cce8828a5dcc46d8f02b63c1078cf936e524a54a2ea2bca0",
+    "_bmad-output/test-artifacts/automation-dw-decision-dw-49/api/events-save-reconciliation.spec.ts": "b0f0ce7a667bcea7639dbd2188cd1cb2fcd957fe887af71e4aba38bb3dff2ada",
+    "_bmad-output/test-artifacts/automation-dw-decision-dw-49/fixtures/uncertain-events.ts": "9727331f8b4bb2f10893fcd7bfd81d4ad0acb665b6381639f03c3ff03a072f9f",
+    "_bmad-output/test-artifacts/automation-dw-decision-dw-49/e2e/uncertain-event-save.spec.ts": "2900579ebe269081d617cab1924bbcbcae982b4192635c8507ea87104b827e45"
+  },
+  "scope_limit": "Artifact config must be invoked explicitly; default CI does not collect these tests."
+}
