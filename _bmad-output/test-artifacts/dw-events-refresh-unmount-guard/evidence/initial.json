@@ -1,0 +1,1111 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/node_modules/.bin/playwright",
+      "test",
+      "tests/api/events-stale-refresh-precondition.spec.ts",
+      "tests/e2e/settings/events-refresh-unmount.spec.ts",
+      "--project=api",
+      "--project=chromium",
+      "--workers=2",
+      "--retries=0",
+      "--reporter=json"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/playwright.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/support/auth/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "api",
+        "name": "api",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/api",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "integration",
+        "name": "integration",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/integration",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": {
+      "command": "npx vite --mode test",
+      "url": "http://localhost:5173",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "e2e/settings/events-refresh-unmount.spec.ts",
+      "file": "e2e/settings/events-refresh-unmount.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "DW-57 events refresh and retry across Settings unmount",
+          "file": "e2e/settings/events-refresh-unmount.spec.ts",
+          "line": 93,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] DW-57-E2E-001 stale edit refresh succeeds after navigating to Mood",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6456,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[05:33:03] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:04] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:04] \u001b[1m\u001b[36m==== Open a creator event, then remove its server row outside the stale UI ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:04] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:04] \u001b[1m\u001b[36m==== \u2705 Waiting for events mount requests to settle - completed successfully after 3 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:05] \u001b[1m\u001b[36m==== Hold both Refresh reads, then unmount Settings through navigation ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:05] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:05] \u001b[1m\u001b[36m==== \u2705 Waiting for both held events GET windows - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:08] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:08] \u001b[1m\u001b[36m==== \u2705 Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:08] \u001b[1m\u001b[36m==== Polling: Waiting for shared events store after Settings unmount ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:08] \u001b[1m\u001b[36m==== \u2705 Waiting for shared events store after Settings unmount - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:09] \u001b[1m\u001b[36m==== Polling: Waiting for fresh Settings mount recovery ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:09] \u001b[1m\u001b[36m==== \u2705 Waiting for fresh Settings mount recovery - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Open a creator event, then remove its server row outside the stale UI",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for events mount requests to settle - completed successfully after 3 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API DELETE http://127.0.0.1:54321/rest/v1/events?id=eq.162f665d-d468-4016-9a85-eff816da0aa5",
+                          "duration": 13
+                        },
+                        {
+                          "title": "Observe PATCH **/rest/v1/events*",
+                          "duration": 695,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe PATCH **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Hold both Refresh reads, then unmount Settings through navigation",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for both held events GET windows - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for shared events store after Settings unmount",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for shared events store after Settings unmount - completed successfully after 1 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for fresh Settings mount recovery",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for fresh Settings mount recovery - completed successfully after 1 iterations",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T05:33:03.214Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-b989a-ds-after-navigating-to-Mood-chromium/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-b989a-ds-after-navigating-to-Mood-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f9a2cef8b6ba53fd46f3-c45e8a1828e6a19da620",
+              "file": "e2e/settings/events-refresh-unmount.spec.ts",
+              "line": 94,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW-57-E2E-002 stale delete refresh fails after navigating to Mood",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                        "line": 131,
+                        "column": 3
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 19649,
+                      "error": {
+                        "message": "RecurseTimeoutError: Recursion timed out without finding a value that satisfies the predicate (15000ms timeout exceeded)",
+                        "stack": "RecurseTimeoutError: Recursion timed out without finding a value that satisfies the predicate (15000ms timeout exceeded)\n    at executePolling (/Users/sallvain/Projects/My-Love/node_modules/@seontechnologies/playwright-utils/src/recurse/recurse.ts:326:13)\n    at recurse (/Users/sallvain/Projects/My-Love/node_modules/@seontechnologies/playwright-utils/src/recurse/recurse.ts:399:3)\n    at expectSettledOnMood (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:57:3)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:163:5",
+                        "location": {
+                          "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                          "column": 3,
+                          "line": 57
+                        },
+                        "snippet": "  55 |\n  56 | async function expectSettledOnMood(page: Page, ids: string[], failed: boolean) {\n> 57 |   await recurse(\n     |   ^\n  58 |     () => eventsSnapshot(page),\n  59 |     (state) => {\n  60 |       expect(state.loading).toBe(false);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                            "column": 3,
+                            "line": 57
+                          },
+                          "message": "RecurseTimeoutError: Recursion timed out without finding a value that satisfies the predicate (15000ms timeout exceeded)\n\n  55 |\n  56 | async function expectSettledOnMood(page: Page, ids: string[], failed: boolean) {\n> 57 |   await recurse(\n     |   ^\n  58 |     () => eventsSnapshot(page),\n  59 |     (state) => {\n  60 |       expect(state.loading).toBe(false);\n    at executePolling (/Users/sallvain/Projects/My-Love/node_modules/@seontechnologies/playwright-utils/src/recurse/recurse.ts:326:13)\n    at recurse (/Users/sallvain/Projects/My-Love/node_modules/@seontechnologies/playwright-utils/src/recurse/recurse.ts:399:3)\n    at expectSettledOnMood (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:57:3)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:163:5"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[05:33:03] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:04] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-1/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:04] \u001b[1m\u001b[36m==== Keep a stale creator row rendered after an actual server deletion ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:04] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:04] \u001b[1m\u001b[36m==== \u2705 Waiting for events mount requests to settle - completed successfully after 3 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:05] \u001b[1m\u001b[36m==== Let a failed Refresh settle after Settings has unmounted ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:05] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:05] \u001b[1m\u001b[36m==== \u2705 Waiting for both held events GET windows - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:08] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:08] \u001b[1m\u001b[36m==== \u2705 Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:08] \u001b[1m\u001b[36m==== Polling: Waiting for shared events store after Settings unmount ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Keep a stale creator row rendered after an actual server deletion",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for events mount requests to settle - completed successfully after 3 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API DELETE http://127.0.0.1:54321/rest/v1/events?id=eq.c1c0905c-cc01-4db0-9458-0f5ae907139c",
+                          "duration": 14
+                        },
+                        {
+                          "title": "Observe DELETE **/rest/v1/events*",
+                          "duration": 695,
+                          "steps": [
+                            {
+                              "title": "Received response for Observe DELETE **/rest/v1/events* (200)",
+                              "duration": 0
+                            }
+                          ]
+                        },
+                        {
+                          "title": "Let a failed Refresh settle after Settings has unmounted",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for both held events GET windows - completed successfully after 1 iterations",
+                          "duration": 1
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for shared events store after Settings unmount",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T05:33:03.215Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                            "line": 131,
+                            "column": 3
+                          }
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-3aa7a-ls-after-navigating-to-Mood-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-3aa7a-ls-after-navigating-to-Mood-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-3aa7a-ls-after-navigating-to-Mood-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                        "column": 3,
+                        "line": 57
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "f9a2cef8b6ba53fd46f3-3a9071e4155d41670e25",
+              "file": "e2e/settings/events-refresh-unmount.spec.ts",
+              "line": 131,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW-57-E2E-003 pending Retry settles with success after navigating to Mood",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                        "line": 169,
+                        "column": 5
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 15911,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('events-settings-load-error')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('events-settings-load-error') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('events-settings-load-error')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('events-settings-load-error')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('events-settings-load-error') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('events-settings-load-error')\u001b[22m\n\n    at openFailedSettings (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:44:64)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:174:7",
+                        "location": {
+                          "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                          "column": 64,
+                          "line": 44
+                        },
+                        "snippet": "  42 |   expect(await initialLoad.waitForCompleted()).toEqual([503, 503, 503, 503]);\n  43 |   await control.waitForIdle();\n> 44 |   await expect(page.getByTestId('events-settings-load-error')).toBeVisible();\n     |                                                                ^\n  45 |   await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled();\n  46 | }\n  47 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                            "column": 64,
+                            "line": 44
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('events-settings-load-error')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('events-settings-load-error') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('events-settings-load-error')\u001b[22m\n\n\n  42 |   expect(await initialLoad.waitForCompleted()).toEqual([503, 503, 503, 503]);\n  43 |   await control.waitForIdle();\n> 44 |   await expect(page.getByTestId('events-settings-load-error')).toBeVisible();\n     |                                                                ^\n  45 |   await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled();\n  46 | }\n  47 |\n    at openFailedSettings (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:44:64)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:174:7"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[05:33:10] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-0/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:10] \u001b[1m\u001b[36m==== Fail both initial Settings load windows and expose Retry ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:10] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:10] \u001b[1m\u001b[36m==== \u2705 Waiting for both held events GET windows - completed successfully after 3 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:10] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:10] \u001b[1m\u001b[36m==== \u2705 Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:10] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:10] \u001b[1m\u001b[36m==== \u2705 Waiting for events mount requests to settle - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Fail both initial Settings load windows and expose Retry",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for both held events GET windows - completed successfully after 3 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for events mount requests to settle - completed successfully after 1 iterations",
+                          "duration": 1
+                        }
+                      ],
+                      "startTime": "2026-09-12T05:33:10.150Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                            "line": 169,
+                            "column": 5
+                          }
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-f9426-ss-after-navigating-to-Mood-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-f9426-ss-after-navigating-to-Mood-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-f9426-ss-after-navigating-to-Mood-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                        "column": 64,
+                        "line": 44
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "f9a2cef8b6ba53fd46f3-0020aad4c9b2964ac8b0",
+              "file": "e2e/settings/events-refresh-unmount.spec.ts",
+              "line": 169,
+              "column": 5
+            },
+            {
+              "title": "[P1] DW-57-E2E-004 pending Retry settles with failure after navigating to Mood",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                        "line": 169,
+                        "column": 5
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 15951,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('events-settings-load-error')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('events-settings-load-error') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('events-settings-load-error')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('events-settings-load-error')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('events-settings-load-error') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('events-settings-load-error')\u001b[22m\n\n    at openFailedSettings (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:44:64)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:174:7",
+                        "location": {
+                          "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                          "column": 64,
+                          "line": 44
+                        },
+                        "snippet": "  42 |   expect(await initialLoad.waitForCompleted()).toEqual([503, 503, 503, 503]);\n  43 |   await control.waitForIdle();\n> 44 |   await expect(page.getByTestId('events-settings-load-error')).toBeVisible();\n     |                                                                ^\n  45 |   await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled();\n  46 | }\n  47 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                            "column": 64,
+                            "line": 44
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('events-settings-load-error')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('events-settings-load-error') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('events-settings-load-error')\u001b[22m\n\n\n  42 |   expect(await initialLoad.waitForCompleted()).toEqual([503, 503, 503, 503]);\n  43 |   await control.waitForIdle();\n> 44 |   await expect(page.getByTestId('events-settings-load-error')).toBeVisible();\n     |                                                                ^\n  45 |   await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled();\n  46 | }\n  47 |\n    at openFailedSettings (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:44:64)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:174:7"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[05:33:24] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-2/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:24] \u001b[1m\u001b[36m==== Fail both initial Settings load windows and expose Retry ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:25] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:25] \u001b[1m\u001b[36m==== \u2705 Waiting for both held events GET windows - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:25] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:25] \u001b[1m\u001b[36m==== \u2705 Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:25] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:25] \u001b[1m\u001b[36m==== \u2705 Waiting for events mount requests to settle - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Fail both initial Settings load windows and expose Retry",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for both held events GET windows - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for events mount requests to settle - completed successfully after 1 iterations",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T05:33:24.541Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                            "line": 169,
+                            "column": 5
+                          }
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-77555-re-after-navigating-to-Mood-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-77555-re-after-navigating-to-Mood-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-77555-re-after-navigating-to-Mood-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                        "column": 64,
+                        "line": 44
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "f9a2cef8b6ba53fd46f3-7ad69a6691a123002313",
+              "file": "e2e/settings/events-refresh-unmount.spec.ts",
+              "line": 169,
+              "column": 5
+            },
+            {
+              "title": "[P2] DW-57-E2E-005 mounted Retry fails then succeeds and restores native focus",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                        "line": 190,
+                        "column": 3
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 15917,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('events-settings-load-error')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('events-settings-load-error') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('events-settings-load-error')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('events-settings-load-error')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('events-settings-load-error') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('events-settings-load-error')\u001b[22m\n\n    at openFailedSettings (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:44:64)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:195:5",
+                        "location": {
+                          "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                          "column": 64,
+                          "line": 44
+                        },
+                        "snippet": "  42 |   expect(await initialLoad.waitForCompleted()).toEqual([503, 503, 503, 503]);\n  43 |   await control.waitForIdle();\n> 44 |   await expect(page.getByTestId('events-settings-load-error')).toBeVisible();\n     |                                                                ^\n  45 |   await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled();\n  46 | }\n  47 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                            "column": 64,
+                            "line": 44
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('events-settings-load-error')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('events-settings-load-error') with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('events-settings-load-error')\u001b[22m\n\n\n  42 |   expect(await initialLoad.waitForCompleted()).toEqual([503, 503, 503, 503]);\n  43 |   await control.waitForIdle();\n> 44 |   await expect(page.getByTestId('events-settings-load-error')).toBeVisible();\n     |                                                                ^\n  45 |   await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled();\n  46 | }\n  47 |\n    at openFailedSettings (/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:44:64)\n    at /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts:195:5"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[05:33:27] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-3/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:27] \u001b[1m\u001b[36m==== Start from an empty failed load under the app StrictMode ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:27] \u001b[1m\u001b[36m==== Polling: Waiting for both held events GET windows ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:27] \u001b[1m\u001b[36m==== \u2705 Waiting for both held events GET windows - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:27] \u001b[1m\u001b[36m==== Polling: Waiting for all released events responses ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:27] \u001b[1m\u001b[36m==== \u2705 Waiting for all released events responses - completed successfully after 2 iterations ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:27] \u001b[1m\u001b[36m==== Polling: Waiting for events mount requests to settle ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:27] \u001b[1m\u001b[36m==== \u2705 Waiting for events mount requests to settle - completed successfully after 1 iterations ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Start from an empty failed load under the app StrictMode",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for both held events GET windows",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for both held events GET windows - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for all released events responses",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for all released events responses - completed successfully after 2 iterations",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Polling: Waiting for events mount requests to settle",
+                          "duration": 0
+                        },
+                        {
+                          "title": "\u2705 Waiting for events mount requests to settle - completed successfully after 1 iterations",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T05:33:26.990Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                            "line": 190,
+                            "column": 3
+                          }
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-0b11c-s-and-restores-native-focus-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-0b11c-s-and-restores-native-focus-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/settings-events-refresh-un-0b11c-s-and-restores-native-focus-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/tests/e2e/settings/events-refresh-unmount.spec.ts",
+                        "column": 64,
+                        "line": 44
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "f9a2cef8b6ba53fd46f3-c597313feb2dacd00bc0",
+              "file": "e2e/settings/events-refresh-unmount.spec.ts",
+              "line": 190,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "api/events-stale-refresh-precondition.spec.ts",
+      "file": "api/events-stale-refresh-precondition.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "DW-57 stale-row refresh API preconditions",
+          "file": "api/events-stale-refresh-precondition.spec.ts",
+          "line": 21,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] DW-57-API-001 creator PATCH returns zero rows after deletion and refresh retains the witness",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 331,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[05:33:41] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-4/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:41] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-4/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:41] \u001b[1m\u001b[36m==== Seed an owned event and a surviving refresh witness ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:41] \u001b[1m\u001b[36m==== Prove the creator can edit the existing row before removing it ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:41] \u001b[1m\u001b[36m==== Submit a stale creator edit after the successful deletion ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:41] \u001b[1m\u001b[36m==== Refresh as the creator and observe only the unchanged witness ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Seed an owned event and a surviving refresh witness",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Prove the creator can edit the existing row before removing it",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API PATCH http://127.0.0.1:54321/rest/v1/events?id=eq.ba23f3b7-a9cc-4275-a4df-eddda85ab33c&select=*",
+                          "duration": 9
+                        },
+                        {
+                          "title": "API DELETE http://127.0.0.1:54321/rest/v1/events?id=eq.ba23f3b7-a9cc-4275-a4df-eddda85ab33c&select=*",
+                          "duration": 5
+                        },
+                        {
+                          "title": "Submit a stale creator edit after the successful deletion",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API PATCH http://127.0.0.1:54321/rest/v1/events?id=eq.ba23f3b7-a9cc-4275-a4df-eddda85ab33c&select=*",
+                          "duration": 4
+                        },
+                        {
+                          "title": "Refresh as the creator and observe only the unchanged witness",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=id,user_id,label,event_date&id=in.(ba23f3b7-a9cc-4275-a4df-eddda85ab33c,08d54fdd-04a2-4d9c-ad27-68714385cb15)",
+                          "duration": 4
+                        }
+                      ],
+                      "startTime": "2026-09-12T05:33:41.619Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/events-stale-refresh-preco-85d72-refresh-retains-the-witness-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/events-stale-refresh-preco-85d72-refresh-retains-the-witness-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8e0240494aae94adfcb1-ef1d9d2e8679d711cf52",
+              "file": "api/events-stale-refresh-precondition.spec.ts",
+              "line": 22,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW-57-API-002 creator DELETE returns zero rows after deletion and refresh retains the witness",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 238,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[05:33:42] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-4/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:42] \u2139 \u001b[1m\u001b[37mStorage state saved to /Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/.auth/local/worker-4/storage-state.json\u001b[0m\n"
+                        },
+                        {
+                          "text": "[05:33:42] \u001b[1m\u001b[36m==== Seed an owned event and a surviving refresh witness ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:42] \u001b[1m\u001b[36m==== Delete the owned row and confirm the creator affected exactly that row ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:42] \u001b[1m\u001b[36m==== Submit a stale creator delete against the now missing row ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[05:33:42] \u001b[1m\u001b[36m==== Refresh as the creator and observe only the unchanged witness ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Seed an owned event and a surviving refresh witness",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Delete the owned row and confirm the creator affected exactly that row",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API DELETE http://127.0.0.1:54321/rest/v1/events?id=eq.088d842d-c749-49be-ae52-dce385df3d75&select=*",
+                          "duration": 5
+                        },
+                        {
+                          "title": "Submit a stale creator delete against the now missing row",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API DELETE http://127.0.0.1:54321/rest/v1/events?id=eq.088d842d-c749-49be-ae52-dce385df3d75&select=*",
+                          "duration": 3
+                        },
+                        {
+                          "title": "Refresh as the creator and observe only the unchanged witness",
+                          "duration": 0
+                        },
+                        {
+                          "title": "API GET http://127.0.0.1:54321/rest/v1/events?select=id,user_id,label,event_date&id=in.(088d842d-c749-49be-ae52-dce385df3d75,4c471c89-b3e2-4c04-b507-9a156044d3be)",
+                          "duration": 3
+                        }
+                      ],
+                      "startTime": "2026-09-12T05:33:42.037Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/events-stale-refresh-preco-a4a7c-refresh-retains-the-witness-api/test-finished-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260911-233556-792a/worktrees/dw-events-refresh-unmount-guard/test-results/events-stale-refresh-preco-a4a7c-refresh-retains-the-witness-api/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8e0240494aae94adfcb1-c2f011a31416b510b46f",
+              "file": "api/events-stale-refresh-precondition.spec.ts",
+              "line": 86,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T05:32:58.532Z",
+    "duration": 44515.994999999995,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 4,
+    "flaky": 0
+  }
+}
