@@ -1,0 +1,49 @@
+{
+  "success": true,
+  "subagent": "api-tests",
+  "tests": [
+    {
+      "file": "_bmad-output/test-artifacts/dw-event-test-date-anchors/tests/api/event-test-date-anchors.spec.ts",
+      "activation_path": "tests/api/event-test-date-anchors.spec.ts",
+      "content": "/**\n * DW-61/64/69: a shared setup anchor survives a midnight crossing at the wire.\n *\n * Provider evidence: public.events in\n * supabase/migrations/20260818000002_create_events_table.sql:17-26 stores\n * event_date as date and created_at as timestamptz. Its INSERT policy requires\n * the owning user's bearer; SELECT admits both halves of the worker pair.\n * tests/api/events-wire-contract.spec.ts confirms POST 201 + an array with\n * return=representation and GET 200 ordered by event_date then created_at.\n */\nimport { log } from '@seontechnologies/playwright-utils';\nimport { z } from 'zod';\nimport { test, expect } from '../support/merged-fixtures';\nimport { createDateAnchorBatch } from '../support/factories/event-test-date-anchors';\n\n// Test-local schema for the exact select projection, matching the table above.\nconst EventRowsSchema = z.array(z.object({\n  id: z.string().uuid(),\n  user_id: z.string().uuid(),\n  label: z.string().max(100),\n  event_date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/),\n  created_at: z.string(),\n}));\ntype EventRows = z.infer<typeof EventRowsSchema>;\nconst EVENT_PROJECTION = 'id,user_id,label,event_date,created_at';\n\n// Deliberately oppose request order with fixed instants one second apart.\n// They control only the created_at tiebreak, independently of event dates.\nconst EARLIER_CREATED_AT = '2000-01-01T00:00:00.000Z';\nconst LATER_CREATED_AT = '2000-01-01T00:00:01.000Z';\n\ntest('[P1] DW.DATE-API-001 one anchor keeps own and partner dates tied across setup midnight', async ({\n  apiRequest,\n  authToken,\n  partnerAuthToken,\n  coupleEvents,\n}) => {\n  // GIVEN: offset zero is calculated before and after simulated local midnight.\n  // The factory restores Node Date synchronously, before these network awaits.\n  // coupleEvents owns checked cleanup before and after this test, even on failure.\n  const batch = createDateAnchorBatch();\n\n  await log.step('Create the own row first with the later tiebreak timestamp');\n  const own = await apiRequest<EventRows>({\n    method: 'POST',\n    path: `/rest/v1/events?select=${EVENT_PROJECTION}`,\n    headers: { Authorization: `Bearer ${authToken}`, Prefer: 'return=representation' },\n    // These are non-idempotent writes; retrying an ambiguous 5xx could insert twice.\n    retryConfig: { maxRetries: 0 },\n    body: {\n      user_id: coupleEvents.userId,\n      label: batch.before.label,\n      event_date: batch.before.date,\n      created_at: LATER_CREATED_AT,\n    },\n  }).validateSchema<EventRows>(EventRowsSchema);\n  expect(own.status).toBe(201);\n  expect(own.body).toHaveLength(1);\n  expect(own.body[0]).toMatchObject({\n    user_id: coupleEvents.userId,\n    label: batch.before.label,\n    event_date: batch.expectedSameDate,\n  });\n\n  await log.step('Create the partner row using the date calculated after midnight');\n  const partner = await apiRequest<EventRows>({\n    method: 'POST',\n    path: `/rest/v1/events?select=${EVENT_PROJECTION}`,\n    headers: { Authorization: `Bearer ${partnerAuthToken}`, Prefer: 'return=representation' },\n    retryConfig: { maxRetries: 0 },\n    body: {\n      user_id: coupleEvents.partnerId,\n      label: batch.after.label,\n      event_date: batch.after.date,\n      created_at: EARLIER_CREATED_AT,\n    },\n  }).validateSchema<EventRows>(EventRowsSchema);\n  expect(partner.status).toBe(201);\n  expect(partner.body).toHaveLength(1);\n  expect(partner.body[0]).toMatchObject({\n    user_id: coupleEvents.partnerId,\n    label: batch.after.label,\n    event_date: batch.expectedSameDate,\n  });\n\n  // WHEN: read committed rows with the signed-in creator's real bearer.\n  // No user_id filter: this also proves the partner row reaches the shared read.\n  await log.step('Read the persisted equal dates in created_at order');\n  const listed = await apiRequest<EventRows>({\n    method: 'GET',\n    path: `/rest/v1/events?select=${EVENT_PROJECTION}&order=event_date.asc,created_at.asc`,\n    headers: { Authorization: `Bearer ${authToken}` },\n  }).validateSchema<EventRows>(EventRowsSchema);\n\n  // THEN: the later request sorts first because both dates remain December 31.\n  // Re-reading Date during the batch instead would put the partner on January 1.\n  expect(listed.status).toBe(200);\n  expect(listed.body.map(({ id, user_id, label, event_date }) => ({\n    id, user_id, label, event_date,\n  }))).toEqual([\n    {\n      id: partner.body[0].id,\n      user_id: coupleEvents.partnerId,\n      label: batch.after.label,\n      event_date: batch.expectedSameDate,\n    },\n    {\n      id: own.body[0].id,\n      user_id: coupleEvents.userId,\n      label: batch.before.label,\n      event_date: batch.expectedSameDate,\n    },\n  ]);\n  expect(listed.body.map((row) => new Date(row.created_at).getTime())).toEqual([\n    new Date(EARLIER_CREATED_AT).getTime(),\n    new Date(LATER_CREATED_AT).getTime(),\n  ]);\n});\n",
+      "description": "DW.DATE-API-001 verifies that equal dates calculated across simulated setup midnight persist equally for both partner owners and retain the independent created_at tiebreak.",
+      "priority_coverage": {
+        "P0": 0,
+        "P1": 1,
+        "P2": 0,
+        "P3": 0
+      }
+    }
+  ],
+  "fixture_needs": [
+    "Existing tests/support/merged-fixtures.ts apiRequest fixture",
+    "Existing authToken and partnerAuthToken for the running worker pair",
+    "Existing coupleEvents for pair IDs and checked setup/teardown",
+    "New tests/support/factories/event-test-date-anchors.ts createDateAnchorBatch() generated by root"
+  ],
+  "knowledge_fragments_used": [
+    "playwright-utils-mandate",
+    "library-integration-mandate",
+    "overview",
+    "api-request",
+    "recurse",
+    "log",
+    "auth-session",
+    "data-factories",
+    "api-testing-patterns",
+    "fixtures-composition",
+    "network-error-monitor"
+  ],
+  "playwright_utils_deviations": [],
+  "pactjs_utils_deviations": [],
+  "provider_scrutiny": "completed",
+  "provider_files_read": [
+    "supabase/migrations/20260818000002_create_events_table.sql",
+    "tests/api/events-wire-contract.spec.ts",
+    "tests/support/fixtures/auth.ts",
+    "tests/support/fixtures/index.ts",
+    "tests/support/auth/supabase-auth-provider.ts"
+  ],
+  "test_count": 1,
+  "summary": "Generated one P1 API test for shared setup anchors crossing local midnight. Real user and partner tokens create rows through apiRequest; a schema-validated authenticated GET proves equal persisted dates, ownership and timestamp order. Fixed timestamps are documented tiebreak inputs; UUID labels come from the shared factory. No additional auth/rejection matrix because provider behavior is unchanged and covered by active events tests. HTTP writes disable retries because they are not idempotent. No Pact artifacts: contract_tests_relevant=false, dependencies absent and the parent probe found broker tools unreachable. No tests run by this worker."
+}

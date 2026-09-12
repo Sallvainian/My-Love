@@ -1,0 +1,34 @@
+{
+  "original_inputs_unchanged": {
+    "_bmad/tea/config.yaml": true,
+    "_bmad-output/implementation-artifacts/spec-dw-61-64-69-event-test-date-anchors.md": true,
+    "playwright.config.ts": true,
+    "vitest.config.ts": true,
+    "package.json": true,
+    "tests/support/helpers/events.ts": true,
+    "tests/support/factories/events.ts": true,
+    "tests/support/merged-fixtures.ts": true,
+    "tests/unit/helpers/events.test.ts": true,
+    "tests/api/events-wire-contract.spec.ts": true,
+    "tests/e2e/home/events.spec.ts": true,
+    "tests/e2e/settings/events-crud.spec.ts": true,
+    "tests/e2e/settings/events-persistence.spec.ts": true,
+    "_bmad-output/implementation-artifacts/deferred-work.md": true
+  },
+  "temporary_test_files_remaining": {
+    "tests/api/event-test-date-anchors.spec.ts": false,
+    "tests/e2e/settings/event-test-date-anchors.spec.ts": false,
+    "tests/support/factories/event-test-date-anchors.ts": false
+  },
+  "mandate_and_hygiene_violations": {
+    "tests/api/event-test-date-anchors.spec.ts": [],
+    "tests/e2e/settings/event-test-date-anchors.spec.ts": [],
+    "tests/support/factories/event-test-date-anchors.ts": []
+  },
+  "merged_fixture_imports": {
+    "specs_using_existing_entrypoint": 2,
+    "total_specs": 2
+  },
+  "git_diff_check_exit": 0,
+  "local_jwts_redacted_from_evidence": 0
+}

@@ -1,0 +1,958 @@
+{
+  "config": {
+    "argv": [
+      "/Users/sallvain/.local/share/mise/installs/node/24.19.0/bin/node",
+      "/Users/sallvain/Projects/My-Love/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/playwright.config.ts",
+      "--repeat-each=3",
+      "--workers=3"
+    ],
+    "configFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/playwright.config.ts",
+    "rootDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 3
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/test-results",
+        "repeatEach": 3,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors",
+        "testIgnore": [],
+        "testMatch": [
+          "/(?:api|e2e)-outsider-.*\\.spec\\.ts/"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/run-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 3,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "api-outsider-cleanup.spec.ts",
+      "file": "api-outsider-cleanup.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "DW-71 outsider cleanup across the Supabase Auth HTTP boundary",
+          "file": "api-outsider-cleanup.spec.ts",
+          "line": 15,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] DW71-API-001 preserves setup and returned deletion errors from the real SDK",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "description": "Loopback Auth faults are the inputs under test.",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                        "line": 16,
+                        "column": 3
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 30,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:22] \u001b[1m\u001b[36m==== Reject password sign-in and account deletion at an isolated Auth server ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Reject password sign-in and account deletion at an isolated Auth server",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:22.453Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "description": "Loopback Auth faults are the inputs under test.",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                            "line": 16,
+                            "column": 3
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8b4a8e402c6648e3e41d-bd702b8926e99bb26a15",
+              "file": "api-outsider-cleanup.spec.ts",
+              "line": 16,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW71-API-002 returns only the setup error after the SDK confirms deletion",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "description": "Loopback Auth faults are the inputs under test.",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                        "line": 48,
+                        "column": 3
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 39,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:22] \u001b[1m\u001b[36m==== Reject password sign-in, then successfully delete the created outsider ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Reject password sign-in, then successfully delete the created outsider",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:22.453Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "description": "Loopback Auth faults are the inputs under test.",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                            "line": 48,
+                            "column": 3
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8b4a8e402c6648e3e41d-14407f2d944c3eb51f43",
+              "file": "api-outsider-cleanup.spec.ts",
+              "line": 48,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW71-API-001 preserves setup and returned deletion errors from the real SDK",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "description": "Loopback Auth faults are the inputs under test.",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                        "line": 16,
+                        "column": 3
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 27,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:23] \u001b[1m\u001b[36m==== Reject password sign-in and account deletion at an isolated Auth server ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Reject password sign-in and account deletion at an isolated Auth server",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:23.384Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "description": "Loopback Auth faults are the inputs under test.",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                            "line": 16,
+                            "column": 3
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8b4a8e402c6648e3e41d-ee25088ced415996e098",
+              "file": "api-outsider-cleanup.spec.ts",
+              "line": 16,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW71-API-002 returns only the setup error after the SDK confirms deletion",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "description": "Loopback Auth faults are the inputs under test.",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                        "line": 48,
+                        "column": 3
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 31,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:23] \u001b[1m\u001b[36m==== Reject password sign-in, then successfully delete the created outsider ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Reject password sign-in, then successfully delete the created outsider",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:23.408Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "description": "Loopback Auth faults are the inputs under test.",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                            "line": 48,
+                            "column": 3
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8b4a8e402c6648e3e41d-f1614a34f54e50fa4155",
+              "file": "api-outsider-cleanup.spec.ts",
+              "line": 48,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW71-API-001 preserves setup and returned deletion errors from the real SDK",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "description": "Loopback Auth faults are the inputs under test.",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                        "line": 16,
+                        "column": 3
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 25,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Reject password sign-in and account deletion at an isolated Auth server ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Reject password sign-in and account deletion at an isolated Auth server",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:24.344Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "description": "Loopback Auth faults are the inputs under test.",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                            "line": 16,
+                            "column": 3
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8b4a8e402c6648e3e41d-4ac9e12831b96b71eb70",
+              "file": "api-outsider-cleanup.spec.ts",
+              "line": 16,
+              "column": 3
+            },
+            {
+              "title": "[P1] DW71-API-002 returns only the setup error after the SDK confirms deletion",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skipNetworkMonitoring",
+                      "description": "Loopback Auth faults are the inputs under test.",
+                      "location": {
+                        "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                        "line": 48,
+                        "column": 3
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 31,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Reject password sign-in, then successfully delete the created outsider ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Reject password sign-in, then successfully delete the created outsider",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:24.358Z",
+                      "annotations": [
+                        {
+                          "type": "skipNetworkMonitoring",
+                          "description": "Loopback Auth faults are the inputs under test.",
+                          "location": {
+                            "file": "/Users/sallvain/Projects/My-Love/.bmad-loop/runs/20260912-034111-45e0/worktrees/dw-outsider-setup-cleanup-errors/_bmad-output/test-artifacts/automation-dw-outsider-setup-cleanup-errors/api-outsider-cleanup.spec.ts",
+                            "line": 48,
+                            "column": 3
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8b4a8e402c6648e3e41d-78ea3232f9db10d89228",
+              "file": "api-outsider-cleanup.spec.ts",
+              "line": 48,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "e2e-outsider-reporting.spec.ts",
+      "file": "e2e-outsider-reporting.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Outsider setup and cleanup diagnostics through Playwright reporting",
+          "file": "e2e-outsider-reporting.spec.ts",
+          "line": 17,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[P1] preserves both failures in JSON and Markdown for returned AuthError",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 593,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:22] \u001b[1m\u001b[36m==== Run an isolated failing helper with returned AuthError cleanup ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[09:32:23] \u001b[1m\u001b[36m==== Verify the same aggregate failure contains both diagnostics ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run an isolated failing helper with returned AuthError cleanup",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Verify the same aggregate failure contains both diagnostics",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:22.456Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c597d7b10e1defb8ee8e-5fc526b14230d858858d",
+              "file": "e2e-outsider-reporting.spec.ts",
+              "line": 19,
+              "column": 5
+            },
+            {
+              "title": "[P1] preserves both failures in JSON and Markdown for rejected string",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 577,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:22] \u001b[1m\u001b[36m==== Run an isolated failing helper with rejected string cleanup ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[09:32:23] \u001b[1m\u001b[36m==== Verify the same aggregate failure contains both diagnostics ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run an isolated failing helper with rejected string cleanup",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Verify the same aggregate failure contains both diagnostics",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:22.510Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c597d7b10e1defb8ee8e-6ac4e257cdc7c70a83d6",
+              "file": "e2e-outsider-reporting.spec.ts",
+              "line": 19,
+              "column": 5
+            },
+            {
+              "title": "[P1] preserves both failures in JSON and Markdown for rejected object",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 591,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:22] \u001b[1m\u001b[36m==== Run an isolated failing helper with rejected object cleanup ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[09:32:23] \u001b[1m\u001b[36m==== Verify the same aggregate failure contains both diagnostics ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run an isolated failing helper with rejected object cleanup",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Verify the same aggregate failure contains both diagnostics",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:22.512Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c597d7b10e1defb8ee8e-a16c033e9b6cf3325449",
+              "file": "e2e-outsider-reporting.spec.ts",
+              "line": 19,
+              "column": 5
+            },
+            {
+              "title": "[P1] preserves both failures in JSON and Markdown for returned AuthError",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 604,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:23] \u001b[1m\u001b[36m==== Run an isolated failing helper with returned AuthError cleanup ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Verify the same aggregate failure contains both diagnostics ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run an isolated failing helper with returned AuthError cleanup",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Verify the same aggregate failure contains both diagnostics",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:23.423Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c597d7b10e1defb8ee8e-08cd5bcba7452767e242",
+              "file": "e2e-outsider-reporting.spec.ts",
+              "line": 19,
+              "column": 5
+            },
+            {
+              "title": "[P1] preserves both failures in JSON and Markdown for rejected string",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 594,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:23] \u001b[1m\u001b[36m==== Run an isolated failing helper with rejected string cleanup ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Verify the same aggregate failure contains both diagnostics ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run an isolated failing helper with rejected string cleanup",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Verify the same aggregate failure contains both diagnostics",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:23.431Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c597d7b10e1defb8ee8e-cb49db5bfce1d0100ff7",
+              "file": "e2e-outsider-reporting.spec.ts",
+              "line": 19,
+              "column": 5
+            },
+            {
+              "title": "[P1] preserves both failures in JSON and Markdown for rejected object",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 594,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:23] \u001b[1m\u001b[36m==== Run an isolated failing helper with rejected object cleanup ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Verify the same aggregate failure contains both diagnostics ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run an isolated failing helper with rejected object cleanup",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Verify the same aggregate failure contains both diagnostics",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:23.458Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c597d7b10e1defb8ee8e-49f1b395ce18624334e0",
+              "file": "e2e-outsider-reporting.spec.ts",
+              "line": 19,
+              "column": 5
+            },
+            {
+              "title": "[P1] preserves both failures in JSON and Markdown for returned AuthError",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 8,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 590,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Run an isolated failing helper with returned AuthError cleanup ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Verify the same aggregate failure contains both diagnostics ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run an isolated failing helper with returned AuthError cleanup",
+                          "duration": 1
+                        },
+                        {
+                          "title": "Verify the same aggregate failure contains both diagnostics",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:24.379Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c597d7b10e1defb8ee8e-670ea835d44db977f77e",
+              "file": "e2e-outsider-reporting.spec.ts",
+              "line": 19,
+              "column": 5
+            },
+            {
+              "title": "[P1] preserves both failures in JSON and Markdown for rejected string",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 592,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Run an isolated failing helper with rejected string cleanup ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Verify the same aggregate failure contains both diagnostics ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run an isolated failing helper with rejected string cleanup",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Verify the same aggregate failure contains both diagnostics",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:24.388Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c597d7b10e1defb8ee8e-da5379912473b974fc69",
+              "file": "e2e-outsider-reporting.spec.ts",
+              "line": 19,
+              "column": 5
+            },
+            {
+              "title": "[P1] preserves both failures in JSON and Markdown for rejected object",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 565,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Run an isolated failing helper with rejected object cleanup ====\u001b[0m\n\n"
+                        },
+                        {
+                          "text": "[09:32:24] \u001b[1m\u001b[36m==== Verify the same aggregate failure contains both diagnostics ====\u001b[0m\n\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Run an isolated failing helper with rejected object cleanup",
+                          "duration": 0
+                        },
+                        {
+                          "title": "Verify the same aggregate failure contains both diagnostics",
+                          "duration": 0
+                        }
+                      ],
+                      "startTime": "2026-09-12T09:32:24.407Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c597d7b10e1defb8ee8e-15306a50ff9a12a51907",
+              "file": "e2e-outsider-reporting.spec.ts",
+              "line": 19,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-12T09:32:21.981Z",
+    "duration": 3016.553,
+    "expected": 15,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

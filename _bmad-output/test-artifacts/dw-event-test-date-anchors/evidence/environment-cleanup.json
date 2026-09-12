@@ -1,0 +1,9 @@
+{
+  "cli_session": "tea-date-anchors-20260912",
+  "cli_session_closed": true,
+  "cli_list_after_close": "(no browsers)",
+  "vite_pid_started_for_run": 63945,
+  "vite_stopped": true,
+  "local_supabase": "pre-existing containers left running",
+  "sprint_board": "No tracked sprint-status.yaml exists in this worktree; none created or modified."
+}

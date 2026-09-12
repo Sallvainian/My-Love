@@ -12,7 +12,7 @@ import type { EventsRefreshControl } from '../../support/fixtures/events-refresh
 import { navigateTo } from '../../support/helpers/navigation';
 
 const expectedLoadFailure = { annotation: [{ type: 'skipNetworkMonitoring' }] };
-const injectedLoadError = '[EventsService.getEvents] Database error: TEA forced events refresh failure';
+const injectedLoadError = '[EventsService.getEventsPage] Database error: TEA forced events refresh failure';
 
 async function eventsSnapshot(page: Page) {
   return page.evaluate(() => {

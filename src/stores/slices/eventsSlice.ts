@@ -15,7 +15,7 @@
  *   `partialize` in `useAppStore.ts` deliberately omits every key here, so a
  *   shared device cannot rehydrate one couple's events into the next account's
  *   session. Freshness is reload-based; there is no realtime subscription.
- * - All three keys are reset by `signedOutState()` in authSlice.
+ * - All account-scoped keys are reset by `signedOutState()` in authSlice.
  *
  * Errors: `eventsService` throws, so every action here has a real reason to
  * report. `eventsError` belongs only to the active load. Writes return their
@@ -30,6 +30,7 @@ import type {
   EventCreateInput,
   EventWriteErrorCode,
   EventUpdateInput,
+  EventsPagination,
 } from '../../services/eventsService';
 import { eventsService } from '../../services/eventsService';
 import { logger } from '../../utils/logger';
@@ -59,9 +60,13 @@ export interface EventsSlice {
   /** Raised by `loadEvents` only — the writes are awaited by their own caller. */
   eventsIsLoading: boolean;
   eventsError: string | null;
+  eventsPagination: EventsPagination | null;
+  eventsIsLoadingMore: boolean;
+  eventsHistoryError: string | null;
 
   // Actions
   loadEvents: () => Promise<EventLoadResult>;
+  loadMoreEvents: () => Promise<EventLoadResult>;
   addEvent: (input: NewEventInput) => Promise<EventWriteResult>;
   editEvent: (eventId: string, updates: EventUpdateInput) => Promise<EventWriteResult>;
   removeEvent: (eventId: string) => Promise<EventWriteResult>;
@@ -77,9 +82,19 @@ export interface EventsSlice {
 function sortByDate(events: CoupleEvent[]): CoupleEvent[] {
   // The created_at tiebreak mirrors getEvents' server order, so same-day cards
   // hold one position across an add, an edit, and a reload.
-  return [...events].sort(
-    (a, b) => a.date.getTime() - b.date.getTime() || a.createdAt.getTime() - b.createdAt.getTime()
-  );
+  return [...events].sort((a, b) => {
+    const dateOrder = a.date.getTime() - b.date.getTime();
+    const instantOrder = a.createdAt.getTime() - b.createdAt.getTime();
+    if (dateOrder || instantOrder) return dateOrder || instantOrder;
+    // Postgres timestamps can differ within a JS millisecond. Pad the fraction
+    // to compare those remaining digits before the deterministic ID tiebreak.
+    const fraction = (event: CoupleEvent) =>
+      ((event.createdAtRaw ?? event.createdAt.toISOString()).match(/\.(\d+)/)?.[1] ?? '')
+        .padEnd(6, '0');
+    const left = fraction(a);
+    const right = fraction(b);
+    return left < right ? -1 : left > right ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
 }
 
 /** Replace by id or append, removing any duplicate copies already present. */
@@ -124,12 +139,14 @@ function writeFailureOf(
 
 type ActiveLoad = {
   requestedBy: string;
+  requestedInSession: number;
   mutationSequenceAtStart: number;
 };
 
-type CompletedMutation =
+type CompletedMutation = { requestedInSession: number } & (
   | { sequence: number; requestedBy: string; kind: 'upsert'; event: CoupleEvent }
-  | { sequence: number; requestedBy: string; kind: 'delete'; eventId: string };
+  | { sequence: number; requestedBy: string; kind: 'delete'; eventId: string }
+);
 
 export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) => {
   /**
@@ -147,6 +164,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       Array.from(activeLoads.values()).some(
         (load) =>
           load.requestedBy === mutation.requestedBy &&
+          load.requestedInSession === mutation.requestedInSession &&
           mutation.sequence > load.mutationSequenceAtStart
       )
     );
@@ -172,6 +190,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     for (const mutation of completedMutations) {
       if (
         mutation.requestedBy !== load.requestedBy ||
+        mutation.requestedInSession !== load.requestedInSession ||
         mutation.sequence <= load.mutationSequenceAtStart
       ) {
         continue;
@@ -186,90 +205,84 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     return sortByDate(reconciled);
   };
 
-  return {
-  // Initial state
-  events: [],
-  eventsIsLoading: false,
-  eventsError: null,
-
-  // Actions
-
-  /**
-   * Load the events visible to this account (own + partner's), date-ordered.
-   *
-   * Not every event: `getEvents()` is called bare, so it reads its default
-   * bounded window — up to 50 rows on each side of today. Past roughly 50 past
-   * events the oldest ones stop arriving, which matters to `EventsSettings`,
-   * the one screen that lists past events so a mistyped date stays editable.
-   * There is no "load more"; see `eventsService.getEvents` for what the cap
-   * drops and why the window is anchored at today.
-   */
-  loadEvents: async () => {
-    // Whose data this is, captured before the await. Sign Out sits on the same
-    // screen that fires this, and the request goes out with a still-valid token
-    // — so it succeeds and its write lands after clearAuth, putting the previous
-    // account's events back on screen for whoever signs in next.
-    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    // Bail before raising the flag: the null -> signed-in transition is the
-    // one auth path that never passes through signedOutState() (authSlice
-    // resets only on an account switch or a sign-out), so a load captured at
-    // null that resolved after sign-in would leave eventsIsLoading stranded
-    // true with nothing due to clear it.
+  const loadPage = async (append: boolean): Promise<EventLoadResult> => {
+    const {
+      userId: requestedBy,
+      authSessionVersion: requestedInSession,
+      eventsPagination,
+      eventsIsLoading,
+      eventsIsLoadingMore,
+    } = get();
     if (!requestedBy) return { status: 'stale' };
+    if (append) {
+      // A refresh owns the traversal until it settles; repeated activation
+      // cannot issue duplicate requests against the same cursors.
+      if (eventsIsLoading || eventsIsLoadingMore || !eventsPagination) return { status: 'stale' };
+      if (!eventsPagination.upcoming.hasMore && !eventsPagination.past.hasMore) {
+        return { status: 'success' };
+      }
+    }
     const loadId = ++latestLoadId;
-    // This load supersedes every older invocation; none of them may apply, so
-    // they cannot need retained mutation records either.
     activeLoads.clear();
     const activeLoad: ActiveLoad = {
       requestedBy,
+      requestedInSession,
       mutationSequenceAtStart: latestMutationSequence,
     };
     activeLoads.set(loadId, activeLoad);
     pruneCompletedMutations();
-    set({ eventsIsLoading: true, eventsError: null });
+    set(
+      append
+        ? { eventsIsLoadingMore: true, eventsHistoryError: null }
+        : { eventsIsLoading: true, eventsIsLoadingMore: false, eventsError: null, eventsHistoryError: null }
+    );
+    const ownsLoad = () =>
+      get().userId === requestedBy &&
+      get().authSessionVersion === requestedInSession &&
+      loadId === latestLoadId;
 
     try {
-      const events = await eventsService.getEvents();
-      // Touch nothing: the account transition itself went through
-      // discardAccountState -> signedOutState(), which already reset every
-      // events key, flag included. Writing the flag here instead would clear a
-      // successor account's own live spinner mid-load. The early null bail is
-      // what makes this sound: with a non-null requestedBy, every mismatch
-      // crossed a sign-out or an account switch, and both run that reset. The
-      // version also catches sign-out followed by sign-in as the same user.
-      if (
-        get().userId !== requestedBy ||
-        get().authSessionVersion !== requestedInSession
-      ) {
-        return { status: 'stale' };
-      }
-      // A newer same-user load owns the flag and the list now.
-      if (loadId !== latestLoadId) return { status: 'stale' };
-      const reconciled = replayCompletedMutations(events, activeLoad);
-      set({ events: reconciled, eventsIsLoading: false });
+      const page = await eventsService.getEventsPage(append ? eventsPagination : undefined);
+      if (!ownsLoad()) return { status: 'stale' };
+      const merged = append
+        ? Array.from(new Map([...get().events, ...page.events].map((event) => [event.id, event])).values())
+        : page.events;
+      const reconciled = replayCompletedMutations(merged, activeLoad);
+      set({
+        events: reconciled,
+        eventsPagination: page.pagination,
+        eventsIsLoading: false,
+        eventsIsLoadingMore: false,
+      });
       return { status: 'success' };
     } catch (error) {
       const errorMsg = messageOf(error, 'Failed to load events');
       console.error('[EventsSlice] Error loading events:', error);
-      // Touch nothing here either — same reasoning as the success branch.
-      if (
-        get().userId !== requestedBy ||
-        get().authSessionVersion !== requestedInSession
-      ) {
-        return { status: 'stale' };
-      }
-      // A newer same-user load owns the flag now; parking this stale failure
-      // would slap an error banner over a refresh that may yet succeed.
-      if (loadId !== latestLoadId) return { status: 'stale' };
-      // The last-good list survives a failed refresh: events are Supabase-only
-      // with no mirror to repopulate from, so blanking here would erase data
-      // the user is looking at. Matches notesSlice and moodSlice.
-      set({ eventsError: errorMsg, eventsIsLoading: false });
+      if (!ownsLoad()) return { status: 'stale' };
+      // Keep the last-good rows AND cursors so retry reads the same page.
+      set(
+        append
+          ? { eventsHistoryError: errorMsg, eventsIsLoadingMore: false }
+          : { eventsError: errorMsg, eventsIsLoading: false }
+      );
       return { status: 'failure', error: errorMsg };
     } finally {
       unregisterLoad(loadId);
     }
-  },
+  };
+
+  return {
+  // Initial state — Supabase only, reset together by signedOutState().
+  events: [],
+  eventsIsLoading: false,
+  eventsError: null,
+  eventsPagination: null,
+  eventsIsLoadingMore: false,
+  eventsHistoryError: null,
+
+  // A refresh resets the traversal to the nearest windows only after success.
+  loadEvents: () => loadPage(false),
+  loadMoreEvents: () => loadPage(true),
 
   /**
    * Create an event owned by the signed-in user, then insert it in date order.
@@ -277,7 +290,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
    * No retry: `public.events` carries no idempotency key to make one safe.
    */
   addEvent: async (input: NewEventInput) => {
-    const requestedBy = get().userId;
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     if (!requestedBy) {
       const errorMsg = 'You must be signed in to add an event';
       return { success: false, code: 'auth', error: errorMsg };
@@ -285,11 +298,13 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
 
     try {
       const created = await eventsService.createEvent({ ...input, userId: requestedBy });
-      recordMutation({ requestedBy, kind: 'upsert', event: created });
       // The new event belongs to the previous account; it must not appear in
       // this one's list. success reports the durable write only — this
       // session's state is deliberately untouched.
-      if (get().userId !== requestedBy) return { success: true };
+      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) {
+        return { success: true };
+      }
+      recordMutation({ requestedBy, requestedInSession, kind: 'upsert', event: created });
       set((state) => ({ events: sortByDate(upsertEvent(state.events, created)) }));
       logger.debug('[EventsSlice] Added event:', created.id);
       return { success: true };
@@ -305,7 +320,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
    * the service, so `events` is left exactly as it was.
    */
   editEvent: async (eventId: string, updates: EventUpdateInput) => {
-    const requestedBy = get().userId;
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     if (!requestedBy) {
       const errorMsg = 'You must be signed in to edit an event';
       return { success: false, code: 'auth', error: errorMsg };
@@ -313,10 +328,12 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
 
     try {
       const updated = await eventsService.updateEvent(eventId, updates);
-      recordMutation({ requestedBy, kind: 'upsert', event: updated });
       // success reports the durable write only — the account changed, so this
       // session's state is deliberately untouched.
-      if (get().userId !== requestedBy) return { success: true };
+      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) {
+        return { success: true };
+      }
+      recordMutation({ requestedBy, requestedInSession, kind: 'upsert', event: updated });
       // Re-sorted, not just replaced: an edit may move the date.
       set((state) => ({
         events: sortByDate(upsertEvent(state.events, updated)),
@@ -334,7 +351,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
    * Delete one of the user's own events.
    */
   removeEvent: async (eventId: string) => {
-    const requestedBy = get().userId;
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     if (!requestedBy) {
       const errorMsg = 'You must be signed in to delete an event';
       return { success: false, code: 'auth', error: errorMsg };
@@ -342,10 +359,12 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
 
     try {
       await eventsService.deleteEvent(eventId);
-      recordMutation({ requestedBy, kind: 'delete', eventId });
       // success reports the durable write only — the account changed, so this
       // session's state is deliberately untouched.
-      if (get().userId !== requestedBy) return { success: true };
+      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) {
+        return { success: true };
+      }
+      recordMutation({ requestedBy, requestedInSession, kind: 'delete', eventId });
       set((state) => ({ events: state.events.filter((event) => event.id !== eventId) }));
       logger.debug('[EventsSlice] Removed event:', eventId);
       return { success: true };

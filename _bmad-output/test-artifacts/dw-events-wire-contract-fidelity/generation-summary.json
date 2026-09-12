@@ -1,0 +1,82 @@
+{
+  "success": true,
+  "total_tests": 6,
+  "api_tests": 5,
+  "e2e_tests": 1,
+  "new_test_count": 1,
+  "reused_test_count": 5,
+  "api_test_files": 1,
+  "e2e_test_files": 1,
+  "factories_created": 1,
+  "fixture_entrypoints_created": 0,
+  "priority_coverage": {
+    "P0": 1,
+    "P1": 4,
+    "P2": 1,
+    "P3": 0
+  },
+  "execution_mode": "subagent",
+  "completed_at": "2026-09-12T08:57:21.681340+00:00",
+  "performance_gain": "not measured; workers ran concurrently",
+  "files": [
+    "tests/api/events-wire-contract-fidelity.spec.ts",
+    "tests/e2e/settings/events-wire-fidelity.spec.ts",
+    "tests/support/factories/events-wire-fidelity.ts"
+  ],
+  "playwright_utils_deviations": [
+    {
+      "file": "tests/api/events-wire-contract-fidelity.spec.ts",
+      "source_file": "tests/api/events-wire-contract.spec.ts",
+      "lines": [
+        322,
+        474,
+        573,
+        588,
+        690
+      ],
+      "pattern": "getUserAccessToken(supabaseAdmin, explicitUserId) instead of authToken fixture",
+      "reason": "The source suite intentionally switches between an explicit worker creator, a separately provisioned outsider, and anonymous calls with no bearer. Preserve its established identity-role setup exactly; parent requires an exact byte snapshot of the active regression tests.",
+      "documentation_location": "Worker metadata; no inline deviation comment was added because that would break the parent-required exact byte snapshot.",
+      "status": "preserved-existing-deviation"
+    }
+  ],
+  "fixture_reuse": [
+    {
+      "path": "tests/support/merged-fixtures.ts",
+      "symbols": [
+        "test",
+        "expect",
+        "apiRequest",
+        "recurse",
+        "supabaseAdmin"
+      ],
+      "notes": "Use the configured merged fixtures when staged at tests/api depth."
+    },
+    {
+      "path": "tests/support/helpers/events.ts",
+      "symbols": [
+        "resolveOwnPair",
+        "seedEvent",
+        "clearPairEvents",
+        "clearOwnPairEvents",
+        "isoDateDaysFromNow"
+      ],
+      "notes": "Worker identity is TEST_WORKER_INDEX-based. Checked afterEach cleanup is preserved. Anonymous regression does not pre-clear stale witnesses."
+    },
+    {
+      "path": "tests/support/helpers/supabase.ts",
+      "symbols": [
+        "getUserAccessToken"
+      ],
+      "notes": "Retains explicit creator/outsider JWT selection in identity-sensitive authorization tests."
+    },
+    {
+      "path": "tests/support/helpers/rls-security.ts",
+      "symbols": [
+        "createOutsiderClient"
+      ],
+      "notes": "One fresh outsider identity, with checked account cleanup and failure aggregation."
+    }
+  ],
+  "pact_relevant": false
+}

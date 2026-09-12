@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "_bmad-output/test-artifacts/dw-events-wire-contract-fidelity/run.py",
+    "npx",
+    "playwright",
+    "test",
+    "tests/api/events-wire-contract-fidelity.spec.ts",
+    "--project=api",
+    "--workers=2",
+    "--grep",
+    "DE.5-API-007|DE.5-API-004",
+    "--repeat-each=5",
+    "--reporter=json"
+  ],
+  "exit_code": 0,
+  "duration_seconds": 11.67
+}

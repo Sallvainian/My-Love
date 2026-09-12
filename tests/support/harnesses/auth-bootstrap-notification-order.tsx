@@ -4,7 +4,8 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../../../src/App';
 import { supabase } from '../../../src/api/supabaseClient';
-import { eventsService, type CoupleEvent } from '../../../src/services/eventsService';
+import { eventsService, type CoupleEvent, type EventsPage } from '../../../src/services/eventsService';
+import { formatDateISO } from '../../../src/utils/dateUtils';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import {
   createAuthBootstrapEvent,
@@ -80,12 +81,12 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
   const originalState = useAppStore.getState();
   const originalGetSession = supabase.auth.getSession;
   const originalOnAuthStateChange = supabase.auth.onAuthStateChange;
-  const originalGetEvents = eventsService.getEvents;
+  const originalGetEventsPage = eventsService.getEventsPage;
   const previousWelcome = localStorage.getItem('lastWelcomeView');
   type LookupResult = Awaited<ReturnType<typeof supabase.auth.getSession>>;
   type AuthCallback = (event: AuthChangeEvent, session: Session | null) => void | Promise<void>;
   const lookup = deferred<LookupResult>();
-  const requests: Array<ReturnType<typeof deferred<CoupleEvent[]>>> = [];
+  const requests: Array<ReturnType<typeof deferred<EventsPage>>> = [];
   const subscriptions: Array<{ callback: AuthCallback; active: boolean }> = [];
   const deliveries: Promise<void>[] = [];
   const calls = { initializeApp: 0, syncPendingMoods: 0, updateSyncStatus: 0, getEvents: 0 };
@@ -95,6 +96,15 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
   let notificationCount = 0;
   let mounted = false;
   let disposed = false;
+
+  const eventPage = (events: CoupleEvent[]): EventsPage => ({
+    events,
+    pagination: {
+      todayISO: formatDateISO(new Date()),
+      upcoming: { cursor: null, hasMore: false },
+      past: { cursor: null, hasMore: false },
+    },
+  });
 
   const resolveLookup = (session: Session | null) => {
     if (lookupSettled) throw new Error('Bootstrap lookup already settled');
@@ -128,12 +138,12 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       // Retire in-flight real store loads before releasing controlled results.
       useAppStore.getState().clearAuth();
       if (!lookupSettled) resolveLookup(null);
-      requests.forEach((request) => request.resolve([]));
+      requests.forEach((request) => request.resolve(eventPage([])));
       await Promise.allSettled([lookup.promise, ...deliveries, ...requests.map((r) => r.promise)]);
     } finally {
       supabase.auth.getSession = originalGetSession;
       supabase.auth.onAuthStateChange = originalOnAuthStateChange;
-      eventsService.getEvents = originalGetEvents;
+      eventsService.getEventsPage = originalGetEventsPage;
       useAppStore.setState(originalState, true);
       if (previousWelcome === null) localStorage.removeItem('lastWelcomeView');
       else localStorage.setItem('lastWelcomeView', previousWelcome);
@@ -163,9 +173,9 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
         },
       };
     };
-    eventsService.getEvents = () => {
+    eventsService.getEventsPage = () => {
       calls.getEvents += 1;
-      const request = deferred<CoupleEvent[]>();
+      const request = deferred<EventsPage>();
       requests.push(request);
       return request.promise;
     };
@@ -232,7 +242,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     resolveEvents: (events, index = 0) => {
       const request = requests[index];
       if (!request) throw new Error('Missing controlled event request ' + index);
-      request.resolve(events.map(createAuthBootstrapEvent));
+      request.resolve(eventPage(events.map(createAuthBootstrapEvent)));
     },
     dispose,
   };

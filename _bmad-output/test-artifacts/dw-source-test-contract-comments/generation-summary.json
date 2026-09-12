@@ -1,0 +1,41 @@
+{
+  "total_tests": 11,
+  "api_tests": 5,
+  "e2e_tests": 6,
+  "new_tests": 0,
+  "reused_tests": 11,
+  "test_files": 3,
+  "fixture_snapshots": 4,
+  "new_fixture_implementations": 0,
+  "priority_coverage": {
+    "P0": 2,
+    "P1": 5,
+    "P2": 4,
+    "P3": 0
+  },
+  "playwright_utils_deviations": [
+    {
+      "file": "tests/api/empty-database-error-fallback.spec.ts",
+      "line": 27,
+      "reason": "SDK fetch injection exercises its parser; apiRequest bypasses that boundary.",
+      "existing": true,
+      "scope": "Controlled in-memory SDK transport; no live application HTTP request uses a vanilla request API."
+    },
+    {
+      "file": "tests/e2e/partner/interaction-record-ownership.spec.ts",
+      "line": 12,
+      "existing": true,
+      "reason": "Browser integration drives production authSlice actions with local identities so old callbacks remain callable. There is no authentication HTTP or HAR traffic; authSessionEnabled is false."
+    },
+    {
+      "file": "tests/support/harnesses/interaction-record-ownership.tsx",
+      "line": 57,
+      "existing": true,
+      "reason": "HTTP/HAR interception cannot retain a JavaScript subscription callback after retirement. The harness replaces subscribeInteractions, invokes retained callbacks without filtering, and restores the prototype on disposal."
+    }
+  ],
+  "detected_stack": "frontend",
+  "execution_mode": "subagent",
+  "pact_mcp_reachable": false,
+  "performance": "Parallel API/E2E workers completed; no comparative speedup measured."
+}
