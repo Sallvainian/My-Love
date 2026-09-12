@@ -14,6 +14,14 @@ inputs:
     # Keep this at or above the CLI the suite is developed against; a CI pin
     # behind it silently tests a different Realtime than the app ships for.
     default: '2.117.0'
+  needs-mail:
+    description: >-
+      Start the Mailpit catcher for jobs whose specs read a real auth email.
+      Default false: only one job needs mail, and the exclusion list below is
+      shared by ten, so making this opt-in keeps the other nine off the
+      rate-limited pull path.
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -124,8 +132,16 @@ runs:
     #   studio        dev UI; nothing in src/ or tests/ references port 54323.
     #   postgres-meta studio's backend, gated SEPARATELY in the CLI, so excluding
     #                 studio alone would still pull this. Both names are required.
-    #   mailpit       no mail is ever sent: auth.email enable_confirmations is off
-    #                 and global-setup.ts mints users with email_confirm: true.
+    #   mailpit       excluded for every job EXCEPT the one that passes
+    #                 needs-mail: true. tests/api/pkce-code-exchange.spec.ts
+    #                 starts a real PKCE flow with signInWithOtp and reads the
+    #                 sign-in link back out of the catcher, so GoTrue has mail
+    #                 to deliver there and the catcher must be up; config.toml
+    #                 leaves [auth.email.smtp] commented out, so that container
+    #                 is the only mail path. It stays excluded elsewhere because
+    #                 the pull cost above is per-job and only Backend Tests (api)
+    #                 reads mail. If that spec ever stops sending mail, drop the
+    #                 input and put mailpit back on the unconditional list.
     #   edge-runtime  biggest single saving. The only caller is
     #                 loveNoteImageService.ts (/functions/v1/upload-love-note-image),
     #                 reached only when a love note carries an image, and no
@@ -149,7 +165,12 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        EXCLUDE='studio,postgres-meta,mailpit,edge-runtime,imgproxy'
+        # Rebuilt per job rather than hardcoded: mailpit is excluded unless the
+        # caller asked for it, so nine of the ten jobs keep the saving.
+        EXCLUDE='studio,postgres-meta,edge-runtime,imgproxy'
+        if [ "${{ inputs.needs-mail }}" != "true" ]; then
+          EXCLUDE="$EXCLUDE,mailpit"
+        fi
 
         # `|| true` so a non-zero `--help` reaches the -z branch below and reports
         # the annotated error, rather than `set -e` aborting the step with nothing

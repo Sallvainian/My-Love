@@ -190,6 +190,12 @@ jobs:
 
       - name: Setup Playwright E2E
         uses: ./.github/actions/setup-playwright-e2e
+        with:
+          # Only this leg reads a real auth email
+          # (tests/api/pkce-code-exchange.spec.ts). Every other Supabase job
+          # keeps Mailpit excluded, so the pull saving the exclusion list
+          # documents is not re-spent nine times over.
+          needs-mail: ${{ matrix.project == 'api' }}
 
       - name: Run ${{ matrix.project }} tests
         run: npx playwright test --project=${{ matrix.project }}
