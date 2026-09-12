@@ -5,7 +5,15 @@ inputs:
   supabase-version:
     description: 'Supabase CLI version to install'
     required: false
-    default: '2.77.1'
+    # 2.117.0, not 2.77.1: the CLI's bundled Realtime image is what serves the
+    # REST broadcast endpoint `src/api/ephemeralBroadcast.ts:120` now sends on,
+    # and that route landed in Realtime v2.97.0. 2.77.1 predates it, so every
+    # `httpSend` in tests/api/couple-broadcast-authorization.spec.ts answered
+    # `the endpoint returned 404` while the same specs passed locally against
+    # the image 2.117.0 pulls (public.ecr.aws/supabase/realtime:v2.124.4).
+    # Keep this at or above the CLI the suite is developed against; a CI pin
+    # behind it silently tests a different Realtime than the app ships for.
+    default: '2.117.0'
 
 runs:
   using: 'composite'
