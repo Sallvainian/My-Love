@@ -171,7 +171,13 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     // Check if today's message is already cached
     let messageId = messageHistory.shownMessages.get(dateString);
 
-    if (!messageId) {
+    // A cached id that is no longer in `messages` must be treated as a miss, not
+    // as authoritative. `shownMessages` is persisted and `messages` is not, so a
+    // no-session boot runs `clearAuth()` against an empty pool and its prune
+    // strips nothing — leaving the previous account's custom id for today in the
+    // map. Without this membership check the lookup below returns undefined and
+    // Home is stuck on "Failed to load message" for the rest of the calendar day.
+    if (!messageId || !messages.some((m) => m.id === messageId)) {
       // Calculate today's message using rotation algorithm with filtered pool
       const todayMessage = getDailyMessage(rotationPool, today);
       messageId = todayMessage.id;
