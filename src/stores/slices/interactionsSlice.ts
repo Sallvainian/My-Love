@@ -233,11 +233,20 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
       // Partner snapshot, taken before the first record can arrive.
       // addIncomingInteraction is synchronous and runs inside a Realtime
       // callback, so it cannot await a lookup per row.
-      const partnerIdAtSubscribe = await interactionService.resolvePartnerId();
+      const lookupAtSubscribe = await interactionService.resolvePartnerLookup();
       if (get().userId !== currentUserId || get().authSessionVersion !== subscribedInSession) {
         throw new Error('Cannot subscribe: account changed during partner lookup');
       }
-      set({ interactionPartnerId: partnerIdAtSubscribe });
+      // Only a CONCLUSIVE lookup may overwrite the snapshot, for the same reason
+      // as the re-resolve below: teardown leaves the snapshot in place, so a
+      // remount whose `users` read fails would blank a value the previous mount
+      // resolved correctly, and every record after it is refused.
+      if (lookupAtSubscribe.status !== 'error') {
+        set({
+          interactionPartnerId:
+            lookupAtSubscribe.status === 'linked' ? lookupAtSubscribe.partnerId : null,
+        });
+      }
 
       // Subscribe to incoming interactions
       let active = true;
