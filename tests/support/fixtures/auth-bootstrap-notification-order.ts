@@ -6,8 +6,18 @@ import type {
   AuthBootstrapSnapshot,
 } from '../harnesses/auth-bootstrap-notification-order';
 
+/**
+ * `profileDisplayName` is a Playwright-level concern, not a harness one: the
+ * display-name gate reads `public.users` over HTTP, and this harness's sessions
+ * carry a synthetic access token PostgREST answers 401 for. Serving the row the
+ * scenario means keeps that read out of the network-error monitor AND lets a
+ * scenario actually choose the gate's answer, which `user_metadata` used to do.
+ * `null` is the seed state — no name chosen — so the setup modal opens.
+ */
+type MountOptions = AuthBootstrapMountOptions & { profileDisplayName?: string | null };
+
 type AuthBootstrap = {
-  mount: (options?: AuthBootstrapMountOptions) => Promise<void>;
+  mount: (options?: MountOptions) => Promise<void>;
   snapshot: () => Promise<AuthBootstrapSnapshot>;
   notify: (...args: Parameters<AuthBootstrapBridge['notify']>) => Promise<void>;
   resolveLookup: (...args: Parameters<AuthBootstrapBridge['resolveLookup']>) => Promise<void>;
@@ -22,6 +32,15 @@ export const test = base.extend<{ authBootstrap: AuthBootstrap }>({
     try {
       await use({
         mount: async (options) => {
+          const { profileDisplayName = 'Bootstrap User', ...harnessOptions } = options ?? {};
+          // `.single()` asks for a bare object rather than an array.
+          await page.route('**/rest/v1/users?select=display_name*', (route) =>
+            route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({ display_name: profileDisplayName }),
+            })
+          );
           const url = new URL('/tests/support/harnesses/auth-bootstrap-notification-order.html', baseURL);
           await page.goto(url.href);
           await recurse(
@@ -29,7 +48,7 @@ export const test = base.extend<{ authBootstrap: AuthBootstrap }>({
             (ready) => ready,
             { timeout: 10000, interval: 50, log: 'Waiting for the auth bootstrap harness' }
           );
-          await page.evaluate((options) => window.__authBootstrap!.mount(options), options);
+          await page.evaluate((options) => window.__authBootstrap!.mount(options), harnessOptions);
           await recurse(
             () => page.evaluate(() => window.__authBootstrap!.snapshot()),
             (state) => state.lookupCalls === 1 && state.activeSubscriptions === 1,

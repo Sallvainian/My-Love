@@ -16,8 +16,14 @@ test.describe('Partner Mood View', () => {
     // GIVEN: User navigates to /partner
     // loadPartner queries /rest/v1/users (2x: own record then partner record)
     // loadPendingRequests queries /rest/v1/partner_requests
+    //
+    // Pinned to the `select=partner*` query rather than any /rest/v1/users hit:
+    // App's display-name gate reads `select=display_name` from the same table at
+    // app start, and the broader glob could resolve this wait on THAT before
+    // loadPartner had run. Same discriminator the network-error monitor uses in
+    // tests/support/merged-fixtures.ts.
     const partnerCall = interceptNetworkCall({
-      url: '**/rest/v1/users**',
+      url: '**/rest/v1/users?select=partner*',
     });
     const requestsCall = interceptNetworkCall({
       url: '**/rest/v1/partner_requests**',
