@@ -16,6 +16,7 @@ import { useAppStore } from './stores/useAppStore';
 // PokeKissInterface moved to PartnerMoodView
 import type { Session } from '@supabase/supabase-js';
 import { getSession, onAuthStateChange } from './api/auth/sessionService';
+import { lookupOwnDisplayName } from './api/supabaseClient';
 import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
@@ -117,6 +118,9 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [needsDisplayName, setNeedsDisplayName] = useState(false);
+  // Which profile-name read is allowed to move the gate. Bumped by every new
+  // read, by sign-out, and by a completed setup — see resolveDisplayNameGate.
+  const displayNameReadRef = useRef(0);
 
   // App survives sign-out. A settled result belongs to one authentication
   // lifetime, even when the same account signs back in before React renders.
@@ -258,6 +262,46 @@ function App() {
 
     checkAuth();
 
+    /**
+     * Settle the display-name gate from the profile row.
+     *
+     * Three things can invalidate an in-flight read before it returns, and each
+     * one is checked on the way out rather than prevented on the way in:
+     *
+     *  - the component unmounted (`isMounted`);
+     *  - a newer read superseded this one, or the user just completed setup,
+     *    both of which bump `displayNameReadRef` — without this a read raised
+     *    before the modal was submitted comes back `unset` afterwards and
+     *    re-opens it;
+     *  - auth moved on. `userId` catches an account switch, `authSessionVersion`
+     *    catches a sign-out and sign-in by the SAME account, which leaves
+     *    `userId` identical. Same capture-and-recheck pair the store's async
+     *    actions use, and the rule `App.eventsSession.test.tsx` already pins for
+     *    this listener.
+     */
+    const resolveDisplayNameGate = (ownerId: string | null, ownerVersion: number) => {
+      const readId = displayNameReadRef.current + 1;
+      displayNameReadRef.current = readId;
+
+      void lookupOwnDisplayName().then((result) => {
+        if (!isMounted || displayNameReadRef.current !== readId) return;
+
+        const { userId, authSessionVersion } = useAppStore.getState();
+        if (userId !== ownerId || authSessionVersion !== ownerVersion) return;
+
+        // Fail OPEN on display: a failed read is not evidence that the user has
+        // no name, and forcing an established account into the setup modal on a
+        // transient 5xx is worse than leaving the gate where it was. The write
+        // side fails closed instead — see DisplayNameSetup.
+        if (result.status === 'error') {
+          console.error('[App] Could not read the profile display name:', result.reason);
+          return;
+        }
+
+        setNeedsDisplayName(result.status === 'unset');
+      });
+    };
+
     // Listen for auth state changes
     const unsubscribe = onAuthStateChange((newSession) => {
       if (isMounted) {
@@ -269,19 +313,29 @@ function App() {
         // Update store auth state for synchronous access by all slices
         const { setAuthUser, clearAuth: clearStoreAuth } = useAppStore.getState();
 
-        // Check if user needs to set display name (for new OAuth signups)
+        // Check if user needs to set display name (for signups without one)
         if (newSession?.user) {
           setAuthUser(newSession.user.id, newSession.user.email);
-          const hasDisplayName = newSession.user.user_metadata?.display_name;
-          setNeedsDisplayName(!hasDisplayName);
+          // The name lives in the profile row, not in auth metadata, so this is
+          // a read and the gate settles a tick later.
+          //
+          // Captured AFTER setAuthUser so an ACCOUNT SWITCH is seen: that is the
+          // only case which moves either value — `authSlice.ts:356` advances
+          // authSessionVersion only when `previous !== userId`. A same-user
+          // TOKEN_REFRESHED, INITIAL_SESSION or USER_UPDATED leaves userId and
+          // the version both unchanged, so for those the identity pair below
+          // cannot tell the superseded read from the new one and
+          // `displayNameReadRef` is the ONLY thing that retires it. Neither
+          // guard is redundant; do not drop the ref.
+          const { userId: ownerId, authSessionVersion: ownerVersion } = useAppStore.getState();
+          resolveDisplayNameGate(ownerId, ownerVersion);
 
-          logger.debug('[App] Auth state changed:', {
-            authenticated: true,
-            hasDisplayName,
-            needsSetup: !hasDisplayName,
-          });
+          logger.debug('[App] Auth state changed:', { authenticated: true });
         } else {
           clearStoreAuth();
+          // Retire any in-flight profile read with the session that raised it,
+          // so a late `unset` cannot open the setup modal over the login screen.
+          displayNameReadRef.current += 1;
           setNeedsDisplayName(false);
           setEventsSettlement(null);
           logger.debug('[App] Auth state changed: signed out');
@@ -530,13 +584,12 @@ function App() {
         <DisplayNameSetup
           isOpen={needsDisplayName}
           onComplete={() => {
+            // No session refresh: the name is in `public.users` now, not in the
+            // JWT's user_metadata, so there is nothing in the session to
+            // re-read. Retire any in-flight profile read that was raised before
+            // the name was saved — it would come back `unset` and re-open this.
+            displayNameReadRef.current += 1;
             setNeedsDisplayName(false);
-            // Refresh session to get updated user_metadata
-            getSession().then((refreshedSession) => {
-              if (refreshedSession) {
-                setSession(refreshedSession);
-              }
-            });
           }}
         />
       </ErrorBoundary>

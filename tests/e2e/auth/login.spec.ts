@@ -69,7 +69,6 @@ test.describe('Login Flow', () => {
           user: {
             id: 'test-user-id',
             email: 'test@example.com',
-            user_metadata: { display_name: 'Test User' },
           },
         },
       },
@@ -84,7 +83,6 @@ test.describe('Login Flow', () => {
         body: {
           id: 'test-user-id',
           email: 'test@example.com',
-          user_metadata: { display_name: 'Test User' },
         },
       },
     });
@@ -96,6 +94,15 @@ test.describe('Login Flow', () => {
       url: '**/rest/v1/events**',
       method: 'GET',
       fulfillResponse: { status: 200, body: [] },
+    });
+
+    // Same reason, for the profile read App fires to decide whether this
+    // account still needs the display-name setup screen. A chosen name keeps
+    // that modal shut, which is what "redirected to the app" means here.
+    interceptNetworkCall({
+      url: '**/rest/v1/users?select=display_name**',
+      method: 'GET',
+      fulfillResponse: { status: 200, body: { display_name: 'Test User' } },
     });
 
     // GIVEN: User is on login screen

@@ -23,6 +23,20 @@ export interface Message {
   text: string;
   category: MessageCategory;
   isCustom: boolean;
+  /**
+   * Owner of a CUSTOM row, on a device that more than one account signs in on.
+   *
+   * Optional because two kinds of row legitimately carry no owner:
+   * - the bundled daily messages (`isCustom: false`), which ship with the app
+   *   and are shared by everyone;
+   * - legacy custom rows written before this field existed, which belong to
+   *   nobody. They stay on disk and are hidden from every account — nothing
+   *   infers their owner from the signed-in user, the device or a timestamp.
+   *
+   * Anything that reads custom rows must compare this against the caller's id;
+   * `customMessageService` is the only place that should be doing so.
+   */
+  userId?: string;
   active?: boolean;
   createdAt: Date;
   isFavorite?: boolean;

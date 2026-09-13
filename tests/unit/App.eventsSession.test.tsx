@@ -5,7 +5,7 @@
  * store/auth actions, and control outcomes at that consumer boundary.
  */
 import type { Session } from '@supabase/supabase-js';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../src/App';
@@ -18,9 +18,17 @@ const auth = vi.hoisted(() => ({
   listener: null as ((session: Session | null) => void) | null,
 }));
 
+/**
+ * The display-name gate reads `public.users`, not the session. Driving it means
+ * controlling that read, and it settles a microtask after the notification
+ * rather than inside it.
+ */
+const profile = vi.hoisted(() => ({ lookupOwnDisplayName: vi.fn() }));
+
 vi.mock('../../src/api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
   getPartnerId: vi.fn(),
+  lookupOwnDisplayName: profile.lookupOwnDisplayName,
 }));
 vi.mock('../../src/api/auth/sessionService', () => ({
   getSession: auth.getSession,
@@ -60,8 +68,12 @@ vi.mock('../../src/components/RelationshipTimers/TimeTogether', () => ({
 vi.mock('../../src/components/LoginScreen', () => ({
   LoginScreen: () => <p>Sign in</p>,
 }));
+// A button, not a <p>: the setup gate's `onComplete` has to be reachable so a
+// test can prove a read raised before the save does not re-open the modal.
 vi.mock('../../src/components/DisplayNameSetup', () => ({
-  DisplayNameSetup: () => <p>Set your display name</p>,
+  DisplayNameSetup: ({ onComplete }: { onComplete: () => void }) => (
+    <button onClick={onComplete}>Set your display name</button>
+  ),
 }));
 vi.mock('../../src/components/PhotoUpload/PhotoUpload', () => ({ PhotoUpload: () => null }));
 vi.mock('../../src/components/PhotoCarousel/PhotoCarousel', () => ({ PhotoCarousel: () => null }));
@@ -105,6 +117,12 @@ vi.mock('framer-motion', () => ({
   },
 }));
 
+/** The shape `lookupOwnDisplayName` answers with; see src/api/supabaseClient.ts. */
+type OwnDisplayNameResult =
+  | { status: 'chosen'; displayName: string }
+  | { status: 'unset' }
+  | { status: 'error'; reason: string };
+
 const USER_ID = 'home-events-user';
 const OTHER_USER_ID = 'other-home-user';
 const success: EventLoadResult = { status: 'success' };
@@ -120,7 +138,11 @@ function session(accessToken = 'initial-token', userId = USER_ID): Session {
       id: userId,
       email: 'home@example.com',
       app_metadata: {},
-      user_metadata: { display_name: 'Home User' },
+      // Empty on purpose. The setup gate used to be `!user_metadata.display_name`
+      // and every test here rendered the app only because this object carried a
+      // name. It now comes from the profile row, so these sessions carry none
+      // and the `profile` mock below is what decides.
+      user_metadata: {},
       aud: 'authenticated',
       created_at: '2026-09-01T00:00:00Z',
     },
@@ -159,6 +181,7 @@ beforeEach(() => {
   localStorage.setItem('lastWelcomeView', String(Date.now()));
   window.history.replaceState({}, '', '/');
   auth.getSession.mockResolvedValue(session());
+  profile.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Home User' });
   useAppStore.setState(
     {
       ...initialState,
@@ -364,7 +387,13 @@ describe('Auth bootstrap notification ownership', () => {
     const ownership = useAppStore.getState().authSessionVersion;
     const updated = session('updated-token');
     updated.user.email = 'updated@example.com';
-    updated.user.user_metadata = hasDisplayName ? { display_name: 'Updated Name' } : {};
+    // Deliberately the OPPOSITE of what the profile says, so a regression that
+    // reads the gate back off the session fails both halves of this case rather
+    // than passing one by luck.
+    updated.user.user_metadata = hasDisplayName ? {} : { display_name: 'Metadata Name' };
+    profile.lookupOwnDisplayName.mockResolvedValue(
+      hasDisplayName ? { status: 'chosen', displayName: 'Updated Name' } : { status: 'unset' }
+    );
 
     await act(async () => {
       // Even a notification delivered after resolution but before the awaited
@@ -545,7 +574,7 @@ describe('Home event-load session ownership', () => {
     expect(screen.queryByTestId('events-load-error')).not.toBeInTheDocument();
   });
 
-  it('keeps the active load and settled state across token refresh and user metadata updates', async () => {
+  it('keeps the active load and settled state across token refresh and profile name updates', async () => {
     const { requests, loadEvents } = controlHomeLoads();
     await renderHome();
     const ownership = useAppStore.getState().authSessionVersion;
@@ -558,13 +587,100 @@ describe('Home event-load session ownership', () => {
     await act(async () => requests[0].resolve(success));
     expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
 
-    await act(async () => {
-      const updated = session('refreshed-token');
-      updated.user.user_metadata.display_name = 'Updated Name';
-      auth.listener!(updated);
-    });
+    // Every refresh re-reads the profile, and a name that changed since must not
+    // disturb a settled Home.
+    profile.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Updated Name' });
+    await act(async () => auth.listener!(session('refreshed-token')));
     expect(useAppStore.getState().authSessionVersion).toBe(ownership);
     expect(loadEvents).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
+  });
+
+  it('discards a profile read raised under the previous account', async () => {
+    const staleRead = deferred<OwnDisplayNameResult>();
+    controlHomeLoads();
+    await renderHome();
+
+    // A signs in and its profile read stays in flight.
+    profile.lookupOwnDisplayName.mockReturnValueOnce(staleRead.promise);
+    await act(async () => auth.listener!(session()));
+
+    // B signs in over the live session before A's read answers.
+    profile.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'B' });
+    await act(async () => auth.listener!(session('b-token', OTHER_USER_ID)));
+    expect(useAppStore.getState().userId).toBe(OTHER_USER_ID);
+
+    // A's answer must not decide anything about B.
+    await act(async () => staleRead.resolve({ status: 'unset' }));
+    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+  });
+
+  it('discards a profile read raised before the same account signed back in', async () => {
+    const staleRead = deferred<OwnDisplayNameResult>();
+    controlHomeLoads();
+    await renderHome();
+
+    profile.lookupOwnDisplayName.mockReturnValueOnce(staleRead.promise);
+    await act(async () => auth.listener!(session()));
+    const firstLifetime = useAppStore.getState().authSessionVersion;
+
+    // Sign out and back in as the SAME account: userId is identical either side,
+    // so only authSessionVersion separates the two lifetimes.
+    await act(async () => {
+      auth.listener!(null);
+      auth.listener!(session('second-token'));
+    });
+    expect(useAppStore.getState().userId).toBe(USER_ID);
+    expect(useAppStore.getState().authSessionVersion).not.toBe(firstLifetime);
+
+    await act(async () => staleRead.resolve({ status: 'unset' }));
+    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+  });
+
+  it('does not re-open setup when a read raised before the name was saved lands after', async () => {
+    const firstRead = deferred<OwnDisplayNameResult>();
+    controlHomeLoads();
+    render(<App />);
+
+    profile.lookupOwnDisplayName.mockReturnValueOnce(firstRead.promise);
+    await act(async () => auth.listener!(session()));
+    await act(async () => firstRead.resolve({ status: 'unset' }));
+    expect(screen.getByText('Set your display name')).toBeInTheDocument();
+
+    // A token refresh while the modal is open raises a second read, which is
+    // still in flight when the user submits their name. Auth never changes here,
+    // so the identity guard cannot be what discards it.
+    const staleRead = deferred<OwnDisplayNameResult>();
+    profile.lookupOwnDisplayName.mockReturnValueOnce(staleRead.promise);
+    const ownership = useAppStore.getState().authSessionVersion;
+    await act(async () => auth.listener!(session('refreshed-token')));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Set your display name'));
+    });
+    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+
+    await act(async () => staleRead.resolve({ status: 'unset' }));
+    expect(useAppStore.getState().authSessionVersion).toBe(ownership);
+    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+  });
+
+  it('leaves the gate alone when the profile read fails', async () => {
+    const reportError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    profile.lookupOwnDisplayName.mockResolvedValue({ status: 'error', reason: 'Service unavailable' });
+    controlHomeLoads();
+    render(<App />);
+
+    await act(async () => auth.listener!(session()));
+    // Fail open on display: a 5xx is not evidence that the user has no name.
+    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(reportError).toHaveBeenCalledWith(
+      '[App] Could not read the profile display name:',
+      'Service unavailable'
+    );
   });
 });
