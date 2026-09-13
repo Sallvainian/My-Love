@@ -789,6 +789,30 @@ describe('subscribeMoodUpdates channel ownership', () => {
     unsubscribeB();
   });
 
+  it('re-takes the snapshot on the first SUBSCRIBED when the join lookup failed', async () => {
+    // Mirror of the love-notes case: `partnerIdAtJoin` is null because the
+    // lookup failed, not because the user is unlinked, so the entry must not be
+    // marked fresh -- nothing else would re-arm it with one consumer mounted.
+    getPartnerId.mockResolvedValue(null);
+
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    // The retry succeeds this time.
+    getPartnerId.mockResolvedValue(PARTNER_ID);
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    emitMood(channel, 'after-recovery');
+    expect(onMood).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
   it('a failed session read at the first SUBSCRIBED does not mute the channel', async () => {
     // `getSignedInUserId` answers null for a FAILED `getSession` exactly as it
     // does for "signed out", so reading that null as an account change muted

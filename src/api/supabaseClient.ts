@@ -85,15 +85,6 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
 );
 
 /**
- * Get the id of the account this device is currently signed in as
- *
- * A session read rather than a cached value on purpose: it is used to notice
- * that the signed-in account CHANGED under a long-lived Realtime channel, and a
- * cache of the id would be exactly the thing that cannot see that.
- *
- * @returns The signed-in user's id, or null when there is no session
- */
-/**
  * Attempts the two delivery-side lookups make, and the backoff between them.
  * Three attempts over ~900ms covers the failures these exist for -- a 5xx, a
  * JWT expiring mid-flight, a network transition between the join ack and the
@@ -110,11 +101,15 @@ export type SessionLookup =
 /**
  * The session read, with the two null cases kept apart.
  *
- * Same split, and same reason, as `lookupPartnerId` below: `getSignedInUserId`
- * collapses "nobody is signed in" and "the read failed" into one `null`, which
- * is fine for a caller deciding what to render and wrong for one deciding
- * whether an account changed underneath a live channel. Treating a failed read
- * as an account change mutes delivery on a session the user still holds.
+ * Same split, and same reason, as `lookupPartnerId` below: collapsing "nobody
+ * is signed in" and "the read failed" into one `null` is fine for a caller
+ * deciding what to render, and wrong for one deciding whether an account
+ * changed underneath a live channel. Treating a failed read as an account
+ * change mutes delivery on a session the user still holds.
+ *
+ * A session read rather than a cached value on purpose: this exists to notice
+ * that the signed-in account CHANGED under a long-lived Realtime channel, and a
+ * cache of the id would be exactly the thing that cannot see that.
  */
 export const lookupSignedInUser = async (): Promise<SessionLookup> => {
   try {
@@ -153,11 +148,6 @@ export const resolveSignedInUserForDelivery = async (): Promise<SessionLookup> =
 
   console.error('[Supabase] Session read failed on every attempt; answer is inconclusive');
   return last;
-};
-
-export const getSignedInUserId = async (): Promise<string | null> => {
-  const result = await lookupSignedInUser();
-  return result.status === 'signed-in' ? result.userId : null;
 };
 
 /**

@@ -115,7 +115,12 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     // both after a join is reported and before the retry path re-subscribes --
     // a retry is a re-join even though the original join never reported
     // SUBSCRIBED at all.
-    let snapshotFresh = true;
+    // Starts false and is raised only once the pre-join lookup below actually
+    // produces a snapshot. `resolvePartnerIdForDelivery` answers null both for a
+    // genuine unlink AND for a lookup that failed all three attempts, so an
+    // unconditional `true` here would let an exhausted retry pass as fresh and
+    // skip the one refresh that could still recover it.
+    let snapshotFresh = false;
     // The signed-in user is captured here, for the life of this effect run.
     // A different account re-runs the effect with a different topic, and this
     // run's handlers are already inert by then.
@@ -254,6 +259,10 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       const partnerId = await resolvePartnerIdForDelivery();
       if (cancelled) return;
       partnerIdRef.current = partnerId;
+      // Only skip the first SUBSCRIBED's refresh when this produced a snapshot.
+      // A genuinely unlinked user pays one extra round-trip that answers null
+      // again; a failed lookup gets the re-fetch that keeps the channel alive.
+      snapshotFresh = partnerId !== null;
 
       // Required for a private channel: Realtime authorizes the join against
       // the socket's access token, which is the anon key until this runs.

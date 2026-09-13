@@ -464,6 +464,43 @@ describe('useRealtimeMessages', () => {
       expect(mocks.getPartnerId).toHaveBeenCalledTimes(2);
     });
 
+    it('re-takes the snapshot on the first SUBSCRIBED when the pre-join lookup failed', async () => {
+      // `resolvePartnerIdForDelivery` answers null for an exhausted retry as
+      // readily as for a genuine unlink. Treating that null as a fresh snapshot
+      // skipped the one refresh left -- a healthy socket emits no further
+      // SUBSCRIBED and the CHANNEL_ERROR retry never fires on a working channel
+      // -- so every note was dropped for the life of the mount.
+      const { supabase } = await import('../../api/supabaseClient');
+
+      let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
+      const mockChannel = {
+        on: vi.fn().mockReturnThis(),
+        subscribe: vi.fn((callback?) => {
+          if (callback) subscribeCallback = callback;
+          return mockChannel;
+        }),
+      };
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
+      // The pre-join lookup fails; the retry inside it is already exhausted.
+      mocks.getPartnerId.mockResolvedValueOnce(null);
+
+      await act(async () => {
+        renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      expect(mocks.getPartnerId).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        subscribeCallback?.('SUBSCRIBED');
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // It must try again rather than accept the failed null as a snapshot.
+      expect(mocks.getPartnerId).toHaveBeenCalledTimes(2);
+    });
+
     it('delivers a note that arrives immediately after the first SUBSCRIBED', async () => {
       // The user-visible half of the case above: a note the partner sends as
       // the Love Notes view opens. Re-taking the snapshot on the first join
