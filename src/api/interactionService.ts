@@ -27,7 +27,12 @@ import {
   logSupabaseError,
 } from './errorHandlers';
 import type { Database } from './supabaseClient';
-import { getPartnerId, supabase } from './supabaseClient';
+import {
+  resolvePartnerIdForDelivery,
+  resolvePartnerLookupForDelivery,
+  supabase,
+} from './supabaseClient';
+import type { PartnerLookup } from './supabaseClient';
 
 /**
  * Supabase interaction record type (from database schema)
@@ -105,7 +110,18 @@ export class InteractionService {
    * @returns Partner user ID, or null when the account has no linked partner
    */
   async resolvePartnerId(): Promise<string | null> {
-    return getPartnerId();
+    return resolvePartnerIdForDelivery();
+  }
+
+  /**
+   * The partner snapshot with "the lookup failed" kept apart from "unlinked".
+   *
+   * The subscription gates every incoming interaction on this value, so the two
+   * must not collapse: a failed `users` read written as null drops every poke
+   * and kiss until the next SUBSCRIBED, and a healthy socket emits none.
+   */
+  async resolvePartnerLookup(): Promise<PartnerLookup> {
+    return resolvePartnerLookupForDelivery();
   }
 
   /**
@@ -190,10 +206,20 @@ export class InteractionService {
       throw new InteractionWriteError(`You are offline. A ${type} needs a connection to send.`);
     }
 
-    const toUserId = await this.resolvePartnerId();
-    if (!toUserId) {
+    const lookup = await this.resolvePartnerLookup();
+    if (lookup.status === 'error') {
+      // NOT NoPartnerError: that renders "Partner not configured", which tells a
+      // linked user their relationship is gone because a `users` read failed.
+      // `isOnline()` above cannot catch this -- it is `navigator.onLine`, true
+      // on a captive portal, a PostgREST 5xx or an RLS error.
+      throw new InteractionWriteError(
+        `Could not confirm your partner just now. Try that ${type} again.`
+      );
+    }
+    if (lookup.status === 'unlinked') {
       throw new NoPartnerError();
     }
+    const toUserId = lookup.partnerId;
 
     // Only the id is checked, not the type: `sendInteraction` is private and
     // every caller passes a literal, so validateInteraction's type branch is

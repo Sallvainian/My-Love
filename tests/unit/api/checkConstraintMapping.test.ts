@@ -122,6 +122,10 @@ vi.mock('@/api/supabaseClient', () => ({
   },
   // The service derives the recipient for itself now (F4).
   getPartnerId: vi.fn().mockResolvedValue('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
+  resolvePartnerIdForDelivery: vi.fn().mockResolvedValue('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
+  resolvePartnerLookupForDelivery: vi
+    .fn()
+    .mockResolvedValue({ status: 'linked', partnerId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }),
 }));
 
 import { eventsService } from '@/services/eventsService';

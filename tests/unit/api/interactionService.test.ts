@@ -97,6 +97,19 @@ vi.mock('@/api/supabaseClient', () => ({
     removeChannel: realtime.removeChannel,
   },
   getPartnerId: () => partnerLookup.resolve(),
+  resolvePartnerIdForDelivery: () => partnerLookup.resolve(),
+  // The service reads the snapshot through the discriminated lookup so it can
+  // tell "unlinked" from "the read failed". Derived from the same stub, so
+  // every existing `partnerLookup.set(...)` keeps its meaning: an id is
+  // `linked`, null is `unlinked`, and a REJECTION is the inconclusive `error`.
+  resolvePartnerLookupForDelivery: async () => {
+    try {
+      const partnerId = await partnerLookup.resolve();
+      return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
+    } catch (error) {
+      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+    }
+  },
 }));
 
 import { InteractionService } from '@/api/interactionService';
