@@ -100,12 +100,14 @@ export class InteractionService {
   /**
    * Resolve the signed-in account's current partner.
    *
-   * A thin wrapper over `getPartnerId()`, and the only place the store reads
-   * the relationship from. It is a method rather than a direct import so the
-   * browser harness in `tests/support/harnesses/interaction-record-ownership.tsx`
-   * can supply a partner identity the same way it already supplies the
-   * subscription — that page runs without a Supabase session, where
-   * `getPartnerId()` can only answer `null`.
+   * A thin wrapper over `resolvePartnerIdForDelivery()`, and the only place the
+   * store reads the relationship from. It is a method rather than a direct
+   * import so the browser harness in
+   * `tests/support/harnesses/interaction-record-ownership.tsx` can supply a
+   * partner identity the same way it already supplies the subscription — that
+   * page runs without a Supabase session, where the real lookup can only answer
+   * `null`. The harness patches `resolvePartnerLookup()` alongside this method,
+   * since the send path goes through that one.
    *
    * @returns Partner user ID, or null when the account has no linked partner
    */
