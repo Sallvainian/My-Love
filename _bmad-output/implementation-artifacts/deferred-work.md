@@ -879,7 +879,8 @@ location: AGENTS.md (Running and verifying)
 source_spec: `1-contain-the-exposed-bot-credential.md`
 severity: low
 reason: AGENTS.md says durable prose goes in that block, but the rotation procedure (fnox set -p age CLAUDE_BOT_PASSWORD, then fnox exec -- node scripts/provision-claude-bot.mjs) lives only in script and migration comments and an out-of-repo memory note. Fix edits an agent-context file, so it is recorded rather than applied here.
-status: open
+status: done 2026-09-13
+resolution: AGENTS.md (Running and verifying) now carries the rotation line: update CLAUDE_BOT_PASSWORD in fnox.toml, then `fnox exec -- node scripts/provision-claude-bot.mjs`. Added by the 2026-09-13 bmad-project-context refresh.
 
 ### DW-87: The retry's re-subscribe cannot rejoin an errored channel at all, because the SDK gates the whole of subscribe() on the channel already being closed.
 origin: spec-deferred 7f2be02c1cc5
