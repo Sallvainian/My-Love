@@ -156,6 +156,16 @@ vi.mock('@/api/supabaseClient', () => ({
   // retrying lookup and the send path through the plain one, but they wrap the
   // same round-trip, so every existing setup in this file keeps its meaning.
   resolvePartnerIdForDelivery: (...args: unknown[]) => getPartnerId(...args),
+  // Derived from the same stub: an id is `linked`, null is `unlinked`, and a
+  // rejection is the inconclusive `error` a refresh must not write back.
+  resolvePartnerLookupForDelivery: async (...args: unknown[]) => {
+    try {
+      const partnerId = await getPartnerId(...args);
+      return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
+    } catch (error) {
+      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+    }
+  },
   getSignedInUserId: (...args: unknown[]) => getSignedInUserId(...args),
   // `verifyChannelOwner` reads the session through the discriminated lookup so
   // it can tell "signed out" from "the read failed". Derived from the same
@@ -704,6 +714,36 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     emitMood(channel, 'after-unlink');
     expect(onMood).not.toHaveBeenCalled();
+
+    unsubscribe();
+  });
+
+  it('keeps the partner when a RE-join refresh is inconclusive', async () => {
+    // The refresh clears the snapshot BEFORE its round-trips, to close the
+    // ex-partner window. So a lookup that fails every attempt and writes its
+    // null back leaves the channel muted for the life of the page view:
+    // `refreshChannelIdentity` runs only on SUBSCRIBED and a healthy socket
+    // emits no further one. An ex-partner cannot exploit the restored value --
+    // `couple_broadcast_partner_can_send` pins the send on `get_my_partner_id()`,
+    // so after a real unlink the server refuses their insert outright.
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    // The join itself. Everything after this is a re-join.
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    // The socket drops and rejoins; the `users` read fails outright.
+    getPartnerId.mockRejectedValueOnce(new Error('network down'));
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    emitMood(channel, 'after-the-blip');
+    expect(onMood).toHaveBeenCalledTimes(1);
 
     unsubscribe();
   });
