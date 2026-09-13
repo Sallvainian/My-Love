@@ -20,8 +20,8 @@ import { waitForSocketReady } from './realtimeSocket';
 import { moodApi } from './moodApi';
 import {
   getPartnerId,
-  getSignedInUserId,
   resolvePartnerIdForDelivery,
+  resolveSignedInUserForDelivery,
   supabase,
 } from './supabaseClient';
 import { parseMoodBroadcast } from './validation/broadcastSchemas';
@@ -492,7 +492,27 @@ class MoodSyncService {
    * flight.
    */
   private async verifyChannelOwner(entry: MoodChannelEntry): Promise<boolean> {
-    const signedInUserId = await getSignedInUserId();
+    const session = await resolveSignedInUserForDelivery();
+
+    if (session.status === 'error') {
+      // Inconclusive, after the retries inside that lookup. Muting here would
+      // be permanent: `refreshChannelIdentity` runs only on a later SUBSCRIBED
+      // and a healthy socket emits none, so the channel would stay silent for
+      // the rest of the page view on a session the user still holds.
+      //
+      // A failed read is not an account change. A real one is conclusive --
+      // signing out clears the session locally, so `getSession` answers
+      // `signed-out` rather than erroring -- and is still caught below, as is
+      // the next SUBSCRIBED's check. The join also remains authorized by RLS
+      // for `ownerUserId` either way, so leaving the snapshot alone does not
+      // widen who may broadcast here.
+      logger.debug(
+        '[MoodSyncService] Session read was inconclusive; leaving the mood channel as it is'
+      );
+      return true;
+    }
+
+    const signedInUserId = session.status === 'signed-in' ? session.userId : null;
 
     if (signedInUserId !== entry.ownerUserId) {
       logger.debug(

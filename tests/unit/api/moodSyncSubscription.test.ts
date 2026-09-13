@@ -157,6 +157,19 @@ vi.mock('@/api/supabaseClient', () => ({
   // same round-trip, so every existing setup in this file keeps its meaning.
   resolvePartnerIdForDelivery: (...args: unknown[]) => getPartnerId(...args),
   getSignedInUserId: (...args: unknown[]) => getSignedInUserId(...args),
+  // `verifyChannelOwner` reads the session through the discriminated lookup so
+  // it can tell "signed out" from "the read failed". Derived from the same
+  // `getSignedInUserId` mock so the existing setups keep their meaning: a
+  // resolved id is `signed-in`, a resolved null is `signed-out`, and a REJECTED
+  // promise is the inconclusive `error` case.
+  resolveSignedInUserForDelivery: async (...args: unknown[]) => {
+    try {
+      const userId = await getSignedInUserId(...args);
+      return userId ? { status: 'signed-in', userId } : { status: 'signed-out' };
+    } catch (error) {
+      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+    }
+  },
 }));
 
 import { moodSyncService } from '@/api/moodSyncService';
@@ -774,6 +787,51 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     unsubscribeA();
     unsubscribeB();
+  });
+
+  it('a failed session read at the first SUBSCRIBED does not mute the channel', async () => {
+    // `getSignedInUserId` answers null for a FAILED `getSession` exactly as it
+    // does for "signed out", so reading that null as an account change muted
+    // the channel on a session the user still held -- terminally, because
+    // `refreshChannelIdentity` runs only on a later SUBSCRIBED and a healthy
+    // socket emits none. The scenario: the access token expires as the channel
+    // joins and the refresh hits a network blip.
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    getSignedInUserId.mockRejectedValue(new Error('network down'));
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    // The read told us nothing, so the join-time snapshot stands.
+    emitMood(channel, 'after-inconclusive-read');
+    expect(onMood).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  it('still mutes when the session read conclusively reports another account', async () => {
+    // The other side of the line above: a CONCLUSIVE answer naming a different
+    // account still stops dispatch on the first SUBSCRIBED.
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    getSignedInUserId.mockResolvedValue(OUTSIDER_ID);
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    emitMood(channel, 'after-account-change');
+    expect(onMood).not.toHaveBeenCalled();
+
+    unsubscribe();
   });
 
   it('returns a no-op unsubscribe when there is no session', async () => {
