@@ -21,6 +21,7 @@ import { moodApi } from './moodApi';
 import {
   getPartnerId,
   resolvePartnerIdForDelivery,
+  resolvePartnerLookupForDelivery,
   resolveSignedInUserForDelivery,
   supabase,
 } from './supabaseClient';
@@ -473,14 +474,26 @@ class MoodSyncService {
     // between here and the new value, and a broadcast arriving in that window
     // would otherwise be authorized against the snapshot being replaced — the
     // ex-partner, which is exactly who this refresh exists to stop.
+    const previous = entry.partnerId;
     entry.partnerId = null;
 
     if (!(await this.verifyChannelOwner(entry))) return;
 
-    // Retried on a transient failure; a genuine unlink still resolves null on
-    // the first attempt. Without the retry this refresh turned one failed
-    // `users` read into a permanently muted channel.
-    entry.partnerId = await resolvePartnerIdForDelivery();
+    // An INCONCLUSIVE lookup restores what the clear above removed. The retry
+    // narrows how often that happens but cannot remove it: exhausting every
+    // attempt still answers null through the `string | null` wrapper, and this
+    // refresh runs only on SUBSCRIBED, so writing that null back muted the
+    // channel for the life of the page view. A conclusive unlink still writes
+    // null, which is what the refresh is for. An ex-partner cannot exploit the
+    // restored window: `couple_broadcast_partner_can_send` pins the send on
+    // `get_my_partner_id()`, so after a real unlink the server refuses their
+    // insert and there is no broadcast for this snapshot to admit.
+    const lookup = await resolvePartnerLookupForDelivery();
+    if (lookup.status === 'error') {
+      entry.partnerId = previous;
+      return;
+    }
+    entry.partnerId = lookup.status === 'linked' ? lookup.partnerId : null;
   }
 
   /**
