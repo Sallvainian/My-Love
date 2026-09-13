@@ -8,9 +8,10 @@
  * - Partner ID must be valid UUID format
  * - Interaction type must be 'poke' or 'kiss'
  * - User must be authenticated
+ * - An incoming row must be addressed to this user and sent by the current partner
  */
 
-import type { InteractionType } from '../types';
+import type { InteractionType, SupabaseInteractionRecord } from '../types';
 
 /**
  * UUID regex pattern (accepts any UUID version)
@@ -95,6 +96,72 @@ export function validateInteraction(
   }
 
   return { isValid: true };
+}
+
+/**
+ * Validates an interaction row that arrived from the wire.
+ *
+ * The database is the boundary that decides who may create an interaction
+ * (`interactions_sender_to_partner_insert`). This is the client half of CAP-4:
+ * a row that reaches the feed must be addressed to the signed-in user and sent
+ * by that user's *current* partner. A row from a former partner, or one that
+ * arrives before the relationship is known, is dropped rather than counted.
+ *
+ * A null `partnerId` therefore rejects everything. That is deliberate: the
+ * relationship may still be loading, and accepting an unverified identity while
+ * waiting is exactly what F4 forbids. The subscription resolves the partner
+ * before it starts listening, so the window is not reachable in normal use.
+ *
+ * @param record - Raw interaction row as delivered
+ * @param identity - The signed-in user and their current partner
+ * @returns Validation result with a reason when invalid
+ */
+export function validateIncomingInteraction(
+  record: SupabaseInteractionRecord,
+  identity: { currentUserId: string | null; partnerId: string | null }
+): {
+  isValid: boolean;
+  error?: string;
+} {
+  const { currentUserId, partnerId } = identity;
+
+  if (!currentUserId) {
+    return { isValid: false, error: 'Not authenticated' };
+  }
+
+  if (!partnerId) {
+    return { isValid: false, error: INTERACTION_ERRORS.NO_PARTNER };
+  }
+
+  if (record.to_user_id !== currentUserId) {
+    return { isValid: false, error: 'Interaction is addressed to another account' };
+  }
+
+  if (record.from_user_id !== partnerId) {
+    return { isValid: false, error: 'Interaction was not sent by the current partner' };
+  }
+
+  if (!isValidInteractionType(record.type)) {
+    return { isValid: false, error: `Invalid interaction type: ${record.type}.` };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Raised when an interaction cannot be sent because the signed-in account has
+ * no linked partner.
+ *
+ * The recipient is derived from the authenticated relationship rather than
+ * supplied by the caller (F4), so "no partner" is now a send-time outcome
+ * instead of a pre-check in the component. The class exists so the UI can tell
+ * that case apart from a real send failure and keep its own wording.
+ */
+export class NoPartnerError extends Error {
+  constructor() {
+    super(INTERACTION_ERRORS.NO_PARTNER);
+    this.name = 'NoPartnerError';
+  }
 }
 
 /**

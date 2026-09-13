@@ -39,6 +39,7 @@
  */
 import { test, expect } from '../support/merged-fixtures';
 import { getWorkerPairEmails } from '../support/auth/worker-pool';
+import { resolveOwnPair } from '../support/helpers/events';
 import { getUserAccessToken } from '../support/helpers/supabase';
 import type { TypedSupabaseClient } from '../support/factories';
 import {
@@ -59,8 +60,9 @@ const OVER_LONG_NOTE = 'n'.repeat(501);
 /**
  * Resolve this worker's own `public.users.id`.
  *
- * Kept self-contained because this API case needs only the signed-in user's id;
- * the broader pair helpers used by event lifecycle specs would add unused setup.
+ * Kept self-contained because most cases here need only the signed-in user's
+ * id; the interactions case additionally needs the partner, and uses the shared
+ * `resolveOwnPair` helper for it.
  */
 async function resolveOwnUserId(supabaseAdmin: TypedSupabaseClient): Promise<string> {
   const pair = getWorkerPairEmails();
@@ -109,10 +111,10 @@ test.describe('CHECK-constraint rejections over the wire', () => {
       constraint: 'interactions_type_check',
       context: 'InteractionService.sendInteraction',
       priority: 'P1',
-      body: (userId: string) => ({
+      body: (userId: string, partnerId: string) => ({
         type: 'hug',
         from_user_id: userId,
-        to_user_id: userId,
+        to_user_id: partnerId,
       }),
     },
     {
@@ -133,14 +135,18 @@ test.describe('CHECK-constraint rejections over the wire', () => {
       apiRequest,
       supabaseAdmin,
     }) => {
-      const userId = await resolveOwnUserId(supabaseAdmin);
+      // The interactions row needs the partner too: since
+      // 20260912020000_partner_only_immutable_interactions.sql an INSERT is
+      // refused before the CHECK constraint can fire unless the recipient is the
+      // caller's current partner, and this file is about the CHECK envelope.
+      const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       const userToken = await getUserAccessToken(supabaseAdmin, userId);
 
       const { status, body } = await apiRequest<PostgrestErrorEnvelope>({
         method: 'POST',
         path: `/rest/v1/${rejection.table}`,
         headers: { Authorization: `Bearer ${userToken}` },
-        body: rejection.body(userId),
+        body: rejection.body(userId, partnerId),
       });
 
       // The server's half of the contract.

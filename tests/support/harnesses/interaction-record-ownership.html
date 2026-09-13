@@ -10,9 +10,12 @@
     <script type="module">
       import { mountInteractionOwnershipHarness } from './interaction-record-ownership.tsx';
 
-      const userId = new URLSearchParams(window.location.search).get('userId');
+      const params = new URLSearchParams(window.location.search);
+      const userId = params.get('userId');
       if (!userId) throw new Error('Interaction ownership harness userId is missing');
-      mountInteractionOwnershipHarness(userId);
+      const partnerId = params.get('partnerId');
+      if (!partnerId) throw new Error('Interaction ownership harness partnerId is missing');
+      mountInteractionOwnershipHarness(userId, partnerId);
     </script>
   </body>
 </html>

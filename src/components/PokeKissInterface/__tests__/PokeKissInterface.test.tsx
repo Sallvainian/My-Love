@@ -17,14 +17,11 @@ vi.mock('../../../stores/useAppStore', () => ({
   }),
 }));
 
-vi.mock('../../../api/supabaseClient', () => ({
-  getPartnerId: vi.fn().mockResolvedValue(null),
-}));
-
 vi.mock('../../InteractionHistory', () => ({
   InteractionHistory: () => null,
 }));
 
+import { NoPartnerError } from '../../../utils/interactionValidation';
 import { PokeKissInterface } from '../PokeKissInterface';
 
 describe('PokeKissInterface interaction subscription', () => {
@@ -131,5 +128,63 @@ describe('PokeKissInterface interaction subscription', () => {
       await pendingSubscription;
     });
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('PokeKissInterface sending', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    storeMocks.subscribeToInteractions.mockResolvedValue(vi.fn());
+  });
+
+  it('asks the store to send, without naming a recipient', async () => {
+    storeMocks.sendPoke.mockResolvedValue({ id: 'poke-1' });
+
+    render(<PokeKissInterface />);
+    fireEvent.click(screen.getByTestId('fab-main-button'));
+    fireEvent.click(screen.getByTestId('poke-button'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('toast-notification')).toHaveTextContent('Poke sent!')
+    );
+    // The recipient is derived from the authenticated relationship inside the
+    // service (F4). A component that still passed one would be trusting a value
+    // the database will not accept.
+    expect(storeMocks.sendPoke).toHaveBeenCalledWith();
+  });
+
+  it.each([
+    ['poke', 'sendPoke', 'poke-button'],
+    ['kiss', 'sendKiss', 'kiss-button'],
+  ] as const)(
+    'reports a missing partner distinctly from a failed %s',
+    async (_label, action, testId) => {
+      storeMocks[action].mockRejectedValue(new NoPartnerError());
+
+      render(<PokeKissInterface />);
+      fireEvent.click(screen.getByTestId('fab-main-button'));
+      fireEvent.click(screen.getByTestId(testId));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('toast-notification')).toHaveTextContent(
+          'Error: Partner not configured'
+        )
+      );
+    }
+  );
+
+  it('still reports a real send failure as a failure', async () => {
+    storeMocks.sendKiss.mockRejectedValue(new Error('network went away'));
+
+    render(<PokeKissInterface />);
+    fireEvent.click(screen.getByTestId('fab-main-button'));
+    fireEvent.click(screen.getByTestId('kiss-button'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('toast-notification')).toHaveTextContent(
+        'Failed to send kiss. Try again.'
+      )
+    );
   });
 });
