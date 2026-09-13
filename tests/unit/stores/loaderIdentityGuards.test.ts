@@ -49,6 +49,13 @@ const createEvent = vi.fn();
 const updateEvent = vi.fn();
 const deleteEvent = vi.fn();
 const getInteractionHistory = vi.fn();
+const getAllStoredMessages = vi.fn();
+const customGetAllForUser = vi.fn();
+const customCreate = vi.fn();
+const customUpdateMessage = vi.fn();
+const customDeleteForUser = vi.fn();
+const customExportMessages = vi.fn();
+const customImportMessages = vi.fn();
 const getUserSessions = vi.fn();
 const getCoupleStats = vi.fn();
 const getSession = vi.fn();
@@ -117,6 +124,30 @@ vi.mock('../../../src/api/interactionService', () => ({
   },
 }));
 
+vi.mock('../../../src/services/storage', () => ({
+  storageService: {
+    // The one read the rotation pool comes from. The captured owner is passed
+    // straight through, so a case can assert WHICH id the service was asked
+    // for, not merely that the store was not written.
+    getAllMessages: (userId: string | null) => getAllStoredMessages(userId),
+    init: vi.fn(),
+    addMessage: vi.fn(),
+    addMessages: vi.fn(),
+    toggleFavorite: vi.fn(),
+  },
+}));
+
+vi.mock('../../../src/services/customMessageService', () => ({
+  customMessageService: {
+    getAllForUser: (userId: string | null, filter?: unknown) => customGetAllForUser(userId, filter),
+    create: (userId: string | null, input: unknown) => customCreate(userId, input),
+    updateMessage: (userId: string | null, input: unknown) => customUpdateMessage(userId, input),
+    deleteForUser: (userId: string | null, id: number) => customDeleteForUser(userId, id),
+    exportMessages: (userId: string | null) => customExportMessages(userId),
+    importMessages: (userId: string | null, data: unknown) => customImportMessages(userId, data),
+  },
+}));
+
 vi.mock('../../../src/services/moodService', () => ({
   moodService: {
     getAllForUser: (userId: string) => getAllForUser(userId),
@@ -139,6 +170,11 @@ vi.mock('../../../src/services/scriptureReadingService', async (importOriginal) 
 });
 
 import { useAppStore } from '../../../src/stores/useAppStore';
+import {
+  OWNER_STORAGE_KEY,
+  VAULT_STORAGE_KEY,
+  stashAnniversaries,
+} from '../../../src/services/anniversaryVault';
 // Type-only, so `vi.mock` above still replaces the runtime module. Annotating
 // the photo fixtures against the real types is what makes a field rename on
 // PhotoUploadInput/SupabasePhoto fail typecheck instead of silently leaving
@@ -274,13 +310,34 @@ function switchToUserC(cOwnState: Record<string, unknown> = {}): void {
 describe('loader identity guards', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    // Start from an empty rotation pool. `setAuthUser` refills it whenever the
+    // identity changes, and the store is a module singleton — so a pool left
+    // behind by the previous test makes that reload fire during setup, against
+    // whatever `mockReturnValue` the previous test left armed (`clearAllMocks`
+    // clears calls, not implementations). Both a stray `getAllMessages` call
+    // and a stray `messages` write then land inside the case under test.
+    useAppStore.setState({ messages: [], currentMessage: null } as unknown as Parameters<
+      typeof useAppStore.setState
+    >[0]);
     useAppStore.getState().clearAuth();
     useAppStore.getState().setAuthUser(A);
+    // AFTER the identity setup, not before: the anniversary vault is
+    // localStorage-backed and outlives a test, and the `clearAuth()` above
+    // re-stashes whichever id the PREVIOUS test left signed in. A stash sitting
+    // under the id a case then signs in as sends `setAuthUser` down its
+    // "restored anniversaries" exit instead of the plain one — a different
+    // branch, which silently masks defects in the one under test.
+    localStorage.removeItem(VAULT_STORAGE_KEY);
+    localStorage.removeItem(OWNER_STORAGE_KEY);
     useAppStore.setState({ error: null });
 
     const { getPartnerId } = await import('../../../src/api/supabaseClient');
     vi.mocked(getPartnerId).mockResolvedValue('USER-B-ID');
     getUnsyncedMoods.mockResolvedValue([]);
+    // Quiet by default: the custom-message cases each set what they need, and
+    // several actions chain into loadMessages/loadCustomMessages afterwards.
+    getAllStoredMessages.mockResolvedValue([]);
+    customGetAllForUser.mockResolvedValue([]);
     // uploadPhoto awaits the quota twice; unless a case says otherwise it is
     // quiet, so neither the reject nor the warning branch is what is measured.
     checkStorageQuota.mockResolvedValue({ used: 0, quota: 1_000, percent: 0, warning: 'none' });
@@ -483,6 +540,455 @@ describe('loader identity guards', () => {
 
       expect(useAppStore.getState().partnerMoods).toEqual([]);
       expect(JSON.stringify(useAppStore.getState())).not.toContain('PARTNERS-PRIVATE-NOTE');
+    });
+  });
+
+  // ==========================================================================
+  // messagesSlice — custom messages (CAP-8 / F8)
+  //
+  // The `messages` store in IndexedDB holds every account that has signed in on
+  // this device. These actions read and write it, and the AdminPanel that
+  // drives them has Sign Out one tap away in the bottom nav — so a continuation
+  // raised by A lands in whatever store is on screen when it settles.
+  //
+  // The owner is passed INTO the service rather than read inside it, which is
+  // what makes the pending-import case testable at all: the assertion is that
+  // the row is stamped with the id captured at entry, not with whoever is
+  // signed in when the write happens.
+  // ==========================================================================
+
+  /** A's own custom row, as IndexedDB hands it back. */
+  function aCustomMessage() {
+    return {
+      id: 7,
+      text: 'A-PRIVATE-CUSTOM-MESSAGE',
+      category: 'custom' as const,
+      isCustom: true,
+      userId: A,
+      active: true,
+      createdAt: new Date('2026-08-03T06:00:00.000Z'),
+      updatedAt: new Date('2026-08-03T06:00:00.000Z'),
+      tags: [],
+    };
+  }
+
+  /** What C already had on screen: a bundled daily row of their own session. */
+  function cRotationPool() {
+    return [
+      {
+        id: 1,
+        text: 'C-ONSCREEN-DAILY',
+        category: 'reason' as const,
+        isCustom: false,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    ];
+  }
+
+  function cCustomList() {
+    return [
+      {
+        id: 99,
+        text: 'C-OWN-CUSTOM-MESSAGE',
+        category: 'custom' as const,
+        isCustom: true,
+        active: true,
+        createdAt: '2026-09-01T00:00:00.000Z',
+      },
+    ];
+  }
+
+  function exportFile() {
+    return {
+      version: '1.0' as const,
+      exportDate: '2026-09-12T00:00:00.000Z',
+      messageCount: 1,
+      messages: [
+        {
+          text: 'A-IMPORTED-MESSAGE',
+          category: 'custom' as const,
+          active: true,
+          tags: [],
+          createdAt: '2026-08-03T06:00:00.000Z',
+          updatedAt: '2026-08-03T06:00:00.000Z',
+        },
+      ],
+    };
+  }
+
+  /** A File whose `text()` this test controls, so the read is a real await. */
+  function importFile(settleText: Promise<string>): File {
+    return { text: () => settleText } as unknown as File;
+  }
+
+  describe('loadMessages', () => {
+    it('asks the service for the account that raised the read', async () => {
+      getAllStoredMessages.mockResolvedValue([]);
+
+      await useAppStore.getState().loadMessages();
+
+      // The rotation pool is shared daily rows PLUS the caller's own custom
+      // rows, so the read has to name an owner. Passing the live id instead of
+      // the captured one is what this pins.
+      expect(getAllStoredMessages).toHaveBeenCalledWith(A);
+    });
+
+    it('discards the rotation pool when the account changed mid-flight', async () => {
+      const pending = deferred<unknown[]>();
+      getAllStoredMessages.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().loadMessages();
+      switchToUserC({ messages: cRotationPool() });
+
+      pending.settle([aCustomMessage()]);
+      await inFlight;
+
+      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+      // A's own writing, one tap of Sign Out away from C's daily message card.
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+    });
+  });
+
+  describe('setAuthUser refills the rotation pool', () => {
+    /**
+     * `discardAccountState` strips the outgoing account's custom rows from
+     * `messages`, and nothing else puts the incoming account's back:
+     * `initializeApp` runs once per page load behind a module flag and an
+     * App-level ref that both survive sign-out, and `loadMessages()` is
+     * otherwise reached only from the custom-message mutators. Without the
+     * reload the new account rotates through the bundled daily messages alone
+     * until they edit a custom message or reload the page.
+     */
+    function aPool() {
+      return [cRotationPool()[0], aCustomMessage()];
+    }
+
+    it('reloads for the incoming account when one signs in over another', async () => {
+      useAppStore.setState({ messages: aPool() } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+      getAllStoredMessages.mockResolvedValue(cRotationPool());
+
+      useAppStore.getState().setAuthUser(C);
+      await flush();
+
+      // Read for C, not for the account that just left.
+      expect(getAllStoredMessages).toHaveBeenLastCalledWith(C);
+      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+    });
+
+    it('reloads on a sign-out followed by a different sign-in', async () => {
+      // The common flow, and NOT the switched-account branch: onAuthStateChange
+      // delivers SIGNED_OUT then SIGNED_IN, so the second call arrives with
+      // `previous === null` and never reaches that branch at all.
+      useAppStore.setState({ messages: aPool() } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+      getAllStoredMessages.mockResolvedValue(cRotationPool());
+
+      useAppStore.getState().clearAuth();
+      useAppStore.getState().setAuthUser(C);
+      await flush();
+
+      expect(getAllStoredMessages).toHaveBeenLastCalledWith(C);
+      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+    });
+
+    it('reloads on the exit that restores stashed anniversaries', async () => {
+      // `setAuthUser` has a THIRD exit: a fresh sign-in whose anniversaries
+      // were stashed at their last sign-out returns from its own `set()`,
+      // before the plain one at the bottom. It is a real production path — it
+      // is how a returning user gets their countdown dates back — and it needs
+      // the reload exactly as much as the other two.
+      stashAnniversaries(C, [{ id: 1, date: '2025-11-26', label: 'C-ANNIVERSARY' }]);
+      useAppStore.setState({ messages: aPool() } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+      getAllStoredMessages.mockResolvedValue(cRotationPool());
+
+      useAppStore.getState().clearAuth();
+      useAppStore.getState().setAuthUser(C);
+      await flush();
+
+      // It really did leave by that exit, not one of the others.
+      expect(useAppStore.getState().settings!.relationship.anniversaries).toHaveLength(1);
+      expect(getAllStoredMessages).toHaveBeenLastCalledWith(C);
+      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+    });
+
+    it('does not re-read IndexedDB when the same user is re-notified', async () => {
+      // TOKEN_REFRESHED, INITIAL_SESSION and USER_UPDATED all land here for the
+      // account that is already signed in, and none of them changes the pool.
+      useAppStore.setState({ messages: aPool() } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+
+      useAppStore.getState().setAuthUser(A);
+      await flush();
+
+      expect(getAllStoredMessages).not.toHaveBeenCalled();
+    });
+
+    it('does not race the cold-boot seed', async () => {
+      // `messages` is not persisted, so it is empty until `initializeApp` seeds
+      // the bundled rows. Firing here would read a still-empty store and could
+      // land that empty array on top of the seed.
+      useAppStore.setState({ messages: [] } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+
+      useAppStore.getState().setAuthUser(C);
+      await flush();
+
+      expect(getAllStoredMessages).not.toHaveBeenCalled();
+    });
+
+    it('repaints Home for the incoming account', async () => {
+      // `discardAccountState` nulls a custom `currentMessage`, and nothing else
+      // recomputes it in-session — `updateCurrentMessage` is called only from
+      // `initializeApp`, which does not run again.
+      useAppStore.setState({
+        messages: aPool(),
+        currentMessage: aCustomMessage(),
+      } as unknown as Parameters<typeof useAppStore.setState>[0]);
+      getAllStoredMessages.mockResolvedValue(cRotationPool());
+
+      useAppStore.getState().setAuthUser(C);
+      expect(useAppStore.getState().currentMessage).toBeNull();
+
+      await flush();
+
+      expect(useAppStore.getState().currentMessage).toMatchObject({ text: 'C-ONSCREEN-DAILY' });
+    });
+
+    it('does not write a pool fetched for an account that has since been replaced', async () => {
+      const pending = deferred<unknown[]>();
+      const dPool = [
+        {
+          id: 3,
+          text: 'D-OWN-DAILY',
+          category: 'reason' as const,
+          isCustom: false,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      ];
+      useAppStore.setState({ messages: aPool() } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+      // The two reloads must be distinguishable: D's own switch fires a reload
+      // of its own, and with one shared mock result the stale write and the
+      // legitimate one are byte-identical — the assertion could not tell them
+      // apart, and would pass with the guard deleted.
+      getAllStoredMessages.mockReturnValueOnce(pending.promise).mockResolvedValue(dPool);
+
+      useAppStore.getState().setAuthUser(C);
+      // A third identity arrives before C's read comes back.
+      useAppStore.getState().setAuthUser('USER-D-ID');
+
+      pending.settle([aCustomMessage()]);
+      await flush();
+
+      expect(useAppStore.getState().messages).toEqual(dPool);
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+    });
+  });
+
+  describe('loadCustomMessages', () => {
+    it('discards the AdminPanel list when the account changed mid-flight', async () => {
+      const pending = deferred<unknown[]>();
+      customGetAllForUser.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().loadCustomMessages();
+      switchToUserC({ customMessages: cCustomList(), customMessagesLoaded: true });
+
+      pending.settle([aCustomMessage()]);
+      await inFlight;
+
+      expect(useAppStore.getState().customMessages).toEqual(cCustomList());
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+    });
+
+    it('does not claim C’s list is loaded on A’s behalf when it fails', async () => {
+      // The catch path writes `customMessages: []` AND `customMessagesLoaded:
+      // true`. Unguarded, A's failure both blanks C's list and tells the
+      // AdminPanel effect there is nothing left to fetch — so C's own load
+      // never fires and the panel stays empty for the whole session.
+      const pending = deferred<unknown[]>();
+      customGetAllForUser.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().loadCustomMessages();
+      switchToUserC({ customMessages: cCustomList(), customMessagesLoaded: false });
+
+      pending.fail(new Error('A-REQUEST-FAILURE'));
+      await inFlight;
+
+      expect(useAppStore.getState().customMessages).toEqual(cCustomList());
+      expect(useAppStore.getState().customMessagesLoaded).toBe(false);
+    });
+  });
+
+  describe('createCustomMessage', () => {
+    it('stamps the row with the account that asked, and leaves the new store alone', async () => {
+      const pending = deferred<unknown>();
+      customCreate.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().createCustomMessage({
+        text: 'A-PRIVATE-CUSTOM-MESSAGE',
+        category: 'custom',
+      });
+      switchToUserC({ customMessages: cCustomList() });
+
+      pending.settle(aCustomMessage());
+      await inFlight;
+
+      // The row IS written, and it is A's — refusing the write would lose a
+      // message the user really did save. It is C's store that is withheld.
+      expect(customCreate).toHaveBeenCalledWith(A, expect.objectContaining({ category: 'custom' }));
+      expect(useAppStore.getState().customMessages).toEqual(cCustomList());
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+    });
+
+    it('does not reload the rotation pool under the new account', async () => {
+      const pending = deferred<unknown>();
+      customCreate.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore
+        .getState()
+        .createCustomMessage({ text: 'A-PRIVATE-CUSTOM-MESSAGE', category: 'custom' });
+      switchToUserC({ messages: cRotationPool() });
+
+      pending.settle(aCustomMessage());
+      await inFlight;
+
+      // loadMessages() is the second write this action makes. Guarding only the
+      // optimistic `set` above would still repaint C's Home from IndexedDB.
+      expect(getAllStoredMessages).not.toHaveBeenCalled();
+      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+    });
+
+    it('discards a continuation raised in a session that has since ended', async () => {
+      // A → signed out → A again. `userId` is identical on both sides, so only
+      // `authSessionVersion` distinguishes the dead session's write from a live
+      // one. An id-only compare lets this through.
+      const pending = deferred<unknown>();
+      customCreate.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore
+        .getState()
+        .createCustomMessage({ text: 'A-PRIVATE-CUSTOM-MESSAGE', category: 'custom' });
+
+      useAppStore.getState().clearAuth();
+      useAppStore.getState().setAuthUser(A);
+      useAppStore.setState({ customMessages: [] } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+
+      pending.settle(aCustomMessage());
+      await inFlight;
+
+      expect(useAppStore.getState().customMessages).toEqual([]);
+    });
+  });
+
+  describe('updateCustomMessage', () => {
+    it('does not repaint the new account’s list with the edit', async () => {
+      const pending = deferred<void>();
+      customUpdateMessage.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore
+        .getState()
+        .updateCustomMessage({ id: 7, text: 'A-PRIVATE-CUSTOM-MESSAGE' });
+      switchToUserC({ customMessages: cCustomList(), messages: cRotationPool() });
+
+      pending.settle();
+      await inFlight;
+
+      expect(customUpdateMessage).toHaveBeenCalledWith(A, expect.objectContaining({ id: 7 }));
+      expect(useAppStore.getState().customMessages).toEqual(cCustomList());
+      expect(getAllStoredMessages).not.toHaveBeenCalled();
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+    });
+  });
+
+  describe('deleteCustomMessage', () => {
+    it('does not remove a row from the new account’s list', async () => {
+      const pending = deferred<void>();
+      customDeleteForUser.mockReturnValue(pending.promise);
+
+      // C's own row happens to carry the same auto-increment id A's did — the
+      // ids come from one shared IndexedDB keyspace, so this is not contrived.
+      const inFlight = useAppStore.getState().deleteCustomMessage(99);
+      switchToUserC({ customMessages: cCustomList(), messages: cRotationPool() });
+
+      pending.settle();
+      await inFlight;
+
+      expect(customDeleteForUser).toHaveBeenCalledWith(A, 99);
+      expect(useAppStore.getState().customMessages).toEqual(cCustomList());
+      expect(getAllStoredMessages).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('exportCustomMessages', () => {
+    it('does not put the previous account’s file into the new one’s downloads', async () => {
+      // Guarded even though nothing here writes the store: the download IS the
+      // disclosure, and it lands in whichever session is on screen.
+      const createObjectURL = vi
+        .spyOn(URL, 'createObjectURL')
+        .mockReturnValue('blob:http://localhost/export');
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+      const click = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined);
+
+      try {
+        const pending = deferred<unknown>();
+        customExportMessages.mockReturnValue(pending.promise);
+
+        const inFlight = useAppStore.getState().exportCustomMessages();
+        switchToUserC();
+
+        pending.settle({ ...exportFile(), messages: [{ text: 'A-PRIVATE-CUSTOM-MESSAGE' }] });
+        await inFlight;
+
+        expect(customExportMessages).toHaveBeenCalledWith(A);
+        expect(createObjectURL).not.toHaveBeenCalled();
+        expect(click).not.toHaveBeenCalled();
+      } finally {
+        vi.restoreAllMocks();
+      }
+    });
+  });
+
+  describe('importCustomMessages', () => {
+    it('stamps the imported rows with A and never writes under C', async () => {
+      const fileRead = deferred<string>();
+      const importing = deferred<{ imported: number; skipped: number }>();
+      customImportMessages.mockReturnValue(importing.promise);
+
+      const inFlight = useAppStore.getState().importCustomMessages(importFile(fileRead.promise));
+
+      // The switch lands while the FILE is still being read, BEFORE the service
+      // is called at all. An owner read live at the call site would be C's, and
+      // C would silently acquire a copy of every message in A's backup.
+      switchToUserC({ customMessages: cCustomList(), messages: cRotationPool() });
+
+      fileRead.settle(JSON.stringify(exportFile()));
+      await flush();
+      importing.settle({ imported: 1, skipped: 0 });
+
+      // The caller still learns what happened to THEIR import…
+      await expect(inFlight).resolves.toEqual({ imported: 1, skipped: 0 });
+      // …the rows carry A's id, because it was captured before the switch…
+      expect(customImportMessages).toHaveBeenCalledWith(
+        A,
+        expect.objectContaining({ version: '1.0' })
+      );
+      // …and C's store is untouched, neither list nor rotation pool.
+      expect(useAppStore.getState().customMessages).toEqual(cCustomList());
+      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+      expect(customGetAllForUser).not.toHaveBeenCalled();
+      expect(getAllStoredMessages).not.toHaveBeenCalled();
     });
   });
 
@@ -1651,6 +2157,87 @@ describe('loader identity guards', () => {
 
       expect(useAppStore.getState().notes).toEqual([note('a1', 'A-CHAT')]);
       expect(useAppStore.getState().notesIsLoading).toBe(false);
+    });
+
+    it('loadMessages writes normally', async () => {
+      getAllStoredMessages.mockResolvedValue(cRotationPool());
+
+      await useAppStore.getState().loadMessages();
+
+      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+    });
+
+    it('loadCustomMessages writes normally', async () => {
+      customGetAllForUser.mockResolvedValue([aCustomMessage()]);
+
+      await useAppStore.getState().loadCustomMessages();
+
+      expect(useAppStore.getState().customMessages).toEqual([
+        expect.objectContaining({ id: 7, text: 'A-PRIVATE-CUSTOM-MESSAGE' }),
+      ]);
+      expect(useAppStore.getState().customMessagesLoaded).toBe(true);
+    });
+
+    it('createCustomMessage writes normally', async () => {
+      customCreate.mockResolvedValue(aCustomMessage());
+
+      await useAppStore
+        .getState()
+        .createCustomMessage({ text: 'A-PRIVATE-CUSTOM-MESSAGE', category: 'custom' });
+
+      expect(useAppStore.getState().customMessages).toEqual([
+        expect.objectContaining({ id: 7, text: 'A-PRIVATE-CUSTOM-MESSAGE' }),
+      ]);
+      // And it still refreshes the rotation pool afterwards.
+      expect(getAllStoredMessages).toHaveBeenCalledWith(A);
+    });
+
+    it('updateCustomMessage and deleteCustomMessage write normally', async () => {
+      customGetAllForUser.mockResolvedValue([aCustomMessage()]);
+      customUpdateMessage.mockResolvedValue(undefined);
+      customDeleteForUser.mockResolvedValue(undefined);
+      await useAppStore.getState().loadCustomMessages();
+
+      await useAppStore.getState().updateCustomMessage({ id: 7, text: 'A-EDITED' });
+      expect(useAppStore.getState().customMessages[0].text).toBe('A-EDITED');
+
+      await useAppStore.getState().deleteCustomMessage(7);
+      expect(useAppStore.getState().customMessages).toEqual([]);
+    });
+
+    it('exportCustomMessages still downloads the file', async () => {
+      const createObjectURL = vi
+        .spyOn(URL, 'createObjectURL')
+        .mockReturnValue('blob:http://localhost/export');
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+      const click = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined);
+
+      try {
+        customExportMessages.mockResolvedValue(exportFile());
+
+        await useAppStore.getState().exportCustomMessages();
+
+        expect(createObjectURL).toHaveBeenCalledTimes(1);
+        expect(click).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.restoreAllMocks();
+      }
+    });
+
+    it('importCustomMessages writes normally', async () => {
+      customImportMessages.mockResolvedValue({ imported: 1, skipped: 0 });
+      customGetAllForUser.mockResolvedValue([aCustomMessage()]);
+
+      await expect(
+        useAppStore
+          .getState()
+          .importCustomMessages(importFile(Promise.resolve(JSON.stringify(exportFile()))))
+      ).resolves.toEqual({ imported: 1, skipped: 0 });
+
+      expect(useAppStore.getState().customMessages).toHaveLength(1);
+      expect(getAllStoredMessages).toHaveBeenCalledWith(A);
     });
 
     it('loadCoupleStats writes normally', async () => {

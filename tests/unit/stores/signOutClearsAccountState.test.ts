@@ -55,6 +55,8 @@ const EXPECTED_RESET: Record<string, unknown> = {
   notesHasMore: true,
   sentMessageTimestamps: [],
   notesPendingRemoval: [],
+  customMessages: [],
+  customMessagesLoaded: false,
   photos: [],
   selectedPhotoId: null,
   isUploading: false,
@@ -103,8 +105,12 @@ const SECRETS = {
   photoCaption: 'PHOTO-CAPTION-TEXT',
   reflection: 'SCRIPTURE-REFLECTION-TEXT',
   anniversaryLabel: 'OUR-FIRST-KISS-LABEL',
+  customMessage: 'MY-OWN-CUSTOM-MESSAGE-TEXT',
   userId: 'USER-A-ID',
 };
+
+/** A bundled daily message: shared by everyone, and must SURVIVE sign-out. */
+const SHARED_DAILY_TEXT = 'A-BUNDLED-DAILY-MESSAGE';
 
 function moodEntry(userId: string, note: string) {
   return {
@@ -154,6 +160,48 @@ function seedSignedInSession(): void {
 
     photos: [{ id: 'photo-1', caption: SECRETS.photoCaption }],
     selectedPhotoId: 'photo-1',
+
+    // The AdminPanel list, plus the rotation pool the same rows feed into.
+    // `messages` deliberately mixes the two kinds: a bundled daily row shared
+    // by every account and this account's own custom row.
+    customMessages: [
+      {
+        id: 7,
+        text: SECRETS.customMessage,
+        category: 'custom',
+        isCustom: true,
+        active: true,
+        createdAt: '2026-08-03T06:00:00.000Z',
+      },
+    ],
+    customMessagesLoaded: true,
+    messages: [
+      {
+        id: 1,
+        text: SHARED_DAILY_TEXT,
+        category: 'reason',
+        isCustom: false,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+      {
+        id: 7,
+        text: SECRETS.customMessage,
+        category: 'custom',
+        isCustom: true,
+        userId: SECRETS.userId,
+        createdAt: new Date('2026-08-03T06:00:00.000Z'),
+      },
+    ],
+    // DailyMessage renders `currentMessage.text` straight onto Home, and it is
+    // a COPY of the row rather than a reference into `messages`.
+    currentMessage: {
+      id: 7,
+      text: SECRETS.customMessage,
+      category: 'custom',
+      isCustom: true,
+      userId: SECRETS.userId,
+      createdAt: new Date('2026-08-03T06:00:00.000Z'),
+    },
 
     interactions: [{ id: 'int-1', from_user_id: 'USER-B-ID', type: 'poke' }],
     unviewedCount: 3,
@@ -300,6 +348,102 @@ describe('clearAuth on sign-out', () => {
     // the next account accept that couple's incoming traffic.
     expect(state.interactionPartnerId).toBeNull();
     expect(state.activeSession).toBeNull();
+  });
+
+  it.each(['clearAuth', 'setAuthUser'] as const)(
+    '%s strips custom messages from the rotation pool but keeps the shared daily ones',
+    (action) => {
+      if (action === 'clearAuth') useAppStore.getState().clearAuth();
+      else useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
+
+      const state = useAppStore.getState();
+
+      // The AdminPanel list and the flag its reload effect gates on.
+      expect(state.customMessages).toEqual([]);
+      expect(state.customMessagesLoaded).toBe(false);
+
+      // `messages` is the rotation pool. Emptying it outright would be safe but
+      // wrong: nothing reloads the bundled rows after an in-place switch, so
+      // the next account would get a blank Home and an empty pool. Only the
+      // account-scoped half goes.
+      expect(state.messages).toEqual([
+        expect.objectContaining({ id: 1, text: SHARED_DAILY_TEXT, isCustom: false }),
+      ]);
+
+      // Home renders this directly, and it is a copy the array strip cannot reach.
+      expect(state.currentMessage).toBeNull();
+    }
+  );
+
+  it('drops the rotation-history entries that point at stripped rows', () => {
+    // `messageHistory.shownMessages` maps a date to the id shown that day, and
+    // it is PERSISTED. If the outgoing account's custom row won today's
+    // rotation, that entry now names an id no longer in the pool — and
+    // `updateCurrentMessage` treats a cached id as authoritative and never
+    // recomputes, so `messages.find(...)` yields undefined and Home shows no
+    // daily message at all, for the rest of the calendar day and across
+    // reloads. Driven through clearAuth: the switched-account path also fires
+    // an asynchronous pool reload, which this case has no business waiting on.
+    useAppStore.setState({
+      messageHistory: {
+        ...useAppStore.getState().messageHistory,
+        shownMessages: new Map([
+          ['2026-09-12', 7], // the outgoing account's custom row — stripped
+          ['2026-09-11', 1], // a bundled daily row — survives the strip
+        ]),
+      },
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+
+    useAppStore.getState().clearAuth();
+
+    const { shownMessages } = useAppStore.getState().messageHistory;
+    expect(shownMessages.has('2026-09-12')).toBe(false);
+    expect(shownMessages.get('2026-09-11')).toBe(1);
+  });
+
+  it('keeps the whole rotation history when the pool has not loaded yet', () => {
+    // The no-session boot: App.tsx calls clearAuth() as soon as getSession()
+    // comes back empty, and `messages` is not persisted — so this runs against
+    // an empty pool, and initializeApp (gated on a session) never fills it.
+    // Pruning by "ids still in the pool" would find nothing surviving and wipe
+    // the persisted 30-day map every time the app opens signed out, taking the
+    // shared daily rows with it. Nothing was stripped here, so nothing goes.
+    useAppStore.setState({
+      messages: [],
+      messageHistory: {
+        ...useAppStore.getState().messageHistory,
+        shownMessages: new Map([
+          ['2026-09-12', 7],
+          ['2026-09-11', 1],
+        ]),
+      },
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+
+    useAppStore.getState().clearAuth();
+
+    const { shownMessages } = useAppStore.getState().messageHistory;
+    expect(shownMessages.get('2026-09-12')).toBe(7);
+    expect(shownMessages.get('2026-09-11')).toBe(1);
+  });
+
+  it('keeps a shared daily message on screen across sign-out', () => {
+    // The other half of the rule: a bundled row is not account state, and
+    // nulling it would blank Home for the next account with nothing to
+    // re-derive it before the next page load.
+    const shared = {
+      id: 1,
+      text: SHARED_DAILY_TEXT,
+      category: 'reason',
+      isCustom: false,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    useAppStore.setState({ currentMessage: shared } as unknown as Parameters<
+      typeof useAppStore.setState
+    >[0]);
+
+    useAppStore.getState().clearAuth();
+
+    expect(useAppStore.getState().currentMessage).toMatchObject({ text: SHARED_DAILY_TEXT });
   });
 
   it('leaves no trace of the seeded identifiers anywhere in the store', () => {
