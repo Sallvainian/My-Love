@@ -2,7 +2,7 @@
 title: 'Bound image upload request buffering'
 type: 'bugfix'
 created: '2026-09-12'
-status: blocked
+status: in-review
 baseline_revision: f99300ccab627787d420cc98ec464030f0730a51
 review_loop_iteration: 0
 followup_review_recommended: false
@@ -17,13 +17,13 @@ deferred: []
 
 **Problem:** `supabase/functions/upload-love-note-image/index.ts:191` runs `new Uint8Array(await req.arrayBuffer())` (and `:180` `req.formData()`) before the size check at `:195`, and never reads `Content-Length`. Any authenticated caller (auth at `:147`, 10 uploads/min per isolate at `:157`) can make the worker hold an arbitrarily large body in memory before it is rejected (CAP-10 / F10).
 
-**Approach:** Check the declared length first, then read `req.body` as a stream, counting bytes and cancelling the reader the moment the running total passes `CONFIG.MAX_FILE_SIZE_BYTES`. Only a body that finished under the cap is assembled and handed to the existing magic-byte check and Storage upload. The unused `multipart/form-data` branch is removed and answered with 415. Everything after the body read (`:207-258`) stays as it is.
+**Approach:** Check the declared length first, then read `req.body` as a stream, counting bytes and stopping retention the moment the running total passes `CONFIG.MAX_FILE_SIZE_BYTES` — releasing what is held and discarding the remainder without retaining it. Only a body that finished under the cap is assembled and handed to the existing magic-byte check and Storage upload. The unused `multipart/form-data` branch is removed and answered with 415. Everything after the body read (`:207-258`) stays as it is.
 
 ## Boundaries & Constraints
 
 **Always:**
-- Strict contract from `SPEC.md` assumptions: reject an absent `Content-Length` with 411, a non-integer or negative one with 400, and one over the cap with 413 — all before a single byte of body is read.
-- Stream `req.body` with `getReader()`; check the cumulative size **before** retaining each chunk; on overflow call `reader.cancel()` and return 413. Never call `arrayBuffer()`, `formData()`, `text()` or `json()` on the request.
+- Strict contract from `SPEC.md` assumptions: reject an absent `Content-Length` with 411, a non-integer or negative one with 400, and one over the cap with 413 — every one of those statuses decided from headers alone, before anything is allocated or retained. A refusal may then discard the body it refuses (see the next bullet); it may never accumulate it.
+- Stream `req.body` with `getReader()`; check the cumulative size **before** retaining each chunk; on overflow release everything retained and discard the remainder without retaining it, bounded by `MAX_DISCARD_BYTES`, then return 413. Peak retained bytes stay ≤ cap + one chunk throughout. Never call `arrayBuffer()`, `formData()`, `text()` or `json()` on the request.
 - Keep the 5 × 1024 × 1024 limit, the 413 body shape (`error`, `message`, `maxSize`), CORS/preflight, 405, 401, 429 with `Retry-After`, the magic-byte 415, the uploader-prefixed path from `generateStoragePath` and the success payload with `X-RateLimit-Remaining`.
 - Accept exactly the two client call sites' format: `application/octet-stream` with a `Blob` body (`src/services/loveNoteImageService.ts:139-145` and `:194-200`). Browsers set `Content-Length` for a `Blob` body; the client must not synthesise the header.
 - Record the measured `Content-Length` behaviour of a real browser upload in **Verification**. If real traffic omits it, stop and record a bounded-stream-only exception before relaxing the 411; do not silently accept header-less bodies.
@@ -37,12 +37,12 @@ deferred: []
 
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
 |----------|--------------|---------------------------|----------------|
-| Over-limit declaration | `Content-Length: 5242881`, any body | 413 before any read; `reader.read()` never called | Zero Storage calls |
+| Over-limit declaration | `Content-Length: 5242881`, any body | 413 decided from headers alone before any read; nothing allocated or retained; the refused body discarded unread-into-memory, bounded by `MAX_DISCARD_BYTES` | Zero Storage calls |
 | Absent length | no `Content-Length` | 411 before any read | Zero Storage calls |
 | Invalid length | `abc`, `-1`, `1.5` | 400 before any read | Zero Storage calls |
-| Header lies small | `Content-Length: 10`, stream of 6 MiB | Reader cancelled at the first chunk that crosses the cap; 413 | Zero Storage calls; retained bytes ≤ cap + one chunk |
+| Header lies small | `Content-Length: 10`, stream of 6 MiB | Retention stops at the first chunk that crosses the cap — everything held is released and the remainder discarded without retention; 413 | Zero Storage calls; retained bytes ≤ cap + one chunk |
 | Exact limit | `Content-Length: 5242880`, 5 MiB valid PNG | Accepted; upload proceeds | — |
-| Limit plus one | `Content-Length: 5242881` | 413 before read | — |
+| Limit plus one | `Content-Length: 5242881` | 413 decided before read, and delivered to the caller | — |
 | Truncated body | declared 1 MiB, stream ends at 100 KiB | 400 (short body), no upload | Zero Storage calls |
 | Client disconnect mid-stream | reader throws | 400 or 499-class response, no upload; error logged once | Zero Storage calls |
 | Multipart | `Content-Type: multipart/form-data` | 415 before any read | Zero Storage calls |
@@ -71,14 +71,46 @@ deferred: []
 - Deploy the function and demonstrate on the hosted endpoint: one supported upload succeeds through the app; one over-limit request returns 413 and the bucket listing is unchanged. Record both, or the concrete access blocker.
 
 **Acceptance Criteria:**
-- Given an over-limit, absent or invalid `Content-Length`, when the request arrives, then the response is 413/411/400 respectively and the body reader is never created.
-- Given a small declared length and an over-limit stream, when the cap is crossed, then the reader is cancelled, 413 is returned, and no Storage call is made.
+- Given an over-limit, absent or invalid `Content-Length`, when the request arrives, then the response is 413/411/400 respectively, decided from headers alone with nothing allocated or retained, and the response reaches the caller.
+- Given a small declared length and an over-limit stream, when the cap is crossed, then retention stops at that chunk, the remainder is discarded without being retained, 413 is returned, and no Storage call is made.
 - Given a valid image at exactly the cap, when uploaded through either client site, then the response and stored object are as before the change.
 - Given `multipart/form-data`, then 415 with no body read.
 - Given `npm run lint`, `npm run typecheck`, `npm run test:unit`, the new `deno test` suite and the new API spec, when they run, then all pass.
 - Given the deployed function, when the hosted checks above run, then the results (status codes, listing counts, the Content-Length observation) are recorded in **Verification** with no credential values.
 
 ## Spec Change Log
+
+### 2026-09-13 — the read-based contract is restated in terms of retention (operator adjudication)
+
+The escalation recorded below was put to the operator, who decided that drain-and-discard
+satisfies F10 and that the contract text, not the code, is what was wrong. Amended in this
+edit: **Always** bullets 1 and 2, matrix rows "Over-limit declaration", "Header lies small"
+and "Limit plus one", the first two **Acceptance Criteria**, and the first **Design Notes**
+bullet. Each now states what may be **retained** rather than what may be **read** — the
+property `remediation.md:94` actually names ("neither allocation nor copies may grow with
+the entire attack body"), and the property the shipped handler and its 29 `deno test` cases
+already prove. No code change accompanies this amendment.
+
+The premise was re-measured independently before the decision, against
+`public.ecr.aws/supabase/edge-runtime:v1.74.3`, Kong bypassed, on the **pre-fix** tree and
+on the handler's 401 path rather than its 413 path — so the result is not an artifact of
+this change, of the gateway, or of the refusal branch:
+
+| Request body bytes | Result on the 401 path |
+|---|---|
+| 262 144 | `status=401 time=0.004298` |
+| 1 048 576 | `status=000 time=12.003919` |
+| 5 242 881 | `status=000 time=12.004678` |
+
+Any response returned on this runtime with roughly ≥ 1 MiB still unread on the wire is
+dropped. Four alternatives were checked concretely and none delivers the 413 while leaving
+the body unread: `req.body.cancel()`, read-one-chunk-then-cancel, and a detached drain are
+all the same class as the probe above; `Expect: 100-continue` is answered by `Deno.serve`
+before the handler runs and is never sent by browser `fetch`, which is the only client
+(`src/services/loveNoteImageService.ts:139-145`) and which `:28` forbids changing.
+`req.body.pipeTo(new WritableStream())` would satisfy the old wording's letter while doing
+the identical drain; it was rejected as letter-gaming, which is itself the evidence that
+the old wording was a proxy for a property the code already has.
 
 ### 2026-09-12 — an over-limit refusal drains the body it refuses
 
@@ -134,7 +166,9 @@ app's own client and none of them needs to deliver a user-facing message. `array
 
 ## Design Notes
 
-- Counting before retaining is what bounds memory; a `chunks.push` followed by a check still holds the oversize chunk. Cap the total retained at the limit and cancel on the chunk that would exceed it.
+- Counting before retaining is what bounds memory; a `chunks.push` followed by a check still holds the oversize chunk. Cap the total retained at the limit, release what is held on the chunk that would exceed it, and discard the rest without retaining it.
+- `MAX_DISCARD_BYTES` is a **delivery** knob, not a memory knob. Live memory is one chunk at every value of it; what it governs is which refusals reach the caller, because above it the 413 is correct and undeliverable. Do not tune it expecting a memory effect.
+- The discard is bounded in bytes, not time: a client trickling a sub-ceiling body holds a worker until it stops sending. Unchanged from the pre-fix `await req.arrayBuffer()` and orthogonal to F10, which is about retained memory.
 - The 411/400 statuses for the header contract are this story's choice; `remediation.md` fixes only 413 for over-limit and 415 for multipart.
 
 **Why `handler.ts` imports nothing remote.** `index.ts` keeps the
@@ -266,75 +300,3 @@ Then, on the hosted endpoint, the two demonstrations this story owes:
 
 Rollback is the same command against the pre-change `index.ts` (commit `f99300cc`).
 
-## Auto Run Result
-
-Status: blocked
-Blocking condition: matrix test audit failed
-
-The implementation is complete, committed (`afb3b55c` code, `6f03e1bd` docs) and every
-command in **Verification** passes. It is blocked at the **Matrix Test Audit** because two
-rows of the read-only I/O & Edge-Case Matrix are contradicted — not uncovered — by the
-shipped tests, and the code cannot be changed to satisfy them without breaking a third row.
-Relaxing a frozen intent-contract is not this session's call.
-
-### The disagreement
-
-`6-bound-image-upload-request-buffering.md:40` requires, for `Content-Length: 5242881` with
-any body: `413 before any read; \`reader.read()\` never called`.
-`6-bound-image-upload-request-buffering.md:43` requires, for a header that lies small:
-`Reader cancelled at the first chunk that crosses the cap`.
-`6-bound-image-upload-request-buffering.md:25` states it as `all before a single byte of
-body is read`, and `:26` as `on overflow call \`reader.cancel()\` and return 413`.
-
-The shipped handler instead drains and discards the refused body, and its own tests assert
-that: `supabase/functions/upload-love-note-image/handler.test.ts:227`
-`assertEquals(counts.pulls, chunks.length + 1);` and `:228`
-`assertEquals(counts.cancels, 0, 'a fully-consumed stream is already closed');`.
-
-Per step-03 the expectation must never be edited to match the code, so this is recorded as
-a blocker rather than absorbed into the Spec Change Log entry above.
-
-### Why "fix the code" is not available
-
-Re-measured in this session against the running local stack, independently of the
-implementation subagent, with a real worker bearer token:
-
-| Probe | Path exercised | Result |
-|---|---|---|
-| authed POST, 30 MiB body, `Content-Length: 31457280` (past `MAX_DISCARD_BYTES`, so the handler refuses **without reading**) | no-read refusal | `status=000 time=30.001610` — the 413 never reached the client |
-| authed POST, 5 242 881 B body (drain path) | drain-then-refuse | `413` in `0.080703 s`, body `{"error":"File too large",…,"actualSize":5242881}` |
-
-A control run first showed an unauthenticated 30 MiB POST returning 401 in 0.088 s, but its
-body was `{"code":"UNAUTHORIZED_NO_AUTH_HEADER",…}` — Kong's shape, not the handler's
-`{"error":"Missing authorization header"}` — so that request never reached the function and
-is not evidence either way.
-
-So on `supabase-edge-runtime 1.74.3` a response returned while the request body is still in
-flight is not delivered. That makes matrix row `:40` ("413 before any read") and matrix row
-`:45` ("Limit plus one … 413") mutually exclusive, and it makes the **Tasks** requirement of
-a passing local API row for "limit plus one" unreachable for any no-read implementation: the
-API spec would hang rather than observe a 413.
-
-### What a human needs to decide
-
-Whether the drain-and-discard form satisfies F10. It preserves the property
-`remediation.md:94` names — live memory stays one chunk regardless of body size, and the
-refusal decision is still taken from headers alone, before anything is read, allocated or
-retained. What it does not preserve is the matrix's literal "never reads". The alternatives
-are to amend rows `:40`/`:43` to the measured runtime behaviour, or to accept an
-undeliverable 413 and drop the "limit plus one" API row.
-
-### Verification evidence from this session (all re-run on the committed tree)
-
-- `deno test --no-lock supabase/functions/upload-love-note-image/` — **29 passed, 0 failed** (18 ms)
-- `npx playwright test --project=api tests/api/upload-love-note-image-limits.spec.ts --workers=1` — **6 passed** (6.6 s)
-- `npm run test:unit` — **112 files, 2090 passed**
-- `npm run typecheck` — clean, exit 0
-- `npm run lint` — **0 errors**, 3 pre-existing `EventCountdown.tsx` warnings (file untouched by this diff)
-
-### Also outstanding (independent of the block)
-
-`supabase functions deploy upload-love-note-image` was not run. The hosted function is still
-version 4 (pre-fix). This is a sequencing hold, not an access blocker — the CLI is
-authenticated and the project linked. The two hosted demonstrations the story owes are
-recorded as pending in **Verification → Outstanding**.
