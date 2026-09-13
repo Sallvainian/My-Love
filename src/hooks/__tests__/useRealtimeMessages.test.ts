@@ -43,6 +43,16 @@ vi.mock('../../api/supabaseClient', () => ({
   // this file driving the behaviour it always drove; the retry itself is
   // covered in supabaseClient's own tests, against lookupPartnerId.
   resolvePartnerIdForDelivery: (...args: unknown[]) => mocks.getPartnerId(...args),
+  // Derived from the same stub, so an id is `linked`, null is `unlinked`, and a
+  // rejection is the inconclusive `error` the refresh must not write back.
+  resolvePartnerLookupForDelivery: async (...args: unknown[]) => {
+    try {
+      const partnerId = await mocks.getPartnerId(...args);
+      return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
+    } catch (error) {
+      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+    }
+  },
 }));
 
 // Mock app store
@@ -499,6 +509,55 @@ describe('useRealtimeMessages', () => {
 
       // It must try again rather than accept the failed null as a snapshot.
       expect(mocks.getPartnerId).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the previous partner when a re-join refresh is inconclusive', async () => {
+      // The refresh clears the ref BEFORE its round-trip, deliberately. So an
+      // exhausted lookup that writes its null back leaves the ref null with
+      // nothing to re-arm it, and every later note is dropped for the life of
+      // the mount while the channel still reports healthy.
+      const { supabase } = await import('../../api/supabaseClient');
+
+      let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
+      let broadcastCallback: ((payload: unknown) => void) | null = null;
+      const mockChannel = {
+        on: vi.fn((type: string, options: { event?: string }, callback: (p: unknown) => void) => {
+          if (type === 'broadcast' && options?.event === 'new_message') {
+            broadcastCallback = callback;
+          }
+          return mockChannel;
+        }),
+        subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
+          if (callback) subscribeCallback = callback;
+          return mockChannel;
+        }),
+      };
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
+      const onNewMessage = vi.fn();
+      await act(async () => {
+        renderHook(() => useRealtimeMessages({ onNewMessage }));
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // First SUBSCRIBED consumes the fresh pre-join snapshot without refetching.
+      await act(async () => {
+        subscribeCallback?.('SUBSCRIBED');
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // The socket drops and rejoins; every attempt of the refresh fails.
+      mocks.getPartnerId.mockRejectedValueOnce(new Error('network down'));
+      await act(async () => {
+        subscribeCallback?.('SUBSCRIBED');
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // The partner the previous lookup resolved must still be in force.
+      await act(async () => {
+        broadcastCallback?.({ payload: { message: validNote() } });
+      });
+      expect(onNewMessage).toHaveBeenCalledTimes(1);
     });
 
     it('delivers a note that arrives immediately after the first SUBSCRIBED', async () => {
