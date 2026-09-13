@@ -196,6 +196,10 @@ jobs:
           # keeps Mailpit excluded, so the pull saving the exclusion list
           # documents is not re-spent nine times over.
           needs-mail: ${{ matrix.project == 'api' }}
+          # Same leg, different container: tests/api/upload-love-note-image-limits.spec.ts
+          # calls /functions/v1/upload-love-note-image, which Kong answers 503
+          # for unless the edge runtime is up.
+          needs-edge-functions: ${{ matrix.project == 'api' }}
 
       - name: Run ${{ matrix.project }} tests
         run: npx playwright test --project=${{ matrix.project }}

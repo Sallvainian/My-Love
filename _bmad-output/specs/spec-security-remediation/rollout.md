@@ -103,6 +103,19 @@ Open. The code half is done and verified on the local stack; the hosted half is 
 
 Full measurements are in `stories/5-enforce-partner-only-immutable-interactions.md` under **Verification**.
 
+### Edge Function — status after story 6 (2026-09-12)
+
+Open. The bounded handler is written and verified end to end on the local stack; it is not deployed.
+
+- **Done and verified locally.** `supabase/functions/upload-love-note-image/` now splits into a `Deno.serve` binding (`index.ts`) and an injectable `handleUpload(req, deps)` (`handler.ts`). The declared `Content-Length` decides 411 (absent), 400 (non-integer, negative, fractional, or past the safe-integer range) and 413 (over the 5 MiB cap) from headers alone; the body is then streamed with the running total checked *before* each chunk is retained, so a header that lies small still ends in 413. The unused multipart branch is gone and answered 415. `arrayBuffer()`, `formData()`, `text()` and `json()` are never called on the request.
+- **Two evidence surfaces.** `supabase/functions/upload-love-note-image/handler.test.ts` — 29 `deno test` cases asserting stream pull count, cancel count and Storage call count, not just status — and `tests/api/upload-love-note-image-limits.spec.ts` — 6 Playwright cases driving the real local endpoint through Kong and listing the uploader's Storage prefix before and after every refusal.
+- **Actual Content-Length behaviour, measured** (this row's requirement). A real Chromium on the dev server, issuing the exact call shape of `src/services/loveNoteImageService.ts:139-145` — Authorization plus `application/octet-stream`, a `Blob` body, no hand-set length — was answered **200**, not 411. The browser sets the header and it survives Kong. No bounded-stream-only exception is needed. The *hosted* gateway remains unmeasured.
+- **One deviation from the story contract, forced by the runtime and recorded there in full.** On `supabase-edge-runtime 1.74.3`, a response returned while the body is still in flight never reaches the client: a 5 MiB + 1 POST refused without reading hung until the client timeout, and so did `req.body.cancel()` and read-one-then-cancel; only a full drain delivered the 413. So an over-limit refusal now drains and **discards** what is left — live memory stays one chunk, which is the property F10 names — bounded by a 25 MiB ceiling and skipped entirely above it. Every other refusal still reads nothing.
+- **Still outstanding for closure.** `supabase functions deploy upload-love-note-image --project-ref xojempkrugifnaveqtqc`, then on the hosted endpoint: one supported upload through the app succeeds, and one `Content-Length: 5242881` request returns 413 with the bucket listing unchanged. The CLI is authenticated and the project linked — `supabase functions list` reports the hosted function at `version: 4`, `verify_jwt: true` — so this is a sequencing hold, not an access blocker: deploying from the loop branch would put unreviewed code into production ahead of the pull request. The first hosted check must be a real upload, because it is also the first measurement of whether the hosted gateway preserves `Content-Length`.
+- **Not in this story, by contract:** the per-isolate rate limiter, the upload formats, and the `love-notes-images` bucket policies are all untouched.
+
+Full measurements are in `stories/6-bound-image-upload-request-buffering.md` under **Verification**.
+
 ## Loop handoff
 
 The installed loop supports folder dispatch without creating a sprint-status file or changing the global policy:
