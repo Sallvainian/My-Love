@@ -35,6 +35,13 @@ jobs:
       contents: read
     outputs:
       app: ${{ steps.filter.outputs.app }}
+      # Per-stage gates. Each answers "could this change break THIS stage?", and
+      # each is a superset of what the stage actually reads — a gate that is
+      # wrong in the `false` direction skips a stage silently and ships the bug
+      # it would have caught, so every one of these errs toward `true`.
+      db: ${{ steps.filter.outputs.db }}
+      backend: ${{ steps.filter.outputs.backend }}
+      e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -47,33 +54,107 @@ jobs:
 
           # Only pull_request events have a base to diff against. Pushes to main,
           # the weekly cron and manual dispatches always run the full suite.
+          # `all` is the fail-safe writer: every gate true. Used for pushes to
+          # main, the weekly cron, manual dispatch and an unreadable diff, so a
+          # stage is never skipped on any path that lacks a base to reason from.
+          all() {
+            { echo "app=true"; echo "db=true"; echo "backend=true"; echo "e2e=true"; } >> "$GITHUB_OUTPUT"
+          }
+
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
-            echo "app=true" >> "$GITHUB_OUTPUT"
+            all
             echo "Event is ${{ github.event_name }} — running full suite"
             exit 0
           fi
 
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          # Both guarded: without `|| { all; exit 0; }` a transient fetch failure
+          # aborts under `set -e`, which reds the sole required check for a
+          # network blip. Falling back to the full suite is never wrong — it only
+          # costs time — whereas failing the check costs a re-run and a merge.
+          git fetch --no-tags origin "${{ github.base_ref }}" || {
+            echo "Base fetch failed — running full suite"; all; exit 0
+          }
+          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD") || {
+            echo "Diff against base failed — running full suite"; all; exit 0
+          }
           echo "Changed files:"
           echo "$CHANGED"
 
           # Fail safe: an empty diff runs everything rather than nothing.
           if [[ -z "$CHANGED" ]]; then
-            echo "app=true" >> "$GITHUB_OUTPUT"
+            all
             echo "Empty diff — running full suite"
             exit 0
           fi
 
           NON_DOCS=$(echo "$CHANGED" | grep -vE '(^docs/|^_bmad-output/|\.md$)' || true)
           if [[ -z "$NON_DOCS" ]]; then
-            echo "app=false" >> "$GITHUB_OUTPUT"
+            { echo "app=false"; echo "db=false"; echo "backend=false"; echo "e2e=false"; } >> "$GITHUB_OUTPUT"
             echo "Documentation-only change — app test stages will be skipped"
-          else
-            echo "app=true" >> "$GITHUB_OUTPUT"
-            echo "App-affecting files changed:"
-            echo "$NON_DOCS"
+            exit 0
           fi
+
+          echo "app=true" >> "$GITHUB_OUTPUT"
+          echo "App-affecting files changed:"
+          echo "$NON_DOCS"
+
+          # A herestring, NOT `echo "$NON_DOCS" | grep -qE`. Under `set -o
+          # pipefail` the pipe form is wrong in the dangerous direction: once the
+          # list exceeds the 64 KiB pipe buffer, `grep -q` exits at the first
+          # match and closes the pipe, the forked `echo` dies of SIGPIPE (141),
+          # pipefail propagates it, and `has` reports NO MATCH on a list that
+          # matched. Reproduced at 3,300 paths / 66 KB; every stage would then
+          # skip on a mass rename or formatting sweep. A herestring has no pipe
+          # and no second process, so the exit status is grep's alone.
+          has() { grep -qE "$1" <<<"$NON_DOCS"; }
+
+          # Anything touching the harness itself, dependencies or tooling config
+          # re-enables every stage: those change how the suites run, not just
+          # what they assert, so no per-stage reasoning about them is sound.
+          # `^\.?mise\.` matches both tracked pin files — `mise.lock` and
+          # `.mise.toml`; the leading dot on the latter is easy to miss.
+          # `^\.env` covers .env.test, which playwright.config.ts:174 documents
+          # as the environment the E2E dev server loads via `vite --mode test`.
+          INFRA='^\.github/|^package(-lock)?\.json$|^tsconfig|^vitest\.config|^playwright\.config|^tests/support/|^scripts/|^\.?mise\.|^\.nvmrc$|^\.env'
+          if has "$INFRA"; then
+            { echo "db=true"; echo "backend=true"; echo "e2e=true"; } >> "$GITHUB_OUTPUT"
+            echo "Harness/dependency/tooling change — all stages enabled"
+            exit 0
+          fi
+
+          # db-tests is pgTAP against the schema: only SQL, the Supabase config
+          # and the pgTAP files themselves can move it. Edge Function source
+          # cannot — pgTAP never invokes one.
+          DB='^supabase/(migrations|tests)/|^supabase/config\.toml$|^supabase/seed'
+          # backend-tests drives RPCs, Storage and the Edge Function over the
+          # wire, so it takes the DB set plus function source plus its own specs
+          # — plus `^src/`, which is not optional: six tests/api specs import
+          # runtime code from src/, three of them as values rather than types
+          # (`handleSupabaseError`/`isPostgrestError` from src/api/errorHandlers
+          # at empty-database-error-fallback.spec.ts:17 and
+          # check-constraint-error-mapping.spec.ts:52, `formatDateISO` from
+          # src/utils/dateUtils at events-read-window.spec.ts:46). Without it a
+          # src-only change skips the very specs that pin its behaviour, and
+          # lint/typecheck catch a signature break but never a behavioural one.
+          BACKEND="$DB|^supabase/functions/|^tests/(api|integration)/|^src/"
+          # e2e-tests drives the browser against the app and its database.
+          # supabase/functions/ is included deliberately even though no current
+          # tests/e2e spec exercises the upload path: the app does call it, the
+          # comment that asserted otherwise went stale once already, and a wrong
+          # `false` here is silent.
+          # `supabase/tests/` is excluded on purpose: pgTAP files are fixtures the
+          # browser app never loads, so they cannot move an E2E result. Every
+          # other supabase/ path can — migrations change the schema the app
+          # reads, config.toml changes the stack it talks to, and functions/ is
+          # reachable from the app even though no tests/e2e spec walks that path
+          # today.
+          E2E='^src/|^index\.html$|^public/|^vite\.config|^tailwind\.config|^postcss\.config|^tests/e2e/|^supabase/(migrations|functions)/|^supabase/config\.toml$|^supabase/seed'
+
+          for pair in "db:$DB" "backend:$BACKEND" "e2e:$E2E"; do
+            name=${pair%%:*}; pat=${pair#*:}
+            if has "$pat"; then echo "$name=true" >> "$GITHUB_OUTPUT"; else echo "$name=false" >> "$GITHUB_OUTPUT"; fi
+          done
+          echo "Gates: db=$(has "$DB" && echo true || echo false) backend=$(has "$BACKEND" && echo true || echo false) e2e=$(has "$E2E" && echo true || echo false)"
 
   # ============================================
   # Stage 1: Lint, Type Check
@@ -142,7 +223,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [changes]
-    if: needs.changes.outputs.app == 'true'
+    if: needs.changes.outputs.db == 'true'
     permissions:
       contents: read
     steps:
@@ -173,7 +254,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [changes]
-    if: needs.changes.outputs.app == 'true'
+    if: needs.changes.outputs.backend == 'true'
     permissions:
       contents: read
     strategy:
@@ -234,7 +315,7 @@ jobs:
     permissions:
       contents: read
     needs: [changes]
-    if: needs.changes.outputs.app == 'true'
+    if: needs.changes.outputs.e2e == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -327,8 +408,13 @@ jobs:
     permissions:
       contents: read
     needs: [changes]
+    # Gated on `e2e`, not `app`: this job burns in changed tests/e2e specs, and
+    # its own detection pattern (^tests/e2e/...\.(spec|test)\.) is a strict
+    # subset of the e2e gate's ^tests/e2e/, so a change that leaves `e2e` false
+    # cannot contain a spec for it to run. Without this, a tests/unit-only PR
+    # spins three runners through a fetch-depth:0 checkout just to skip.
     if: >-
-      needs.changes.outputs.app == 'true' &&
+      needs.changes.outputs.e2e == 'true' &&
       github.event_name == 'pull_request' &&
       github.base_ref == 'main'
     strategy:
@@ -512,19 +598,39 @@ jobs:
             exit 0
           fi
 
-          echo "Lint:              ${{ needs.lint.result }}"
-          echo "Unit Tests:        ${{ needs.unit-tests.result }}"
-          echo "DB Tests:          ${{ needs.db-tests.result }}"
-          echo "Backend Tests:     ${{ needs.backend-tests.result }}"
-          echo "E2E Tests:         ${{ needs.e2e-tests.result }}"
+          # A stage that was gated off reports `skipped` — and so does a stage
+          # that never ran because something upstream broke. Those must not be
+          # conflated: `check` accepts `skipped` ONLY when this change's gate for
+          # that stage was false. A stage whose gate was true and which did not
+          # succeed fails the build, whatever the reason.
+          rc=0
+          check() {   # <label> <result> <gate>
+            local label="$1" result="$2" gate="$3"
+            if [[ "$gate" != "true" ]]; then
+              if [[ "$result" == "skipped" || "$result" == "success" ]]; then
+                echo "$label: $result (not affected by this change)"
+                return
+              fi
+              echo "$label: FAILED — gate was '$gate' but result is '$result'"
+              rc=1
+              return
+            fi
+            if [[ "$result" != "success" ]]; then
+              echo "$label: FAILED — required for this change, result is '$result'"
+              rc=1
+              return
+            fi
+            echo "$label: success"
+          }
+
+          check "Lint"          "${{ needs.lint.result }}"          "${{ needs.changes.outputs.app }}"
+          check "Unit Tests"    "${{ needs.unit-tests.result }}"    "${{ needs.changes.outputs.app }}"
+          check "DB Tests"      "${{ needs.db-tests.result }}"      "${{ needs.changes.outputs.db }}"
+          check "Backend Tests" "${{ needs.backend-tests.result }}" "${{ needs.changes.outputs.backend }}"
+          check "E2E Tests"     "${{ needs.e2e-tests.result }}"     "${{ needs.changes.outputs.e2e }}"
           echo "Burn-In:           ${{ needs.burn-in.result }}"
 
-          # Check standard jobs
-          if [[ "${{ needs.lint.result }}" != "success" ]] || \
-             [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
-             [[ "${{ needs.db-tests.result }}" != "success" ]] || \
-             [[ "${{ needs.backend-tests.result }}" != "success" ]] || \
-             [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
+          if [[ "$rc" -ne 0 ]]; then
             echo "One or more standard stages failed"
             exit 1
           fi
