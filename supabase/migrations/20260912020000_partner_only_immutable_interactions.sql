@@ -84,6 +84,11 @@ create policy "interactions_sender_to_partner_insert"
   with check (
     from_user_id = (select auth.uid())
     and to_user_id = public.get_my_partner_id()
+    -- A row may not arrive already read. `getUnviewedInteractions` filters on
+    -- `viewed = false`, so a sender who inserts `viewed: true` delivers a poke
+    -- that never reaches the recipient's unread badge. The client always sends
+    -- `false`, so this constrains nothing it does.
+    and viewed = false
   );
 
 -- ============================================
@@ -107,7 +112,15 @@ create policy "interactions_recipient_marks_viewed"
 -- ============================================
 revoke all on public.interactions from anon, authenticated;
 
-grant select, insert on public.interactions to authenticated;
+grant select on public.interactions to authenticated;
+-- Column-scoped, like the UPDATE grant below and for the same reason: a
+-- table-level INSERT grant lets the caller name `created_at`, and the ordering
+-- in `getInteractionHistory` is `created_at desc`, so a row inserted with a
+-- far-future timestamp pins itself to the top of the feed permanently. The
+-- column is omitted here so its default applies and the value is the server's.
+-- `id` stays grantable: the client leaves it to the default, but
+-- tests/api/interaction-authorization.spec.ts supplies its own.
+grant insert (id, type, from_user_id, to_user_id, viewed) on public.interactions to authenticated;
 grant update (viewed) on public.interactions to authenticated;
 
 commit;

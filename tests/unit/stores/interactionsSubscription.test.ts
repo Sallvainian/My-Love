@@ -521,4 +521,51 @@ describe('interactionsSlice subscription bridge', () => {
     expect(store.getState().interactions).toEqual([]);
     expect(JSON.stringify(store.getState())).not.toContain('late-poke');
   });
+
+  it('keeps a late KISS out of the new account feed too', async () => {
+    // The kiss guard was reachable with the whole suite green: its only other
+    // test covers the NoPartnerError rejection, never the post-await account
+    // switch, so deleting the guard cost nothing.
+    const store = createTestStore();
+    let releaseSend: ((record: SupabaseInteractionRecord) => void) | undefined;
+    sendKiss.mockImplementation(
+      () => new Promise<SupabaseInteractionRecord>((resolve) => { releaseSend = resolve; })
+    );
+
+    const pending = store.getState().sendKiss();
+    await vi.waitFor(() => expect(releaseSend).toBeDefined());
+
+    store.getState().setAuthUser(OTHER_USER_ID);
+    const record = interaction('late-kiss', { from_user_id: USER_ID, to_user_id: OTHER_USER_ID });
+    releaseSend!(record);
+
+    await expect(pending).resolves.toBe(record);
+    expect(store.getState().interactions).toEqual([]);
+    expect(JSON.stringify(store.getState())).not.toContain('late-kiss');
+  });
+
+  it('refuses the snapshot when the SAME account signs out and back in mid-lookup', async () => {
+    // `authSessionVersion`, not `userId`, is what catches this: the id matches
+    // again by the time the lookup resolves. The existing guard tests use
+    // clearAuth() alone, which nulls userId, so the version clause was
+    // deletable with the suite green.
+    const store = createTestStore();
+    let releaseLookup: ((partnerId: string | null) => void) | undefined;
+    resolvePartnerId.mockImplementation(
+      () => new Promise<string | null>((resolve) => { releaseLookup = resolve; })
+    );
+
+    const pending = store.getState().subscribeToInteractions(vi.fn());
+    await vi.waitFor(() => expect(releaseLookup).toBeDefined());
+
+    // Out and back in as the SAME account: userId ends up identical, the
+    // session version does not.
+    store.getState().clearAuth();
+    store.getState().setAuthUser(USER_ID);
+
+    releaseLookup!(OTHER_USER_ID);
+    await pending.catch(() => undefined);
+
+    expect(store.getState().interactionPartnerId).toBeNull();
+  });
 });
