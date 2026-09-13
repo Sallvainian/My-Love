@@ -16,12 +16,17 @@ test.describe('Interaction record ownership', () => {
     '[P0] DW-75-E2E-001 rejects old records while signed out and after the same account returns',
     async ({ page, interactionOwnership }) => {
       const userId = randomUUID();
-      const existing = createInteractionRecord({ to_user_id: userId });
-      const current = createInteractionRecord({ to_user_id: userId, type: 'kiss' });
+      const partnerId = randomUUID();
+      const existing = createInteractionRecord({ from_user_id: partnerId, to_user_id: userId });
+      const current = createInteractionRecord({
+        from_user_id: partnerId,
+        to_user_id: userId,
+        type: 'kiss',
+      });
       const badge = page.getByTestId('notification-badge');
 
       await log.step('Show an interaction from the initial authentication lifetime');
-      await interactionOwnership.mount(userId);
+      await interactionOwnership.mount(userId, partnerId);
       await expect(page.getByRole('button', { name: 'Open actions' })).toBeVisible();
       await interactionOwnership.dispatch(0, existing);
       const initial = await interactionOwnership.snapshot();
@@ -32,7 +37,10 @@ test.describe('Interaction record ownership', () => {
 
       await log.step('Sign out through authSlice and deliver a still-callable old record');
       await interactionOwnership.clearAuth();
-      await interactionOwnership.dispatch(0, createInteractionRecord({ to_user_id: userId }));
+      await interactionOwnership.dispatch(
+        0,
+        createInteractionRecord({ from_user_id: partnerId, to_user_id: userId })
+      );
       expect(await interactionOwnership.snapshot()).toMatchObject({
         userId: null,
         authSessionVersion: initial.authSessionVersion + 1,
@@ -44,7 +52,10 @@ test.describe('Interaction record ownership', () => {
 
       await log.step('Return to the same account without cleaning up its old callback');
       await interactionOwnership.setAuthUser(userId);
-      await interactionOwnership.dispatch(0, createInteractionRecord({ to_user_id: userId }));
+      await interactionOwnership.dispatch(
+        0,
+        createInteractionRecord({ from_user_id: partnerId, to_user_id: userId })
+      );
       expect(await interactionOwnership.snapshot()).toMatchObject({
         userId,
         authSessionVersion: initial.authSessionVersion + 2,
@@ -68,8 +79,21 @@ test.describe('Interaction record ownership', () => {
         createdAt: current.created_at,
       }]);
       expect(accepted.unviewedCount).toBe(1);
-      await interactionOwnership.dispatch(0, createInteractionRecord({ to_user_id: userId }));
+      await interactionOwnership.dispatch(
+        0,
+        createInteractionRecord({ from_user_id: partnerId, to_user_id: userId })
+      );
       expect(await interactionOwnership.snapshot()).toEqual(accepted);
+
+      await log.step('Refuse a record from somebody who is not the current partner');
+      // The live subscription accepts this account's traffic, so the only thing
+      // that can refuse this record is the partner check (CAP-4).
+      await interactionOwnership.dispatch(
+        currentSubscription,
+        createInteractionRecord({ from_user_id: randomUUID(), to_user_id: userId })
+      );
+      expect(await interactionOwnership.snapshot()).toEqual(accepted);
+
       await expect(badge).toHaveText('1');
       await expect(badge).toHaveAttribute('aria-label', '1 unviewed interaction');
     }
@@ -80,12 +104,15 @@ test.describe('Interaction record ownership', () => {
     async ({ page, interactionOwnership }) => {
       const userA = randomUUID();
       const userB = randomUUID();
-      const beforeSwitch = createInteractionRecord({ to_user_id: userA });
+      // A's partner is a third account; B's partner is A. Each account's
+      // snapshot is taken when it subscribes.
+      const partnerOfA = randomUUID();
+      const beforeSwitch = createInteractionRecord({ from_user_id: partnerOfA, to_user_id: userA });
       const current = createInteractionRecord({ from_user_id: userA, to_user_id: userB });
       const badge = page.getByTestId('notification-badge');
 
       await log.step('Populate account A before switching directly to B');
-      await interactionOwnership.mount(userA);
+      await interactionOwnership.mount(userA, partnerOfA);
       await interactionOwnership.dispatch(0, beforeSwitch);
       const initial = await interactionOwnership.snapshot();
       expect(initial.interactions.map(({ id }) => id)).toEqual([beforeSwitch.id]);
@@ -93,7 +120,11 @@ test.describe('Interaction record ownership', () => {
       await expect(badge).toHaveAttribute('aria-label', '1 unviewed interaction');
 
       await interactionOwnership.setAuthUser(userB);
-      await interactionOwnership.dispatch(0, createInteractionRecord({ to_user_id: userA }));
+      await interactionOwnership.setPartnerId(userA);
+      await interactionOwnership.dispatch(
+        0,
+        createInteractionRecord({ from_user_id: partnerOfA, to_user_id: userA })
+      );
       expect(await interactionOwnership.snapshot()).toMatchObject({
         userId: userB,
         authSessionVersion: initial.authSessionVersion + 1,
@@ -125,7 +156,10 @@ test.describe('Interaction record ownership', () => {
           { userId: userB, cleanupCalls: 0 },
         ],
       });
-      await interactionOwnership.dispatch(0, createInteractionRecord({ to_user_id: userA }));
+      await interactionOwnership.dispatch(
+        0,
+        createInteractionRecord({ from_user_id: partnerOfA, to_user_id: userA })
+      );
       expect(await interactionOwnership.snapshot()).toEqual(accepted);
       await expect(badge).toHaveText('1');
       await expect(badge).toHaveAttribute('aria-label', '1 unviewed interaction');
@@ -136,18 +170,24 @@ test.describe('Interaction record ownership', () => {
     '[P1] DW-75-E2E-003 preserves records and delivery through same-user refresh without duplicate counts',
     async ({ page, interactionOwnership }) => {
       const userId = randomUUID();
-      const existing = createInteractionRecord({ to_user_id: userId });
+      const partnerId = randomUUID();
+      const existing = createInteractionRecord({ from_user_id: partnerId, to_user_id: userId });
       const fresh = createInteractionRecord({
+        from_user_id: partnerId,
         to_user_id: userId,
         type: 'kiss',
         viewed: null,
         created_at: '2026-09-12T03:00:00.000Z',
       });
-      const viewed = createInteractionRecord({ to_user_id: userId, viewed: true });
+      const viewed = createInteractionRecord({
+        from_user_id: partnerId,
+        to_user_id: userId,
+        viewed: true,
+      });
       const badge = page.getByTestId('notification-badge');
 
       await log.step('Keep an existing unread interaction across a same-user auth refresh');
-      await interactionOwnership.mount(userId);
+      await interactionOwnership.mount(userId, partnerId);
       await interactionOwnership.dispatch(0, existing);
       const initial = await interactionOwnership.snapshot();
       expect(initial.interactions.map(({ id }) => id)).toEqual([existing.id]);

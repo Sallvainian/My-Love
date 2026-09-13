@@ -63,6 +63,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   interactions: [],
   unviewedCount: 0,
   isSubscribed: false,
+  interactionPartnerId: null,
   session: null,
   scriptureLoading: false,
   isSyncing: false,
@@ -295,6 +296,9 @@ describe('clearAuth on sign-out', () => {
     expect(state.selectedPhotoId).toBeNull();
     expect(state.interactions).toEqual([]);
     expect(state.unviewedCount).toBe(0);
+    // The partner snapshot names the previous couple: a stale one would let
+    // the next account accept that couple's incoming traffic.
+    expect(state.interactionPartnerId).toBeNull();
     expect(state.activeSession).toBeNull();
   });
 
