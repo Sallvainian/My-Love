@@ -864,3 +864,112 @@ reason: Reproduced with TZ=America/Nuuk: local 2026-03-27 23:30 plus one day usi
 status: done 2026-09-12
 resolution: resolved by sweep bundle dw-event-helper-calendar-day-offsets
 resolution-undo: f1f54829eeec8a92362ccf7d56827785f3782bece2e52d1232ce15cc31764d98 2026-09-12 7374617475733a206f70656e
+
+### DW-85: The forward DELETE migration is only ever verified on a fresh replay, where the row it deletes never exists.
+origin: spec-deferred ee22b3cb6330
+location: supabase/migrations/20260912000000_remove_claude_bot_password_row.sql:13
+source_spec: `1-contain-the-exposed-bot-credential.md`
+severity: low
+reason: supabase/tests/database/22_claude_bot_config_no_secret.sql runs against a db reset database whose edited seed never inserts test_password, so the DELETE in 20260912000000_remove_claude_bot_password_row.sql matches nothing there; the migration was hand-verified inside a rolled-back transaction (insert placeholder row, apply, before=1 after=0) and the repo has no pattern for replaying one migration against pre-seeded state. Settle by running `select count(*) from public.claude_bot_config where key = 'test_password'` against the linked project after the next deploy and expecting 0.
+status: open
+
+### DW-86: AGENTS.md carries no durable prose about the bot credential being provisioned out of band or the rotation command.
+origin: spec-deferred 77116e136280
+location: AGENTS.md (Running and verifying)
+source_spec: `1-contain-the-exposed-bot-credential.md`
+severity: low
+reason: AGENTS.md says durable prose goes in that block, but the rotation procedure (fnox set -p age CLAUDE_BOT_PASSWORD, then fnox exec -- node scripts/provision-claude-bot.mjs) lives only in script and migration comments and an out-of-repo memory note. Fix edits an agent-context file, so it is recorded rather than applied here.
+status: open
+
+### DW-87: The retry's re-subscribe cannot rejoin an errored channel at all, because the SDK gates the whole of subscribe() on the channel already being closed.
+origin: spec-deferred 7f2be02c1cc5
+location: src/hooks/useRealtimeMessages.ts:190-196
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+severity: medium
+reason: node_modules/@supabase/realtime-js/dist/module/RealtimeChannel.js:134 wraps the entire join body in `if (this.channelAdapter.isClosed())` and otherwise returns `this`. After a CHANNEL_ERROR the state is `errored`, not closed, so the retry at useRealtimeMessages.ts is a no-op however many times it fires. Pre-existing and untouched by this story: the baseline retry had the identical shape, and passing `handleStatus` (patched this pass) fixes only the reporting half. Settle by removing and reopening the channel on retry rather than re-subscribing the same object, with a test that drives a real CHANNEL_ERROR.
+status: open
+
+### DW-88: getPartnerId() returning null for a transient error is indistinguishable from "unlinked", and would drop every note and mood for the life of the channel.
+origin: spec-deferred 2f395306ff06
+location: src/api/supabaseClient.ts:128-136
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+reason: src/api/supabaseClient.ts:128-136 returns null on any PostgREST error, and both receivers treat a null snapshot as "trust nothing". A snapshot taken at join would then stay null until the next SUBSCRIBED. I could not show the program reaches this: the users query and the Realtime socket address the same host, so a network failure denies the join too and the retry path runs. Settle by reproducing a PostgREST-only failure (for example a 500 injected at /rest/v1/users) while the websocket stays healthy, and observing whether notes stop arriving.
+status: open
+
+### DW-89: The Array.isArray guard was adopted at the three broadcast-facing mood sites and not at the four siblings that share the identical idiom.
+origin: spec-deferred c4d4e08547c9
+location: src/stores/slices/moodSlice.ts:384
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+severity: low
+reason: src/stores/slices/moodSlice.ts:384, src/components/MoodHistory/MoodDetailModal.tsx:91, src/components/MoodHistory/CalendarDay.tsx:72 and src/components/MoodTracker/MoodTracker.tsx:170 still use `x && x.length > 0` ahead of an unconditional MOOD_CONFIG[allMoods[0]] deref. No broadcast reaches them: moodSlice's transform consumes moodApi.fetchByUser output, already parsed by MoodArraySchema, and the MoodHistory pair read the offline-first IndexedDB path. Pre-existing hardening rather than a hole this story opened. Settle by deciding whether the IndexedDB read path needs the same guard and covering it in the shape of src/components/MoodTracker/__tests__/moodArrayGuards.test.tsx.
+status: open
+
+### DW-90: No E2E drives the app's own Realtime clients in a browser against the new policies; live evidence stops at the raw SDK.
+origin: spec-deferred 4e2d371094d1
+location: tests/e2e/notes/love-notes.spec.ts
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+severity: low
+reason: tests/api/couple-broadcast-authorization.spec.ts builds its own createClient identities and calls join()/httpSend() directly; it imports neither useRealtimeMessages, moodSyncService, sendEphemeralBroadcast nor the store, and tests/e2e/notes/love-notes.spec.ts and tests/e2e/partner/partner-mood.spec.ts mention neither realtime nor broadcast. The policy predicates themselves are measured because the spec builds the same topic strings and the same session-based clients, but the composition shipped to users is covered only by mocked unit tests. Pre-existing for both features. Settle with a two-context E2E in the shape of the togetherMode scripture specs.
+status: open
+
+### DW-91: An effect re-run that lands while the previous run's un-awaited removeChannel is still deregistering is handed the dying channel.
+origin: spec-deferred 76257cdda80f
+location: src/hooks/useRealtimeMessages.ts:215-232
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+severity: low
+reason: useRealtimeMessages' cleanup calls supabase.removeChannel without awaiting it, and src/api/realtimeSocket.ts documents that the registry entry is dropped later still, from the _onClose hook, so supabase.channel(topic) in the replacement run can return the leaving object whose subscribe() is a silent no-op. Pre-existing: the baseline cleanup had the same shape, and the new `cancelled` guard covers only the subscribe-after-unmount half. Settle by awaiting the leave the way moodSyncService's closingMoodChannels registry does.
+status: open
+
+### DW-92: getSignedInUserId() returning null for a transient getSession error is read as "the account changed", which mutes the mood channel until a fresh subscriber re-arms it.
+origin: spec-deferred e08d417d905d
+location: src/api/supabaseClient.ts:81-92
+source_spec: `2-authorize-and-validate-couple-broadcasts.md`
+reason: src/api/supabaseClient.ts:81-92 returns null on any getSession error or throw, and refreshChannelIdentity (src/api/moodSyncService.ts:455-460) treats `null !== entry.ownerUserId` as an account change and nulls the partner snapshot. Only the next SUBSCRIBED or a new subscriber's `entry.partnerId = partnerIdAtJoin` restores it, and an already-joined channel emits no further SUBSCRIBED. I could not show the program reaches this: refreshChannelIdentity runs only from the SUBSCRIBED arm, i.e. moments after the same session authorized the private join, so a session read that fails while that join succeeds is not demonstrated. Same shape as the getPartnerId ambiguity already recorded. Settle by injecting a getSession failure while the websocket stays healthy and observing whether partner moods stop arriving.
+status: open
+
+### DW-93: The PKCE callback is never exercised against the deployed site: no real Google consent round-trip, and the hosted redirect-URL allow list was not read.
+origin: spec-deferred 5ada678c7e15
+location: src/api/auth/actionService.ts:119 (redirectTo) / hosted project xojempkrugifnaveqtqc
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+severity: medium
+reason: The hosted project issues the PKCE authorize redirect (measured: HTTP 302 to accounts.google.com with response_type=code), but completing consent needs a Google account this session does not hold and no authorized integration provides. Separately, /auth/v1/authorize does not validate redirect_to up front -- a deliberately bogus https://not-allowed.example.com/steal returned the same 302 with no error parameter -- so the allow list is not readable from here and the Supabase MCP exposes no auth settings endpoint. The local substitute (tests/api/pkce-code-exchange.spec.ts) mints a real GoTrue code and proves only the initiating client redeems it. Settle by completing one real Google sign-in on https://sallvainian.github.io/My-Love/ after deploy.yml ships this, confirming the session lands and the URL returns with ?code=.
+status: open
+
+### DW-94: A PKCE sign-in cannot complete where localStorage is unavailable, which the previous implicit flow tolerated.
+origin: spec-deferred 33150c174af6
+location: src/api/supabaseClient.ts:59
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+severity: low
+reason: With site data blocked or in a private window, supportsLocalStorage() is false and the SDK falls back to an in-memory store, which a full-page redirect to the provider wipes along with the verifier; the returning ?code= then finds nothing and is ignored. Under the old implicit flow the fragment carried the tokens, so the same browser signed in for that tab. Password sign-in is unaffected either way. Not fixed here: a cookie or sessionStorage adapter is new storage surface rather than a direct correction. Settle by deciding whether a private-window Google sign-in is supported, then adding an adapter or a stated limitation.
+status: open
+
+### DW-95: A code callback that finds no verifier is ignored in silence, with nothing shown to the person who just came back from the provider.
+origin: spec-deferred f540b6e377f9
+location: src/App.tsx:229-296
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+severity: low
+reason: GoTrueClient.js:3356-3366 classifies such a URL as not-a-callback, so _initialize falls through to _recoverAndRefresh and the app renders the login screen with no explanation; measured in tests/unit/api/supabaseClientAuthFlow.test.ts, which asserts exactly that silence. Recoverable -- signing in again from this browser works -- and the fix is user-facing callback handling, which the story's contract excludes ("Never: add ... an exchangeCodeForSession call of our own"). Settle by deciding whether a "finish sign-in in the browser you started in" message is wanted, and where it would live given that the SDK owns callback classification.
+status: open
+
+### DW-96: The provider-denial callback is as silent as the missing-verifier one, and only the second was recorded.
+origin: spec-deferred 34a72182aa5f
+location: src/App.tsx:229-296
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+severity: low
+reason: GoTrueClient.js:3252-3259 throws AuthImplicitGrantRedirectError for any `#error=` URL before the flowType switch, _initialize returns it at :417, and nothing in src/App.tsx:229-296 reads _initialize's return value -- so a user who declines Google consent lands on the login screen with no explanation. Pre-existing: the implicit flow behaved identically, so this story neither caused nor changed it. The unit case "preserves an existing session for an error callback" asserts the session and the request count, never the returned error. Settle together with the missing-verifier silence: decide whether a "sign-in was cancelled" message is wanted, and where it lives given that the SDK owns callback classification.
+status: open
+
+### DW-97: Every redirect_to assertion runs where BASE_URL is "/", so the production "/My-Love/" base path is pinned nowhere.
+origin: spec-deferred 90661930e678
+location: tests/unit/api/supabaseClientAuthFlow.test.ts / tests/e2e/auth/google-oauth.spec.ts
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+severity: low
+reason: vite.config.ts:11 is `base: mode === 'production' ? '/My-Love/' : '/'` and playwright.config.ts:178 boots the dev server with `npx vite --mode test`, so both new assertions -- the unit case's `redirect_to` equality and the E2E's `appBaseUrl + '/'` -- only ever observe `/`. The byte-for-byte requirement the story pins is therefore verified at local origins alone. Not fixable from this session for the same reason the deployed-site verification is not. Recorded separately rather than folded into that entry, because the triage log of the previous pass said it had been grouped there and the text does not carry it. Settle by asserting the authorize URL's `redirect_to` once against a production-mode build, or by reading it during the outstanding deployed-site sign-in.
+status: open
+
+### DW-98: Whether an installed PWA returns from Google consent into the same storage partition that wrote the verifier was not established.
+origin: spec-deferred 194da630c317
+location: src/api/supabaseClient.ts:59-77
+source_spec: `3-require-browser-initiated-auth-callbacks.md`
+reason: Unverified. vite.config.ts:71 declares `display: 'standalone'`, and signInWithGoogle navigates the current context with window.location.href, which on the platforms checked keeps the round trip inside the app's own context and storage. What was not measured is an actual installed-PWA Google sign-in on a platform that hands OAuth to a separate browser context: there the returning `?code=` would find no verifier and be ignored, where the old implicit fragment carried the tokens themselves. Same failure mode as the private-window entry, a different trigger. Settle by completing one Google sign-in from the installed PWA on iOS and Android after deploy; if it fails, the fix is a storage adapter or a stated limitation, not a change to the flow type.
+status: open

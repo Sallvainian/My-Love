@@ -661,11 +661,16 @@ interface MoodCardProps {
   formatDate: (date: string) => string;
 }
 
-const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCardProps) {
+export const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCardProps) {
   const { mood, date, note, timestamp } = moodEntry;
 
-  // Read moods array, fall back to [mood] for legacy entries
-  const allMoods = moodEntry.moods && moodEntry.moods.length > 0 ? moodEntry.moods : [mood];
+  // Read moods array, fall back to [mood] for legacy entries.
+  //
+  // Array.isArray, not a truthy check. `MOOD_CONFIG[allMoods[0]]` below is
+  // dereferenced unconditionally, so a non-array `moods` took the whole view
+  // down: a string yields a single character, a number yields undefined, and
+  // either way `primaryConfig.icon` throws.
+  const allMoods = Array.isArray(moodEntry.moods) && moodEntry.moods.length > 0 ? moodEntry.moods : [mood];
 
   const primaryConfig = MOOD_CONFIG[allMoods[0]];
   const PrimaryIcon = primaryConfig.icon;

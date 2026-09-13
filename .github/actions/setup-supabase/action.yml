@@ -5,7 +5,23 @@ inputs:
   supabase-version:
     description: 'Supabase CLI version to install'
     required: false
-    default: '2.77.1'
+    # 2.117.0, not 2.77.1: the CLI's bundled Realtime image is what serves the
+    # REST broadcast endpoint `src/api/ephemeralBroadcast.ts:120` now sends on,
+    # and that route landed in Realtime v2.97.0. 2.77.1 predates it, so every
+    # `httpSend` in tests/api/couple-broadcast-authorization.spec.ts answered
+    # `the endpoint returned 404` while the same specs passed locally against
+    # the image 2.117.0 pulls (public.ecr.aws/supabase/realtime:v2.124.4).
+    # Keep this at or above the CLI the suite is developed against; a CI pin
+    # behind it silently tests a different Realtime than the app ships for.
+    default: '2.117.0'
+  needs-mail:
+    description: >-
+      Start the Mailpit catcher for jobs whose specs read a real auth email.
+      Default false: only one job needs mail, and the exclusion list below is
+      shared by ten, so making this opt-in keeps the other nine off the
+      rate-limited pull path.
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -31,19 +47,55 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        base="https://github.com/supabase/cli/releases/download/v${{ inputs.supabase-version }}"
+        ver="${{ inputs.supabase-version }}"
+        base="https://github.com/supabase/cli/releases/download/v$ver"
+
+        # The release layout is not stable across versions, so probe instead of
+        # assuming. v2.77.1 publishes an UNversioned tarball
+        # (supabase_linux_amd64.tar.gz) beside a VERSIONED checksums file
+        # (supabase_2.77.1_checksums.txt); v2.117.0 inverts both -- versioned
+        # tarball, plain checksums.txt -- and a hardcoded pair 404s on one
+        # version or the other. The 404 is silent under -fsSL, so it surfaces
+        # three jobs later as `supabase: command not found`.
+        #
         # --max-time bounds a single attempt; --retry-max-time bounds the
         # whole retry loop. Without the latter, 5 retries of a hanging
         # endpoint could outlast the 15-minute job timeout this defends.
-        curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
-          --max-time 60 --retry-max-time 180 \
-          -o /tmp/supabase_linux_amd64.tar.gz "$base/supabase_linux_amd64.tar.gz"
-        curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
-          --max-time 20 --retry-max-time 60 \
-          -o /tmp/supabase_checksums.txt "$base/supabase_${{ inputs.supabase-version }}_checksums.txt"
-        (cd /tmp && grep 'supabase_linux_amd64.tar.gz$' supabase_checksums.txt | sha256sum -c -)
+        dl() {
+          curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
+            --max-time "$2" --retry-max-time "$3" -o "$4" "$base/$1"
+        }
+
+        tarball=""
+        for name in "supabase_${ver}_linux_amd64.tar.gz" "supabase_linux_amd64.tar.gz"; do
+          if dl "$name" 60 180 /tmp/supabase_cli.tar.gz; then tarball="$name"; break; fi
+        done
+        if [ -z "$tarball" ]; then
+          echo "::error::No linux_amd64 tarball found in supabase/cli release v$ver under either known name."
+          exit 1
+        fi
+
+        sums=""
+        for name in "checksums.txt" "supabase_${ver}_checksums.txt"; do
+          if dl "$name" 20 60 /tmp/supabase_checksums.txt; then sums="$name"; break; fi
+        done
+        if [ -z "$sums" ]; then
+          echo "::error::No checksums file found in supabase/cli release v$ver under either known name."
+          exit 1
+        fi
+
+        # The checksums file names the asset exactly as published, so match on
+        # the tarball name that actually downloaded, and fail loudly if that
+        # name is absent rather than piping an empty list into sha256sum.
+        if ! grep -q "  ${tarball}\$" /tmp/supabase_checksums.txt; then
+          echo "::error::$sums does not list $tarball; refusing to install an unverified binary."
+          exit 1
+        fi
+        cp /tmp/supabase_cli.tar.gz "/tmp/$tarball"
+        (cd /tmp && grep "  ${tarball}\$" supabase_checksums.txt | sha256sum -c -)
+
         mkdir -p ~/.local/bin
-        tar -xzf /tmp/supabase_linux_amd64.tar.gz -C ~/.local/bin supabase
+        tar -xzf /tmp/supabase_cli.tar.gz -C ~/.local/bin supabase
         chmod +x ~/.local/bin/supabase
 
     - name: Add Supabase CLI to PATH
@@ -80,8 +132,16 @@ runs:
     #   studio        dev UI; nothing in src/ or tests/ references port 54323.
     #   postgres-meta studio's backend, gated SEPARATELY in the CLI, so excluding
     #                 studio alone would still pull this. Both names are required.
-    #   mailpit       no mail is ever sent: auth.email enable_confirmations is off
-    #                 and global-setup.ts mints users with email_confirm: true.
+    #   mailpit       excluded for every job EXCEPT the one that passes
+    #                 needs-mail: true. tests/api/pkce-code-exchange.spec.ts
+    #                 starts a real PKCE flow with signInWithOtp and reads the
+    #                 sign-in link back out of the catcher, so GoTrue has mail
+    #                 to deliver there and the catcher must be up; config.toml
+    #                 leaves [auth.email.smtp] commented out, so that container
+    #                 is the only mail path. It stays excluded elsewhere because
+    #                 the pull cost above is per-job and only Backend Tests (api)
+    #                 reads mail. If that spec ever stops sending mail, drop the
+    #                 input and put mailpit back on the unconditional list.
     #   edge-runtime  biggest single saving. The only caller is
     #                 loveNoteImageService.ts (/functions/v1/upload-love-note-image),
     #                 reached only when a love note carries an image, and no
@@ -105,7 +165,12 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        EXCLUDE='studio,postgres-meta,mailpit,edge-runtime,imgproxy'
+        # Rebuilt per job rather than hardcoded: mailpit is excluded unless the
+        # caller asked for it, so nine of the ten jobs keep the saving.
+        EXCLUDE='studio,postgres-meta,edge-runtime,imgproxy'
+        if [ "${{ inputs.needs-mail }}" != "true" ]; then
+          EXCLUDE="$EXCLUDE,mailpit"
+        fi
 
         # `|| true` so a non-zero `--help` reaches the -z branch below and reports
         # the annotated error, rather than `set -e` aborting the step with nothing

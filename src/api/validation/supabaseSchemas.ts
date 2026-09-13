@@ -17,7 +17,7 @@ import { z } from 'zod/v4';
 /**
  * UUID schema for Supabase record IDs
  */
-const UUIDSchema = z.string().uuid('Invalid UUID format');
+export const UUIDSchema = z.string().uuid('Invalid UUID format');
 
 /**
  * ISO timestamp schema for Supabase timestamps
@@ -28,7 +28,7 @@ const UUIDSchema = z.string().uuid('Invalid UUID format');
  * - Timezone without colon: 2025-01-15T10:30:00+00
  * - Timezone with colon: 2025-01-15T10:30:00+00:00
  */
-const TimestampSchema = z.string().refine(
+export const TimestampSchema = z.string().refine(
   (val) => {
     // Accept various PostgreSQL/ISO 8601 formats
     // Required: YYYY-MM-DDTHH:MM:SS

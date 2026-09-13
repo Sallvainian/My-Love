@@ -1,6 +1,12 @@
 name: 'Setup Playwright E2E'
 description: 'Cache browsers, install deps, start Supabase, and install Playwright for E2E tests'
 
+inputs:
+  needs-mail:
+    description: 'Forwarded to setup-supabase: start the Mailpit catcher for specs that read a real auth email.'
+    required: false
+    default: 'false'
+
 runs:
   using: 'composite'
   steps:
@@ -18,6 +24,8 @@ runs:
 
     - name: Setup Supabase Local
       uses: ./.github/actions/setup-supabase
+      with:
+        needs-mail: ${{ inputs.needs-mail }}
 
     - name: Install Playwright browsers
       if: steps.pw-cache.outputs.cache-hit != 'true'
