@@ -99,12 +99,46 @@ export async function assertLocalDatabaseReachable(): Promise<void> {
   }
 }
 
+/**
+ * Refuse a migration that opens or closes its own transaction.
+ *
+ * The isolation this helper promises is the outer `BEGIN` / `ROLLBACK` it wraps
+ * the file in. A migration carrying its own `commit;` ends that transaction
+ * from the inside: everything up to it is committed for real against the local
+ * stack, and the trailing `ROLLBACK` then has no transaction to undo and
+ * degrades to a warning on stderr. Nothing in the result distinguishes that
+ * from a clean replay, so the run reads as isolated while having written to a
+ * database other test workers share.
+ *
+ * 25 of the migrations in this repo are written that way, so this is a trap
+ * waiting for the next caller rather than a hypothetical. Failing here is the
+ * point: a replay that cannot be rolled back should say so, not do it anyway.
+ */
+function assertNoOwnTransactionControl(migration: string, sql: string): void {
+  const offenders = sql
+    .split('\n')
+    .map((line, index) => ({ line: line.trim().toLowerCase(), number: index + 1 }))
+    // Statement-leading only: `commit;` inside a function body or a string
+    // literal is not transaction control at this level.
+    .filter(({ line }) => /^(begin|commit|end|rollback)\s*;/.test(line));
+
+  if (offenders.length === 0) return;
+
+  const where = offenders.map(({ line, number }) => `${number}: ${line}`).join(', ');
+  throw new Error(
+    `${migration} manages its own transaction (${where}), so it cannot be replayed inside a ` +
+      `rollback: its own commit would end this helper's transaction and persist the replay. ` +
+      `Replay a migration without transaction control, or assert against a disposable database.`
+  );
+}
+
 export async function replayMigrationInRollback(options: MigrationReplayOptions): Promise<MigrationReplayResult> {
   const { migration, before = [], after = [], times = 1 } = options;
   if (!/^\d{14}_[a-z0-9_]+\.sql$/.test(migration)) {
     throw new Error(`Not a migration file name: ${migration}`);
   }
   const migrationSql = await readFile(path.join(MIGRATIONS_DIR, migration), 'utf8');
+  assertNoOwnTransactionControl(migration, migrationSql);
 
   await assertLocalDatabaseReachable();
 

@@ -93,18 +93,71 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
  *
  * @returns The signed-in user's id, or null when there is no session
  */
-export const getSignedInUserId = async (): Promise<string | null> => {
+/**
+ * Attempts the two delivery-side lookups make, and the backoff between them.
+ * Three attempts over ~900ms covers the failures these exist for -- a 5xx, a
+ * JWT expiring mid-flight, a network transition between the join ack and the
+ * follow-up fetch -- without holding a join open long enough to matter.
+ */
+const LOOKUP_ATTEMPTS = 3;
+const LOOKUP_BACKOFF_MS = [300, 600];
+
+export type SessionLookup =
+  | { status: 'signed-in'; userId: string }
+  | { status: 'signed-out' }
+  | { status: 'error'; reason: string };
+
+/**
+ * The session read, with the two null cases kept apart.
+ *
+ * Same split, and same reason, as `lookupPartnerId` below: `getSignedInUserId`
+ * collapses "nobody is signed in" and "the read failed" into one `null`, which
+ * is fine for a caller deciding what to render and wrong for one deciding
+ * whether an account changed underneath a live channel. Treating a failed read
+ * as an account change mutes delivery on a session the user still holds.
+ */
+export const lookupSignedInUser = async (): Promise<SessionLookup> => {
   try {
     const { data, error } = await supabase.auth.getSession();
     if (error) {
       console.error('[Supabase] Failed to read the current session:', error);
-      return null;
+      return { status: 'error', reason: error.message };
     }
-    return data.session?.user?.id ?? null;
+    const userId = data.session?.user?.id ?? null;
+    return userId ? { status: 'signed-in', userId } : { status: 'signed-out' };
   } catch (error) {
     console.error('[Supabase] Error reading the current session:', error);
-    return null;
+    return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
   }
+};
+
+/**
+ * The session read for a Realtime receiver: retries a failed read, and accepts
+ * a conclusive answer -- signed in, or signed out -- immediately.
+ *
+ * Returns the discriminated result rather than an id, because the caller has to
+ * tell "signed out" (conclusive: mute) from "the read failed" (inconclusive:
+ * muting would be permanent, since nothing re-runs on a healthy socket).
+ */
+export const resolveSignedInUserForDelivery = async (): Promise<SessionLookup> => {
+  let last: SessionLookup = { status: 'error', reason: 'not attempted' };
+
+  for (let attempt = 0; attempt < LOOKUP_ATTEMPTS; attempt += 1) {
+    last = await lookupSignedInUser();
+    if (last.status !== 'error') return last;
+
+    const backoff = LOOKUP_BACKOFF_MS[attempt];
+    if (backoff === undefined) break;
+    await new Promise((resolve) => setTimeout(resolve, backoff));
+  }
+
+  console.error('[Supabase] Session read failed on every attempt; answer is inconclusive');
+  return last;
+};
+
+export const getSignedInUserId = async (): Promise<string | null> => {
+  const result = await lookupSignedInUser();
+  return result.status === 'signed-in' ? result.userId : null;
 };
 
 /**
@@ -176,16 +229,6 @@ export const lookupPartnerId = async (): Promise<PartnerLookup> => {
 };
 
 /**
- * Number of attempts `resolvePartnerIdForDelivery` makes, and the backoff
- * between them. Three attempts over ~900ms covers the failure this exists for
- * -- a 5xx, a JWT expiring mid-flight, a network transition between the join
- * ack and the follow-up fetch -- without holding the join open long enough to
- * matter. A caller that exhausts them is left with `null`, exactly as before.
- */
-const PARTNER_LOOKUP_ATTEMPTS = 3;
-const PARTNER_LOOKUP_BACKOFF_MS = [300, 600];
-
-/**
  * The partner snapshot for a Realtime receiver: retries a failed lookup, and
  * accepts `unlinked` immediately.
  *
@@ -195,13 +238,13 @@ const PARTNER_LOOKUP_BACKOFF_MS = [300, 600];
  * looks like an unlink, which is what made the drop permanent.
  */
 export const resolvePartnerIdForDelivery = async (): Promise<string | null> => {
-  for (let attempt = 0; attempt < PARTNER_LOOKUP_ATTEMPTS; attempt += 1) {
+  for (let attempt = 0; attempt < LOOKUP_ATTEMPTS; attempt += 1) {
     const result = await lookupPartnerId();
 
     if (result.status === 'linked') return result.partnerId;
     if (result.status === 'unlinked') return null;
 
-    const backoff = PARTNER_LOOKUP_BACKOFF_MS[attempt];
+    const backoff = LOOKUP_BACKOFF_MS[attempt];
     if (backoff === undefined) break;
     await new Promise((resolve) => setTimeout(resolve, backoff));
   }
