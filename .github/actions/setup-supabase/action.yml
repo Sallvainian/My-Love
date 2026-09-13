@@ -22,6 +22,15 @@ inputs:
       rate-limited pull path.
     required: false
     default: 'false'
+  needs-edge-functions:
+    description: >-
+      Start the edge runtime for jobs whose specs call a Supabase Edge
+      Function through Kong. Default false for the same reason as needs-mail:
+      edge-runtime is the biggest single image pull and only one job needs it.
+      Without it Kong answers 503 from a dead upstream rather than failing to
+      start, so a spec that needs it fails on an assertion, not on setup.
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -102,7 +111,9 @@ runs:
       shell: bash
       run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-    # `-x` excludes five services no CI job here touches. Verified against the pinned
+    # `-x` excludes up to five services. Three no CI job here touches; the other
+    # two, mailpit and edge-runtime, are opt-in per job through needs-mail and
+    # needs-edge-functions, so only the api leg starts them. Verified against the pinned
     # CLI source that the flag skips the PULL, not merely the container start:
     # internal/start/start.go:234 filters the excluded names out of the compose
     # project (`Services: utils.GetServices().Filter(notExcluded)`) BEFORE :236 pulls
@@ -142,12 +153,15 @@ runs:
     #                 the pull cost above is per-job and only Backend Tests (api)
     #                 reads mail. If that spec ever stops sending mail, drop the
     #                 input and put mailpit back on the unconditional list.
-    #   edge-runtime  biggest single saving. The only caller is
-    #                 loveNoteImageService.ts (/functions/v1/upload-love-note-image),
-    #                 reached only when a love note carries an image, and no
-    #                 Playwright spec attaches one. IF YOU ADD AN E2E FOR LOVE-NOTE
-    #                 IMAGE UPLOAD, REMOVE edge-runtime FROM THIS LIST — it would
-    #                 otherwise fail against a dead Kong upstream.
+    #   edge-runtime  biggest single saving, now opt-in via needs-edge-functions
+    #                 rather than unconditional. The warning this note used to
+    #                 carry came true: tests/api/upload-love-note-image-limits.spec.ts
+    #                 drives /functions/v1/upload-love-note-image, and with the
+    #                 runtime excluded all six of its cases got 503 from a dead
+    #                 Kong upstream instead of 200/413/415/401. Kong answers, so
+    #                 the job fails on an assertion rather than on setup, which
+    #                 reads like a product bug. Any new spec that calls an Edge
+    #                 Function must set needs-edge-functions on its job.
     #
     # NOT excludable: postgres, plus kong/postgrest/gotrue/realtime/storage-api,
     # which the steps below and the suite depend on.
@@ -167,9 +181,12 @@ runs:
         set -euo pipefail
         # Rebuilt per job rather than hardcoded: mailpit is excluded unless the
         # caller asked for it, so nine of the ten jobs keep the saving.
-        EXCLUDE='studio,postgres-meta,edge-runtime,imgproxy'
+        EXCLUDE='studio,postgres-meta,imgproxy'
         if [ "${{ inputs.needs-mail }}" != "true" ]; then
           EXCLUDE="$EXCLUDE,mailpit"
+        fi
+        if [ "${{ inputs.needs-edge-functions }}" != "true" ]; then
+          EXCLUDE="$EXCLUDE,edge-runtime"
         fi
 
         # `|| true` so a non-zero `--help` reaches the -z branch below and reports
