@@ -2,7 +2,7 @@
 title: 'Bound image upload request buffering'
 type: 'bugfix'
 created: '2026-09-12'
-status: in-progress
+status: blocked
 baseline_revision: f99300ccab627787d420cc98ec464030f0730a51
 review_loop_iteration: 0
 followup_review_recommended: false
@@ -265,3 +265,76 @@ Then, on the hosted endpoint, the two demonstrations this story owes:
 2. One request with `Content-Length: 5242881` returns 413 and the bucket listing is unchanged.
 
 Rollback is the same command against the pre-change `index.ts` (commit `f99300cc`).
+
+## Auto Run Result
+
+Status: blocked
+Blocking condition: matrix test audit failed
+
+The implementation is complete, committed (`afb3b55c` code, `6f03e1bd` docs) and every
+command in **Verification** passes. It is blocked at the **Matrix Test Audit** because two
+rows of the read-only I/O & Edge-Case Matrix are contradicted — not uncovered — by the
+shipped tests, and the code cannot be changed to satisfy them without breaking a third row.
+Relaxing a frozen intent-contract is not this session's call.
+
+### The disagreement
+
+`6-bound-image-upload-request-buffering.md:40` requires, for `Content-Length: 5242881` with
+any body: `413 before any read; \`reader.read()\` never called`.
+`6-bound-image-upload-request-buffering.md:43` requires, for a header that lies small:
+`Reader cancelled at the first chunk that crosses the cap`.
+`6-bound-image-upload-request-buffering.md:25` states it as `all before a single byte of
+body is read`, and `:26` as `on overflow call \`reader.cancel()\` and return 413`.
+
+The shipped handler instead drains and discards the refused body, and its own tests assert
+that: `supabase/functions/upload-love-note-image/handler.test.ts:227`
+`assertEquals(counts.pulls, chunks.length + 1);` and `:228`
+`assertEquals(counts.cancels, 0, 'a fully-consumed stream is already closed');`.
+
+Per step-03 the expectation must never be edited to match the code, so this is recorded as
+a blocker rather than absorbed into the Spec Change Log entry above.
+
+### Why "fix the code" is not available
+
+Re-measured in this session against the running local stack, independently of the
+implementation subagent, with a real worker bearer token:
+
+| Probe | Path exercised | Result |
+|---|---|---|
+| authed POST, 30 MiB body, `Content-Length: 31457280` (past `MAX_DISCARD_BYTES`, so the handler refuses **without reading**) | no-read refusal | `status=000 time=30.001610` — the 413 never reached the client |
+| authed POST, 5 242 881 B body (drain path) | drain-then-refuse | `413` in `0.080703 s`, body `{"error":"File too large",…,"actualSize":5242881}` |
+
+A control run first showed an unauthenticated 30 MiB POST returning 401 in 0.088 s, but its
+body was `{"code":"UNAUTHORIZED_NO_AUTH_HEADER",…}` — Kong's shape, not the handler's
+`{"error":"Missing authorization header"}` — so that request never reached the function and
+is not evidence either way.
+
+So on `supabase-edge-runtime 1.74.3` a response returned while the request body is still in
+flight is not delivered. That makes matrix row `:40` ("413 before any read") and matrix row
+`:45` ("Limit plus one … 413") mutually exclusive, and it makes the **Tasks** requirement of
+a passing local API row for "limit plus one" unreachable for any no-read implementation: the
+API spec would hang rather than observe a 413.
+
+### What a human needs to decide
+
+Whether the drain-and-discard form satisfies F10. It preserves the property
+`remediation.md:94` names — live memory stays one chunk regardless of body size, and the
+refusal decision is still taken from headers alone, before anything is read, allocated or
+retained. What it does not preserve is the matrix's literal "never reads". The alternatives
+are to amend rows `:40`/`:43` to the measured runtime behaviour, or to accept an
+undeliverable 413 and drop the "limit plus one" API row.
+
+### Verification evidence from this session (all re-run on the committed tree)
+
+- `deno test --no-lock supabase/functions/upload-love-note-image/` — **29 passed, 0 failed** (18 ms)
+- `npx playwright test --project=api tests/api/upload-love-note-image-limits.spec.ts --workers=1` — **6 passed** (6.6 s)
+- `npm run test:unit` — **112 files, 2090 passed**
+- `npm run typecheck` — clean, exit 0
+- `npm run lint` — **0 errors**, 3 pre-existing `EventCountdown.tsx` warnings (file untouched by this diff)
+
+### Also outstanding (independent of the block)
+
+`supabase functions deploy upload-love-note-image` was not run. The hosted function is still
+version 4 (pre-fix). This is a sequencing hold, not an access blocker — the CLI is
+authenticated and the project linked. The two hosted demonstrations the story owes are
+recorded as pending in **Verification → Outstanding**.
