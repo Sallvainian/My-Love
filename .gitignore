@@ -69,7 +69,7 @@ tests/.auth/
 .claude
 !.claude/commands/
 !.claude/rules/
-_bmad/
+_bmad/*
 !.bmad/
 .code
 
@@ -109,7 +109,7 @@ docs/99-Archive/
 supabase/.temp/
 
 # BMAD method files (local tooling)
-_bmad/
+_bmad/*
 .agent/
 .agents/
 skills/
@@ -142,3 +142,16 @@ gha-creds-*.json
 .bmad-loop/cache/
 .bmad-loop/policy.toml
 _bmad/render/
+
+# BMAD customization overrides are deliberate configuration, not installed
+# module content: `_bmad/custom/.gitignore` ignores only `*.user.toml`, so the
+# non-user overrides are meant to be shared. The `_bmad/*` exclusions above are
+# written with a trailing `*` rather than as a bare directory so git descends
+# far enough for these negations to apply.
+!_bmad/custom/
+_bmad/custom/*
+!_bmad/custom/*.toml
+# ...but never personal overrides. `*.user.toml` ends in `.toml`, so the
+# negation above would otherwise re-include it. Do not rely on the inner
+# `_bmad/custom/.gitignore` for this -- it is not itself tracked.
+_bmad/custom/*.user.toml
