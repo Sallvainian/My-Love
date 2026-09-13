@@ -6,6 +6,10 @@ inputs:
     description: 'Forwarded to setup-supabase: start the Mailpit catcher for specs that read a real auth email.'
     required: false
     default: 'false'
+  needs-edge-functions:
+    description: 'Forwarded to setup-supabase: start the edge runtime for specs that call a Supabase Edge Function.'
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -26,6 +30,7 @@ runs:
       uses: ./.github/actions/setup-supabase
       with:
         needs-mail: ${{ inputs.needs-mail }}
+        needs-edge-functions: ${{ inputs.needs-edge-functions }}
 
     - name: Install Playwright browsers
       if: steps.pw-cache.outputs.cache-hit != 'true'
