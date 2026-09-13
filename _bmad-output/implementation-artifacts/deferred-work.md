@@ -1013,3 +1013,42 @@ source_spec: `7-partition-custom-messages-by-account.md`
 severity: low
 reason: Verified at src/components/AdminPanel/DeleteConfirmDialog.tsx:21-24 (`deleteCustomMessage(message.id); onConfirm();`) against src/stores/slices/messagesSlice.ts:497-500, which re-throws. The missing await is pre-existing — messagesSlice re-threw before this story and BaseIndexedDBService.delete already threw on a DB error — but deleteForUser adds two new throw cases (signed out via requireOwner, and a row owned by someone else). Neither new case is reachable from the dialog today: the ids it offers come from the owner-scoped `customMessages` list and AdminPanel renders only behind a session. Settle by driving deleteCustomMessage through a rejection in a component test.
 status: open
+
+### DW-104: An unnamed partner is rendered as their full email address in the chat, while the own-name path falls back to the email prefix.
+origin: spec-deferred a5c51df004b8
+location: src/api/supabaseClient.ts (getPartnerDisplayName)
+source_spec: `8-separate-profile-names-from-auth-identity.md`
+severity: low
+reason: getPartnerDisplayName returns the stored display_name verbatim and LoveNotes renders it. For a profile still carrying the trigger's email seed that value IS the email. Pre-existing: this function is untouched by story 8 and behaved identically before, because the old trigger also seeded display_name from the email. The fix is to share one seed-fallback classification between the own-name and partner-name readers.
+status: open
+
+### DW-105: If a public.users row were ever absent while its auth user exists, the setup modal could never be satisfied, and the users INSERT policy now has no client caller.
+origin: spec-deferred 05606ebe644a
+location: src/components/DisplayNameSetup/DisplayNameSetup.tsx (zero-row branch)
+source_spec: `8-separate-profile-names-from-auth-identity.md`
+reason: lookupOwnDisplayName maps PGRST116 to `unset`, which opens the modal, while DisplayNameSetup's plain UPDATE cannot create the row and `id` is outside the new column grant. No reachable path to that state was demonstrated: public.users.id is REFERENCES auth.users(id) ON DELETE CASCADE and no client code deletes profiles. What would settle it: whether any operator or admin path deletes a public.users row without deleting the auth user. The intent requires the INSERT policy be left untouched, so removing the now-callerless policy is out of scope here regardless.
+status: open
+
+### DW-106: Hosted evidence for the migration has not been recorded.
+origin: spec-deferred 930d06819af2
+location: n/a
+source_spec: `8-separate-profile-names-from-auth-identity.md`
+severity: low
+reason: The story's execution list asks for a hosted refused email PATCH, a hosted own-name change, and green FN-GRANT checks against the hosted project. The migration reaches that project only through .github/workflows/deploy.yml on merge, so this evidence cannot be produced before the branch lands. Outstanding operator action.
+status: open
+
+### DW-107: The acceptance criterion "the name shows in chat after reload" is not covered end to end.
+origin: spec-deferred 02bb20c02356
+location: tests/e2e/auth/display-name-setup.spec.ts
+source_spec: `8-separate-profile-names-from-auth-identity.md`
+severity: low
+reason: display-name-setup.spec.ts asserts the saved profile row and the app container after reload but never navigates to love notes; OwnDisplayName.test.tsx covers the chat rendering with getOwnDisplayName mocked. Closing this needs a partner-linked dedicated account, which the setup spec's throwaway nameless account does not have.
+status: open
+
+### DW-108: The ledger entry migrated from this story's second deferred item lost its severity when it was written to deferred-work.md.
+origin: spec-deferred 67f592004a06
+location: _bmad-output/implementation-artifacts/deferred-work.md (DW-105)
+source_spec: `8-separate-profile-names-from-auth-identity.md`
+severity: low
+reason: Verified by reading the block: `### DW-105` in _bmad-output/implementation-artifacts/deferred-work.md goes straight from `source_spec:` to `reason:` with no `severity:` line, while DW-104, DW-106 and DW-107 each carry `severity: low`. This spec's frontmatter records that same item as `severity: medium (unverified)`, so DW-105 is the only non-low severity of the four and it is the one the ledger dropped. Not repaired here: this run was instructed not to modify, re-open or rewrite existing ledger entries -- the orchestrator owns them. Raised through this list because it is the only channel back to the owner.
+status: open

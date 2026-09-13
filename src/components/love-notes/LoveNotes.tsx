@@ -20,7 +20,7 @@ import { motion } from 'framer-motion';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { authService } from '../../api/authService';
-import { getPartnerDisplayName } from '../../api/supabaseClient';
+import { getOwnDisplayName, getPartnerDisplayName } from '../../api/supabaseClient';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
 import type { LoveNote } from '../../types/models';
 import { useAppStore } from '../../stores/useAppStore';
@@ -62,12 +62,22 @@ export function LoveNotes(): ReactElement {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        // Get display name from user metadata
-        const user = await authService.getUser();
-        if (user?.user_metadata?.display_name) {
-          setUserName(user.user_metadata.display_name);
+        // Own name from the profile row, the same place the partner's comes
+        // from. It used to be read off auth user_metadata, which the setup
+        // modal wrote — but `sync_user_profile()` copied that metadata over
+        // `public.users.display_name` on every auth update, so the two could
+        // disagree and the chat showed whichever one the caller happened to
+        // ask. 20260912030000 made the profile row the single home.
+        const [ownDisplayName, user] = await Promise.all([
+          getOwnDisplayName(),
+          authService.getUser(),
+        ]);
+        if (ownDisplayName) {
+          setUserName(ownDisplayName);
         } else if (user?.email) {
-          // Fallback to email prefix
+          // Fallback to email prefix, for a profile still carrying only the
+          // trigger's seed (and for a failed read, which is the same non-answer
+          // as far as a rendered name is concerned).
           setUserName(user.email.split('@')[0]);
         }
 
