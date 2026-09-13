@@ -11,8 +11,8 @@ import { customMessageService } from './customMessageService';
  * Story 3.5: Migrate custom messages from LocalStorage (Story 3.4) to IndexedDB
  *
  * This service handles the one-time migration of custom messages from LocalStorage
- * to the production-ready IndexedDB storage system. After successful migration,
- * the LocalStorage data is removed to prevent duplicate migrations.
+ * to the production-ready IndexedDB storage system. The LocalStorage list is
+ * kept afterwards rather than removed; see below for why.
  *
  * THESE ROWS HAVE NO OWNER, AND THIS MIGRATION MAY NOT INVENT ONE
  *
@@ -138,10 +138,15 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
       }
     }
 
-    // Remove LocalStorage data after successful migration
+    // The LocalStorage list is KEPT, not removed. The rows this migration wrote
+    // are unowned — preserved on disk but hidden from every account until the
+    // product decision above returns them — so this key holds the only copy a
+    // user can still read. Removing it would destroy that copy for a benefit
+    // the dedup already provides: `createUnownedIfAbsent` compares normalized
+    // text inside one readwrite transaction, so a repeat migration reports
+    // 'duplicate' and writes nothing.
     if (result.migratedCount > 0 || result.skippedCount === customMessages.length) {
-      localStorage.removeItem(LOCALSTORAGE_KEY);
-      logger.info('[MigrationService] Removed LocalStorage data after migration');
+      logger.info('[MigrationService] Kept LocalStorage data: migrated rows are unowned');
     }
 
     // Log migration summary
