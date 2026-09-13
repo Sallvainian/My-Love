@@ -175,12 +175,11 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
       return;
     }
 
-    // Ahead of the send, not in the catch below: the recipient is resolved
-    // inside the service (F4), and every failure path of that lookup returns
-    // null (supabaseClient.ts:99-112), so offline it would report "Partner not
-    // configured" for what is really a missing connection.
-    // interactionService.ts's honest sentence is unreachable from there.
-    // Interactions are Supabase-only -- no queue, no retry -- so say so.
+    // Ahead of the send, not in the catch below. sendInteraction does throw its
+    // own offline sentence, but the catch below maps every error that is not a
+    // NoPartnerError to the generic "Failed to send poke. Try again.", so that
+    // sentence never reaches the user. Interactions are Supabase-only -- no
+    // queue, no retry -- so say plainly that a connection is needed.
     if (!isOnline()) {
       setShowToast('You are offline. A poke needs a connection to send.');
       setTimeout(() => setShowToast(null), 3000);
