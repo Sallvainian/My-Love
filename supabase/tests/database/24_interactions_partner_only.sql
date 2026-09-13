@@ -25,7 +25,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(48);
+select plan(51);
 
 -- ============================================
 -- Helpers (re-created per file: each test file runs in its own transaction)
@@ -146,7 +146,10 @@ select isnt(
 select ok(has_table_privilege('authenticated', 'public.interactions', 'SELECT'),
   'INT-DB-010: authenticated can still SELECT interactions');
 
-select ok(has_table_privilege('authenticated', 'public.interactions', 'INSERT'),
+-- Column-scoped, so `has_table_privilege` is false by design: it reports the
+-- table-wide grant, and this one names columns. The columns the client actually
+-- sends are asserted individually at INT-DB-049/050.
+select ok(has_column_privilege('authenticated', 'public.interactions', 'type', 'INSERT'),
   'INT-DB-011: authenticated can still INSERT interactions');
 
 select ok(not has_table_privilege('authenticated', 'public.interactions', 'UPDATE'),
@@ -160,6 +163,16 @@ select ok(has_column_privilege('authenticated', 'public.interactions', 'viewed',
 
 select ok(not has_column_privilege('authenticated', 'public.interactions', 'type', 'UPDATE'),
   'INT-DB-015: authenticated cannot UPDATE type');
+
+-- The INSERT grant is column-scoped for the same reason the UPDATE grant is.
+-- A table-level INSERT lets the caller name `created_at`, and
+-- getInteractionHistory orders `created_at desc`, so a far-future value pins a
+-- row to the top of the feed for good.
+select ok(not has_column_privilege('authenticated', 'public.interactions', 'created_at', 'INSERT'),
+  'INT-DB-049: authenticated cannot supply created_at on INSERT');
+
+select ok(has_column_privilege('authenticated', 'public.interactions', 'viewed', 'INSERT'),
+  'INT-DB-050: authenticated may still supply viewed on INSERT, which the client sends as false');
 
 select ok(not has_column_privilege('authenticated', 'public.interactions', 'from_user_id', 'UPDATE'),
   'INT-DB-016: authenticated cannot UPDATE from_user_id');
@@ -231,6 +244,21 @@ select lives_ok(
     'kiss', current_setting('tests.user_a'), current_setting('tests.user_b')
   ),
   'INT-DB-026: a linked partner can send a kiss'
+);
+
+-- Behavioural half of INT-DB-049/050, driven by the SAME linked pair as the two
+-- accepted inserts above. `viewed` is the only difference, so a pass here cannot
+-- come from the recipient conjunct. Without the `viewed = false` clause a sender
+-- could deliver a poke that `getUnviewedInteractions` -- which filters
+-- `viewed = false` -- never returns, so it would never reach the unread badge.
+select throws_ok(
+  format(
+    'insert into public.interactions (type, from_user_id, to_user_id, viewed) values (%L, %L, %L, true)',
+    'poke', current_setting('tests.user_a'), current_setting('tests.user_b')
+  ),
+  '42501',
+  null,
+  'INT-DB-051: a sender cannot insert an interaction that is already viewed'
 );
 
 select throws_ok(
