@@ -144,8 +144,8 @@ describe('migrateCustomMessagesFromLocalStorage', () => {
 
   it('counts a repeat migration as skipped rather than duplicating the rows', async () => {
     // The service reports 'duplicate' and the migration has to carry that
-    // through to skippedCount — the localStorage key is only removed once
-    // every message has been accounted for, so a miscount strands the data.
+    // through to skippedCount: the counts are the migration's only report of
+    // what happened, and a miscount misreports a list as unmigrated.
     seedLocalStorage(['LEGACY-DEVICE-MESSAGE']);
     const { migrate } = await freshModules();
     await migrate();
@@ -173,15 +173,17 @@ describe('migrateCustomMessagesFromLocalStorage', () => {
     ]);
   });
 
-  it('clears LocalStorage once the list is accounted for', async () => {
+  it('keeps LocalStorage once the list is accounted for', async () => {
     seedLocalStorage(['LEGACY-DEVICE-MESSAGE']);
     const { migrate } = await freshModules();
 
     await migrate();
 
-    // Otherwise the next boot migrates it again. The rows are on disk, so this
-    // is a move rather than a deletion.
-    expect(localStorage.getItem(LOCALSTORAGE_KEY)).toBeNull();
+    // The migrated rows are unowned and therefore invisible to every account,
+    // so this key is the only copy left that a user can read. Re-migrating is
+    // harmless: the repeat-migration case above proves it skips rather than
+    // duplicates.
+    expect(localStorage.getItem(LOCALSTORAGE_KEY)).not.toBeNull();
   });
 
   it('is a no-op when there is nothing to migrate', async () => {
