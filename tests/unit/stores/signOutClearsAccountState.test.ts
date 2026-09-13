@@ -378,12 +378,13 @@ describe('clearAuth on sign-out', () => {
   it('drops the rotation-history entries that point at stripped rows', () => {
     // `messageHistory.shownMessages` maps a date to the id shown that day, and
     // it is PERSISTED. If the outgoing account's custom row won today's
-    // rotation, that entry now names an id no longer in the pool — and
-    // `updateCurrentMessage` treats a cached id as authoritative and never
-    // recomputes, so `messages.find(...)` yields undefined and Home shows no
-    // daily message at all, for the rest of the calendar day and across
-    // reloads. Driven through clearAuth: the switched-account path also fires
-    // an asynchronous pool reload, which this case has no business waiting on.
+    // rotation, that entry now names an id no longer in the pool, and the
+    // incoming account would inherit it. `updateCurrentMessage` also defends
+    // itself against a dangling id now (see updateCurrentMessageStaleCache),
+    // so this asserts the prune on its own terms — the stored map is left
+    // clean — rather than as the only thing preventing a broken Home screen.
+    // Driven through clearAuth: the switched-account path also fires an
+    // asynchronous pool reload, which this case has no business waiting on.
     useAppStore.setState({
       messageHistory: {
         ...useAppStore.getState().messageHistory,

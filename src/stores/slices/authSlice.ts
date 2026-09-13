@@ -288,10 +288,15 @@ function discardAccountState(
   // that day. It is persisted, and neither `signedOutState()` nor the strip
   // above touches it — so if the outgoing account's custom row won today's
   // rotation, today's entry now points at an id that is no longer in the pool.
-  // `updateCurrentMessage` treats a cached id as authoritative and never
-  // recomputes, so `messages.find(...)` yields undefined and Home shows no
-  // daily message at all — for the rest of the calendar day, across reloads.
-  // Dropping the dangling entries is what lets the next recompute happen.
+  // Dropping the dangling entries keeps the persisted map honest: the incoming
+  // account never inherits a date pointing at a row it cannot see.
+  //
+  // This is no longer the only thing standing between that and a broken Home
+  // screen. `updateCurrentMessage` now treats a cached id that is absent from
+  // `messages` as a miss and recomputes (`messagesSlice.ts`), which also covers
+  // the case this prune cannot reach: a no-session boot, where the pool below
+  // is empty and nothing is stripped. Both are wanted — this one keeps the
+  // stored map clean, that one fails safe when it could not be.
   // Keyed on the ids actually STRIPPED, not on the complement of the surviving
   // pool. `messages` is not persisted, so a no-session boot reaches here with
   // an empty array — App.tsx calls clearAuth() the moment getSession() comes
