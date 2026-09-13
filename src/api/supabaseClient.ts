@@ -289,6 +289,112 @@ export const getPartnerDisplayName = async (): Promise<string | null> => {
 };
 
 /**
+ * The name `sync_user_profile()` writes when it seeds a brand-new profile row
+ * and the account has neither a metadata name nor an email
+ * (`20251206024345_remote_schema.sql:164`). It is a placeholder, never a name
+ * anyone chose, so it counts as "not set" here.
+ */
+export const SEED_FALLBACK_NAME = 'Unknown';
+
+/**
+ * The signed-in user's own profile name, with "not chosen yet" and "could not
+ * find out" kept apart.
+ *
+ * Same three-state shape, and for the same reason, as `PartnerLookup` above:
+ * `getOwnDisplayName` collapses it to `string | null` for the callers that only
+ * decide what to render, but App gates the setup modal on it, and there "no
+ * name yet" and "the read failed" must not be the same answer. A 5xx read as
+ * `unset` shoves an established user back into the setup screen.
+ */
+export type OwnDisplayNameLookup =
+  | { status: 'chosen'; displayName: string }
+  | { status: 'unset' }
+  | { status: 'error'; reason: string };
+
+/**
+ * Read the chosen profile name from `public.users`.
+ *
+ * `unset` means the row carries only what `sync_user_profile()` seeded it with,
+ * which is `COALESCE(raw_user_meta_data->>'display_name', email, 'Unknown')`
+ * (`20251206024345_remote_schema.sql:164`). So the four seed shapes -- null, the
+ * empty string, the account's own email, and 'Unknown' -- all read as "no name
+ * chosen". 20260912030000 stopped the trigger rewriting the column after the
+ * INSERT, but it deliberately did not backfill existing rows, so this rule is
+ * what decides which of those rows still need the setup screen.
+ *
+ * This classification is recomputed on EVERY read, never recorded — so a row
+ * whose `display_name` really does hold the account's own email address reads
+ * as `unset` every time, not once. Such a user would be shown the setup screen
+ * on every load and every token refresh, permanently. That is why
+ * `DisplayNameSetup` refuses to write a name equal to the account email or to
+ * `SEED_FALLBACK_NAME`: the write side rejects exactly what this function calls
+ * a seed, so the only thing that can put such a value in the column is the
+ * trigger's own seed — where it genuinely does mean "no name chosen". Existing
+ * customer rows are still never edited.
+ *
+ * PGRST116 (no row) also reads as `unset`. It should be unreachable -- the
+ * trigger creates the row inside the same statement that creates the auth user
+ * -- and the setup write fails closed if the row really is missing, because it
+ * checks that its UPDATE matched something.
+ */
+export const lookupOwnDisplayName = async (): Promise<OwnDisplayNameLookup> => {
+  try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    const user = sessionData.session?.user ?? null;
+
+    if (!user) {
+      // Not an `unset`: with no session there is no profile to have a name, and
+      // answering "no name chosen" here would open the setup modal over a
+      // signed-out app. Same fail-open-on-display rule as the read error below.
+      const reason = sessionError?.message ?? 'No authenticated session';
+      console.error('[Supabase] Cannot read own display name:', reason);
+      return { status: 'error', reason };
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('display_name')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        console.warn('[Supabase] User has no users table record yet');
+        return { status: 'unset' };
+      }
+      console.error('[Supabase] Failed to get own display name:', error);
+      return { status: 'error', reason: error.message };
+    }
+
+    const stored = data?.display_name?.trim() ?? '';
+    const email = user.email?.trim() ?? '';
+    const isSeedFallback =
+      stored === '' ||
+      stored === SEED_FALLBACK_NAME ||
+      (email !== '' && stored.toLowerCase() === email.toLowerCase());
+
+    return isSeedFallback ? { status: 'unset' } : { status: 'chosen', displayName: stored };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error('[Supabase] Error getting own display name:', error);
+    return { status: 'error', reason };
+  }
+};
+
+/**
+ * The signed-in user's chosen profile name, or null when they have not chosen
+ * one and for a failed read alike.
+ *
+ * The right shape for a consumer that only renders a name and already has its
+ * own fallback (`LoveNotes` shows the email prefix). Anything that has to act
+ * on the difference -- App's setup gate -- calls `lookupOwnDisplayName`.
+ */
+export const getOwnDisplayName = async (): Promise<string | null> => {
+  const result = await lookupOwnDisplayName();
+  return result.status === 'chosen' ? result.displayName : null;
+};
+
+/**
  * Check if Supabase is properly configured
  */
 export const isSupabaseConfigured = (): boolean => {

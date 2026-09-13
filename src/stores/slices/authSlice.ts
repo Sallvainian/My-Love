@@ -88,6 +88,20 @@ export function signedOutState() {
     sentMessageTimestamps: [],
     notesPendingRemoval: [],
 
+    // messagesSlice — a custom message is one account's private writing, and
+    // the AdminPanel lists `customMessages` directly. `customMessagesLoaded` is
+    // the flag AdminPanel's effect gates its reload on, so leaving it true
+    // strands the previous account's list on screen with nothing to refresh it.
+    //
+    // `messages` is NOT reset here, because it is not wholly account state: it
+    // also holds the shared daily rows, and nothing reloads them after an
+    // in-place account switch (`initializeApp` is guarded to run once per page
+    // load), so emptying it would leave the next account with a blank Home and
+    // no rotation pool at all. `discardAccountState` strips its custom rows
+    // instead — see the comment there.
+    customMessages: [],
+    customMessagesLoaded: false,
+
     // photosSlice
     photos: [],
     selectedPhotoId: null,
@@ -159,6 +173,51 @@ export interface AuthSlice {
 }
 
 /**
+ * Put the incoming account's own custom messages back into the rotation pool.
+ *
+ * `discardAccountState` strips the outgoing account's custom rows from
+ * `messages`, and nothing else refills them: `initializeApp` is guarded by a
+ * module-level flag AND an App-level ref, both of which survive sign-out, so it
+ * runs once per page load; `loadMessages()` is otherwise reached only from the
+ * custom-message mutators. Without this, an account that signs in over another
+ * rotates through the bundled daily messages alone until they happen to edit a
+ * custom message or reload the page — which is the very pool the ownership work
+ * exists to get right.
+ *
+ * Fire-and-forget, because `setAuthUser` is called synchronously from
+ * `onAuthStateChange` and must not become async. `loadMessages` carries the
+ * usual `{ userId, authSessionVersion }` capture-and-recheck and captures AFTER
+ * the new identity is in the store, so a reload raised for one account cannot
+ * write under the next; the recompute that follows re-checks the same pair.
+ *
+ * `updateCurrentMessage()` is what actually repaints Home: `discardAccountState`
+ * nulls a custom `currentMessage`, and nothing else recomputes it in-session.
+ *
+ * Skipped when `messages` is empty, which is the cold-boot case — the array is
+ * not persisted, so it is empty until `initializeApp` seeds it. Firing there
+ * would race that seed with a read of a still-empty store. It also keeps this
+ * inert for callers that compose a partial store without messagesSlice.
+ */
+function reloadRotationPool(get: () => AppState): void {
+  if ((get().messages?.length ?? 0) === 0) return;
+
+  const { userId, authSessionVersion } = get();
+  void get()
+    .loadMessages()
+    .then(() => {
+      if (get().userId !== userId || get().authSessionVersion !== authSessionVersion) return;
+      get().updateCurrentMessage();
+    })
+    // `loadMessages` swallows its own errors, but `updateCurrentMessage` runs
+    // inside the callback above and nothing is awaiting this chain — a throw
+    // there would surface as an unhandled rejection on the auth path, with no
+    // caller to report it.
+    .catch((error) => {
+      console.error('[AuthSlice] Failed to reload the rotation pool:', error);
+    });
+}
+
+/**
  * The one way account state is discarded.
  *
  * Revoking and resetting are a pair, not two steps a caller may pick from.
@@ -201,9 +260,65 @@ function discardAccountState(
   const restored = identity.userId && settings ? takeAnniversaries(identity.userId) : null;
   setAnniversaryOwner(identity.userId);
 
+  // `messages` is the daily-rotation pool: the shared bundled messages PLUS
+  // whichever custom rows the outgoing account owned. Only the second half is
+  // account state, so it is stripped rather than the whole array being emptied.
+  //
+  // Emptying it would be safe but not correct: nothing reloads the daily rows
+  // after an in-place switch — `initializeApp` is guarded by a module flag and
+  // an App-level ref, both of which survive sign-out — so the next account
+  // would land on a Home screen with `currentMessage` null and every rotation
+  // call logging "No active messages available". Like `settings`, this needs
+  // the CURRENT object and so cannot live in `signedOutState()`.
+  //
+  // Defensive `?? []`, on the same rule as the `settings` guard above: callers
+  // that compose a partial store (component tests building authSlice alone)
+  // reach here with the key absent, and sign-out must not throw for them.
+  const sharedMessages = (get().messages ?? []).filter((message) => !message.isCustom);
+
+  // `currentMessage` is a COPY of a row, not a reference into the array, so
+  // stripping `messages` does not touch it — and DailyMessage renders
+  // `currentMessage.text` straight onto Home. A custom one is the outgoing
+  // account's own writing and goes with the rest. `reloadRotationPool` is what
+  // paints a new one, on the sign-in side of the transition.
+  const outgoing = get().currentMessage;
+  const currentMessage = outgoing && !outgoing.isCustom ? outgoing : null;
+
+  // `messageHistory.shownMessages` maps a date to the id of the message shown
+  // that day. It is persisted, and neither `signedOutState()` nor the strip
+  // above touches it — so if the outgoing account's custom row won today's
+  // rotation, today's entry now points at an id that is no longer in the pool.
+  // Dropping the dangling entries keeps the persisted map honest: the incoming
+  // account never inherits a date pointing at a row it cannot see.
+  //
+  // This is no longer the only thing standing between that and a broken Home
+  // screen. `updateCurrentMessage` now treats a cached id that is absent from
+  // `messages` as a miss and recomputes (`messagesSlice.ts`), which also covers
+  // the case this prune cannot reach: a no-session boot, where the pool below
+  // is empty and nothing is stripped. Both are wanted — this one keeps the
+  // stored map clean, that one fails safe when it could not be.
+  // Keyed on the ids actually STRIPPED, not on the complement of the surviving
+  // pool. `messages` is not persisted, so a no-session boot reaches here with
+  // an empty array — App.tsx calls clearAuth() the moment getSession() comes
+  // back empty, long before initializeApp has seeded anything, and that path is
+  // gated on a session so it never seeds at all. Against an empty pool a
+  // "keep only ids still in the pool" filter drops EVERY entry in the persisted
+  // 30-day map, including the shared daily rows this prune exists to protect.
+  const history = get().messageHistory;
+  const strippedIds = new Set(
+    (get().messages ?? []).filter((message) => message.isCustom).map((message) => message.id)
+  );
+  const shownMessages =
+    history?.shownMessages instanceof Map
+      ? new Map(Array.from(history.shownMessages).filter(([, id]) => !strippedIds.has(id)))
+      : history?.shownMessages;
+
   set({
     ...identity,
     ...signedOutState(),
+    messages: sharedMessages,
+    currentMessage,
+    ...(history ? { messageHistory: { ...history, shownMessages } } : null),
     // Advance with the reset, even for a repeated sign-out. A later sign-in
     // by the same user must never reclaim ownership of an earlier request.
     authSessionVersion: get().authSessionVersion + 1,
@@ -248,6 +363,9 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => (
 
     if (switchedAccount) {
       discardAccountState(get, set, identity);
+      // After the strip, not before: `loadMessages` has to capture the NEW
+      // identity, and it reads the store to do so.
+      reloadRotationPool(get);
       return;
     }
 
@@ -269,11 +387,20 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => (
             relationship: { ...settings.relationship, anniversaries: restored },
           },
         } as Partial<AppState>);
+        reloadRotationPool(get);
         return;
       }
     }
 
     set(identity);
+
+    // Sign out, then sign in as someone else, is TWO calls: clearAuth strips
+    // the custom rows, and this one arrives with `previous === null` — so it
+    // never reaches the switched-account branch above and needs the reload just
+    // as much. Gated on the id actually changing, because TOKEN_REFRESHED,
+    // INITIAL_SESSION and USER_UPDATED all land here for the same user and must
+    // not re-read IndexedDB on every token refresh.
+    if (previous !== userId) reloadRotationPool(get);
   },
 
   clearAuth: () => {

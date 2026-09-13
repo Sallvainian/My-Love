@@ -171,10 +171,33 @@ class StorageService {
     }
   }
 
-  async getAllMessages(): Promise<Message[]> {
+  /**
+   * Narrow a batch of rows to the ones `userId` may see: the shared daily
+   * messages, plus that caller's own custom messages.
+   *
+   * Custom rows with no owner are legacy and belong to nobody: `undefined`
+   * never equals a user id and never equals `null`, so they are excluded for
+   * every caller, signed out included.
+   */
+  private visibleTo(messages: Message[], userId: string | null): Message[] {
+    return messages.filter((message) => !message.isCustom || message.userId === userId);
+  }
+
+  /**
+   * Every message the caller may see, shared and own alike.
+   *
+   * The `messages` store holds every account that has signed in on this device,
+   * and this read feeds the daily rotation and the Home screen — so unscoped it
+   * put one partner's private custom messages into the other's rotation pool.
+   *
+   * `userId` is REQUIRED and nullable rather than optional: the signed-out case
+   * is real (the daily messages still have to load), but it has to be stated at
+   * the call site rather than reached by leaving an argument off.
+   */
+  async getAllMessages(userId: string | null): Promise<Message[]> {
     try {
       await this.init();
-      const messages = await this.db!.getAll('messages');
+      const messages = this.visibleTo(await this.db!.getAll('messages'), userId);
       logger.debug('[StorageService] Retrieved all messages, count:', messages.length);
       return messages;
     } catch (error) {
@@ -183,10 +206,13 @@ class StorageService {
     }
   }
 
-  async getMessagesByCategory(category: string): Promise<Message[]> {
+  async getMessagesByCategory(category: string, userId: string | null): Promise<Message[]> {
     try {
       await this.init();
-      const messages = await this.db!.getAllFromIndex('messages', 'by-category', category);
+      const messages = this.visibleTo(
+        await this.db!.getAllFromIndex('messages', 'by-category', category),
+        userId
+      );
       logger.debug(
         '[StorageService] Retrieved messages by category:',
         category,
@@ -297,11 +323,18 @@ class StorageService {
   }
 
   // Export data for backup
-  async exportData(): Promise<{ photos: Photo[]; messages: Message[] }> {
+  //
+  // `userId` is threaded through for the same reason getAllMessages takes it:
+  // an export is a read, and it must not hand the caller another account's
+  // custom messages. No caller today, but the argument keeps it that way.
+  async exportData(userId: string | null): Promise<{ photos: Photo[]; messages: Message[] }> {
     try {
       await this.init();
       logger.debug('[StorageService] Exporting all data from IndexedDB...');
-      const [photos, messages] = await Promise.all([this.getAllPhotos(), this.getAllMessages()]);
+      const [photos, messages] = await Promise.all([
+        this.getAllPhotos(),
+        this.getAllMessages(userId),
+      ]);
       logger.debug(
         '[StorageService] Data exported successfully, photos:',
         photos.length,

@@ -973,3 +973,82 @@ location: src/api/supabaseClient.ts:59-77
 source_spec: `3-require-browser-initiated-auth-callbacks.md`
 reason: Unverified. vite.config.ts:71 declares `display: 'standalone'`, and signInWithGoogle navigates the current context with window.location.href, which on the platforms checked keeps the round trip inside the app's own context and storage. What was not measured is an actual installed-PWA Google sign-in on a platform that hands OAuth to a separate browser context: there the returning `?code=` would find no verifier and be ignored, where the old implicit fragment carried the tokens themselves. Same failure mode as the private-window entry, a different trigger. Settle by completing one Google sign-in from the installed PWA on iOS and Android after deploy; if it fails, the fix is a storage adapter or a stated limitation, not a change to the flow type.
 status: open
+
+### DW-99: storageService.getMessage / updateMessage / deleteMessage / toggleFavorite still reach any row in the messages store by id with no ownership check.
+origin: spec-deferred f5bbde9a7366
+location: src/services/storage.ts:157,227-276
+source_spec: `7-partition-custom-messages-by-account.md`
+severity: medium
+reason: Verified at src/services/storage.ts:157 (getMessage returns any row) and :256-260 (toggleFavorite reads through it then writes isFavorite with no owner check). Pre-existing: none of these four were introduced or altered by this story, and the intent's Always list names only getAllMessages and getMessagesByCategory. Not reachable from the UI today because the ids a component can offer now come from the scoped `messages` array, but the service surface remains unscoped for any future caller.
+status: open
+
+### DW-100: messagesSlice.toggleFavorite set()s after an await with no identity capture or recheck.
+origin: spec-deferred 50b8808c997c
+location: src/stores/slices/messagesSlice.ts:130-148
+source_spec: `7-partition-custom-messages-by-account.md`
+severity: medium
+reason: Verified at src/stores/slices/messagesSlice.ts:130-148: `await storageService.toggleFavorite(messageId)` is followed by an unguarded set() writing both `messages` and `messageHistory.favoriteIds`. Pre-existing and outside the seven actions the intent enumerates; AGENTS.md records the guard as copy-pasted at 19 sites with uneven coverage. A switch landing mid-flight appends the outgoing account's message id to the incoming account's favoriteIds.
+status: open
+
+### DW-101: settingsSlice.initializeApp reads get().userId live at two points separated by an await, with no identity capture or recheck around its set({ messages }).
+origin: spec-deferred c9cd7a4ea314
+location: src/stores/slices/settingsSlice.ts:126,141
+source_spec: `7-partition-custom-messages-by-account.md`
+severity: low
+reason: Verified at src/stores/slices/settingsSlice.ts:126,141 with set() at :143,:147 and get().updateCurrentMessage() at :151. Caused by this story (the argument is new), but initializeApp is guarded by a module-level isInitialized flag and an App-level ref, so it runs once per page load and no reachable interleaving was demonstrated. It is now the only messages writer without the guard idiom this story introduced elsewhere.
+status: open
+
+### DW-102: The intent's I/O matrix states outcomes at three surfaces (service, store, UI) but the tests occupy two; the "AdminPanel shows none" half of row 1 is unasserted.
+origin: spec-deferred cd5ea7d12745
+location: src/components/AdminPanel/AdminPanel.tsx:26-30
+source_spec: `7-partition-custom-messages-by-account.md`
+severity: low
+reason: No AdminPanel component test exists anywhere under tests/, and no E2E spec covers admin or custom messages. The store chain that would carry it (customMessagesLoaded: false re-firing AdminPanel.tsx:26-30) is verified to exist by reading, not by test. Story :73 sanctions this ("AdminPanel needs no change if the slice signature stays"), so it is a gap against the verbatim matrix rather than a deviation from the plan.
+status: open
+
+### DW-103: DeleteConfirmDialog calls deleteCustomMessage without await or catch, so a rejected delete closes the dialog as if it succeeded and surfaces as an unhandled rejection.
+origin: spec-deferred 3c0512dcb4a2
+location: src/components/AdminPanel/DeleteConfirmDialog.tsx:21-24
+source_spec: `7-partition-custom-messages-by-account.md`
+severity: low
+reason: Verified at src/components/AdminPanel/DeleteConfirmDialog.tsx:21-24 (`deleteCustomMessage(message.id); onConfirm();`) against src/stores/slices/messagesSlice.ts:497-500, which re-throws. The missing await is pre-existing — messagesSlice re-threw before this story and BaseIndexedDBService.delete already threw on a DB error — but deleteForUser adds two new throw cases (signed out via requireOwner, and a row owned by someone else). Neither new case is reachable from the dialog today: the ids it offers come from the owner-scoped `customMessages` list and AdminPanel renders only behind a session. Settle by driving deleteCustomMessage through a rejection in a component test.
+status: open
+
+### DW-104: An unnamed partner is rendered as their full email address in the chat, while the own-name path falls back to the email prefix.
+origin: spec-deferred a5c51df004b8
+location: src/api/supabaseClient.ts (getPartnerDisplayName)
+source_spec: `8-separate-profile-names-from-auth-identity.md`
+severity: low
+reason: getPartnerDisplayName returns the stored display_name verbatim and LoveNotes renders it. For a profile still carrying the trigger's email seed that value IS the email. Pre-existing: this function is untouched by story 8 and behaved identically before, because the old trigger also seeded display_name from the email. The fix is to share one seed-fallback classification between the own-name and partner-name readers.
+status: open
+
+### DW-105: If a public.users row were ever absent while its auth user exists, the setup modal could never be satisfied, and the users INSERT policy now has no client caller.
+origin: spec-deferred 05606ebe644a
+location: src/components/DisplayNameSetup/DisplayNameSetup.tsx (zero-row branch)
+source_spec: `8-separate-profile-names-from-auth-identity.md`
+reason: lookupOwnDisplayName maps PGRST116 to `unset`, which opens the modal, while DisplayNameSetup's plain UPDATE cannot create the row and `id` is outside the new column grant. No reachable path to that state was demonstrated: public.users.id is REFERENCES auth.users(id) ON DELETE CASCADE and no client code deletes profiles. What would settle it: whether any operator or admin path deletes a public.users row without deleting the auth user. The intent requires the INSERT policy be left untouched, so removing the now-callerless policy is out of scope here regardless.
+status: open
+
+### DW-106: Hosted evidence for the migration has not been recorded.
+origin: spec-deferred 930d06819af2
+location: n/a
+source_spec: `8-separate-profile-names-from-auth-identity.md`
+severity: low
+reason: The story's execution list asks for a hosted refused email PATCH, a hosted own-name change, and green FN-GRANT checks against the hosted project. The migration reaches that project only through .github/workflows/deploy.yml on merge, so this evidence cannot be produced before the branch lands. Outstanding operator action.
+status: open
+
+### DW-107: The acceptance criterion "the name shows in chat after reload" is not covered end to end.
+origin: spec-deferred 02bb20c02356
+location: tests/e2e/auth/display-name-setup.spec.ts
+source_spec: `8-separate-profile-names-from-auth-identity.md`
+severity: low
+reason: display-name-setup.spec.ts asserts the saved profile row and the app container after reload but never navigates to love notes; OwnDisplayName.test.tsx covers the chat rendering with getOwnDisplayName mocked. Closing this needs a partner-linked dedicated account, which the setup spec's throwaway nameless account does not have.
+status: open
+
+### DW-108: The ledger entry migrated from this story's second deferred item lost its severity when it was written to deferred-work.md.
+origin: spec-deferred 67f592004a06
+location: _bmad-output/implementation-artifacts/deferred-work.md (DW-105)
+source_spec: `8-separate-profile-names-from-auth-identity.md`
+severity: low
+reason: Verified by reading the block: `### DW-105` in _bmad-output/implementation-artifacts/deferred-work.md goes straight from `source_spec:` to `reason:` with no `severity:` line, while DW-104, DW-106 and DW-107 each carry `severity: low`. This spec's frontmatter records that same item as `severity: medium (unverified)`, so DW-105 is the only non-low severity of the four and it is the one the ledger dropped. Not repaired here: this run was instructed not to modify, re-open or rewrite existing ledger entries -- the orchestrator owns them. Raised through this list because it is the only channel back to the owner.
+status: open

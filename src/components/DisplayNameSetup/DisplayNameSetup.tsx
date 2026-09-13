@@ -1,21 +1,29 @@
 /**
  * DisplayNameSetup Modal
  *
- * Prompts users to set their display name after successful Google OAuth signup.
+ * Prompts users to set their display name after a signup that carried no name.
  * This modal appears AFTER auth is complete to avoid broken accounts.
  *
  * Features:
  * - Modal overlay with form
  * - Display name validation (3-30 characters)
- * - Updates Supabase Auth user_metadata
- * - Creates users table row if needed
+ * - Writes the name to the user's own `public.users` row
+ *
+ * The name is profile data, not auth identity. It used to be written to
+ * `auth.updateUser({ data: { display_name } })` and mirrored into `public.users`
+ * by `sync_user_profile()`, but that trigger re-ran its `ON CONFLICT DO UPDATE`
+ * on every auth update and so reset the name on the next sign-in.
+ * 20260912030000_profile_name_email_ownership.sql took `display_name` out of
+ * that branch and granted `authenticated` UPDATE on (display_name, updated_at),
+ * so the profile row is now the one place the name lives and a plain update is
+ * the whole write. No metadata write, and no session refresh after it.
  *
  * @component
  */
 
 import { useState, type FormEvent } from 'react';
 import { getUser } from '../../api/auth/sessionService';
-import { supabase } from '../../api/supabaseClient';
+import { SEED_FALLBACK_NAME, supabase } from '../../api/supabaseClient';
 import { logger } from '../../utils/logger';
 import './DisplayNameSetup.css';
 
@@ -58,33 +66,57 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
         throw new Error('User not authenticated');
       }
 
-      // Update Supabase Auth user_metadata with display name
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: {
-          display_name: displayName.trim(),
-        },
-      });
+      // Refuse exactly what the read side calls a seed.
+      //
+      // `lookupOwnDisplayName` classifies a stored name equal to the account's
+      // email or to SEED_FALLBACK_NAME as "no name chosen", and it recomputes
+      // that on EVERY read rather than recording an answer. So saving one of
+      // these would succeed and then re-open this modal on every reload and
+      // every TOKEN_REFRESHED, permanently — and since the modal is an early
+      // return in App.tsx, a mid-session re-open unmounts the whole app tree.
+      // The length check alone let both through: any email of 30 characters or
+      // fewer passes it, and so does the literal 'Unknown'.
+      //
+      // Checked here rather than beside the length rule because it needs the
+      // account email, which only `getUser()` above supplies. Still no write:
+      // this returns before the update, and the outer `finally` clears the
+      // loading flag.
+      const trimmedName = displayName.trim();
+      const accountEmail = user.email?.trim() ?? '';
+
+      if (accountEmail !== '' && trimmedName.toLowerCase() === accountEmail.toLowerCase()) {
+        setError('Please choose a name that is different from your email address');
+        return;
+      }
+
+      if (trimmedName === SEED_FALLBACK_NAME) {
+        setError(`"${SEED_FALLBACK_NAME}" is not a name — please choose another`);
+        return;
+      }
+
+      // The profile row is the name's only home. A plain update, not an upsert:
+      // the row already exists (sync_user_profile() creates it in the same
+      // statement that creates the auth user), and an upsert would have to name
+      // `id`, which `authenticated` no longer holds UPDATE on.
+      const { data: updated, error: updateError } = await supabase
+        .from('users')
+        .update({
+          display_name: trimmedName,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
+        .select('id');
 
       if (updateError) {
         throw updateError;
       }
 
-      // Create users table row if it doesn't exist
-      // This is idempotent - if row exists, it won't create duplicate
-      const { error: upsertError } = await supabase.from('users').upsert(
-        {
-          id: user.id,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'id',
-          ignoreDuplicates: false,
-        }
-      );
-
-      if (upsertError) {
-        console.error('[DisplayNameSetup] Error creating user row:', upsertError);
-        // Don't throw - this is not critical, user_metadata update is what matters
+      // Fail closed. RLS makes a write the caller is not allowed to make a
+      // zero-row update rather than an error, and so does a missing profile
+      // row — and either way the name was not saved, so closing the modal would
+      // drop the user into an app that still shows their email.
+      if (!updated || updated.length === 0) {
+        throw new Error('Could not find your profile to save the name to');
       }
 
       logger.debug('[DisplayNameSetup] Display name set successfully:', displayName.trim());
