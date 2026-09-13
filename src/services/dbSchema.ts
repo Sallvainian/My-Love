@@ -117,6 +117,13 @@ export interface MyLoveDBSchema extends DBSchema {
     indexes: {
       'by-category': string;
       'by-date': Date;
+      /**
+       * Owner of a custom row. Seeded daily rows and legacy custom rows carry
+       * no `userId`, so IndexedDB leaves them out of this index entirely —
+       * which is why ownership filtering is done in the service rather than by
+       * reading this index alone.
+       */
+      'by-user': string;
     };
   };
   photos: {
@@ -187,7 +194,12 @@ export const DB_NAME = 'my-love-db';
 //
 // v7 replaces the moods `by-date` unique index with `by-user-date`, unique on
 // [userId, date], so two accounts on one device can each hold today's mood.
-export const DB_VERSION = 7;
+//
+// v8 adds `by-user` to the messages store. Custom messages carry an owner now,
+// for the same reason moods do: the store holds every account that has signed
+// in on this device, and an unscoped read handed one partner the other's
+// private custom messages to list, edit, delete, export and rotate through.
+export const DB_VERSION = 8;
 
 /**
  * Store name constants for consistent access across services
@@ -205,7 +217,7 @@ export const STORE_NAMES = {
 
 /**
  * Centralized IndexedDB upgrade function
- * Handles all store creation and migrations for v1-v5
+ * Handles all store creation and migrations for v1-v8
  *
  * Called by all services to ensure consistent database schema.
  * This fixes the tech debt where each service had duplicate upgrade logic.
@@ -241,7 +253,26 @@ export function upgradeDb(
     });
     messageStore.createIndex('by-category', 'category');
     messageStore.createIndex('by-date', 'createdAt');
-    logger.debug('[dbSchema] Created messages store with indexes (v1)');
+    messageStore.createIndex('by-user', 'userId');
+    logger.debug('[dbSchema] Created messages store with indexes (v1, by-user at v8)');
+  } else if (tx) {
+    // v8: add `by-user` to an existing store. Same mechanics as the moods
+    // branch below — adding an index to a store that already exists needs the
+    // versionchange transaction, so a caller that cannot supply one leaves the
+    // store alone rather than half-migrating. Every opener threads `tx`.
+    //
+    // Gated on the index being absent, not on `oldVersion < 8`: a profile that
+    // reached its current version through storage.ts's old hand-written
+    // callback can be at any version with any subset of the schema, and a
+    // version guard would skip past it forever.
+    const messageStore = tx.objectStore('messages');
+
+    if (!messageStore.indexNames.contains('by-user')) {
+      // Not unique: one account owns many custom rows, and the seeded daily
+      // rows carry no `userId` at all so IndexedDB simply omits them here.
+      messageStore.createIndex('by-user', 'userId');
+      logger.debug('[dbSchema] Created messages by-user index (v8)');
+    }
   }
 
   // v2: photos store

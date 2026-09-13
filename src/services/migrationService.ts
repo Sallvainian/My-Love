@@ -13,6 +13,16 @@ import { customMessageService } from './customMessageService';
  * This service handles the one-time migration of custom messages from LocalStorage
  * to the production-ready IndexedDB storage system. After successful migration,
  * the LocalStorage data is removed to prevent duplicate migrations.
+ *
+ * THESE ROWS HAVE NO OWNER, AND THIS MIGRATION MAY NOT INVENT ONE
+ *
+ * The Story 3.4 LocalStorage list predates accounts. It is per-device data, and
+ * the account signed in when this runs — App.tsx fires it once a session
+ * exists — is simply whoever opened the app first, not the author. Stamping it
+ * with that id would hand one partner the other's messages, which is the exact
+ * leak the ownership work removes. So the rows are stored unowned: preserved on
+ * disk, hidden from every account, claimed by none. Returning them to a user is
+ * a product decision, not one a migration makes silently.
  */
 
 const LOCALSTORAGE_KEY = 'my-love-custom-messages';
@@ -71,10 +81,14 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
       return result;
     }
 
-    // Get existing messages from IndexedDB to detect duplicates
-    const existingMessages = await customMessageService.getAll({ isCustom: true });
-    const existingTexts = new Set(existingMessages.map((m) => m.text.trim().toLowerCase()));
-
+    // Duplicate detection now lives inside customMessageService: it compares
+    // against the unowned rows only, and does the check and the write in one
+    // transaction. Reading those rows here to build a text set is precisely the
+    // unscoped read the service stopped exposing — and an owner-scoped read
+    // would compare this device's legacy list against the signed-in account's
+    // own messages, skipping a migration because the wrong person wrote the
+    // same sentence.
+    //
     // Migrate each message to IndexedDB
     for (const message of customMessages) {
       try {
@@ -87,11 +101,15 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
         };
 
         // Validate with schema before migration
+        // (createUnownedIfAbsent() also validates, but we validate here to provide better error messages during migration)
         const validated = CreateMessageInputSchema.parse(messageInput);
 
-        // Check for duplicates (same text already in IndexedDB)
-        const normalizedText = validated.text.trim().toLowerCase();
-        if (existingTexts.has(normalizedText)) {
+        // Store without an owner, skipping a text this device already migrated.
+        // The service's check-and-write is one transaction, so it also prevents
+        // duplicates WITHIN this batch without a local text set.
+        const outcome = await customMessageService.createUnownedIfAbsent(validated);
+
+        if (outcome === 'duplicate') {
           logger.debug(
             '[MigrationService] Skipping duplicate message:',
             validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
@@ -100,11 +118,6 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
           continue;
         }
 
-        // Create message in IndexedDB via customMessageService
-        // (customMessageService.create() also validates, but we validate here to provide better error messages during migration)
-        await customMessageService.create(validated);
-
-        existingTexts.add(normalizedText); // Prevent duplicates within same migration
         result.migratedCount++;
         logger.info(
           '[MigrationService] Migrated message:',
