@@ -333,8 +333,17 @@ export async function navigateToTogetherRoleSelection(page: Page): Promise<strin
   // then loadCoupleStats (POST /rpc/scripture_get_couple_stats). Each response
   // causes a re-render that can detach the start button mid-click.
   // We must wait for the LAST response (couple stats) to guarantee stability.
+  //
+  // Pinned to the `select=partner` query rather than any /rest/v1/users hit:
+  // App's display-name gate reads `select=display_name` from the same table at
+  // app start, and the broader matcher could resolve this wait on THAT before
+  // loadPartner had run. Same discriminator the network-error monitor uses in
+  // tests/support/merged-fixtures.ts.
   const partnerLoaded = page.waitForResponse(
-    (resp) => resp.url().includes('/rest/v1/users') && resp.status() >= 200 && resp.status() < 300,
+    (resp) =>
+      resp.url().includes('/rest/v1/users?select=partner') &&
+      resp.status() >= 200 &&
+      resp.status() < 300,
     { timeout: 20_000 }
   );
   const statsLoaded = page.waitForResponse(

@@ -115,7 +115,13 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
       displayName: null,
     });
     await log.step('Seed the existing store identity and mount its pending initial lookup');
-    await authBootstrap.mount({ initialIdentity: { userId: original.user.id, email: original.user.email } });
+    // `displayName: null` on the session no longer decides the gate — the gate
+    // reads the profile row. `profileDisplayName: null` is the same scenario
+    // expressed where it now lives: this account has chosen no name.
+    await authBootstrap.mount({
+      initialIdentity: { userId: original.user.id, email: original.user.email },
+      profileDisplayName: null,
+    });
     await expect(page.getByText('Loading...', { exact: true })).toBeVisible();
     const before = await authBootstrap.snapshot();
 

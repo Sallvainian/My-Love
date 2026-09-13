@@ -165,7 +165,7 @@ test.describe('Foreign implicit fragment — already signed in', () => {
       // assertion, and it is what makes reading storage below race-free: the
       // attacker's account is brand new and has no display name, so a client
       // that accepted the fragment lands on the setup overlay instead, which
-      // `App.tsx:527` returns *in place of* the shell.
+      // `src/App.tsx:581` returns *in place of* the shell.
       await expect(page.getByTestId('app-container')).toBeVisible();
       await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
       await expect(page.getByTestId('login-screen')).toHaveCount(0);
