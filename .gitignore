@@ -140,7 +140,7 @@ test-results.json
 gha-creds-*.json
 .bmad-loop/runs/
 .bmad-loop/cache/
-.bmad-loop/policy.toml
+.bmad-loop/archive/
 _bmad/render/
 
 # BMAD customization overrides are deliberate configuration, not installed
