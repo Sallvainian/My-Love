@@ -11,6 +11,17 @@ vi.mock('../../../src/api/interactionService', () => ({
   InteractionService: class {
     subscribeInteractions = subscribeInteractions;
     resolvePartnerId = resolvePartnerId;
+    // Derived from the same stub so every existing `resolvePartnerId.mock*`
+    // setup keeps working: an id is `linked`, null is `unlinked`, and a
+    // rejection is the inconclusive `error` the reconnect path must not act on.
+    resolvePartnerLookup = async () => {
+      try {
+        const partnerId = await resolvePartnerId();
+        return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
+      } catch (error) {
+        return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+      }
+    };
     sendPoke = sendPoke;
     sendKiss = sendKiss;
   },
@@ -45,6 +56,12 @@ interface CapturedSubscription {
 }
 
 const subscriptions: CapturedSubscription[] = [];
+
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 function createTestStore() {
   const createSlices: AppStateCreator<TestStore> = (...args) => ({
@@ -354,6 +371,49 @@ describe('interactionsSlice subscription bridge', () => {
     subscription.reportInteraction(interaction('from-the-partner'));
     expect(store.getState().interactions.map(({ id }) => id)).toEqual(['from-the-partner']);
     expect(store.getState().unviewedCount).toBe(1);
+  });
+
+  it('keeps delivering when a reconnect cannot confirm the partner', async () => {
+    // The reconnect re-resolve is the one write that can clobber a WORKING
+    // snapshot. A failed `users` read is indistinguishable from an unlink
+    // unless the lookup says so, and `SUBSCRIBED` fires once more on a healthy
+    // socket, so a failure-null here drops every poke and kiss for the rest of
+    // the page view while `isSubscribed` stays true and the UI looks fine.
+    const store = createTestStore();
+    await store.getState().subscribeToInteractions(vi.fn());
+    const subscription = subscriptions[0];
+
+    subscription.reportInteraction(interaction('before-the-drop'));
+    expect(store.getState().interactions.map(({ id }) => id)).toEqual(['before-the-drop']);
+
+    // Wi-Fi blips; the channel rejoins and the `users` read fails outright.
+    resolvePartnerId.mockRejectedValue(new Error('network down'));
+    subscription.reportStatus('SUBSCRIBED');
+    await flushMicrotasks();
+
+    subscription.reportInteraction(interaction('after-the-blip'));
+    expect(store.getState().interactions.map(({ id }) => id)).toEqual([
+      'after-the-blip',
+      'before-the-drop',
+    ]);
+  });
+
+  it('still stops delivery when a reconnect confirms the relationship ended', async () => {
+    // The conclusive case must keep working: re-resolving on a re-join is
+    // exactly how an ex-partner stops being authorized.
+    const store = createTestStore();
+    await store.getState().subscribeToInteractions(vi.fn());
+    const subscription = subscriptions[0];
+
+    subscription.reportInteraction(interaction('while-linked'));
+    expect(store.getState().interactions.map(({ id }) => id)).toEqual(['while-linked']);
+
+    resolvePartnerId.mockResolvedValue(null);
+    subscription.reportStatus('SUBSCRIBED');
+    await flushMicrotasks();
+
+    subscription.reportInteraction(interaction('after-the-unlink'));
+    expect(store.getState().interactions.map(({ id }) => id)).toEqual(['while-linked']);
   });
 
   it('refuses every record while the relationship is unknown', async () => {

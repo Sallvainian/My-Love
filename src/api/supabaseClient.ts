@@ -227,20 +227,25 @@ export const lookupPartnerId = async (): Promise<PartnerLookup> => {
  * drops every broadcast. What changes is that one transient failure no longer
  * looks like an unlink, which is what made the drop permanent.
  */
-export const resolvePartnerIdForDelivery = async (): Promise<string | null> => {
-  for (let attempt = 0; attempt < LOOKUP_ATTEMPTS; attempt += 1) {
-    const result = await lookupPartnerId();
+export const resolvePartnerLookupForDelivery = async (): Promise<PartnerLookup> => {
+  let last: PartnerLookup = { status: 'error', reason: 'not attempted' };
 
-    if (result.status === 'linked') return result.partnerId;
-    if (result.status === 'unlinked') return null;
+  for (let attempt = 0; attempt < LOOKUP_ATTEMPTS; attempt += 1) {
+    last = await lookupPartnerId();
+    if (last.status !== 'error') return last;
 
     const backoff = LOOKUP_BACKOFF_MS[attempt];
     if (backoff === undefined) break;
     await new Promise((resolve) => setTimeout(resolve, backoff));
   }
 
-  console.error('[Supabase] Partner lookup failed on every attempt; delivery stays closed');
-  return null;
+  console.error('[Supabase] Partner lookup failed on every attempt; answer is inconclusive');
+  return last;
+};
+
+export const resolvePartnerIdForDelivery = async (): Promise<string | null> => {
+  const result = await resolvePartnerLookupForDelivery();
+  return result.status === 'linked' ? result.partnerId : null;
 };
 
 export const getPartnerId = async (): Promise<string | null> => {
