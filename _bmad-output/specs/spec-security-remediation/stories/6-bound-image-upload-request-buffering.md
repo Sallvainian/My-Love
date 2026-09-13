@@ -2,7 +2,7 @@
 title: 'Bound image upload request buffering'
 type: 'bugfix'
 created: '2026-09-12'
-status: in-review
+status: 'done'
 baseline_revision: f99300ccab627787d420cc98ec464030f0730a51
 review_loop_iteration: 0
 followup_review_recommended: false
