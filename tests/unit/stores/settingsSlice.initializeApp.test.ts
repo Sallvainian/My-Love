@@ -19,8 +19,11 @@ vi.mock('../../../src/data/defaultMessagesLoader', () => ({
   loadDefaultMessages: mockLoadDefaultMessages,
 }));
 
+const SIGNED_IN_USER = 'USER-A-ID';
+
 type TestState = SettingsSlice & {
   __isHydrated: boolean;
+  userId: string | null;
   isLoading: boolean;
   error: string | null;
   messages: Message[];
@@ -37,6 +40,11 @@ const buildTestStore = async () => {
 
   const store = create<TestState>()((set, get, api) => ({
     __isHydrated: true,
+    // `initializeApp` reads this to scope its message load. Without it the
+    // slice's `get().userId` is undefined and every assertion below passes
+    // whether the argument is the signed-in user or a hardcoded null — which
+    // would empty every user's rotation pool of their own custom rows.
+    userId: SIGNED_IN_USER,
     isLoading: false,
     error: null,
     messages: [],
@@ -96,6 +104,10 @@ describe('createSettingsSlice initializeApp', () => {
       ])
     );
     expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(2);
+    // Both reads — the "is this database seeded?" check and the re-read for
+    // auto-generated ids — are scoped to the signed-in account.
+    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(1, SIGNED_IN_USER);
+    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2, SIGNED_IN_USER);
     expect(store.getState().messages).toEqual(seededMessages);
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });
@@ -120,6 +132,7 @@ describe('createSettingsSlice initializeApp', () => {
     expect(mockLoadDefaultMessages).not.toHaveBeenCalled();
     expect(mockStorageService.addMessages).not.toHaveBeenCalled();
     expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(1);
+    expect(mockStorageService.getAllMessages).toHaveBeenCalledWith(SIGNED_IN_USER);
     expect(store.getState().messages).toEqual(existingMessages);
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });

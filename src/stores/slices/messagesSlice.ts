@@ -9,6 +9,14 @@
  *
  * Cross-slice dependencies:
  * - Depends on Settings (uses settings.relationship.startDate for message rotation)
+ * - authSlice: custom messages belong to one account. Every action that reaches
+ *   IndexedDB captures `{ userId, authSessionVersion }` at entry, passes the
+ *   captured id to the service, and rechecks the pair before every post-await
+ *   `set()` — the `photosSlice`/`eventsSlice` idiom. `authSessionVersion` is
+ *   paired with `userId` rather than compared alone so that A → signed out → A
+ *   again is distinguishable from an uninterrupted A: `clearAuth` bumps it on
+ *   every sign-out, and an id-only compare would let a request raised in the
+ *   dead session write as if it were live.
  */
 
 import { customMessageService } from '../../services/customMessageService';
@@ -77,14 +85,27 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
 
   // Actions
   loadMessages: async () => {
+    // Rotation pool: shared daily rows plus this account's own custom rows.
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const stillCurrent = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
-      const messages = await storageService.getAllMessages();
+      const messages = await storageService.getAllMessages(requestedBy);
+      if (!stillCurrent()) return;
       set({ messages });
     } catch (error) {
       console.error('Error loading messages:', error);
     }
   },
 
+  /**
+   * @deprecated Dead action: no component calls it, and it writes `isCustom:
+   * true` straight through `storageService.addMessage` with no owner — which
+   * would produce exactly the legacy unowned row this slice now hides.
+   * Deliberately left alone (removing it is not this change), but do not wire a
+   * caller to it. Use `createCustomMessage`, which stamps the owner.
+   */
   addMessage: async (text, category) => {
     try {
       const newMessage: Omit<Message, 'id'> = {
@@ -333,8 +354,16 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
 
   // Custom message actions (Story 3.5: Migrated to IndexedDB)
   loadCustomMessages: async () => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const stillCurrent = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
-      const customMessagesFromDB = await customMessageService.getAll({ isCustom: true });
+      // Signed out this returns [], so the AdminPanel list empties rather than
+      // showing whatever the last account left on disk.
+      const customMessagesFromDB = await customMessageService.getAllForUser(requestedBy, {
+        isCustom: true,
+      });
 
       // Convert Date objects to ISO strings for CustomMessage interface
       const customMessages: CustomMessage[] = customMessagesFromDB.map((m) => ({
@@ -348,18 +377,27 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
         tags: m.tags,
       }));
 
+      if (!stillCurrent()) return;
       set({ customMessages, customMessagesLoaded: true });
       logger.debug(`[AdminPanel] Loaded ${customMessages.length} custom messages from IndexedDB`);
     } catch (error) {
       console.error('[AdminPanel] Error loading custom messages from IndexedDB:', error);
+      // The `loaded` flag is half the guard: AdminPanel re-fires this effect
+      // while it is false, so an early return that skipped it would spin.
+      if (!stillCurrent()) return;
       set({ customMessages: [], customMessagesLoaded: true });
     }
   },
 
   createCustomMessage: async (input: CreateMessageInput) => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const stillCurrent = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
-      // Story 3.5: Save to IndexedDB via customMessageService
-      const message = await customMessageService.create(input);
+      // Story 3.5: Save to IndexedDB via customMessageService.
+      // Throws when signed out — there is no owner to stamp the row with.
+      const message = await customMessageService.create(requestedBy, input);
 
       // Convert to CustomMessage format for state
       const newCustomMessage: CustomMessage = {
@@ -372,6 +410,11 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
         updatedAt: message.updatedAt?.toISOString(),
         tags: message.tags,
       };
+
+      // The row is written and stamped with the id that asked for it either
+      // way; it is this session's STORE that is withheld once the account has
+      // changed under the request.
+      if (!stillCurrent()) return;
 
       // Update state (optimistic UI update)
       set((state) => ({
@@ -391,9 +434,17 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
   },
 
   updateCustomMessage: async (input: UpdateMessageInput) => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const stillCurrent = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
-      // Story 3.5: Update in IndexedDB via customMessageService
-      await customMessageService.updateMessage(input);
+      // Story 3.5: Update in IndexedDB via customMessageService.
+      // Throws when the row is not this user's, so a stale id from another
+      // account's list cannot change their message.
+      await customMessageService.updateMessage(requestedBy, input);
+
+      if (!stillCurrent()) return;
 
       // Update state (optimistic UI update)
       set((state) => ({
@@ -423,9 +474,16 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
   },
 
   deleteCustomMessage: async (id: number) => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const stillCurrent = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
-      // Story 3.5: Delete from IndexedDB via customMessageService
-      await customMessageService.delete(id);
+      // Story 3.5: Delete from IndexedDB via customMessageService.
+      // Throws for a row this user does not own.
+      await customMessageService.deleteForUser(requestedBy, id);
+
+      if (!stillCurrent()) return;
 
       // Update state (optimistic UI update)
       set((state) => ({
@@ -479,8 +537,17 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
 
   // Export custom messages to JSON file (Story 3.5 AC-3.5.6)
   exportCustomMessages: async () => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const stillCurrent = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
-      const exportData = await customMessageService.exportMessages();
+      const exportData = await customMessageService.exportMessages(requestedBy);
+
+      // Guarded even though nothing here writes the store: the download itself
+      // is the disclosure. A file A asked for must not land in B's Downloads
+      // because the account changed while the read was in flight.
+      if (!stillCurrent()) return;
 
       // Generate filename with current date
       const dateStr = new Date().toISOString().split('T')[0];
@@ -510,13 +577,22 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
 
   // Import custom messages from JSON file (Story 3.5 AC-3.5.6)
   importCustomMessages: async (file: File) => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const stillCurrent = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
       // Read file content
       const text = await file.text();
       const exportData = JSON.parse(text);
 
-      // Import via service
-      const result = await customMessageService.importMessages(exportData);
+      // Import via service. Rows are stamped with the id captured at entry, so
+      // an import that settles after a switch still belongs to the account that
+      // started it — never to whoever is signed in when it lands.
+      const result = await customMessageService.importMessages(requestedBy, exportData);
+
+      // The rows are A's and stay A's; B's store is simply not touched.
+      if (!stillCurrent()) return result;
 
       // Reload custom messages and main messages
       await get().loadCustomMessages();

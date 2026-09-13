@@ -973,3 +973,43 @@ location: src/api/supabaseClient.ts:59-77
 source_spec: `3-require-browser-initiated-auth-callbacks.md`
 reason: Unverified. vite.config.ts:71 declares `display: 'standalone'`, and signInWithGoogle navigates the current context with window.location.href, which on the platforms checked keeps the round trip inside the app's own context and storage. What was not measured is an actual installed-PWA Google sign-in on a platform that hands OAuth to a separate browser context: there the returning `?code=` would find no verifier and be ignored, where the old implicit fragment carried the tokens themselves. Same failure mode as the private-window entry, a different trigger. Settle by completing one Google sign-in from the installed PWA on iOS and Android after deploy; if it fails, the fix is a storage adapter or a stated limitation, not a change to the flow type.
 status: open
+
+### DW-99: storageService.getMessage / updateMessage / deleteMessage / toggleFavorite still reach any row in the messages store by id with no ownership check.
+origin: spec-deferred f5bbde9a7366
+location: src/services/storage.ts:157,227-276
+source_spec: `7-partition-custom-messages-by-account.md`
+severity: medium
+reason: Verified at src/services/storage.ts:157 (getMessage returns any row) and :256-260 (toggleFavorite reads through it then writes isFavorite with no owner check). Pre-existing: none of these four were introduced or altered by this story, and the intent's Always list names only getAllMessages and getMessagesByCategory. Not reachable from the UI today because the ids a component can offer now come from the scoped `messages` array, but the service surface remains unscoped for any future caller.
+status: open
+
+### DW-100: messagesSlice.toggleFavorite set()s after an await with no identity capture or recheck.
+origin: spec-deferred 50b8808c997c
+location: src/stores/slices/messagesSlice.ts:130-148
+source_spec: `7-partition-custom-messages-by-account.md`
+severity: medium
+reason: Verified at src/stores/slices/messagesSlice.ts:130-148: `await storageService.toggleFavorite(messageId)` is followed by an unguarded set() writing both `messages` and `messageHistory.favoriteIds`. Pre-existing and outside the seven actions the intent enumerates; AGENTS.md records the guard as copy-pasted at 19 sites with uneven coverage. A switch landing mid-flight appends the outgoing account's message id to the incoming account's favoriteIds.
+status: open
+
+### DW-101: settingsSlice.initializeApp reads get().userId live at two points separated by an await, with no identity capture or recheck around its set({ messages }).
+origin: spec-deferred c9cd7a4ea314
+location: src/stores/slices/settingsSlice.ts:126,141
+source_spec: `7-partition-custom-messages-by-account.md`
+severity: low
+reason: Verified at src/stores/slices/settingsSlice.ts:126,141 with set() at :143,:147 and get().updateCurrentMessage() at :151. Caused by this story (the argument is new), but initializeApp is guarded by a module-level isInitialized flag and an App-level ref, so it runs once per page load and no reachable interleaving was demonstrated. It is now the only messages writer without the guard idiom this story introduced elsewhere.
+status: open
+
+### DW-102: The intent's I/O matrix states outcomes at three surfaces (service, store, UI) but the tests occupy two; the "AdminPanel shows none" half of row 1 is unasserted.
+origin: spec-deferred cd5ea7d12745
+location: src/components/AdminPanel/AdminPanel.tsx:26-30
+source_spec: `7-partition-custom-messages-by-account.md`
+severity: low
+reason: No AdminPanel component test exists anywhere under tests/, and no E2E spec covers admin or custom messages. The store chain that would carry it (customMessagesLoaded: false re-firing AdminPanel.tsx:26-30) is verified to exist by reading, not by test. Story :73 sanctions this ("AdminPanel needs no change if the slice signature stays"), so it is a gap against the verbatim matrix rather than a deviation from the plan.
+status: open
+
+### DW-103: DeleteConfirmDialog calls deleteCustomMessage without await or catch, so a rejected delete closes the dialog as if it succeeded and surfaces as an unhandled rejection.
+origin: spec-deferred 3c0512dcb4a2
+location: src/components/AdminPanel/DeleteConfirmDialog.tsx:21-24
+source_spec: `7-partition-custom-messages-by-account.md`
+severity: low
+reason: Verified at src/components/AdminPanel/DeleteConfirmDialog.tsx:21-24 (`deleteCustomMessage(message.id); onConfirm();`) against src/stores/slices/messagesSlice.ts:497-500, which re-throws. The missing await is pre-existing — messagesSlice re-threw before this story and BaseIndexedDBService.delete already threw on a DB error — but deleteForUser adds two new throw cases (signed out via requireOwner, and a row owned by someone else). Neither new case is reachable from the dialog today: the ids it offers come from the owner-scoped `customMessages` list and AdminPanel renders only behind a session. Settle by driving deleteCustomMessage through a rejection in a component test.
+status: open
