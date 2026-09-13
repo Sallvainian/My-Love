@@ -23,10 +23,37 @@ import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema'
  * Story 5.3: Refactored to extend BaseIndexedDBService to reduce duplication
  * Story 5.5: Added validation layer to prevent data corruption
  *
+ * OWNERSHIP IS A REQUIRED ARGUMENT, NOT A LOOKUP
+ *
+ * The `messages` store holds every account that has signed in on this device.
+ * Custom rows carry a `userId`; the seeded daily rows do not, and are shared by
+ * everyone. Every method here that returns, changes, counts or exports a row
+ * takes the caller's id and matches it against the row first — so one partner
+ * can no longer list, edit, delete, export or rotate through the other's
+ * private messages on a shared browser.
+ *
+ * The one exception is `createUnownedIfAbsent()`, which takes no caller id
+ * because it has none to take: it exists for the legacy LocalStorage migration
+ * and writes a row that belongs to NOBODY. It reads the whole store to
+ * deduplicate, and that is safe only because it returns no row to its caller —
+ * see its own comment.
+ *
+ * The id is passed IN rather than read from the store, so the service stays
+ * store-free and a continuation that resolves after an account switch writes
+ * under the id it was raised with instead of whoever is signed in now.
+ *
  * Extends: BaseIndexedDBService<Message>
- * - Inherits: init(), add(), get(), getAll(), update(), delete(), clear(), getPage()
+ * - Inherits: init(), add()
  * - Implements: getStoreName(), _doInit()
- * - Preserves: Service-specific methods (getActiveCustomMessages, exportMessages, importMessages)
+ * - OVERRIDDEN TO THROW: get(), getAll(), update(), delete(), clear(), getPage().
+ *   TypeScript cannot narrow an inherited public method into one that demands an
+ *   owner, so each unscoped base method is closed off here instead; nothing may
+ *   reach the base implementation for this store. Their owner-scoped
+ *   replacements are getForUser(), getAllForUser(), updateMessage() and
+ *   deleteForUser().
+ * - Owner-scoped: create(), getActiveCustomMessages(), exportMessages(),
+ *   importMessages()
+ * - Unowned, migration-only: createUnownedIfAbsent()
  */
 class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema, 'messages'> {
   /**
@@ -56,14 +83,123 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
     }
   }
 
+  // ==========================================================================
+  // Ownership
+  // ==========================================================================
+
   /**
-   * Create a new custom message in IndexedDB
+   * Is this row readable by `userId`?
+   *
+   * Seeded daily rows (`isCustom: false`) are shared — they ship with the app,
+   * carry no owner and are not partitioned. A custom row belongs to exactly one
+   * account. A custom row with no `userId` is legacy: it belongs to nobody and
+   * is readable by nobody. `userId` is always a non-empty string here (callers
+   * fail closed before reaching this), so an absent owner cannot match.
+   */
+  private isVisibleTo(message: Message, userId: string): boolean {
+    if (!message.isCustom) return true;
+    return message.userId === userId;
+  }
+
+  /**
+   * Is this row writable by `userId`?
+   *
+   * Stricter than readability: the shared daily rows are nobody's to change
+   * through this service, so only an owned custom row qualifies.
+   */
+  private isOwnedBy(message: Message, userId: string): boolean {
+    return message.isCustom === true && message.userId === userId;
+  }
+
+  /**
+   * Demand a signed-in owner for a mutation.
+   *
+   * Writes fail loudly rather than silently doing nothing, matching the base
+   * class's split: reads degrade to empty, writes throw. A signed-out caller
+   * has no custom messages to change, and guessing an owner is the whole bug
+   * this service exists to remove.
+   */
+  private requireOwner(userId: string | null | undefined, operation: string): string {
+    if (!userId) {
+      throw new Error(
+        `[CustomMessageService] ${operation} requires a signed-in user — refusing to write an unowned custom message`
+      );
+    }
+    return userId;
+  }
+
+  // ==========================================================================
+  // Inherited unscoped methods — closed off
+  //
+  // Each of these is public on BaseIndexedDBService and reaches every account's
+  // rows in this store. They cannot be narrowed to demand an owner (a subclass
+  // method may not add required parameters), so they are overridden to throw
+  // and named replacements are provided below.
+  // ==========================================================================
+
+  /** @deprecated Unscoped. Use {@link getForUser}. */
+  async get(_id: number | string): Promise<Message | null> {
+    throw new Error(
+      '[CustomMessageService] get() is unscoped — use getForUser(userId, id) so one account cannot read another’s custom messages'
+    );
+  }
+
+  /** @deprecated Unscoped. Use {@link getAllForUser}. */
+  async getAll(): Promise<Message[]> {
+    throw new Error(
+      '[CustomMessageService] getAll() is unscoped — use getAllForUser(userId, filter) so one account cannot read another’s custom messages'
+    );
+  }
+
+  /** @deprecated Unscoped. Use {@link updateMessage}. */
+  async update(_id: number | string, _updates: Partial<Message>): Promise<void> {
+    throw new Error(
+      '[CustomMessageService] update() is unscoped — use updateMessage(userId, input) so one account cannot change another’s custom messages'
+    );
+  }
+
+  /** @deprecated Unscoped. Use {@link deleteForUser}. */
+  async delete(_id: number | string): Promise<void> {
+    throw new Error(
+      '[CustomMessageService] delete() is unscoped — use deleteForUser(userId, id) so one account cannot delete another’s custom messages'
+    );
+  }
+
+  /**
+   * @deprecated Unscoped, and has no owner-scoped replacement: clearing the
+   * store would take the seeded daily messages and every other account's custom
+   * rows with it. Delete rows one at a time through {@link deleteForUser}.
+   */
+  async clear(): Promise<void> {
+    throw new Error(
+      '[CustomMessageService] clear() would wipe every account’s messages — delete owned rows through deleteForUser(userId, id)'
+    );
+  }
+
+  /** @deprecated Unscoped. Page over {@link getAllForUser} instead. */
+  async getPage(_offset: number, _limit: number): Promise<Message[]> {
+    throw new Error(
+      '[CustomMessageService] getPage() is unscoped — page over getAllForUser(userId, filter) instead'
+    );
+  }
+
+  // ==========================================================================
+  // Owner-scoped API
+  // ==========================================================================
+
+  /**
+   * Create a new custom message owned by `userId`
    * AC-3.5.1: Save to IndexedDB messages store with isCustom: true
    * AC-5.5.6: Validate input at service boundary before IndexedDB write
    * Uses inherited add() method from base class
+   *
+   * @param userId - The authenticated user the row belongs to. Required.
+   * @param input - Message content
    */
-  async create(input: CreateMessageInput): Promise<Message> {
+  async create(userId: string | null, input: CreateMessageInput): Promise<Message> {
     try {
+      const owner = this.requireOwner(userId, 'create');
+
       // Validate input at service boundary
       const validated = CreateMessageInputSchema.parse(input);
 
@@ -71,6 +207,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
         text: validated.text,
         category: validated.category,
         isCustom: true,
+        userId: owner,
         active: validated.active ?? true, // Default: true
         isFavorite: false,
         createdAt: new Date(),
@@ -95,25 +232,116 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
   }
 
   /**
-   * Update an existing custom message
+   * Store a legacy LocalStorage row that belongs to nobody
+   *
+   * The Story 3.4 LocalStorage list predates accounts entirely, so there is no
+   * honest owner for it: stamping it with whoever happens to be signed in when
+   * the migration runs is exactly the inference this story forbids. The row is
+   * written without a `userId`, which keeps it on disk and hides it from every
+   * account — the same standing as a custom row written before this field
+   * existed. If those rows should ever come back, that is a product decision,
+   * not something a migration may make on the user's behalf.
+   *
+   * Deduplication lives inside this method rather than in the caller so that no
+   * unowned row is ever handed out: reading them to compare texts is precisely
+   * what the rest of this service exists to prevent. The check and the write
+   * share one readwrite transaction, so two openers cannot both insert.
+   *
+   * @returns `'created'` when the row was written, `'duplicate'` when an
+   *          unowned row with the same text already exists
+   */
+  async createUnownedIfAbsent(input: CreateMessageInput): Promise<'created' | 'duplicate'> {
+    try {
+      const validated = CreateMessageInputSchema.parse(input);
+      await this.init();
+
+      const normalizedText = validated.text.trim().toLowerCase();
+      const tx = this.getTypedDB().transaction('messages', 'readwrite');
+
+      const existing = await tx.store.getAll();
+      const alreadyStored = existing.some(
+        (row) =>
+          row.isCustom === true &&
+          row.userId === undefined &&
+          row.text.trim().toLowerCase() === normalizedText
+      );
+
+      if (alreadyStored) {
+        await tx.done;
+        return 'duplicate';
+      }
+
+      // No `userId` key at all, rather than an explicit undefined: IndexedDB
+      // keeps the property when it is present, and an own-property `userId`
+      // reads back differently from an absent one in anything that inspects
+      // the row.
+      await tx.store.add({
+        text: validated.text,
+        category: validated.category,
+        isCustom: true,
+        active: validated.active ?? true,
+        isFavorite: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        tags: validated.tags || [],
+      } as Message);
+      await tx.done;
+
+      logger.debug('[CustomMessageService] Stored legacy message without an owner');
+      return 'created';
+    } catch (error) {
+      if (isZodError(error)) {
+        console.error('[CustomMessageService] Validation failed:', error.issues);
+        throw createValidationError(error);
+      }
+      console.error('[CustomMessageService] Failed to store legacy message:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update a custom message the caller owns
    * AC-3.5.4: Update active field to control rotation participation
    * AC-5.5.6: Validate input at service boundary before IndexedDB write
-   * Uses inherited update() method from base class with custom updatedAt logic
+   *
+   * The ownership read and the write share ONE readwrite transaction. Checking
+   * through the base class's `get` then `put` would leave an await between the
+   * two, which is the same check-then-act defect one microtask wide.
+   *
+   * @param userId - The authenticated user. Required.
+   * @param input - Fields to change, including the row id
+   * @throws if the row is missing, is a shared daily row, or belongs to someone
+   *         else — a write never fails silently
    */
-  async updateMessage(input: UpdateMessageInput): Promise<void> {
+  async updateMessage(userId: string | null, input: UpdateMessageInput): Promise<void> {
     try {
+      const owner = this.requireOwner(userId, 'updateMessage');
+
       // Validate input at service boundary
       const validated = UpdateMessageInputSchema.parse(input);
 
-      const updates: Partial<Message> = {
+      await this.init();
+
+      const tx = this.getTypedDB().transaction('messages', 'readwrite');
+      const current = await tx.store.get(validated.id);
+
+      if (!current || !this.isOwnedBy(current, owner)) {
+        await tx.done;
+        // Deliberately one message for "missing" and "not yours": a caller who
+        // may not touch the row also may not learn whether it exists.
+        throw new Error(`Custom message ${validated.id} not found for this user`);
+      }
+
+      await tx.store.put({
+        ...current,
         ...(validated.text !== undefined && { text: validated.text }),
         ...(validated.category !== undefined && { category: validated.category }),
         ...(validated.active !== undefined && { active: validated.active }),
         ...(validated.tags !== undefined && { tags: validated.tags }),
         updatedAt: new Date(),
-      };
+      });
+      await tx.done;
 
-      await super.update(validated.id, updates);
       logger.debug('[CustomMessageService] Custom message updated, id:', validated.id);
     } catch (error) {
       // Transform Zod validation errors into user-friendly messages
@@ -128,11 +356,92 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
   }
 
   /**
-   * Get all messages with optional filtering
-   * AC-3.5.3: Category filter works with custom messages
+   * Delete a custom message the caller owns
+   *
+   * Absent rows are a no-op, as the base class's delete was, so a retry that
+   * lands twice does not fail. A row that EXISTS and is not the caller's throws
+   * instead: that is the cross-account case, and it must not look like success.
+   *
+   * @param userId - The authenticated user. Required.
+   * @param id - Row id
    */
-  async getAll(filter?: MessageFilter): Promise<Message[]> {
+  async deleteForUser(userId: string | null, id: number): Promise<void> {
     try {
+      const owner = this.requireOwner(userId, 'deleteForUser');
+
+      await this.init();
+
+      const tx = this.getTypedDB().transaction('messages', 'readwrite');
+      const current = await tx.store.get(id);
+
+      if (!current) {
+        await tx.done;
+        logger.debug('[CustomMessageService] Nothing to delete, id:', id);
+        return;
+      }
+
+      if (!this.isOwnedBy(current, owner)) {
+        await tx.done;
+        throw new Error(`Custom message ${id} not found for this user`);
+      }
+
+      await tx.store.delete(id);
+      await tx.done;
+
+      logger.debug('[CustomMessageService] Custom message deleted, id:', id);
+    } catch (error) {
+      console.error(`[CustomMessageService] Failed to delete custom message ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get one message by id, if the caller may see it
+   *
+   * A read, so it degrades to `null` rather than throwing: another account's
+   * row, a legacy unowned row and a row that does not exist are indistinguishable
+   * to the caller, which is the point.
+   *
+   * @param userId - The authenticated user, or null when signed out
+   * @param id - Row id
+   */
+  async getForUser(userId: string | null, id: number): Promise<Message | null> {
+    try {
+      if (!userId) return null;
+
+      await this.init();
+
+      const message = await this.getTypedDB().get('messages', id);
+
+      if (!message || !this.isVisibleTo(message, userId)) return null;
+
+      return message;
+    } catch (error) {
+      console.error(`[CustomMessageService] Failed to get message ${id}:`, error);
+      return null; // Graceful fallback
+    }
+  }
+
+  /**
+   * Get the messages one user may see, with optional filtering
+   * AC-3.5.3: Category filter works with custom messages
+   *
+   * Returns the shared daily rows plus this user's own custom rows. Another
+   * account's custom rows and legacy unowned rows are never included, whatever
+   * the filter says.
+   *
+   * Signed out (`userId` null) this returns NOTHING, not the shared rows: the
+   * daily rotation reads through `storageService.getAllMessages`, so failing
+   * closed here costs nothing and removes the one way an unscoped read could
+   * still be reached.
+   *
+   * @param userId - The authenticated user, or null when signed out
+   * @param filter - Optional category / isCustom / active / text / tag filters
+   */
+  async getAllForUser(userId: string | null, filter?: MessageFilter): Promise<Message[]> {
+    try {
+      if (!userId) return [];
+
       await this.init();
 
       const db = this.getTypedDB();
@@ -144,6 +453,9 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       } else {
         messages = await db.getAll('messages');
       }
+
+      // Ownership FIRST, before any caller-supplied filter can widen it
+      messages = messages.filter((m) => this.isVisibleTo(m, userId));
 
       // Filter by isCustom
       if (filter?.isCustom !== undefined) {
@@ -183,26 +495,28 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
   }
 
   /**
-   * Note: delete() and get() methods are inherited from BaseIndexedDBService
-   * - delete(id: number): Promise<void> - Delete message by ID
-   * - get(id: number): Promise<Message | null> - Get message by ID (replaces getById)
-   */
-
-  /**
-   * Get only active custom messages for rotation algorithm
+   * Get one user's active custom messages for the rotation algorithm
    * AC-3.5.2: Only messages with active: true participate in daily rotation
+   *
+   * @param userId - The authenticated user, or null when signed out
    */
-  async getActiveCustomMessages(): Promise<Message[]> {
-    return this.getAll({ isCustom: true, active: true });
+  async getActiveCustomMessages(userId: string | null): Promise<Message[]> {
+    return this.getAllForUser(userId, { isCustom: true, active: true });
   }
 
   /**
-   * Export all custom messages to JSON for backup
+   * Export one user's custom messages to JSON for backup
    * AC-3.5.6: Export functionality for backing up custom messages
+   *
+   * The export file carries NO owner field. It is a list of texts, and the
+   * account that imports it becomes the owner of the rows it creates — an owner
+   * read out of a file would be an owner the importing user never chose.
+   *
+   * @param userId - The authenticated user, or null when signed out
    */
-  async exportMessages(): Promise<CustomMessagesExport> {
+  async exportMessages(userId: string | null): Promise<CustomMessagesExport> {
     try {
-      const messages = await this.getAll({ isCustom: true });
+      const messages = await this.getAllForUser(userId, { isCustom: true });
 
       const exportData: CustomMessagesExport = {
         version: '1.0',
@@ -233,14 +547,28 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
   }
 
   /**
-   * Import custom messages from JSON backup
+   * Import custom messages from JSON backup, owned by the importing user
    * AC-3.5.6: Import functionality with duplicate detection
    * AC-5.5.6: Validate import data structure before processing
+   *
+   * Duplicate detection compares against THIS user's rows only. Comparing
+   * against the whole store would silently skip a message because the other
+   * partner happens to have written the same sentence — which both loses the
+   * import and discloses that their row exists.
+   *
+   * Any owner field in the file is ignored: `CustomMessagesExportSchema` is a
+   * plain Zod object, so unknown keys are stripped before anything reads them.
+   *
+   * @param userId - The authenticated user. Required.
+   * @param exportData - Parsed export file
    */
   async importMessages(
+    userId: string | null,
     exportData: CustomMessagesExport
   ): Promise<{ imported: number; skipped: number }> {
     try {
+      const owner = this.requireOwner(userId, 'importMessages');
+
       // Validate import data structure at service boundary
       const validated = CustomMessagesExportSchema.parse(exportData);
 
@@ -251,8 +579,8 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       let importedCount = 0;
       let skippedCount = 0;
 
-      // Get existing custom message texts for duplicate detection
-      const existingMessages = await this.getAll({ isCustom: true });
+      // Get this user's existing custom message texts for duplicate detection
+      const existingMessages = await this.getAllForUser(owner, { isCustom: true });
       const existingTexts = new Set(existingMessages.map((m) => m.text.trim().toLowerCase()));
 
       for (const msg of validated.messages) {
@@ -265,7 +593,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
             msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
           );
         } else {
-          await this.create({
+          await this.create(owner, {
             text: msg.text,
             category: msg.category,
             active: msg.active,
