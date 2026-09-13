@@ -30,20 +30,43 @@ test.describe('Google OAuth', () => {
     // Supabase signInWithOAuth does a full page navigation to /auth/v1/authorize.
     // Intercept and redirect back to the app URL (not Supabase) to avoid 404.
     const appBaseUrl = page.url().replace(/\/$/, '');
+    // An array, not a `let`: a variable assigned only inside this callback stays
+    // narrowed to its initial type at the use site, so `authorizeUrl!` would be
+    // `never` there and the compiler could not check the assertions below.
+    const authorizeUrls: string[] = [];
     await page.route('**/auth/v1/authorize**', (route) => {
+      authorizeUrls.push(route.request().url());
       route.fulfill({
         status: 302,
         headers: { Location: appBaseUrl + '/' },
       });
     });
 
-    // WHEN: User clicks Google sign-in button
+    // WHEN: User clicks Google sign-in button. Arm the wait first: under PKCE
+    // the SDK awaits `crypto.subtle.digest` before assigning
+    // `window.location.href`, so the navigation no longer starts synchronously
+    // with the click and the assertions below would otherwise race an empty
+    // `authorizeUrls`.
+    const authorizeRequested = page.waitForRequest('**/auth/v1/authorize**');
     await page.getByTestId('google-signin-button').click();
+    await authorizeRequested;
 
     // THEN: The page navigated away from login (OAuth redirect was initiated)
     // After our intercept redirects back, the app reloads and shows login screen again
     await page.waitForLoadState('domcontentloaded');
     // If we got here, the OAuth flow was successfully initiated and intercepted
     await expect(page.getByTestId('login-screen')).toBeVisible({ timeout: 5000 });
+
+    // CAP-13: the real browser starts a PKCE flow, so the provider hands back a
+    // code this browser can redeem rather than tokens anyone could replay.
+    expect(authorizeUrls).toHaveLength(1);
+    const authorizeParams = new URL(authorizeUrls[0]).searchParams;
+    expect(authorizeParams.get('code_challenge_method')).toBe('s256');
+    expect(authorizeParams.get('code_challenge')).toBeTruthy();
+    // The project's redirect allow-list entry must keep matching exactly: the
+    // SDK appends a flow id only under experimental.appendPkceFlowIdToRedirects.
+    expect(authorizeParams.get('redirect_to')).toBe(appBaseUrl + '/');
+    expect(authorizeParams.get('access_type')).toBe('offline');
+    expect(authorizeParams.get('prompt')).toBe('consent');
   });
 });

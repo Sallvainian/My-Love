@@ -29,6 +29,37 @@
  * Sends are therefore queued per topic, and each one awaits its own teardown
  * before the next starts.
  *
+ * Every send here is PRIVATE, and goes over the REST broadcast endpoint rather
+ * than the websocket.
+ *
+ * `love-notes:<uuid>` and `mood-updates:<uuid>` used to be public topics that
+ * anyone holding the anon key could join and publish to. They are private now,
+ * authorized by the INSERT policy `couple_broadcast_partner_can_send` on
+ * `realtime.messages` (20260912010000_private_couple_broadcast_policies.sql),
+ * which admits a send only to the caller's current partner's topic. A caller
+ * with no session, or whose partner link has gone, is rejected -- there is
+ * deliberately no public fallback.
+ *
+ * Why REST and not a socket join. A sender holds INSERT on the partner's topic
+ * and deliberately NOT SELECT: a sender needs send permission, not blanket read
+ * permission across partner topics. Measured against realtime v2.124.4 on the
+ * local stack, a private websocket join with INSERT and no SELECT is refused --
+ *
+ *   error_code=Unauthorized [error] Unauthorized: You do not have permissions
+ *   to read from this Channel topic: love-notes:<uuid>
+ *
+ * -- so the join, not the send, is what a write-only grant fails. The REST
+ * broadcast endpoint evaluates the same INSERT policy without requiring a join:
+ * the partner's `httpSend` returns 202 and the recipient receives it, while an
+ * outsider's rejects with `Unauthorized` and nothing is delivered. Widening the
+ * SELECT policy to partner topics would have made the socket join work and is
+ * exactly what this story exists to avoid.
+ *
+ * Note `httpSend`, not `send`. The SDK's `send()` silently falls back to the
+ * same REST endpoint when the channel is not joined -- but it swallows the
+ * denial and resolves 'ok', which is measured behaviour, not a guess. Only
+ * `httpSend` surfaces the rejection the caller has to see.
+ *
  * @module api/ephemeralBroadcast
  */
 
@@ -37,11 +68,10 @@ import { waitForSocketReady } from './realtimeSocket';
 import { supabase } from './supabaseClient';
 
 /**
- * Upper bound on one send, measured from `subscribe()` to the send resolving.
+ * Upper bound on one send's HTTP request.
  *
- * Realtime applies its own 10s timeout and reports TIMED_OUT, which is the
- * signal we would rather act on, so this sits above it. It exists only so that a
- * channel that never reports any status at all cannot wedge the queue for its
+ * Passed straight to `httpSend`, which aborts the fetch when it elapses. It
+ * exists so that a request that never answers cannot wedge the queue for its
  * topic permanently — that would be a worse failure than the one being fixed.
  */
 const BROADCAST_TIMEOUT_MS = 15_000;
@@ -64,41 +94,49 @@ async function openSendClose(
   // The queues are per-topic but the socket is global, which is what made the
   // other order wrong: awaiting first left a microtask in which a send on a
   // DIFFERENT topic could finish its `finally`, drop the last channel and
-  // disconnect. This channel would then join nothing and report TIMED_OUT ten
-  // seconds later.
-  const channel = supabase.channel(topic);
+  // disconnect, leaving this send's `removeChannel` to drive a socket it never
+  // shared.
+  const channel = supabase.channel(topic, { config: { private: true } });
 
-  // Now wait out any disconnect already in flight. Subscribing inside that
-  // window calls socket.connect(), which returns early while disconnecting, so
-  // the join is never sent -- see realtimeSocket.
-  await waitForSocketReady();
-
+  // Everything after the claim runs inside the `try`, so that every path out of
+  // this function goes through the `removeChannel` below. Both awaits here can
+  // reject -- `setAuth` on a refresh failure, `waitForSocketReady` on its own
+  // timeout -- and before this block was widened either rejection left the topic
+  // in the client's registry for the life of the page. The claim itself stays
+  // outside: it is synchronous and cannot throw past the registry push, and
+  // moving it in would buy nothing while blurring the claim-then-wait order the
+  // comment above depends on.
   try {
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(new Error(`Broadcast to ${topic} timed out after ${BROADCAST_TIMEOUT_MS}ms`));
-      }, BROADCAST_TIMEOUT_MS);
+    // The REST endpoint authorizes against the socket's access token, which is
+    // the anon key until this runs -- and an anon caller holds no EXECUTE on
+    // get_my_partner_id, so the policy would never even be reached. It only sets
+    // the token, so it slots between the claim above and the wait below without
+    // disturbing either.
+    await supabase.realtime.setAuth();
 
-      const succeed = () => {
-        clearTimeout(timer);
-        resolve();
-      };
-      const fail = (error: unknown) => {
-        clearTimeout(timer);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      };
+    // Retained deliberately. The REST send below does not need the socket, but
+    // the `removeChannel` in the `finally` still drives the shared socket's
+    // disconnect when it takes the last channel out, and the claim-then-wait
+    // order this queue was built around is unchanged. Dropping it would be a
+    // change to the socket lifecycle that this story did not measure.
+    await waitForSocketReady();
 
-      channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          channel.send({ type: 'broadcast', event, payload }).then(succeed, fail);
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          fail(new Error(`Channel subscription failed: ${status}`));
-        }
-      });
-    });
+    // `httpSend` resolves only on a 202 and rejects on anything else, including
+    // the 'Unauthorized' an RLS denial produces. There is no status callback to
+    // wait on and no join to time out, so the 15s bound is handed to the fetch
+    // itself rather than raced against it.
+    const result = await channel.httpSend(event, payload, { timeout: BROADCAST_TIMEOUT_MS });
+
+    // Unreachable against realtime-js 2.116.0, which rejects rather than
+    // returning the failure shape -- but the signature admits it, and a
+    // silently dropped broadcast is the failure mode this module exists to
+    // prevent.
+    if (result.success === false) {
+      throw new Error(`Broadcast to ${topic} was rejected (${result.status}): ${result.error}`);
+    }
   } finally {
     // Awaited, not fired and forgotten: the topic stays claimed until the
-    // server acks the leave, and the next send in this queue would otherwise be
+    // client has let it go, and the next send in this queue would otherwise be
     // handed this dying channel.
     await supabase.removeChannel(channel);
   }
@@ -110,7 +148,8 @@ async function openSendClose(
  * @param topic - Realtime topic, e.g. `mood-updates:<partnerId>`
  * @param event - Broadcast event name the receiver listens for
  * @param payload - Broadcast body
- * @throws if the channel never subscribes, or the send fails
+ * @throws if the broadcast request is rejected — an RLS denial answers 403 and
+ *   rejects with `Unauthorized` — or times out
  */
 export function sendEphemeralBroadcast(
   topic: string,

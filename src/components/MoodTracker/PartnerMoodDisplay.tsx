@@ -102,9 +102,14 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
     return <NoMoodLoggedState />;
   }
 
-  // Read mood_types array, fall back to [mood_type] for legacy entries
+  // Read mood_types array, fall back to [mood_type] for legacy entries.
+  //
+  // Array.isArray, not a truthy check: this record can arrive over a Realtime
+  // broadcast, and a non-array `mood_types` would otherwise be indexed and
+  // mapped as if it were one. A string is the worst case -- truthy, with a
+  // length -- so it reaches the mood lookup one character at a time.
   const allMoods: MoodType[] =
-    partnerMood.mood_types && partnerMood.mood_types.length > 0
+    Array.isArray(partnerMood.mood_types) && partnerMood.mood_types.length > 0
       ? (partnerMood.mood_types as MoodType[])
       : [partnerMood.mood_type as MoodType];
 

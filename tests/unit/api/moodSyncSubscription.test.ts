@@ -60,6 +60,18 @@ const socket = {
 /** Resolvers for pending getSession calls, so resolution order is controllable */
 let sessionQueue: Array<(value: unknown) => void> = [];
 
+/**
+ * Config each `channel()` call was given, in call order. `mood-updates:<uuid>`
+ * is a private topic now: without `private: true` Realtime runs no policy check
+ * and anyone holding the anon key can join and publish on it.
+ */
+let channelConfigs: Array<unknown> = [];
+/** Order of the calls whose ORDER is load-bearing: setAuth must precede the join. */
+let opOrder: string[] = [];
+
+const getPartnerId = vi.fn();
+const getSignedInUserId = vi.fn();
+
 const getSession = vi.fn(
   () =>
     new Promise((resolve) => {
@@ -74,7 +86,8 @@ vi.mock('@/api/supabaseClient', () => ({
     },
     // Hands back whatever is registered under the topic, in ANY state — this is
     // the RealtimeClient behaviour a naive mock hides.
-    channel: (topic: string) => {
+    channel: (topic: string, config?: unknown) => {
+      channelConfigs.push(config);
       const existing = openChannels.get(topic);
       if (existing) return existing;
 
@@ -98,6 +111,7 @@ vi.mock('@/api/supabaseClient', () => ({
             chan.state = 'joining';
             return chan;
           }
+          opOrder.push(`subscribe:${chan.topic}`);
           chan.state = 'joined';
           chan.statusHandlers.push(handler);
           return chan;
@@ -132,15 +146,65 @@ vi.mock('@/api/supabaseClient', () => ({
     },
     realtime: {
       isDisconnecting: () => socket.state === 'disconnecting',
+      setAuth: async () => {
+        opOrder.push('setAuth');
+      },
     },
   },
-  getPartnerId: vi.fn(),
+  getPartnerId: (...args: unknown[]) => getPartnerId(...args),
+  // Both names at one mock: the receive paths read the snapshot through the
+  // retrying lookup and the send path through the plain one, but they wrap the
+  // same round-trip, so every existing setup in this file keeps its meaning.
+  resolvePartnerIdForDelivery: (...args: unknown[]) => getPartnerId(...args),
+  // Derived from the same stub: an id is `linked`, null is `unlinked`, and a
+  // rejection is the inconclusive `error` a refresh must not write back.
+  resolvePartnerLookupForDelivery: async (...args: unknown[]) => {
+    try {
+      const partnerId = await getPartnerId(...args);
+      return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
+    } catch (error) {
+      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+    }
+  },
+  getSignedInUserId: (...args: unknown[]) => getSignedInUserId(...args),
+  // `verifyChannelOwner` reads the session through the discriminated lookup so
+  // it can tell "signed out" from "the read failed". Derived from the same
+  // `getSignedInUserId` mock so the existing setups keep their meaning: a
+  // resolved id is `signed-in`, a resolved null is `signed-out`, and a REJECTED
+  // promise is the inconclusive `error` case.
+  resolveSignedInUserForDelivery: async (...args: unknown[]) => {
+    try {
+      const userId = await getSignedInUserId(...args);
+      return userId ? { status: 'signed-in', userId } : { status: 'signed-out' };
+    } catch (error) {
+      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+    }
+  },
 }));
 
 import { moodSyncService } from '@/api/moodSyncService';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
+const PARTNER_ID = '00000000-0000-4000-8000-000000000002';
+const OUTSIDER_ID = '00000000-0000-4000-8000-000000000003';
 const TOPIC = `mood-updates:${USER_ID}`;
+
+/**
+ * Stable UUID per test label.
+ *
+ * Broadcast bodies are parsed now, and the schema wants a real UUID for `id`.
+ * The tests still read better with names like 'after-reopen', so the label is
+ * mapped to a UUID rather than replaced by one.
+ */
+const moodIds = new Map<string, string>();
+function moodIdFor(label: string): string {
+  let id = moodIds.get(label);
+  if (!id) {
+    id = `00000000-0000-4000-8000-1${String(moodIds.size + 1).padStart(11, '0')}`;
+    moodIds.set(label, id);
+  }
+  return id;
+}
 
 /** Resolve the oldest pending getSession with a valid session */
 function resolveNextSession(): void {
@@ -149,20 +213,32 @@ function resolveNextSession(): void {
   resolve({ data: { session: { user: { id: USER_ID } } } });
 }
 
-/** Deliver a partner mood broadcast to everything attached to the channel */
-function emitMood(chan: FakeChannel, id: string): void {
+/**
+ * Deliver a partner mood broadcast to everything attached to the channel.
+ *
+ * `user_id` is the PARTNER, not the topic owner: the service now drops anything
+ * whose sender is not the partner snapshot taken at join.
+ */
+function emitMood(
+  chan: FakeChannel,
+  label: string,
+  overrides: Record<string, unknown> = {}
+): string {
+  const id = moodIdFor(label);
   chan.broadcastHandlers.forEach((handler) =>
     handler({
       payload: {
         id,
-        user_id: USER_ID,
+        user_id: PARTNER_ID,
         mood_type: 'happy',
         mood_types: ['happy'],
         note: null,
         created_at: '2026-08-03T12:00:00.000Z',
+        ...overrides,
       },
     })
   );
+  return id;
 }
 
 /** Report a subscription status to everything attached to the channel */
@@ -207,7 +283,13 @@ describe('subscribeMoodUpdates channel ownership', () => {
     constructedChannels = [];
     sessionQueue = [];
     leaveQueue = [];
+    channelConfigs = [];
+    opOrder = [];
     removeChannel.mockClear();
+    getPartnerId.mockReset();
+    getPartnerId.mockResolvedValue(PARTNER_ID);
+    getSignedInUserId.mockReset();
+    getSignedInUserId.mockResolvedValue(USER_ID);
     socket.state = 'connected';
     socket.windowMs = 40;
   });
@@ -263,7 +345,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     expect(onMoodA).not.toHaveBeenCalled();
     expect(onMoodB).toHaveBeenCalledTimes(1);
-    expect(onMoodB).toHaveBeenCalledWith(expect.objectContaining({ id: 'mood-after-a-left' }));
+    expect(onMoodB).toHaveBeenCalledWith(expect.objectContaining({ id: moodIdFor('mood-after-a-left') }));
 
     unsubscribeB();
   });
@@ -306,8 +388,8 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     // Only the first `.on()` handler is registered on the shared channel, so a
     // fan-out that forgot the second consumer would leave B silent.
-    expect(onMoodA).toHaveBeenCalledWith(expect.objectContaining({ id: 'shared-mood' }));
-    expect(onMoodB).toHaveBeenCalledWith(expect.objectContaining({ id: 'shared-mood' }));
+    expect(onMoodA).toHaveBeenCalledWith(expect.objectContaining({ id: moodIdFor('shared-mood') }));
+    expect(onMoodB).toHaveBeenCalledWith(expect.objectContaining({ id: moodIdFor('shared-mood') }));
 
     unsubscribeA();
     unsubscribeB();
@@ -413,7 +495,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     expect(reopened.state).toBe('joined');
 
     emitMood(reopened, 'after-reopen');
-    expect(onMoodB).toHaveBeenCalledWith(expect.objectContaining({ id: 'after-reopen' }));
+    expect(onMoodB).toHaveBeenCalledWith(expect.objectContaining({ id: moodIdFor('after-reopen') }));
     expect(onMoodA).not.toHaveBeenCalled();
 
     unsubscribeB();
@@ -484,6 +566,336 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     unsubscribeB();
     unsubscribeC();
+  });
+
+  it('opens the topic as a private channel, with the JWT installed before the join', async () => {
+    const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    // A public join to this topic is readable and writable by anyone holding
+    // the project's anon key; `private: true` is what makes the SELECT policy
+    // on realtime.messages run at all.
+    expect(channelConfigs).toEqual([
+      { config: { broadcast: { self: false }, private: true } },
+    ]);
+    // And the token has to be on the socket first, or the join is evaluated
+    // against the anon key and denied.
+    expect(opOrder).toEqual(['setAuth', `subscribe:${TOPIC}`]);
+
+    unsubscribe();
+  });
+
+  it('drops a broadcast from someone who is not the partner', async () => {
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    // The identity check lives in the service, not in each consumer:
+    // PartnerMoodView raised a toast for ANY broadcast, so a check that only
+    // usePartnerMood performed left that path exposed.
+    emitMood(constructedChannels[0], 'forged', { user_id: OUTSIDER_ID });
+
+    expect(onMood).not.toHaveBeenCalled();
+
+    unsubscribe();
+  });
+
+  it('drops malformed broadcasts without reaching a subscriber', async () => {
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    // A non-array mood_types used to be indexed and mapped straight into three
+    // mood views; an unknown mood_type has no MOOD_CONFIG entry; a missing
+    // created_at leaves the timeline with no timestamp to sort on.
+    emitMood(channel, 'string-moods', { mood_types: 'happy' });
+    emitMood(channel, 'number-moods', { mood_types: 7 });
+    emitMood(channel, 'unknown-type', { mood_type: 'hangry' });
+    emitMood(channel, 'no-created-at', { created_at: undefined });
+    channel.broadcastHandlers.forEach((handler) =>
+      handler({ payload: 'not an object' } as unknown as { payload: Record<string, unknown> })
+    );
+
+    expect(onMood).not.toHaveBeenCalled();
+
+    unsubscribe();
+  });
+
+  it('delivers a valid multi-mood broadcast whole', async () => {
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const id = emitMood(constructedChannels[0], 'multi', { mood_types: ['happy', 'tired'] });
+
+    expect(onMood).toHaveBeenCalledWith(
+      expect.objectContaining({ id, mood_types: ['happy', 'tired'] })
+    );
+    // The wire carries no updated_at; the receiver has always used the creation
+    // time in its place.
+    expect(onMood.mock.calls[0][0]).toMatchObject({ updated_at: '2026-08-03T12:00:00.000Z' });
+
+    unsubscribe();
+  });
+
+  it('stops dispatching once the device is signed in as a different account', async () => {
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+    emitMood(channel, 'before-switch');
+    expect(onMood).toHaveBeenCalledTimes(1);
+
+    // Sign-out, or a second account on a shared device, while this channel is
+    // still open. The next join re-checks, and the topic no longer belongs to
+    // whoever is signed in.
+    getSignedInUserId.mockResolvedValue(OUTSIDER_ID);
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    emitMood(channel, 'after-switch');
+    expect(onMood).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  it('keeps the join-time snapshot on the FIRST SUBSCRIBED', async () => {
+    // `subscribeMoodUpdates` resolved the partner moments before the join and
+    // assigned it. Re-taking it here would null a fresh value and re-fetch it
+    // over a `users` round-trip, and `parseMoodBroadcast` drops everything for
+    // want of a partner id while that is in flight -- so a mood sent as the
+    // view opens would be lost, silently and for good.
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+    const lookupsAfterJoin = getPartnerId.mock.calls.length;
+
+    // Were this SUBSCRIBED to refresh, the mood below would land in the window
+    // where the snapshot is null and be dropped.
+    emitStatus(channel, 'SUBSCRIBED');
+    emitMood(channel, 'immediately-after-join');
+    expect(onMood).toHaveBeenCalledTimes(1);
+
+    await flush();
+    // And it cost no second round-trip.
+    expect(getPartnerId.mock.calls.length).toBe(lookupsAfterJoin);
+
+    unsubscribe();
+  });
+
+  it('re-takes the partner snapshot on a RE-join', async () => {
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    // The join itself. Everything after this is a re-join.
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    // The relationship ended while the channel was up. RLS is re-evaluated at
+    // the re-join, and so is this snapshot.
+    getPartnerId.mockResolvedValue(null);
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    emitMood(channel, 'after-unlink');
+    expect(onMood).not.toHaveBeenCalled();
+
+    unsubscribe();
+  });
+
+  it('keeps the partner when a RE-join refresh is inconclusive', async () => {
+    // The refresh clears the snapshot BEFORE its round-trips, to close the
+    // ex-partner window. So a lookup that fails every attempt and writes its
+    // null back leaves the channel muted for the life of the page view:
+    // `refreshChannelIdentity` runs only on SUBSCRIBED and a healthy socket
+    // emits no further one. An ex-partner cannot exploit the restored value --
+    // `couple_broadcast_partner_can_send` pins the send on `get_my_partner_id()`,
+    // so after a real unlink the server refuses their insert outright.
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    // The join itself. Everything after this is a re-join.
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    // The socket drops and rejoins; the `users` read fails outright.
+    getPartnerId.mockRejectedValueOnce(new Error('network down'));
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    emitMood(channel, 'after-the-blip');
+    expect(onMood).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  it('a later subscriber re-arms a snapshot a failed refresh had nulled', async () => {
+    // The recovery half of the line above: `entry.partnerId = partnerIdAtJoin`
+    // runs for EVERY caller, not only the one that opens the channel. Without
+    // it, a refresh that resolved null — a failed `users` lookup, or a session
+    // read that momentarily reported no account — leaves the entry muted for
+    // the life of the page, because `refreshChannelIdentity` only runs on the
+    // next SUBSCRIBED and an already-joined channel never emits another.
+    const onMoodA = vi.fn();
+    const pendingA = moodSyncService.subscribeMoodUpdates(onMoodA);
+    resolveNextSession();
+    const unsubscribeA = await pendingA;
+
+    const channel = constructedChannels[0];
+
+    // The join, then the re-join whose lookup fails. Only a RE-join refreshes,
+    // so the failing lookup has to be the second SUBSCRIBED.
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    getPartnerId.mockResolvedValue(null);
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    emitMood(channel, 'while-muted');
+    expect(onMoodA).not.toHaveBeenCalled();
+
+    // The Partner tab mounts. Its own lookup succeeds, and that is the only
+    // thing that can restore delivery for BOTH consumers.
+    getPartnerId.mockResolvedValue(PARTNER_ID);
+    const onMoodB = vi.fn();
+    const pendingB = moodSyncService.subscribeMoodUpdates(onMoodB);
+    resolveNextSession();
+    const unsubscribeB = await pendingB;
+
+    expect(constructedChannels).toHaveLength(1);
+
+    emitMood(channel, 'after-rearm');
+    expect(onMoodB).toHaveBeenCalledTimes(1);
+    expect(onMoodA).toHaveBeenCalledTimes(1);
+
+    unsubscribeA();
+    unsubscribeB();
+  });
+
+  it('a later subscriber whose lookup fails does not mute a working channel', async () => {
+    // The other half of the line above. `entry.partnerId = partnerIdAtJoin`
+    // must not run when the lookup FAILED: getPartnerId answers null for a
+    // transient `users` error exactly as it does for an unlink, so an
+    // unguarded write here lets the second consumer's failed round-trip
+    // silently stop partner moods for the first one too — and nothing
+    // re-arms it, because refreshChannelIdentity fires only on SUBSCRIBED
+    // and an already-joined channel emits no further one.
+    const onMoodA = vi.fn();
+    const pendingA = moodSyncService.subscribeMoodUpdates(onMoodA);
+    resolveNextSession();
+    const unsubscribeA = await pendingA;
+
+    const channel = constructedChannels[0];
+
+    emitMood(channel, 'before');
+    expect(onMoodA).toHaveBeenCalledTimes(1);
+
+    // The Partner tab mounts while the websocket is healthy, but its `users`
+    // round-trip fails.
+    getPartnerId.mockResolvedValue(null);
+    const onMoodB = vi.fn();
+    const pendingB = moodSyncService.subscribeMoodUpdates(onMoodB);
+    resolveNextSession();
+    const unsubscribeB = await pendingB;
+
+    expect(constructedChannels).toHaveLength(1);
+
+    // Both consumers still receive the partner's mood.
+    emitMood(channel, 'after');
+    expect(onMoodA).toHaveBeenCalledTimes(2);
+    expect(onMoodB).toHaveBeenCalledTimes(1);
+
+    unsubscribeA();
+    unsubscribeB();
+  });
+
+  it('re-takes the snapshot on the first SUBSCRIBED when the join lookup failed', async () => {
+    // Mirror of the love-notes case: `partnerIdAtJoin` is null because the
+    // lookup failed, not because the user is unlinked, so the entry must not be
+    // marked fresh -- nothing else would re-arm it with one consumer mounted.
+    getPartnerId.mockResolvedValue(null);
+
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    // The retry succeeds this time.
+    getPartnerId.mockResolvedValue(PARTNER_ID);
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    emitMood(channel, 'after-recovery');
+    expect(onMood).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  it('a failed session read at the first SUBSCRIBED does not mute the channel', async () => {
+    // `getSignedInUserId` answers null for a FAILED `getSession` exactly as it
+    // does for "signed out", so reading that null as an account change muted
+    // the channel on a session the user still held -- terminally, because
+    // `refreshChannelIdentity` runs only on a later SUBSCRIBED and a healthy
+    // socket emits none. The scenario: the access token expires as the channel
+    // joins and the refresh hits a network blip.
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    getSignedInUserId.mockRejectedValue(new Error('network down'));
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    // The read told us nothing, so the join-time snapshot stands.
+    emitMood(channel, 'after-inconclusive-read');
+    expect(onMood).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  it('still mutes when the session read conclusively reports another account', async () => {
+    // The other side of the line above: a CONCLUSIVE answer naming a different
+    // account still stops dispatch on the first SUBSCRIBED.
+    const onMood = vi.fn();
+    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    resolveNextSession();
+    const unsubscribe = await pending;
+
+    const channel = constructedChannels[0];
+
+    getSignedInUserId.mockResolvedValue(OUTSIDER_ID);
+    emitStatus(channel, 'SUBSCRIBED');
+    await flush();
+
+    emitMood(channel, 'after-account-change');
+    expect(onMood).not.toHaveBeenCalled();
+
+    unsubscribe();
   });
 
   it('returns a no-op unsubscribe when there is no session', async () => {

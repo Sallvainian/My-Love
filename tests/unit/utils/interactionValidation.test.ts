@@ -4,9 +4,12 @@ import {
   isValidInteractionType,
   validatePartnerId,
   validateInteraction,
+  validateIncomingInteraction,
+  NoPartnerError,
   sanitizeInput,
   INTERACTION_ERRORS,
 } from '@/utils/interactionValidation';
+import type { SupabaseInteractionRecord } from '@/types';
 
 describe('isValidUUID', () => {
   it('accepts a valid UUID v4', () => {
@@ -124,5 +127,100 @@ describe('INTERACTION_ERRORS', () => {
     expect(INTERACTION_ERRORS).toHaveProperty('RATE_LIMIT');
     expect(INTERACTION_ERRORS).toHaveProperty('SERVER_ERROR');
     expect(INTERACTION_ERRORS).toHaveProperty('UNKNOWN_ERROR');
+  });
+});
+
+describe('validateIncomingInteraction', () => {
+  const ME = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const PARTNER = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const STRANGER = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+  function incoming(
+    overrides: Partial<SupabaseInteractionRecord> = {}
+  ): SupabaseInteractionRecord {
+    return {
+      id: 'incoming-1',
+      type: 'poke',
+      from_user_id: PARTNER,
+      to_user_id: ME,
+      viewed: false,
+      created_at: '2026-09-12T12:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  it('accepts a row addressed to me and sent by my current partner', () => {
+    expect(
+      validateIncomingInteraction(incoming(), { currentUserId: ME, partnerId: PARTNER })
+    ).toEqual({ isValid: true });
+  });
+
+  it('accepts a kiss as well as a poke', () => {
+    expect(
+      validateIncomingInteraction(incoming({ type: 'kiss' }), {
+        currentUserId: ME,
+        partnerId: PARTNER,
+      }).isValid
+    ).toBe(true);
+  });
+
+  it('rejects a row sent by anyone other than the current partner', () => {
+    const result = validateIncomingInteraction(incoming({ from_user_id: STRANGER }), {
+      currentUserId: ME,
+      partnerId: PARTNER,
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe('Interaction was not sent by the current partner');
+  });
+
+  it('rejects a row addressed to another account', () => {
+    const result = validateIncomingInteraction(incoming({ to_user_id: STRANGER }), {
+      currentUserId: ME,
+      partnerId: PARTNER,
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe('Interaction is addressed to another account');
+  });
+
+  it('rejects everything while the relationship is unknown', () => {
+    const result = validateIncomingInteraction(incoming(), {
+      currentUserId: ME,
+      partnerId: null,
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe(INTERACTION_ERRORS.NO_PARTNER);
+  });
+
+  it('rejects everything when nobody is signed in', () => {
+    const result = validateIncomingInteraction(incoming(), {
+      currentUserId: null,
+      partnerId: PARTNER,
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe('Not authenticated');
+  });
+
+  it('rejects an interaction type the app does not render', () => {
+    const result = validateIncomingInteraction(incoming({ type: 'hug' }), {
+      currentUserId: ME,
+      partnerId: PARTNER,
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe('Invalid interaction type: hug.');
+  });
+});
+
+describe('NoPartnerError', () => {
+  it('carries the shared no-partner sentence and a name the UI can match on', () => {
+    const error = new NoPartnerError();
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe('NoPartnerError');
+    expect(error.message).toBe(INTERACTION_ERRORS.NO_PARTNER);
   });
 });
