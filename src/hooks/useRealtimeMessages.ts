@@ -25,7 +25,11 @@
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useCallback, useEffect, useRef } from 'react';
-import { resolvePartnerIdForDelivery, supabase } from '../api/supabaseClient';
+import {
+  resolvePartnerIdForDelivery,
+  resolvePartnerLookupForDelivery,
+  supabase,
+} from '../api/supabaseClient';
 import { parseLoveNoteBroadcast } from '../api/validation/broadcastSchemas';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
@@ -139,17 +143,30 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // for the length of the round-trip would check the first notes off the
       // rejoined channel against the relationship this refresh exists to
       // replace. Dropping them for that window is the safe direction.
+      const previous = partnerIdRef.current;
       partnerIdRef.current = null;
 
-      // Retries a FAILED lookup rather than reading its null as "unlinked".
-      // This is the site the permanent mute came from: the clear above is
-      // correct and has to stay, so a transient error here left the ref null
-      // with nothing to re-arm it -- SUBSCRIBED fires once on a healthy socket
-      // -- and every subsequent note was dropped for the life of the mount.
-      void resolvePartnerIdForDelivery().then((partnerId) => {
-        if (cancelled) return;
-        partnerIdRef.current = partnerId;
-      });
+      // An INCONCLUSIVE lookup restores what was there rather than leaving the
+      // clear above standing. The clear is correct and has to stay, but a
+      // retry that exhausts every attempt still answers null through the
+      // `string | null` wrapper, so writing it back left the ref null with
+      // nothing to re-arm it -- SUBSCRIBED fires once on a healthy socket --
+      // and every subsequent note was dropped for the life of the mount.
+      // A conclusive unlink still writes null, which is the point of the
+      // refresh.
+      void resolvePartnerLookupForDelivery()
+        .then((lookup) => {
+          if (cancelled) return;
+          if (lookup.status === 'error') {
+            partnerIdRef.current = previous;
+            return;
+          }
+          partnerIdRef.current = lookup.status === 'linked' ? lookup.partnerId : null;
+        })
+        .catch(() => {
+          if (cancelled) return;
+          partnerIdRef.current = previous;
+        });
     };
 
     // Create user-specific channel for receiving messages
