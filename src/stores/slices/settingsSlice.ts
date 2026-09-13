@@ -119,8 +119,11 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
       // Initialize IndexedDB
       await storageService.init();
 
-      // Load messages from IndexedDB
-      const storedMessages = await storageService.getAllMessages();
+      // Load messages from IndexedDB — shared daily rows plus this account's
+      // own custom rows. The seeding decision below reads the same list, and
+      // still works when nobody is signed in: the daily rows are shared, so
+      // their absence is what marks an unseeded database.
+      const storedMessages = await storageService.getAllMessages(get().userId);
 
       // If no messages exist, populate with default messages
       if (storedMessages.length === 0) {
@@ -135,7 +138,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         await storageService.addMessages(messagesToAdd);
 
         // Reload messages from IndexedDB to get auto-generated IDs
-        const messagesWithIds = await storageService.getAllMessages();
+        const messagesWithIds = await storageService.getAllMessages(get().userId);
 
         // MessagesSlice state - no cast needed
         set({ messages: messagesWithIds });

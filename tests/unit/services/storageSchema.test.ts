@@ -150,6 +150,22 @@ describe('storageService schema', () => {
     }
   });
 
+  it('leaves a messages store custom rows can be partitioned in', async () => {
+    // The mirror of the moods case above. `by-user` is what separates one
+    // account's custom messages from the other's on a shared device, so
+    // `contains('messages')` alone is not enough of an assertion.
+    const storageService = await freshStorageService();
+    await storageService.init();
+
+    const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+    try {
+      const store = db.transaction('messages', 'readonly').objectStore('messages');
+      expect(store.indexNames.contains('by-user')).toBe(true);
+    } finally {
+      db.close();
+    }
+  });
+
   it('does not discard rows already in a healthy database', async () => {
     // NOTE: this asserts that reopening at the SAME version preserves rows. It
     // deliberately does NOT exercise `upgradeDb` — opening twice at DB_VERSION
@@ -169,6 +185,109 @@ describe('storageService schema', () => {
     await reopened.init();
 
     expect(await reopened.getMessage(messageId)).toMatchObject({ text: 'keep me' });
+  });
+
+  describe('message reads are scoped to one account', () => {
+    /**
+     * `getAllMessages` feeds the daily rotation and the Home screen, and the
+     * store holds every account that has signed in on this device — so
+     * unscoped it put one partner's private custom messages into the other's
+     * rotation pool. Driven through the real storageService against a real
+     * store, because the property under test is which ROWS come back.
+     */
+    const A = '00000000-0000-4000-8000-00000000000a';
+    const B = '00000000-0000-4000-8000-00000000000b';
+
+    async function seedSharedDevice() {
+      const storageService = await freshStorageService();
+      await storageService.init();
+      await storageService.addMessage({
+        text: 'BUNDLED-DAILY',
+        category: 'reason',
+        isCustom: false,
+        isFavorite: false,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      });
+      await storageService.addMessage({
+        text: 'A-PRIVATE-CUSTOM',
+        category: 'custom',
+        isCustom: true,
+        userId: A,
+        isFavorite: false,
+        createdAt: new Date('2026-08-03T06:00:00.000Z'),
+      });
+      await storageService.addMessage({
+        text: 'B-PRIVATE-CUSTOM',
+        category: 'custom',
+        isCustom: true,
+        userId: B,
+        isFavorite: false,
+        createdAt: new Date('2026-08-03T06:00:00.000Z'),
+      });
+      // Legacy: written before custom rows carried an owner, or migrated from
+      // the Story 3.4 LocalStorage list. Belongs to nobody.
+      await storageService.addMessage({
+        text: 'LEGACY-OWNERLESS',
+        category: 'custom',
+        isCustom: true,
+        isFavorite: false,
+        createdAt: new Date('2026-08-03T06:00:00.000Z'),
+      });
+      return storageService;
+    }
+
+    it('returns the shared daily rows plus only the caller’s own custom rows', async () => {
+      const storageService = await seedSharedDevice();
+
+      expect((await storageService.getAllMessages(B)).map((m) => m.text).sort()).toEqual([
+        'B-PRIVATE-CUSTOM',
+        'BUNDLED-DAILY',
+      ]);
+      expect((await storageService.getAllMessages(A)).map((m) => m.text).sort()).toEqual([
+        'A-PRIVATE-CUSTOM',
+        'BUNDLED-DAILY',
+      ]);
+    });
+
+    it('still loads the daily rows when nobody is signed in, and no custom row', async () => {
+      const storageService = await seedSharedDevice();
+
+      // Signing out must not blank Home — the bundled messages are shared —
+      // but it must not leave anyone's custom rows in the pool either.
+      expect((await storageService.getAllMessages(null)).map((m) => m.text)).toEqual([
+        'BUNDLED-DAILY',
+      ]);
+    });
+
+    it('excludes the legacy unowned row from every caller', async () => {
+      const storageService = await seedSharedDevice();
+
+      for (const caller of [A, B, null]) {
+        const pool = await storageService.getAllMessages(caller);
+        expect(pool.map((m) => m.text)).not.toContain('LEGACY-OWNERLESS');
+      }
+      // …and it is still on disk: hidden, not deleted, not claimed.
+      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+      try {
+        expect((await db.getAll('messages')).map((m) => m.text)).toContain('LEGACY-OWNERLESS');
+      } finally {
+        db.close();
+      }
+    });
+
+    it('scopes getMessagesByCategory the same way', async () => {
+      const storageService = await seedSharedDevice();
+
+      // This read goes through the by-category index rather than getAll, which
+      // is a separate path to the same rows.
+      expect((await storageService.getMessagesByCategory('custom', B)).map((m) => m.text)).toEqual([
+        'B-PRIVATE-CUSTOM',
+      ]);
+      expect(await storageService.getMessagesByCategory('custom', null)).toEqual([]);
+      expect((await storageService.getMessagesByCategory('reason', A)).map((m) => m.text)).toEqual([
+        'BUNDLED-DAILY',
+      ]);
+    });
   });
 
   describe('upgrading an existing database', () => {
@@ -248,6 +367,29 @@ describe('storageService schema', () => {
         expect(indexNames).not.toContain('by-date');
         // And the seeded row survived the index swap.
         expect(await db.getAll('moods')).toHaveLength(1);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('[from v5] adds the messages by-user index without dropping rows', async () => {
+      // `seedLegacy` builds `messages` the way a pre-v8 profile has it: no
+      // owner index. Reached through storageService rather than by calling
+      // upgradeDb directly, because storage.ts has to thread the versionchange
+      // transaction through for the existing-store branch to run at all.
+      await seedLegacy(5, 'id');
+
+      const storageService = await freshStorageService();
+      await storageService.init();
+
+      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+      try {
+        const tx = db.transaction('messages', 'readonly');
+        const indexNames = Array.from(tx.store.indexNames);
+        await tx.done;
+
+        expect(indexNames).toContain('by-user');
+        expect(await db.getAll('messages')).toHaveLength(1);
       } finally {
         db.close();
       }
