@@ -100,9 +100,10 @@ export class InteractionService {
   /**
    * Resolve the signed-in account's current partner.
    *
-   * A thin wrapper over `resolvePartnerIdForDelivery()`, and the only place the
-   * store reads the relationship from. It is a method rather than a direct
-   * import so the browser harness in
+   * A thin wrapper over `resolvePartnerIdForDelivery()`. No `src/` caller
+   * remains: the store's subscribe path reads `resolvePartnerLookup()` below,
+   * which keeps a failed read apart from an unlink. This stays because it is a
+   * method rather than a direct import, so the browser harness in
    * `tests/support/harnesses/interaction-record-ownership.tsx` can supply a
    * partner identity the same way it already supplies the subscription — that
    * page runs without a Supabase session, where the real lookup can only answer

@@ -398,6 +398,30 @@ describe('interactionsSlice subscription bridge', () => {
     ]);
   });
 
+  it('keeps a working snapshot when the pre-subscribe lookup cannot confirm the partner', async () => {
+    // The pre-subscribe write is the OTHER site that can clobber a working
+    // snapshot. Teardown deliberately leaves the snapshot in place, and
+    // PokeKissInterface remounts on every navigation back into the partner
+    // view, so a remount whose `users` read fails would blank a value the
+    // previous mount resolved correctly and refuse every record after it.
+    const store = createTestStore();
+    const unsubscribe = await store.getState().subscribeToInteractions(vi.fn());
+    expect(store.getState().interactionPartnerId).toBe(OTHER_USER_ID);
+
+    // The slice's own teardown, not the service mock's: it is the one that
+    // leaves the snapshot in place.
+    unsubscribe();
+    expect(store.getState().interactionPartnerId).toBe(OTHER_USER_ID);
+
+    // Navigating back remounts; this time the `users` read fails outright.
+    resolvePartnerId.mockRejectedValue(new Error('network down'));
+    await store.getState().subscribeToInteractions(vi.fn());
+
+    expect(store.getState().interactionPartnerId).toBe(OTHER_USER_ID);
+    subscriptions[subscriptions.length - 1].reportInteraction(interaction('after-the-remount'));
+    expect(store.getState().interactions.map(({ id }) => id)).toContain('after-the-remount');
+  });
+
   it('still stops delivery when a reconnect confirms the relationship ended', async () => {
     // The conclusive case must keep working: re-resolving on a re-join is
     // exactly how an ex-partner stops being authorized.
