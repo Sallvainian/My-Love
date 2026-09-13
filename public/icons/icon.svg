@@ -1,10 +1,12 @@
-<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Two hearts leaning together">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF6B9D;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#F43F5E;stop-opacity:1" />
+    <linearGradient id="g3" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF2F6"/>
+      <stop offset="1" stop-color="#FFD3E0"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" fill="url(#grad)" rx="120"/>
-  <text x="50%" y="55%" font-size="280" text-anchor="middle" dy=".1em">💕</text>
+  <rect x="0" y="0" width="512" height="512" fill="url(#g3)"/>
+  <path d="M 243.71 372.45 C 157.39 332.09 112.07 299.67 104.73 258.02 C 97.39 216.37 126.35 186 157.08 180.58 C 180.12 176.52 200.21 185.61 213.47 200.95 C 220.69 181.99 236.45 166.58 259.5 162.52 C 290.22 157.1 327.83 175.73 335.17 217.38 C 342.52 259.03 311.02 305.01 243.71 372.45 Z" fill="#F43F5E"/>
+  <path d="M 325.26 259.37 C 285.33 209.96 267.65 177.28 275.42 150.18 C 283.19 123.08 309.43 113.35 329.42 119.08 C 344.42 123.38 353.79 134.69 357.26 147.77 C 367.12 138.52 381.07 133.89 396.07 138.19 C 416.06 143.92 433.15 166.08 425.38 193.18 C 417.61 220.28 385.3 238.62 325.26 259.37 Z" fill="none" stroke="#FFF2F6" stroke-width="26" stroke-linejoin="round"/>
+  <path d="M 325.26 259.37 C 285.33 209.96 267.65 177.28 275.42 150.18 C 283.19 123.08 309.43 113.35 329.42 119.08 C 344.42 123.38 353.79 134.69 357.26 147.77 C 367.12 138.52 381.07 133.89 396.07 138.19 C 416.06 143.92 433.15 166.08 425.38 193.18 C 417.61 220.28 385.3 238.62 325.26 259.37 Z" fill="#FF6B9D"/>
 </svg>
