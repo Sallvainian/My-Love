@@ -110,7 +110,7 @@ export const SEEDED_MESSAGE_HISTORY = {
  * `Date`. `src/App.tsx:625` hands these straight to `getUpcomingEventCards`,
  * whose filter calls `getCalendarDaysDiff(event.date, now)` — and that
  * function's first statement is `date.getFullYear()`
- * (`src/components/RelationshipTimers/EventCountdown.tsx`). A rehydrated event
+ * (`src/components/RelationshipTimers/eventCountdownHelpers.ts`). A rehydrated event
  * therefore throws a `TypeError` inside Home's render, on top of disclosing
  * the previous couple's dates. Both harms come from this one shape.
  */
