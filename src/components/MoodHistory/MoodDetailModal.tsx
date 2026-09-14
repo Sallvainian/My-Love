@@ -86,9 +86,15 @@ function MoodDetailContent({
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Read moods array, fall back to [mood.mood] for legacy entries
+  // Read moods array, fall back to [mood.mood] for legacy entries.
+  //
+  // Array.isArray, not a truthy check: a truthy value that is not an array can
+  // still clear `.length > 0` and is then used as one. Measured pre-fix, both a
+  // string and an array-like object throw `allMoods.map is not a function` in
+  // the icon row below -- that map runs before the title's className, so
+  // `primaryMoodConfig` is never dereferenced either way.
   const allMoods: MoodType[] =
-    mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood as MoodType];
+    Array.isArray(mood.moods) && mood.moods.length > 0 ? mood.moods : [mood.mood as MoodType];
 
   const primaryMoodConfig = MOOD_CONFIG[allMoods[0]];
   const moodDate = new Date(mood.timestamp);
