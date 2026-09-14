@@ -155,3 +155,4 @@ _bmad/custom/*
 # negation above would otherwise re-include it. Do not rely on the inner
 # `_bmad/custom/.gitignore` for this -- it is not itself tracked.
 _bmad/custom/*.user.toml
+.bmad-loop/policy.toml
