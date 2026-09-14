@@ -895,7 +895,8 @@ origin: spec-deferred 2f395306ff06
 location: src/api/supabaseClient.ts:128-136
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 reason: src/api/supabaseClient.ts:128-136 returns null on any PostgREST error, and both receivers treat a null snapshot as "trust nothing". A snapshot taken at join would then stay null until the next SUBSCRIBED. I could not show the program reaches this: the users query and the Realtime socket address the same host, so a network failure denies the join too and the retry path runs. Settle by reproducing a PostgREST-only failure (for example a 500 injected at /rest/v1/users) while the websocket stays healthy, and observing whether notes stop arriving.
-status: open
+status: done 2026-09-14
+resolution: already resolved: Resolved by 6fe1fdad and 467e020c: src/api/supabaseClient.ts:180 lookupPartnerId now returns {status:'error',reason} instead of null for a PostgREST failure (:205-210), resolvePartnerLookupForDelivery retries three times with backoff (:222-243), and both receivers restore the previous snapshot rather than muting -- src/hooks/useRealtimeMessages.ts:159-162 (if lookup.status === 'error' then partnerIdRef.current = previous; return) and src/api/moodSyncService.ts:492-495 (if lookup.status === 'error' then entry.partnerId = previous; return). The permanent drop the entry describes is closed.
 
 ### DW-89: The Array.isArray guard was adopted at the three broadcast-facing mood sites and not at the four siblings that share the identical idiom.
 origin: spec-deferred c4d4e08547c9
@@ -926,7 +927,8 @@ origin: spec-deferred e08d417d905d
 location: src/api/supabaseClient.ts:81-92
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 reason: src/api/supabaseClient.ts:81-92 returns null on any getSession error or throw, and refreshChannelIdentity (src/api/moodSyncService.ts:455-460) treats `null !== entry.ownerUserId` as an account change and nulls the partner snapshot. Only the next SUBSCRIBED or a new subscriber's `entry.partnerId = partnerIdAtJoin` restores it, and an already-joined channel emits no further SUBSCRIBED. I could not show the program reaches this: refreshChannelIdentity runs only from the SUBSCRIBED arm, i.e. moments after the same session authorized the private join, so a session read that fails while that join succeeds is not demonstrated. Same shape as the getPartnerId ambiguity already recorded. Settle by injecting a getSession failure while the websocket stays healthy and observing whether partner moods stop arriving.
-status: open
+status: done 2026-09-14
+resolution: already resolved: Resolved by aa2357ca and e611f45d: src/api/supabaseClient.ts:111 lookupSignedInUser returns {status:'error',reason} rather than null for a getSession failure (:117-120), and src/api/moodSyncService.ts:510-531 verifyChannelOwner returns true on session.status === 'error' -- logging 'Session read was inconclusive; not treating it as an account change' -- so a transient session read is no longer read as an account change and no longer mutes the channel.
 
 ### DW-93: The PKCE callback is never exercised against the deployed site: no real Google consent round-trip, and the hosted redirect-URL allow list was not read.
 origin: spec-deferred 5ada678c7e15
