@@ -156,3 +156,12 @@ _bmad/custom/*
 # `_bmad/custom/.gitignore` for this -- it is not itself tracked.
 _bmad/custom/*.user.toml
 .bmad-loop/policy.toml
+
+# Grok CLI (bmad-loop review adapter) — MUST stay tracked.
+# Grok filters repo-scoped skills that are gitignored, and bmad-loop runs
+# sessions in `git worktree` checkouts, so .grok/skills must be real tracked
+# files for the review stage to find bmad-build-auto. Do not ignore .grok/.
+# The bare `skills/` rule above (BMAD section) otherwise swallows
+# .grok/skills, so it must be negated explicitly.
+!.grok/
+!.grok/skills/
