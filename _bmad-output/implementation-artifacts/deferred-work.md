@@ -916,7 +916,9 @@ location: tests/e2e/notes/love-notes.spec.ts
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 severity: low
 reason: tests/api/couple-broadcast-authorization.spec.ts builds its own createClient identities and calls join()/httpSend() directly; it imports neither useRealtimeMessages, moodSyncService, sendEphemeralBroadcast nor the store, and tests/e2e/notes/love-notes.spec.ts and tests/e2e/partner/partner-mood.spec.ts mention neither realtime nor broadcast. The policy predicates themselves are measured because the spec builds the same topic strings and the same session-based clients, but the composition shipped to users is covered only by mocked unit tests. Pre-existing for both features. Settle with a two-context E2E in the shape of the togetherMode scripture specs.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-realtime-browser-e2e
+resolution-undo: 5c15a4b3473ab95dce8d5efbbfbf9ea1f4df3395307ef5d5fdbbbf666e03049e 2026-09-14 7374617475733a206f70656e
 
 ### DW-91: An effect re-run that lands while the previous run's un-awaited removeChannel is still deregistering is handed the dying channel.
 origin: spec-deferred 76257cdda80f
@@ -1178,4 +1180,12 @@ location: src/components/MoodHistory/CalendarDay.tsx:23, src/components/MoodTrac
 source_spec: `spec-dw-89-mood-array-shape-guards.md`
 severity: low
 reason: All seven guarded sites hand-roll `Array.isArray(x) && x.length > 0 ? x : [fallback]`: moodSlice.ts:394, CalendarDay.tsx:79, MoodDetailModal.tsx:97, PartnerMoodView.tsx:673, PartnerMoodDisplay.tsx:112, MoodTracker.tsx:177, MoodHistoryItem.tsx:44. MOOD_CONFIG is itself defined four times -- MoodDetailModal.tsx:27, CalendarDay.tsx:23, PartnerMoodView.tsx:35, MoodTracker.tsx:57 (measured with grep). A single normalizeMoods() would collapse the expression and turn DW-118 into a one-line change. Not fixed here: the intent scopes this to a one-expression shape guard per site and forbids type-level changes, so extracting a shared normalizer is a different piece of work.
+status: open
+
+### DW-123: The sibling private-broadcast path, mood-updates:<partnerId>, still has no browser-level Realtime coverage; DW-90 is closed for love notes only.
+origin: spec-deferred de21e27d0575
+location: tests/e2e/partner/partner-mood.spec.ts
+source_spec: `spec-dw-90-realtime-browser-e2e.md`
+severity: low
+reason: src/api/moodSyncService.ts:257 runs the same composition (private topic, sendEphemeralBroadcast, store, UI) under the same policy migration 20260912010000_private_couple_broadcast_policies.sql, whose predicates cover both prefixes. grep -c "realtime\|broadcast" tests/e2e/partner/partner-mood.spec.ts returns 0, and the only other tests/e2e files mentioning realtime are the interaction specs, whose own header states they do not exercise live Realtime. Pre-existing: this story's intent names one deliverable, "sends a love note from one context and asserts it arrives live in the other", so the mood leg was never in scope for it.
 status: open
