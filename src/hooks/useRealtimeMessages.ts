@@ -25,6 +25,7 @@
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useCallback, useEffect, useRef } from 'react';
+import { waitForSocketReady } from '../api/realtimeSocket';
 import {
   resolvePartnerIdForDelivery,
   resolvePartnerLookupForDelivery,
@@ -46,6 +47,80 @@ const RETRY_CONFIG = {
   baseDelay: 1000, // 1 second
   maxDelay: 30000, // 30 seconds max
 };
+
+/**
+ * Love-notes topics whose channel is mid-leave, keyed to the promise that
+ * settles when the server acks it.
+ *
+ * `removeChannel` does not deregister the channel — it only awaits
+ * `channel.unsubscribe()`, which flips the state to `leaving` and resolves on
+ * the ack; the client's registry entry is dropped later, from the `_onClose`
+ * hook (@supabase/realtime-js dist/module/RealtimeChannel.js:100-101). Until
+ * that lands, `supabase.channel(topic)` still hands back the dying object
+ * (@supabase/realtime-js dist/module/RealtimeClient.js:335-346), and
+ * `.subscribe()` on it does nothing at all because the whole join body is
+ * gated on the channel being closed (@supabase/realtime-js
+ * dist/module/RealtimeChannel.js:134 `if (this.channelAdapter.isClosed())`).
+ *
+ * Line numbers are the `dist/module` build throughout this file; `dist/main`
+ * is the same code at different offsets.
+ *
+ * Module scope, not a ref, and deliberately so: the cleanup closure of effect
+ * run N and the setup closure of run N+1 never share a ref cell, and two mounts
+ * of the Love Notes view both resolve to `love-notes:<uid>`. `moodSyncService`
+ * gets the same effect for free by being a singleton; this hook has to say it.
+ */
+const closingNoteChannels = new Map<string, Promise<unknown>>();
+
+/**
+ * Hand a channel back to the client and record the leave, so the next open for
+ * this topic waits it out instead of being handed the object that is still
+ * going away.
+ *
+ * The `.catch()` is load-bearing: a leave can resolve `error`, and that
+ * rejection must never propagate into an unrelated open.
+ */
+function releaseNoteChannel(topic: string, channel: RealtimeChannel): void {
+  const leaving = supabase.removeChannel(channel).catch((err) => {
+    logger.debug('[useRealtimeMessages] Love-notes channel leave failed:', err);
+  });
+  closingNoteChannels.set(topic, leaving);
+  void leaving.finally(() => {
+    // Only clear our own entry — a later teardown may already have replaced it.
+    if (closingNoteChannels.get(topic) === leaving) {
+      closingNoteChannels.delete(topic);
+    }
+  });
+}
+
+/**
+ * Wait out every leave recorded for this topic.
+ *
+ * Re-read after each await rather than awaiting the one promise captured up
+ * front: a teardown landing while we wait REPLACES the entry, and the open that
+ * follows would then race a leave nobody waited on.
+ *
+ * This loop is the one deliberate DIVERGENCE from `moodSyncService`, not a copy
+ * of it: that module reads `closingMoodChannels` exactly once (`:616`) and
+ * never re-reads it after its `await closing` (`:619`). Its `:621` re-read is
+ * of `moodChannels` -- the OPEN map -- for an unrelated reason it states at
+ * `:620`, "Another subscriber may have opened the replacement while we
+ * waited". So the same replaced-entry race is still open there; see DW-109's
+ * sibling note about the two registries diverging.
+ *
+ * The loop terminates because a settled leave deletes its own entry before this
+ * continuation runs.
+ */
+async function waitForNoteChannelLeaves(topic: string): Promise<void> {
+  let closing = closingNoteChannels.get(topic);
+  while (closing) {
+    logger.debug(`[useRealtimeMessages] Waiting for the previous ${topic} channel to close`);
+    await closing;
+    const next = closingNoteChannels.get(topic);
+    if (next === closing) break;
+    closing = next;
+  }
+}
 
 /** Pull the `message` field out of a broadcast body without trusting its shape. */
 function unwrapMessage(raw: unknown): unknown {
@@ -104,21 +179,22 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
 
     let subscriptionActive = true;
     // Set when this effect run is superseded or unmounted, so the async
-    // partner lookup and setAuth below do not go on to subscribe a channel this
-    // run no longer owns. supabase.channel() dedupes by topic, so a superseded
-    // run and its replacement share one object, and letting both call
-    // subscribe() sends duplicate phx_join frames — the same guard
-    // useScriptureBroadcast carries.
+    // partner lookup, the wait for a previous leave, and setAuth below do not
+    // go on to create and subscribe a channel this run no longer owns.
+    // supabase.channel() dedupes by topic, so a superseded run and its
+    // replacement would share one object, and letting both call subscribe()
+    // sends duplicate phx_join frames — the same guard useScriptureBroadcast
+    // carries.
     let cancelled = false;
 
     // Whether the partner snapshot can be trusted for the NEXT `SUBSCRIBED`.
     //
-    // The IIFE below resolves it immediately before the first `subscribe`, so
-    // it is fresh for that join and re-taking it would only cost delivery.
+    // The first open below resolves it immediately before the first `subscribe`,
+    // so it is fresh for that join and re-taking it would only cost delivery.
     // Every later join may span a relationship change, so it is marked stale
-    // both after a join is reported and before the retry path re-subscribes --
-    // a retry is a re-join even though the original join never reported
-    // SUBSCRIBED at all.
+    // both after a join is reported and before the retry path opens its
+    // replacement channel -- a retry is a re-join even though the original join
+    // never reported SUBSCRIBED at all.
     // Starts false and is raised only once the pre-join lookup below actually
     // produces a snapshot. `resolvePartnerIdForDelivery` answers null both for a
     // genuine unlink AND for a lookup that failed all three attempts, so an
@@ -129,6 +205,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     // A different account re-runs the effect with a different topic, and this
     // run's handlers are already inert by then.
     const currentUserId = userId;
+    const topic = `love-notes:${currentUserId}`;
 
     // Never carry the previous run's partner over; until it resolves, every
     // broadcast is dropped rather than trusted.
@@ -169,30 +246,33 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
         });
     };
 
-    // Create user-specific channel for receiving messages
-    const channel = supabase
-      .channel(`love-notes:${currentUserId}`, {
-        config: { private: true },
-      })
-      .on('broadcast', { event: 'new_message' }, (payload) => {
-        if (!subscriptionActive) return;
-        handleNewMessage((payload as { payload?: unknown })?.payload, currentUserId);
-      });
-
-    channelRef.current = channel;
-
     const handleStatus = (status: string, err?: Error) => {
       logger.info('[useRealtimeMessages] Subscription status:', status, err || '');
 
       // Reset retry count on successful subscription
       if (status === 'SUBSCRIBED') {
         retryCountRef.current = 0;
+        // And cancel the retry that failure scheduled. The SDK runs its own
+        // rejoin loop on an errored channel (@supabase/phoenix
+        // assets/js/phoenix/channel.js:76 `rejoinTimer.scheduleTimeout()`),
+        // so a channel can report SUBSCRIBED again from INSIDE our backoff
+        // window -- and now that the retry removes and recreates rather than
+        // re-subscribing, letting the stale timer fire would tear a healthy,
+        // joined channel down. Its replacement joins with `snapshotFresh`
+        // false, which nulls `partnerIdRef` for a PostgREST round-trip, and
+        // every note arriving in that window is dropped. Before the retry did
+        // real work this timer was harmless, which is why it was never cleared
+        // here.
+        if (retryTimeoutRef.current) {
+          clearTimeout(retryTimeoutRef.current);
+          retryTimeoutRef.current = null;
+        }
         // Only a RE-join re-takes the snapshot. The relationship may have
         // changed while the channel was down, so trusting the original join's
         // value across a reconnect would be wrong.
         //
         // The FIRST join is not that case, and refreshing it costs delivery for
-        // nothing: the IIFE below resolved the snapshot and assigned it
+        // nothing: the first open resolved the snapshot and assigned it
         // microseconds before calling `subscribe`, so clearing it here would
         // discard a fresh value and re-fetch it over a new PostgREST
         // round-trip. `parseLoveNoteBroadcast` drops every note for want of a
@@ -236,58 +316,170 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
         }
 
         // Schedule retry with exponential backoff. The delays are unchanged;
-        // what is new is the setAuth() ahead of the re-subscribe.
+        // what is new is that the retry REPLACES the channel instead of
+        // re-subscribing the one that failed.
         //
-        // A retry is a re-join, and a private join is authorized against the
-        // token on the socket. Re-installing it first is the same contract the
-        // first subscribe follows, and without it a retry that was scheduled
-        // because the token had gone stale would re-join with the stale token
-        // and be denied again — five times, and then give up.
+        // `channelRef.current.subscribe(handleStatus)` could never rejoin:
+        // RealtimeChannel gates its entire join body on the channel already
+        // being closed (@supabase/realtime-js
+        // dist/module/RealtimeChannel.js:134
+        // `if (this.channelAdapter.isClosed())`), a join-push or socket-level
+        // error leaves it `errored` (@supabase/realtime-js
+        // dist/module/RealtimeChannel.js:169, @supabase/phoenix
+        // assets/js/phoenix/channel.js:75), and a `subscribe()` that misses the
+        // gate just `return this` — no phx_join frame, no status callback,
+        // silence for the life of the page. Only a fresh object can join the
+        // topic again, and it can only be created once the leave of the old one
+        // has landed.
+        //
+        // The setAuth() ahead of the join stays where it was, inside
+        // `openChannel`: a retry is a re-join, and a private join is authorized
+        // against the token on the socket. Without it a retry that was
+        // scheduled because the token had gone stale would re-join with the
+        // stale token and be denied again — five times, and then give up.
+        // `openChannel` is also what releases the failed channel, and only
+        // once that setAuth has RESOLVED: releasing first would mean a rejected
+        // token install left no channel at all, and with nothing left to report
+        // a status, nothing would ever schedule another retry.
         retryTimeoutRef.current = setTimeout(() => {
-          if (!subscriptionActive || !channelRef.current) return;
-          void supabase.realtime.setAuth()
-            .then(() => {
-            if (!subscriptionActive || !channelRef.current) return;
-            // The backoff has elapsed since the snapshot was taken and this is
-            // a fresh join, so the SUBSCRIBED it produces must re-take it.
-            snapshotFresh = false;
-            // `handleStatus` again, not a bare subscribe(). RealtimeChannel wires
-            // the callback it is HANDED into _onError/_onClose and the joinPush
-            // receives; a retry that passes none reports nothing, so neither the
-            // retry-count reset nor the partner refresh below ever runs again and
-            // the rejoined channel keeps checking notes against the snapshot from
-            // the original join.
-            channelRef.current.subscribe(handleStatus);
-            })
-            // A rejected token install must not surface as an unhandled
-            // rejection. The retry is simply not made; the next CHANNEL_ERROR
-            // schedules another, and the channel stays closed meanwhile, which
-            // is the safe direction.
+          if (!subscriptionActive) return;
+
+          // The backoff has elapsed since the snapshot was taken and this is
+          // a fresh join, so the SUBSCRIBED it produces must re-take it. The
+          // retry itself deliberately does NOT re-resolve the partner before
+          // joining: every re-join re-takes the snapshot on SUBSCRIBED, and
+          // doing it here as well would take it twice.
+          snapshotFresh = false;
+
+          void openChannel({ takeSnapshot: false, releaseCurrent: true })
+            // A rejected token install — or a rejected leave, or anything else
+            // thrown in there — must not surface as an unhandled rejection.
+            // The retry is simply not made; the next CHANNEL_ERROR schedules
+            // another, and the channel stays closed meanwhile, which is the
+            // safe direction.
             .catch((error) => {
-              console.error('[useRealtimeMessages] Retry token install failed:', error);
+              console.error('[useRealtimeMessages] Retry setup failed:', error);
             });
         }, delay);
       }
     };
 
-    void (async () => {
-      // Snapshot the partner BEFORE the join, so the very first broadcast is
-      // already checked against a known sender.
-      const partnerId = await resolvePartnerIdForDelivery();
-      if (cancelled) return;
-      partnerIdRef.current = partnerId;
-      // Only skip the first SUBSCRIBED's refresh when this produced a snapshot.
-      // A genuinely unlinked user pays one extra round-trip that answers null
-      // again; a failed lookup gets the re-fetch that keeps the channel alive.
-      snapshotFresh = partnerId !== null;
+    /**
+     * Open (or re-open) this run's channel.
+     *
+     * Ordering follows moodSyncService's: the two round-trips first (`:603`
+     * the partner lookup, `:607` setAuth), then the wait for a leave in flight
+     * (`:616-624`), then `waitForSocketReady()` (`:626-630`), and only then the
+     * channel — with no await between that last check and `subscribe()`, which
+     * is what `moodSyncService:598-600` warns the block creating the channel
+     * must stay free of. Both socket-facing checks are read immediately before
+     * they are acted on; putting the two round-trips after them would let
+     * either go stale across an await.
+     *
+     * It is that ordering, not a transcription: the release step below has no
+     * counterpart in moodSyncService (a refcounted singleton never throws its
+     * own live channel away), and this hook skips that module's `:621`/`:629`
+     * re-reads of the open map because it holds no such map — one mount owns
+     * the topic (`MessageInput.tsx:50` passes `useLoveNotes(false)`).
+     *
+     * Creating the channel this late also closes the window in which a
+     * superseded run owns a registered, never-joined channel that no later
+     * cleanup can remove.
+     */
+    const openChannel = async ({
+      takeSnapshot,
+      releaseCurrent,
+    }: {
+      takeSnapshot: boolean;
+      releaseCurrent: boolean;
+    }): Promise<void> => {
+      if (takeSnapshot) {
+        // Snapshot the partner BEFORE the join, so the very first broadcast is
+        // already checked against a known sender.
+        const partnerId = await resolvePartnerIdForDelivery();
+        if (cancelled) return;
+        partnerIdRef.current = partnerId;
+        // Only skip the first SUBSCRIBED's refresh when this produced a
+        // snapshot. A genuinely unlinked user pays one extra round-trip that
+        // answers null again; a failed lookup gets the re-fetch that keeps the
+        // channel alive.
+        snapshotFresh = partnerId !== null;
+      }
 
       // Required for a private channel: Realtime authorizes the join against
       // the socket's access token, which is the anon key until this runs.
       await supabase.realtime.setAuth();
       if (cancelled) return;
 
+      // Only now is the failed channel let go. Everything above can reject,
+      // and a retry that had already released it would leave the hook with no
+      // channel at all — nothing to report a further CHANNEL_ERROR, so nothing
+      // to schedule the next retry, and a feed dead until the view is
+      // remounted. Held until here, a rejected token install leaves the
+      // channel in place for the SDK's own rejoin loop to recover.
+      if (releaseCurrent) {
+        const failed = channelRef.current;
+
+        // ...unless it is not failed any more. The SDK runs its own rejoin
+        // loop on an errored channel and schedules the first attempt 1000ms
+        // out (@supabase/phoenix assets/js/phoenix/socket.js:137
+        // `[1000, 2000, 5000][tries - 1]`), which is exactly when this hook's
+        // first backoff elapses -- so a SUBSCRIBED can land on the old channel
+        // while the awaits above are still in flight. The SUBSCRIBED branch
+        // clears the pending timer, but this open is already past that point
+        // and nothing else it reads can see the recovery; only the channel's
+        // own state can. Replacing a joined channel here would drop every note
+        // until the replacement finished joining, and buy nothing: the topic
+        // is already being served.
+        if (failed?.state === 'joined') {
+          logger.debug(
+            '[useRealtimeMessages] Channel recovered while re-opening; keeping it and dropping the retry'
+          );
+          return;
+        }
+
+        channelRef.current = null;
+        if (failed) {
+          releaseNoteChannel(topic, failed);
+        }
+      }
+
+      // A leave for this topic may still be in flight — the one just recorded
+      // above, or a previous mount's cleanup. Opening now would just retrieve
+      // the dying channel and join nothing.
+      await waitForNoteChannelLeaves(topic);
+      if (cancelled) return;
+
+      // Closing that channel may have been what removed the LAST channel in
+      // the app, which tears the shared socket down; opening inside that window
+      // silently never joins. Read last, and acted on with no await in
+      // between.
+      await waitForSocketReady();
+      if (cancelled) return;
+
+      // Created here rather than at the top of the effect: `supabase.channel()`
+      // registers synchronously, and anything registered before these awaits
+      // outlives a cleanup that ran while they were in flight.
+      const channel = supabase
+        .channel(topic, {
+          config: { private: true },
+        })
+        .on('broadcast', { event: 'new_message' }, (payload) => {
+          if (!subscriptionActive) return;
+          handleNewMessage((payload as { payload?: unknown })?.payload, currentUserId);
+        });
+
+      channelRef.current = channel;
+
+      // `handleStatus` is handed to every subscribe, first join and retry
+      // alike. RealtimeChannel wires the callback it is HANDED into
+      // _onError/_onClose and the joinPush receives; a join that passes none
+      // reports nothing, so neither the retry-count reset nor the partner
+      // refresh would ever run again.
       channel.subscribe(handleStatus);
-    })().catch((error) => {
+    };
+
+    void openChannel({ takeSnapshot: true, releaseCurrent: false }).catch((error) => {
       // Same reason as the retry path: without this a rejected `setAuth` — or
       // anything else thrown in here — becomes an unhandled rejection. The
       // channel simply never joins, and the snapshot stays null, so nothing is
@@ -308,7 +500,10 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
 
       if (channelRef.current) {
         logger.debug('[useRealtimeMessages] Unsubscribing from channel');
-        supabase.removeChannel(channelRef.current);
+        // Through the registry, not a bare removeChannel: recording the leave
+        // is what lets the next effect run for this topic wait it out instead
+        // of opening the dying object.
+        releaseNoteChannel(topic, channelRef.current);
         channelRef.current = null;
       }
 

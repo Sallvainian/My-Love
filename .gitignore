@@ -155,3 +155,12 @@ _bmad/custom/*
 # negation above would otherwise re-include it. Do not rely on the inner
 # `_bmad/custom/.gitignore` for this -- it is not itself tracked.
 _bmad/custom/*.user.toml
+.bmad-loop/policy.toml
+
+# Grok CLI (bmad-loop review adapter). Untracked, like .claude/ and _bmad/.
+# Grok's own README claims repo-scoped skills are filtered when gitignored;
+# grok 1.0.30 does not do that -- the skill is discovered under `.grok/skills/`,
+# a bare `skills/` rule and `.grok/` alike. Worktree checkouts are served by
+# `seed_files = [".grok/skills"]` in .bmad-loop/profiles/grok.toml, which copies
+# the tree in, so nothing here needs to be tracked.
+.grok/

@@ -16,12 +16,12 @@
 import type { ReactNode } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EventCountdown } from '../EventCountdown';
 import {
-  EventCountdown,
   getCalendarDaysDiff,
   getEventsSlotView,
   getUpcomingEventCards,
-} from '../EventCountdown';
+} from '../eventCountdownHelpers';
 
 // Motion-only props are dropped rather than spread onto the DOM node: React
 // rejects `whileHover`/`initial`/`animate`/`transition` on a plain <div> and

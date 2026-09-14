@@ -379,9 +379,20 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       const transformedMoods: MoodEntry[] = partnerMoodRecords.map((record) => {
         // Handle nullable created_at (shouldn't be null in practice, but types say it can be)
         const createdAt = record.created_at || new Date().toISOString();
-        // Handle mood_types array (backward compat: use mood_type if mood_types is null)
+        // Read mood_types array, fall back to [mood_type] for legacy entries.
+        //
+        // Array.isArray, not a truthy check. Nothing non-array can reach this
+        // today: `moodSyncService.fetchMoods` delegates to `moodApi.fetchByUser`,
+        // whose `MoodArraySchema.parse` types `mood_types` through
+        // `SupabaseMoodSchema` as `z.array(MoodTypeSchema).nullable().optional()`
+        // and throws `ApiValidationError` before this transform runs. Symbol
+        // names, not line numbers: those drift, and nothing checks them. The
+        // shape test is defensive normalization at the
+        // boundary, so a future caller that skips that validation cannot store a
+        // non-array as `MoodEntry.moods` and leave every consumer to defend
+        // itself -- not a fix for a live leak.
         const moods =
-          record.mood_types && record.mood_types.length > 0
+          Array.isArray(record.mood_types) && record.mood_types.length > 0
             ? record.mood_types
             : [record.mood_type];
         return {
