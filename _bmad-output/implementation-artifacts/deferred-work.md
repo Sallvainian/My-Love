@@ -888,14 +888,17 @@ location: src/hooks/useRealtimeMessages.ts:190-196
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 severity: medium
 reason: node_modules/@supabase/realtime-js/dist/module/RealtimeChannel.js:134 wraps the entire join body in `if (this.channelAdapter.isClosed())` and otherwise returns `this`. After a CHANNEL_ERROR the state is `errored`, not closed, so the retry at useRealtimeMessages.ts is a no-op however many times it fires. Pre-existing and untouched by this story: the baseline retry had the identical shape, and passing `handleStatus` (patched this pass) fixes only the reporting half. Settle by removing and reopening the channel on retry rather than re-subscribing the same object, with a test that drives a real CHANNEL_ERROR.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-realtime-channel-rejoin-lifecycle
+resolution-undo: 0cc4137f6b281b58f559fe5e6b090ec351e5bf79bc001829e38a38cee52e68d1 2026-09-14 7374617475733a206f70656e
 
 ### DW-88: getPartnerId() returning null for a transient error is indistinguishable from "unlinked", and would drop every note and mood for the life of the channel.
 origin: spec-deferred 2f395306ff06
 location: src/api/supabaseClient.ts:128-136
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 reason: src/api/supabaseClient.ts:128-136 returns null on any PostgREST error, and both receivers treat a null snapshot as "trust nothing". A snapshot taken at join would then stay null until the next SUBSCRIBED. I could not show the program reaches this: the users query and the Realtime socket address the same host, so a network failure denies the join too and the retry path runs. Settle by reproducing a PostgREST-only failure (for example a 500 injected at /rest/v1/users) while the websocket stays healthy, and observing whether notes stop arriving.
-status: open
+status: done 2026-09-14
+resolution: already resolved: Resolved by 6fe1fdad and 467e020c: src/api/supabaseClient.ts:180 lookupPartnerId now returns {status:'error',reason} instead of null for a PostgREST failure (:205-210), resolvePartnerLookupForDelivery retries three times with backoff (:222-243), and both receivers restore the previous snapshot rather than muting -- src/hooks/useRealtimeMessages.ts:159-162 (if lookup.status === 'error' then partnerIdRef.current = previous; return) and src/api/moodSyncService.ts:492-495 (if lookup.status === 'error' then entry.partnerId = previous; return). The permanent drop the entry describes is closed.
 
 ### DW-89: The Array.isArray guard was adopted at the three broadcast-facing mood sites and not at the four siblings that share the identical idiom.
 origin: spec-deferred c4d4e08547c9
@@ -919,14 +922,17 @@ location: src/hooks/useRealtimeMessages.ts:215-232
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 severity: low
 reason: useRealtimeMessages' cleanup calls supabase.removeChannel without awaiting it, and src/api/realtimeSocket.ts documents that the registry entry is dropped later still, from the _onClose hook, so supabase.channel(topic) in the replacement run can return the leaving object whose subscribe() is a silent no-op. Pre-existing: the baseline cleanup had the same shape, and the new `cancelled` guard covers only the subscribe-after-unmount half. Settle by awaiting the leave the way moodSyncService's closingMoodChannels registry does.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-realtime-channel-rejoin-lifecycle
+resolution-undo: 0cc4137f6b281b58f559fe5e6b090ec351e5bf79bc001829e38a38cee52e68d1 2026-09-14 7374617475733a206f70656e
 
 ### DW-92: getSignedInUserId() returning null for a transient getSession error is read as "the account changed", which mutes the mood channel until a fresh subscriber re-arms it.
 origin: spec-deferred e08d417d905d
 location: src/api/supabaseClient.ts:81-92
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 reason: src/api/supabaseClient.ts:81-92 returns null on any getSession error or throw, and refreshChannelIdentity (src/api/moodSyncService.ts:455-460) treats `null !== entry.ownerUserId` as an account change and nulls the partner snapshot. Only the next SUBSCRIBED or a new subscriber's `entry.partnerId = partnerIdAtJoin` restores it, and an already-joined channel emits no further SUBSCRIBED. I could not show the program reaches this: refreshChannelIdentity runs only from the SUBSCRIBED arm, i.e. moments after the same session authorized the private join, so a session read that fails while that join succeeds is not demonstrated. Same shape as the getPartnerId ambiguity already recorded. Settle by injecting a getSession failure while the websocket stays healthy and observing whether partner moods stop arriving.
-status: open
+status: done 2026-09-14
+resolution: already resolved: Resolved by aa2357ca and e611f45d: src/api/supabaseClient.ts:111 lookupSignedInUser returns {status:'error',reason} rather than null for a getSession failure (:117-120), and src/api/moodSyncService.ts:510-531 verifyChannelOwner returns true on session.status === 'error' -- logging 'Session read was inconclusive; not treating it as an account change' -- so a transient session read is no longer read as an account change and no longer mutes the channel.
 
 ### DW-93: The PKCE callback is never exercised against the deployed site: no real Google consent round-trip, and the hosted redirect-URL allow list was not read.
 origin: spec-deferred 5ada678c7e15
@@ -942,7 +948,9 @@ location: src/api/supabaseClient.ts:59
 source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: low
 reason: With site data blocked or in a private window, supportsLocalStorage() is false and the SDK falls back to an in-memory store, which a full-page redirect to the provider wipes along with the verifier; the returning ?code= then finds nothing and is ignored. Under the old implicit flow the fragment carried the tokens, so the same browser signed in for that tab. Password sign-in is unaffected either way. Not fixed here: a cookie or sessionStorage adapter is new storage surface rather than a direct correction. Settle by deciding whether a private-window Google sign-in is supported, then adding an adapter or a stated limitation.
-status: open
+status: done 2026-09-14
+resolution: closed by human decision: Google sign-in requires site data to be enabled; password sign-in covers that browser, and persistSession would not survive a reload there either, so an adapter buys one session and adds new auth storage surface.
+decision: 2026-09-14 State the limitation, no adapter — Google sign-in requires site data to be enabled; password sign-in covers that browser, and persistSession would not survive a reload there either, so an adapter buys one session and adds new auth storage surface.
 
 ### DW-95: A code callback that finds no verifier is ignored in silence, with nothing shown to the person who just came back from the provider.
 origin: spec-deferred f540b6e377f9
@@ -951,6 +959,7 @@ source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: low
 reason: GoTrueClient.js:3356-3366 classifies such a URL as not-a-callback, so _initialize falls through to _recoverAndRefresh and the app renders the login screen with no explanation; measured in tests/unit/api/supabaseClientAuthFlow.test.ts, which asserts exactly that silence. Recoverable -- signing in again from this browser works -- and the fix is user-facing callback handling, which the story's contract excludes ("Never: add ... an exchangeCodeForSession call of our own"). Settle by deciding whether a "finish sign-in in the browser you started in" message is wanted, and where it would live given that the SDK owns callback classification.
 status: open
+decision: 2026-09-14 Show a recoverable message — Detect a returning ?code= that produced no session and render a recoverable explanation on the login screen -- that sign-in has to be finished in the browser it was started in -- without adding an exchangeCodeForSession call of our own. Settle DW-96's provider-denial silence in the same handler and on the same surface, and replace the unit case that currently pins the silence.
 
 ### DW-96: The provider-denial callback is as silent as the missing-verifier one, and only the second was recorded.
 origin: spec-deferred 34a72182aa5f
@@ -959,6 +968,7 @@ source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: low
 reason: GoTrueClient.js:3252-3259 throws AuthImplicitGrantRedirectError for any `#error=` URL before the flowType switch, _initialize returns it at :417, and nothing in src/App.tsx:229-296 reads _initialize's return value -- so a user who declines Google consent lands on the login screen with no explanation. Pre-existing: the implicit flow behaved identically, so this story neither caused nor changed it. The unit case "preserves an existing session for an error callback" asserts the session and the request count, never the returned error. Settle together with the missing-verifier silence: decide whether a "sign-in was cancelled" message is wanted, and where it lives given that the SDK owns callback classification.
 status: open
+decision: 2026-09-14 Show a cancelled-sign-in message — Read the SDK initialize outcome for an error callback and render a sign-in was cancelled message on the login screen, sharing one handler and one surface with DW-95's missing-verifier case, and extend the existing unit case to assert the returned error rather than only the preserved session.
 
 ### DW-97: Every redirect_to assertion runs where BASE_URL is "/", so the production "/My-Love/" base path is pinned nowhere.
 origin: spec-deferred 90661930e678
@@ -1028,7 +1038,9 @@ origin: spec-deferred 05606ebe644a
 location: src/components/DisplayNameSetup/DisplayNameSetup.tsx (zero-row branch)
 source_spec: `8-separate-profile-names-from-auth-identity.md`
 reason: lookupOwnDisplayName maps PGRST116 to `unset`, which opens the modal, while DisplayNameSetup's plain UPDATE cannot create the row and `id` is outside the new column grant. No reachable path to that state was demonstrated: public.users.id is REFERENCES auth.users(id) ON DELETE CASCADE and no client code deletes profiles. What would settle it: whether any operator or admin path deletes a public.users row without deleting the auth user. The intent requires the INSERT policy be left untouched, so removing the now-callerless policy is out of scope here regardless.
-status: open
+status: done 2026-09-14
+resolution: closed by human decision: No client or cascade path produces a profile row without an auth user, the modal surfaces a visible error rather than failing silently, and the INSERT policy is deliberately pinned by supabase/tests/database/25_profile_name_email_ownership.sql:150-153.
+decision: 2026-09-14 Unreachable; keep the policy — No client or cascade path produces a profile row without an auth user, the modal surfaces a visible error rather than failing silently, and the INSERT policy is deliberately pinned by supabase/tests/database/25_profile_name_email_ownership.sql:150-153.
 
 ### DW-106: Hosted evidence for the migration has not been recorded.
 origin: spec-deferred 930d06819af2
@@ -1052,4 +1064,68 @@ location: _bmad-output/implementation-artifacts/deferred-work.md (DW-105)
 source_spec: `8-separate-profile-names-from-auth-identity.md`
 severity: low
 reason: Verified by reading the block: `### DW-105` in _bmad-output/implementation-artifacts/deferred-work.md goes straight from `source_spec:` to `reason:` with no `severity:` line, while DW-104, DW-106 and DW-107 each carry `severity: low`. This spec's frontmatter records that same item as `severity: medium (unverified)`, so DW-105 is the only non-low severity of the four and it is the one the ledger dropped. Not repaired here: this run was instructed not to modify, re-open or rewrite existing ledger entries -- the orchestrator owns them. Raised through this list because it is the only channel back to the owner.
+status: open
+
+### DW-109: A phx_leave answered 'error' leaves the channel stuck in `leaving`, yet removeChannel still resolves, so the leave-wait clears and the reopen is handed a channel whose subscribe() is gated shut.
+origin: spec-deferred ab6f498a5c7a
+location: src/hooks/useRealtimeMessages.ts:79-96
+source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
+severity: medium
+reason: @supabase/phoenix assets/js/phoenix/channel.js:247-249 wires the close hook to "ok" and "timeout" only, so an 'error' leave never reaches `closed` and never runs `socket.remove(this)`. @supabase/realtime-js dist/module/RealtimeChannel.js:604-612 still resolves 'error', and RealtimeClient.js:254-259 skips `teardown()` unless the status is 'ok'. The same hole exists in moodSyncService's closingMoodChannels, which the intent told this work to mirror, so fixing it here alone would diverge the two. The `.catch()` in releaseNoteChannel guards a rejection the SDK never produces, and the test that exercises it uses a shape the real client cannot return.
+status: open
+
+### DW-110: CLOSED remains an unhandled terminal status, so a close the hook did not ask for leaves the topic permanently silent with no retry scheduled.
+origin: spec-deferred 2b5328606176
+location: src/hooks/useRealtimeMessages.ts
+source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
+severity: medium
+reason: subscribe() wires `_onClose(() => callback(CLOSED))` (@supabase/realtime-js dist/module/RealtimeChannel.js:148), but handleStatus retries only CHANNEL_ERROR and TIMED_OUT. Pre-existing: the baseline hook ignored CLOSED too. Any fix must distinguish the hook's own deliberate leave from a close it did not initiate, since ignoring CLOSED is load-bearing for the release path.
+status: open
+
+### DW-111: This is a third uncoordinated per-topic leave registry, against the repo's stated direction to route Realtime work through a shared one.
+origin: spec-deferred 5770bf9b09b4
+location: src/hooks/useRealtimeMessages.ts:69
+source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
+severity: low
+reason: moodSyncService.ts:149 and ephemeralBroadcast.ts already hold their own; interactionService and the scripture hooks still take none. AGENTS.md says to route new Realtime work through moodSyncService's refcounted registry and never call supabase.channel() directly. Extracting the pair into realtimeSocket.ts would cover the whole channel namespace. Pre-existing duplication, widened rather than created by this change.
+status: open
+
+### DW-112: realtimeSocket.ts's header rationale quotes SDK behaviour that no longer matches the installed realtime-js, and this change newly depends on it.
+origin: spec-deferred c8dd2018bb24
+location: src/api/realtimeSocket.ts:1-46
+source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
+severity: low
+reason: The header quotes `RealtimeClient.js:213-219` disconnecting as soon as the last channel is removed. In 2.116.0 removeChannel only tears down on 'ok' (dist/module/RealtimeClient.js:254-259); the disconnect moved to `_remove` -> `_schedulePendingDisconnect`, with `_disconnectOnEmptyChannelsAfterMs` defaulting to 2x heartbeatIntervalMs (:646-647), and `channel()` cancels it (:340). The ~100ms window the helper waits out is likely unreachable on a rejoin now. The gate is cheap and harmless; the comment justifying it should be re-verified.
+status: open
+
+### DW-113: Giving up after five retries is entrenched with no exit and no signal to the UI, and closingNoteChannels is unobservable from tests.
+origin: spec-deferred a9a9ffc293cb
+location: src/hooks/useRealtimeMessages.ts
+source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
+severity: low
+reason: handleStatus returns after the max-retry check, leaving the errored channel in channelRef and in client.channels, and the hook returns {} so no consumer can tell the feed is dead; moodSyncService at least keeps lastStatus and replays it. closingNoteChannels is unexported, so a wedged entry and an empty map look identical from outside the module. Pre-existing give-up behaviour: the baseline had the same five-retry ceiling and the same empty return value.
+status: open
+
+### DW-114: Both DW ledger entries' `location:` fields point at the wrong code, so a future reader reconciling the bundle against the ledger lands in the wrong block.
+origin: spec-deferred 35b1312c2b70
+location: .bmad-loop/runs/20260914-114531-81a7/bundles/realtime-channel-rejoin-lifecycle/intent.md
+source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
+severity: low
+reason: Against baseline d3306502, DW-87's cited src/hooks/useRealtimeMessages.ts:190-196 is inside the SUBSCRIBED snapshot comment, not the retry; DW-91's :215-232 is the backoff block, not the cleanup. The intent prose citations (:260, :311, :174) do match the baseline verbatim, and the implementation followed the prose. Not fixed here: this run is directed not to edit the deferred-work ledger.
+status: open
+
+### DW-115: The `location:` fields this bundle wrote into the DW ledger are unreliable: one points into a gitignored run directory that cannot be opened later, and the rest land on comment lines or carry no line
+origin: spec-deferred 169b5ae59949
+location: _bmad-output/implementation-artifacts/deferred-work.md
+source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
+severity: low
+reason: DW-114's location is `.bmad-loop/runs/20260914-114531-81a7/bundles/realtime-channel-rejoin-lifecycle/intent.md`, but `.gitignore` lists `.bmad-loop/runs/`, and AGENTS.md records that a deleted run directory is unrecoverable -- so the one entry whose whole subject is "location fields point at the wrong code" files a location a future reader cannot open. In the same append, DW-111's `src/hooks/useRealtimeMessages.ts:69` is a comment line (the registry it describes is the `const closingNoteChannels` declaration below it), DW-109's `:79-96` starts on a blank docblock line and runs past the end of `releaseNoteChannel`, and DW-110 and DW-113 carry no line range while DW-87, DW-91, DW-109, DW-111 and DW-112 all do. Not repaired here: this run is directed not to modify, re-open or rewrite ledger entries, and the orchestrator owns them.
+status: open
+
+### DW-116: The ledger's own reason text states that the run must not edit the ledger, while the same change rewrites two entry statuses and appends six new entries to it.
+origin: spec-deferred e17ee324ad13
+location: _bmad-output/implementation-artifacts/deferred-work.md
+source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
+severity: low
+reason: DW-114's reason reads "Not fixed here: this run is directed not to edit the deferred-work ledger", and the DW-105 entry above it reads "this run was instructed not to modify, re-open or rewrite existing ledger entries -- the orchestrator owns them"; the same diff sets DW-87 and DW-91 to `status: done 2026-09-14` with `resolution:` and `resolution-undo:` lines and appends DW-109 through DW-114. Both statements are true of different edits -- the run does not touch OTHER entries, while its own done-markers and new entries are exactly what it is supposed to write -- but neither says so, so the next reader meets a file that contradicts itself. Needs a sentence distinguishing the edits the run owns from the ones it does not; the orchestrator owns that text.
 status: open
