@@ -25,12 +25,16 @@ usage_parser = "none"
 skill_tree = ".grok/skills"
 first_run_note = "run `grok` once in the project and run /hooks-trust to trust project hooks (untrusted hooks never execute)"
 
-# .grok/skills is untracked (matching this repo's convention of not tracking
+# .grok is untracked (matching this repo's convention of not tracking
 # .claude/ , .agents/ and _bmad/), so a `git worktree add` checkout omits it.
 # seed_files copies the tree in from the main repo, which is what lets an
 # isolated review session still resolve bmad-build-auto. Directories are
 # supported (worktree_flow.py walks them recursively).
-seed_files = [".grok/skills"]
+#
+# .grok/hooks is listed for the same reason: `config_path` below points into it,
+# and without seeding it a worktree review session starts with no hook config at
+# all -- silently, since untrusted or absent hooks simply never fire.
+seed_files = [".grok/skills", ".grok/hooks"]
 
 [hooks]
 dialect = "claude-settings-json"
