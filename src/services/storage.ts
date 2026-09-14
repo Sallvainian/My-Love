@@ -154,16 +154,29 @@ class StorageService {
     }
   }
 
-  async getMessage(id: number): Promise<Message | undefined> {
+  /**
+   * One message by id, if this caller may see it.
+   *
+   * `userId` is REQUIRED and nullable for the same reason getAllMessages's is:
+   * the signed-out case is real (the shared daily rows still have to load), but
+   * it has to be stated at the call site rather than reached by leaving an
+   * argument off.
+   *
+   * A row this caller may not see is reported exactly as a row that is not
+   * there — same `undefined`, same warning. Message ids are small sequential
+   * integers, so a distinguishable "exists but hidden" answer would hand one
+   * account a way to enumerate the other's private rows.
+   */
+  async getMessage(id: number, userId: string | null): Promise<Message | undefined> {
     try {
       await this.init();
       const message = await this.db!.get('messages', id);
-      if (message) {
+      if (message && this.isVisibleTo(message, userId)) {
         logger.debug('[StorageService] Message retrieved successfully, id:', id);
-      } else {
-        console.warn('[StorageService] Message not found, id:', id);
+        return message;
       }
-      return message;
+      console.warn('[StorageService] Message not found, id:', id);
+      return undefined;
     } catch (error) {
       console.error('[StorageService] Failed to get message:', error);
       console.error('[StorageService] Message id:', id);
@@ -172,15 +185,27 @@ class StorageService {
   }
 
   /**
-   * Narrow a batch of rows to the ones `userId` may see: the shared daily
-   * messages, plus that caller's own custom messages.
+   * Narrow a batch of rows to the ones `userId` may see. The rule itself is
+   * {@link isVisibleTo}.
+   */
+  private visibleTo(messages: Message[], userId: string | null): Message[] {
+    return messages.filter((message) => this.isVisibleTo(message, userId));
+  }
+
+  /**
+   * May `userId` see this row? The shared daily messages are everyone's, plus
+   * that caller's own custom messages.
    *
    * Custom rows with no owner are legacy and belong to nobody: `undefined`
    * never equals a user id and never equals `null`, so they are excluded for
    * every caller, signed out included.
+   *
+   * This is the single expression of the rule — the batch reads reach it
+   * through {@link visibleTo} and every by-id read and write consults it
+   * directly, so the row-at-a-time paths cannot drift away from the batch ones.
    */
-  private visibleTo(messages: Message[], userId: string | null): Message[] {
-    return messages.filter((message) => !message.isCustom || message.userId === userId);
+  private isVisibleTo(message: Message, userId: string | null): boolean {
+    return !message.isCustom || message.userId === userId;
   }
 
   /**
@@ -227,12 +252,27 @@ class StorageService {
     }
   }
 
-  async updateMessage(id: number, updates: Partial<Message>): Promise<void> {
+  /**
+   * Edit one message, if this caller may see it.
+   *
+   * `userId` is REQUIRED and nullable for the same reason getAllMessages's is:
+   * the signed-out case is real (the shared daily rows are everyone's to
+   * favorite), but it has to be stated at the call site. A row this caller may
+   * not see takes the same warn-and-no-op branch as an id that is not in the
+   * store — nothing is written and nothing is disclosed.
+   */
+  async updateMessage(id: number, updates: Partial<Message>, userId: string | null): Promise<void> {
     try {
       await this.init();
-      const message = await this.getMessage(id);
+      const message = await this.getMessage(id, userId);
       if (message) {
-        await this.db!.put('messages', { ...message, ...updates });
+        // Pinned to the row that was actually checked. The store is keyed on
+        // `id`, so an `id` inside `updates` is a second, unchecked address for
+        // this write: a caller who may see row X could otherwise aim the put at
+        // row Y and overwrite it without Y ever passing the guard above.
+        // (Whether `updates` may carry `userId`/`isCustom` is a separate
+        // question — ownership reassignment — and is deliberately untouched.)
+        await this.db!.put('messages', { ...message, ...updates, id: message.id });
         logger.debug('[StorageService] Message updated successfully, id:', id);
       } else {
         console.warn('[StorageService] Cannot update - message not found, id:', id);
@@ -244,9 +284,32 @@ class StorageService {
     }
   }
 
-  async deleteMessage(id: number): Promise<void> {
+  /**
+   * Delete one message, if this caller may see it.
+   *
+   * `userId` is REQUIRED and nullable for the same reason getAllMessages's is:
+   * the signed-out case is real, but it has to be stated at the call site.
+   *
+   * This reads the row first purely to answer that question — a blind delete
+   * has no way to tell whose row it is about to remove. The read is a raw
+   * `get` rather than `this.getMessage` on purpose: getMessage degrades a
+   * failed read to `undefined`, which here would turn a broken store into a
+   * silent no-op delete, so a failure re-throws instead.
+   *
+   * That leaves a deliberate asymmetry inside this service: `updateMessage`
+   * and `toggleFavorite` do read through `getMessage`, so a failed read leaves
+   * them resolving as a silent no-op. That is their behaviour from before
+   * ownership scoping and it is kept unchanged. `deleteMessage` had no read at
+   * all to preserve, so its new one takes the stricter contract.
+   */
+  async deleteMessage(id: number, userId: string | null): Promise<void> {
     try {
       await this.init();
+      const message = await this.db!.get('messages', id);
+      if (!message || !this.isVisibleTo(message, userId)) {
+        console.warn('[StorageService] Cannot delete - message not found, id:', id);
+        return;
+      }
       await this.db!.delete('messages', id);
       logger.debug('[StorageService] Message deleted successfully, id:', id);
     } catch (error) {
@@ -256,12 +319,21 @@ class StorageService {
     }
   }
 
-  async toggleFavorite(messageId: number): Promise<void> {
+  /**
+   * Flip one message's favorite flag, if this caller may see it.
+   *
+   * `userId` is REQUIRED and nullable for the same reason getAllMessages's is,
+   * and the nullable half is load-bearing here: Home favorites the daily
+   * message through this method, and the daily rows are shared — reachable by
+   * every caller, signed out included. The rule is visibility, not ownership,
+   * for exactly that reason.
+   */
+  async toggleFavorite(messageId: number, userId: string | null): Promise<void> {
     try {
       await this.init();
-      const message = await this.getMessage(messageId);
+      const message = await this.getMessage(messageId, userId);
       if (message) {
-        await this.updateMessage(messageId, { isFavorite: !message.isFavorite });
+        await this.updateMessage(messageId, { isFavorite: !message.isFavorite }, userId);
         logger.debug(
           '[StorageService] Favorite toggled successfully, id:',
           messageId,
