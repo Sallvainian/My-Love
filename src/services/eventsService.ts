@@ -58,7 +58,7 @@ export type SupabaseEventRecord = Database['public']['Tables']['events']['Row'];
  * (`20260818000002_create_events_table.sql:22`).
  *
  * Structurally identical to `IconType` in
- * `src/components/RelationshipTimers/EventCountdown.tsx:14`, which is not
+ * `src/components/RelationshipTimers/EventCountdown.tsx:15`, which is not
  * exported — a structural match is assignable, so the component stays a leaf.
  */
 export type EventIcon = 'ring' | 'plane' | 'calendar';

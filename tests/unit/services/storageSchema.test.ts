@@ -19,6 +19,7 @@ import 'fake-indexeddb/auto';
 import { openDB, type IDBPDatabase } from 'idb';
 import { DB_NAME, DB_VERSION } from '../../../src/services/dbSchema';
 import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
+import type { Message } from '../../../src/types';
 
 const ALL_STORES = [
   'messages',
@@ -184,7 +185,7 @@ describe('storageService schema', () => {
     const reopened = await freshStorageService();
     await reopened.init();
 
-    expect(await reopened.getMessage(messageId)).toMatchObject({ text: 'keep me' });
+    expect(await reopened.getMessage(messageId, null)).toMatchObject({ text: 'keep me' });
   });
 
   describe('message reads are scoped to one account', () => {
@@ -287,6 +288,263 @@ describe('storageService schema', () => {
       expect((await storageService.getMessagesByCategory('reason', A)).map((m) => m.text)).toEqual([
         'BUNDLED-DAILY',
       ]);
+    });
+
+    describe('reads and writes by id are scoped the same way', () => {
+      /**
+       * `getMessage`, `updateMessage`, `deleteMessage` and `toggleFavorite`
+       * reached any row in the shared store by id with no owner check, while
+       * their batch siblings above already filtered. Every case here drives the
+       * real service against the same seeded shared device and confirms what is
+       * actually ON DISK afterwards — a denied write that merely returns early
+       * and a denied write that writes anyway are indistinguishable from the
+       * caller's side, so the store is the only honest witness.
+       *
+       * The rule is VISIBILITY, not ownership: Home favorites the daily message
+       * through `toggleFavorite`, and the daily rows are shared. An owner-only
+       * rule would pass a cross-account test and break the live app.
+       */
+
+      /** Every row as it actually sits on disk, bypassing the service's filter. */
+      async function rowsOnDisk(): Promise<Message[]> {
+        const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+        try {
+          return await db.getAll('messages');
+        } finally {
+          db.close();
+        }
+      }
+
+      /** The row with this text as it sits on disk, or undefined once it is gone. */
+      async function diskRow(text: string): Promise<Message | undefined> {
+        return (await rowsOnDisk()).find((message) => message.text === text);
+      }
+
+      /** The row at this id as it sits on disk — the retargeting cases move text around. */
+      async function rowAt(id: number): Promise<Message | undefined> {
+        return (await rowsOnDisk()).find((message) => message.id === id);
+      }
+
+      /** The id of a seeded row, read off disk so a test can name a row it may not see. */
+      async function idOf(text: string): Promise<number> {
+        const row = await diskRow(text);
+        if (!row) throw new Error(`seed row not found on disk: ${text}`);
+        return row.id;
+      }
+
+      /**
+       * Swap the service's cached connection for one whose reads or writes fail.
+       *
+       * The split under test is the service's existing error contract — reads
+       * degrade to `undefined`, writes re-throw — and it only shows when the
+       * READ succeeds and the write does not, which a wholesale outage cannot
+       * produce. `close` forwards to the real connection so afterEach still
+       * releases it; `init()` sees a non-null `db` and leaves the stub alone.
+       *
+       * The stub models only `get`, `getAll`, `put`, `delete` and `close` —
+       * every store method these four paths touch, and nothing else. A case
+       * that reaches `getMessagesByCategory`, `addMessage` or `addMessages`
+       * after calling this gets a TypeError off the missing method, which reads
+       * like the rejection it asked for and is not; seed before breaking.
+       */
+      function breakStore(service: unknown, broken: { reads?: boolean; writes?: boolean }): void {
+        const holder = service as { db: IDBPDatabase<MyLoveDBSchema> };
+        const real = holder.db;
+        const fail = () => Promise.reject(new Error('IndexedDB is unavailable'));
+        holder.db = {
+          get: (store: 'messages', key: number) => (broken.reads ? fail() : real.get(store, key)),
+          getAll: (store: 'messages') => (broken.reads ? fail() : real.getAll(store)),
+          put: (store: 'messages', value: Message) =>
+            broken.writes ? fail() : real.put(store, value),
+          delete: (store: 'messages', key: number) =>
+            broken.writes ? fail() : real.delete(store, key),
+          close: () => real.close(),
+        } as unknown as IDBPDatabase<MyLoveDBSchema>;
+      }
+
+      it('hands the owner their own custom row', async () => {
+        const storageService = await seedSharedDevice();
+
+        expect(await storageService.getMessage(await idOf('A-PRIVATE-CUSTOM'), A)).toMatchObject({
+          text: 'A-PRIVATE-CUSTOM',
+        });
+      });
+
+      it('answers a cross-account read exactly as it answers a missing id', async () => {
+        const storageService = await seedSharedDevice();
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+
+        // Identical answers: nothing tells B that this id is taken. Message ids
+        // are small sequential integers, so a distinguishable "exists but
+        // hidden" would be an enumeration oracle over A's private rows.
+        expect(await storageService.getMessage(aId, B)).toBeUndefined();
+        expect(await storageService.getMessage(999_999, B)).toBeUndefined();
+      });
+
+      it('leaves the shared daily row readable by every caller, signed out included', async () => {
+        const storageService = await seedSharedDevice();
+        const dailyId = await idOf('BUNDLED-DAILY');
+
+        expect(await storageService.getMessage(dailyId, B)).toMatchObject({
+          text: 'BUNDLED-DAILY',
+        });
+        expect(await storageService.getMessage(dailyId, null)).toMatchObject({
+          text: 'BUNDLED-DAILY',
+        });
+      });
+
+      it('hides the legacy unowned row from every caller', async () => {
+        const storageService = await seedSharedDevice();
+        const legacyId = await idOf('LEGACY-OWNERLESS');
+
+        for (const caller of [A, B, null]) {
+          expect(await storageService.getMessage(legacyId, caller)).toBeUndefined();
+        }
+        // Hidden, not deleted and not claimed.
+        expect(await diskRow('LEGACY-OWNERLESS')).toBeDefined();
+      });
+
+      it('refuses every write against the legacy unowned row', async () => {
+        const storageService = await seedSharedDevice();
+        const legacyId = await idOf('LEGACY-OWNERLESS');
+
+        // The only row excluded by `undefined !== null` rather than by two ids
+        // differing, so the signed-out caller is the case that actually
+        // exercises it — and it was asserted on the read path alone.
+        await expect(
+          storageService.updateMessage(legacyId, { text: 'CLAIMED' }, null)
+        ).resolves.toBeUndefined();
+        await expect(storageService.toggleFavorite(legacyId, null)).resolves.toBeUndefined();
+        await expect(storageService.deleteMessage(legacyId, null)).resolves.toBeUndefined();
+
+        expect(await rowAt(legacyId)).toMatchObject({
+          text: 'LEGACY-OWNERLESS',
+          isFavorite: false,
+        });
+      });
+
+      it('refuses a cross-account update without throwing and without writing', async () => {
+        const storageService = await seedSharedDevice();
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+
+        await expect(
+          storageService.updateMessage(aId, { text: 'B-OVERWROTE-IT' }, B)
+        ).resolves.toBeUndefined();
+
+        expect((await rowsOnDisk()).map((message) => message.text)).not.toContain('B-OVERWROTE-IT');
+        expect(await diskRow('A-PRIVATE-CUSTOM')).toBeDefined();
+      });
+
+      it('pins the write to the row it checked, not to an id inside the updates', async () => {
+        const storageService = await seedSharedDevice();
+        const dailyId = await idOf('BUNDLED-DAILY');
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+
+        // The store is keyed on `id`, so `updates.id` is a second address for
+        // the write. B may see the shared daily row and may not see A's — so
+        // an unpinned put walks straight past the guard using a row it is
+        // allowed to name.
+        await storageService.updateMessage(dailyId, { id: aId, text: 'B-OVERWROTE-IT' }, B);
+
+        expect(await rowAt(aId)).toMatchObject({ text: 'A-PRIVATE-CUSTOM' });
+        // It landed on the row that was actually checked, rather than being
+        // dropped: `updates` is not validated here, only re-addressed.
+        expect(await rowAt(dailyId)).toMatchObject({ text: 'B-OVERWROTE-IT' });
+      });
+
+      it('applies the owner’s own update', async () => {
+        const storageService = await seedSharedDevice();
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+
+        await storageService.updateMessage(aId, { text: 'A-EDITED' }, A);
+
+        expect(await diskRow('A-EDITED')).toBeDefined();
+        expect(await diskRow('A-PRIVATE-CUSTOM')).toBeUndefined();
+      });
+
+      it('refuses a cross-account delete without throwing and leaves the row on disk', async () => {
+        const storageService = await seedSharedDevice();
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+
+        await expect(storageService.deleteMessage(aId, B)).resolves.toBeUndefined();
+
+        expect(await diskRow('A-PRIVATE-CUSTOM')).toBeDefined();
+      });
+
+      it('applies the owner’s own delete', async () => {
+        const storageService = await seedSharedDevice();
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+
+        await storageService.deleteMessage(aId, A);
+
+        expect(await diskRow('A-PRIVATE-CUSTOM')).toBeUndefined();
+        // Only that row: a delete must not take the shared rotation with it.
+        expect(await diskRow('BUNDLED-DAILY')).toBeDefined();
+      });
+
+      it('refuses a cross-account favorite and leaves the flag as it was', async () => {
+        const storageService = await seedSharedDevice();
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+
+        await expect(storageService.toggleFavorite(aId, B)).resolves.toBeUndefined();
+
+        expect(await diskRow('A-PRIVATE-CUSTOM')).toMatchObject({ isFavorite: false });
+      });
+
+      it('applies the owner’s own favorite', async () => {
+        const storageService = await seedSharedDevice();
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+
+        await storageService.toggleFavorite(aId, A);
+
+        expect(await diskRow('A-PRIVATE-CUSTOM')).toMatchObject({ isFavorite: true });
+      });
+
+      it('lets a signed-in and a signed-out caller both favorite the shared daily row', async () => {
+        const storageService = await seedSharedDevice();
+        const dailyId = await idOf('BUNDLED-DAILY');
+
+        // The live path this protects: DailyMessage's heart runs over the
+        // rotation pool, which is shared daily rows plus own custom rows, and
+        // A is who the app actually runs as. An owner-only rule would silently
+        // stop Home favoriting the daily message.
+        await storageService.toggleFavorite(dailyId, A);
+        expect(await rowAt(dailyId)).toMatchObject({ isFavorite: true });
+
+        // And signed out it is still reachable — the daily rows are nobody's
+        // private property, so the flag flips back.
+        await storageService.toggleFavorite(dailyId, null);
+        expect(await rowAt(dailyId)).toMatchObject({ isFavorite: false });
+      });
+
+      it('still degrades a failed read to undefined', async () => {
+        const storageService = await seedSharedDevice();
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+        breakStore(storageService, { reads: true });
+
+        expect(await storageService.getMessage(aId, A)).toBeUndefined();
+      });
+
+      it('re-throws when the ownership read before a delete fails', async () => {
+        const storageService = await seedSharedDevice();
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+        breakStore(storageService, { reads: true });
+
+        // deleteMessage reads raw rather than through getMessage exactly so a
+        // broken store cannot present itself as "not found" and swallow the
+        // delete. Routing it through getMessage would resolve silently here.
+        await expect(storageService.deleteMessage(aId, A)).rejects.toThrow();
+      });
+
+      it('still re-throws a failed write', async () => {
+        const storageService = await seedSharedDevice();
+        const aId = await idOf('A-PRIVATE-CUSTOM');
+        breakStore(storageService, { writes: true });
+
+        await expect(storageService.updateMessage(aId, { text: 'X' }, A)).rejects.toThrow();
+        await expect(storageService.deleteMessage(aId, A)).rejects.toThrow();
+        await expect(storageService.toggleFavorite(aId, A)).rejects.toThrow();
+      });
     });
   });
 
