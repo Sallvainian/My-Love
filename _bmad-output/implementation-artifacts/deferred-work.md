@@ -980,7 +980,9 @@ location: tests/unit/api/supabaseClientAuthFlow.test.ts / tests/e2e/auth/google-
 source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: low
 reason: vite.config.ts:11 is `base: mode === 'production' ? '/My-Love/' : '/'` and playwright.config.ts:178 boots the dev server with `npx vite --mode test`, so both new assertions -- the unit case's `redirect_to` equality and the E2E's `appBaseUrl + '/'` -- only ever observe `/`. The byte-for-byte requirement the story pins is therefore verified at local origins alone. Not fixable from this session for the same reason the deployed-site verification is not. Recorded separately rather than folded into that entry, because the triage log of the previous pass said it had been grouped there and the text does not carry it. Settle by asserting the authorize URL's `redirect_to` once against a production-mode build, or by reading it during the outstanding deployed-site sign-in.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-production-base-redirect-assertion
+resolution-undo: 9a82e817c408383cfb4ee4e071886a4e6b282feec426a7f3d34cf8aab443dba0 2026-09-14 7374617475733a206f70656e
 
 ### DW-98: Whether an installed PWA returns from Google consent into the same storage partition that wrote the verifier was not established.
 origin: spec-deferred 194da630c317
@@ -1188,4 +1190,28 @@ location: tests/e2e/partner/partner-mood.spec.ts
 source_spec: `spec-dw-90-realtime-browser-e2e.md`
 severity: low
 reason: src/api/moodSyncService.ts:257 runs the same composition (private topic, sendEphemeralBroadcast, store, UI) under the same policy migration 20260912010000_private_couple_broadcast_policies.sql, whose predicates cover both prefixes. grep -c "realtime\|broadcast" tests/e2e/partner/partner-mood.spec.ts returns 0, and the only other tests/e2e files mentioning realtime are the interaction specs, whose own header states they do not exercise live Realtime. Pre-existing: this story's intent names one deliverable, "sends a love note from one context and asserts it arrives live in the other", so the mood leg was never in scope for it.
+status: open
+
+### DW-124: `resetPasswordForEmail` composes the same `origin + BASE_URL` prefix as the Google flow, but its composed link is asserted at no base, production or dev.
+origin: spec-deferred 6d932a2a3909
+location: src/api/auth/actionService.ts:97
+source_spec: `spec-dw-97-production-base-redirect-assertion.md`
+severity: low
+reason: `src/api/auth/actionService.ts:97` is ``redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}reset-password` ``, and the path join is correct only because `BASE_URL` ends in `/`. Measured: `grep -rn "reset-password" tests/ src/` (excluding `tests/e2e-archive/`) returns that one source line and nothing under `tests/`; the only other reference, `src/api/auth/__tests__/authServices.test.ts:41`, registers `resetPasswordForEmail` as a mock and never inspects its options. Pre-existing: the DW-97 intent names only the authorize URL's `redirect_to`, so this change neither caused nor exposed it. Settle by adding a sibling case that stubs `BASE_URL` to the production base and asserts the reset link is `http://localhost:3000/My-Love/reset-password`.
+status: open
+
+### DW-125: `navigationSlice.setView`'s production branch and `App.getRoutePath`'s base-stripping branch read the same `import.meta.env.BASE_URL` this story pinned for the authorize URL, and neither branch is
+origin: spec-deferred 198ce5879b5a
+location: src/stores/slices/navigationSlice.ts:63, src/App.tsx:179-180
+source_spec: `spec-dw-97-production-base-redirect-assertion.md`
+severity: medium
+reason: `src/stores/slices/navigationSlice.ts:63` is `const fullPath = base === '/' ? basePath : base.slice(0, -1) + basePath;` and `src/App.tsx:179-180` is `if (base !== '/' && pathname.startsWith(base)) { return pathname.slice(base.length - 1); }`. Both are production-only branches: every test runs at `BASE_URL === '/'`, which takes the other arm each time. Demonstrated by the review's verification-gap layer -- rewriting `navigationSlice.ts:63` to `base + basePath` and `App.tsx:180` to `return pathname;` left `npx vitest run` at 91 files / 1705 passed, both mutants green. On the deployed site those two edits emit `/My-Love//photos` and then fail base-stripping on reload, so no `currentView` arm matches and the app resets to home. E2E cannot reach it either: `playwright.config.ts:178` is `command: 'npx vite --mode test'` and `vite.config.ts:11` serves `/` off production. Pre-existing: this story's intent names only the authorize URL's `redirect_to` and its Never forbids touching `src/`, so
+status: open
+
+### DW-126: DW-97's ledger entry names two files and is closed whole, but only the unit half was addressed and the resolution line records neither the carve-out nor the substituted settle mechanism.
+origin: spec-deferred 59ad7c8a9014
+location: _bmad-output/implementation-artifacts/deferred-work.md (DW-97)
+source_spec: `spec-dw-97-production-base-redirect-assertion.md`
+severity: low
+reason: DW-97's `location:` is `tests/unit/api/supabaseClientAuthFlow.test.ts / tests/e2e/auth/google-oauth.spec.ts` and its reason covers `both new assertions`. Verified: `tests/e2e/auth/google-oauth.spec.ts:68` still reads `expect(authorizeParams.get('redirect_to')).toBe(appBaseUrl + '/');` and this story's Never excludes it deliberately (`the deployed-origin round-trip stays operator work under DW-93`). Separately, DW-97's reason ends `Settle by asserting the authorize URL's redirect_to once against a production-mode build, or by reading it during the outstanding deployed-site sign-in.` -- what shipped is a stubbed `BASE_URL` under happy-dom bound to `vite.config.ts` via `loadConfigFromFile`, which is neither. The rationale for accepting that substitution lives only in this spec's triage log, not in the ledger a later sweep reads. Not fixable from this session: the orchestrator owns ledger entry status and resolution text, and this story's Never forbids editing the ledger. Settle by
 status: open
