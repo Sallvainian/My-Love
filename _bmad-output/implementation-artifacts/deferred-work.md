@@ -1241,3 +1241,10 @@ source_spec: `spec-dw-99-message-store-ownership-scoping.md`
 severity: medium
 reason: src/types/index.ts:21 gives Message a single `isFavorite` boolean and the bundled daily rows are shared by both accounts, so toggleFavorite on a daily row writes a flag the partner reads. Pre-existing and schema-level — the fix is per-account favorite storage, well past this change's service boundary.
 status: open
+
+### DW-130: A display name can be set once at signup and never changed, because the only form that writes it is unreachable afterwards.
+origin: operator report during post-merge verification of sweep 7, 2026-09-14
+location: src/App.tsx:581
+severity: medium
+reason: `DisplayNameSetup` is the only UI that writes `display_name`, and src/App.tsx:581 renders it only when `needsDisplayName`, which src/App.tsx:301 sets solely on `result.status === 'unset'`. Nothing under src/components/Settings/ references display_name, so once a name is chosen there is no route back to that form. The backend already supports the change and needs no work: policy `users_update_self_safe` is `USING ((select auth.uid()) = id)`, `authenticated` holds UPDATE on only (display_name, updated_at) on the hosted project, and DisplayNameSetup.tsx:102-108 already issues `.update({ display_name, updated_at }).eq('id', user.id)`. The work is a settings entry point that reopens that form prefilled with the current name -- no schema, migration or grant change. Any edit surface must keep the write-side refusal of a name equal to the account email (DisplayNameSetup.tsx:85), because supabaseClient.ts:373-376 classifies a stored name equal to SEED_FALLBACK_NAME or the account email as 'unset' and would otherwise re-prompt the user forever. Related: DW-104, where a partner who never chose a name renders as their full email address in the love-notes chat.
+status: open
