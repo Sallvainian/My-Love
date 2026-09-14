@@ -906,7 +906,9 @@ location: src/stores/slices/moodSlice.ts:384
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 severity: low
 reason: src/stores/slices/moodSlice.ts:384, src/components/MoodHistory/MoodDetailModal.tsx:91, src/components/MoodHistory/CalendarDay.tsx:72 and src/components/MoodTracker/MoodTracker.tsx:170 still use `x && x.length > 0` ahead of an unconditional MOOD_CONFIG[allMoods[0]] deref. No broadcast reaches them: moodSlice's transform consumes moodApi.fetchByUser output, already parsed by MoodArraySchema, and the MoodHistory pair read the offline-first IndexedDB path. Pre-existing hardening rather than a hole this story opened. Settle by deciding whether the IndexedDB read path needs the same guard and covering it in the shape of src/components/MoodTracker/__tests__/moodArrayGuards.test.tsx.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-mood-array-shape-guards
+resolution-undo: db52fa9894ee31ba5b66017c3aac8ac433ce45263c21a54d94782f0a1386fd0a 2026-09-14 7374617475733a206f70656e
 
 ### DW-90: No E2E drives the app's own Realtime clients in a browser against the new policies; live evidence stops at the raw SDK.
 origin: spec-deferred 4e2d371094d1
@@ -1128,4 +1130,52 @@ location: _bmad-output/implementation-artifacts/deferred-work.md
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: low
 reason: DW-114's reason reads "Not fixed here: this run is directed not to edit the deferred-work ledger", and the DW-105 entry above it reads "this run was instructed not to modify, re-open or rewrite existing ledger entries -- the orchestrator owns them"; the same diff sets DW-87 and DW-91 to `status: done 2026-09-14` with `resolution:` and `resolution-undo:` lines and appends DW-109 through DW-114. Both statements are true of different edits -- the run does not touch OTHER entries, while its own done-markers and new entries are exactly what it is supposed to write -- but neither says so, so the next reader meets a file that contradicts itself. Needs a sentence distinguishing the edits the run owns from the ones it does not; the orchestrator owns that text.
+status: open
+
+### DW-117: An eighth site, src/services/moodSyncPayload.ts:58, reads MoodEntry.moods with the same bare truthy-plus-length idiom and was left unguarded.
+origin: spec-deferred 717f9a6f63ec
+location: src/services/moodSyncPayload.ts:58
+source_spec: `spec-dw-89-mood-array-shape-guards.md`
+severity: low
+reason: `const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];` reads the same field as the seven converted sites. Its output is both the sync request body (src/api/moodSyncService.ts:197, src/sw.ts:169) and the change-detection fingerprint (moodSyncPayload.ts:85-86), so a truthy non-array would be sent to the server verbatim. Pre-existing and outside this bundle's four named sites: it feeds a payload, not a MOOD_CONFIG deref. No local writer can produce a non-array today -- addMoodEntry takes MoodType[] (moodSlice.ts:38). Every existing test feeds it a real array or undefined.
+status: open
+
+### DW-118: The guard tests the container, not the elements: a genuine MoodType[] holding an unknown mood string still throws at every one of the seven sites.
+origin: spec-deferred cc319fe80d55
+location: src/components/MoodHistory/MoodDetailModal.tsx:152, src/components/MoodHistory/CalendarDay.tsx:103
+source_spec: `spec-dw-89-mood-array-shape-guards.md`
+severity: medium
+reason: MoodDetailModal.tsx:152-157 runs `MOOD_CONFIG[m].icon` per element, CalendarDay.tsx:103 runs `MOOD_CONFIG[primaryMood].bgColor`, and MoodTracker.tsx renders `selectedMoods.map((m) => MOOD_CONFIG[m].label)`. Array.isArray says nothing about element validity. The Supabase path is protected by MoodTypeSchema, but the IndexedDB path that feeds these three components applies no schema. Pre-existing and identical at the three sites that adopted the guard earlier, so not caused by this change. What would settle reachability: whether a stored IndexedDB row can hold a mood string outside the MOOD_CONFIG keys -- for example a retired mood key left behind by an older app version.
+status: open
+
+### DW-119: The offline-first IndexedDB read path normalizes nothing, so the three components that read it each carry their own per-consumer guard instead.
+origin: spec-deferred 7af76122fac6
+location: src/services/moodService.ts:255
+source_spec: `spec-dw-89-mood-array-shape-guards.md`
+severity: low
+reason: moodSlice.loadMoods (moodSlice.ts:160-171) calls moodService.getAllForUser (src/services/moodService.ts:255-264), which filters by userId and returns raw rows with no shape check, and the same is true of getMoodsInRange as called from MoodHistoryCalendar.tsx:81. The Supabase side is normalized at its boundary; the larger path is not. Deferred rather than fixed because the intent scoped this bundle to four named consumer sites and framed the work as defensive hardening at those sites.
+status: open
+
+### DW-120: DW-117 dismisses itself with an argument DW-119 contradicts: moodSyncPayload is fed from the unvalidated IndexedDB path, not from addMoodEntry, so its real exposure is higher than filed.
+origin: spec-deferred 23b5564b69a8
+location: src/services/moodSyncPayload.ts:58, src/api/moodSyncService.ts:337
+source_spec: `spec-dw-89-mood-array-shape-guards.md`
+severity: medium
+reason: DW-117 argues "No local writer can produce a non-array today -- addMoodEntry takes MoodType[]". That reasons about the writer's signature, but the read path is IndexedDB: src/api/moodSyncService.ts:337 `const unsyncedMoods = await moodService.getUnsyncedMoods(currentUserId);` feeds :186 `const moodInsert: MoodInsert = moodSyncPayload(mood, mood.userId);`. That is the same path DW-119 says normalizes nothing. Either the IndexedDB path can hold a non-array -- in which case moodSyncPayload ships it into the request body and the change fingerprint, a worse outcome than a render crash -- or it cannot, in which case the four guards this bundle added are equally unreachable. The two entries argue from mutually exclusive premises. Secondary: the cited signature is at moodSlice.ts:39, not :38 (:38 is the comment `// Actions`), and reads `MoodEntry['mood'][]`. Not fixed here: the intent forbids touching moodSyncPayload.ts:58, and this run is directed not to edit the ledger.
+status: open
+
+### DW-121: Nothing pins the Array.isArray idiom, so the consistency this bundle bought decays on the next PR that copies the surviving truthy form.
+origin: spec-deferred 40c86f3fe220
+location: eslint.config.js, src/services/moodSyncPayload.ts:58
+source_spec: `spec-dw-89-mood-array-shape-guards.md`
+severity: low
+reason: The change's only stated value is that "a reader copying the idiom can no longer copy the wrong one", but the wrong one is still in the tree: src/services/moodSyncPayload.ts:58 reads `const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];`. No lint rule, no-restricted-syntax entry, or grep-based test enforces the invariant. Not fixed here: any enforcement is config surface beyond the intent's "one-expression shape guard per site", and the rule would immediately flag the one line the intent forbids touching.
+status: open
+
+### DW-122: Seven hand-rolled copies of one expression and four separate MOOD_CONFIG definitions mean DW-118's element validation would need four key sets rather than one.
+origin: spec-deferred 0ac06de3be9c
+location: src/components/MoodHistory/CalendarDay.tsx:23, src/components/MoodTracker/MoodTracker.tsx:57
+source_spec: `spec-dw-89-mood-array-shape-guards.md`
+severity: low
+reason: All seven guarded sites hand-roll `Array.isArray(x) && x.length > 0 ? x : [fallback]`: moodSlice.ts:394, CalendarDay.tsx:79, MoodDetailModal.tsx:97, PartnerMoodView.tsx:673, PartnerMoodDisplay.tsx:112, MoodTracker.tsx:177, MoodHistoryItem.tsx:44. MOOD_CONFIG is itself defined four times -- MoodDetailModal.tsx:27, CalendarDay.tsx:23, PartnerMoodView.tsx:35, MoodTracker.tsx:57 (measured with grep). A single normalizeMoods() would collapse the expression and turn DW-118 into a one-line change. Not fixed here: the intent scopes this to a one-expression shape guard per site and forbids type-level changes, so extracting a shared normalizer is a different piece of work.
 status: open
