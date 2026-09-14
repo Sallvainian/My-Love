@@ -16,6 +16,19 @@ const OUTSIDER_ID = '33333333-3333-4333-8333-333333333333';
 const mocks = vi.hoisted(() => ({
   getPartnerId: vi.fn(),
   setAuth: vi.fn(),
+  /**
+   * The leave. The hook records every teardown as
+   * `removeChannel(...).catch(...)` in a per-topic registry and the next open
+   * for that topic awaits it, so this has to be a promise a test can hold open
+   * or reject on purpose.
+   */
+  removeChannel: vi.fn(),
+  /**
+   * The shared socket, as `waitForSocketReady` reads it. Removing the last
+   * channel parks the socket in `disconnecting` for ~100ms, and every open
+   * inside that window silently never joins.
+   */
+  isDisconnecting: vi.fn(),
   /** Ordered record of the calls whose ORDER is load-bearing */
   order: [] as string[],
 }));
@@ -31,9 +44,14 @@ vi.mock('../../api/supabaseClient', () => ({
         return { unsubscribe: vi.fn() };
       }),
     })),
-    removeChannel: vi.fn(),
+    // `async` so this always hands back a promise: the hook does
+    // `removeChannel(...).catch(...)` and stores the result, and a bare
+    // `undefined` would throw before the registry entry was ever written.
+    removeChannel: vi.fn(async (...args: unknown[]) => mocks.removeChannel(...args)),
     realtime: {
       setAuth: (...args: unknown[]) => mocks.setAuth(...args),
+      // Consulted by `waitForSocketReady`, which every open goes through.
+      isDisconnecting: (...args: unknown[]) => mocks.isDisconnecting(...args),
     },
   },
   getPartnerId: (...args: unknown[]) => mocks.getPartnerId(...args),
@@ -84,6 +102,8 @@ describe('useRealtimeMessages', () => {
     vi.clearAllMocks();
     mocks.order.length = 0;
     mocks.getPartnerId.mockResolvedValue(PARTNER_ID);
+    mocks.removeChannel.mockResolvedValue('ok');
+    mocks.isDisconnecting.mockReturnValue(false);
     mocks.setAuth.mockImplementation(async () => {
       mocks.order.push('setAuth');
     });
@@ -120,20 +140,20 @@ describe('useRealtimeMessages', () => {
   });
 
   /**
-   * A channel that is claimed but never subscribed, with the async setup parked
-   * mid-flight.
+   * The channel a parked setup would have claimed, had it got that far.
    *
-   * `supabase.channel()` registers synchronously, so the cleanup can remove it;
-   * `subscribe()` happens two awaits later, and by then the effect run may no
-   * longer own it. A superseded run that subscribes anyway re-joins a private
-   * topic the hook has already released, and no later cleanup can remove it —
-   * `channelRef.current` is null by then.
+   * `supabase.channel()` registers synchronously and the SDK hands the topic
+   * back to anyone who asks until its leave has landed, so a channel created
+   * before the awaits and abandoned by a cleanup mid-flight is a private topic
+   * the hook can no longer release — `channelRef.current` is null by then.
+   * The hook therefore creates nothing until every await has returned and
+   * `cancelled` has been re-checked, which is what the two cases below pin.
    */
   function parkedChannel() {
     return { on: vi.fn().mockReturnThis(), subscribe: vi.fn() };
   }
 
-  it('does not subscribe when unmounted during the partner lookup', async () => {
+  it('creates no channel at all when unmounted during the partner lookup', async () => {
     const { supabase } = await import('../../api/supabaseClient');
     const mockChannel = parkedChannel();
     vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
@@ -149,19 +169,172 @@ describe('useRealtimeMessages', () => {
     const { unmount } = renderHook(() => useRealtimeMessages());
 
     await waitFor(() => {
-      expect(supabase.channel).toHaveBeenCalled();
+      expect(mocks.getPartnerId).toHaveBeenCalled();
     });
+    // Same invariant as before, against the mechanism that replaced eager
+    // creation: nothing is claimed while the setup is parked, so nothing is
+    // subscribed either.
+    expect(supabase.channel).not.toHaveBeenCalled();
     expect(mockChannel.subscribe).not.toHaveBeenCalled();
 
     unmount();
-    expect(supabase.removeChannel).toHaveBeenCalledWith(mockChannel);
+    // Nothing was ever claimed, so the cleanup has nothing to release.
+    expect(supabase.removeChannel).not.toHaveBeenCalled();
 
     await act(async () => {
       releasePartner(PARTNER_ID);
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
+    // The parked run resumes, sees `cancelled`, and stops before creating one.
+    expect(supabase.channel).not.toHaveBeenCalled();
     expect(mockChannel.subscribe).not.toHaveBeenCalled();
+  });
+
+  it('waits out a leave still in flight before re-opening the topic', async () => {
+    const { supabase } = await import('../../api/supabaseClient');
+    const first = parkedChannel();
+    const second = parkedChannel();
+    vi.mocked(supabase.channel)
+      .mockReturnValueOnce(first as unknown as RealtimeChannel)
+      .mockReturnValue(second as unknown as RealtimeChannel);
+
+    // The leave the cleanup records, held open on purpose.
+    let settleLeave: () => void = () => {};
+    mocks.removeChannel.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          settleLeave = resolve;
+        })
+    );
+
+    // Fake timers for the whole case. `waitForSocketReady` polls on a 10ms
+    // timer, so on wall-clock sleeps the negatives below would hold only by
+    // being longer than the poll and could flip on a loaded machine.
+    vi.useFakeTimers();
+    try {
+      let firstMount!: { unmount: () => void };
+      await act(async () => {
+        firstMount = renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(first.subscribe).toHaveBeenCalled();
+
+      firstMount.unmount();
+      expect(supabase.removeChannel).toHaveBeenCalledWith(first);
+
+      // A second mount resolves to the same `love-notes:<uid>` topic. Asking
+      // the client for it now would just retrieve the object that is still
+      // going away, whose subscribe() is gated shut.
+      await act(async () => {
+        renderHook(() => useRealtimeMessages());
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(1);
+
+      // The leave lands, but the socket is now mid-disconnect: opening inside
+      // that window silently never joins. 500ms is half `waitForSocketReady`'s
+      // own 1000ms upper bound, so it is unambiguously still parked.
+      mocks.isDisconnecting.mockReturnValue(true);
+      await act(async () => {
+        settleLeave();
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(1);
+
+      // Both gates clear, and only then is the replacement created and joined.
+      mocks.isDisconnecting.mockReturnValue(false);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50);
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(2);
+      expect(second.subscribe).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('creates nothing when unmounted while parked on the socket check', async () => {
+    const { supabase } = await import('../../api/supabaseClient');
+    const first = parkedChannel();
+    const second = parkedChannel();
+    vi.mocked(supabase.channel)
+      .mockReturnValueOnce(first as unknown as RealtimeChannel)
+      .mockReturnValue(second as unknown as RealtimeChannel);
+
+    vi.useFakeTimers();
+    try {
+      let firstMount!: { unmount: () => void };
+      await act(async () => {
+        firstMount = renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(first.subscribe).toHaveBeenCalled();
+      firstMount.unmount();
+
+      // The socket is mid-disconnect, so the second mount's open runs the
+      // partner lookup, setAuth and the leave wait and then parks in
+      // `waitForSocketReady` — the last await before the channel exists.
+      mocks.isDisconnecting.mockReturnValue(true);
+      let secondMount!: { unmount: () => void };
+      await act(async () => {
+        secondMount = renderHook(() => useRealtimeMessages());
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(1);
+
+      // Unmounted while parked there; then the socket settles and the parked
+      // open resumes.
+      secondMount.unmount();
+      mocks.isDisconnecting.mockReturnValue(false);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+
+      // It created and subscribed nothing. Without the `cancelled` re-check
+      // after `waitForSocketReady` this joins a private channel for a
+      // component that is gone, and `channelRef.current` is already null so no
+      // cleanup can ever release it — the leave the NEXT mount waits on is
+      // never recorded either, so it is handed the live object.
+      expect(supabase.channel).toHaveBeenCalledTimes(1);
+      expect(second.subscribe).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('opens the replacement even when the previous leave rejects', async () => {
+    const { supabase } = await import('../../api/supabaseClient');
+    const { logger } = await import('../../utils/logger');
+    const first = parkedChannel();
+    const second = parkedChannel();
+    vi.mocked(supabase.channel)
+      .mockReturnValueOnce(first as unknown as RealtimeChannel)
+      .mockReturnValue(second as unknown as RealtimeChannel);
+
+    // A leave can resolve `error`, and that rejection must not propagate into
+    // an unrelated open.
+    const leaveFailure = new Error('leave failed');
+    mocks.removeChannel.mockRejectedValueOnce(leaveFailure);
+    const debug = vi.spyOn(logger, 'debug');
+
+    const firstMount = renderHook(() => useRealtimeMessages());
+    await waitFor(() => {
+      expect(first.subscribe).toHaveBeenCalled();
+    });
+    firstMount.unmount();
+
+    renderHook(() => useRealtimeMessages());
+
+    await waitFor(() => {
+      expect(second.subscribe).toHaveBeenCalled();
+    });
+    expect(debug).toHaveBeenCalledWith(
+      '[useRealtimeMessages] Love-notes channel leave failed:',
+      leaveFailure
+    );
+
+    debug.mockRestore();
   });
 
   it('does not subscribe when unmounted during setAuth', async () => {
@@ -380,6 +553,28 @@ describe('useRealtimeMessages', () => {
       // Should have made 6 attempts total (1 initial + 5 retries)
       // After max retries, no more attempts should be made
       expect(mockSubscribe).toHaveBeenCalledTimes(6);
+
+      // The other two halves of giving up, now that a retry REPLACES the
+      // channel rather than re-subscribing it. Each of the five retries
+      // released exactly the channel it was replacing and created exactly one
+      // replacement, so 1 initial + 5 replacements = 6 channels and 5 leaves —
+      // and the sixth failure did neither.
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+      expect(supabase.removeChannel).toHaveBeenCalledTimes(5);
+
+      // And it STAYS given up: another CHANNEL_ERROR, and the longest backoff
+      // the config allows, move none of the three counters. A give-up path that
+      // still released or re-created a channel fails right here.
+      await act(async () => {
+        subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30000);
+      });
+
+      expect(mockSubscribe).toHaveBeenCalledTimes(6);
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+      expect(supabase.removeChannel).toHaveBeenCalledTimes(5);
     });
 
     it('should reset retry count on successful subscription', async () => {
@@ -646,6 +841,12 @@ describe('useRealtimeMessages', () => {
       expect(subscribeCallbacks).toHaveLength(2);
       expect(subscribeCallbacks[1]).toBeTypeOf('function');
 
+      // And the retry did NOT re-resolve the partner ahead of its join. The
+      // contract is that every re-join re-takes the snapshot on SUBSCRIBED, so
+      // a pre-join lookup here would take it twice and null the ref for a
+      // round-trip the join does not need.
+      expect(mocks.getPartnerId).toHaveBeenCalledTimes(1);
+
       const partnerLookupsBefore = mocks.getPartnerId.mock.calls.length;
       await act(async () => {
         subscribeCallbacks[1]?.('SUBSCRIBED');
@@ -665,6 +866,263 @@ describe('useRealtimeMessages', () => {
         await vi.advanceTimersByTimeAsync(1000);
       });
       expect(subscribeCallbacks).toHaveLength(3);
+    });
+
+    it('cancels the pending retry when the channel recovers inside the backoff', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+
+      let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
+      const mockChannel = {
+        on: vi.fn().mockReturnThis(),
+        subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
+          if (callback) subscribeCallback = callback;
+        }),
+      };
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
+      await act(async () => {
+        renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(mockChannel.subscribe).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+      });
+
+      // The SDK runs its own rejoin loop on an errored channel, so the channel
+      // can come back on its own INSIDE our backoff window.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(400);
+        subscribeCallback?.('SUBSCRIBED');
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // Well past the 1000ms the retry was scheduled for.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      // The healthy channel was left alone: no leave, no replacement, no second
+      // join. A stale timer firing here would tear a joined channel down and
+      // rejoin with `snapshotFresh` false, nulling the partner snapshot for a
+      // PostgREST round-trip during which every note is dropped.
+      expect(supabase.removeChannel).not.toHaveBeenCalled();
+      expect(supabase.channel).toHaveBeenCalledTimes(1);
+      expect(mockChannel.subscribe).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a channel that recovers after the retry has already started opening', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+
+      let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
+      const first = {
+        on: vi.fn().mockReturnThis(),
+        subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
+          if (callback) subscribeCallback = callback;
+        }),
+        // Read by the release step; the SDK's own rejoin loop moves it back to
+        // `joined` below.
+        state: 'errored',
+      };
+      const second = parkedChannel();
+      vi.mocked(supabase.channel)
+        .mockReturnValueOnce(first as unknown as RealtimeChannel)
+        .mockReturnValue(second as unknown as RealtimeChannel);
+
+      await act(async () => {
+        renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(first.subscribe).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+      });
+
+      // Park the retry inside its own setAuth. This is the window the
+      // SUBSCRIBED branch's `clearTimeout` cannot cover: the timer has already
+      // fired, so clearing it changes nothing and the open runs on regardless.
+      let releaseAuth: () => void = () => {};
+      mocks.setAuth.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseAuth = resolve;
+          })
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(mocks.setAuth).toHaveBeenCalledTimes(2);
+
+      // The SDK's rejoin lands while the retry is parked \u2014 its first attempt
+      // is due at the same 1000ms this backoff was
+      // (@supabase/phoenix assets/js/phoenix/socket.js:137).
+      await act(async () => {
+        first.state = 'joined';
+        subscribeCallback?.('SUBSCRIBED');
+        releaseAuth();
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // The parked retry resumed, saw a joined channel and dropped itself:
+      // no leave, no replacement, no second join. Replacing it here would
+      // drop every note until the replacement had joined, to serve a topic
+      // that was already being served.
+      expect(supabase.removeChannel).not.toHaveBeenCalled();
+      expect(supabase.channel).toHaveBeenCalledTimes(1);
+      expect(second.subscribe).not.toHaveBeenCalled();
+    });
+
+    it('waits out the retry\u2019s own leave before opening the replacement', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+
+      let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
+      const first = {
+        on: vi.fn().mockReturnThis(),
+        subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
+          if (callback) subscribeCallback = callback;
+        }),
+      };
+      const second = parkedChannel();
+      vi.mocked(supabase.channel)
+        .mockReturnValueOnce(first as unknown as RealtimeChannel)
+        .mockReturnValue(second as unknown as RealtimeChannel);
+
+      // The leave the RETRY records — not a cleanup's — held open.
+      let settleLeave: () => void = () => {};
+      mocks.removeChannel.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            settleLeave = resolve;
+          })
+      );
+
+      await act(async () => {
+        renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      // The retry let the failed channel go and is parked on that leave. Until
+      // it lands the client still hands this topic back, so creating the
+      // replacement now would join nothing — which is what a bare
+      // `removeChannel(...)` outside the registry reintroduces every time the
+      // retry fires against a channel that is `joined` rather than `errored`.
+      expect(supabase.removeChannel).toHaveBeenCalledWith(first);
+      expect(supabase.channel).toHaveBeenCalledTimes(1);
+      expect(second.subscribe).not.toHaveBeenCalled();
+
+      await act(async () => {
+        settleLeave();
+        await vi.advanceTimersByTimeAsync(10);
+      });
+
+      expect(supabase.channel).toHaveBeenCalledTimes(2);
+      expect(second.subscribe).toHaveBeenCalled();
+    });
+
+    it('attempts no join when the retry token install rejects', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+
+      let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
+      const mockChannel = {
+        on: vi.fn().mockReturnThis(),
+        subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
+          if (callback) subscribeCallback = callback;
+          return mockChannel;
+        }),
+      };
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
+      // A rejected token install must never escape as an unhandled rejection:
+      // nothing in the hook is awaiting the retry, so an uncaught one would
+      // take the page's error handler, not this call stack.
+      const unhandled = vi.fn();
+      process.on('unhandledRejection', unhandled);
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await act(async () => {
+          renderHook(() => useRealtimeMessages());
+          await vi.runOnlyPendingTimersAsync();
+        });
+
+        // The first join lands normally.
+        expect(mockChannel.subscribe).toHaveBeenCalledTimes(1);
+        expect(supabase.channel).toHaveBeenCalledTimes(1);
+
+        // The retry's setAuth is the one that fails — a refresh that could not
+        // reach Supabase, say.
+        const tokenFailure = new Error('token refresh failed');
+        mocks.setAuth.mockRejectedValueOnce(tokenFailure);
+
+        await act(async () => {
+          subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000);
+        });
+
+        // The token install rejected before any channel could be created, so
+        // nothing joined.
+        expect(supabase.channel).toHaveBeenCalledTimes(1);
+        expect(mockChannel.subscribe).toHaveBeenCalledTimes(1);
+
+        // And the failed channel was NOT released. Releasing it ahead of
+        // setAuth would leave the hook holding no channel at all — nothing
+        // left to report a status, so nothing to schedule another retry, and
+        // the feed dead until the view is remounted.
+        expect(supabase.removeChannel).not.toHaveBeenCalled();
+
+        // Caught and logged rather than thrown.
+        expect(consoleError).toHaveBeenCalledWith(
+          '[useRealtimeMessages] Retry setup failed:',
+          tokenFailure
+        );
+
+        // The channel stays closed: no later timer revives it on its own. Only
+        // the next CHANNEL_ERROR — which a channel that never joined cannot
+        // report — would schedule another attempt.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(30000);
+        });
+        expect(supabase.channel).toHaveBeenCalledTimes(1);
+        expect(mockChannel.subscribe).toHaveBeenCalledTimes(1);
+
+        // Recovery is still possible, which is the point of holding the
+        // channel: it is still there to report, and the next failure retries
+        // normally — at 2000ms, the second step of the backoff, since the
+        // attempt that failed still spent one of the five.
+        await act(async () => {
+          subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(2000);
+        });
+        expect(supabase.removeChannel).toHaveBeenCalledTimes(1);
+        expect(supabase.channel).toHaveBeenCalledTimes(2);
+        expect(mockChannel.subscribe).toHaveBeenCalledTimes(2);
+
+        // Let any rejection Node was going to report reach its checkpoint.
+        // Real timers for this last turn: vitest's fake timers stub
+        // setImmediate too, so a faked one would never fire. Nothing is pending
+        // by now — the hook has given up until the next CHANNEL_ERROR.
+        vi.useRealTimers();
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(unhandled).not.toHaveBeenCalled();
+      } finally {
+        process.off('unhandledRejection', unhandled);
+        consoleError.mockRestore();
+      }
     });
 
     it('should clear retry timeout on unmount', async () => {

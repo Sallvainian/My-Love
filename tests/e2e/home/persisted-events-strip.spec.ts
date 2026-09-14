@@ -19,7 +19,7 @@
  *    event's `date` is a string. `src/App.tsx:625` passes the array to
  *    `getUpcomingEventCards`, whose filter calls `getCalendarDaysDiff`, whose
  *    first statement is `date.getFullYear()`
- *    (`src/components/RelationshipTimers/EventCountdown.tsx`). Under happy-dom
+ *    (`src/components/RelationshipTimers/eventCountdownHelpers.ts`). Under happy-dom
  *    nothing calls that function; in a browser it takes Home down into the
  *    ErrorBoundary.
  * 3. **Whether the blob is repaired on disk.** Zustand re-persists the
