@@ -25,13 +25,6 @@ paths-ignore:
   # resolve. ESLint likewise disables no-unused-vars under tests/**. Retained only
   # as documentation — see tests/e2e-archive/README.md.
   - 'tests/e2e-archive/**'
-  # Vendored copies of the BMAD skill tree, carried here so the Grok CLI can
-  # resolve repo-scoped skills. They are duplicates of `.claude/skills`, which
-  # `.gitignore:115` has always hidden from analysis, so scanning only these
-  # copies reported issues their originals never surfaced -- all in pytest
-  # fixtures (chmod on tmp_path files, cleanup `except OSError: pass`). Nothing
-  # under here runs in the app or in CI's build.
-  - '.grok/**'
 
 queries:
   - uses: security-extended
