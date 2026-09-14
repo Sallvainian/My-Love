@@ -128,8 +128,14 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
   },
 
   toggleFavorite: async (messageId) => {
+    // The flag lands in the shared `messages` store, which holds every account
+    // that has signed in on this device, so the write has to name the account
+    // that raised it. Captured at entry like `loadMessages` does; the
+    // post-await recheck before `set()` is deliberately not here (DW-100).
+    const { userId: requestedBy } = get();
+
     try {
-      await storageService.toggleFavorite(messageId);
+      await storageService.toggleFavorite(messageId, requestedBy);
 
       set((state) => ({
         messages: state.messages.map((msg) =>
