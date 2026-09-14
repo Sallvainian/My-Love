@@ -166,8 +166,15 @@ export function MoodTracker() {
     const existingMood = getMoodForDate(today);
 
     if (existingMood) {
-      // Support both old single mood and new multiple moods
-      if (existingMood.moods && existingMood.moods.length > 0) {
+      // Support both old single mood and new multiple moods.
+      //
+      // Array.isArray, not a truthy check: a truthy value that is not an array
+      // can still clear `.length > 0` and is then seeded straight into
+      // `selectedMoods`. A string survives `selectedMoods.includes(...)` in the
+      // mood grid and then throws `selectedMoods.map is not a function` on the
+      // "Selected:" line below; an array-like object throws one step earlier, on
+      // `.includes`.
+      if (Array.isArray(existingMood.moods) && existingMood.moods.length > 0) {
         setSelectedMoods(existingMood.moods);
       } else {
         setSelectedMoods([existingMood.mood]);
