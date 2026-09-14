@@ -6,8 +6,9 @@
 #
 # Skill discovery does NOT include <repo>/.claude/skills — Grok scans
 # ./.grok/skills, <repo_root>/.grok/skills, ~/.grok/skills and ~/.claude/skills
-# only — hence skill_tree = ".grok/skills". Repo-scoped skills are filtered out
-# when gitignored, so .grok/ must stay tracked. The bmad-* skills there are
+# only — hence skill_tree = ".grok/skills". Grok's README says repo-scoped skills
+# are filtered out when gitignored; grok 1.0.30 does not do that, so .grok/ is
+# gitignored like .claude/ and _bmad/ (see below). The bmad-* skills there are
 # COPIES of .claude/skills/* (not symlinks: bmad-loop runs sessions in git
 # worktree checkouts where gitignored .claude/ is absent, so links would
 # dangle). They therefore go stale on a BMAD upgrade — re-copy after running
