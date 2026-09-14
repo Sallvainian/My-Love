@@ -997,7 +997,9 @@ location: src/services/storage.ts:157,227-276
 source_spec: `7-partition-custom-messages-by-account.md`
 severity: medium
 reason: Verified at src/services/storage.ts:157 (getMessage returns any row) and :256-260 (toggleFavorite reads through it then writes isFavorite with no owner check). Pre-existing: none of these four were introduced or altered by this story, and the intent's Always list names only getAllMessages and getMessagesByCategory. Not reachable from the UI today because the ids a component can offer now come from the scoped `messages` array, but the service surface remains unscoped for any future caller.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-message-store-ownership-scoping
+resolution-undo: ea1805a2ada35a4f2bffdb6ddfe19f128423b1fb03cc6e8e6f4e08bc94b3c14d 2026-09-14 7374617475733a206f70656e
 
 ### DW-100: messagesSlice.toggleFavorite set()s after an await with no identity capture or recheck.
 origin: spec-deferred 50b8808c997c
@@ -1214,4 +1216,28 @@ location: _bmad-output/implementation-artifacts/deferred-work.md (DW-97)
 source_spec: `spec-dw-97-production-base-redirect-assertion.md`
 severity: low
 reason: DW-97's `location:` is `tests/unit/api/supabaseClientAuthFlow.test.ts / tests/e2e/auth/google-oauth.spec.ts` and its reason covers `both new assertions`. Verified: `tests/e2e/auth/google-oauth.spec.ts:68` still reads `expect(authorizeParams.get('redirect_to')).toBe(appBaseUrl + '/');` and this story's Never excludes it deliberately (`the deployed-origin round-trip stays operator work under DW-93`). Separately, DW-97's reason ends `Settle by asserting the authorize URL's redirect_to once against a production-mode build, or by reading it during the outstanding deployed-site sign-in.` -- what shipped is a stubbed `BASE_URL` under happy-dom bound to `vite.config.ts` via `loadConfigFromFile`, which is neither. The rationale for accepting that substitution lives only in this spec's triage log, not in the ledger a later sweep reads. Not fixable from this session: the orchestrator owns ledger entry status and resolution text, and this story's Never forbids editing the ledger. Settle by
+status: open
+
+### DW-127: storageService.updateMessage merges `updates` unfiltered, so a caller who may see a row can reassign its owner or convert a shared daily row into a private one.
+origin: spec-deferred 33d30b016bed
+location: src/services/storage.ts:275
+source_spec: `spec-dw-99-message-store-ownership-scoping.md`
+severity: medium
+reason: src/services/storage.ts:275 writes `{ ...message, ...updates, id: message.id }`. The id is now pinned to the checked row, but `userId` and `isCustom` still pass straight through, so `updateMessage(myRowId, { userId: other }, me)` donates a row and `updateMessage(dailyId, { isCustom: true, userId: me }, me)` takes a shared bundled row out of the partner's rotation pool. Pre-existing: the unfiltered spread predates this change. The repo's stronger door already solves it with an explicit field allowlist at src/services/customMessageService.ts:335-342. No production caller passes arbitrary `updates` today — src/stores/slices/messagesSlice.ts:138 is the only production call of any of the four methods, and it calls toggleFavorite.
+status: open
+
+### DW-128: Shared daily rows stay arbitrarily updatable and deletable by every caller, signed out included, because the by-id guard enforces visibility rather than ownership.
+origin: spec-deferred 831a770c8b3c
+location: src/services/storage.ts:261,291
+source_spec: `spec-dw-99-message-store-ownership-scoping.md`
+severity: medium
+reason: src/services/storage.ts isVisibleTo returns true unconditionally for `!isCustom` rows, so `deleteMessage(dailyId, null)` and `updateMessage(dailyId, { text }, B)` both succeed. The rule had to be visibility for toggleFavorite — Home favorites the daily message through it (src/components/DailyMessage/DailyMessage.tsx:157) — but updateMessage and deleteMessage have no production caller and were widened on that same rationale. The repo holds both rules at once: tests/unit/services/customMessageService.ownership.test.ts:326 asserts the same daily row is NOT editable through customMessageService. A deleted daily row does not heal: src/stores/slices/settingsSlice.ts:129 re-seeds only when the whole visible set is empty. Settle by deciding whether the two callerless writers should take customMessageService's stricter isOwnedBy rule (src/services/customMessageService.ts:110).
+status: open
+
+### DW-129: One row-level isFavorite flag is shared by every account on a device, so each partner sees and can clear the other's favorited daily messages.
+origin: spec-deferred c98a4ba7aa0c
+location: src/types/index.ts:21
+source_spec: `spec-dw-99-message-store-ownership-scoping.md`
+severity: medium
+reason: src/types/index.ts:21 gives Message a single `isFavorite` boolean and the bundled daily rows are shared by both accounts, so toggleFavorite on a daily row writes a flag the partner reads. Pre-existing and schema-level — the fix is per-account favorite storage, well past this change's service boundary.
 status: open
