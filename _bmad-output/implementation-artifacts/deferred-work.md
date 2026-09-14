@@ -944,7 +944,9 @@ location: src/api/supabaseClient.ts:59
 source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: low
 reason: With site data blocked or in a private window, supportsLocalStorage() is false and the SDK falls back to an in-memory store, which a full-page redirect to the provider wipes along with the verifier; the returning ?code= then finds nothing and is ignored. Under the old implicit flow the fragment carried the tokens, so the same browser signed in for that tab. Password sign-in is unaffected either way. Not fixed here: a cookie or sessionStorage adapter is new storage surface rather than a direct correction. Settle by deciding whether a private-window Google sign-in is supported, then adding an adapter or a stated limitation.
-status: open
+status: done 2026-09-14
+resolution: closed by human decision: Google sign-in requires site data to be enabled; password sign-in covers that browser, and persistSession would not survive a reload there either, so an adapter buys one session and adds new auth storage surface.
+decision: 2026-09-14 State the limitation, no adapter — Google sign-in requires site data to be enabled; password sign-in covers that browser, and persistSession would not survive a reload there either, so an adapter buys one session and adds new auth storage surface.
 
 ### DW-95: A code callback that finds no verifier is ignored in silence, with nothing shown to the person who just came back from the provider.
 origin: spec-deferred f540b6e377f9
@@ -953,6 +955,7 @@ source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: low
 reason: GoTrueClient.js:3356-3366 classifies such a URL as not-a-callback, so _initialize falls through to _recoverAndRefresh and the app renders the login screen with no explanation; measured in tests/unit/api/supabaseClientAuthFlow.test.ts, which asserts exactly that silence. Recoverable -- signing in again from this browser works -- and the fix is user-facing callback handling, which the story's contract excludes ("Never: add ... an exchangeCodeForSession call of our own"). Settle by deciding whether a "finish sign-in in the browser you started in" message is wanted, and where it would live given that the SDK owns callback classification.
 status: open
+decision: 2026-09-14 Show a recoverable message — Detect a returning ?code= that produced no session and render a recoverable explanation on the login screen -- that sign-in has to be finished in the browser it was started in -- without adding an exchangeCodeForSession call of our own. Settle DW-96's provider-denial silence in the same handler and on the same surface, and replace the unit case that currently pins the silence.
 
 ### DW-96: The provider-denial callback is as silent as the missing-verifier one, and only the second was recorded.
 origin: spec-deferred 34a72182aa5f
@@ -961,6 +964,7 @@ source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: low
 reason: GoTrueClient.js:3252-3259 throws AuthImplicitGrantRedirectError for any `#error=` URL before the flowType switch, _initialize returns it at :417, and nothing in src/App.tsx:229-296 reads _initialize's return value -- so a user who declines Google consent lands on the login screen with no explanation. Pre-existing: the implicit flow behaved identically, so this story neither caused nor changed it. The unit case "preserves an existing session for an error callback" asserts the session and the request count, never the returned error. Settle together with the missing-verifier silence: decide whether a "sign-in was cancelled" message is wanted, and where it lives given that the SDK owns callback classification.
 status: open
+decision: 2026-09-14 Show a cancelled-sign-in message — Read the SDK initialize outcome for an error callback and render a sign-in was cancelled message on the login screen, sharing one handler and one surface with DW-95's missing-verifier case, and extend the existing unit case to assert the returned error rather than only the preserved session.
 
 ### DW-97: Every redirect_to assertion runs where BASE_URL is "/", so the production "/My-Love/" base path is pinned nowhere.
 origin: spec-deferred 90661930e678
@@ -1030,7 +1034,9 @@ origin: spec-deferred 05606ebe644a
 location: src/components/DisplayNameSetup/DisplayNameSetup.tsx (zero-row branch)
 source_spec: `8-separate-profile-names-from-auth-identity.md`
 reason: lookupOwnDisplayName maps PGRST116 to `unset`, which opens the modal, while DisplayNameSetup's plain UPDATE cannot create the row and `id` is outside the new column grant. No reachable path to that state was demonstrated: public.users.id is REFERENCES auth.users(id) ON DELETE CASCADE and no client code deletes profiles. What would settle it: whether any operator or admin path deletes a public.users row without deleting the auth user. The intent requires the INSERT policy be left untouched, so removing the now-callerless policy is out of scope here regardless.
-status: open
+status: done 2026-09-14
+resolution: closed by human decision: No client or cascade path produces a profile row without an auth user, the modal surfaces a visible error rather than failing silently, and the INSERT policy is deliberately pinned by supabase/tests/database/25_profile_name_email_ownership.sql:150-153.
+decision: 2026-09-14 Unreachable; keep the policy — No client or cascade path produces a profile row without an auth user, the modal surfaces a visible error rather than failing silently, and the INSERT policy is deliberately pinned by supabase/tests/database/25_profile_name_email_ownership.sql:150-153.
 
 ### DW-106: Hosted evidence for the migration has not been recorded.
 origin: spec-deferred 930d06819af2
