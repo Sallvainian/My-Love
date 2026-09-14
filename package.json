@@ -67,7 +67,7 @@
     "@types/react-dom": "^19.2.7",
     "@types/react-window": "^2.0.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.0",
     "@vitest/ui": "^4.1.11",
     "autoprefixer": "^10.5.5",
     "dotenv": "^17.4.2",
