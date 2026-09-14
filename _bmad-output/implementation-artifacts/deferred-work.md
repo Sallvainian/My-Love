@@ -1096,7 +1096,9 @@ location: src/hooks/useRealtimeMessages.ts:69
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: low
 reason: moodSyncService.ts:149 and ephemeralBroadcast.ts already hold their own; interactionService and the scripture hooks still take none. AGENTS.md says to route new Realtime work through moodSyncService's refcounted registry and never call supabase.channel() directly. Extracting the pair into realtimeSocket.ts would cover the whole channel namespace. Pre-existing duplication, widened rather than created by this change.
-status: open
+status: done 2026-09-14
+resolution: closed by human decision: Three registries is accepted pre-existing duplication; the realtime-note-channel-lifecycle bundle keeps useRealtimeMessages and moodSyncService in sync by applying the same leave fix to both, and ephemeralBroadcast's send chains serve a different purpose.
+decision: 2026-09-14 Accept the duplication and close — Three registries is accepted pre-existing duplication; the realtime-note-channel-lifecycle bundle keeps useRealtimeMessages and moodSyncService in sync by applying the same leave fix to both, and ephemeralBroadcast's send chains serve a different purpose.
 
 ### DW-112: realtimeSocket.ts's header rationale quotes SDK behaviour that no longer matches the installed realtime-js, and this change newly depends on it.
 origin: spec-deferred c8dd2018bb24
@@ -1241,6 +1243,7 @@ source_spec: `spec-dw-99-message-store-ownership-scoping.md`
 severity: medium
 reason: src/types/index.ts:21 gives Message a single `isFavorite` boolean and the bundled daily rows are shared by both accounts, so toggleFavorite on a daily row writes a flag the partner reads. Pre-existing and schema-level — the fix is per-account favorite storage, well past this change's service boundary.
 status: open
+decision: 2026-09-14 Build per-account favorites — Move favorite state off the shared Message row onto per-account storage. Add a favorites store or index keyed on (messageId, userId) in src/services/dbSchema.ts alone, bumping DB_VERSION and gating the upgrade branch on whether the store exists rather than on oldVersion < N, and plan how the existing shared isFavorite booleans on daily rows are carried over or dropped. Then update storage.ts's toggleFavorite and getMessage, messagesSlice.ts's toggleFavorite and messageHistory.favoriteIds, and the UI readers including DailyMessage.tsx, and make sure the new account-scoped field is added to signedOutState() in authSlice.ts in the same commit so a sign-out does not leak it.
 
 ### DW-130: A display name can be set once at signup and never changed, because the only form that writes it is unreachable afterwards.
 origin: operator report during post-merge verification of sweep 7, 2026-09-14
