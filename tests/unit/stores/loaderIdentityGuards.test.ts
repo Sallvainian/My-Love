@@ -50,6 +50,7 @@ const updateEvent = vi.fn();
 const deleteEvent = vi.fn();
 const getInteractionHistory = vi.fn();
 const getAllStoredMessages = vi.fn();
+const toggleStoredFavorite = vi.fn();
 const customGetAllForUser = vi.fn();
 const customCreate = vi.fn();
 const customUpdateMessage = vi.fn();
@@ -133,7 +134,11 @@ vi.mock('../../../src/services/storage', () => ({
     init: vi.fn(),
     addMessage: vi.fn(),
     addMessages: vi.fn(),
-    toggleFavorite: vi.fn(),
+    // Same shape as getAllMessages above, and for the same reason: the
+    // `messages` store is shared by every account on the device, so a case has
+    // to be able to assert WHICH id the write was made for.
+    toggleFavorite: (messageId: number, userId: string | null) =>
+      toggleStoredFavorite(messageId, userId),
   },
 }));
 
@@ -646,6 +651,27 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().messages).toEqual(cRotationPool());
       // A's own writing, one tap of Sign Out away from C's daily message card.
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+    });
+  });
+
+  describe('toggleFavorite', () => {
+    it('names the account that raised the favorite when it reaches the store', async () => {
+      const own = aCustomMessage();
+      useAppStore.setState({ messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+
+      await useAppStore.getState().toggleFavorite(own.id);
+
+      // The favorite is a write into a store shared by every account on the
+      // device, so it has to name an owner. Passing `null` would still compile
+      // and would still flip the row — on whoever's row shares that id.
+      expect(toggleStoredFavorite).toHaveBeenCalledWith(own.id, A);
+      // The seeded row is read back: the optimistic flip and the favourite
+      // list are the rest of this action, and without these the whole `set()`
+      // could be deleted with the case still green.
+      expect(useAppStore.getState().messages).toEqual([{ ...own, isFavorite: true }]);
+      expect(useAppStore.getState().messageHistory.favoriteIds).toContain(own.id);
     });
   });
 
