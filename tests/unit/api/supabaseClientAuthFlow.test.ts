@@ -7,21 +7,36 @@
  * before the module is imported, so `GoTrueClient._initialize()` classifies it
  * exactly as it does in a browser.
  *
- * Every case asserts the number of `fetch` calls as well as the session,
- * because the session assertion alone does not discriminate. Under the SDK's
- * implicit default (`GoTrueClient.js:21`) a hostile fragment causes an
- * immediate `GET /auth/v1/user` with the supplied token; under `flowType:
+ * Every callback case asserts the number of `fetch` calls as well as the
+ * session, because the session assertion alone does not discriminate. Under
+ * the SDK's implicit default (`GoTrueClient.js:21`) a hostile fragment causes
+ * an immediate `GET /auth/v1/user` with the supplied token; under `flowType:
  * 'pkce'` the URL is refused at `GoTrueClient.js:3263-3265` before anything is
  * sent. A fake token therefore yields "no session" either way -- only the
- * absent request distinguishes the fixed client from the broken one.
+ * absent request distinguishes the fixed client from the broken one. The
+ * sign-in cases below assert the built authorize URL instead.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
+import { loadConfigFromFile } from 'vite';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 // `vitest.config.ts` defines VITE_SUPABASE_URL as the project URL, so the
 // SDK derives this storage key (`sb-${hostname.split('.')[0]}-auth-token`).
 const STORAGE_KEY = 'sb-xojempkrugifnaveqtqc-auth-token';
 const APP_ORIGIN = 'http://localhost:3000';
+
+/**
+ * The deployed base path. `vite.config.ts:11` is the source of truth
+ * (`base: mode === 'production' ? '/My-Love/' : '/'`) and the case below binds
+ * this constant to it at runtime: `loadConfigFromFile` takes a path string, so
+ * a repo rename or custom-domain switch turns the suite red instead of shipping
+ * green. It is read that way rather than imported because a static
+ * `import '../../../vite.config'` raises TS6307 -- that file belongs to
+ * `tsconfig.node.json` while this suite builds under `tsconfig.test.json`.
+ */
+const PRODUCTION_BASE = '/My-Love/';
 
 /**
  * A complete implicit grant fragment, in the shape `_getSessionFromURL`
@@ -78,11 +93,15 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
   let fetchSpy: FetchSpy;
   // Every client built during a case, so none is left running afterwards.
   let clients: Array<{ auth: { stopAutoRefresh: () => Promise<void> } }>;
+  // Set only by the case that drives a real browser redirect; `afterEach`
+  // restores it so no later case runs with navigation suppressed.
+  let assignSpy: MockInstance<typeof window.location.assign> | null;
 
   beforeEach(() => {
     vi.resetModules();
     localStorage.clear();
     clients = [];
+    assignSpy = null;
     // Never call through. `vitest.config.ts` points the module at the real
     // hosted project, so an un-stubbed spy would put the regression state --
     // the one where the SDK does fetch the callback token -- on the network.
@@ -97,6 +116,20 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     // key -- and a stray refresh is exactly what would corrupt a fetch count.
     for (const client of clients) await client.auth.stopAutoRefresh();
     fetchSpy.mockRestore();
+    assignSpy?.mockRestore();
+    assignSpy = null;
+    // The production-base case stubs `BASE_URL`; every other case must see the
+    // `"/"` that is Vite's own built-in `base` default -- `vitest.config.ts`
+    // sets no `base` and defines no `BASE_URL`.
+    vi.unstubAllEnvs();
+    // AC 3, asserted rather than assumed: without these two lines, deleting
+    // either restore above leaves the whole unit suite green, so a leaked stub
+    // would only ever surface as an unrelated case failing somewhere later.
+    // The sibling cases cannot catch it themselves -- they interpolate
+    // `import.meta.env.BASE_URL` on both the input and the expected side, so a
+    // leaked value shifts both together.
+    expect(import.meta.env.BASE_URL).toBe('/');
+    expect(vi.isMockFunction(window.location.assign)).toBe(false);
     localStorage.clear();
     setUrl(`${APP_ORIGIN}/`);
   });
@@ -186,6 +219,50 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
       (key) => key.endsWith('-code-verifier') && !key.endsWith('-flows-code-verifier')
     );
     expect(verifierKeys.length).toBeGreaterThan(0);
+  });
+
+  it('sends the authorize redirect_to to the deployed base path', async () => {
+    // Every other case here runs at `BASE_URL === '/'`, so nothing pins the
+    // base the deployed bundle is built with. Stub it to `vite.config.ts:11`'s
+    // production value and let the REAL `signInWithGoogle` build the URL
+    // through the REAL SDK -- the expectation below is a hard-coded literal,
+    // not a restatement of the template at `src/api/auth/actionService.ts:119`.
+    //
+    // First bind the stub to the config that actually builds the deployment, so
+    // a repo rename cannot leave this case green against a stale literal.
+    const viteConfig = await loadConfigFromFile(
+      { command: 'build', mode: 'production' },
+      // Absolute on purpose. `loadConfigFromFile` resolves an explicit path
+      // against `process.cwd()` and ignores its `configRoot` parameter
+      // (`vite/dist/node/chunks/node.js:36963`), so a bare `'vite.config.ts'`
+      // makes this case depend on the directory vitest was launched from.
+      // `fileURLToPath` is handed the string, not a `URL` instance: under
+      // happy-dom the global `URL` is happy-dom's own class and Node rejects it
+      // with "The URL must be of scheme file".
+      resolve(dirname(fileURLToPath(import.meta.url)), '../../../vite.config.ts')
+    );
+    expect(viteConfig?.config.base).toBe(PRODUCTION_BASE);
+
+    vi.stubEnv('BASE_URL', PRODUCTION_BASE);
+    // Deeper than the base on purpose: were line 119 `${window.location.href}`,
+    // the captured `redirect_to` would carry `settings` and fail below.
+    setUrl(`${APP_ORIGIN}${PRODUCTION_BASE}settings`);
+    // `signInWithGoogle` passes no `skipBrowserRedirect`, so the SDK navigates
+    // at `GoTrueClient.js:4067-4068`. The spy captures the built URL and
+    // suppresses the navigation.
+    assignSpy = vi.spyOn(window.location, 'assign').mockImplementation(() => {});
+
+    const { supabase } = await importAppClient();
+    clients.push(supabase);
+    // `vi.resetModules()` ran in `beforeEach`, so this shares the registry with
+    // the import above and reuses the client already pushed to `clients`.
+    const { signInWithGoogle } = await import('../../../src/api/auth/actionService');
+    const error = await signInWithGoogle();
+
+    expect(error).toBeNull();
+    expect(assignSpy).toHaveBeenCalledTimes(1);
+    const authorizeUrl = new URL(String(assignSpy.mock.calls[0][0]));
+    expect(authorizeUrl.searchParams.get('redirect_to')).toBe('http://localhost:3000/My-Love/');
   });
 
   it('redeems a code callback for a flow this browser started', async () => {
