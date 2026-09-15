@@ -373,6 +373,108 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     expect(authorizeUrl.searchParams.get('redirect_to')).toBe('http://localhost:3000/My-Love/');
   });
 
+  it('says nothing about a failed exchange to someone who is already signed in', async () => {
+    // The same failing callback as the case above, in a browser that already
+    // holds a session — a link opened a second time, or opened in a tab that is
+    // already authenticated.
+    //
+    // The classifier has to read the session before it reports anything, which
+    // is why the error case cannot short-circuit: 'code-expired' tells the
+    // person to sign in again, and they already are. The docblock's promise
+    // that `null` covers "a redeemed callback" is what this pins.
+    setUrl(`${APP_ORIGIN}/`);
+    const starter = await importAppClient();
+    clients.push(starter.supabase);
+    await starter.supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+        skipBrowserRedirect: true,
+      },
+    });
+
+    fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).includes('grant_type=pkce')) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_grant', error_description: 'Invalid code' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      throw new Error(`unexpected request: ${String(input)}`);
+    });
+
+    vi.resetModules();
+    // The difference from the case above, and the whole point of it.
+    seedVictimSession();
+    setUrl(`${APP_ORIGIN}/?code=a-code-this-browser-cannot-redeem`);
+    const returning = await importAppClient();
+    clients.push(returning.supabase);
+
+    const { data } = await returning.supabase.auth.getSession();
+    expect(data.session, 'the precondition is that a session survives').not.toBeNull();
+
+    await expect(returning.getAuthCallbackOutcome()).resolves.toBeNull();
+  });
+
+  it('sends the password-reset link to the deployed base path', async () => {
+    // The sibling of the authorize-URL case above, for the one other place that
+    // composes `origin + BASE_URL` into a link people receive by email
+    // (`src/api/auth/actionService.ts:97`). Nothing asserted it at any base:
+    // measured, `grep -rn "reset-password" tests/ src/` returned that single
+    // source line and nothing under `tests/`, and the only other mention --
+    // `src/api/auth/__tests__/authServices.test.ts:41` -- registers
+    // `resetPasswordForEmail` as a mock and never inspects its options
+    // (DW-124).
+    //
+    // The path join is correct only because `BASE_URL` ends in `/`. At the dev
+    // base that is invisible: `'/' + 'reset-password'` and
+    // `'/My-Love/' + 'reset-password'` are both well-formed, and it is only a
+    // base without the trailing slash that would silently produce
+    // `/My-Lovereset-password`.
+    const viteConfig = await loadConfigFromFile(
+      { command: 'build', mode: 'production' },
+      resolve(dirname(fileURLToPath(import.meta.url)), '../../../vite.config.ts')
+    );
+    expect(viteConfig?.config.base).toBe(PRODUCTION_BASE);
+
+    vi.stubEnv('BASE_URL', PRODUCTION_BASE);
+    // Deeper than the base on purpose, the same way the authorize case is: were
+    // line 97 `${window.location.href}`, the captured link would carry
+    // `settings` and fail below.
+    setUrl(`${APP_ORIGIN}${PRODUCTION_BASE}settings`);
+
+    // `resetPasswordForEmail` navigates nowhere, so there is no `assign` to spy
+    // on. The link travels in the recover request body instead.
+    fetchSpy.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+
+    const { supabase } = await importAppClient();
+    clients.push(supabase);
+    const { resetPassword } = await import('../../../src/api/auth/actionService');
+    const error = await resetPassword('someone@example.com');
+
+    expect(error).toBeNull();
+    const recoverCall = fetchSpy.mock.calls.find((call) =>
+      String(call[0]).includes('/auth/v1/recover')
+    );
+    expect(recoverCall, 'the reset must have reached the recover endpoint').toBeDefined();
+
+    // A hard-coded literal, not a restatement of the template in
+    // actionService.ts -- otherwise this passes whatever that line composes.
+    const body = JSON.parse(String((recoverCall?.[1] as RequestInit).body)) as {
+      email: string;
+      gotrue_meta_security?: unknown;
+    };
+    expect(body.email).toBe('someone@example.com');
+    const redirectTo = new URL(String(recoverCall?.[0])).searchParams.get('redirect_to');
+    expect(redirectTo).toBe('http://localhost:3000/My-Love/reset-password');
+  });
+
   it('redeems a code callback for a flow this browser started', async () => {
     // The acceptance half, on the app's own client. Every other callback case
     // here asserts a refusal, so without this one nothing would notice if the
@@ -449,8 +551,8 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     await expect(returning.getAuthCallbackOutcome()).resolves.toBeNull();
   });
 
-  it('says nothing when a code this browser started fails to exchange', async () => {
-    // The `error ||` half of the classifier's guard, which nothing else
+  it('explains a code this browser started but could not exchange', async () => {
+    // The error-with-a-code half of the classifier's guard, which nothing else
     // reaches. This browser HOLDS the verifier, so the URL is a real PKCE
     // callback and the exchange is attempted -- it just fails, which is the
     // ordinary expired-or-reused code. `_getSessionFromURL` rethrows the
@@ -458,9 +560,12 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     // `_initialize` returns it, leaving `initialize()` with a non-null error
     // that is NOT the implicit-grant class.
     //
-    // Without `error ||` this reads `needs-original-browser` -- the captured
-    // `code` is present and the failed exchange left no session -- and tells
-    // someone whose code simply expired to go and find a different browser.
+    // This used to answer `null`, which is what DW-131 was raised about: the
+    // most common real callback failure ended on the login screen in silence.
+    // It must still not read `needs-original-browser` -- the captured `code` is
+    // present and the failed exchange left no session, so the branch below it
+    // would tell someone whose code simply expired to go and find a different
+    // browser.
     setUrl(`${APP_ORIGIN}/`);
     const starter = await importAppClient();
     clients.push(starter.supabase);
@@ -505,7 +610,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     expect(error).toBeInstanceOf(AuthError);
     expect(isAuthImplicitGrantRedirectError(error)).toBe(false);
 
-    await expect(returning.getAuthCallbackOutcome()).resolves.toBeNull();
+    await expect(returning.getAuthCallbackOutcome()).resolves.toBe('code-expired');
   });
 
   it('leaves password sign-in on the password grant with no PKCE parameters', async () => {

@@ -26,6 +26,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
+import { stripBasePath } from './utils/basePath';
 import { logger } from './utils/logger';
 import { logStorageQuota } from './utils/storageMonitor';
 import { applyTheme } from './utils/themes';
@@ -179,20 +180,10 @@ function App() {
   // App-level wiring. Settings' copy is strictly better: it surfaces the
   // failure to the user instead of only console.error-ing it.
 
-  // Helper to get route path without base (handles both dev and production)
-  const getRoutePath = (pathname: string): string => {
-    // Strip the base path in production (/My-Love/)
-    const base = import.meta.env.BASE_URL || '/';
-    if (base !== '/' && pathname.startsWith(base)) {
-      return pathname.slice(base.length - 1); // Keep leading slash
-    }
-    return pathname;
-  };
-
   // Story 4.5: Initial route detection and popstate listener (AC-4.5.5, AC-4.5.6)
   useEffect(() => {
     // AC-4.5.5: Initial route detection - set view based on URL
-    const routePath = getRoutePath(window.location.pathname);
+    const routePath = stripBasePath(window.location.pathname);
     const initialView =
       routePath === '/photos'
         ? 'photos'
@@ -211,7 +202,7 @@ function App() {
 
     // AC-4.5.6: Browser back/forward button support
     const handlePopState = () => {
-      const routePath = getRoutePath(window.location.pathname);
+      const routePath = stripBasePath(window.location.pathname);
       const view =
         routePath === '/photos'
           ? 'photos'

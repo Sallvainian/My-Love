@@ -668,7 +668,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 <button
                   onClick={handleDeleteConfirm}
                   disabled={isDeleting}
-                  className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-white transition hover:bg-red-600"
+                  className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
                 >
                   Delete
                 </button>
