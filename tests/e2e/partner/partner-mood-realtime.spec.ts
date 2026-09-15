@@ -4,7 +4,7 @@
  *
  * The sibling of `tests/e2e/notes/love-notes-realtime.spec.ts`, which DW-90
  * produced for love notes and which this follows in shape. DW-90 was closed for
- * notes only; `src/api/moodSyncService.ts:257` runs the same composition --
+ * notes only; `src/api/moodSyncService.ts:267` runs the same composition --
  * private topic, `sendEphemeralBroadcast`, store, UI -- under the same policy
  * migration `20260912010000_private_couple_broadcast_policies.sql`, whose two
  * predicates each cover both topic prefixes. So the mood half of that
@@ -28,11 +28,11 @@
  * `logger.info`, which is unconditional (`src/utils/logger.ts:10-12`), so the
  * join is a real signal already present in the shipped code -- no app change,
  * and no sleep. Deliberately NOT the service-level line at
- * `moodSyncService.ts:681`: that one is `logger.debug`, which is stripped
+ * `moodSyncService.ts:691`: that one is `logger.debug`, which is stripped
  * outside development.
  *
  * Identities are this worker's own pooled pair, linked once by
- * `tests/support/auth/global-setup.ts:151`. Nothing here links, unlinks or
+ * `tests/support/auth/global-setup.ts:171`. Nothing here links, unlinks or
  * resets an account, and teardown deletes only the row carrying this test's own
  * uuid.
  */
@@ -96,8 +96,8 @@ test.describe('Partner mood realtime delivery', () => {
       // two contexts below sign in as.
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       // The exact path this send must take. The sender addresses its PARTNER's
-      // topic (`moodSyncService.ts:257`) while the receiver joins its OWN
-      // (`:595`) — the same value seen from the two ends of the pair.
+      // topic (`moodSyncService.ts:267`) while the receiver joins its OWN
+      // (`:605`) — the same value seen from the two ends of the pair.
       const expectedBroadcastPath = `${BROADCAST_PATH}${encodeURIComponent(
         `mood-updates:${partnerId}`
       )}/events/new_mood`;
@@ -170,7 +170,7 @@ test.describe('Partner mood realtime delivery', () => {
         const broadcastResponse = await broadcast;
         moodRowCommitted = true;
         // Asserted before the UI: the broadcast is fire-and-forget and
-        // `moodSyncService.ts:222` swallows its rejection, so checking the
+        // `moodSyncService.ts:232` swallows its rejection, so checking the
         // partner's screen first would report a refused send as a missing
         // element and point at the wrong layer.
         expect(broadcastResponse.status()).toBe(202);
@@ -210,14 +210,20 @@ test.describe('Partner mood realtime delivery', () => {
         // one failure worth reading — with a teardown message.
         expect.soft(error, 'Teardown must delete the mood row this test created').toBeNull();
 
-        // At most one row, never exactly one. Unlike `love_notes`, `moods` is
-        // unique on `(user_id, created_at)`
+        // Exactly one, and guarded by `moodRowCommitted` so a failure before
+        // the send cannot add a false teardown failure on top of the real one.
+        //
+        // Worth saying why one is right, because the schema suggests otherwise:
+        // `moods` is unique on `(user_id, created_at)`
         // (`20260726000000_moods_unique_user_created_at.sql:72`) and
-        // `moodSlice.ts:70` writes through `saveForDate`, so a second run on the
-        // same day UPDATES the existing row rather than inserting beside it.
-        // The marker still identifies it, but the count that proves a
-        // mis-resolved identity in the notes spec cannot transfer: the row it
-        // would be counting may predate this test.
+        // `moodSlice.ts:71` writes through `saveForDate`, which reads as "a
+        // second run the same day updates the existing row". It does not, on
+        // this path. `saveForDate` looks for that row through IndexedDB's
+        // `by-user-date` index, and a Playwright context starts with an empty
+        // IndexedDB -- storage state carries cookies and localStorage only. So
+        // no local row is found, the sync takes `moodApi.create`, and that
+        // upserts on a `created_at` stamped per save at millisecond precision.
+        // Every run inserts its own row, and this deletes exactly that one.
         if (moodRowCommitted) {
           expect
             .soft(deleted ?? [], 'Teardown must not match rows outside this pair')

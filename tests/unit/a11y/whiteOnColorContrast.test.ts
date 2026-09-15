@@ -233,8 +233,15 @@ function findWhiteOnColourPairings(): Pairing[] {
       //
       // A literal carrying BOTH `text-white` and a `bg-` utility is the unit
       // judged, so a conditional's two arms are judged separately, which is
-      // what you want. Known limitation: a pairing split across two literals
-      // (`${base} text-white`, with the background inside `base`) is not seen.
+      // what you want.
+      //
+      // Two known limitations, both of which under-report rather than
+      // over-report. A pairing split across two literals (`${base} text-white`,
+      // with the background inside `base`) is not seen. And the scan is
+      // line-by-line, so a template literal left open across several lines is
+      // only judged where both utilities land on the SAME line -- the usual
+      // case, since a wrapped class list tends to keep its colour pair
+      // together, but not a guarantee.
       for (const literal of text.matchAll(/'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g)) {
         const classes = literal[0];
         if (!classes.includes('text-white')) continue;

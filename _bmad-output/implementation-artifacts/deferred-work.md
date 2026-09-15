@@ -1362,7 +1362,7 @@ source_spec: `spec-dw-100-101-store-identity-guard-gaps-2.md`
 severity: low
 reason: settingsSlice.ts:171-173 attaches .catch() because nothing awaits the chain. settingsSlice.initializeApp.test.ts:124-132's loadMessages rethrows into that catch, unlike messagesSlice.ts:97-99 which swallows. Pre-existing in 84e6c8ea.
 status: done 2026-09-15
-resolution: SUPERSEDED by commit dfca89a9, verified by mutation: deleting the `.catch()` turns "handles a thrown handoff completion without an unhandled rejection" red. The entry's second half was still true and is fixed — the test double's `loadMessages` rethrew where production swallows (messagesSlice.ts:104-107), which gave the chain a rejection route production does not have. It now swallows, and the mutant still dies, so the case was passing for the right reason.
+resolution: SUPERSEDED by commit dfca89a9, verified by mutation: deleting the `.catch()` turns "handles a thrown handoff completion without an unhandled rejection" red. The entry's second half was still true and is fixed — the test double's `loadMessages` rethrew where production swallows (messagesSlice.ts:105-107 — the `catch` block itself; `:104` is the line above it), which gave the chain a rejection route production does not have. It now swallows, and the mutant still dies, so the case was passing for the right reason.
 
 ### DW-138: moodSyncService reports an unsolicited CLOSED but has no rejoin for it, so a mood topic closed by the server stays silent for the life of the page.
 origin: raised while closing DW-110, 2026-09-15

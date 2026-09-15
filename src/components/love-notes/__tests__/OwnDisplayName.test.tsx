@@ -36,6 +36,11 @@ vi.mock('../../../hooks/useLoveNotes', () => ({
     fetchOlderNotes: vi.fn(),
     clearError: vi.fn(),
     retryFailedMessage: vi.fn(),
+    // Required by `UseLoveNotesResult`, and a `vi.mock` factory is untyped, so
+    // omitting it rendered the component with a value its own type forbids.
+    // `undefined` fell through both ternaries and silently suppressed the
+    // notice, which is not the state this suite means to be in.
+    realtimeStatus: 'connected',
   }),
 }));
 

@@ -143,7 +143,13 @@ export function LoveNotes(): ReactElement {
             // amber-700 and red-600 rather than the -500 pair, which is 3.82:1
             // on white and below the 4.5:1 AA floor at this size (DW-134).
             <span
-              data-testid="realtime-connection-status"
+              // Suffixed, not bare. `PartnerMoodView.tsx:548` already uses
+              // `realtime-connection-status` for a different feed with a
+              // different vocabulary; the two are never on screen together
+              // today, but a spec written against the bare id would read as
+              // feed-agnostic and bind to whichever view happened to be
+              // mounted.
+              data-testid="realtime-connection-status-notes"
               role="status"
               aria-live="polite"
               className={`text-xs ${

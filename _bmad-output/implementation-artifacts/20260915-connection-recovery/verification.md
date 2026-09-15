@@ -9,7 +9,7 @@ All commands run from the repo root on `fix/connection-recovery-user-facing`, ba
 | Typecheck | `npx tsc -b --force` | clean, no output |
 | Lint | `npm run lint` | clean, 0 problems |
 | Whitespace | `git diff --check 3f0d951b` | clean |
-| Unit suite | `npx vitest run` | **102 files, 1924 tests, all passed** |
+| Unit suite | `npx vitest run` | **103 files, 1934 tests, all passed** (after review fixes) |
 | Browser | `npx playwright test <7 affected specs> --project=chromium --workers=2` | **16 passed** |
 | Production build | `fnox exec -- npm run build` | built; `dist/assets/*.js` carries the inlined project URL, so the env really was injected |
 
@@ -43,6 +43,11 @@ and required to fail first. Every mutation was reverted and the suite re-run gre
 | `withBasePath` rewritten to `base + routePath` | DW-125's first named mutant | 3 failed |
 | `stripBasePath` rewritten to `return pathname` | DW-125's second named mutant | 2 failed |
 | E2E: receiver listens for a different event, sender untouched | live delivery | send still answered 202; the delivery assertion failed |
+| The `gaveUp` flag not honoured by in-flight opens (A-6) | the resurrection case | 1 failed, a sixth channel created |
+| The two `LoveNotes` notice states swapped (A-8) | the notice cases | 2 failed |
+| The `LoveNotes` notice element deleted (A-8) | the notice cases | 4 failed |
+| `getAuthCallbackOutcome` short-circuiting before the session read (B3) | the signed-in case | 1 failed |
+| The contrast scanner reverted to `className="…"` only (B1) | the canary and the allowlist | 2 failed |
 
 ## One case that does not kill a mutant, stated rather than implied
 
