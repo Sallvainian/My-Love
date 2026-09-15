@@ -36,7 +36,27 @@ first_run_note = "run `grok` once in the project and run /hooks-trust to trust p
 # all -- silently, since untrusted or absent hooks simply never fire.
 seed_files = [".grok/skills", ".grok/hooks"]
 
+# SessionEnd is deliberately NOT mapped. Grok scopes its hooks per session and a
+# SUBAGENT is a session: when one finishes, grok fires SessionEnd carrying the
+# subagent's id and its own transcript, not the main session's. bmad-loop's
+# generic adapter reads any SessionEnd as proof the CLI died and returns
+# "crashed" unconditionally (adapters/generic.py:1067), so every grok session
+# that outlived a subagent was killed mid-work. Measured on run
+# 20260914-184113-c59d, four times, always the same shape -- e.g. dev-1-g2's
+# main session was 01a0a338-033c-7c41-8446-a2ace771401e while the fatal
+# SessionEnd carried 01a0a33d-8f9c-7611-b4d3-0b98e4dc077e, which grok's own log
+# names 14ms later as `subagent completed {subagent_id: 01a0a33d-8f9c-...}`.
+# The adapter has this guard for Copilot but only on Stop, keyed on an EMPTY
+# transcript_path (generic.py:1002-1013); grok's subagent SessionEnd carries a
+# real one, so that filter cannot catch it.
+#
+# Unmapped, the relay is never registered for the event and no SessionEnd file
+# is ever written, which puts grok on the same footing as Codex: a real death is
+# caught by the window-death probe instead (generic.py:915-925, "died without a
+# SessionEnd hook"), ~5s later rather than instantly. That is the whole cost.
+# Do not re-add SessionEnd without first confirming grok stopped firing it for
+# subagents (verified against grok 1.0.30).
 [hooks]
 dialect = "claude-settings-json"
 config_path = ".grok/hooks/bmad-loop.json"
-events = { SessionStart = "SessionStart", Stop = "Stop", SessionEnd = "SessionEnd", PreCompact = "PreCompact" }
+events = { SessionStart = "SessionStart", Stop = "Stop", PreCompact = "PreCompact" }
