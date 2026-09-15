@@ -21,7 +21,7 @@
  * @component
  */
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { getUser } from '../../api/auth/sessionService';
 import { SEED_FALLBACK_NAME, supabase } from '../../api/supabaseClient';
 import { logger } from '../../utils/logger';
@@ -32,10 +32,37 @@ interface DisplayNameSetupProps {
   isOpen: boolean;
   /** Callback when display name is set successfully */
   onComplete: () => void;
+  /**
+   * Name to pre-fill the field with, for the Settings edit route.
+   *
+   * Read once, by `useState`'s initialiser -- so the caller has to mount this
+   * component freshly per open rather than keep it mounted behind
+   * `isOpen={false}`, or a later change to this prop is ignored. Settings does
+   * exactly that; App's signup gate passes nothing and gets today's empty field.
+   */
+  initialName?: string;
+  /**
+   * Supplied only by a surface the user can back out of. Its presence IS what
+   * renders the Cancel control: the signup gate deliberately has no way out,
+   * because an account with no name is the state this modal exists to end.
+   */
+  onCancel?: () => void;
+  /**
+   * Which copy to wear. 'setup' is the first-run welcome; 'edit' is the same
+   * form, with the same refusals, reached from Settings by someone who already
+   * has a name.
+   */
+  mode?: 'setup' | 'edit';
 }
 
-export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onComplete }) => {
-  const [displayName, setDisplayName] = useState('');
+export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
+  isOpen,
+  onComplete,
+  initialName = '',
+  onCancel,
+  mode = 'setup',
+}) => {
+  const [displayName, setDisplayName] = useState(initialName);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -130,16 +157,95 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
     }
   };
 
+  // Escape closes, but ONLY where there is somewhere to close to. The signup
+  // gate supplies no `onCancel` and so gets no key handler at all: an account
+  // with no name is the state this modal exists to end, and a dismissable gate
+  // would drop the user into an app still showing their email.
+  //
+  // Bound to the document rather than the overlay because nothing here traps
+  // focus (deliberately — see the dialog role below), so the key event can be
+  // raised from outside this subtree.
+  useEffect(() => {
+    if (!isOpen || !onCancel) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel();
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onCancel]);
+
   if (!isOpen) {
     return null;
   }
 
+  const isEdit = mode === 'edit';
+
+  const submitButton = (
+    <button
+      type="submit"
+      className="submit-button"
+      data-testid="display-name-submit"
+      disabled={isLoading || !displayName.trim()}
+    >
+      {isLoading ? (
+        <span className="loading-spinner">
+          <svg
+            className="spinner-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle
+              className="spinner-track"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="spinner-head"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          {isEdit ? 'Saving...' : 'Setting up...'}
+        </span>
+      ) : isEdit ? (
+        'Save name'
+      ) : (
+        'Continue'
+      )}
+    </button>
+  );
+
   return (
     <div className="display-name-setup-overlay" data-testid="display-name-setup">
-      <div className="display-name-setup-modal" data-testid="display-name-modal">
+      {/* Opened by choice over a live Settings page, so it has to announce
+          itself as a dialog and name itself from the title already on screen.
+          `aria-modal` is what tells a screen reader to stop at the scrim rather
+          than read Change and Sign Out behind it. No focus trap: one would be a
+          larger change than this needs, and without it Escape is bound to the
+          document so the key still reaches us. */}
+      <div
+        className="display-name-setup-modal"
+        data-testid="display-name-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="display-name-modal-title"
+      >
         <div className="modal-header">
-          <h2 className="modal-title">Welcome! 👋</h2>
-          <p className="modal-subtitle">What would you like to be called?</p>
+          <h2 className="modal-title" id="display-name-modal-title">
+            {isEdit ? 'Change your name' : 'Welcome! 👋'}
+          </h2>
+          <p className="modal-subtitle">
+            {isEdit
+              ? 'This is the name your partner sees on your notes.'
+              : 'What would you like to be called?'}
+          </p>
         </div>
 
         <form className="modal-form" onSubmit={handleSubmit}>
@@ -189,41 +295,26 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
             <p className="form-hint">3-30 characters</p>
           </div>
 
-          <button
-            type="submit"
-            className="submit-button"
-            data-testid="display-name-submit"
-            disabled={isLoading || !displayName.trim()}
-          >
-            {isLoading ? (
-              <span className="loading-spinner">
-                <svg
-                  className="spinner-icon"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <circle
-                    className="spinner-track"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="spinner-head"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Setting up...
-              </span>
-            ) : (
-              'Continue'
-            )}
-          </button>
+          {/* Cancel first in the DOM so Tab reaches it before the primary
+              action, and rendered only when there is somewhere to cancel TO.
+              Without `onCancel` the markup is byte-identical to the signup
+              gate's, wrapper included. */}
+          {onCancel ? (
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="cancel-button"
+                data-testid="display-name-cancel"
+                onClick={onCancel}
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              {submitButton}
+            </div>
+          ) : (
+            submitButton
+          )}
         </form>
       </div>
     </div>
