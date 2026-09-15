@@ -145,6 +145,41 @@
   transform: none;
 }
 
+/* Edit mode only: the signup gate renders the submit button bare, exactly as
+   before, so this row never wraps it there. */
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.modal-actions .submit-button {
+  flex: 1 1 auto;
+  width: auto;
+}
+
+.cancel-button {
+  flex: 0 0 auto;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-button:hover:not(:disabled) {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .loading-spinner {
   display: flex;
   align-items: center;
@@ -216,5 +251,15 @@
     background-color: #450a0a;
     border-color: #7f1d1d;
     color: #fca5a5;
+  }
+
+  .cancel-button {
+    color: #9ca3af;
+    border-color: #4b5563;
+  }
+
+  .cancel-button:hover:not(:disabled) {
+    background-color: #374151;
+    color: #f9fafb;
   }
 }

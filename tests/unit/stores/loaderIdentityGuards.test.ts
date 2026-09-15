@@ -673,6 +673,88 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().messages).toEqual([{ ...own, isFavorite: true }]);
       expect(useAppStore.getState().messageHistory.favoriteIds).toContain(own.id);
     });
+
+    it('discards the favorite write when the account changed mid-flight', async () => {
+      const own = aCustomMessage();
+      useAppStore.setState({ messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+
+      const pending = deferred<void>();
+      toggleStoredFavorite.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().toggleFavorite(own.id);
+      // Seed C with a known favoriteIds list. An unguarded `map` is a no-op
+      // when C's pool does not share A's id, so favoriteIds is the leak.
+      const cFavoriteIds = [42];
+      switchToUserC({
+        messages: cRotationPool(),
+        messageHistory: {
+          ...useAppStore.getState().messageHistory,
+          favoriteIds: cFavoriteIds,
+        },
+      });
+
+      pending.settle();
+      await inFlight;
+
+      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+      expect(useAppStore.getState().messageHistory.favoriteIds).toEqual(cFavoriteIds);
+    });
+
+    it('discards the favorite write when the SAME account signs back in mid-flight', async () => {
+      // `userId` is A again by the time the request lands, so an id-only
+      // compare would let this through. `authSessionVersion` is the half
+      // that distinguishes the dead session from the live one.
+      const own = aCustomMessage();
+      useAppStore.setState({ messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+
+      const pending = deferred<void>();
+      toggleStoredFavorite.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().toggleFavorite(own.id);
+
+      useAppStore.getState().clearAuth();
+      useAppStore.getState().setAuthUser(A);
+      const knownFavoriteIds = [42];
+      useAppStore.setState({
+        messages: [{ ...own, isFavorite: false }],
+        messageHistory: {
+          ...useAppStore.getState().messageHistory,
+          favoriteIds: knownFavoriteIds,
+        },
+      } as unknown as Parameters<typeof useAppStore.setState>[0]);
+
+      pending.settle();
+      await inFlight;
+
+      expect(useAppStore.getState().userId).toBe(A);
+      expect(useAppStore.getState().messages).toEqual([{ ...own, isFavorite: false }]);
+      expect(useAppStore.getState().messageHistory.favoriteIds).toEqual(knownFavoriteIds);
+    });
+
+    it('swallows a service rejection and does not write the favorite', async () => {
+      const own = aCustomMessage();
+      useAppStore.setState({ messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+      const knownFavoriteIds = [...useAppStore.getState().messageHistory.favoriteIds];
+      const failure = new Error('toggle-failed');
+      toggleStoredFavorite.mockRejectedValueOnce(failure);
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await expect(useAppStore.getState().toggleFavorite(own.id)).resolves.toBeUndefined();
+
+        expect(useAppStore.getState().messages).toEqual([{ ...own, isFavorite: false }]);
+        expect(useAppStore.getState().messageHistory.favoriteIds).toEqual(knownFavoriteIds);
+        expect(log).toHaveBeenCalledWith('Error toggling favorite:', failure);
+      } finally {
+        log.mockRestore();
+      }
+    });
   });
 
   describe('setAuthUser refills the rotation pool', () => {

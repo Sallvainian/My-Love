@@ -1362,7 +1362,7 @@ function EventDeleteConfirmation({
               onClick={handleDelete}
               disabled={isDeleting}
               data-testid="events-delete-confirm"
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-red-600 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-red-700 disabled:opacity-50"
             >
               {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
               {isDeleting ? 'Deleting...' : 'Delete'}

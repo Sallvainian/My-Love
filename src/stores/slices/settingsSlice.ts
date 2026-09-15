@@ -89,6 +89,10 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
     get().setLoading(true);
     get().setError(null);
 
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const stillCurrent = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
     try {
       // CRITICAL: Check Zustand persist hydration status
       // Hydration completes synchronously during store creation (before initializeApp is called)
@@ -123,7 +127,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
       // own custom rows. The seeding decision below reads the same list, and
       // still works when nobody is signed in: the daily rows are shared, so
       // their absence is what marks an unseeded database.
-      const storedMessages = await storageService.getAllMessages(get().userId);
+      const storedMessages = await storageService.getAllMessages(requestedBy);
 
       // If no messages exist, populate with default messages
       if (storedMessages.length === 0) {
@@ -138,17 +142,36 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         await storageService.addMessages(messagesToAdd);
 
         // Reload messages from IndexedDB to get auto-generated IDs
-        const messagesWithIds = await storageService.getAllMessages(get().userId);
+        const messagesWithIds = await storageService.getAllMessages(requestedBy);
 
-        // MessagesSlice state - no cast needed
-        set({ messages: messagesWithIds });
-      } else {
-        // MessagesSlice state - no cast needed
+        if (stillCurrent()) {
+          set({ messages: messagesWithIds });
+        }
+      } else if (stillCurrent()) {
         set({ messages: storedMessages });
       }
 
-      // MessagesSlice action - no "if exists" guard needed
-      get().updateCurrentMessage();
+      if (stillCurrent()) {
+        get().updateCurrentMessage();
+      } else {
+        // `reloadRotationPool` returns early on an empty pool, which is the
+        // cold-boot state this path leaves behind, so the same two lines are
+        // inlined here rather than routed through it.
+        const { userId, authSessionVersion } = get();
+        void get()
+          .loadMessages()
+          .then(() => {
+            if (get().userId !== userId || get().authSessionVersion !== authSessionVersion) return;
+            get().updateCurrentMessage();
+          })
+          // `loadMessages` swallows its own errors, but `updateCurrentMessage` runs
+          // inside the callback above and nothing is awaiting this chain — a throw
+          // there would surface as an unhandled rejection on the init path, with no
+          // caller to report it.
+          .catch((error) => {
+            console.error('[App Init] Failed to reload the rotation pool:', error);
+          });
+      }
 
       get().setLoading(false);
 

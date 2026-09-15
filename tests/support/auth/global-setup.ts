@@ -66,6 +66,26 @@ async function ensureUser(
     user_metadata: { display_name: displayName },
   });
   if (updateError) throw new Error(`Failed to update user ${email}: ${updateError.message}`);
+
+  // The profile row's name is written here too, because the auth-side update
+  // above no longer reaches it. `sync_user_profile()` omits `display_name` from
+  // its ON CONFLICT DO UPDATE on purpose --
+  // `supabase/migrations/20260912030000_profile_name_email_ownership.sql:112-114`,
+  // "once the row exists the profile owns its own name" -- which is right for
+  // real accounts and wrong for fixtures: a spec that renames a pool account
+  // and is killed before its teardown restores it (CI cancel, --max-failures,
+  // OOM) would otherwise leave that row renamed for every later run with
+  // nothing able to put it back. Setup is the one place allowed to overrule the
+  // profile, so pool names become self-healing again rather than one-way.
+  const { error: profileNameError } = await admin
+    .from('users')
+    .update({ display_name: displayName, updated_at: new Date().toISOString() })
+    .eq('id', existingUserId);
+  if (profileNameError) {
+    throw new Error(
+      `Failed to reset the profile display name for ${email}: ${profileNameError.message}`
+    );
+  }
 }
 
 async function getAppUserIdByEmail(
