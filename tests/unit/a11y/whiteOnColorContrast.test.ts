@@ -74,17 +74,6 @@ const KNOWN_BELOW_FLOOR = new Map<string, { count: number; note: string }>([
       note: 'green-500 at 2.22:1 — DW-140. green-700 (4.94:1) is the first shade that clears.',
     },
   ],
-  [
-    'src/components/PhotoGallery/PhotoGridItem.tsx:blue-500',
-    {
-      count: 1,
-      note: 'blue-500 at 3.76:1 on text-xs, measured at full opacity though the class is bg-blue-500/90 over a photo — DW-142.',
-    },
-  ],
-  [
-    'src/components/InteractionHistory/InteractionHistory.tsx:purple-500',
-    { count: 1, note: 'purple-500 at 4.12:1 — DW-139.' },
-  ],
 ]);
 
 /**
@@ -257,7 +246,7 @@ function findWhiteOnColourPairings(): Pairing[] {
       // This codebase writes classes both ways — roughly 1300 `className="`
       // against 130 `className={` — and the second form is where conditional
       // pairings live, e.g. `photo.isOwn ? 'bg-pink-600 text-white' :
-      // 'bg-blue-500/90 text-white'`. An attribute-shaped regex walks past all
+      // 'bg-blue-600 text-white'`. An attribute-shaped regex walks past all
       // of them, which is a guard that reports clean over exactly the cases
       // most likely to be wrong. The first version of this file did that.
       //
