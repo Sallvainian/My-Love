@@ -1373,7 +1373,9 @@ origin: raised while closing DW-110, 2026-09-15
 location: src/api/moodSyncService.ts `subscribeMoodUpdates`, the `.subscribe((status) => ...)` callback
 severity: medium
 reason: DW-110 was fixed at its stated location, `useRealtimeMessages`, where a CLOSED now routes into the hook's existing backoff. The mood path has the same hole and no backoff to route into: the subscribe callback records `lastStatus` and fans the status out to subscribers, and `PartnerMoodView.tsx:210` maps CLOSED to a `disconnected` indicator, but nothing reopens the channel. Measured against the installed SDK in tests/unit/api/realtimeLeaveContract.test.ts: a server-initiated `phx_close` moves the channel to `closed`, removes it from the client registry, and schedules no rejoin — so the partner's moods stop arriving until the view is remounted, with the indicator the only sign. Not fixed while closing DW-110 because building a retry loop in the refcounted registry is a different change from adding a branch to one that already exists, and DW-110's `location:` names the hook alone. Settle by giving the registry a bounded reopen, or by deciding the indicator is sufficient and recording that.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-dw-mood-channel-closed-rejoin
+resolution-undo: 51b235da13de19eaafbd6598d967c09b0a0ea129dff00b8d127e53b16b7dc772 2026-09-15 7374617475733a206f70656e
 
 ### DW-139: A non-destructive badge pairs white text with bg-purple-500, at 4.12:1.
 origin: raised while closing DW-134, 2026-09-15
