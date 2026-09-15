@@ -24,7 +24,7 @@
  */
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { waitForSocketReady } from '../api/realtimeSocket';
 import {
   resolvePartnerIdForDelivery,
@@ -35,6 +35,14 @@ import { parseLoveNoteBroadcast } from '../api/validation/broadcastSchemas';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
 import { logger } from '../utils/logger';
+
+/**
+ * How the love-notes feed is doing, for a consumer that wants to say so.
+ *
+ * `disconnected` is terminal within a mount: it means the retry ceiling was
+ * reached and this hook will not try again on its own.
+ */
+export type NoteFeedStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
 interface UseRealtimeMessagesOptions {
   onNewMessage?: (message: LoveNote) => void;
@@ -52,15 +60,22 @@ const RETRY_CONFIG = {
  * Love-notes topics whose channel is mid-leave, keyed to the promise that
  * settles when the server acks it.
  *
- * `removeChannel` does not deregister the channel — it only awaits
- * `channel.unsubscribe()`, which flips the state to `leaving` and resolves on
- * the ack; the client's registry entry is dropped later, from the `_onClose`
- * hook (@supabase/realtime-js dist/module/RealtimeChannel.js:100-101). Until
- * that lands, `supabase.channel(topic)` still hands back the dying object
- * (@supabase/realtime-js dist/module/RealtimeClient.js:335-346), and
- * `.subscribe()` on it does nothing at all because the whole join body is
+ * Defensive, and measured to be so. The registry entry is dropped from the
+ * `_onClose` hook (@supabase/realtime-js
+ * dist/module/RealtimeChannel.js:100-101), and on the installed SDK that hook
+ * runs synchronously inside `removeChannel`, because phoenix's leave completes
+ * locally without waiting for the server (assets/js/phoenix/channel.js:242,251
+ * — see `releaseNoteChannel` below). So today a leave and its deregistration
+ * are effectively one step, and nothing observed here is racing.
+ *
+ * It is kept anyway because the cost is a Map entry and the failure it guards
+ * is silent: were the deregistration to become asynchronous again,
+ * `supabase.channel(topic)` would hand back the dying object
+ * (@supabase/realtime-js dist/module/RealtimeClient.js:335-346) and
+ * `.subscribe()` on it would do nothing at all, since the whole join body is
  * gated on the channel being closed (@supabase/realtime-js
- * dist/module/RealtimeChannel.js:134 `if (this.channelAdapter.isClosed())`).
+ * dist/module/RealtimeChannel.js:134 `if (this.channelAdapter.isClosed())`) —
+ * a dead feed with no error anywhere.
  *
  * Line numbers are the `dist/module` build throughout this file; `dist/main`
  * is the same code at different offsets.
@@ -77,8 +92,23 @@ const closingNoteChannels = new Map<string, Promise<unknown>>();
  * this topic waits it out instead of being handed the object that is still
  * going away.
  *
- * The `.catch()` is load-bearing: a leave can resolve `error`, and that
- * rejection must never propagate into an unrelated open.
+ * The `.catch()` is a belt, not the mechanism. `removeChannel` awaits
+ * `channel.unsubscribe()`, which resolves 'ok' | 'timed out' | 'error' and has
+ * no rejection path at all (@supabase/realtime-js
+ * dist/module/RealtimeChannel.js:604-612), so nothing reaches it today. It is
+ * kept because a rejection escaping into an unrelated open would be silent and
+ * expensive, and an SDK bump is free to introduce one.
+ *
+ * What actually frees the topic is the SDK: phoenix sets `state = leaving`
+ * BEFORE it tests `canPush()`, so `canPush()` -- which requires `isJoined()` --
+ * is always false by then and the leave completes locally and at once, running
+ * its close hook without waiting for the server (@supabase/phoenix
+ * assets/js/phoenix/channel.js:242,250-251). That close hook is what calls
+ * `socket.remove(this)`, so the client already holds no channel under this
+ * topic by the time the promise here settles. Measured, not assumed:
+ * tests/unit/api/realtimeLeaveContract.test.ts drives a real client and asserts
+ * it for a leave the server never answers, so an SDK bump that reintroduces the
+ * wait turns that file red instead of silently wedging both registries.
  */
 function releaseNoteChannel(topic: string, channel: RealtimeChannel): void {
   const leaving = supabase.removeChannel(channel).catch((err) => {
@@ -100,13 +130,13 @@ function releaseNoteChannel(topic: string, channel: RealtimeChannel): void {
  * front: a teardown landing while we wait REPLACES the entry, and the open that
  * follows would then race a leave nobody waited on.
  *
- * This loop is the one deliberate DIVERGENCE from `moodSyncService`, not a copy
- * of it: that module reads `closingMoodChannels` exactly once (`:616`) and
- * never re-reads it after its `await closing` (`:619`). Its `:621` re-read is
- * of `moodChannels` -- the OPEN map -- for an unrelated reason it states at
- * `:620`, "Another subscriber may have opened the replacement while we
- * waited". So the same replaced-entry race is still open there; see DW-109's
- * sibling note about the two registries diverging.
+ * This loop is a deliberate DIVERGENCE from `moodSyncService`, not a copy of
+ * it: that module reads `closingMoodChannels` exactly once and never re-reads
+ * it after its `await closing`. The divergence is harmless rather than a bug on
+ * either side — the leave and its deregistration are one synchronous step on
+ * the installed SDK, so neither module can actually observe a replaced entry —
+ * and it is left in place here because a re-read loop stays correct if that
+ * ever stops being true, while the single read would not.
  *
  * The loop terminates because a settled leave deletes its own entry before this
  * continuation runs.
@@ -139,6 +169,21 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
    * refreshing it does not re-render the chat or re-run the effect.
    */
   const partnerIdRef = useRef<string | null>(null);
+  /**
+   * The last status a channel actually reported, tagged with the account it was
+   * reported for.
+   *
+   * State rather than a ref because this one is meant to reach the screen --
+   * every other piece of subscription bookkeeping here is a ref precisely so
+   * that refreshing it does NOT re-render the chat.
+   *
+   * Only the reported half is stored. `idle` and `connecting` are derived below
+   * instead, because setting them would mean calling setState in the effect
+   * body, and the account tag is what makes that derivation safe: a sign-out or
+   * an account switch changes the key, so a previous account's `disconnected`
+   * can never be shown against the new one's freshly opening channel.
+   */
+  const [report, setReport] = useState<{ key: string; status: NoteFeedStatus } | null>(null);
   const addNote = useAppStore((state) => state.addNote);
   const userId = useAppStore((state) => state.userId);
 
@@ -246,12 +291,27 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
         });
     };
 
-    const handleStatus = (status: string, err?: Error) => {
+    const handleStatus = (status: string, err?: Error, source?: RealtimeChannel) => {
       logger.info('[useRealtimeMessages] Subscription status:', status, err || '');
+
+      // A status from a channel this run has already let go is not news about
+      // the live feed, and the CLOSED branch below makes that distinction
+      // load-bearing: the SDK reports CLOSED for every deliberate leave, not
+      // only for one the app did not ask for
+      // (tests/unit/api/realtimeLeaveContract.test.ts pins both). Without these
+      // two guards, releasing a channel would immediately reopen the topic it
+      // was just asked to release -- on every unmount, and on every retry.
+      //
+      // Both release paths are already covered by the time they call
+      // `releaseNoteChannel`: the cleanup lowers `subscriptionActive` first,
+      // and the retry nulls `channelRef` first.
+      if (!subscriptionActive) return;
+      if (source && source !== channelRef.current) return;
 
       // Reset retry count on successful subscription
       if (status === 'SUBSCRIBED') {
         retryCountRef.current = 0;
+        setReport({ key: currentUserId, status: 'connected' });
         // And cancel the retry that failure scheduled. The SDK runs its own
         // rejoin loop on an errored channel (@supabase/phoenix
         // assets/js/phoenix/channel.js:76 `rejoinTimer.scheduleTimeout()`),
@@ -287,14 +347,45 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       }
 
       // Handle subscription errors with exponential backoff (AC-2.3.5)
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        console.error('[useRealtimeMessages] Subscription error:', err);
+      //
+      // CLOSED joins them. Everything deliberate has been filtered out above,
+      // so a CLOSED reaching here is the server or the socket closing a topic
+      // out from under a live subscription -- and the SDK schedules no rejoin
+      // for that: the channel goes to `closed`, leaves the client's registry,
+      // and nothing re-arms it. Before this, that left the notes feed silent
+      // for the rest of the mount with no error logged and nothing on screen.
+      // It shares the backoff rather than getting its own path because the
+      // recovery is identical: replace the channel and join again.
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        if (status === 'CLOSED') {
+          // Not `console.error`: an unsolicited close is an ordinary network
+          // event, and the recovery below is expected to succeed.
+          logger.info('[useRealtimeMessages] Channel closed unexpectedly; re-opening');
+        } else {
+          console.error('[useRealtimeMessages] Subscription error:', err);
+        }
 
         // Check if max retries exceeded
         if (retryCountRef.current >= RETRY_CONFIG.maxRetries) {
           console.error(
             `[useRealtimeMessages] Max retries (${RETRY_CONFIG.maxRetries}) exceeded. Giving up.`
           );
+
+          // Hand the dead channel back instead of abandoning it in place.
+          // Leaving it in `channelRef` and in the client's registry keeps the
+          // topic occupied for the rest of the mount, and since its join is
+          // gated on the channel being closed, nothing that later reaches for
+          // this topic can join either -- so giving up poisoned the topic for
+          // every future consumer, not just this one.
+          const abandoned = channelRef.current;
+          channelRef.current = null;
+          if (abandoned) {
+            releaseNoteChannel(topic, abandoned);
+          }
+
+          // And say so. This is the only terminal state the hook has; until it
+          // was reported, the feed just stopped and no consumer could tell.
+          setReport({ key: currentUserId, status: 'disconnected' });
           return;
         }
 
@@ -305,6 +396,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
         );
 
         retryCountRef.current++;
+        setReport({ key: currentUserId, status: 'reconnecting' });
 
         logger.debug(
           `[useRealtimeMessages] Retry attempt ${retryCountRef.current}/${RETRY_CONFIG.maxRetries} in ${delay}ms`
@@ -476,7 +568,14 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // _onError/_onClose and the joinPush receives; a join that passes none
       // reports nothing, so neither the retry-count reset nor the partner
       // refresh would ever run again.
-      channel.subscribe(handleStatus);
+      // Wrapped rather than handed over bare, so a status can be attributed to
+      // the channel that reported it. `handleStatus` outlives any one channel --
+      // the retry hands the same function to the replacement -- so without this
+      // identity a late CLOSED from the channel just released is
+      // indistinguishable from the live one closing.
+      channel.subscribe((subscribeStatus, subscribeError) =>
+        handleStatus(subscribeStatus, subscribeError, channel)
+      );
     };
 
     void openChannel({ takeSnapshot: true, releaseCurrent: false }).catch((error) => {
@@ -512,7 +611,20 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     };
   }, [enabled, userId, handleNewMessage]);
 
-  // Return empty object - subscription status can be checked via side effects
-  // Note: Accessing refs during render is not recommended
-  return {};
+  // Derived, not stored: `idle` and `connecting` are facts about the props and
+  // about whether anything has reported yet, so deriving them here keeps the
+  // effect free of a setState that would cascade a render on every mount.
+  // A report tagged with a different account is ignored rather than shown --
+  // after a switch the new channel is opening, which is `connecting`.
+  const feedKey = enabled && userId ? userId : '';
+  const status: NoteFeedStatus = !feedKey
+    ? 'idle'
+    : report?.key === feedKey
+      ? report.status
+      : 'connecting';
+
+  // Previously `{}`. The one terminal state this hook has -- the retry ceiling
+  // giving up -- was invisible to every caller, so the notes feed could stop
+  // for good with nothing anywhere to say so.
+  return { status };
 }

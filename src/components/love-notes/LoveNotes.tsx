@@ -35,8 +35,36 @@ import { NoteRemoveConfirmation } from './NoteRemoveConfirmation';
  * and eventually a message input (Story 2.2).
  */
 export function LoveNotes(): ReactElement {
-  const { notes, isLoading, error, hasMore, fetchOlderNotes, clearError, retryFailedMessage } =
-    useLoveNotes();
+  const {
+    notes,
+    isLoading,
+    error,
+    hasMore,
+    fetchOlderNotes,
+    clearError,
+    retryFailedMessage,
+    realtimeStatus,
+  } = useLoveNotes();
+
+  /**
+   * What to say about the live feed, if anything.
+   *
+   * Only the two states worth interrupting the chat for get text. `connected`,
+   * `connecting` and `idle` render nothing at all: a working feed should not
+   * narrate itself, and a badge that is always on screen is the one nobody
+   * reads on the day it matters.
+   *
+   * `disconnected` is terminal -- the subscription gave up after five failed
+   * re-joins and nothing re-arms it -- so the wording says what is true of the
+   * feed rather than promising a recovery that is not coming. Reopening the
+   * screen is what starts a new subscription.
+   */
+  const realtimeNotice =
+    realtimeStatus === 'reconnecting'
+      ? 'Reconnecting…'
+      : realtimeStatus === 'disconnected'
+        ? 'Not receiving new notes'
+        : null;
 
   // Get navigation function and userId from store
   const navigateHome = useAppStore((state) => state.navigateHome);
@@ -106,7 +134,26 @@ export function LoveNotes(): ReactElement {
           <ArrowLeft className="h-5 w-5 text-gray-600" />
         </button>
 
-        <h1 className="text-lg font-semibold text-gray-800">Love Notes</h1>
+        <div className="flex flex-col items-center">
+          <h1 className="text-lg font-semibold text-gray-800">Love Notes</h1>
+          {realtimeNotice && (
+            // `role="status"` with a polite live region, matching the error
+            // banner's treatment below: this appears without the person having
+            // done anything, so it has to be announced rather than only seen.
+            // amber-700 and red-600 rather than the -500 pair, which is 3.82:1
+            // on white and below the 4.5:1 AA floor at this size (DW-134).
+            <span
+              data-testid="realtime-connection-status"
+              role="status"
+              aria-live="polite"
+              className={`text-xs ${
+                realtimeStatus === 'disconnected' ? 'text-red-600' : 'text-amber-700'
+              }`}
+            >
+              {realtimeNotice}
+            </span>
+          )}
+        </div>
 
         {/* Spacer for symmetric header layout */}
         <div className="w-9" />
