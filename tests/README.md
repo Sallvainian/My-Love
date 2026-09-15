@@ -20,7 +20,7 @@ npm run test:e2e:ui
 npm run test:e2e:debug
 
 # Run specific test file
-npx playwright test tests/e2e/scripture/scripture-lobby-4.1.spec.ts
+npx playwright test tests/e2e/navigation/tray.spec.ts
 ```
 
 ## Priority Tags
@@ -48,92 +48,48 @@ npx playwright test --grep "\\[P2\\]"
 ```
 tests/
 ├── e2e/                            # End-to-end test files (Playwright)
+│   ├── account-data/
 │   ├── auth/                       # Authentication flows
-│   │   ├── login.spec.ts
-│   │   ├── logout.spec.ts
-│   │   ├── google-oauth.spec.ts
-│   │   └── display-name-setup.spec.ts
-│   ├── home/                       # Home view
-│   │   ├── welcome-splash.spec.ts
-│   │   └── error-boundary.spec.ts
-│   ├── mood/                       # Mood tracking
-│   │   └── mood-tracker.spec.ts
-│   ├── navigation/                 # Navigation & routing
-│   │   └── routing.spec.ts
-│   ├── notes/                      # Love notes messaging
-│   │   └── love-notes.spec.ts
-│   ├── offline/                    # Offline support
-│   │   └── network-status.spec.ts
-│   ├── partner/                    # Partner interactions
-│   │   └── partner-mood.spec.ts
-│   ├── photos/                     # Photo gallery & upload
-│   │   ├── photo-gallery.spec.ts
-│   │   └── photo-upload.spec.ts
-│   ├── scripture/                  # Scripture reading (largest domain)
-│   │   ├── scripture-overview.spec.ts
-│   │   ├── scripture-session.spec.ts
-│   │   ├── scripture-seeding.spec.ts
-│   │   ├── scripture-solo-reading.spec.ts
-│   │   ├── scripture-stats.spec.ts
-│   │   ├── scripture-reflection-2.1.spec.ts
-│   │   ├── scripture-reflection-2.2.spec.ts
-│   │   ├── scripture-reflection-2.3.spec.ts
-│   │   ├── scripture-lobby-4.1.spec.ts
-│   │   ├── scripture-lobby-4.1-p2.spec.ts
-│   │   ├── scripture-reading-4.2.spec.ts
-│   │   ├── scripture-reconnect-4.3.spec.ts
-│   │   ├── scripture-accessibility.spec.ts
-│   │   └── scripture-rls-security.spec.ts
-│   └── example.spec.ts             # Smoke test
+│   ├── errors/
+│   ├── home/                       # Home view, events dashboard
+│   ├── mood/
+│   ├── navigation/                 # Tray + routing
+│   ├── notes/                      # Love notes
+│   ├── offline/
+│   ├── partner/                    # Partner mood + interactions
+│   ├── photos/
+│   └── settings/                   # Events CRUD and related
 ├── api/                            # API-level tests (separate Playwright project)
-│   ├── scripture-lobby-4.1.spec.ts
-│   └── scripture-reflection-api.spec.ts
-├── integration/                    # Integration tests — RPC business logic, no browser
-│   └── example-rpc.spec.ts         # Sample: Supabase RPC lifecycle validation
+│   ├── events-wire-contract.spec.ts
+│   ├── couple-broadcast-authorization.spec.ts
+│   └── …                          # 16 live specs
+├── integration/                    # Integration tests — no browser
+│   ├── example-rpc.spec.ts         # Admin-client events seed/cleanup
+│   └── claude-bot-config-forward-migration.spec.ts
 ├── unit/                           # Unit tests (Vitest + happy-dom)
-│   ├── data/
-│   │   └── scriptureSteps.test.ts
+│   ├── api/
+│   ├── helpers/
 │   ├── hooks/
-│   │   ├── useAutoSave.test.ts
-│   │   ├── useScriptureBroadcast.test.ts
-│   │   ├── useScriptureBroadcast.reconnect.test.ts
-│   │   ├── useScripturePresence.test.ts
-│   │   └── useScripturePresence.reconnect.test.ts
 │   ├── services/
-│   │   ├── dbSchema.test.ts
-│   │   ├── dbSchema.indexes.test.ts
-│   │   ├── scriptureReadingService.cache.test.ts
-│   │   ├── scriptureReadingService.crud.test.ts
-│   │   ├── scriptureReadingService.service.test.ts
-│   │   └── scriptureReadingService.stats.test.ts
 │   ├── stores/
-│   │   ├── scriptureReadingSlice.test.ts
-│   │   ├── scriptureReadingSlice.lobby.test.ts
-│   │   ├── scriptureReadingSlice.lockin.test.ts
-│   │   ├── scriptureReadingSlice.reconnect.test.ts
-│   │   ├── scriptureReadingSlice.stats.test.ts
-│   │   └── settingsSlice.initializeApp.test.ts
 │   ├── utils/
-│   │   ├── dateFormat.test.ts
-│   │   └── moodGrouping.test.ts
 │   └── validation/
-│       └── schemas.test.ts
 ├── support/                        # Test infrastructure
 │   ├── merged-fixtures.ts          # Main entry — import { test, expect } from here
-│   ├── auth-setup.ts               # Worker pool auth setup (runs once before all tests)
 │   ├── fixtures/
-│   │   ├── index.ts                # Custom fixtures (supabaseAdmin, testSession)
-│   │   ├── worker-auth.ts          # Worker-isolated auth with partner support
-│   │   ├── together-mode.ts        # Together mode lifecycle (seed → link → navigate → cleanup)
-│   │   └── scripture-navigation.ts # High-level scripture flow navigation
+│   │   ├── index.ts                # Custom fixtures (supabaseAdmin, supabaseAsUser, coupleEvents)
+│   │   ├── auth.ts                 # Worker-isolated auth with partner identity
+│   │   └── events-refresh-control.ts
 │   ├── factories/
-│   │   └── index.ts                # Data factories (createTestSession, linkTestPartners, cleanup)
-│   ├── helpers/
-│   │   ├── index.ts                # Generic utilities (waitFor, getTestId, expectToast, retry)
-│   │   ├── supabase.ts             # Supabase admin client, token acquisition
-│   │   └── scripture-lobby.ts      # Together mode lobby navigation helpers
-│   └── helpers.ts                  # Scripture flow helpers (startSoloSession, advanceOneStep, submitReflectionSummary)
-├── e2e-archive/                    # Archived/superseded specs
+│   │   ├── index.ts                # TypedSupabaseClient export
+│   │   └── events.ts               # resolveWorkerPairIds, seedEvents, clearPairEvents
+│   └── helpers/
+│       ├── index.ts                # Generic utilities (generateTestEmail, getTestId, expectToast)
+│       ├── navigation.ts           # Tray destinations (six views)
+│       ├── events.ts               # Single-row event helpers
+│       ├── rls-security.ts
+│       └── supabase.ts             # Supabase admin client, token acquisition
+├── e2e-archive/                    # Archived/superseded specs (frozen)
 ├── setup.ts                        # Vitest setup (browser API mocks)
 └── README.md
 ```
@@ -142,7 +98,7 @@ tests/
 
 ### Fixture Composition Pattern
 
-All E2E, API, and integration tests import from `merged-fixtures.ts` which combines 9 fixtures via `mergeTests`:
+All E2E, API, and integration tests import from `merged-fixtures.ts` which combines playwright-utils fixtures with custom project fixtures via `mergeTests`:
 
 **playwright-utils fixtures:**
 
@@ -155,10 +111,9 @@ All E2E, API, and integration tests import from `merged-fixtures.ts` which combi
 **Custom project fixtures:**
 
 - `supabaseAdmin` — Admin client with service role key for test data manipulation
-- `testSession` — Pre-seeded scripture sessions with auto-cleanup
-- `workerAuth` — Worker-isolated storage state paths (primary + partner)
-- `scriptureNav` — High-level scripture flow methods (ensureOverview, startSoloSession, advanceOneStep)
-- `togetherMode` — Full together-mode lifecycle: seed → link partners → navigate both users → cleanup
+- `supabaseAsUser` — User-scoped client so RLS applies
+- `coupleEvents` — Events seeding for this worker's couple, cleared before and after
+- `authOptions` / `partnerUserIdentifier` — Worker-isolated storage state (primary + partner)
 
 ### Worker-Isolated Auth
 
@@ -166,43 +121,46 @@ Tests run in parallel with worker-scoped auth isolation:
 
 - Auth setup creates a pool of test user pairs (primary + partner) sized to CPU count
 - Each Playwright worker gets its own authenticated storage state
-- Partners are pre-linked for together-mode tests
+- Partners are pre-linked for two-context specs
 - Pool size is configurable via `PLAYWRIGHT_AUTH_POOL_SIZE` env var
 
 ### Data Factories
 
-Test data is created via Supabase RPCs, not UI interactions:
+Test data is seeded through the admin client, not UI interactions:
 
 ```typescript
-// Create test sessions with specific presets
-const result = await createTestSession(supabase, {
-  sessionCount: 2,
-  preset: 'mid_session',
-  includeReflections: true,
-});
+import {
+  resolveWorkerPairIds,
+  seedEvents,
+  clearPairEvents,
+} from './support/factories/events';
 
-// Cleanup respects FK constraints (messages → reflections → bookmarks → step_states → sessions)
-await cleanupTestSession(supabase, result.session_ids);
+const pair = await resolveWorkerPairIds(supabaseAdmin);
+const seeded = await seedEvents(
+  supabaseAdmin,
+  pair,
+  [{ dayOffset: 0, label: 'Meetup' }],
+  new Date()
+);
+
+await clearPairEvents(supabaseAdmin, pair);
 ```
+
+Specs that only need the fixture can use `coupleEvents.seed` / `coupleEvents.clear` instead.
 
 ### Example Test
 
 ```typescript
 import { test, expect } from '../support/merged-fixtures';
 
-test('[P0] user can start solo scripture session', async ({ page, log }) => {
-  await log.step('Navigate to scripture overview');
-  await page.goto('/scripture?fresh=true');
-  await expect(page.getByTestId('scripture-start-button')).toBeVisible();
+test.use({ authSessionEnabled: false });
 
-  await log.step('Start solo session');
-  await page.getByTestId('scripture-start-button').click();
-  await page.getByTestId('scripture-mode-solo').click();
-
-  await log.step('Verify reading flow');
-  await expect(page.getByTestId('solo-reading-flow')).toBeVisible();
+test('[P0] should display login screen when not authenticated', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('login-screen')).toBeVisible();
 });
 ```
+
 
 ## Configuration
 
