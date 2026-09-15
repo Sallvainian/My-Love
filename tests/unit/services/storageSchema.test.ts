@@ -16,13 +16,14 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { openDB, type IDBPDatabase } from 'idb';
+import { openDB, unwrap, type IDBPDatabase } from 'idb';
 import { DB_NAME, DB_VERSION } from '../../../src/services/dbSchema';
 import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 import type { Message } from '../../../src/types';
 
 const ALL_STORES = [
   'messages',
+  'message-favorites',
   'photos',
   'moods',
   'sw-auth',
@@ -188,6 +189,47 @@ describe('storageService schema', () => {
     expect(await reopened.getMessage(messageId, null)).toMatchObject({ text: 'keep me' });
   });
 
+  it.each(['storage', 'mood', 'custom', 'worker'] as const)('migrates v8 once when %s opens first, preserving raw rows', async (opener) => {
+    const legacy = await openDB<MyLoveDBSchema>(DB_NAME, 8, {
+      upgrade(db) {
+        const messages = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+        messages.createIndex('by-category', 'category');
+        messages.createIndex('by-date', 'createdAt');
+        messages.createIndex('by-user', 'userId');
+      },
+    });
+    const raw: Message[] = [
+      { id: 1, text: 'daily', category: 'reason', isCustom: false, isFavorite: true, createdAt: new Date() },
+      { id: 2, text: 'owned', category: 'custom', isCustom: true, userId: 'owner-a', isFavorite: true, createdAt: new Date() },
+      { id: 3, text: 'ownerless', category: 'custom', isCustom: true, isFavorite: true, createdAt: new Date() },
+    ];
+    for (const row of raw) await legacy.put('messages', row);
+    legacy.close();
+    vi.resetModules();
+    if (opener === 'worker') {
+      await (await import('../../../src/sw-db')).getPendingMoods('owner-a');
+    }
+    const first = opener === 'storage' || opener === 'worker'
+      ? (await import('../../../src/services/storage')).storageService
+      : opener === 'mood'
+        ? (await import('../../../src/services/moodService')).moodService
+        : (await import('../../../src/services/customMessageService')).customMessageService;
+    openServices.push(first as unknown as { db: IDBPDatabase<MyLoveDBSchema> | null });
+    await first.init();
+    const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+    try {
+      expect(await db.getAll('messages')).toEqual(raw);
+      expect(await db.getAll('message-favorites')).toEqual([{ messageId: 2, userId: 'owner-a' }]);
+      expect(db.transaction('message-favorites').store.indexNames.contains('by-user')).toBe(true);
+      const service = await freshStorageService();
+      expect((await service.getAllMessages('owner-a')).map((row) => [row.id, row.isFavorite])).toEqual([[1, false], [2, true]]);
+      expect(await service.toggleFavorite(2, 'owner-a')).toBe(false);
+      const reopened = await freshStorageService();
+      expect(await reopened.getMessage(2, 'owner-a')).toMatchObject({ isFavorite: false });
+      expect(await db.getAll('messages')).toEqual(raw);
+    } finally { db.close(); }
+  });
+
   describe('message reads are scoped to one account', () => {
     /**
      * `getAllMessages` feeds the daily rotation and the Home screen, and the
@@ -300,9 +342,8 @@ describe('storageService schema', () => {
        * and a denied write that writes anyway are indistinguishable from the
        * caller's side, so the store is the only honest witness.
        *
-       * The rule is VISIBILITY, not ownership: Home favorites the daily message
-       * through `toggleFavorite`, and the daily rows are shared. An owner-only
-       * rule would pass a cross-account test and break the live app.
+       * Favorites require a signed-in caller who can see the row. Generic
+       * updates/deletes require ownership of a custom row and reject denial.
        */
 
       /** Every row as it actually sits on disk, bypassing the service's filter. */
@@ -341,11 +382,8 @@ describe('storageService schema', () => {
        * produce. `close` forwards to the real connection so afterEach still
        * releases it; `init()` sees a non-null `db` and leaves the stub alone.
        *
-       * The stub models only `get`, `getAll`, `put`, `delete` and `close` —
-       * every store method these four paths touch, and nothing else. A case
-       * that reaches `getMessagesByCategory`, `addMessage` or `addMessages`
-       * after calling this gets a TypeError off the missing method, which reads
-       * like the rejection it asked for and is not; seed before breaking.
+       * The transaction proxy injects read or write failures independently,
+       * while forwarding unmodified operations to the real IndexedDB store.
        */
       function breakStore(service: unknown, broken: { reads?: boolean; writes?: boolean }): void {
         const holder = service as { db: IDBPDatabase<MyLoveDBSchema> };
@@ -358,9 +396,39 @@ describe('storageService schema', () => {
             broken.writes ? fail() : real.put(store, value),
           delete: (store: 'messages', key: number) =>
             broken.writes ? fail() : real.delete(store, key),
+          transaction: (...args: Parameters<typeof real.transaction>) => {
+            const tx = real.transaction(...args);
+            const wrap = (store: object) => new Proxy(store, {
+              get(target, key) {
+                if ((broken.reads && ['get', 'getAll'].includes(String(key))) ||
+                    (broken.writes && ['put', 'delete'].includes(String(key)))) return fail;
+                const value = Reflect.get(target, key);
+                return typeof value === 'function' ? value.bind(target) : value;
+              },
+            });
+            return new Proxy(tx, {
+              get(target, key) {
+                if (key === 'store') return wrap(target.store!);
+                if (key === 'objectStore') return (name: never) => wrap(target.objectStore(name));
+                const value = Reflect.get(target, key);
+                return typeof value === 'function' ? value.bind(target) : value;
+              },
+            });
+          },
           close: () => real.close(),
         } as unknown as IDBPDatabase<MyLoveDBSchema>;
       }
+
+      it('hides a null-owner legacy custom row from signed-out reads', async () => {
+        const service = await seedSharedDevice();
+        const id = await service.addMessage({
+          text: 'NULL-OWNER', category: 'custom', isCustom: true,
+          userId: null, createdAt: new Date(),
+        } as unknown as Omit<Message, 'id'>);
+        expect(await service.getMessage(id, null)).toBeUndefined();
+        expect((await service.getAllMessages(null)).some((row) => row.id === id)).toBe(false);
+        expect(await rowAt(id)).toBeDefined();
+      });
 
       it('hands the owner their own custom row', async () => {
         const storageService = await seedSharedDevice();
@@ -413,9 +481,9 @@ describe('storageService schema', () => {
         // exercises it — and it was asserted on the read path alone.
         await expect(
           storageService.updateMessage(legacyId, { text: 'CLAIMED' }, null)
-        ).resolves.toBeUndefined();
-        await expect(storageService.toggleFavorite(legacyId, null)).resolves.toBeUndefined();
-        await expect(storageService.deleteMessage(legacyId, null)).resolves.toBeUndefined();
+        ).rejects.toThrow();
+        await expect(storageService.toggleFavorite(legacyId, null)).rejects.toThrow();
+        await expect(storageService.deleteMessage(legacyId, null)).rejects.toThrow();
 
         expect(await rowAt(legacyId)).toMatchObject({
           text: 'LEGACY-OWNERLESS',
@@ -423,13 +491,13 @@ describe('storageService schema', () => {
         });
       });
 
-      it('refuses a cross-account update without throwing and without writing', async () => {
+      it('refuses a cross-account update by throwing without writing', async () => {
         const storageService = await seedSharedDevice();
         const aId = await idOf('A-PRIVATE-CUSTOM');
 
         await expect(
           storageService.updateMessage(aId, { text: 'B-OVERWROTE-IT' }, B)
-        ).resolves.toBeUndefined();
+        ).rejects.toThrow();
 
         expect((await rowsOnDisk()).map((message) => message.text)).not.toContain('B-OVERWROTE-IT');
         expect(await diskRow('A-PRIVATE-CUSTOM')).toBeDefined();
@@ -444,12 +512,11 @@ describe('storageService schema', () => {
         // the write. B may see the shared daily row and may not see A's — so
         // an unpinned put walks straight past the guard using a row it is
         // allowed to name.
-        await storageService.updateMessage(dailyId, { id: aId, text: 'B-OVERWROTE-IT' }, B);
+        await expect(storageService.updateMessage(dailyId, { id: aId, text: 'B-OVERWROTE-IT' }, B)).rejects.toThrow('protected');
 
         expect(await rowAt(aId)).toMatchObject({ text: 'A-PRIVATE-CUSTOM' });
-        // It landed on the row that was actually checked, rather than being
-        // dropped: `updates` is not validated here, only re-addressed.
-        expect(await rowAt(dailyId)).toMatchObject({ text: 'B-OVERWROTE-IT' });
+        // Protected-field rejection leaves both source and target untouched.
+        expect(await rowAt(dailyId)).toMatchObject({ text: 'BUNDLED-DAILY' });
       });
 
       it('applies the owner’s own update', async () => {
@@ -462,11 +529,11 @@ describe('storageService schema', () => {
         expect(await diskRow('A-PRIVATE-CUSTOM')).toBeUndefined();
       });
 
-      it('refuses a cross-account delete without throwing and leaves the row on disk', async () => {
+      it('refuses a cross-account delete by throwing and leaves the row on disk', async () => {
         const storageService = await seedSharedDevice();
         const aId = await idOf('A-PRIVATE-CUSTOM');
 
-        await expect(storageService.deleteMessage(aId, B)).resolves.toBeUndefined();
+        await expect(storageService.deleteMessage(aId, B)).rejects.toThrow();
 
         expect(await diskRow('A-PRIVATE-CUSTOM')).toBeDefined();
       });
@@ -486,7 +553,7 @@ describe('storageService schema', () => {
         const storageService = await seedSharedDevice();
         const aId = await idOf('A-PRIVATE-CUSTOM');
 
-        await expect(storageService.toggleFavorite(aId, B)).resolves.toBeUndefined();
+        await expect(storageService.toggleFavorite(aId, B)).rejects.toThrow();
 
         expect(await diskRow('A-PRIVATE-CUSTOM')).toMatchObject({ isFavorite: false });
       });
@@ -497,24 +564,61 @@ describe('storageService schema', () => {
 
         await storageService.toggleFavorite(aId, A);
 
-        expect(await diskRow('A-PRIVATE-CUSTOM')).toMatchObject({ isFavorite: true });
+        expect(await storageService.getMessage(aId, A)).toMatchObject({ isFavorite: true });
+        expect(await diskRow('A-PRIVATE-CUSTOM')).toMatchObject({ isFavorite: false });
       });
 
-      it('lets a signed-in and a signed-out caller both favorite the shared daily row', async () => {
-        const storageService = await seedSharedDevice();
-        const dailyId = await idOf('BUNDLED-DAILY');
+      it('partitions shared daily favorites across accounts and refuses signed-out writes', async () => {
+        const service = await seedSharedDevice();
+        const id = await idOf('BUNDLED-DAILY');
+        expect(await service.toggleFavorite(id, A)).toBe(true);
+        expect(await service.getMessage(id, A)).toMatchObject({ isFavorite: true });
+        expect(await service.getMessage(id, B)).toMatchObject({ isFavorite: false });
+        expect(await service.getMessage(id, null)).toMatchObject({ isFavorite: false });
+        await expect(service.toggleFavorite(id, null)).rejects.toThrow();
+        const reopened = await freshStorageService();
+        expect(await reopened.getMessage(id, A)).toMatchObject({ isFavorite: true });
+        expect((await reopened.getMessagesByCategory('reason', A))[0].isFavorite).toBe(true);
+        expect((await reopened.exportData(B)).messages.every((row) => !row.isFavorite)).toBe(true);
+        expect(await rowAt(id)).toMatchObject({ isFavorite: false });
+      });
 
-        // The live path this protects: DailyMessage's heart runs over the
-        // rotation pool, which is shared daily rows plus own custom rows, and
-        // A is who the app actually runs as. An owner-only rule would silently
-        // stop Home favoriting the daily message.
-        await storageService.toggleFavorite(dailyId, A);
-        expect(await rowAt(dailyId)).toMatchObject({ isFavorite: true });
+      it('serializes concurrent toggles and returns each committed value', async () => {
+        const service = await seedSharedDevice();
+        const id = await idOf('BUNDLED-DAILY');
+        expect(await Promise.all([service.toggleFavorite(id, A), service.toggleFavorite(id, A)])).toEqual([true, false]);
+        expect(await service.getMessage(id, A)).toMatchObject({ isFavorite: false });
+      });
 
-        // And signed out it is still reachable — the daily rows are nobody's
-        // private property, so the flag flips back.
-        await storageService.toggleFavorite(dailyId, null);
-        expect(await rowAt(dailyId)).toMatchObject({ isFavorite: false });
+      it('refuses shared and missing generic writes and every protected update', async () => {
+        const service = await seedSharedDevice();
+        const daily = await idOf('BUNDLED-DAILY');
+        const own = await idOf('A-PRIVATE-CUSTOM');
+        const before = await rowsOnDisk();
+        for (const id of [daily, 999999]) {
+          await expect(service.updateMessage(id, { text: 'changed' }, A)).rejects.toThrow();
+          await expect(service.deleteMessage(id, A)).rejects.toThrow();
+        }
+        for (const updates of [{ userId: B }, { isCustom: false }, { id: daily }, { createdAt: new Date() }, { isFavorite: true }]) {
+          await expect(service.updateMessage(own, updates, A)).rejects.toThrow('protected');
+        }
+        expect(await rowsOnDisk()).toEqual(before);
+      });
+
+      it('surfaces a real aborted transaction without changing favorites', async () => {
+        const service = await seedSharedDevice();
+        const id = await idOf('BUNDLED-DAILY');
+        const holder = service as unknown as { db: IDBPDatabase<MyLoveDBSchema> };
+        const native = unwrap(holder.db);
+        const original = native.transaction.bind(native);
+        const transaction = vi.spyOn(native, 'transaction').mockImplementationOnce((...args) => {
+          const tx = original(...args);
+          tx.abort();
+          return tx;
+        });
+        await expect(service.toggleFavorite(id, A)).rejects.toThrow();
+        transaction.mockRestore();
+        expect(await service.getMessage(id, A)).toMatchObject({ isFavorite: false });
       });
 
       it('still degrades a failed read to undefined', async () => {

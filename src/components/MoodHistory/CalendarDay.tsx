@@ -13,7 +13,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { memo } from 'react';
-import type { MoodEntry, MoodType } from '../../types';
+import type { MoodEntry } from '../../types';
+import { normalizeMoodEntry } from '../../types/moods';
 
 /**
  * Mood icon configuration
@@ -65,25 +66,10 @@ export const CalendarDay = memo<CalendarDayProps>(function CalendarDay({
   year,
   onClick,
 }) {
-  const hasMood = !!mood;
-
-  // Read moods array, fall back to [mood.mood] for legacy entries.
-  //
-  // Array.isArray, not a truthy check: a truthy value that is not an array can
-  // still clear `.length > 0` and is then used as one. Measured pre-fix, a
-  // string indexes to the character `'h'`, so `MOOD_CONFIG[primaryMood].bgColor`
-  // in `dayClasses` below throws before anything renders; an array-like object
-  // indexes to a real mood, clears that lookup, and throws on `allMoods.join`
-  // in the aria-label.
-  const allMoods: MoodType[] =
-    hasMood && Array.isArray(mood.moods) && mood.moods.length > 0
-      ? mood.moods
-      : hasMood
-        ? [mood.mood as MoodType]
-        : [];
-
-  // Use the first mood for bg color and icon
-  const primaryMood = allMoods.length > 0 ? allMoods[0] : undefined;
+  const normalized = mood ? normalizeMoodEntry(mood) : null;
+  const hasMood = !!normalized;
+  const allMoods = normalized?.moods ?? [];
+  const primaryMood = normalized?.mood;
 
   // Visual hierarchy: current day > mood days > empty days
   // Task 10: Added focus indicators for accessibility
@@ -124,7 +110,7 @@ export const CalendarDay = memo<CalendarDayProps>(function CalendarDay({
       }
       aria-disabled={!hasMood}
       tabIndex={hasMood ? 0 : -1}
-      onClick={() => onClick(mood)}
+      onClick={() => onClick(normalized ?? undefined)}
       disabled={!hasMood}
       whileHover={hasMood ? { scale: 1.05 } : undefined}
       whileTap={hasMood ? { scale: 0.95 } : undefined}

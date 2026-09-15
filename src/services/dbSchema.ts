@@ -111,6 +111,11 @@ export interface ScriptureMessage {
  * - v5: Added scripture stores (sessions, reflections, bookmarks, messages)
  */
 export interface MyLoveDBSchema extends DBSchema {
+  'message-favorites': {
+    key: [number, string];
+    value: { messageId: number; userId: string };
+    indexes: { 'by-user': string };
+  };
   messages: {
     key: number;
     value: Message;
@@ -199,13 +204,15 @@ export const DB_NAME = 'my-love-db';
 // for the same reason moods do: the store holds every account that has signed
 // in on this device, and an unscoped read handed one partner the other's
 // private custom messages to list, edit, delete, export and rotate through.
-export const DB_VERSION = 8;
+// v9 stores favorites by account and message, preserving only attributable legacy flags.
+export const DB_VERSION = 9;
 
 /**
  * Store name constants for consistent access across services
  */
 export const STORE_NAMES = {
   MESSAGES: 'messages',
+  MESSAGE_FAVORITES: 'message-favorites',
   PHOTOS: 'photos',
   MOODS: 'moods',
   SW_AUTH: 'sw-auth',
@@ -217,7 +224,7 @@ export const STORE_NAMES = {
 
 /**
  * Centralized IndexedDB upgrade function
- * Handles all store creation and migrations for v1-v8
+ * Handles all store creation and migrations for v1-v9
  *
  * Called by all services to ensure consistent database schema.
  * This fixes the tech debt where each service had duplicate upgrade logic.
@@ -273,6 +280,36 @@ export function upgradeDb(
       messageStore.createIndex('by-user', 'userId');
       logger.debug('[dbSchema] Created messages by-user index (v8)');
     }
+  }
+
+  // v9: favorites belong to an account, never to a shared message row.
+  // Creating the store is also the one-time migration marker. Keep legacy
+  // rows intact; only a custom row with an explicit owner can be attributed.
+  if (!db.objectStoreNames.contains('message-favorites')) {
+    const favorites = db.createObjectStore('message-favorites', {
+      keyPath: ['messageId', 'userId'],
+    });
+    favorites.createIndex('by-user', 'userId');
+    if (tx) {
+      const request = unwrap(tx.objectStore('messages')).openCursor();
+      request.addEventListener('success', () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const row = cursor.value as Message;
+        if (
+          row.isCustom === true &&
+          typeof row.userId === 'string' &&
+          row.userId &&
+          row.isFavorite === true
+        ) {
+          unwrap(favorites).put({ messageId: row.id, userId: row.userId });
+        }
+        cursor.continue();
+      });
+    }
+  } else if (tx) {
+    const favorites = tx.objectStore('message-favorites');
+    if (!favorites.indexNames.contains('by-user')) favorites.createIndex('by-user', 'userId');
   }
 
   // v2: photos store

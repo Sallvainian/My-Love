@@ -7,6 +7,7 @@ import type {
   MessageFilter,
   UpdateMessageInput,
 } from '../types';
+import { projectMessageFavorites } from './messageFavorites';
 import { logger } from '../utils/logger';
 import {
   CreateMessageInputSchema,
@@ -371,8 +372,8 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
 
       await this.init();
 
-      const tx = this.getTypedDB().transaction('messages', 'readwrite');
-      const current = await tx.store.get(id);
+      const tx = this.getTypedDB().transaction(['messages', 'message-favorites'], 'readwrite');
+      const current = await tx.objectStore('messages').get(id);
 
       if (!current) {
         await tx.done;
@@ -385,7 +386,8 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
         throw new Error(`Custom message ${id} not found for this user`);
       }
 
-      await tx.store.delete(id);
+      await tx.objectStore('messages').delete(id);
+      await tx.objectStore('message-favorites').delete([id, owner]);
       await tx.done;
 
       logger.debug('[CustomMessageService] Custom message deleted, id:', id);
@@ -415,7 +417,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
 
       if (!message || !this.isVisibleTo(message, userId)) return null;
 
-      return message;
+      return (await projectMessageFavorites(this.getTypedDB(), [message], userId))[0];
     } catch (error) {
       console.error(`[CustomMessageService] Failed to get message ${id}:`, error);
       return null; // Graceful fallback
@@ -486,7 +488,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
         'filter:',
         filter
       );
-      return messages;
+      return await projectMessageFavorites(db, messages, userId);
     } catch (error) {
       console.error('[CustomMessageService] Failed to get all messages:', error);
       console.error('[CustomMessageService] Filter:', filter);

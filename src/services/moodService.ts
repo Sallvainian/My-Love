@@ -1,6 +1,7 @@
 import { openDB } from 'idb';
 import { ZodError } from 'zod/v4';
 import type { MoodEntry } from '../types';
+import { normalizeMoodEntry } from '../types/moods';
 import { formatDateISO } from '../utils/dateUtils';
 import { logger } from '../utils/logger';
 import { createValidationError, isZodError } from '../validation/errorMessages';
@@ -8,7 +9,7 @@ import { MoodEntrySchema } from '../validation/schemas';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
 import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
 import type { MarkSyncedOutcome } from './moodSyncPayload';
-import { moodSyncFingerprint } from './moodSyncPayload';
+import { matchesMoodSyncFingerprint } from './moodSyncPayload';
 
 export type { MarkSyncedOutcome };
 
@@ -102,6 +103,48 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
   }
 
   /**
+   * Atomically save by owner/date, including rows hidden by display validation.
+   * Hidden rows retain notes unless the replacement supplies nonempty text.
+   * Visible-row edits keep the existing clear-note semantics.
+   */
+  async saveForDate(
+    userId: string,
+    date: string,
+    moods: MoodEntry['mood'][],
+    note?: string,
+    requireExisting = false
+  ): Promise<MoodEntry> {
+    if (!userId) throw new Error('User not authenticated');
+    let validated;
+    try {
+      validated = MoodEntrySchema.parse({ date, mood: moods[0], moods, note: note || '' });
+    } catch (error) {
+      if (isZodError(error)) throw createValidationError(error as ZodError);
+      throw error;
+    }
+    await this.init();
+    const tx = this.getTypedDB().transaction('moods', 'readwrite');
+    void tx.done.catch(() => {});
+    const existing = await tx.store.index('by-user-date').get([userId, date]);
+    if (!existing && requireExisting) {
+      await tx.done;
+      throw new Error(`Mood entry for ${date} not found`);
+    }
+    const savedNote =
+      existing && !normalizeMoodEntry(existing) && !note?.trim() ? existing.note : validated.note;
+    const saved: MoodEntry = {
+      ...(existing ?? { userId, date, timestamp: new Date() }),
+      mood: validated.mood,
+      moods: validated.moods,
+      note: savedNote,
+      synced: false,
+    };
+    const id = await tx.store.put(saved);
+    await tx.done;
+    return { ...saved, id };
+  }
+
+  /**
    * Update an existing mood entry
    * Story 6.2: AC-5 - Can only log one mood per day (edit if logging again same day)
    *
@@ -175,7 +218,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
 
       logger.debug(`[MoodService] getMoodForDate(${dateString}):`, mood || 'not found');
 
-      return mood || null;
+      return mood ? normalizeMoodEntry(mood) : null;
     } catch (error) {
       console.error('[MoodService] Error getting mood for date:', error);
       return null; // Graceful degradation for read operations
@@ -206,7 +249,10 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
 
       logger.debug(`[MoodService] getMoodsInRange(${startString} to ${endString}):`, moods.length);
 
-      return moods;
+      return moods.flatMap((row) => {
+        const normalized = normalizeMoodEntry(row);
+        return normalized ? [normalized] : [];
+      });
     } catch (error) {
       console.error('[MoodService] Error getting moods in range:', error);
       return []; // Graceful degradation for read operations
@@ -261,7 +307,10 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
 
       logger.debug(`[MoodService] Found ${mine.length} mood entries for the current user`);
 
-      return mine;
+      return mine.flatMap((row) => {
+        const normalized = normalizeMoodEntry(row);
+        return normalized ? [normalized] : [];
+      });
     } catch (error) {
       console.error('[MoodService] Error getting moods for user:', error);
       return []; // Graceful degradation for read operations
@@ -313,7 +362,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
         return 'missing';
       }
 
-      const unchanged = moodSyncFingerprint(current) === sentFingerprint;
+      const unchanged = matchesMoodSyncFingerprint(current, sentFingerprint);
 
       await tx.store.put({ ...current, supabaseId, synced: unchanged });
       await tx.done;

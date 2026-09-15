@@ -1,7 +1,9 @@
 import { m as motion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import type { CustomMessage } from '../../types';
+import { useDialogSession } from './useDialogSession';
 
 interface DeleteConfirmDialogProps {
   message: CustomMessage;
@@ -18,9 +20,30 @@ export function DeleteConfirmDialog({
 }: DeleteConfirmDialogProps) {
   const { deleteCustomMessage } = useAppStore();
 
-  const handleDelete = () => {
-    deleteCustomMessage(message.id);
-    onConfirm();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pending = useRef(false);
+  const captureSession = useDialogSession();
+
+  const handleDelete = async () => {
+    if (pending.current) return;
+    pending.current = true;
+    setIsDeleting(true);
+    setError(null);
+    const stillCurrent = captureSession();
+    try {
+      await deleteCustomMessage(message.id);
+      if (stillCurrent()) onConfirm();
+    } catch {
+      if (stillCurrent()) setError('Could not delete this message. Please try again.');
+    } finally {
+      pending.current = false;
+      if (stillCurrent()) setIsDeleting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (!pending.current) onCancel();
   };
 
   if (!isOpen) return null;
@@ -32,7 +55,7 @@ export function DeleteConfirmDialog({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onCancel}
+        onClick={handleCancel}
         className="fixed inset-0 z-50 bg-black/50"
         data-testid="admin-delete-dialog-backdrop"
       />
@@ -48,6 +71,10 @@ export function DeleteConfirmDialog({
         <div
           className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
           data-testid="admin-delete-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-message-title"
+          aria-busy={isDeleting}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header with warning icon */}
@@ -55,7 +82,9 @@ export function DeleteConfirmDialog({
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
               <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
-            <h2 className="mb-2 text-xl font-bold text-gray-900">Delete Message?</h2>
+            <h2 id="delete-message-title" className="mb-2 text-xl font-bold text-gray-900">
+              Delete Message?
+            </h2>
             <p className="text-sm text-gray-500">
               This action cannot be undone. The message will be permanently removed from your
               library.
@@ -73,10 +102,15 @@ export function DeleteConfirmDialog({
             </div>
           </div>
 
+          {error && (
+            <p role="alert" className="px-6 pb-4 text-sm text-red-700">{error}</p>
+          )}
+
           {/* Actions */}
           <div className="flex items-center gap-3 border-t border-gray-200 bg-gray-50 p-6">
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
+              disabled={isDeleting}
               className="flex-1 rounded-lg border border-gray-300 px-6 py-2.5 font-medium text-gray-700 transition-colors hover:bg-gray-100"
               data-testid="admin-delete-dialog-cancel"
             >
@@ -84,10 +118,11 @@ export function DeleteConfirmDialog({
             </button>
             <button
               onClick={handleDelete}
+              disabled={isDeleting}
               className="flex-1 rounded-lg bg-red-600 px-6 py-2.5 font-medium text-white transition-colors hover:bg-red-700"
               data-testid="admin-delete-dialog-confirm"
             >
-              Delete
+              {isDeleting ? 'Deleting…' : error ? 'Retry delete' : 'Delete'}
             </button>
           </div>
         </div>

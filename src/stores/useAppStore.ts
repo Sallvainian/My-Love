@@ -146,6 +146,11 @@ export const useAppStore = create<AppState>()(
               }
             }
 
+            if (data.state?.messageHistory && 'favoriteIds' in data.state.messageHistory) {
+              delete data.state.messageHistory.favoriteIds;
+              mutated = true;
+            }
+
             // Schema-validate persisted settings; drop just `settings` on failure
             // so Zustand's shallow merge falls back to the settingsSlice defaults.
             if (data.state?.settings) {
@@ -180,6 +185,7 @@ export const useAppStore = create<AppState>()(
         // Story 3.3: Serialize Map to Array for JSON storage
         messageHistory: {
           ...state.messageHistory,
+          favoriteIds: undefined,
           shownMessages:
             state.messageHistory?.shownMessages instanceof Map
               ? Array.from(state.messageHistory.shownMessages.entries())
@@ -220,6 +226,7 @@ export const useAppStore = create<AppState>()(
         // Story 3.3: Deserialize Array back to Map with validation
         // Handle null/undefined messageHistory gracefully
         if (state?.messageHistory) {
+          state.messageHistory.favoriteIds = [];
           try {
             // Use unknown + type guards instead of any for proper narrowing
             const raw = state.messageHistory.shownMessages as unknown;

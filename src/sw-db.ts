@@ -14,7 +14,7 @@ import { openDB } from 'idb';
 import type { MyLoveDBSchema, StoredAuthToken, StoredMoodEntry } from './services/dbSchema';
 import { DB_NAME, DB_VERSION, STORE_NAMES, upgradeDb } from './services/dbSchema';
 import type { MarkSyncedOutcome } from './services/moodSyncPayload';
-import { moodSyncFingerprint } from './services/moodSyncPayload';
+import { matchesMoodSyncFingerprint } from './services/moodSyncPayload';
 
 // Re-export types for consumers (sw.ts imports StoredMoodEntry)
 export type { StoredMoodEntry } from './services/dbSchema';
@@ -102,7 +102,7 @@ export async function markMoodSynced(
       return 'missing';
     }
 
-    const unchanged = moodSyncFingerprint(current) === sentFingerprint;
+    const unchanged = matchesMoodSyncFingerprint(current, sentFingerprint);
 
     // supabaseId is recorded either way: the server row exists, so the next
     // pass must PATCH it rather than insert a second one.

@@ -117,4 +117,15 @@ describe('persisted moods', () => {
     // MoodTracker pre-fills its note on mount.
     expect(useAppStore.getState().moods).toEqual([]);
   });
+  it('discards legacy global favorite IDs on hydration and omits them from new writes', async () => {
+    localStorage.setItem(STORAGE_KEY, persistedBlob({
+      messageHistory: { shownMessages: [], currentIndex: 0, favoriteIds: [17, 42] },
+    }));
+    const { useAppStore } = await import('@/stores/useAppStore');
+    expect(useAppStore.getState().messageHistory.favoriteIds).toEqual([]);
+    useAppStore.setState({ messageHistory: { ...useAppStore.getState().messageHistory, favoriteIds: [9] } });
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    expect(persisted.state.messageHistory).not.toHaveProperty('favoriteIds');
+  });
+
 });
