@@ -1391,7 +1391,9 @@ origin: raised while closing DW-134, 2026-09-15
 location: src/components/PartnerMoodView/PartnerMoodView.tsx:497
 severity: medium
 reason: `className="flex items-center gap-1 rounded-lg bg-green-500 px-3 py-2 font-medium text-white transition-colors hover:bg-green-600"`. Measured from the installed palette: `--color-green-500` is oklch(72.3% 0.219 149.579) = #00c950, 2.22:1 against white — less than half the AA floor and materially worse than the 3.82:1 that DW-134 was raised for. Not the worst in the tree, though this entry claimed so when first written: DW-141's coral-500 send button is 1.99:1. That claim was made while the contrast guard could not see the project's own palette, and is corrected here. Severity is medium rather than low on that ratio alone: measured from the same palette, green-600 is 3.22:1 and still fails, and green-700 is 4.94:1 and clears — so unlike the red family, where one step sufficed, this needs a two-step move and a look at how it reads next to the surrounding UI. Pre-existing and outside DW-134's two named buttons. Allowlisted in tests/unit/a11y/whiteOnColorContrast.test.ts with its measured ratio. Settle by moving to green-700 or darker, or by darkening the text instead of the ground.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-decision-dw-140
+resolution-undo: 41a640e02e5ef2a3bfed871e706e818fa110f554685606288daf3cae7e548eb0 2026-09-15 7374617475733a206f70656e
 decision: 2026-09-15 Darken the ground to green-700 / hover green-800 — Change the Accept button to bg-green-700 hover:bg-green-800 text-white, re-measure against the installed palette, and remove the PartnerMoodView.tsx:green-500 KNOWN_BELOW_FLOOR row so the honesty test stays true. Leave coral, purple, blue, and the primary gradient alone.
 
 ### DW-141: The love-notes send button pairs white text with bg-coral-500, at 1.99:1 — the worst contrast in the app, and not fixable by a shade bump.
