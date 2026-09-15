@@ -392,7 +392,7 @@ export function MessageList({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             onClick={scrollToBottom}
-            className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#FF6B6B] px-4 py-2 text-white shadow-lg transition-colors hover:bg-[#FF5252]"
+            className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#FF6B6B] px-4 py-2 text-gray-800 shadow-lg transition-colors hover:bg-[#FF5252]"
             aria-label="Scroll to new message"
             data-testid="new-message-indicator"
           >
