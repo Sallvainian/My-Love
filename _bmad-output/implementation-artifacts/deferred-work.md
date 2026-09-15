@@ -1031,7 +1031,8 @@ location: src/components/AdminPanel/AdminPanel.tsx:26-30
 source_spec: `7-partition-custom-messages-by-account.md`
 severity: low
 reason: No AdminPanel component test exists anywhere under tests/, and no E2E spec covers admin or custom messages. The store chain that would carry it (customMessagesLoaded: false re-firing AdminPanel.tsx:26-30) is verified to exist by reading, not by test. Story :73 sanctions this ("AdminPanel needs no change if the slice signature stays"), so it is a gap against the verbatim matrix rather than a deviation from the plan.
-status: open
+status: done 2026-09-15
+resolution: resolved on branch fix/account-data-mood-validation: tests/unit/components/AdminPanel.accountData.test.tsx renders the real AdminPanel over real fake-IndexedDB services and the real store, asserting A/B/A ownership at the UI surface the matrix named.
 
 ### DW-103: DeleteConfirmDialog calls deleteCustomMessage without await or catch, so a rejected delete closes the dialog as if it succeeded and surfaces as an unhandled rejection.
 origin: spec-deferred 3c0512dcb4a2
@@ -1039,7 +1040,8 @@ location: src/components/AdminPanel/DeleteConfirmDialog.tsx:21-24
 source_spec: `7-partition-custom-messages-by-account.md`
 severity: low
 reason: Verified at src/components/AdminPanel/DeleteConfirmDialog.tsx:21-24 (`deleteCustomMessage(message.id); onConfirm();`) against src/stores/slices/messagesSlice.ts:497-500, which re-throws. The missing await is pre-existing — messagesSlice re-threw before this story and BaseIndexedDBService.delete already threw on a DB error — but deleteForUser adds two new throw cases (signed out via requireOwner, and a row owned by someone else). Neither new case is reachable from the dialog today: the ids it offers come from the owner-scoped `customMessages` list and AdminPanel renders only behind a session. Settle by driving deleteCustomMessage through a rejection in a component test.
-status: open
+status: done 2026-09-15
+resolution: resolved on branch fix/account-data-mood-validation: DeleteConfirmDialog now awaits the deletion, blocks dismissal and duplicate submits while it is pending, and surfaces an accessible failure with retry/cancel instead of closing as if it succeeded. Covered by AdminPanel.accountData.test.tsx.
 
 ### DW-104: An unnamed partner is rendered as their full email address in the chat, while the own-name path falls back to the email prefix.
 origin: spec-deferred a5c51df004b8
@@ -1158,7 +1160,8 @@ location: src/services/moodSyncPayload.ts:58
 source_spec: `spec-dw-89-mood-array-shape-guards.md`
 severity: low
 reason: `const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];` reads the same field as the seven converted sites. Its output is both the sync request body (src/api/moodSyncService.ts:197, src/sw.ts:169) and the change-detection fingerprint (moodSyncPayload.ts:85-86), so a truthy non-array would be sent to the server verbatim. Pre-existing and outside this bundle's four named sites: it feeds a payload, not a MOOD_CONFIG deref. No local writer can produce a non-array today -- addMoodEntry takes MoodType[] (moodSlice.ts:38). Every existing test feeds it a real array or undefined.
-status: open
+status: done 2026-09-15
+resolution: resolved on branch fix/account-data-mood-validation: src/services/moodSyncPayload.ts now projects through the shared normalizer (normalizeMoodValues) and throws before the network on a row with no recognized values, replacing the bare truthy-plus-length idiom.
 
 ### DW-118: The guard tests the container, not the elements: a genuine MoodType[] holding an unknown mood string still throws at every one of the seven sites.
 origin: spec-deferred cc319fe80d55
@@ -1166,7 +1169,8 @@ location: src/components/MoodHistory/MoodDetailModal.tsx:152, src/components/Moo
 source_spec: `spec-dw-89-mood-array-shape-guards.md`
 severity: medium
 reason: MoodDetailModal.tsx:152-157 runs `MOOD_CONFIG[m].icon` per element, CalendarDay.tsx:103 runs `MOOD_CONFIG[primaryMood].bgColor`, and MoodTracker.tsx renders `selectedMoods.map((m) => MOOD_CONFIG[m].label)`. Array.isArray says nothing about element validity. The Supabase path is protected by MoodTypeSchema, but the IndexedDB path that feeds these three components applies no schema. Pre-existing and identical at the three sites that adopted the guard earlier, so not caused by this change. What would settle reachability: whether a stored IndexedDB row can hold a mood string outside the MOOD_CONFIG keys -- for example a retired mood key left behind by an older app version.
-status: open
+status: done 2026-09-15
+resolution: resolved on branch fix/account-data-mood-validation: src/types/moods.ts is one canonical twelve-key vocabulary with element-level validation; all seven consumers normalize through it, so an unknown mood string can no longer reach a MOOD_CONFIG lookup. Covered by tests/unit/services/moodNormalization.test.ts and the display cases in moodArrayGuards.test.tsx.
 
 ### DW-119: The offline-first IndexedDB read path normalizes nothing, so the three components that read it each carry their own per-consumer guard instead.
 origin: spec-deferred 7af76122fac6
@@ -1174,7 +1178,8 @@ location: src/services/moodService.ts:255
 source_spec: `spec-dw-89-mood-array-shape-guards.md`
 severity: low
 reason: moodSlice.loadMoods (moodSlice.ts:160-171) calls moodService.getAllForUser (src/services/moodService.ts:255-264), which filters by userId and returns raw rows with no shape check, and the same is true of getMoodsInRange as called from MoodHistoryCalendar.tsx:81. The Supabase side is normalized at its boundary; the larger path is not. Deferred rather than fixed because the intent scoped this bundle to four named consumer sites and framed the work as defensive hardening at those sites.
-status: open
+status: done 2026-09-15
+resolution: resolved on branch fix/account-data-mood-validation: the offline-first IndexedDB read path normalizes at the service boundary — moodService display reads return normalized copies and hide wholly invalid rows, while the raw pending queues keep them for accounting — so the per-consumer guards are no longer each component’s own problem.
 
 ### DW-120: DW-117 dismisses itself with an argument DW-119 contradicts: moodSyncPayload is fed from the unvalidated IndexedDB path, not from addMoodEntry, so its real exposure is higher than filed.
 origin: spec-deferred 23b5564b69a8
@@ -1182,7 +1187,8 @@ location: src/services/moodSyncPayload.ts:58, src/api/moodSyncService.ts:337
 source_spec: `spec-dw-89-mood-array-shape-guards.md`
 severity: medium
 reason: DW-117 argues "No local writer can produce a non-array today -- addMoodEntry takes MoodType[]". That reasons about the writer's signature, but the read path is IndexedDB: src/api/moodSyncService.ts:337 `const unsyncedMoods = await moodService.getUnsyncedMoods(currentUserId);` feeds :186 `const moodInsert: MoodInsert = moodSyncPayload(mood, mood.userId);`. That is the same path DW-119 says normalizes nothing. Either the IndexedDB path can hold a non-array -- in which case moodSyncPayload ships it into the request body and the change fingerprint, a worse outcome than a render crash -- or it cannot, in which case the four guards this bundle added are equally unreachable. The two entries argue from mutually exclusive premises. Secondary: the cited signature is at moodSlice.ts:39, not :38 (:38 is the comment `// Actions`), and reads `MoodEntry['mood'][]`. Not fixed here: the intent forbids touching moodSyncPayload.ts:58, and this run is directed not to edit the ledger.
-status: open
+status: done 2026-09-15
+resolution: resolved on branch fix/account-data-mood-validation: the contradiction is settled the way this entry framed it. moodSyncPayload is fed from the IndexedDB path, so it validates there: the shared payload/fingerprint projection now normalizes and fails before either writer sends. Closed together with DW-117 and DW-119 rather than as separate work.
 
 ### DW-121: Nothing pins the Array.isArray idiom, so the consistency this bundle bought decays on the next PR that copies the surviving truthy form.
 origin: spec-deferred 40c86f3fe220
@@ -1198,7 +1204,8 @@ location: src/components/MoodHistory/CalendarDay.tsx:23, src/components/MoodTrac
 source_spec: `spec-dw-89-mood-array-shape-guards.md`
 severity: low
 reason: All seven guarded sites hand-roll `Array.isArray(x) && x.length > 0 ? x : [fallback]`: moodSlice.ts:394, CalendarDay.tsx:79, MoodDetailModal.tsx:97, PartnerMoodView.tsx:673, PartnerMoodDisplay.tsx:112, MoodTracker.tsx:177, MoodHistoryItem.tsx:44. MOOD_CONFIG is itself defined four times -- MoodDetailModal.tsx:27, CalendarDay.tsx:23, PartnerMoodView.tsx:35, MoodTracker.tsx:57 (measured with grep). A single normalizeMoods() would collapse the expression and turn DW-118 into a one-line change. Not fixed here: the intent scopes this to a one-expression shape guard per site and forbids type-level changes, so extracting a shared normalizer is a different piece of work.
-status: open
+status: done 2026-09-15
+resolution: resolved on branch fix/account-data-mood-validation: src/types/moods.ts holds the single normalizer and vocabulary; the seven hand-rolled copies of the expression now call it. The four MOOD_CONFIG definitions are kept deliberately — they carry different per-surface icons and styling — but are typed against the one MoodType.
 
 ### DW-123: The sibling private-broadcast path, mood-updates:<partnerId>, still has no browser-level Realtime coverage; DW-90 is closed for love notes only.
 origin: spec-deferred de21e27d0575
@@ -1238,7 +1245,8 @@ location: src/services/storage.ts:275
 source_spec: `spec-dw-99-message-store-ownership-scoping.md`
 severity: medium
 reason: src/services/storage.ts:275 writes `{ ...message, ...updates, id: message.id }`. The id is now pinned to the checked row, but `userId` and `isCustom` still pass straight through, so `updateMessage(myRowId, { userId: other }, me)` donates a row and `updateMessage(dailyId, { isCustom: true, userId: me }, me)` takes a shared bundled row out of the partner's rotation pool. Pre-existing: the unfiltered spread predates this change. The repo's stronger door already solves it with an explicit field allowlist at src/services/customMessageService.ts:335-342. No production caller passes arbitrary `updates` today — src/stores/slices/messagesSlice.ts:138 is the only production call of any of the four methods, and it calls toggleFavorite.
-status: open
+status: done 2026-09-15
+resolution: resolved on branch fix/account-data-mood-validation: storageService.updateMessage now requires signed-in ownership of a custom row and applies an editable-field allowlist, so protected fields including the owner cannot be reassigned, and a denied or missing write throws instead of silently succeeding.
 
 ### DW-128: Shared daily rows stay arbitrarily updatable and deletable by every caller, signed out included, because the by-id guard enforces visibility rather than ownership.
 origin: spec-deferred 831a770c8b3c
@@ -1246,7 +1254,8 @@ location: src/services/storage.ts:261,291
 source_spec: `spec-dw-99-message-store-ownership-scoping.md`
 severity: medium
 reason: src/services/storage.ts isVisibleTo returns true unconditionally for `!isCustom` rows, so `deleteMessage(dailyId, null)` and `updateMessage(dailyId, { text }, B)` both succeed. The rule had to be visibility for toggleFavorite — Home favorites the daily message through it (src/components/DailyMessage/DailyMessage.tsx:157) — but updateMessage and deleteMessage have no production caller and were widened on that same rationale. The repo holds both rules at once: tests/unit/services/customMessageService.ownership.test.ts:326 asserts the same daily row is NOT editable through customMessageService. A deleted daily row does not heal: src/stores/slices/settingsSlice.ts:129 re-seeds only when the whole visible set is empty. Settle by deciding whether the two callerless writers should take customMessageService's stricter isOwnedBy rule (src/services/customMessageService.ts:110).
-status: open
+status: done 2026-09-15
+resolution: resolved on branch fix/account-data-mood-validation: readable shared daily rows are separated from writable owned custom rows. Generic update and delete enforce ownership rather than visibility; favoriting no longer routes through updateMessage and has its own account-keyed write.
 
 ### DW-129: One row-level isFavorite flag is shared by every account on a device, so each partner sees and can clear the other's favorited daily messages.
 origin: spec-deferred c98a4ba7aa0c
@@ -1254,7 +1263,8 @@ location: src/types/index.ts:21
 source_spec: `spec-dw-99-message-store-ownership-scoping.md`
 severity: medium
 reason: src/types/index.ts:21 gives Message a single `isFavorite` boolean and the bundled daily rows are shared by both accounts, so toggleFavorite on a daily row writes a flag the partner reads. Pre-existing and schema-level — the fix is per-account favorite storage, well past this change's service boundary.
-status: open
+status: done 2026-09-15
+resolution: resolved on branch fix/account-data-mood-validation: favorites moved to a dedicated message-favorites store keyed [messageId, userId] with a by-account index, added by the existence-gated v8→9 upgrade in dbSchema.ts. The one-time migration carries only known-owner custom favorites and never assigns unattributed shared flags; sign-out scrubs the projections and favoriteIds is no longer persisted or hydrated.
 decision: 2026-09-14 Build per-account favorites — Move favorite state off the shared Message row onto per-account storage. Add a favorites store or index keyed on (messageId, userId) in src/services/dbSchema.ts alone, bumping DB_VERSION and gating the upgrade branch on whether the store exists rather than on oldVersion < N, and plan how the existing shared isFavorite booleans on daily rows are carried over or dropped. Then update storage.ts's toggleFavorite and getMessage, messagesSlice.ts's toggleFavorite and messageHistory.favoriteIds, and the UI readers including DailyMessage.tsx, and make sure the new account-scoped field is added to signedOutState() in authSlice.ts in the same commit so a sign-out does not leak it.
 decision: 2026-09-14 Build per-account favorites — Move favorite state off the shared Message row onto per-account storage. Add a favorites store or index keyed on (messageId, userId) in src/services/dbSchema.ts alone, bumping DB_VERSION and gating the upgrade branch on whether the store exists rather than on oldVersion < N, and plan how the existing shared isFavorite booleans on daily rows are carried over or dropped. Then update storage.ts's toggleFavorite and getMessage, messagesSlice.ts's toggleFavorite and messageHistory.favoriteIds, and the UI readers including DailyMessage.tsx, and make sure the new account-scoped field is added to signedOutState() in authSlice.ts in the same commit so a sign-out does not leak it.
 
