@@ -13,6 +13,7 @@
  */
 
 import { logger } from '../../utils/logger';
+import { withBasePath } from '../../utils/basePath';
 import type { AppStateCreator } from '../types';
 
 export type ViewType =
@@ -58,9 +59,10 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
         settings: '/settings',
       };
       const basePath = pathMap[view];
-      // Respect base URL in production (e.g., /My-Love/ for GitHub Pages)
-      const base = import.meta.env.BASE_URL || '/';
-      const fullPath = base === '/' ? basePath : base.slice(0, -1) + basePath;
+      // Respect base URL in production (e.g., /My-Love/ for GitHub Pages).
+      // Shared with `App`'s inverse so the round trip can be asserted at the
+      // production base, which neither call site could express alone (DW-125).
+      const fullPath = withBasePath(basePath);
       // Tapping the already-active tab must not stack an identical history entry —
       // it would cost one Back press per tap before the user can leave the view.
       if (window.location.pathname === fullPath) {
