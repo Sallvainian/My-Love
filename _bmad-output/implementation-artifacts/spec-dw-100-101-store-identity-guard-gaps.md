@@ -2,13 +2,13 @@
 title: 'DW-100/DW-101: close the last two messages-writing identity-guard gaps'
 type: 'bugfix'
 created: '2026-09-14'
-status: 'blocked'
+status: ready-for-dev
 review_loop_iteration: 0
 followup_review_recommended: false
 context: []
 warnings: ['oversized']
 deferred: []
-baseline_revision: 'ef583b5a3d7606c1758878364d6a7c1079cf21f5'
+baseline_revision: 25338e26a09fc2ef6f2feae8f7494e1084c63bff
 ---
 
 <intent-contract>
@@ -182,106 +182,3 @@ Observed, out of scope: `messagesSlice.addMessage` (:110-127) has the same ungua
 - `npm run typecheck` -- expected: no NEW errors in the touched files (a worktree-only TS2883 baseline may be present).
 - `npm run lint` -- expected: exit 0.
 
-## Auto Run Result
-
-Status: blocked
-Blocking condition: intent gap
-
-### What was attempted
-
-DW-100 and DW-101 were both implemented and all four verification commands passed
-(`npx vitest run` on the two suites: 116 passed; `npm run test:unit`: 93 files / 1743 passed;
-`npm run typecheck`: exit 0; `npm run lint`: exit 0). Review then found that the DW-101 half
-introduces a reachable user-facing dead end, and the resolution is not determined by the
-captured intent. The code changes were reverted; the attempt is preserved at
-`spec-dw-100-101-store-identity-guard-gaps.attempt.patch` (311 lines, relative to
-`ef583b5a3d7606c1758878364d6a7c1079cf21f5`).
-
-Files in the reverted attempt:
-- `src/stores/slices/messagesSlice.ts` — DW-100: pair capture + `stillCurrent()` recheck in `toggleFavorite`.
-- `src/stores/slices/settingsSlice.ts` — DW-101: pair capture, captured id passed to both reads, writes gated.
-- `tests/unit/stores/loaderIdentityGuards.test.ts` — three cases for `toggleFavorite`.
-- `tests/unit/stores/settingsSlice.initializeApp.test.ts` — `authSessionVersion` on the test store, two mid-flight cases.
-
-### The gap
-
-DW-101 asks for the write to be withheld when identity changed mid-init. Withholding it is
-correct, but on a cold boot it starves the incoming account instead of leaking to them, and
-nothing refills the pool:
-
-- `reloadRotationPool` bails on an empty pool (`src/stores/slices/authSlice.ts:202`), and on a
-  cold boot `messages` is empty precisely because the init that would have filled it is the one
-  being withheld.
-- `initializeApp` latches `isInitialized = true` on the stale path, so neither `App.tsx:390`
-  (also gated by its own ref) nor `DailyMessage.tsx:130`'s Retry button can re-run it.
-
-Demonstrated against the real composed store, driving the real `clearAuth()`/`setAuthUser()`
-path: with the guard, `messages` stays `[]` and `currentMessage` stays `null`, the second
-`initializeApp()` issues no read, and Home is left on its 10-second timeout screen with a dead
-Retry. With the guard removed, the same probe writes the outgoing account's pool into the
-incoming account's store — the DW-101 leak. So the change trades a low-severity data leak for
-an availability dead end.
-
-### Unresolved questions (a human must choose)
-
-The bundle intent says only "copy the exact idiom ... gates the write on a `stillCurrent()`
-recheck". It does not say what the stale path owes the incoming account, and at least three
-resolutions differ observably:
-
-1. Leave `isInitialized` false on the stale path, so the existing Retry button recovers.
-   Cheapest; recovery is manual and only appears after the 10-second timeout.
-2. Keep `isInitialized` true and have the stale path call `get().loadMessages()`, which captures
-   the new identity when it re-reads the store. Automatic recovery, but it adds the very
-   rotation-pool reload this spec's Boundaries forbid.
-3. Relax `reloadRotationPool`'s empty-pool early return in `authSlice.ts`, making
-   `setAuthUser` genuinely own the refill as this spec claims. Repairs the premise rather than
-   working around it, but reintroduces the seed race that early return was written to avoid, in
-   a file outside this change's scope.
-
-This spec's own `<intent-contract>` mandates the behaviour that causes the defect — "release the
-loading flag **and set the module `isInitialized` flag** on the stale path too", the matching
-I/O matrix row, and the acceptance criterion that pins the short-circuit — so the root cause sits
-inside the read-only block and cannot be repaired by amending the sections outside it.
-
-Note: DW-100 (`messagesSlice.toggleFavorite`) is unaffected by this gap. It was implemented,
-covered and mutation-checked cleanly, and could ship on its own.
-
-### Findings breakdown
-
-- 27 findings across four layers: high 5, medium 2, low 16, false 4, maybe-false 0.
-- Patches applied: none — the intent_gap cascade makes lower entries moot.
-- Rejected, with reasons: the single-captured-boolean refactor (the two gates cannot drift, and
-  hoisting would let a stale write through); the positive-wrap-vs-early-return shape complaint
-  (an early return would skip `setLoading(false)` and `isInitialized`); the field-compare-surface
-  complaint (mutation runs confirm the version half is pinned); `seedAsOnScreen` typing (the
-  file's store-seeding idiom is already untyped casts, and `Message[]` would fail excess-property
-  check); the unguarded `addMessages` (benign shared rows; its fixes are a spec edit or an
-  unseeded database); the invisible-row `toggleFavorite` no-op (pre-existing and documented as
-  preserved at `src/services/storage.ts:299-303`); deleting the error-path test (it covers a row
-  of this spec's own matrix); the artifact-surface observation (no bad outcome); the ledger
-  off-by-one (its fix edits the ledger, which the invocation forbids); and the stale Code Map
-  anchors (its fix edits this build's spec).
-- Carried for the ledger, all pre-existing and none caused by this change: the unguarded
-  `setError` in `initializeApp`'s `catch` (the incoming account inherits the outgoing init's
-  error banner; `error` is absent from `signedOutState()`); a concurrent `loadMessages` dropping
-  the row mid-write, which turns an unfavorite into an append to `favoriteIds`; `favoriteIds`
-  surviving sign-out intact at `src/stores/slices/authSlice.ts:321`, so the incoming account
-  inherits the outgoing account's favorites on shared daily rows; and `messagesSlice.addMessage`
-  (`:110-127`), a third messages writer that `set()`s after an await with no identity capture at
-  all, which has no ledger entry.
-
-### Follow-up review recommendation
-
-`false` — no entry was triaged `patch` this pass.
-
-### Verification performed
-
-Before the revert: `npx vitest run` on both touched suites (116 passed), `npm run test:unit`
-(93 files, 1743 passed), `npm run typecheck` (exit 0), `npm run lint` (exit 0). Every row of the
-I/O matrix had a covering case that ran and passed. After the revert, `src` and `tests` are
-byte-identical to `ef583b5a3d7606c1758878364d6a7c1079cf21f5`.
-
-### Residual risks
-
-Both ledger entries remain open. The working tree carries no code change; only this spec and
-the saved attempt patch are new, and neither is committed.
