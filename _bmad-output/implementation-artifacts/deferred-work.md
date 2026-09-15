@@ -956,6 +956,7 @@ source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: medium
 reason: The hosted project issues the PKCE authorize redirect (measured: HTTP 302 to accounts.google.com with response_type=code), but completing consent needs a Google account this session does not hold and no authorized integration provides. Separately, /auth/v1/authorize does not validate redirect_to up front -- a deliberately bogus https://not-allowed.example.com/steal returned the same 302 with no error parameter -- so the allow list is not readable from here and the Supabase MCP exposes no auth settings endpoint. The local substitute (tests/api/pkce-code-exchange.spec.ts) mints a real GoTrue code and proves only the initiating client redeems it. Settle by completing one real Google sign-in on https://sallvainian.github.io/My-Love/ after deploy.yml ships this, confirming the session lands and the URL returns with ?code=.
 status: open
+decision: 2026-09-15 Keep open until a hosted Google sign-in is recorded
 
 ### DW-94: A PKCE sign-in cannot complete where localStorage is unavailable, which the previous implicit flow tolerated.
 origin: spec-deferred 33150c174af6
@@ -1005,6 +1006,7 @@ location: src/api/supabaseClient.ts:59-77
 source_spec: `3-require-browser-initiated-auth-callbacks.md`
 reason: Unverified. vite.config.ts:71 declares `display: 'standalone'`, and signInWithGoogle navigates the current context with window.location.href, which on the platforms checked keeps the round trip inside the app's own context and storage. What was not measured is an actual installed-PWA Google sign-in on a platform that hands OAuth to a separate browser context: there the returning `?code=` would find no verifier and be ignored, where the old implicit fragment carried the tokens themselves. Same failure mode as the private-window entry, a different trigger. Settle by completing one Google sign-in from the installed PWA on iOS and Android after deploy; if it fails, the fix is a storage adapter or a stated limitation, not a change to the flow type.
 status: open
+decision: 2026-09-15 Keep open until iOS and Android PWA sign-in are measured
 
 ### DW-99: storageService.getMessage / updateMessage / deleteMessage / toggleFavorite still reach any row in the messages store by id with no ownership check.
 origin: spec-deferred f5bbde9a7366
@@ -1080,7 +1082,9 @@ location: n/a
 source_spec: `8-separate-profile-names-from-auth-identity.md`
 severity: low
 reason: The story's execution list asks for a hosted refused email PATCH, a hosted own-name change, and green FN-GRANT checks against the hosted project. The migration reaches that project only through .github/workflows/deploy.yml on merge, so this evidence cannot be produced before the branch lands. Outstanding operator action.
-status: open
+status: done 2026-09-15
+resolution: closed by human decision: Hosted evidence substituted by local profile-name-email-ownership.spec.ts and pgTAP FN-GRANT checks; deploy.yml migrate has run on main after story 8.
+decision: 2026-09-15 Close; accept local tests plus a successful db push — Hosted evidence substituted by local profile-name-email-ownership.spec.ts and pgTAP FN-GRANT checks; deploy.yml migrate has run on main after story 8.
 
 ### DW-107: The acceptance criterion "the name shows in chat after reload" is not covered end to end.
 origin: spec-deferred 02bb20c02356
@@ -1369,39 +1373,70 @@ origin: raised while closing DW-110, 2026-09-15
 location: src/api/moodSyncService.ts `subscribeMoodUpdates`, the `.subscribe((status) => ...)` callback
 severity: medium
 reason: DW-110 was fixed at its stated location, `useRealtimeMessages`, where a CLOSED now routes into the hook's existing backoff. The mood path has the same hole and no backoff to route into: the subscribe callback records `lastStatus` and fans the status out to subscribers, and `PartnerMoodView.tsx:210` maps CLOSED to a `disconnected` indicator, but nothing reopens the channel. Measured against the installed SDK in tests/unit/api/realtimeLeaveContract.test.ts: a server-initiated `phx_close` moves the channel to `closed`, removes it from the client registry, and schedules no rejoin — so the partner's moods stop arriving until the view is remounted, with the indicator the only sign. Not fixed while closing DW-110 because building a retry loop in the refcounted registry is a different change from adding a branch to one that already exists, and DW-110's `location:` names the hook alone. Settle by giving the registry a bounded reopen, or by deciding the indicator is sufficient and recording that.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-dw-mood-channel-closed-rejoin
+resolution-undo: 51b235da13de19eaafbd6598d967c09b0a0ea129dff00b8d127e53b16b7dc772 2026-09-15 7374617475733a206f70656e
 
 ### DW-139: A non-destructive badge pairs white text with bg-purple-500, at 4.12:1.
 origin: raised while closing DW-134, 2026-09-15
 location: src/components/InteractionHistory/InteractionHistory.tsx:183
 severity: low
 reason: `<div className="rounded-full bg-purple-500 px-3 py-1 text-xs font-medium text-white">`. Measured from the installed Tailwind palette: `--color-purple-500` is oklch(62.7% 0.265 303.9) = #ad46ff, 4.12:1 against white — below the 4.5:1 AA floor, and at `text-xs` it is small text, so the 3:1 large-text allowance does not apply. Pre-existing and outside DW-134, which named two destructive buttons. Allowlisted in tests/unit/a11y/whiteOnColorContrast.test.ts with its measured ratio, and that allowlist fails if the pairing is fixed without removing the entry. Settle by moving to purple-600 or darker, the way DW-28 moved the pink family and DW-134 the red.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-dw-badge-contrast-shades
+resolution-undo: 8f95a4b0e2a9d093a35cedfb5015a1e19979fec05a43e48b1f65f7842ad21ff3 2026-09-15 7374617475733a206f70656e
 
 ### DW-140: The partner-mood action button pairs white text with bg-green-500, at 2.22:1.
 origin: raised while closing DW-134, 2026-09-15
 location: src/components/PartnerMoodView/PartnerMoodView.tsx:497
 severity: medium
 reason: `className="flex items-center gap-1 rounded-lg bg-green-500 px-3 py-2 font-medium text-white transition-colors hover:bg-green-600"`. Measured from the installed palette: `--color-green-500` is oklch(72.3% 0.219 149.579) = #00c950, 2.22:1 against white — less than half the AA floor and materially worse than the 3.82:1 that DW-134 was raised for. Not the worst in the tree, though this entry claimed so when first written: DW-141's coral-500 send button is 1.99:1. That claim was made while the contrast guard could not see the project's own palette, and is corrected here. Severity is medium rather than low on that ratio alone: measured from the same palette, green-600 is 3.22:1 and still fails, and green-700 is 4.94:1 and clears — so unlike the red family, where one step sufficed, this needs a two-step move and a look at how it reads next to the surrounding UI. Pre-existing and outside DW-134's two named buttons. Allowlisted in tests/unit/a11y/whiteOnColorContrast.test.ts with its measured ratio. Settle by moving to green-700 or darker, or by darkening the text instead of the ground.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-decision-dw-140
+resolution-undo: 41a640e02e5ef2a3bfed871e706e818fa110f554685606288daf3cae7e548eb0 2026-09-15 7374617475733a206f70656e
+decision: 2026-09-15 Darken the ground to green-700 / hover green-800 — Change the Accept button to bg-green-700 hover:bg-green-800 text-white, re-measure against the installed palette, and remove the PartnerMoodView.tsx:green-500 KNOWN_BELOW_FLOOR row so the honesty test stays true. Leave coral, purple, blue, and the primary gradient alone.
 
 ### DW-141: The love-notes send button pairs white text with bg-coral-500, at 1.99:1 — the worst contrast in the app, and not fixable by a shade bump.
 origin: raised while closing DW-134, 2026-09-15
 location: src/components/love-notes/MessageInput.tsx:269
 severity: medium
 reason: `className="bg-coral-500 hover:bg-coral-600 focus:ring-coral-500 disabled:hover:bg-coral-500 min-h-[44px] rounded-lg px-6 py-2 font-medium text-white ..."`. `coral` is a project colour, not a Tailwind one — `tailwind.config.js:20`, reached through `src/index.css:4` `@config '../tailwind.config.js'`. Measured from that file: `coral-500` is `#ffa07a`, 1.99:1 against white, less than half the 4.5:1 AA floor and worse than DW-140's green-500. This is the primary action of the love-notes screen. Unlike the red family, where DW-134 moved one step from 500 to 600, no step fixes it: measured across the whole ramp, coral-600 is 2.5:1, coral-700 is 2.95:1, coral-800 is 3.79:1, and only coral-900 (`#c44536`) clears at 4.94:1 — a colour far darker than the brand's coral. So this is a design decision, not a class edit: either the button stops being coral, or the label stops being white. Allowlisted in tests/unit/a11y/whiteOnColorContrast.test.ts with its measured ratio. Settle by choosing between a darker ground and dark text on coral.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-decision-dw-141
+resolution-undo: 3a81584d964cd09861eb5d3d1b59ee312b892f68054f4b2bec7ae3c377aeb673 2026-09-15 7374617475733a206f70656e
+decision: 2026-09-15 Keep coral-500; switch the Send label to dark text — Keep the brand coral-500 ground on the love-notes Send button and replace text-white with a dark text colour that clears 4.5:1 against #ffa07a. Remove the MessageInput.tsx:coral-500 KNOWN_BELOW_FLOOR row. Decide in the same session whether LoveNoteMessage and MessageList bg-[#FF6B6B] text-white stay as hex or join the same treatment.
 
 ### DW-142: The photo owner badge pairs white text with bg-blue-500/90 over a photograph, at 3.76:1 even before the photo shows through.
 origin: raised while closing DW-134, 2026-09-15
 location: src/components/PhotoGallery/PhotoGridItem.tsx:100
 severity: low
 reason: `photo.isOwn ? 'bg-pink-600 text-white' : 'bg-blue-500/90 text-white'` — the second arm only. Measured from the installed palette: `--color-blue-500` is oklch(62.3% 0.214 259.815) = #2b7fff, 3.76:1 against white at full opacity, below the 4.5:1 floor and below even the 3.82:1 that DW-134 was raised for; the badge is `text-xs`, so the large-text allowance does not apply. The true ratio is worse and not knowable from the class alone, because `/90` lets the photograph behind it through, and the opaque figure is the optimistic bound. The `isOwn` arm, `bg-pink-600` (#e60076), clears at 4.54:1 — so the two arms of one conditional disagree about the standard. Allowlisted in tests/unit/a11y/whiteOnColorContrast.test.ts. Settle by moving the second arm to blue-600 or darker, measured the same way the first arm evidently was.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-dw-badge-contrast-shades
+resolution-undo: 8f95a4b0e2a9d093a35cedfb5015a1e19979fec05a43e48b1f65f7842ad21ff3 2026-09-15 7374617475733a206f70656e
 
 ### DW-143: The app's primary call-to-action is a gradient whose every point fails AA, in ten components, while its own hover state passes.
 origin: raised while closing DW-134, 2026-09-15
 location: src/components/DailyMessage/DailyMessage.tsx:133 and :260, src/components/WelcomeSplash/WelcomeSplash.tsx:110, src/components/WelcomeButton/WelcomeButton.tsx:46, src/components/PhotoGallery/PhotoGallery.tsx:309, src/components/ErrorBoundary/ErrorBoundary.tsx:67, src/components/ViewErrorBoundary/ViewErrorBoundary.tsx:61, src/components/AdminPanel/AdminPanel.tsx:149, src/components/AdminPanel/CreateMessageForm.tsx:230, src/components/AdminPanel/EditMessageForm.tsx:252
 severity: medium
 reason: One idiom, copied ten times: `bg-gradient-to-r from-pink-500 to-rose-500` with `text-white`. A gradient carries no `bg-<colour>-<shade>`, so it has never been measured by anything — it was outside tests/unit/a11y/whiteOnColorContrast.test.ts until that file learned to read `from-`/`via-`/`to-` stops, which is how this was found. Measured at both ends: `pink-500` is Tailwind's `#f6339a` at 3.58:1, and `rose-500` resolves to this project's own override `#f43f5e` (`tailwind.config.js:65`) at 3.67:1. Both are below the 4.5:1 AA floor, so every point along the sweep is, and `DailyMessage.tsx:260` is `text-xs`, where the large-text allowance does not apply either. The fix is already written in the tree and applied to the wrong state: several of these carry `hover:from-pink-600 hover:to-rose-600`, and those stops clear at 4.54:1 and 4.70:1 — so today the button becomes compliant only while the pointer is on it. Not fixed here: promoting the hover values changes the resting colour of the app's primary action in ten places, which is a design decision rather than a class edit, and DW-134 named two destructive buttons. Allowlisted as a group in that test, keyed by swatch with an expected count of ten each, so fixing some and not others turns it red. Settle by deciding whether the resting gradient becomes the 600 pair.
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-decision-dw-143
+resolution-undo: dd676099fa1be563a5689ab4e6a46363e0c539df80e00b09b29992dc1215c901 2026-09-15 7374617475733a206f70656e
+decision: 2026-09-15 Promote resting stops to pink-600 / rose-600 everywhere the idiom appears — Change the resting gradient from from-pink-500 to-rose-500 to from-pink-600 to-rose-600 with text-white on all ten bg-gradient-to-r sites, plus PokeKissInterface.tsx:439 and src/index.css .btn-primary, in one change. Darken or drop the existing hover:from-pink-600 hover:to-rose-600 so hover is not lighter than rest. Clear both KNOWN_GRADIENT_BELOW_FLOOR counts together; do not ship a subset.
+
+### DW-144: Own-message bubbles still drop below 4.5:1 while isSending applies opacity-70.
+origin: spec-deferred 7390a9ee0dac
+location: src/components/love-notes/LoveNoteMessage.tsx:276
+source_spec: `spec-dw-141-love-notes-send-button-contrast.md`
+severity: low
+reason: LoveNoteMessage.tsx:276 already had `${isSending ? 'opacity-70' : ''}`. Group-composite of canvas gray-800 (30,41,57) on #FF6B6B at 0.7 over LoveNotes bg #FFF5F5 is 2.715:1. Pre-change white on the same stack was 2.07:1. Rest of the own bubble is 5.286:1. Removing the fade would change in-flight send UX this bundle did not restyle.
+status: open
+
+### DW-145: Admin panel title icon still pairs white text with the old pink-500 / rose-500 gradient.
+origin: spec-deferred adccd24143eb
+location: src/components/AdminPanel/AdminPanel.tsx:103
+source_spec: `spec-dw-143-promote-resting-gradient-to-600.md`
+severity: medium
+reason: AdminPanel.tsx:103 is still `bg-gradient-to-r from-pink-500 to-rose-500` with a child span at :104 `text-xl text-white`. The scanner requires both utilities on the same literal, so this pairing is invisible. Intent named :149, not :103. Pre-existing; this change left it.
 status: open

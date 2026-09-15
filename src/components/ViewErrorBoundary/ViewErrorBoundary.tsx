@@ -58,7 +58,7 @@ function ViewErrorFallback({
           <button
             onClick={onRetry}
             data-testid="error-try-again"
-            className="rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-2 font-medium text-white shadow-md transition-all hover:from-pink-600 hover:to-rose-600 hover:shadow-lg"
+            className="rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 px-4 py-2 font-medium text-white shadow-md transition-all hover:from-pink-700 hover:to-rose-700 hover:shadow-lg"
           >
             Try Again
           </button>
