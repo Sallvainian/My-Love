@@ -3,6 +3,7 @@ import { openDB } from 'idb';
 import type { Message, Photo } from '../types';
 import { logger } from '../utils/logger';
 import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
+import { projectMessageFavorites } from './messageFavorites';
 
 class StorageService {
   private db: IDBPDatabase<MyLoveDBSchema> | null = null;
@@ -173,7 +174,7 @@ class StorageService {
       const message = await this.db!.get('messages', id);
       if (message && this.isVisibleTo(message, userId)) {
         logger.debug('[StorageService] Message retrieved successfully, id:', id);
-        return message;
+        return (await projectMessageFavorites(this.db!, [message], userId))[0];
       }
       console.warn('[StorageService] Message not found, id:', id);
       return undefined;
@@ -196,16 +197,15 @@ class StorageService {
    * May `userId` see this row? The shared daily messages are everyone's, plus
    * that caller's own custom messages.
    *
-   * Custom rows with no owner are legacy and belong to nobody: `undefined`
-   * never equals a user id and never equals `null`, so they are excluded for
-   * every caller, signed out included.
+   * Custom rows with no nonempty owner are legacy and belong to nobody.
+   * Signed-out readers see only shared rows, even if a legacy owner is null.
    *
    * This is the single expression of the rule — the batch reads reach it
-   * through {@link visibleTo} and every by-id read and write consults it
-   * directly, so the row-at-a-time paths cannot drift away from the batch ones.
+   * through {@link visibleTo}. By-id reads and favorite writes use it too;
+   * generic edits and deletions additionally require ownership.
    */
   private isVisibleTo(message: Message, userId: string | null): boolean {
-    return !message.isCustom || message.userId === userId;
+    return !message.isCustom || (!!userId && message.userId === userId);
   }
 
   /**
@@ -224,7 +224,7 @@ class StorageService {
       await this.init();
       const messages = this.visibleTo(await this.db!.getAll('messages'), userId);
       logger.debug('[StorageService] Retrieved all messages, count:', messages.length);
-      return messages;
+      return await projectMessageFavorites(this.db!, messages, userId);
     } catch (error) {
       console.error('[StorageService] Failed to get all messages:', error);
       return []; // Graceful fallback: return empty array
@@ -244,7 +244,7 @@ class StorageService {
         'count:',
         messages.length
       );
-      return messages;
+      return await projectMessageFavorites(this.db!, messages, userId);
     } catch (error) {
       console.error('[StorageService] Failed to get messages by category:', error);
       console.error('[StorageService] Category:', category);
@@ -252,102 +252,61 @@ class StorageService {
     }
   }
 
-  /**
-   * Edit one message, if this caller may see it.
-   *
-   * `userId` is REQUIRED and nullable for the same reason getAllMessages's is:
-   * the signed-out case is real (the shared daily rows are everyone's to
-   * favorite), but it has to be stated at the call site. A row this caller may
-   * not see takes the same warn-and-no-op branch as an id that is not in the
-   * store — nothing is written and nothing is disclosed.
-   */
+  /** Owner-only edits. Protected fields are rejected, not silently stripped. */
   async updateMessage(id: number, updates: Partial<Message>, userId: string | null): Promise<void> {
-    try {
-      await this.init();
-      const message = await this.getMessage(id, userId);
-      if (message) {
-        // Pinned to the row that was actually checked. The store is keyed on
-        // `id`, so an `id` inside `updates` is a second, unchecked address for
-        // this write: a caller who may see row X could otherwise aim the put at
-        // row Y and overwrite it without Y ever passing the guard above.
-        // (Whether `updates` may carry `userId`/`isCustom` is a separate
-        // question — ownership reassignment — and is deliberately untouched.)
-        await this.db!.put('messages', { ...message, ...updates, id: message.id });
-        logger.debug('[StorageService] Message updated successfully, id:', id);
-      } else {
-        console.warn('[StorageService] Cannot update - message not found, id:', id);
-      }
-    } catch (error) {
-      console.error('[StorageService] Failed to update message:', error);
-      console.error('[StorageService] Message id:', id, 'updates:', updates);
-      throw error; // Re-throw to allow caller to handle
+    if (!userId) throw new Error('Message writes require a signed-in user');
+    const editable = new Set(['text', 'category', 'active', 'tags']);
+    if (Object.keys(updates).some((key) => !editable.has(key))) {
+      throw new Error('Cannot update protected message fields');
     }
+    await this.init();
+    const tx = this.db!.transaction('messages', 'readwrite');
+    // A failed request also rejects tx.done; observe both failure channels.
+    void tx.done.catch(() => {});
+    const message = await tx.store.get(id);
+    if (!message || !message.isCustom || message.userId !== userId) {
+      await tx.done;
+      throw new Error('Message not found for this user');
+    }
+    await tx.store.put({ ...message, ...updates, updatedAt: new Date() });
+    await tx.done;
   }
 
-  /**
-   * Delete one message, if this caller may see it.
-   *
-   * `userId` is REQUIRED and nullable for the same reason getAllMessages's is:
-   * the signed-out case is real, but it has to be stated at the call site.
-   *
-   * This reads the row first purely to answer that question — a blind delete
-   * has no way to tell whose row it is about to remove. The read is a raw
-   * `get` rather than `this.getMessage` on purpose: getMessage degrades a
-   * failed read to `undefined`, which here would turn a broken store into a
-   * silent no-op delete, so a failure re-throws instead.
-   *
-   * That leaves a deliberate asymmetry inside this service: `updateMessage`
-   * and `toggleFavorite` do read through `getMessage`, so a failed read leaves
-   * them resolving as a silent no-op. That is their behaviour from before
-   * ownership scoping and it is kept unchanged. `deleteMessage` had no read at
-   * all to preserve, so its new one takes the stricter contract.
-   */
   async deleteMessage(id: number, userId: string | null): Promise<void> {
-    try {
-      await this.init();
-      const message = await this.db!.get('messages', id);
-      if (!message || !this.isVisibleTo(message, userId)) {
-        console.warn('[StorageService] Cannot delete - message not found, id:', id);
-        return;
-      }
-      await this.db!.delete('messages', id);
-      logger.debug('[StorageService] Message deleted successfully, id:', id);
-    } catch (error) {
-      console.error('[StorageService] Failed to delete message:', error);
-      console.error('[StorageService] Message id:', id);
-      throw error; // Re-throw to allow caller to handle
+    if (!userId) throw new Error('Message writes require a signed-in user');
+    await this.init();
+    const tx = this.db!.transaction(['messages', 'message-favorites'], 'readwrite');
+    // A failed request also rejects tx.done; observe both failure channels.
+    void tx.done.catch(() => {});
+    const message = await tx.objectStore('messages').get(id);
+    if (!message || !message.isCustom || message.userId !== userId) {
+      await tx.done;
+      throw new Error('Message not found for this user');
     }
+    await tx.objectStore('messages').delete(id);
+    await tx.objectStore('message-favorites').delete([id, userId]);
+    await tx.done;
   }
 
-  /**
-   * Flip one message's favorite flag, if this caller may see it.
-   *
-   * `userId` is REQUIRED and nullable for the same reason getAllMessages's is,
-   * and the nullable half is load-bearing here: Home favorites the daily
-   * message through this method, and the daily rows are shared — reachable by
-   * every caller, signed out included. The rule is visibility, not ownership,
-   * for exactly that reason.
-   */
-  async toggleFavorite(messageId: number, userId: string | null): Promise<void> {
-    try {
-      await this.init();
-      const message = await this.getMessage(messageId, userId);
-      if (message) {
-        await this.updateMessage(messageId, { isFavorite: !message.isFavorite }, userId);
-        logger.debug(
-          '[StorageService] Favorite toggled successfully, id:',
-          messageId,
-          'new value:',
-          !message.isFavorite
-        );
-      } else {
-        console.warn('[StorageService] Cannot toggle favorite - message not found, id:', messageId);
-      }
-    } catch (error) {
-      console.error('[StorageService] Failed to toggle favorite:', error);
-      console.error('[StorageService] Message id:', messageId);
-      throw error; // Re-throw to allow caller to handle
+  /** Read and toggle atomically; return the committed account-specific value. */
+  async toggleFavorite(messageId: number, userId: string | null): Promise<boolean> {
+    if (!userId) throw new Error('Favorites require a signed-in user');
+    await this.init();
+    const tx = this.db!.transaction(['messages', 'message-favorites'], 'readwrite');
+    // A failed request also rejects tx.done; observe both failure channels.
+    void tx.done.catch(() => {});
+    const message = await tx.objectStore('messages').get(messageId);
+    if (!message || !this.isVisibleTo(message, userId)) {
+      await tx.done;
+      throw new Error('Message not found for this user');
     }
+    const favorites = tx.objectStore('message-favorites');
+    const key: [number, string] = [messageId, userId];
+    const isFavorite = !(await favorites.get(key));
+    if (isFavorite) await favorites.put({ messageId, userId });
+    else await favorites.delete(key);
+    await tx.done;
+    return isFavorite;
   }
 
   // Bulk operations

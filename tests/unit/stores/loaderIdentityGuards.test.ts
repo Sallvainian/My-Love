@@ -638,6 +638,16 @@ describe('loader identity guards', () => {
       expect(getAllStoredMessages).toHaveBeenCalledWith(A);
     });
 
+    it('reselects a daily message when the current custom row was deleted', async () => {
+      const own = aCustomMessage();
+      const daily = cRotationPool()[0];
+      useAppStore.setState({ messages: [own, daily], currentMessage: own });
+      getAllStoredMessages.mockResolvedValueOnce([daily]);
+      await useAppStore.getState().loadMessages();
+      expect(useAppStore.getState().currentMessage).toEqual(daily);
+      expect(useAppStore.getState().messages).toEqual([daily]);
+    });
+
     it('discards the rotation pool when the account changed mid-flight', async () => {
       const pending = deferred<unknown[]>();
       getAllStoredMessages.mockReturnValue(pending.promise);
@@ -656,8 +666,9 @@ describe('loader identity guards', () => {
 
   describe('toggleFavorite', () => {
     it('names the account that raised the favorite when it reaches the store', async () => {
+      toggleStoredFavorite.mockResolvedValueOnce(true);
       const own = aCustomMessage();
-      useAppStore.setState({ messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
+      useAppStore.setState({ currentMessage: { ...own, isFavorite: false }, messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
         typeof useAppStore.setState
       >[0]);
 
@@ -672,6 +683,17 @@ describe('loader identity guards', () => {
       // could be deleted with the case still green.
       expect(useAppStore.getState().messages).toEqual([{ ...own, isFavorite: true }]);
       expect(useAppStore.getState().messageHistory.favoriteIds).toContain(own.id);
+      expect(useAppStore.getState().currentMessage?.isFavorite).toBe(true);
+    });
+
+    it('uses the committed boolean even when the UI starts stale', async () => {
+      const own = aCustomMessage();
+      useAppStore.setState({ messages: [{ ...own, isFavorite: false }], currentMessage: { ...own, isFavorite: false } });
+      toggleStoredFavorite.mockResolvedValueOnce(false);
+      await useAppStore.getState().toggleFavorite(own.id);
+      expect(useAppStore.getState().messages[0].isFavorite).toBe(false);
+      expect(useAppStore.getState().currentMessage?.isFavorite).toBe(false);
+      expect(useAppStore.getState().messageHistory.favoriteIds).not.toContain(own.id);
     });
 
     it('discards the favorite write when the account changed mid-flight', async () => {

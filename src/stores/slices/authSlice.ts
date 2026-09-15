@@ -274,7 +274,9 @@ function discardAccountState(
   // Defensive `?? []`, on the same rule as the `settings` guard above: callers
   // that compose a partial store (component tests building authSlice alone)
   // reach here with the key absent, and sign-out must not throw for them.
-  const sharedMessages = (get().messages ?? []).filter((message) => !message.isCustom);
+  const sharedMessages = (get().messages ?? [])
+    .filter((message) => !message.isCustom)
+    .map((message) => ({ ...message, isFavorite: false }));
 
   // `currentMessage` is a COPY of a row, not a reference into the array, so
   // stripping `messages` does not touch it — and DailyMessage renders
@@ -282,7 +284,7 @@ function discardAccountState(
   // account's own writing and goes with the rest. `reloadRotationPool` is what
   // paints a new one, on the sign-in side of the transition.
   const outgoing = get().currentMessage;
-  const currentMessage = outgoing && !outgoing.isCustom ? outgoing : null;
+  const currentMessage = outgoing && !outgoing.isCustom ? { ...outgoing, isFavorite: false } : null;
 
   // `messageHistory.shownMessages` maps a date to the id of the message shown
   // that day. It is persisted, and neither `signedOutState()` nor the strip
@@ -318,7 +320,7 @@ function discardAccountState(
     ...signedOutState(),
     messages: sharedMessages,
     currentMessage,
-    ...(history ? { messageHistory: { ...history, shownMessages } } : null),
+    ...(history ? { messageHistory: { ...history, shownMessages, favoriteIds: [] } } : null),
     // Advance with the reset, even for a repeated sign-out. A later sign-in
     // by the same user must never reclaim ownership of an earlier request.
     authSessionVersion: get().authSessionVersion + 1,
