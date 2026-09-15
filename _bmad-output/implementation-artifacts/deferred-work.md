@@ -1011,7 +1011,9 @@ location: src/stores/slices/messagesSlice.ts:130-148
 source_spec: `7-partition-custom-messages-by-account.md`
 severity: medium
 reason: Verified at src/stores/slices/messagesSlice.ts:130-148: `await storageService.toggleFavorite(messageId)` is followed by an unguarded set() writing both `messages` and `messageHistory.favoriteIds`. Pre-existing and outside the seven actions the intent enumerates; AGENTS.md records the guard as copy-pasted at 19 sites with uneven coverage. A switch landing mid-flight appends the outgoing account's message id to the incoming account's favoriteIds.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-store-identity-guard-gaps
+resolution-undo: 5ed869dbc9cc632ed55dafb4788b27e92f4377b334530e348b14959aaeb28d6d 2026-09-14 7374617475733a206f70656e
 
 ### DW-101: settingsSlice.initializeApp reads get().userId live at two points separated by an await, with no identity capture or recheck around its set({ messages }).
 origin: spec-deferred c9cd7a4ea314
@@ -1019,7 +1021,9 @@ location: src/stores/slices/settingsSlice.ts:126,141
 source_spec: `7-partition-custom-messages-by-account.md`
 severity: low
 reason: Verified at src/stores/slices/settingsSlice.ts:126,141 with set() at :143,:147 and get().updateCurrentMessage() at :151. Caused by this story (the argument is new), but initializeApp is guarded by a module-level isInitialized flag and an App-level ref, so it runs once per page load and no reachable interleaving was demonstrated. It is now the only messages writer without the guard idiom this story introduced elsewhere.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-store-identity-guard-gaps
+resolution-undo: 5ed869dbc9cc632ed55dafb4788b27e92f4377b334530e348b14959aaeb28d6d 2026-09-14 7374617475733a206f70656e
 
 ### DW-102: The intent's I/O matrix states outcomes at three surfaces (service, store, UI) but the tests occupy two; the "AdminPanel shows none" half of row 1 is unasserted.
 origin: spec-deferred cd5ea7d12745
@@ -1286,4 +1290,28 @@ location: src/components/Settings/AnniversarySettings.tsx:207 and src/components
 source_spec: `spec-dw-104-107-130-display-name-edit-and-fallback.md`
 severity: low
 reason: Measured against this repo's Tailwind 4.3.3 palette: `--color-red-500` is `oklch(63.7% 0.237 25.331)` = #fb2c36, which is 3.82:1 against #ffffff -- below the 4.5:1 AA floor, and the exact figure axe reported for the events delete-confirm button before it was moved to `bg-red-600` (#e7000b, 4.76:1) in this change. The same `bg-red-500` + `text-white` pairing remains on the anniversary reset button and the photo delete button. Neither sits under an axe scan today, so both are silently non-compliant. Pre-existing; only the events button was touched here because only it was under a scan this change's page-height increase brought into evaluation.
+status: open
+
+### DW-135: initializeApp's mid-flight cases all change userId as well as authSessionVersion, so dropping the version half of stillCurrent() in settingsSlice stays green.
+origin: spec-deferred c2486f7a296d
+location: tests/unit/stores/settingsSlice.initializeApp.test.ts:215-335
+source_spec: `spec-dw-100-101-store-identity-guard-gaps-2.md`
+severity: medium
+reason: The three mid-flight cases at settingsSlice.initializeApp.test.ts:215-335 set userId to USER_C or null whenever they bump authSessionVersion. toggleFavorite has a same-account re-login case; initializeApp does not. Pre-existing in 84e6c8ea, not introduced by this pass.
+status: open
+
+### DW-136: No case changes identity a second time while the stale-path loadMessages() handoff is in flight, so deleting the inner pair recheck in the .then() stays green.
+origin: spec-deferred 2102472b0dc6
+location: src/stores/slices/settingsSlice.ts:163-165
+source_spec: `spec-dw-100-101-store-identity-guard-gaps-2.md`
+severity: low
+reason: settingsSlice.ts:163-165 re-checks userId and authSessionVersion before updateCurrentMessage(). The three handoff cases settle the handoff under a still-current incoming identity. Pre-existing in 84e6c8ea.
+status: open
+
+### DW-137: Nothing makes the initializeApp stale-path handoff chain reject, so deleting its .catch() stays green. The test double's loadMessages also does not swallow errors the way production does.
+origin: spec-deferred 8dae3341d08c
+location: src/stores/slices/settingsSlice.ts:171-173
+source_spec: `spec-dw-100-101-store-identity-guard-gaps-2.md`
+severity: low
+reason: settingsSlice.ts:171-173 attaches .catch() because nothing awaits the chain. settingsSlice.initializeApp.test.ts:124-132's loadMessages rethrows into that catch, unlike messagesSlice.ts:97-99 which swallows. Pre-existing in 84e6c8ea.
 status: open

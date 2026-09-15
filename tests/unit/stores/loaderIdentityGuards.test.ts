@@ -734,6 +734,27 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().messages).toEqual([{ ...own, isFavorite: false }]);
       expect(useAppStore.getState().messageHistory.favoriteIds).toEqual(knownFavoriteIds);
     });
+
+    it('swallows a service rejection and does not write the favorite', async () => {
+      const own = aCustomMessage();
+      useAppStore.setState({ messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+      const knownFavoriteIds = [...useAppStore.getState().messageHistory.favoriteIds];
+      const failure = new Error('toggle-failed');
+      toggleStoredFavorite.mockRejectedValueOnce(failure);
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await expect(useAppStore.getState().toggleFavorite(own.id)).resolves.toBeUndefined();
+
+        expect(useAppStore.getState().messages).toEqual([{ ...own, isFavorite: false }]);
+        expect(useAppStore.getState().messageHistory.favoriteIds).toEqual(knownFavoriteIds);
+        expect(log).toHaveBeenCalledWith('Error toggling favorite:', failure);
+      } finally {
+        log.mockRestore();
+      }
+    });
   });
 
   describe('setAuthUser refills the rotation pool', () => {
