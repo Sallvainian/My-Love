@@ -333,6 +333,27 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       expect(onComplete).not.toHaveBeenCalled();
     });
 
+    it('ignores Escape while a save is in flight, as the Cancel button does', async () => {
+      // The parent unmounts this form on cancel but does not cancel the write,
+      // so closing mid-save would let the name land while the user is backing
+      // out -- and would drop a failed save's error onto an unmounted tree.
+      // `getUser` never settling holds `isLoading` true for the whole test.
+      backend.getUser.mockReturnValue(new Promise(() => {}));
+      const { onCancel, onComplete } = renderEdit('Jessie');
+
+      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Casey' } });
+      fireEvent.click(screen.getByTestId('display-name-submit'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('display-name-cancel')).toBeDisabled();
+      });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(onComplete).not.toHaveBeenCalled();
+    });
+
     it('saves an edited name through the same single profile write', async () => {
       const { onComplete } = renderEdit('Jessie');
 
