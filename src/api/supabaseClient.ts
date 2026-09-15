@@ -124,7 +124,11 @@ const returnedWithCode = (() => {
  * redeemed callback, and a foreign `#access_token=` fragment the client refused
  * (DW-95, DW-96).
  */
-export type AuthCallbackOutcome = 'cancelled' | 'needs-original-browser' | null;
+export type AuthCallbackOutcome =
+  | 'cancelled'
+  | 'provider-error'
+  | 'needs-original-browser'
+  | null;
 
 /**
  * Classify this page load's authentication callback, from what the SDK already
@@ -155,9 +159,33 @@ export type AuthCallbackOutcome = 'cancelled' | 'needs-original-browser' | null;
  * A session present means the person is not on the login screen, so there is
  * nowhere to say it and nothing to say: that reads `null`.
  */
+/**
+ * OAuth error names that are NOT the person changing their mind.
+ *
+ * `AuthImplicitGrantRedirectError` is thrown for every `#error=` fragment
+ * (`GoTrueClient.js:3255-3261`), so the class alone cannot tell a refusal from
+ * a failure -- it carried both, and both read as "you cancelled". The raw
+ * OAuth `error` parameter is preserved on `details.error` (`:3259`), and that
+ * is the discriminator; `details.code` is not, because `:3260` defaults it to
+ * `'unspecified_code'` and it is therefore never absent.
+ *
+ * Only names that are provably not a refusal are listed. RFC 6749 4.1.2.1
+ * reserves `access_denied` for "the resource owner denied the request", and
+ * the SDK's own docblock uses it as the example (`errors.d.ts:129`), so the
+ * refusal case keeps its existing answer. Anything unrecognised also keeps it.
+ * That way this can only ever correct a wrong message, never introduce one:
+ * no hosted denial fragment had to be observed first, which is what kept this
+ * deferred.
+ */
+const PROVIDER_FAILURE_ERRORS = new Set(['server_error', 'temporarily_unavailable']);
+
 export const getAuthCallbackOutcome = async (): Promise<AuthCallbackOutcome> => {
   const { error } = await supabase.auth.initialize();
-  if (isAuthImplicitGrantRedirectError(error)) return 'cancelled';
+  if (isAuthImplicitGrantRedirectError(error)) {
+    return PROVIDER_FAILURE_ERRORS.has(error.details?.error ?? '')
+      ? 'provider-error'
+      : 'cancelled';
+  }
   if (error || !returnedWithCode) return null;
   const { data } = await supabase.auth.getSession();
   return data.session ? null : 'needs-original-browser';

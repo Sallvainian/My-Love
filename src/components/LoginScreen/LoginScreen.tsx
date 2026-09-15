@@ -35,6 +35,12 @@ interface LoginScreenProps {
  */
 const CALLBACK_NOTICES: Record<Exclude<AuthCallbackOutcome, null>, string> = {
   cancelled: 'Sign-in was cancelled, so nothing changed. You can sign in again below.',
+  // Deliberately does NOT say "cancelled": nobody cancelled anything. It also
+  // does not promise that retrying works, because a provider-side failure
+  // often repeats -- saying "try again" and having it fail identically is the
+  // thing that sends people looking for a fault in their own account.
+  'provider-error':
+    'Sign-in could not be completed — the sign-in service reported a problem, so nothing changed. Please try again in a moment.',
   // No mention of a link: the usual way here is a Google return whose verifier
   // is gone -- a private window, cleared storage, a PWA handing OAuth to a
   // separate context -- where nothing was opened and there may be no other
