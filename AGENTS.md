@@ -1,5 +1,5 @@
 <!-- bmad:context -->
-<!-- Verified 2026-09-13 against 11496d87. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
+<!-- Verified 2026-09-15 against 04d594f0. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
 
 ## My Love
 
@@ -25,7 +25,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, part
 ## Where things are
 
 - State: `src/stores/useAppStore.ts` composes 12 slices from `src/stores/slices/`; `appSlice` is composed first and owns `isLoading`/`error`/`__isHydrated`; `authSlice` owns `userId` and `authSessionVersion` and is not persisted.
-- A new view is registered in five hand-maintained places: `ViewType` and `pathMap` in `navigationSlice.ts`, both URL ternaries in `App.tsx` (~189 and ~208), the `currentView ===` render chain (~697), and the `DESTINATIONS` list in `Navigation/NavigationTray.tsx`. Only `pathMap` is typechecked, so missing the rest still compiles, renders nothing, and resets to home on reload.
+- A new view is registered in five hand-maintained places: `ViewType` and `pathMap` in `navigationSlice.ts`, both URL ternaries in `App.tsx` (~189 and ~208), the `currentView ===` render chain (~724), and the `DESTINATIONS` list in `Navigation/NavigationTray.tsx`. Only `pathMap` is typechecked, so missing the rest still compiles, renders nothing, and resets to home on reload.
 - E2E fixtures: import `{ test, expect }` from `tests/support/merged-fixtures.ts`, never from `@playwright/test`.
 - Loop runs live in `.bmad-loop/runs/<id>/`, finished ones in `.bmad-loop/archive/`; both are gitignored, so a deleted run is unrecoverable. Never delete a run directory — one deletion took stories 1-5 of an active run with it; move it to `archive/` instead.
 
@@ -57,7 +57,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, part
 
 ## Known pitfalls
 
-- Any async store action that `set()`s after an `await` must capture `{ userId, authSessionVersion }` first and re-check both before writing — `authSessionVersion` is bumped on every sign-out, so a same-account re-login is caught too. The pair is copy-pasted at 46 sites with no shared helper, and `addMoodEntry`, `selectRole`, `sendNote`'s image branch, `toggleFavorite` and `initializeApp` still lack it.
+- Any async store action that `set()`s after an `await` must capture `{ userId, authSessionVersion }` first and re-check both before writing — `authSessionVersion` is bumped on every sign-out, so a same-account re-login is caught too. The pair is copy-pasted at 26 sites with no shared helper, and `selectRole` and `sendNote`'s image branch still lack it.
 - Sign-out discards account state only through `discardAccountState()` in `authSlice.ts`, which spreads `signedOutState()` — the store itself survives sign-out, so a new account-scoped field must be added to `signedOutState()` in the same commit; a partial reset leaks the previous couple's data on a shared device.
 - `BaseIndexedDBService.getAll()` returns every account's rows. Scope by `userId` in the service, as `moodService.getAllForUser` does, before anything reaches UI state.
 - IndexedDB schema changes go in `src/services/dbSchema.ts` alone: bump `DB_VERSION` and gate each branch on whether the store exists, never on `oldVersion < N`. Five modules open `my-love-db` and all delegate to `upgradeDb`; only the one that wins the versionchange transaction runs its callback, so a private upgrade callback anywhere would silently decide the schema for everyone.
@@ -67,7 +67,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, part
 - A retryable INSERT must reuse one client-generated key across attempts, backed by a DB `UNIQUE` constraint plus `.upsert(..., { onConflict, ignoreDuplicates: true })`. Copy `notesSlice.ts` or `photoService.ts`; there is no shared helper. A retryable Storage upload additionally needs an UPDATE policy on `storage.objects` for its bucket, because an overwrite is an UPDATE and without one every retry is rejected.
 - Supabase policy work has four traps: a policy on `public.users` must not read `public.users`, which raises 42P17 on every query against it — go through `public.get_my_partner_id()`; `users.partner_id` changes only via the `accept_partner_request` RPC, never a client UPDATE; every storage object path must start with the uploader's `auth.uid()`, which 7 of the 9 `storage.objects` policies key on; and an UPDATE policy must state `WITH CHECK` explicitly, because Postgres reuses `USING` as the check and this repo was bitten twice.
 - A new public table must `ENABLE ROW LEVEL SECURITY` in its creating migration — `20260725170000_grant_api_roles_on_public.sql` grants ALL on future tables to `anon` and `authenticated`, so a table without RLS is open to every user. Declare policies that call `get_my_partner_id()` as `TO authenticated`.
-- Eight files under `supabase/tests/database/` assert exact policy sets with pgTAP `policies_are`, so adding, renaming or dropping a policy fails `supabase test db` in a file the migration never mentions until those arrays are edited in the same change. Declare pgTAP helpers inline — `00_helpers.sql` rolls back before later files run.
+- Seven files under `supabase/tests/database/` assert exact policy sets with pgTAP `policies_are`, so adding, renaming or dropping a policy fails `supabase test db` in a file the migration never mentions until those arrays are edited in the same change. Declare pgTAP helpers inline — `00_helpers.sql` rolls back before later files run.
 - E2E accounts come from the per-worker pool in `tests/support/auth/worker-pool.ts`, keyed on `TEST_WORKER_INDEX` — never `TEST_PARALLEL_INDEX`, which diverges from it on retry. A spec must not link or unlink partners, reset a password, or null a shared row at teardown; those rows belong to other workers.
 - Do not remove the `nodeName` shim from `tests/setup.ts` — without it DOMPurify sees every tag as `''` under happy-dom and text inside `<script>`/`<style>` survives sanitization. It must stay in `setupFiles`.
 - Do not rewrite the shell idioms in `playwright.config.ts` to POSIX — the `stdio` stderr suppression and the double-quoted `docker inspect --format` are required by `cmd.exe`, and without them the whole env block falls into its catch and no local Supabase vars are ever set. Separately, its Supabase env block must stay unguarded: re-guarding it drops the dev server onto the `.env.test` placeholder key and every Realtime handshake is rejected with 403.
