@@ -18,6 +18,7 @@
  */
 
 import type { MoodEntry, MoodType } from '../types';
+import { normalizeMoodValues } from '../types/moods';
 
 /**
  * Result of recording a sync against a local mood record
@@ -53,13 +54,18 @@ function toCreatedAt(timestamp: MoodEntry['timestamp']): string {
 }
 
 function moodSyncFields(mood: SyncableMood): MoodSyncFields {
-  // A legacy single-mood record has no `moods` array; send its primary mood as
-  // a one-element array so both shapes fingerprint identically.
-  const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];
+  const normalized = normalizeMoodValues(mood.mood, mood.moods);
+  if (!normalized) throw new Error('Mood contains no recognized values');
+  if (mood.note != null && (typeof mood.note !== 'string' || mood.note.length > 200)) {
+    throw new Error('Mood note is invalid');
+  }
+  if (!(mood.timestamp instanceof Date) && typeof mood.timestamp !== 'string') {
+    throw new Error('Mood timestamp is invalid');
+  }
 
   return {
-    mood_type: mood.mood,
-    mood_types: moodTypes,
+    mood_type: normalized.mood,
+    mood_types: normalized.moods,
     note: mood.note || null,
     created_at: toCreatedAt(mood.timestamp),
   };
@@ -84,4 +90,13 @@ export function moodSyncPayload(mood: SyncableMood, userId: string): MoodSyncPay
  */
 export function moodSyncFingerprint(mood: SyncableMood): string {
   return JSON.stringify(moodSyncFields(mood));
+}
+
+/** Newly corrupted rows still receive their server ID, but must remain dirty. */
+export function matchesMoodSyncFingerprint(mood: SyncableMood, sentFingerprint: string): boolean {
+  try {
+    return moodSyncFingerprint(mood) === sentFingerprint;
+  } catch {
+    return false;
+  }
 }

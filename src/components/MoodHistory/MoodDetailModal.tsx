@@ -16,7 +16,8 @@ import {
 import type { ReactElement } from 'react';
 import { useRef } from 'react';
 import { useFocusTrap } from '../../hooks';
-import type { MoodEntry, MoodType } from '../../types';
+import type { MoodEntry } from '../../types';
+import { normalizeMoodEntry } from '../../types/moods';
 import { formatModalDate, formatModalTime } from '../../utils/calendarHelpers';
 
 /**
@@ -86,17 +87,9 @@ function MoodDetailContent({
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Read moods array, fall back to [mood.mood] for legacy entries.
-  //
-  // Array.isArray, not a truthy check: a truthy value that is not an array can
-  // still clear `.length > 0` and is then used as one. Measured pre-fix, both a
-  // string and an array-like object throw `allMoods.map is not a function` in
-  // the icon row below -- that map runs before the title's className, so
-  // `primaryMoodConfig` is never dereferenced either way.
-  const allMoods: MoodType[] =
-    Array.isArray(mood.moods) && mood.moods.length > 0 ? mood.moods : [mood.mood as MoodType];
-
-  const primaryMoodConfig = MOOD_CONFIG[allMoods[0]];
+  // The outer component only mounts this content for a recoverable record.
+  const allMoods = mood.moods!;
+  const primaryMoodConfig = MOOD_CONFIG[mood.mood];
   const moodDate = new Date(mood.timestamp);
   const formattedDate = formatModalDate(moodDate);
   const formattedTime = formatModalTime(moodDate);
@@ -150,11 +143,11 @@ function MoodDetailContent({
           {/* Mood icons and type - AC-4: Icons with color */}
           <div className="mb-6 flex items-center gap-4">
             <div className="flex gap-2" aria-hidden="true">
-              {allMoods.map((m) => {
+              {allMoods.map((m, index) => {
                 const cfg = MOOD_CONFIG[m];
                 const MoodIcon = cfg.icon;
                 return (
-                  <div key={m} className={`rounded-full p-4 ${cfg.bgColor}`}>
+                  <div key={`${m}-${index}`} className={`rounded-full p-4 ${cfg.bgColor}`}>
                     <MoodIcon className={`h-8 w-8 ${cfg.color}`} />
                   </div>
                 );
@@ -207,7 +200,8 @@ function MoodDetailContent({
 }
 
 export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps): ReactElement {
+  const normalized = mood ? normalizeMoodEntry(mood) : null;
   return (
-    <AnimatePresence>{mood && <MoodDetailContent mood={mood} onClose={onClose} />}</AnimatePresence>
+    <AnimatePresence>{normalized && <MoodDetailContent mood={normalized} onClose={onClose} />}</AnimatePresence>
   );
 }

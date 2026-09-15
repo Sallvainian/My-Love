@@ -20,6 +20,7 @@ import { getPartnerId } from '../../api/supabaseClient';
 import { moodService } from '../../services/moodService';
 import { MOOD_SYNC_LOCK, withSyncLock } from '../../services/syncLock';
 import type { MoodEntry } from '../../types';
+import { normalizeMoodEntry, normalizeMoodValues } from '../../types/moods';
 import { formatDateISO } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
 import type { AppStateCreator } from '../types';
@@ -60,100 +61,66 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 
   // Actions
   addMoodEntry: async (moods, note) => {
+    const { userId, authSessionVersion } = get();
+    const stillCurrent = () =>
+      get().userId === userId && get().authSessionVersion === authSessionVersion;
+    if (!userId) throw new Error('User not authenticated');
     try {
-      // Get authenticated user ID from store (synchronous, offline-safe)
-      const userId = get().userId;
-      if (!userId) {
-        throw new Error('User not authenticated');
-      }
-
-      // Check if mood already exists for today.
-      // Matched on owner AND date: the store is shared by every account that
-      // has signed in on this device, so a date-only match let one partner's
-      // entry be found and overwritten by the other.
-      const today = formatDateISO(new Date());
-      const existingMood = get().moods.find((m) => m.date === today && m.userId === userId);
-
-      if (existingMood && existingMood.id) {
-        // Update existing mood
-        await get().updateMoodEntry(today, moods, note);
-        return;
-      }
-
-      // Create new mood entry via MoodService (validates with MoodEntrySchema)
-      const created = await moodService.create(userId, moods, note);
-
-      // Optimistic UI update - add to state immediately
+      // The UI intentionally hides unrecoverable rows. Resolve the owner/date
+      // on disk atomically so replacing a hidden row cannot collide with it.
+      const saved = await moodService.saveForDate(userId, formatDateISO(new Date()), moods, note);
+      if (!stillCurrent()) return;
       set((state) => ({
-        moods: [...state.moods, created],
+        moods: state.moods.some((row) => row.id === saved.id)
+          ? state.moods.map((row) => row.id === saved.id ? saved : row)
+          : [...state.moods, saved],
       }));
-
-      // Update sync status
       await get().updateSyncStatus();
-
-      // Immediate sync if online (standard pattern)
+      if (!stillCurrent()) return;
       if (navigator.onLine) {
         try {
           await get().syncPendingMoods();
-          logger.debug('[MoodSlice] Immediate sync completed for new mood');
-        } catch (syncError) {
-          // Don't fail the add if sync fails - background sync will retry
-          console.warn(
-            '[MoodSlice] Immediate sync failed, will retry via background sync:',
-            syncError
-          );
+        } catch (error) {
+          console.warn('[MoodSlice] Immediate sync failed, will retry:', error);
         }
       }
-
-      logger.debug('[MoodSlice] Added mood entry:', created);
     } catch (error) {
       console.error('[MoodSlice] Error adding mood entry:', error);
-      throw error; // Re-throw to allow UI to show error feedback
+      throw error;
     }
   },
 
   getMoodForDate: (date) => {
     const userId = get().userId;
-    return get().moods.find((m) => m.date === date && m.userId === userId);
+    const row = get().moods.find((m) => m.date === date && m.userId === userId);
+    return row ? normalizeMoodEntry(row) ?? undefined : undefined;
   },
 
   updateMoodEntry: async (date, moods, note) => {
+    const { userId, authSessionVersion } = get();
+    const stillCurrent = () =>
+      get().userId === userId && get().authSessionVersion === authSessionVersion;
+    if (!userId) throw new Error('User not authenticated');
     try {
-      const userId = get().userId;
-      const existingMood = get().moods.find((m) => m.date === date && m.userId === userId);
-      if (!existingMood || !existingMood.id) {
-        throw new Error(`Mood entry for ${date} not found`);
-      }
-
-      // Update via MoodService (validates with MoodEntrySchema)
-      const updated = await moodService.updateMood(existingMood.id, moods, note);
-
-      // Update state
+      const saved = await moodService.saveForDate(userId, date, moods, note, true);
+      if (!stillCurrent()) return;
       set((state) => ({
-        moods: state.moods.map((m) => (m.id === existingMood.id ? updated : m)),
+        moods: state.moods.some((row) => row.id === saved.id)
+          ? state.moods.map((row) => row.id === saved.id ? saved : row)
+          : [...state.moods, saved],
       }));
-
-      // Update sync status
       await get().updateSyncStatus();
-
-      // Immediate sync if online (standard pattern)
+      if (!stillCurrent()) return;
       if (navigator.onLine) {
         try {
           await get().syncPendingMoods();
-          logger.debug('[MoodSlice] Immediate sync completed for updated mood');
-        } catch (syncError) {
-          // Don't fail the update if sync fails - background sync will retry
-          console.warn(
-            '[MoodSlice] Immediate sync failed, will retry via background sync:',
-            syncError
-          );
+        } catch (error) {
+          console.warn('[MoodSlice] Immediate sync failed, will retry:', error);
         }
       }
-
-      logger.debug('[MoodSlice] Updated mood entry:', updated);
     } catch (error) {
       console.error('[MoodSlice] Error updating mood entry:', error);
-      throw error; // Re-throw to allow UI to show error feedback
+      throw error;
     }
   },
 
@@ -162,7 +129,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       // Only this user's rows. The IndexedDB store holds every account that has
       // signed in on this device, so getAll() here put one partner's private
       // notes straight into the other's UI state.
-      const userId = get().userId;
+      const { userId, authSessionVersion } = get();
       if (!userId) {
         set({ moods: [] });
         return;
@@ -173,7 +140,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       // Identity guard, same as fetchPartnerMoods below: Sign Out sits on the
       // same screen that fires this, so the read can land after clearAuth and
       // write this user's own mood notes back over the reset.
-      if (get().userId !== userId) return;
+      if (get().userId !== userId || get().authSessionVersion !== authSessionVersion) return;
 
       set({ moods: allMoods });
 
@@ -194,7 +161,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       // authSlice is not persisted -- so on a fresh load userId is still null
       // and `?? undefined` fell through to the unscoped read, badging the
       // previous account's pending moods until a later call corrected it.
-      const currentUserId = get().userId;
+      const { userId: currentUserId, authSessionVersion } = get();
       const unsyncedMoods = currentUserId
         ? await moodService.getUnsyncedMoods(currentUserId)
         : [];
@@ -204,7 +171,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       // text, so this is well below the disclosures the other guards close —
       // but it is the same shape, and the badge it feeds is read straight off
       // the store with no re-derivation.
-      if (get().userId !== currentUserId) return;
+      if (get().userId !== currentUserId || get().authSessionVersion !== authSessionVersion) return;
 
       set((state) => ({
         syncStatus: {
@@ -236,6 +203,17 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
    * Story 6.4: AC #1 - Background sync with retry logic
    */
   syncPendingMoods: async () => {
+    // A batch outlives the session that started it: App.tsx fires this from a
+    // 5-minute interval and from the `online` event, and Sign Out sits in the
+    // bottom nav of the very screen showing the sync badge. Every write below
+    // is account-scoped completion state, so a batch raised by A must not clear
+    // B's spinner, stamp B's `lastSyncAt`, or overwrite B's pending count when
+    // it lands. `authSessionVersion` is the half that catches A signing back in
+    // as A — an id-only compare lets that through.
+    const { userId, authSessionVersion } = get();
+    const stillCurrent = () =>
+      get().userId === userId && get().authSessionVersion === authSessionVersion;
+
     // Concurrency guard: skip if already syncing to prevent duplicate DB rows
     if (get().syncStatus.isSyncing) {
       logger.debug('[MoodSlice] Skipping sync - already in progress');
@@ -285,13 +263,24 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       // makes the retry button claim success for a sync that never ran.
       if (!locked.ran) {
         logger.debug('[MoodSlice] Another context holds the sync lock - skipping');
-        set((state) => ({
-          syncStatus: { ...state.syncStatus, isSyncing: false },
-        }));
+        if (stillCurrent()) {
+          set((state) => ({
+            syncStatus: { ...state.syncStatus, isSyncing: false },
+          }));
+        }
         return { synced: 0, failed: 0, skipped: true };
       }
 
       const result = locked.result;
+
+      // The batch itself is finished and its rows are written; only the UI
+      // follow-through is abandoned. Returning before the loaders, not merely
+      // before the `set`, is the point: `loadMoods` and `fetchPartnerMoods`
+      // would otherwise fire against the new session on the dead one's behalf.
+      if (!stillCurrent()) {
+        logger.debug('[MoodSlice] Sync completed after the session ended - discarding UI updates');
+        return { synced: result.synced, failed: result.failed, skipped: false };
+      }
 
       // Reload moods from IndexedDB to reflect synced status
       // This ensures the UI shows the correct sync state after successful sync
@@ -311,14 +300,18 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       // Update sync status after completion
       await get().updateSyncStatus();
 
-      // Update lastSyncAt timestamp
-      set((state) => ({
-        syncStatus: {
-          ...state.syncStatus,
-          lastSyncAt: new Date(),
-          isSyncing: false,
-        },
-      }));
+      // Update lastSyncAt timestamp. Rechecked because `loadMoods` and
+      // `updateSyncStatus` are both awaited above, so the session can end
+      // between the check before them and here.
+      if (stillCurrent()) {
+        set((state) => ({
+          syncStatus: {
+            ...state.syncStatus,
+            lastSyncAt: new Date(),
+            isSyncing: false,
+          },
+        }));
+      }
 
       logger.debug(`[MoodSlice] Sync complete: ${result.synced} synced, ${result.failed} failed`);
 
@@ -326,15 +319,21 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
     } catch (error) {
       console.error('[MoodSlice] Error syncing pending moods:', error);
 
-      // Mark sync as complete even on error
-      set((state) => ({
-        syncStatus: {
-          ...state.syncStatus,
-          isSyncing: false,
-        },
-      }));
+      // Mark sync as complete even on error — but only for the session that
+      // raised it. A dead session's failure must not clear the live one's
+      // spinner, which is also the flag that suppresses a duplicate same-tab
+      // batch.
+      if (stillCurrent()) {
+        set((state) => ({
+          syncStatus: {
+            ...state.syncStatus,
+            isSyncing: false,
+          },
+        }));
+      }
 
-      // Re-throw to allow UI to show error feedback
+      // Re-throw to allow UI to show error feedback. Unconditional: the caller
+      // that started this batch still needs the rejection.
       throw error;
     }
   },
@@ -355,7 +354,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
    */
   fetchPartnerMoods: async (limit = 30) => {
     // Whose data this is, captured before any await.
-    const requestedBy = get().userId;
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     try {
       // Check network status first
       if (!navigator.onLine) {
@@ -376,30 +375,15 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       const partnerMoodRecords = await moodSyncService.fetchMoods(partnerId, limit);
 
       // Transform Supabase records to MoodEntry format
-      const transformedMoods: MoodEntry[] = partnerMoodRecords.map((record) => {
+      const transformedMoods: MoodEntry[] = partnerMoodRecords.flatMap((record) => {
         // Handle nullable created_at (shouldn't be null in practice, but types say it can be)
         const createdAt = record.created_at || new Date().toISOString();
-        // Read mood_types array, fall back to [mood_type] for legacy entries.
-        //
-        // Array.isArray, not a truthy check. Nothing non-array can reach this
-        // today: `moodSyncService.fetchMoods` delegates to `moodApi.fetchByUser`,
-        // whose `MoodArraySchema.parse` types `mood_types` through
-        // `SupabaseMoodSchema` as `z.array(MoodTypeSchema).nullable().optional()`
-        // and throws `ApiValidationError` before this transform runs. Symbol
-        // names, not line numbers: those drift, and nothing checks them. The
-        // shape test is defensive normalization at the
-        // boundary, so a future caller that skips that validation cannot store a
-        // non-array as `MoodEntry.moods` and leave every consumer to defend
-        // itself -- not a fix for a live leak.
-        const moods =
-          Array.isArray(record.mood_types) && record.mood_types.length > 0
-            ? record.mood_types
-            : [record.mood_type];
+        const normalized = normalizeMoodValues(record.mood_type, record.mood_types);
+        if (!normalized) return [];
         return {
           id: undefined, // Partner moods don't have local IDB id
           userId: record.user_id,
-          mood: record.mood_type,
-          moods: moods, // Include all selected moods
+          ...normalized,
           note: record.note || undefined,
           date: formatDateISO(new Date(createdAt)), // Extract local YYYY-MM-DD
           timestamp: new Date(createdAt),
@@ -413,7 +397,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       // this, and the request went out with a still-valid token. Landing after
       // clearAuth would write the previous couple's mood notes — free text —
       // straight back over the reset.
-      if (get().userId !== requestedBy) return;
+      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
       set({ partnerMoods: transformedMoods });
 
       logger.debug(`[MoodSlice] Fetched ${transformedMoods.length} partner moods`);
@@ -430,6 +414,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
    * @returns Partner's mood entry for the date, or undefined if not found
    */
   getPartnerMoodForDate: (date) => {
-    return get().partnerMoods.find((m) => m.date === date);
+    const row = get().partnerMoods.find((m) => m.date === date);
+    return row ? normalizeMoodEntry(row) ?? undefined : undefined;
   },
 });
