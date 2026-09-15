@@ -40,6 +40,19 @@ if [ "$SKIP_LINT" = false ]; then
   echo "Running TypeScript type check..."
   npm run typecheck || { echo "❌ Type check failed"; exit 1; }
 
+  # Mirrors the "Edge Function tests" step in .github/workflows/test.yml.
+  # supabase/functions/** is outside both `npm run lint` (src tests scripts) and
+  # every tsconfig, so this is the only stage that sees the bounded upload
+  # handler at all. Skipped with a warning rather than a failure when deno is
+  # absent, since it is not in .mise.toml.
+  if command -v deno >/dev/null 2>&1; then
+    echo "Running Edge Function tests (deno)..."
+    deno test --no-lock supabase/functions/upload-love-note-image/ \
+      || { echo "❌ Edge Function tests failed"; exit 1; }
+  else
+    echo "⚠️  deno not found — skipping Edge Function tests (CI runs them)"
+  fi
+
   echo "✅ Lint & Type Check passed"
   echo ""
 else
