@@ -1382,7 +1382,9 @@ origin: raised while closing DW-134, 2026-09-15
 location: src/components/InteractionHistory/InteractionHistory.tsx:183
 severity: low
 reason: `<div className="rounded-full bg-purple-500 px-3 py-1 text-xs font-medium text-white">`. Measured from the installed Tailwind palette: `--color-purple-500` is oklch(62.7% 0.265 303.9) = #ad46ff, 4.12:1 against white — below the 4.5:1 AA floor, and at `text-xs` it is small text, so the 3:1 large-text allowance does not apply. Pre-existing and outside DW-134, which named two destructive buttons. Allowlisted in tests/unit/a11y/whiteOnColorContrast.test.ts with its measured ratio, and that allowlist fails if the pairing is fixed without removing the entry. Settle by moving to purple-600 or darker, the way DW-28 moved the pink family and DW-134 the red.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-dw-badge-contrast-shades
+resolution-undo: 8f95a4b0e2a9d093a35cedfb5015a1e19979fec05a43e48b1f65f7842ad21ff3 2026-09-15 7374617475733a206f70656e
 
 ### DW-140: The partner-mood action button pairs white text with bg-green-500, at 2.22:1.
 origin: raised while closing DW-134, 2026-09-15
@@ -1405,7 +1407,9 @@ origin: raised while closing DW-134, 2026-09-15
 location: src/components/PhotoGallery/PhotoGridItem.tsx:100
 severity: low
 reason: `photo.isOwn ? 'bg-pink-600 text-white' : 'bg-blue-500/90 text-white'` — the second arm only. Measured from the installed palette: `--color-blue-500` is oklch(62.3% 0.214 259.815) = #2b7fff, 3.76:1 against white at full opacity, below the 4.5:1 floor and below even the 3.82:1 that DW-134 was raised for; the badge is `text-xs`, so the large-text allowance does not apply. The true ratio is worse and not knowable from the class alone, because `/90` lets the photograph behind it through, and the opaque figure is the optimistic bound. The `isOwn` arm, `bg-pink-600` (#e60076), clears at 4.54:1 — so the two arms of one conditional disagree about the standard. Allowlisted in tests/unit/a11y/whiteOnColorContrast.test.ts. Settle by moving the second arm to blue-600 or darker, measured the same way the first arm evidently was.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-dw-badge-contrast-shades
+resolution-undo: 8f95a4b0e2a9d093a35cedfb5015a1e19979fec05a43e48b1f65f7842ad21ff3 2026-09-15 7374617475733a206f70656e
 
 ### DW-143: The app's primary call-to-action is a gradient whose every point fails AA, in ten components, while its own hover state passes.
 origin: raised while closing DW-134, 2026-09-15
