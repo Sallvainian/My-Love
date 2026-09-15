@@ -32,41 +32,105 @@
  * different offsets.
  */
 import { RealtimeClient, type RealtimeChannel } from '@supabase/realtime-js';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const TOPIC = 'love-notes:00000000-0000-4000-8000-000000000000';
 const REALTIME_TOPIC = `realtime:${TOPIC}`;
 
-/** The slice of the WebSocket contract phoenix's `transportConnect` touches. */
-class FakeWebSocket {
-  static instances: FakeWebSocket[] = [];
-  url: string;
-  // OPEN. `RealtimeClient.connect()` ends in `_handleNodeJsRaceCondition()`,
-  // which calls `onConnOpen()` itself when readyState already reads OPEN, so
-  // nothing here ever has to fire `onopen`.
-  readyState = 1;
-  binaryType = 'arraybuffer';
-  bufferedAmount = 0;
-  sent: string[] = [];
-  onopen: (() => void) | null = null;
-  onerror: ((event: unknown) => void) | null = null;
-  onmessage: ((event: unknown) => void) | null = null;
-  onclose: ((event: unknown) => void) | null = null;
+/**
+ * Hoisted so the moodSyncService mock factory can use the same transport the
+ * SDK cases already drive. `serverCloses` / `answer` / `frames` keep reading
+ * `FakeWebSocket.instances`.
+ */
+const harness = vi.hoisted(() => {
+  class FakeWebSocket {
+    static instances: FakeWebSocket[] = [];
+    url: string;
+    // OPEN. `RealtimeClient.connect()` ends in `_handleNodeJsRaceCondition()`,
+    // which calls `onConnOpen()` itself when readyState already reads OPEN, so
+    // nothing here ever has to fire `onopen`.
+    readyState = 1;
+    binaryType = 'arraybuffer';
+    bufferedAmount = 0;
+    sent: string[] = [];
+    onopen: (() => void) | null = null;
+    onerror: ((event: unknown) => void) | null = null;
+    onmessage: ((event: unknown) => void) | null = null;
+    onclose: ((event: unknown) => void) | null = null;
 
-  constructor(url: string) {
-    this.url = url;
-    FakeWebSocket.instances.push(this);
+    constructor(url: string) {
+      this.url = url;
+      FakeWebSocket.instances.push(this);
+    }
+
+    send(data: string): void {
+      this.sent.push(data);
+    }
+
+    close(): void {
+      this.readyState = 3;
+      this.onclose?.({ code: 1000, reason: '', wasClean: true });
+    }
   }
 
-  send(data: string): void {
-    this.sent.push(data);
-  }
+  const USER_ID = '00000000-0000-4000-8000-000000000001';
+  const PARTNER_ID = '00000000-0000-4000-8000-000000000002';
 
-  close(): void {
-    this.readyState = 3;
-    this.onclose?.({ code: 1000, reason: '', wasClean: true });
-  }
-}
+  return {
+    FakeWebSocket,
+    USER_ID,
+    PARTNER_ID,
+    client: null as RealtimeClient | null,
+    setAuth: vi.fn(async () => {}),
+    getPartnerId: vi.fn(async () => PARTNER_ID as string | null),
+    opened: [] as RealtimeChannel[],
+  };
+});
+
+const FakeWebSocket = harness.FakeWebSocket;
+
+vi.mock('@/api/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: async () => ({
+        data: { session: { user: { id: harness.USER_ID } } },
+      }),
+    },
+    channel: (topic: string, params?: Record<string, unknown>) => {
+      if (!harness.client) {
+        throw new Error('mood RealtimeClient was not installed');
+      }
+      const channel = harness.client.channel(topic, params as never);
+      harness.opened.push(channel);
+      return channel;
+    },
+    removeChannel: (channel: RealtimeChannel) => {
+      if (!harness.client) {
+        throw new Error('mood RealtimeClient was not installed');
+      }
+      return harness.client.removeChannel(channel);
+    },
+    realtime: {
+      setAuth: harness.setAuth,
+      isDisconnecting: () => harness.client?.isDisconnecting() ?? false,
+    },
+  },
+  getPartnerId: harness.getPartnerId,
+  resolvePartnerIdForDelivery: harness.getPartnerId,
+  resolvePartnerLookupForDelivery: async () => {
+    const partnerId = await harness.getPartnerId();
+    return partnerId
+      ? { status: 'linked' as const, partnerId }
+      : { status: 'unlinked' as const };
+  },
+  resolveSignedInUserForDelivery: async () => ({
+    status: 'signed-in' as const,
+    userId: harness.USER_ID,
+  }),
+  getSignedInUserId: async () => harness.USER_ID,
+}));
+
+import { moodSyncService } from '@/api/moodSyncService';
 
 interface Frame {
   joinRef: string | null;
@@ -234,5 +298,100 @@ describe('the SDK leave/close contract the channel registries depend on', () => 
     await expect(leave).resolves.toBe('ok');
     expect(channel.state).toBe('closed');
     expect(statuses).toEqual(['SUBSCRIBED', 'CLOSED']);
+  });
+});
+
+const MOOD_TOPIC = `mood-updates:${harness.USER_ID}`;
+const MOOD_REALTIME_TOPIC = `realtime:${MOOD_TOPIC}`;
+
+function installMoodClient(): void {
+  const client = new RealtimeClient('ws://localhost:54321/realtime/v1', {
+    params: { apikey: 'test-anon-key' },
+    // @ts-expect-error - the SDK types `transport` as the DOM WebSocket ctor.
+    transport: FakeWebSocket,
+    heartbeatIntervalMs: 1_000_000,
+  });
+  client.setAuth = harness.setAuth as never;
+  harness.client = client;
+}
+
+describe('moodSyncService unsolicited CLOSED reopen', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeWebSocket.instances.length = 0;
+    harness.opened.length = 0;
+    harness.setAuth.mockClear();
+    harness.getPartnerId.mockReset();
+    harness.getPartnerId.mockResolvedValue(harness.PARTNER_ID);
+    installMoodClient();
+  });
+
+  afterEach(async () => {
+    if (harness.client) {
+      await harness.client.removeAllChannels();
+    }
+    harness.client = null;
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  async function subscribeMoodAndJoin(): Promise<() => void> {
+    const unsubscribe = await moodSyncService.subscribeMoodUpdates(vi.fn());
+    const join = frames().find(
+      (frame) => frame.event === 'phx_join' && frame.topic === MOOD_REALTIME_TOPIC
+    );
+    expect(join, 'the mood channel must have put a join on the wire').toBeDefined();
+    answer(join as Frame, 'ok');
+    await Promise.resolve();
+    return unsubscribe;
+  }
+
+  it('joins again on a new channel after the server closes the topic', async () => {
+    const unsubscribe = await subscribeMoodAndJoin();
+
+    expect(harness.opened).toHaveLength(1);
+    const first = harness.opened[0];
+    const refsBeforeClose = new Set(
+      frames()
+        .filter((frame) => frame.event === 'phx_join')
+        .map((frame) => frame.joinRef)
+    );
+
+    serverCloses(MOOD_REALTIME_TOPIC);
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(harness.opened.length).toBeGreaterThan(1);
+    const second = harness.opened[1];
+    expect(second).not.toBe(first);
+
+    const trailingJoin = frames()
+      .filter((frame) => frame.event === 'phx_join' && frame.topic === MOOD_REALTIME_TOPIC)
+      .find((frame) => !refsBeforeClose.has(frame.joinRef));
+    expect(trailingJoin, 'a later phx_join must come from a different channel').toBeDefined();
+
+    unsubscribe();
+  });
+
+  it('does not rejoin after the last subscriber unsubscribes', async () => {
+    const unsubscribe = await subscribeMoodAndJoin();
+    const joinsBefore = frames().filter(
+      (frame) => frame.event === 'phx_join' && frame.topic === MOOD_REALTIME_TOPIC
+    ).length;
+
+    unsubscribe();
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(
+      frames().filter((frame) => frame.event === 'phx_join' && frame.topic === MOOD_REALTIME_TOPIC)
+    ).toHaveLength(joinsBefore);
   });
 });

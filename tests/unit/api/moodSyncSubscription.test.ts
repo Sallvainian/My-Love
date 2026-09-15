@@ -71,6 +71,7 @@ let opOrder: string[] = [];
 
 const getPartnerId = vi.fn();
 const getSignedInUserId = vi.fn();
+const setAuth = vi.fn();
 
 const getSession = vi.fn(
   () =>
@@ -128,6 +129,12 @@ vi.mock('@/api/supabaseClient', () => ({
     // round-trip.
     removeChannel: (chan: FakeChannel) => {
       removeChannel(chan);
+      // An unsolicited `phx_close` already closed the channel and dropped it
+      // from the client (see `serverClosesTopic`). The leave is then a no-op
+      // that still has to resolve so `closingMoodChannels` can clear.
+      if (chan.state === 'closed' && !openChannels.has(chan.topic)) {
+        return Promise.resolve('ok');
+      }
       chan.state = 'leaving';
       return new Promise<string>((resolve) => {
         leaveQueue.push(() => {
@@ -146,9 +153,7 @@ vi.mock('@/api/supabaseClient', () => ({
     },
     realtime: {
       isDisconnecting: () => socket.state === 'disconnecting',
-      setAuth: async () => {
-        opOrder.push('setAuth');
-      },
+      setAuth: (...args: unknown[]) => setAuth(...args),
     },
   },
   getPartnerId: (...args: unknown[]) => getPartnerId(...args),
@@ -246,6 +251,17 @@ function emitStatus(chan: FakeChannel, status: string): void {
   chan.statusHandlers.forEach((handler) => handler(status));
 }
 
+/**
+ * Mirror an SDK `phx_close`: the channel goes `closed`, drops out of the
+ * client's registry, and reports `CLOSED`. Without the drop, a mocked reopen
+ * would be handed this dying object and `subscribe()` would no-op.
+ */
+function serverClosesTopic(chan: FakeChannel): void {
+  chan.state = 'closed';
+  openChannels.delete(chan.topic);
+  emitStatus(chan, 'CLOSED');
+}
+
 /** Deliver the server's ack for the oldest in-flight leave */
 function ackNextLeave(): void {
   const ack = leaveQueue.shift();
@@ -290,6 +306,10 @@ describe('subscribeMoodUpdates channel ownership', () => {
     getPartnerId.mockResolvedValue(PARTNER_ID);
     getSignedInUserId.mockReset();
     getSignedInUserId.mockResolvedValue(USER_ID);
+    setAuth.mockReset();
+    setAuth.mockImplementation(async () => {
+      opOrder.push('setAuth');
+    });
     socket.state = 'connected';
     socket.windowMs = 40;
   });
@@ -908,5 +928,207 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     expect(constructedChannels).toHaveLength(0);
     expect(removeChannel).not.toHaveBeenCalled();
+  });
+
+  describe('unsolicited CLOSED reopen', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(async () => {
+      await vi.runOnlyPendingTimersAsync();
+      vi.useRealTimers();
+    });
+
+    async function fireReopen(delayMs = 1000): Promise<void> {
+      await vi.advanceTimersByTimeAsync(delayMs);
+      while (leaveQueue.length > 0) ackNextLeave();
+      await vi.advanceTimersByTimeAsync(socket.windowMs + 20);
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+
+    it('re-arms a join when reopen setAuth rejects after the row is swapped', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onMood = vi.fn();
+      const pending = moodSyncService.subscribeMoodUpdates(onMood);
+      resolveNextSession();
+      const unsubscribe = await pending;
+
+      expect(constructedChannels).toHaveLength(1);
+
+      setAuth.mockRejectedValueOnce(new Error('token install failed'));
+      serverClosesTopic(constructedChannels[0]);
+      await fireReopen();
+
+      expect(constructedChannels).toHaveLength(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[MoodSyncService] Retry setup failed:',
+        expect.any(Error)
+      );
+
+      await fireReopen(2000);
+
+      expect(constructedChannels).toHaveLength(2);
+      emitMood(constructedChannels[1], 'after-setAuth-reject');
+      expect(onMood).toHaveBeenCalledWith(
+        expect.objectContaining({ id: moodIdFor('after-setAuth-reject') })
+      );
+
+      unsubscribe();
+      errorSpy.mockRestore();
+    });
+
+    it('reopens a live entry on a new channel after an unsolicited CLOSED', async () => {
+      const onMood = vi.fn();
+      const onStatus = vi.fn();
+      const pending = moodSyncService.subscribeMoodUpdates(onMood, onStatus);
+      resolveNextSession();
+      const unsubscribe = await pending;
+
+      const first = constructedChannels[0];
+      serverClosesTopic(first);
+
+      expect(onStatus).toHaveBeenCalledWith('CLOSED');
+      expect(constructedChannels).toHaveLength(1);
+
+      await fireReopen();
+
+      expect(constructedChannels).toHaveLength(2);
+      const replacement = constructedChannels[1];
+      expect(replacement).not.toBe(first);
+      expect(replacement.state).toBe('joined');
+      expect(opOrder.slice(-2)).toEqual(['setAuth', `subscribe:${TOPIC}`]);
+
+      emitMood(replacement, 'after-unsolicited-close');
+      expect(onMood).toHaveBeenCalledWith(
+        expect.objectContaining({ id: moodIdFor('after-unsolicited-close') })
+      );
+
+      unsubscribe();
+    });
+
+    it("does not reopen when last-subscriber teardown reports CLOSED", async () => {
+      const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+      resolveNextSession();
+      const unsubscribe = await pending;
+
+      const channel = constructedChannels[0];
+      unsubscribe();
+      emitStatus(channel, 'CLOSED');
+
+      await fireReopen();
+
+      expect(constructedChannels).toHaveLength(1);
+    });
+
+    it('cancels a pending reopen when the last subscriber detaches during backoff', async () => {
+      const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+      resolveNextSession();
+      const unsubscribe = await pending;
+
+      serverClosesTopic(constructedChannels[0]);
+      unsubscribe();
+
+      await fireReopen();
+
+      expect(constructedChannels).toHaveLength(1);
+    });
+
+    it('restores the CLOSED retry budget when the replacement reports SUBSCRIBED', async () => {
+      const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+      resolveNextSession();
+      const unsubscribe = await pending;
+
+      serverClosesTopic(constructedChannels[0]);
+      await fireReopen();
+      expect(constructedChannels).toHaveLength(2);
+
+      emitStatus(constructedChannels[1], 'SUBSCRIBED');
+
+      serverClosesTopic(constructedChannels[1]);
+      await fireReopen(1000);
+
+      expect(constructedChannels).toHaveLength(3);
+
+      unsubscribe();
+    });
+
+    it("re-takes the partner snapshot on the replacement's first SUBSCRIBED", async () => {
+      const onMood = vi.fn();
+      const pending = moodSyncService.subscribeMoodUpdates(onMood);
+      resolveNextSession();
+      const unsubscribe = await pending;
+
+      serverClosesTopic(constructedChannels[0]);
+      await fireReopen();
+
+      getPartnerId.mockResolvedValue(null);
+      emitStatus(constructedChannels[1], 'SUBSCRIBED');
+      await vi.advanceTimersByTimeAsync(0);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      emitMood(constructedChannels[1], 'after-unlink');
+      expect(onMood).not.toHaveBeenCalled();
+
+      unsubscribe();
+    });
+
+    it("a released channel's late CLOSED does not notify live consumers or open another join", async () => {
+      const onStatus = vi.fn();
+      const pending = moodSyncService.subscribeMoodUpdates(vi.fn(), onStatus);
+      resolveNextSession();
+      const unsubscribe = await pending;
+
+      const first = constructedChannels[0];
+      serverClosesTopic(first);
+      await fireReopen();
+      expect(constructedChannels).toHaveLength(2);
+
+      onStatus.mockClear();
+      emitStatus(first, 'CLOSED');
+      await fireReopen(30000);
+
+      expect(constructedChannels).toHaveLength(2);
+      expect(onStatus).not.toHaveBeenCalledWith('CLOSED');
+
+      unsubscribe();
+    });
+
+    it('stops joining once five unsolicited CLOSEs have been spent', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onStatus = vi.fn();
+      const pending = moodSyncService.subscribeMoodUpdates(vi.fn(), onStatus);
+      resolveNextSession();
+      const unsubscribe = await pending;
+
+      const delays = [1000, 2000, 4000, 8000, 16000];
+      for (const delay of delays) {
+        serverClosesTopic(constructedChannels[constructedChannels.length - 1]);
+        await fireReopen(delay);
+      }
+
+      expect(constructedChannels).toHaveLength(6);
+
+      serverClosesTopic(constructedChannels[5]);
+      await fireReopen(30000);
+
+      expect(constructedChannels).toHaveLength(6);
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[MoodSyncService] Max retries (5) exceeded. Giving up.'
+      );
+
+      const lateStatus = vi.fn();
+      const latePending = moodSyncService.subscribeMoodUpdates(vi.fn(), lateStatus);
+      resolveNextSession();
+      const lateUnsubscribe = await latePending;
+      expect(lateStatus).toHaveBeenCalledWith('CLOSED');
+      expect(constructedChannels).toHaveLength(6);
+
+      unsubscribe();
+      lateUnsubscribe();
+      errorSpy.mockRestore();
+    });
   });
 });
