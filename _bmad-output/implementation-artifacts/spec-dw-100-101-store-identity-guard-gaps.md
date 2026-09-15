@@ -8,7 +8,7 @@ followup_review_recommended: false
 context: []
 warnings: ['oversized']
 deferred: []
-baseline_revision: 25338e26a09fc2ef6f2feae8f7494e1084c63bff
+baseline_revision: f4425d56e584b581cf51f14599392bafa9d3f737
 ---
 
 <intent-contract>
