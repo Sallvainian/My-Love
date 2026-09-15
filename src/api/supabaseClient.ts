@@ -333,9 +333,59 @@ export const getPartnerId = async (): Promise<string | null> => {
 };
 
 /**
+ * The name `sync_user_profile()` writes when it seeds a brand-new profile row
+ * and the account has neither a metadata name nor an email
+ * (`20251206024345_remote_schema.sql:164`). It is a placeholder, never a name
+ * anyone chose, so it counts as "not set" here.
+ */
+export const SEED_FALLBACK_NAME = 'Unknown';
+
+/**
+ * Does a stored `display_name` carry only what `sync_user_profile()` seeded,
+ * rather than a name someone chose?
+ *
+ * The trigger seeds a new profile row with
+ * `COALESCE(raw_user_meta_data->>'display_name', email, 'Unknown')`
+ * (`20251206024345_remote_schema.sql:164`), and 20260912030000 deliberately did
+ * not backfill the rows already seeded that way -- so every reader of the column
+ * has to decide for itself which stored values still mean "no name chosen".
+ *
+ * One predicate rather than a copy per reader, because the two readers classify
+ * the same column and used to disagree: this rule was a local `const` inside
+ * `lookupOwnDisplayName` while `getPartnerDisplayName` returned the column
+ * verbatim, so in a couple where neither had chosen a name the chat showed your
+ * own email PREFIX for you and your partner's FULL email address for them.
+ *
+ * Equality, not containment: 'Unknown Soldier' and 'p@example.com (work)' are
+ * names someone typed. `accountEmail` is the email of the row being classified,
+ * so only a name matching its OWN account counts as a seed -- someone else's
+ * address is a deliberate choice, if an odd one.
+ */
+export const isSeedFallbackName = (
+  storedName: string | null | undefined,
+  accountEmail: string | null | undefined
+): boolean => {
+  const stored = storedName?.trim() ?? '';
+  const email = accountEmail?.trim() ?? '';
+
+  return (
+    stored === '' ||
+    stored === SEED_FALLBACK_NAME ||
+    (email !== '' && stored.toLowerCase() === email.toLowerCase())
+  );
+};
+
+/**
  * Get partner's display name
  * Fetches the partner's display_name from the users table.
  * This provides the correct name for each user's partner (not a hardcoded config value).
+ *
+ * A partner row still carrying only the trigger's seed answers `null` -- the
+ * same answer this already gives for "no partner" and "the read failed".
+ * `LoveNotes` is its only caller and does nothing with the difference except
+ * keep its own 'Partner' default, which is exactly what is wanted: before this,
+ * a partner who had never chosen a name was rendered in the chat as their full
+ * email address.
  *
  * @returns Partner's display name or null if not found
  */
@@ -348,10 +398,14 @@ export const getPartnerDisplayName = async (): Promise<string | null> => {
       return null;
     }
 
-    // Query partner's display_name from users table
+    // `email` as well as the name: the seed rule asks whether the stored name
+    // equals THIS row's own address, so the comparison value is the partner's
+    // email, not the caller's. It is readable -- the SELECT policy returns own
+    // + partner rows (`20260205000001_fix_users_rls_recursion.sql:28-37`), and
+    // `partnerService` already selects it; only UPDATE was narrowed.
     const { data, error } = await supabase
       .from('users')
-      .select('display_name')
+      .select('display_name, email')
       .eq('id', partnerId)
       .single();
 
@@ -360,20 +414,19 @@ export const getPartnerDisplayName = async (): Promise<string | null> => {
       return null;
     }
 
-    return data?.display_name ?? null;
+    if (isSeedFallbackName(data?.display_name, data?.email)) {
+      logger.debug('[Supabase] Partner profile still carries the seed name, not rendering it');
+      return null;
+    }
+
+    // Trimmed, matching `lookupOwnDisplayName`: the predicate already proved
+    // there is something left after the trim.
+    return data?.display_name?.trim() ?? null;
   } catch (error) {
     console.error('[Supabase] Error getting partner display name:', error);
     return null;
   }
 };
-
-/**
- * The name `sync_user_profile()` writes when it seeds a brand-new profile row
- * and the account has neither a metadata name nor an email
- * (`20251206024345_remote_schema.sql:164`). It is a placeholder, never a name
- * anyone chose, so it counts as "not set" here.
- */
-export const SEED_FALLBACK_NAME = 'Unknown';
 
 /**
  * The signed-in user's own profile name, with "not chosen yet" and "could not
@@ -445,14 +498,13 @@ export const lookupOwnDisplayName = async (): Promise<OwnDisplayNameLookup> => {
       return { status: 'error', reason: error.message };
     }
 
-    const stored = data?.display_name?.trim() ?? '';
-    const email = user.email?.trim() ?? '';
-    const isSeedFallback =
-      stored === '' ||
-      stored === SEED_FALLBACK_NAME ||
-      (email !== '' && stored.toLowerCase() === email.toLowerCase());
+    // The shared predicate, not a second copy of the rule -- see
+    // `isSeedFallbackName` for why the partner reader has to agree with this one.
+    if (isSeedFallbackName(data?.display_name, user.email)) {
+      return { status: 'unset' };
+    }
 
-    return isSeedFallback ? { status: 'unset' } : { status: 'chosen', displayName: stored };
+    return { status: 'chosen', displayName: data?.display_name?.trim() ?? '' };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     console.error('[Supabase] Error getting own display name:', error);

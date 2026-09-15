@@ -134,4 +134,54 @@ describe('own display name in the chat', () => {
     render(<LoveNotes />);
     await waitFor(() => expect(screen.getByTestId('partner-name')).toHaveTextContent('Partner Name'));
   });
+
+  /**
+   * DW-104, the other half. `getPartnerDisplayName` used to return the stored
+   * column verbatim, so a partner who had never chosen a name — whose row still
+   * carried the trigger's email seed — was rendered on every note as their full
+   * email address, while the same person's own view of themselves showed the
+   * email PREFIX. The seed rule now lives in one predicate that both readers
+   * share, and a seeded partner row answers `null`.
+   *
+   * What is pinned HERE is only what this component decides: that a `null`
+   * answer leaves the `'Partner'` default at `LoveNotes.tsx:59` standing, and
+   * that the own-name fallback is not borrowed for it. Which partner rows
+   * actually produce that `null` — a seed, a failed read, no partner at all —
+   * is the lookup's contract, and it is pinned against the REAL function in
+   * tests/unit/api/partnerDisplayNameContract.test.ts. Splitting those three
+   * across cases here would be a lie: the mock collapses them into one value
+   * before the component ever sees them, so the cases would differ only in
+   * their names.
+   */
+  describe('the partner-side fallback', () => {
+    it("falls back to 'Partner', never to an address, when the lookup answers null", async () => {
+      api.getOwnDisplayName.mockResolvedValue('Frankie');
+      api.getPartnerDisplayName.mockResolvedValue(null);
+
+      render(<LoveNotes />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('partner-name').textContent).toBe('Partner');
+      });
+      // The user-visible shape of the bug, asserted directly: whatever the
+      // fallback is, it must not be an address or a fragment of one.
+      const rendered = screen.getByTestId('partner-name').textContent ?? '';
+      expect(rendered).not.toContain('@');
+      expect(rendered).not.toContain('example.com');
+    });
+
+    it('does not borrow the own-name fallback for the partner', async () => {
+      // Both sides are unnamed here. The email in play is the CALLER's, so
+      // reusing the own-name fallback would print the caller's prefix as their
+      // partner's name — the wrong person, not merely the wrong string.
+      api.getOwnDisplayName.mockResolvedValue(null);
+      api.getPartnerDisplayName.mockResolvedValue(null);
+      api.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
+
+      render(<LoveNotes />);
+
+      await waitFor(() => expect(screen.getByTestId('own-name').textContent).toBe('person'));
+      expect(screen.getByTestId('partner-name').textContent).toBe('Partner');
+    });
+  });
 });

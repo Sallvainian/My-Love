@@ -257,4 +257,191 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     expect(backend.updatePayload).toBeNull();
     expect(onComplete).not.toHaveBeenCalled();
   });
+
+  /**
+   * DW-130: the same form, reached a second time.
+   *
+   * Until now `display_name` could be chosen exactly once — App rendered this
+   * modal only while the profile row still carried the trigger's seed, and
+   * nothing else in the app writes the column. Settings now mounts the same
+   * component with a prefilled field and a way out.
+   *
+   * What is pinned here is that the second surface is not a second
+   * implementation: the refusals above are the only thing keeping a saved name
+   * out of the state the read side calls "unset", and a copy of this form that
+   * skipped them would let a user type their own email into Settings and be
+   * thrown back to the setup screen on every load, for good.
+   */
+  describe('edit mode, the route back from Settings', () => {
+    function renderEdit(initialName: string, onCancel = vi.fn(), onComplete = vi.fn()) {
+      render(
+        <DisplayNameSetup
+          isOpen
+          mode="edit"
+          initialName={initialName}
+          onCancel={onCancel}
+          onComplete={onComplete}
+        />
+      );
+      return { onCancel, onComplete };
+    }
+
+    it('arrives with the current name already in the field', async () => {
+      renderEdit('Frankie');
+
+      expect(screen.getByLabelText('Display Name')).toHaveValue('Frankie');
+    });
+
+    it('wears edit copy rather than the first-run welcome', async () => {
+      renderEdit('Frankie');
+
+      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Change your name');
+      expect(screen.getByTestId('display-name-submit')).toHaveTextContent('Save name');
+      expect(screen.queryByText(/Welcome!/)).not.toBeInTheDocument();
+    });
+
+    it('closes through onCancel without writing anything', async () => {
+      const { onCancel, onComplete } = renderEdit('Frankie');
+
+      fireEvent.click(screen.getByTestId('display-name-cancel'));
+
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      expect(backend.updatePayload).toBeNull();
+      expect(backend.getUser).not.toHaveBeenCalled();
+      expect(onComplete).not.toHaveBeenCalled();
+    });
+
+    it('announces itself as a modal dialog named by its title', async () => {
+      // It now opens over a live Settings page rather than replacing the app, so
+      // without these a screen reader reads straight past the scrim into the
+      // Change and Sign Out controls behind it.
+      renderEdit('Frankie');
+
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveAttribute('aria-modal', 'true');
+      // Named by the heading already on screen, not a duplicated aria-label.
+      expect(dialog).toHaveAccessibleName('Change your name');
+    });
+
+    it('closes through onCancel when Escape is pressed', async () => {
+      const { onCancel, onComplete } = renderEdit('Frankie');
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      expect(backend.updatePayload).toBeNull();
+      expect(onComplete).not.toHaveBeenCalled();
+    });
+
+    it('saves an edited name through the same single profile write', async () => {
+      const { onComplete } = renderEdit('Frankie');
+
+      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Frank' } });
+      fireEvent.click(screen.getByTestId('display-name-submit'));
+
+      await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+      expect(Object.keys(backend.updatePayload ?? {}).sort()).toEqual([
+        'display_name',
+        'updated_at',
+      ]);
+      expect(backend.updatePayload).toMatchObject({ display_name: 'Frank' });
+      expect(backend.eqColumn).toBe('id');
+      expect(backend.eqValue).toBe('user-a');
+      expect(backend.updateUser).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['the account email', 'person@example.com'],
+      ['the account email in another case', 'Person@Example.COM'],
+    ])('still refuses %s when the field started prefilled', async (_label, name) => {
+      const { onComplete } = renderEdit('Frankie');
+
+      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: name } });
+      fireEvent.click(screen.getByTestId('display-name-submit'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('display-name-error')).toHaveTextContent(
+          'Please choose a name that is different from your email address'
+        )
+      );
+      expect(backend.updatePayload).toBeNull();
+      expect(onComplete).not.toHaveBeenCalled();
+      // Still open, so the user can correct it rather than lose the edit.
+      expect(screen.getByTestId('display-name-setup')).toBeInTheDocument();
+    });
+
+    it("still refuses the literal 'Unknown' when the field started prefilled", async () => {
+      const { onComplete } = renderEdit('Frankie');
+
+      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Unknown' } });
+      fireEvent.click(screen.getByTestId('display-name-submit'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('display-name-error')).toHaveTextContent(
+          'is not a name — please choose another'
+        )
+      );
+      expect(backend.updatePayload).toBeNull();
+      expect(onComplete).not.toHaveBeenCalled();
+    });
+
+    it('still fails closed on a zero-row update', async () => {
+      // The RLS shape. An edit surface that closed here would show the new name
+      // in Settings while the row still held the old one.
+      backend.result = { data: [], error: null };
+      const { onComplete } = renderEdit('Frankie');
+
+      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Frank' } });
+      fireEvent.click(screen.getByTestId('display-name-submit'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('display-name-error')).toHaveTextContent(
+          'Could not find your profile to save the name to'
+        )
+      );
+      expect(onComplete).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The untouched call site. Every new prop is optional, and App passes none of
+   * them, so the signup gate has to keep the shape it had — most of all the
+   * absence of a way out, because an account with no name is exactly the state
+   * that modal exists to end.
+   */
+  describe("App's signup gate is unchanged by the new props", () => {
+    it('offers no Cancel control and starts empty', async () => {
+      render(<DisplayNameSetup isOpen onComplete={vi.fn()} />);
+
+      expect(screen.queryByTestId('display-name-cancel')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Display Name')).toHaveValue('');
+    });
+
+    it('keeps the welcome copy', async () => {
+      render(<DisplayNameSetup isOpen onComplete={vi.fn()} />);
+
+      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Welcome!');
+      expect(screen.getByTestId('display-name-submit')).toHaveTextContent('Continue');
+    });
+
+    it('is still a named modal dialog, since the semantics are not the exit', async () => {
+      render(<DisplayNameSetup isOpen onComplete={vi.fn()} />);
+
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveAttribute('aria-modal', 'true');
+      expect(dialog).toHaveAccessibleName(/Welcome!/);
+    });
+
+    it('cannot be dismissed with Escape', async () => {
+      // The gate is deliberately inescapable: an account with no name is the
+      // state it exists to end, and `onCancel` is what opts a surface into an
+      // exit. Pressing Escape here must not close it or write anything.
+      render(<DisplayNameSetup isOpen onComplete={vi.fn()} />);
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      expect(screen.getByTestId('display-name-setup')).toBeInTheDocument();
+      expect(backend.updatePayload).toBeNull();
+    });
+  });
 });
