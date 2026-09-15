@@ -146,7 +146,7 @@ function AccountAdminPanel({ onExit }: AdminPanelProps) {
               {/* Create button */}
               <button
                 onClick={() => setIsCreateOpen(true)}
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-2 font-medium text-white transition-shadow hover:shadow-lg"
+                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 px-4 py-2 font-medium text-white transition-shadow hover:shadow-lg"
                 data-testid="admin-create-button"
               >
                 <Plus className="h-5 w-5" />
