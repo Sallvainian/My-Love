@@ -273,7 +273,7 @@ function LoveNoteMessageComponent({
             isOwnMessage
               ? 'rounded-br-md bg-[#FF6B6B] text-gray-800'
               : 'rounded-bl-md bg-[#E9ECEF] text-gray-800'
-          } ${isSending ? 'opacity-70' : ''} ${hasError ? 'border-2 border-red-500' : ''} `}
+          } ${hasError ? 'border-2 border-red-500' : ''} `}
         >
           {/* Image (displayed above text if both present) */}
           {hasImage && (
