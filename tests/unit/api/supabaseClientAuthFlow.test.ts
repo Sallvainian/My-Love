@@ -243,6 +243,43 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     await expect(getAuthCallbackOutcome()).resolves.toBe('cancelled');
   });
 
+  it('separates a provider-side failure from a denial, and keeps the session', async () => {
+    seedVictimSession();
+    // DW-93: the SDK throws the SAME error class here as for a denial
+    // (`GoTrueClient.js:3255-3261`), so before the split this read
+    // "Sign-in was cancelled" at someone who cancelled nothing.
+    setUrl(
+      `${APP_ORIGIN}/#error=server_error&error_code=unexpected_failure&error_description=Database+error`
+    );
+
+    const { supabase, getAuthCallbackOutcome } = await importAppClient();
+    clients.push(supabase);
+    const { data } = await supabase.auth.getSession();
+
+    expect(data.session?.user?.id).toBe(VICTIM_USER_ID);
+
+    const { error } = await supabase.auth.initialize();
+    expect(isAuthImplicitGrantRedirectError(error)).toBe(true);
+    // The discriminator, on the SDK's own value: `details.error` carries the raw
+    // OAuth name, while `details.code` is defaulted and so never absent.
+    expect(error && 'details' in error ? error.details : null).toMatchObject({
+      error: 'server_error',
+    });
+
+    await expect(getAuthCallbackOutcome()).resolves.toBe('provider-error');
+  });
+
+  it('still reads an unrecognised error name as a cancellation', async () => {
+    // The split only reclassifies names it can name, so an unfamiliar fragment
+    // keeps the old answer rather than inventing a new claim about it.
+    setUrl(`${APP_ORIGIN}/#error=interaction_required&error_code=403&error_description=Nope`);
+
+    const { supabase, getAuthCallbackOutcome } = await importAppClient();
+    clients.push(supabase);
+
+    await expect(getAuthCallbackOutcome()).resolves.toBe('cancelled');
+  });
+
   it('says nothing on an ordinary load', async () => {
     // The load every other one is measured against: no callback parameters, no
     // stored session. Without this the classifier could return a notice for
