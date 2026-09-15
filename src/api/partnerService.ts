@@ -14,7 +14,7 @@
 
 import { logger } from '../utils/logger';
 import { handleSupabaseError, isPostgrestError, logSupabaseError } from './errorHandlers';
-import { supabase } from './supabaseClient';
+import { isSeedFallbackName, supabase } from './supabaseClient';
 
 export interface UserSearchResult {
   id: string;
@@ -82,10 +82,26 @@ class PartnerService {
         return null;
       }
 
+      // The seed rule, not a raw `||` chain. `sync_user_profile()` seeds a new
+      // profile with COALESCE(metadata name, email, 'Unknown'), and the stored
+      // value is a non-empty string in every one of those cases -- so a plain
+      // `display_name || email || 'Partner'` is truthy on the seed and renders
+      // the partner's own email address as their name.
+      //
+      // That is not hypothetical here: it reached the page heading. For a
+      // couple where neither person had chosen a name, the chat correctly said
+      // 'Partner' -- `getPartnerDisplayName` has applied this rule since DW-104
+      // -- while the partner-mood view showed the full address three times over
+      // from the same stored row (DW-133). One predicate, shared with that
+      // reader, is what keeps the two from disagreeing again.
+      const partnerName = isSeedFallbackName(partnerRecord.display_name, partnerRecord.email)
+        ? 'Partner'
+        : (partnerRecord.display_name?.trim() ?? 'Partner');
+
       return {
         id: partnerRecord.id,
         email: partnerRecord.email || '',
-        displayName: partnerRecord.display_name || partnerRecord.email || 'Partner',
+        displayName: partnerName,
         connectedAt: userRecord.updated_at,
       };
     } catch (error) {
