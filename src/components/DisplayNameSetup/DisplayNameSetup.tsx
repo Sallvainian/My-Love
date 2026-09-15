@@ -165,8 +165,15 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
   // Bound to the document rather than the overlay because nothing here traps
   // focus (deliberately — see the dialog role below), so the key event can be
   // raised from outside this subtree.
+  //
+  // Carries the same `isLoading` guard the Cancel button does, because closing
+  // is what `onCancel` means and the button is `disabled={isLoading}` for a
+  // reason: the parent unmounts this form on cancel, but the in-flight write is
+  // not cancelled with it. Without the guard, Escape during a save lets the
+  // write land anyway while the UI backs out, and a FAILED write sets its error
+  // on an unmounted component, so the user is told nothing.
   useEffect(() => {
-    if (!isOpen || !onCancel) return;
+    if (!isOpen || !onCancel || isLoading) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onCancel();
@@ -174,7 +181,7 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onCancel]);
+  }, [isOpen, onCancel, isLoading]);
 
   if (!isOpen) {
     return null;
