@@ -67,13 +67,6 @@ const KNOWN_BELOW_FLOOR = new Map<string, { count: number; note: string }>([
       note: 'coral-500 at 1.99:1 — the love-notes send button, and the worst in the tree. DW-141. Not a shade bump: every coral shade fails except coral-900 (4.94:1), so this is a brand decision.',
     },
   ],
-  [
-    'src/components/PartnerMoodView/PartnerMoodView.tsx:green-500',
-    {
-      count: 1,
-      note: 'green-500 at 2.22:1 — DW-140. green-700 (4.94:1) is the first shade that clears.',
-    },
-  ],
 ]);
 
 /**
