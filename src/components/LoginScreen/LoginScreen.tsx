@@ -47,6 +47,13 @@ const CALLBACK_NOTICES: Record<Exclude<AuthCallbackOutcome, null>, string> = {
   // browser left to finish in. Hence "or", and a recovery that works from here.
   'needs-original-browser':
     'Sign-in could not be finished here — this is not the browser you started in, or that sign-in is no longer stored. Just sign in again below.',
+  // Names the cause, unlike 'provider-error' above, because here the cause is
+  // knowable often enough to be useful and the person can act on it: a link
+  // they followed twice, or one that sat too long. The recovery is the same
+  // either way, which is what makes naming it safe when it is occasionally a
+  // server fault instead.
+  'code-expired':
+    'That sign-in link has expired or was already used, so nothing changed. Just sign in again below.',
 };
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callbackOutcome }) => {
@@ -110,6 +117,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
       } else if (result.session) {
         // Success - call callback if provided
         onLoginSuccess?.();
+      } else {
+        // Neither an error nor a session. Unreachable through the installed
+        // auth-js: `signInWithPassword` substitutes an
+        // `AuthInvalidTokenResponseError` for exactly this shape before it can
+        // reach a caller (`dist/module/GoTrueClient.js:960-962` — naming the
+        // build because the CJS one is the same code at different offsets, and
+        // `package.json`'s `module` field is what Vite resolves), and all four of its
+        // return paths carry an error or a session.
+        //
+        // Guarded anyway because the contract this code is written against is
+        // `AuthResult` (`src/api/auth/types.ts:8-12`), which declares both
+        // fields nullable, and the SDK is pinned only by a caret range. The
+        // cost of being wrong in the other direction is a sign-in button that
+        // stops the spinner and says nothing at all, which reads as the app
+        // being broken (DW-132).
+        console.error('[LoginScreen] Sign-in resolved with neither a session nor an error');
+        setError('Sign-in could not be completed. Please try again.');
       }
     } catch (err) {
       console.error('[LoginScreen] Unexpected error:', err);

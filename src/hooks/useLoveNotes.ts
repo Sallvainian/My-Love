@@ -17,7 +17,7 @@
 import { useCallback, useEffect } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
-import { useRealtimeMessages } from './useRealtimeMessages';
+import { useRealtimeMessages, type NoteFeedStatus } from './useRealtimeMessages';
 
 /**
  * Return type for useLoveNotes hook
@@ -25,6 +25,11 @@ import { useRealtimeMessages } from './useRealtimeMessages';
 interface UseLoveNotesResult {
   /** Array of love notes in chat order (oldest first) */
   notes: LoveNote[];
+  /**
+   * How the live subscription is doing, so a consumer can say when the chat has
+   * stopped receiving notes. `disconnected` is terminal for this mount.
+   */
+  realtimeStatus: NoteFeedStatus;
   /** Whether notes are currently being fetched */
   isLoading: boolean;
   /** Error message if fetch failed */
@@ -138,10 +143,16 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
 
   // Story 2.3: Real-time subscription via dedicated hook
   // Using Broadcast API per useRealtimeMessages implementation
-  useRealtimeMessages({ enabled: autoFetch });
+  //
+  // The return value is no longer discarded. The subscription can give up for
+  // good -- five failed re-joins and it stops trying, with nothing in the app
+  // re-arming it -- and until that reached a caller the chat simply stopped
+  // receiving notes with no way for anyone to tell (DW-113).
+  const { status: realtimeStatus } = useRealtimeMessages({ enabled: autoFetch });
 
   return {
     notes,
+    realtimeStatus,
     isLoading,
     error,
     hasMore,

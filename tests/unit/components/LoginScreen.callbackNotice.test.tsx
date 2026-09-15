@@ -51,16 +51,77 @@ describe('LoginScreen callback notice', () => {
     expect(notice.textContent).toContain('browser you started in');
   });
 
-  it('gives the two outcomes distinct copy', () => {
-    const { unmount } = renderLogin('cancelled');
-    const cancelled = screen.getByTestId('login-notice').textContent;
-    unmount();
+  it('explains a sign-in link that has expired or been used already', () => {
+    renderLogin('code-expired');
 
-    renderLogin('needs-original-browser');
-    const stranded = screen.getByTestId('login-notice').textContent;
+    const notice = screen.getByTestId('login-notice');
+    expect(notice).toHaveAttribute('role', 'status');
+    expect(notice.textContent).toContain('expired or was already used');
+    // Recoverable from here, with no instruction to go anywhere else -- the
+    // distinction from 'needs-original-browser', which is the outcome this one
+    // would otherwise be confused with.
+    expect(notice.textContent).toContain('sign in again below');
+    expect(notice.textContent).not.toContain('browser you started in');
+  });
 
-    expect(cancelled).toBeTruthy();
-    expect(stranded).not.toBe(cancelled);
+  it('separates a provider-side failure from a cancellation', () => {
+    renderLogin('provider-error');
+
+    const notice = screen.getByTestId('login-notice');
+    expect(notice).toHaveAttribute('role', 'status');
+    // Nobody cancelled anything, and the copy must not say they did. This
+    // outcome shipped with no render coverage at all; only the classifier that
+    // produces it was tested.
+    expect(notice.textContent).not.toContain('cancelled');
+    expect(notice.textContent).toContain('sign-in service reported a problem');
+  });
+
+  it('gives every outcome distinct copy', () => {
+    // All four, not a pair. Each exists to tell the person something different
+    // about what went wrong, so any two sharing wording means one of them is
+    // not doing its job -- and the copy is the entire feature.
+    const outcomes = [
+      'cancelled',
+      'provider-error',
+      'needs-original-browser',
+      'code-expired',
+    ] as const;
+
+    const copy = outcomes.map((outcome) => {
+      const { unmount } = renderLogin(outcome);
+      const text = screen.getByTestId('login-notice').textContent;
+      unmount();
+      expect(text, `${outcome} must render a notice`).toBeTruthy();
+      return text;
+    });
+
+    expect(new Set(copy).size).toBe(outcomes.length);
+  });
+
+  it('says something when a sign-in resolves with neither a session nor an error', async () => {
+    // Driven at OUR contract, not the SDK's. `AuthResult`
+    // (src/api/auth/types.ts:8-12) declares both fields nullable, and this is
+    // what `LoginScreen` does when handed that shape. The installed auth-js
+    // cannot produce it -- `dist/module/GoTrueClient.js:960-962` substitutes an
+    // `AuthInvalidTokenResponseError` first -- so mocking the SDK into this
+    // state would be asserting against an impossible world. Stubbing the
+    // boundary the component actually calls is the honest version (DW-132).
+    actions.signIn.mockResolvedValue({ user: null, session: null, error: null });
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(<LoginScreen callbackOutcome={null} />);
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'someone@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+    fireEvent.submit(screen.getByTestId('login-screen').querySelector('form') as HTMLFormElement);
+
+    // The failure mode this guards is a button that stops its spinner and
+    // leaves the screen exactly as it was, which reads as the app being broken.
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /sign-in could not be completed/i
+    );
+    errorLog.mockRestore();
   });
 
   it('renders no notice region for an ordinary load', () => {

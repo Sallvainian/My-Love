@@ -121,14 +121,29 @@ const buildTestStore = async () => {
       set({ error });
     },
     updateCurrentMessage,
+    /**
+     * Faithful to `messagesSlice.loadMessages`, including the try/catch.
+     *
+     * The catch is not decoration. Production swallows its own read failure
+     * (`src/stores/slices/messagesSlice.ts:104-107`), which is precisely why
+     * `initializeApp`'s handoff chain attaches a `.catch()` for
+     * `updateCurrentMessage` instead: nothing else in that chain can reject.
+     * A double that rethrows here would give the chain a rejection route
+     * production does not have, and the case asserting that `.catch()` would
+     * then be green for the wrong reason (DW-137).
+     */
     loadMessages: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       loadMessagesRequestedBy.push(requestedBy);
-      const messages = await mockStorageService.getAllMessages(requestedBy);
-      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) {
-        return;
+      try {
+        const messages = await mockStorageService.getAllMessages(requestedBy);
+        if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) {
+          return;
+        }
+        set({ messages });
+      } catch (error) {
+        console.error('[MessagesSlice] Failed to load messages:', error);
       }
-      set({ messages });
     },
     ...createSettingsSlice(
       set as unknown as Parameters<typeof createSettingsSlice>[0],
