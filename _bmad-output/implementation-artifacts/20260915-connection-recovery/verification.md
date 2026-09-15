@@ -9,7 +9,7 @@ All commands run from the repo root on `fix/connection-recovery-user-facing`, ba
 | Typecheck | `npx tsc -b --force` | clean, no output |
 | Lint | `npm run lint` | clean, 0 problems |
 | Whitespace | `git diff --check 3f0d951b` | clean |
-| Unit suite | `npx vitest run` | **103 files, 1934 tests, all passed** (after review fixes) |
+| Unit suite | `npx vitest run` | **103 files, 1935 tests, all passed** (after review and re-check fixes) |
 | Browser | `npx playwright test <7 affected specs> --project=chromium --workers=2` | **16 passed** |
 | Production build | `fnox exec -- npm run build` | built; `dist/assets/*.js` carries the inlined project URL, so the env really was injected |
 
@@ -48,6 +48,7 @@ and required to fail first. Every mutation was reverted and the suite re-run gre
 | The `LoveNotes` notice element deleted (A-8) | the notice cases | 4 failed |
 | `getAuthCallbackOutcome` short-circuiting before the session read (B3) | the signed-in case | 1 failed |
 | The contrast scanner reverted to `className="…"` only (B1) | the canary and the allowlist | 2 failed |
+| Gradient stops no longer scanned (B-R1) | the gradient canary and allowlist | 2 failed |
 
 ## One case that does not kill a mutant, stated rather than implied
 
@@ -72,6 +73,10 @@ DW-137 were raised about, and claiming otherwise for a test of my own would be t
 - **No axe scan** covers either button DW-134 names. The contrast claim rests on a computation
   against the installed palette, now encoded as a test, not on a browser scan.
 - **`moodSyncService` still has no rejoin** for an unsolicited CLOSED. Raised as DW-138.
+- **Five contrast failures are allowlisted, not fixed**, with measured ratios: DW-139 through DW-143.
+  The two that matter are the love-notes send button at 1.99:1 and the app's primary gradient CTA,
+  which fails at every point along the sweep in ten components. Both are design decisions rather
+  than class edits, which is why they are raised rather than changed.
 
 ## Hosted check performed
 
