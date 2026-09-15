@@ -15,19 +15,47 @@
 
 import { useState, type FormEvent } from 'react';
 import { signIn, signInWithGoogle } from '../../api/auth/actionService';
+import type { AuthCallbackOutcome } from '../../api/supabaseClient';
 import './LoginScreen.css';
 
 interface LoginScreenProps {
   /** Callback when login is successful */
   onLoginSuccess?: () => void;
+  /**
+   * What the authentication callback this page load arrived with did, when it
+   * left the person here with nothing to read (DW-95, DW-96).
+   */
+  callbackOutcome?: AuthCallbackOutcome;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+/**
+ * What each recoverable callback outcome says. Both are phrased as something
+ * that still works from here, because both are: signing in again from this
+ * browser is the whole of the recovery in either case.
+ */
+const CALLBACK_NOTICES: Record<Exclude<AuthCallbackOutcome, null>, string> = {
+  cancelled: 'Sign-in was cancelled, so nothing changed. You can sign in again below.',
+  // No mention of a link: the usual way here is a Google return whose verifier
+  // is gone -- a private window, cleared storage, a PWA handing OAuth to a
+  // separate context -- where nothing was opened and there may be no other
+  // browser left to finish in. Hence "or", and a recovery that works from here.
+  'needs-original-browser':
+    'Sign-in could not be finished here — this is not the browser you started in, or that sign-in is no longer stored. Just sign in again below.',
+};
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callbackOutcome }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A new sign-in attempt retires the notice: from that moment the attempt's
+  // own feedback is what the person needs, and the callback that produced the
+  // notice is over either way.
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
+
+  const callbackNotice =
+    !noticeDismissed && callbackOutcome ? CALLBACK_NOTICES[callbackOutcome] : null;
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,6 +69,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setNoticeDismissed(true);
 
     // Client-side validation
     if (!email || !password) {
@@ -86,6 +115,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   const handleGoogleSignIn = async () => {
     setError(null);
+    setNoticeDismissed(true);
     setIsGoogleLoading(true);
 
     try {
@@ -111,6 +141,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           <h1 className="login-title">Welcome Back</h1>
           <p className="login-subtitle">Sign in to continue</p>
         </div>
+
+        {callbackNotice && (
+          <div className="login-notice" data-testid="login-notice" role="status" aria-live="polite">
+            <svg
+              className="notice-icon"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                fillRule="evenodd"
+                d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span>{callbackNotice}</span>
+          </div>
+        )}
 
         <form className="login-form" onSubmit={handleSubmit}>
           {error && (
