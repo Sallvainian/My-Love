@@ -145,10 +145,26 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         const messagesWithIds = await storageService.getAllMessages(requestedBy);
 
         if (stillCurrent()) {
-          set({ messages: messagesWithIds });
+          set((state) => ({
+            messages: messagesWithIds,
+            messageHistory: {
+              ...state.messageHistory,
+              favoriteIds: messagesWithIds
+                .filter((message) => message.isFavorite)
+                .map((message) => message.id),
+            },
+          }));
         }
       } else if (stillCurrent()) {
-        set({ messages: storedMessages });
+        set((state) => ({
+          messages: storedMessages,
+          messageHistory: {
+            ...state.messageHistory,
+            favoriteIds: storedMessages
+              .filter((message) => message.isFavorite)
+              .map((message) => message.id),
+          },
+        }));
       }
 
       if (stillCurrent()) {

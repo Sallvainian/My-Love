@@ -4,6 +4,7 @@ import type { MoodEntry } from '@/types';
 // Mock services before importing the store
 vi.mock('@/services/moodService', () => ({
   moodService: {
+    saveForDate: vi.fn(),
     create: vi.fn(),
     updateMood: vi.fn(),
     getAll: vi.fn(),
@@ -103,7 +104,7 @@ describe('moodSlice', () => {
   describe('addMoodEntry', () => {
     it('creates a mood entry and adds to state', async () => {
       const entry = makeMoodEntry();
-      mockedMoodService.create.mockResolvedValue(entry);
+      mockedMoodService.saveForDate.mockResolvedValue(entry);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([entry]);
       mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
         synced: 1,
@@ -118,7 +119,7 @@ describe('moodSlice', () => {
       const { get } = createTestStore({ userId: 'user-123' });
       await get().addMoodEntry(['happy']);
 
-      expect(mockedMoodService.create).toHaveBeenCalledWith('user-123', ['happy'], undefined);
+      expect(mockedMoodService.saveForDate).toHaveBeenCalledWith('user-123', entry.date, ['happy'], undefined);
       expect(get().moods).toContainEqual(entry);
     });
 
@@ -127,7 +128,7 @@ describe('moodSlice', () => {
       await expect(get().addMoodEntry(['happy'])).rejects.toThrow('User not authenticated');
     });
 
-    it('delegates to updateMoodEntry if mood already exists for today', async () => {
+    it('saves by owner/date when the UI already has a mood for today', async () => {
       const existing = makeMoodEntry({ id: 5 });
 
       const { get, set } = createTestStore({ userId: 'user-123' });
@@ -135,7 +136,7 @@ describe('moodSlice', () => {
       set({ moods: [existing] } as Partial<MoodSlice>);
 
       const updated = makeMoodEntry({ id: 5, mood: 'sad', moods: ['sad'] });
-      mockedMoodService.updateMood.mockResolvedValue(updated);
+      mockedMoodService.saveForDate.mockResolvedValue(updated);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
       mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
         synced: 0,
@@ -147,12 +148,12 @@ describe('moodSlice', () => {
 
       await get().addMoodEntry(['sad']);
 
-      expect(mockedMoodService.updateMood).toHaveBeenCalledWith(5, ['sad'], undefined);
+      expect(mockedMoodService.saveForDate).toHaveBeenCalledWith('user-123', existing.date, ['sad'], undefined);
     });
 
     it('handles sync failure gracefully (does not throw)', async () => {
       const entry = makeMoodEntry();
-      mockedMoodService.create.mockResolvedValue(entry);
+      mockedMoodService.saveForDate.mockResolvedValue(entry);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([entry]);
       mockedMoodSyncService.syncPendingMoods.mockRejectedValue(new Error('network'));
       // syncPendingMoods failure re-throws, but addMoodEntry catches sync errors
@@ -172,7 +173,7 @@ describe('moodSlice', () => {
       const { get, set } = createTestStore({ userId: 'user-123' });
       set({ moods: [entry] } as Partial<MoodSlice>);
 
-      expect(get().getMoodForDate(today)).toBe(entry);
+      expect(get().getMoodForDate(today)).toEqual(entry);
     });
 
     it('returns undefined when no mood for date', () => {
@@ -418,6 +419,158 @@ describe('moodSlice', () => {
         expect(mockedMoodService.getAll).not.toHaveBeenCalled();
       });
     });
+
+    /**
+     * A batch outlives the session that raised it.
+     *
+     * App.tsx fires this from a 5-minute interval and from the `online` event,
+     * and Sign Out is in the bottom nav of the screen showing the sync badge.
+     * So A's batch routinely settles after B has signed in — and every write in
+     * this action is account-scoped completion state: the spinner, the pending
+     * count and `lastSyncAt`.
+     *
+     * Each case seeds a RECOGNISABLE successor status and asserts the whole
+     * object is untouched, not just one field. Asserting `isSyncing === false`
+     * alone would pass against a stale write, since that is what the stale
+     * write sets it to.
+     */
+    describe('when the session ends before the batch settles', () => {
+      const SUCCESSOR_STATUS = {
+        pendingMoods: 7,
+        isOnline: true,
+        isSyncing: true,
+        lastSyncAt: new Date('2026-01-01T00:00:00.000Z'),
+      };
+
+      /** A promise the test settles by hand, to hold the batch open across the switch */
+      function gate<T>() {
+        let settle: (value: T) => void = () => {};
+        let fail: (reason: unknown) => void = () => {};
+        const promise = new Promise<T>((resolve, reject) => {
+          settle = resolve;
+          fail = reject;
+        });
+        promise.catch(() => {});
+        return { promise, settle, fail };
+      }
+
+      beforeEach(() => {
+        mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
+        mockedGetPartnerId.mockResolvedValue(null);
+      });
+
+      it('leaves the replacement account’s sync status untouched on success', async () => {
+        const pending = gate<{ synced: number; failed: number; deferred: number; errors: [] }>();
+        mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
+
+        const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
+        const inFlight = get().syncPendingMoods();
+
+        set({ userId: 'USER-B', authSessionVersion: 2, syncStatus: { ...SUCCESSOR_STATUS } });
+        pending.settle({ synced: 3, failed: 0, deferred: 0, errors: [] });
+        const result = await inFlight;
+
+        expect(get().syncStatus).toEqual(SUCCESSOR_STATUS);
+        // The caller that started the batch still gets the truth about it.
+        expect(result).toEqual({ synced: 3, failed: 0, skipped: false });
+      });
+
+      it('launches no loaders on the replacement account’s behalf', async () => {
+        const pending = gate<{ synced: number; failed: number; deferred: number; errors: [] }>();
+        mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
+
+        const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
+        const inFlight = get().syncPendingMoods();
+
+        set({ userId: 'USER-B', authSessionVersion: 2, syncStatus: { ...SUCCESSOR_STATUS } });
+        pending.settle({ synced: 1, failed: 0, deferred: 0, errors: [] });
+        await inFlight;
+
+        // Skipping only the `set` is not enough: these reload B's moods and
+        // refresh B's partner on a dead session's schedule.
+        expect(mockedMoodService.getAllForUser).not.toHaveBeenCalled();
+        expect(mockedGetPartnerId).not.toHaveBeenCalled();
+      });
+
+      it('leaves the replacement account’s sync status untouched on failure', async () => {
+        const pending = gate<never>();
+        mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
+
+        const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
+        const inFlight = get().syncPendingMoods();
+
+        set({ userId: 'USER-B', authSessionVersion: 2, syncStatus: { ...SUCCESSOR_STATUS } });
+        pending.fail(new Error('network'));
+
+        // The rejection still reaches the caller; only the store write is dropped.
+        await expect(inFlight).rejects.toThrow('network');
+        expect(get().syncStatus).toEqual(SUCCESSOR_STATUS);
+      });
+
+      it('leaves the replacement account’s sync status untouched when the lock was held', async () => {
+        const opened = gate<void>();
+        Object.defineProperty(navigator, 'locks', {
+          configurable: true,
+          value: {
+            request: async (
+              _name: string,
+              _options: { ifAvailable?: boolean },
+              callback: (lock: null) => Promise<unknown>
+            ) => {
+              await opened.promise;
+              return callback(null);
+            },
+          },
+        });
+
+        const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
+        const inFlight = get().syncPendingMoods();
+
+        set({ userId: 'USER-B', authSessionVersion: 2, syncStatus: { ...SUCCESSOR_STATUS } });
+        opened.settle();
+        const result = await inFlight;
+
+        expect(get().syncStatus).toEqual(SUCCESSOR_STATUS);
+        expect(result).toEqual({ synced: 0, failed: 0, skipped: true });
+
+        Reflect.deleteProperty(navigator, 'locks');
+      });
+
+      it('discards the batch when the same account signs back in', async () => {
+        // The version-only half of the guard. `userId` is USER-A on both sides,
+        // so an id-only compare lets this stale completion straight through.
+        const pending = gate<{ synced: number; failed: number; deferred: number; errors: [] }>();
+        mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
+
+        const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
+        const inFlight = get().syncPendingMoods();
+
+        set({ userId: 'USER-A', authSessionVersion: 2, syncStatus: { ...SUCCESSOR_STATUS } });
+        pending.settle({ synced: 2, failed: 0, deferred: 0, errors: [] });
+        await inFlight;
+
+        expect(get().syncStatus).toEqual(SUCCESSOR_STATUS);
+        expect(mockedMoodService.getAllForUser).not.toHaveBeenCalled();
+      });
+
+      it('still completes normally for an uninterrupted session', async () => {
+        // The control. Without it the guard could simply discard everything and
+        // every assertion above would still pass.
+        mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
+          synced: 1,
+          failed: 0,
+          deferred: 0,
+          errors: [],
+        });
+
+        const { get } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
+        await get().syncPendingMoods();
+
+        expect(get().syncStatus.isSyncing).toBe(false);
+        expect(get().syncStatus.lastSyncAt).toBeInstanceOf(Date);
+        expect(mockedMoodService.getAllForUser).toHaveBeenCalledWith('USER-A');
+      });
+    });
   });
 
   describe('fetchPartnerMoods', () => {
@@ -498,7 +651,7 @@ describe('moodSlice', () => {
       const { get, set } = createTestStore();
       set({ partnerMoods: [entry] } as Partial<MoodSlice>);
 
-      expect(get().getPartnerMoodForDate('2025-06-15')).toBe(entry);
+      expect(get().getPartnerMoodForDate('2025-06-15')).toEqual(entry);
     });
 
     it('returns undefined when no partner mood for date', () => {

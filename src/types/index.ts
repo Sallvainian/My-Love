@@ -1,22 +1,12 @@
+import type { MoodType } from './moods';
+
 // Core types for the My Love app
 
 export type ThemeName = 'sunset' | 'ocean' | 'lavender' | 'rose';
 
 export type MessageCategory = 'reason' | 'memory' | 'affirmation' | 'future' | 'custom';
 
-export type MoodType =
-  | 'loved'
-  | 'happy'
-  | 'content'
-  | 'excited'
-  | 'thoughtful'
-  | 'grateful'
-  | 'sad'
-  | 'anxious'
-  | 'frustrated'
-  | 'angry'
-  | 'lonely'
-  | 'tired';
+export type { MoodType } from './moods';
 
 export interface Message {
   id: number;

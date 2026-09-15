@@ -1,34 +1,4 @@
-/**
- * Non-array mood arrays must not reach the mood lookup
- *
- * Seven sites share one idiom: read the multi-mood array, fall back to the
- * legacy single mood otherwise. A truthy check cannot tell an array from a
- * string — `'happy'` is truthy AND has a length — so the fallback was skipped
- * and the value mapped or indexed one character at a time. All seven now test
- * the shape with `Array.isArray`.
- *
- * This file covers six of them. `MoodHistoryItem` and `PartnerMoodDisplay` read
- * `mood_types` off a record that can arrive over a Realtime broadcast. The other
- * four — `MoodTracker`, `MoodDetailModal`, `CalendarDay` and
- * `moodSlice.fetchPartnerMoods` — are defensive rather than live bug fixes: the
- * three components read the offline-first IndexedDB path and `fetchPartnerMoods`
- * transforms schema-validated `moodApi.fetchByUser` output, so no unvalidated
- * value reaches any of them today. The value there is that a reader copying the
- * idiom can no longer copy the wrong one. The seventh site, `MoodCard` in
- * `PartnerMoodView`, is covered by
- * `src/components/PartnerMoodView/__tests__/MoodCard.moodArray.test.tsx`.
- *
- * One site reading the same field still carries the truthy form:
- * `src/services/moodSyncPayload.ts:58` builds a sync payload rather than a
- * `MOOD_CONFIG` deref, and was deliberately left outside this bundle's scope.
- *
- * Each site gets the non-array rows pinned alongside a well-shaped multi-mood
- * case. The array-like object is the row that most needs `Array.isArray`: it is
- * truthy, has a length, AND indexes to a valid mood, so it clears the
- * `MOOD_CONFIG` lookup and only throws later, on `.map`/`.join`/`.includes`. A
- * number reproduces nothing — `(7).length` is undefined, so the old truthy check
- * already fell back — and is pinned only so that stays true.
- */
+/** Shared mood normalization at all display boundaries; data hooks are mocked. */
 import { render, screen } from '@testing-library/react';
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -460,5 +430,61 @@ describe('moodSlice.fetchPartnerMoods mood_types guard', () => {
     const partnerMoods = await fetchWith(['happy', 'tired']);
 
     expect(partnerMoods[0].moods).toEqual(['happy', 'tired']);
+  });
+});
+
+
+describe('malformed element recovery at mood displays', () => {
+  beforeEach(() => {
+    mockedGetPartnerId.mockResolvedValue(null);
+    storeState.getMoodForDate.mockReset();
+  });
+
+  const displays = ['history', 'partner', 'modal', 'calendar', 'tracker'] as const;
+  function display(kind: (typeof displays)[number], invalid = false) {
+    const values = invalid ? [null, 'unknown'] : ['sad', null, 'tired', 'sad'];
+    const local = { ...moodEntry(values), mood: 'unknown', note: invalid ? 'hidden note' : undefined } as unknown as MoodEntry;
+    const remote = { ...moodRecord(values), mood_type: 'unknown' } as unknown as SupabaseMood;
+    if (kind === 'history') return render(<MoodHistoryItem mood={remote} />);
+    if (kind === 'partner') {
+      mockedUsePartnerMood.mockReturnValue({ partnerMood: remote, isLoading: false, error: null } as ReturnType<typeof usePartnerMood>);
+      return render(<PartnerMoodDisplay partnerId={PARTNER_ID} />);
+    }
+    if (kind === 'modal') return render(<MoodDetailModal mood={local} onClose={vi.fn()} />);
+    if (kind === 'calendar') return render(<CalendarDay dateKey={DATE_KEY} dayNumber={12} isToday={false} mood={local} monthName="September" year={2026} onClick={vi.fn()} />);
+    storeState.getMoodForDate.mockReturnValue(local);
+    return render(<MoodTracker />);
+  }
+
+  it.each(displays)('%s preserves recognized values in order, including duplicates', (kind) => {
+    const { container } = display(kind);
+    if (kind === 'calendar') {
+      expect(screen.getByTestId(`calendar-day-${DATE_KEY}`)).toHaveAttribute('aria-label', expect.stringContaining('sad, tired, sad mood'));
+    } else {
+      expect(container.textContent?.toLowerCase()).toContain('sad, tired, sad');
+    }
+  });
+
+  it.each(displays)('%s excludes wholly invalid moods instead of inventing a display value', (kind) => {
+    const { container } = display(kind, true);
+    if (kind === 'calendar') expect(screen.getByTestId(`calendar-day-${DATE_KEY}`)).toHaveAttribute('data-has-mood', 'false');
+    else if (kind === 'tracker') {
+      expect(container.textContent).not.toContain('Selected:');
+      expect(container.querySelector('textarea')?.value ?? '').toBe('');
+    } else {
+      expect(screen.queryByTestId(kind === 'history' ? 'mood-history-item' : kind === 'partner' ? 'partner-mood-display' : 'mood-detail-modal')).toBeNull();
+    }
+  });
+
+  it('normalizes partner records independently and omits invalid siblings', async () => {
+    mockedGetPartnerId.mockResolvedValue(PARTNER_ID);
+    mockedMoodSyncService.fetchMoods.mockResolvedValue([
+      { ...moodRecord(['tired', null, 'sad', 'tired']), mood_type: 'unknown' },
+      { ...moodRecord([null]), mood_type: 'unknown' },
+    ] as unknown as Awaited<ReturnType<typeof moodSyncService.fetchMoods>>);
+    const { get } = createTestStore();
+    await get().fetchPartnerMoods();
+    expect(get().partnerMoods).toHaveLength(1);
+    expect(get().partnerMoods[0]).toMatchObject({ mood: 'tired', moods: ['tired', 'sad', 'tired'] });
   });
 });

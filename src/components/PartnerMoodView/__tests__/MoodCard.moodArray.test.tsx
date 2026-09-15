@@ -48,4 +48,14 @@ describe('MoodCard moods guard', () => {
 
     expect(screen.getByTestId('partner-mood-card')).toHaveTextContent('Happy, Tired');
   });
+  it('recovers mixed values without reordering or deduplicating them', () => {
+    render(<MoodCard moodEntry={{ ...entry(['sad', null, 'tired', 'sad']), mood: 'unknown' } as unknown as MoodEntry} formatDate={formatDate} />);
+    expect(screen.getByTestId('partner-mood-card')).toHaveTextContent('Sad, Tired, Sad');
+  });
+
+  it('omits an entirely invalid mood', () => {
+    render(<MoodCard moodEntry={{ ...entry([null]), mood: 'unknown' } as unknown as MoodEntry} formatDate={formatDate} />);
+    expect(screen.queryByTestId('partner-mood-card')).toBeNull();
+  });
+
 });

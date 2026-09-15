@@ -1,3 +1,4 @@
+import { MOOD_TYPES } from '../types/moods';
 import { z } from 'zod/v4';
 import { VALIDATION_LIMITS } from '../config/performance';
 
@@ -79,20 +80,7 @@ export const PhotoUploadInputSchema = z.object({
  * Mood type enum validation
  * Ensures only valid mood types are accepted
  */
-const MoodTypeSchema = z.enum([
-  'loved',
-  'happy',
-  'content',
-  'excited',
-  'thoughtful',
-  'grateful',
-  'sad',
-  'anxious',
-  'frustrated',
-  'angry',
-  'lonely',
-  'tired',
-]);
+const MoodTypeSchema = z.enum(MOOD_TYPES);
 
 /**
  * ISO date format validation (YYYY-MM-DD)

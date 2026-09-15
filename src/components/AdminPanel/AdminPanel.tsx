@@ -7,12 +7,22 @@ import { CreateMessageForm } from './CreateMessageForm';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import { EditMessageForm } from './EditMessageForm';
 import { MessageList } from './MessageList';
+import { useDialogSession } from './useDialogSession';
 
 interface AdminPanelProps {
   onExit?: () => void;
 }
 
 export function AdminPanel({ onExit }: AdminPanelProps) {
+  const userId = useAppStore((s) => s.userId);
+  const sessionVersion = useAppStore((s) => s.authSessionVersion);
+  // A whole new panel owns each identity's previews and completion callbacks.
+  // Unmount outside AnimatePresence so outgoing private dialogs cannot linger.
+  return <AccountAdminPanel key={`${userId}:${sessionVersion}`} onExit={onExit} />;
+}
+
+function AccountAdminPanel({ onExit }: AdminPanelProps) {
+  const captureSession = useDialogSession();
   const customMessagesLoaded = useAppStore((s) => s.customMessagesLoaded);
   const loadCustomMessages = useAppStore((s) => s.loadCustomMessages);
   const exportCustomMessages = useAppStore((s) => s.exportCustomMessages);
@@ -40,9 +50,11 @@ export function AdminPanel({ onExit }: AdminPanelProps) {
 
   // Export messages (Story 3.5 AC-3.5.6)
   const handleExport = async () => {
+    const stillCurrent = captureSession();
     try {
       await exportCustomMessages();
     } catch (error) {
+      if (!stillCurrent()) return;
       console.error('[AdminPanel] Export failed:', error);
       alert('Failed to export messages. Please try again.');
     }
@@ -56,13 +68,16 @@ export function AdminPanel({ onExit }: AdminPanelProps) {
   const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const stillCurrent = captureSession();
 
     try {
       const result = await importCustomMessages(file);
+      if (!stillCurrent()) return;
       alert(
         `Import complete!\nImported: ${result.imported} messages\nSkipped duplicates: ${result.skipped}`
       );
     } catch (error) {
+      if (!stillCurrent()) return;
       console.error('[AdminPanel] Import failed:', error);
       alert('Failed to import messages. Please check the file format and try again.');
     } finally {

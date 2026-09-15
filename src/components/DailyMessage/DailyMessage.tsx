@@ -16,6 +16,7 @@ interface DailyMessageProps {
 export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   const {
     currentMessage,
+    userId,
     settings,
     messageHistory,
     toggleFavorite,
@@ -287,8 +288,9 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
               >
                 <button
                   onClick={handleFavorite}
+                  disabled={!userId}
                   className="btn-icon group"
-                  aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-label={!userId ? 'Sign in to save favorites' : isFavorited ? 'Remove from favorites' : 'Add to favorites'}
                   data-testid="message-favorite-button"
                 >
                   <Heart

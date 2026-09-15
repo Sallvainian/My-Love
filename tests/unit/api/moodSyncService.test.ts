@@ -99,6 +99,24 @@ describe('moodSyncService.syncPendingMoods', () => {
     vi.useRealTimers();
   });
 
+  it('uploads recovered values and continues past invalid siblings without sending them', async () => {
+    const invalid = pendingMood({ id: 2, mood: 'unknown', moods: [null] } as unknown as Partial<MoodEntry>);
+    const valid = pendingMood({ mood: 'loved', moods: ['sad', null, 'happy', 'sad'] } as unknown as Partial<MoodEntry>);
+    mockedMoodService.getUnsyncedMoods.mockResolvedValue([invalid, valid]);
+    const result = await runSync();
+    expect(result).toMatchObject({ synced: 1, failed: 1, deferred: 0 });
+    expect(backend.rows).toHaveLength(1);
+    expect(backend.rows[0]).toMatchObject({ mood_type: 'loved', mood_types: ['sad', 'happy', 'sad'] });
+    expect(mockedMoodService.markAsSynced).toHaveBeenCalledTimes(1);
+    expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(1, backend.rows[0].id, moodSyncFingerprint(valid));
+    expect(invalid.mood).toBe('unknown');
+  });
+
+  it('rejects a direct invalid sync before any database write', async () => {
+    await expect(moodSyncService.syncMood(pendingMood({ mood: 'invalid', moods: [] } as unknown as Partial<MoodEntry>))).rejects.toThrow('recognized');
+    expect(backend.rows).toHaveLength(0);
+  });
+
   it('[A: first sync of a new mood] writes one row and binds its id to the record', async () => {
     mockedMoodService.getUnsyncedMoods.mockResolvedValue([pendingMood()]);
 

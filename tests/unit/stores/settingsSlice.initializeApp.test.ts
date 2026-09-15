@@ -333,4 +333,56 @@ describe('createSettingsSlice initializeApp', () => {
     expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });
+  it('rejects a version-only stale initialization and hands off to the new session', async () => {
+    const pending = deferred<Message[]>();
+    mockStorageService.init.mockResolvedValue(undefined);
+    mockStorageService.getAllMessages.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(sharedDailyPool());
+    const { store, updateCurrentMessage, loadMessagesRequestedBy } = await buildTestStore();
+    const run = store.getState().initializeApp();
+    await flush();
+    store.setState({ authSessionVersion: 2 });
+    pending.settle(aOutgoingPool());
+    await run;
+    await flush();
+    expect(store.getState().messages.map((row) => row.text)).toEqual(['SHARED-DAILY']);
+    expect(loadMessagesRequestedBy).toEqual([SIGNED_IN_USER]);
+    expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('withholds the handoff completion when a second version-only change lands', async () => {
+    const pending = deferred<Message[]>();
+    const handoff = deferred<Message[]>();
+    mockStorageService.init.mockResolvedValue(undefined);
+    mockStorageService.getAllMessages.mockReturnValueOnce(pending.promise).mockReturnValueOnce(handoff.promise);
+    const { store, updateCurrentMessage } = await buildTestStore();
+    const run = store.getState().initializeApp();
+    await flush();
+    store.setState({ authSessionVersion: 2 });
+    pending.settle(aOutgoingPool());
+    await run;
+    store.setState({ authSessionVersion: 3 });
+    handoff.settle(sharedDailyPool());
+    await flush();
+    expect(updateCurrentMessage).not.toHaveBeenCalled();
+  });
+
+  it('handles a thrown handoff completion without an unhandled rejection', async () => {
+    const pending = deferred<Message[]>();
+    mockStorageService.init.mockResolvedValue(undefined);
+    mockStorageService.getAllMessages.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(sharedDailyPool());
+    const { store, updateCurrentMessage } = await buildTestStore();
+    const failure = new Error('rotation failed');
+    updateCurrentMessage.mockImplementation(() => { throw failure; });
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const run = store.getState().initializeApp();
+    await flush();
+    store.setState({ authSessionVersion: 2 });
+    pending.settle(aOutgoingPool());
+    await run;
+    await flush();
+    expect(log).toHaveBeenCalledWith('[App Init] Failed to reload the rotation pool:', failure);
+    expect(store.getState().isLoading).toBe(false);
+    log.mockRestore();
+  });
+
 });
