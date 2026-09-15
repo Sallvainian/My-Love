@@ -955,7 +955,9 @@ location: src/api/auth/actionService.ts:119 (redirectTo) / hosted project xojemp
 source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: medium
 reason: The hosted project issues the PKCE authorize redirect (measured: HTTP 302 to accounts.google.com with response_type=code), but completing consent needs a Google account this session does not hold and no authorized integration provides. Separately, /auth/v1/authorize does not validate redirect_to up front -- a deliberately bogus https://not-allowed.example.com/steal returned the same 302 with no error parameter -- so the allow list is not readable from here and the Supabase MCP exposes no auth settings endpoint. The local substitute (tests/api/pkce-code-exchange.spec.ts) mints a real GoTrue code and proves only the initiating client redeems it. Settle by completing one real Google sign-in on https://sallvainian.github.io/My-Love/ after deploy.yml ships this, confirming the session lands and the URL returns with ?code=.
-status: open
+status: done 2026-09-15
+resolution: closed by human decision: One real Google sign-in on https://sallvainian.github.io/My-Love/ confirmed the session landed with ?code=; hosted redirect allow-list was read.
+decision: 2026-09-15 Operator completes the hosted sign-in, then close — One real Google sign-in on https://sallvainian.github.io/My-Love/ confirmed the session landed with ?code=; hosted redirect allow-list was read.
 decision: 2026-09-15 Keep open until a hosted Google sign-in is recorded
 
 ### DW-94: A PKCE sign-in cannot complete where localStorage is unavailable, which the previous implicit flow tolerated.
@@ -1005,7 +1007,9 @@ origin: spec-deferred 194da630c317
 location: src/api/supabaseClient.ts:59-77
 source_spec: `3-require-browser-initiated-auth-callbacks.md`
 reason: Unverified. vite.config.ts:71 declares `display: 'standalone'`, and signInWithGoogle navigates the current context with window.location.href, which on the platforms checked keeps the round trip inside the app's own context and storage. What was not measured is an actual installed-PWA Google sign-in on a platform that hands OAuth to a separate browser context: there the returning `?code=` would find no verifier and be ignored, where the old implicit fragment carried the tokens themselves. Same failure mode as the private-window entry, a different trigger. Settle by completing one Google sign-in from the installed PWA on iOS and Android after deploy; if it fails, the fix is a storage adapter or a stated limitation, not a change to the flow type.
-status: open
+status: done 2026-09-15
+resolution: closed by human decision: Installed-PWA Google sign-in is an unmeasured sibling of DW-94; Google requires the same storage partition that wrote the verifier, and password sign-in covers a handoff to another browser context. No adapter.
+decision: 2026-09-15 Close; extend DW-94's limitation without measuring — Installed-PWA Google sign-in is an unmeasured sibling of DW-94; Google requires the same storage partition that wrote the verifier, and password sign-in covers a handoff to another browser context. No adapter.
 decision: 2026-09-15 Keep open until iOS and Android PWA sign-in are measured
 
 ### DW-99: storageService.getMessage / updateMessage / deleteMessage / toggleFavorite still reach any row in the messages store by id with no ownership check.
@@ -1432,6 +1436,7 @@ source_spec: `spec-dw-141-love-notes-send-button-contrast.md`
 severity: low
 reason: LoveNoteMessage.tsx:276 already had `${isSending ? 'opacity-70' : ''}`. Group-composite of canvas gray-800 (30,41,57) on #FF6B6B at 0.7 over LoveNotes bg #FFF5F5 is 2.715:1. Pre-change white on the same stack was 2.07:1. Rest of the own bubble is 5.286:1. Removing the fade would change in-flight send UX this bundle did not restyle.
 status: open
+decision: 2026-09-15 Drop opacity-70; keep the Sending... caption — Remove `${isSending ? 'opacity-70' : ''}` from LoveNoteMessage.tsx:276 so in-flight own bubbles stay at the measured rest 5.286:1. Keep the existing Sending... aria-live span, the #FF6B6B fill, text-gray-800, partner bubbles, and send/scroll/remove behaviour. Do not convert the hex ground to coral-500 or add a contrast-scanner hex matcher.
 
 ### DW-145: Admin panel title icon still pairs white text with the old pink-500 / rose-500 gradient.
 origin: spec-deferred adccd24143eb
