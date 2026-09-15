@@ -203,10 +203,20 @@ export const getAuthCallbackOutcome = async (): Promise<AuthCallbackOutcome> => 
   // whichever it was, and copy vague enough to cover every cause is
   // indistinguishable from `provider-error`, which would leave the person with
   // two different notices that say the same nothing.
-  if (error) return returnedWithCode ? 'code-expired' : null;
   if (!returnedWithCode) return null;
   const { data } = await supabase.auth.getSession();
-  return data.session ? null : 'needs-original-browser';
+  // A session settles it, whatever the SDK reported. Someone already signed in
+  // has nothing to recover from -- a link opened twice, or opened in a tab that
+  // is already authenticated, must not be answered with "sign in again below".
+  // This read is why the error case cannot short-circuit above it.
+  if (data.session) return null;
+  // No session, and the SDK reported a failure: the exchange was attempted and
+  // did not work. That is the ordinary expired-or-reused link, which used to
+  // fall into the same silence as an uneventful load (DW-131).
+  //
+  // Without an error it is the other shape entirely -- a `code` this browser
+  // holds no verifier for, which is never exchanged at all.
+  return error ? 'code-expired' : 'needs-original-browser';
 };
 
 /**

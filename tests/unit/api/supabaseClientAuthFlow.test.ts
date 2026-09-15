@@ -373,6 +373,49 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     expect(authorizeUrl.searchParams.get('redirect_to')).toBe('http://localhost:3000/My-Love/');
   });
 
+  it('says nothing about a failed exchange to someone who is already signed in', async () => {
+    // The same failing callback as the case above, in a browser that already
+    // holds a session — a link opened a second time, or opened in a tab that is
+    // already authenticated.
+    //
+    // The classifier has to read the session before it reports anything, which
+    // is why the error case cannot short-circuit: 'code-expired' tells the
+    // person to sign in again, and they already are. The docblock's promise
+    // that `null` covers "a redeemed callback" is what this pins.
+    setUrl(`${APP_ORIGIN}/`);
+    const starter = await importAppClient();
+    clients.push(starter.supabase);
+    await starter.supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+        skipBrowserRedirect: true,
+      },
+    });
+
+    fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).includes('grant_type=pkce')) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_grant', error_description: 'Invalid code' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      throw new Error(`unexpected request: ${String(input)}`);
+    });
+
+    vi.resetModules();
+    // The difference from the case above, and the whole point of it.
+    seedVictimSession();
+    setUrl(`${APP_ORIGIN}/?code=a-code-this-browser-cannot-redeem`);
+    const returning = await importAppClient();
+    clients.push(returning.supabase);
+
+    const { data } = await returning.supabase.auth.getSession();
+    expect(data.session, 'the precondition is that a session survives').not.toBeNull();
+
+    await expect(returning.getAuthCallbackOutcome()).resolves.toBeNull();
+  });
+
   it('sends the password-reset link to the deployed base path', async () => {
     // The sibling of the authorize-URL case above, for the one other place that
     // composes `origin + BASE_URL` into a link people receive by email
