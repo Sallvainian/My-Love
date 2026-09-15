@@ -23,7 +23,13 @@
  * stub it. Vite inlines it at build time either way.
  */
 
-/** The configured base, normalised so it always ends in exactly one `/`. */
+/**
+ * The configured base, or `'/'` when it is unset.
+ *
+ * No normalisation happens here, and none is needed: Vite guarantees the value
+ * ends in `/`, which is exactly the property both helpers below rely on. Said
+ * out loud because they would be wrong without it, not because this enforces it.
+ */
 function currentBase(): string {
   return import.meta.env.BASE_URL || '/';
 }

@@ -31,12 +31,18 @@
  * the pending disconnect regardless.
  *
  * The gate is kept anyway, for two reasons. It still describes something real —
- * a socket the browser or an explicit `disconnect()` has genuinely put into
- * CLOSING, which sign-out does — and in that state an open really would fail to
- * join. And it is close to free: `isDisconnecting()` is a boolean read, and the
- * poll below runs only when it is already true. Removing it would buy one
- * property access and reintroduce a failure mode whose only symptom is a
- * channel that reports TIMED_OUT ten seconds later for no visible reason.
+ * a socket genuinely in CLOSING — and in that state an open really would fail to
+ * join. What reaches that state is NOT an explicit `disconnect()`: nothing in
+ * `src/` calls one, sign-out included. It is the browser closing the transport
+ * (a dropped network, a backgrounded tab), or the SDK's own deferred
+ * `_schedulePendingDisconnect` firing 50s after the last channel goes away —
+ * which is reachable simply by leaving both the notes and partner views for
+ * that long, and then opening one again.
+ *
+ * And it is close to free: `isDisconnecting()` is a boolean read, and the poll
+ * below runs only when it is already true. Removing it would buy one property
+ * access and reintroduce a failure mode whose only symptom is a channel that
+ * reports TIMED_OUT ten seconds later for no visible reason.
  *
  * Line numbers are the `dist/module` build; `dist/main` is the same code at
  * different offsets. The leave-side half of these measurements is asserted in

@@ -183,7 +183,24 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
    * an account switch changes the key, so a previous account's `disconnected`
    * can never be shown against the new one's freshly opening channel.
    */
-  const [report, setReport] = useState<{ key: string; status: NoteFeedStatus } | null>(null);
+  const [report, setReportState] = useState<{ key: string; status: NoteFeedStatus } | null>(null);
+
+  /**
+   * Write only when something actually changed.
+   *
+   * `setReport` is called from `handleStatus`, which a healthy channel can reach
+   * repeatedly -- every re-join reports SUBSCRIBED again. A fresh object each
+   * time is a new state value by identity, so React re-renders the chat for a
+   * status that did not move. Harmless for the two current callers, but
+   * `useRealtimeMessages` takes an `onNewMessage` callback and a caller passing
+   * an inline arrow would re-run the effect on every render, which turns a
+   * needless re-render into a loop.
+   */
+  const setReport = useCallback((next: { key: string; status: NoteFeedStatus }) => {
+    setReportState((previous) =>
+      previous && previous.key === next.key && previous.status === next.status ? previous : next
+    );
+  }, []);
   const addNote = useAppStore((state) => state.addNote);
   const userId = useAppStore((state) => state.userId);
 
@@ -232,6 +249,22 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     // carries.
     let cancelled = false;
 
+    /**
+     * Whether the retry ceiling has been reached for this effect run.
+     *
+     * Separate from `cancelled`, which means "this run is over". This run is
+     * still live; it has simply stopped trying. The distinction matters because
+     * an `openChannel` can be parked on an await when the ceiling is hit: the
+     * fifth retry fires, parks on `setAuth()`, and the old channel reports
+     * another failure from inside that window -- which is exactly the
+     * interleaving the retry path documents below. The give-up branch then runs,
+     * releases the channel and reports `disconnected`, and the parked open would
+     * resume and build a fresh channel on top of it, leaving the banner saying
+     * the feed is dead while a channel is live. `disconnected` is documented as
+     * terminal, so it has to actually be.
+     */
+    let gaveUp = false;
+
     // Whether the partner snapshot can be trusted for the NEXT `SUBSCRIBED`.
     //
     // The first open below resolves it immediately before the first `subscribe`,
@@ -278,7 +311,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // refresh.
       void resolvePartnerLookupForDelivery()
         .then((lookup) => {
-          if (cancelled) return;
+          if (cancelled || gaveUp) return;
           if (lookup.status === 'error') {
             partnerIdRef.current = previous;
             return;
@@ -286,7 +319,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
           partnerIdRef.current = lookup.status === 'linked' ? lookup.partnerId : null;
         })
         .catch(() => {
-          if (cancelled) return;
+          if (cancelled || gaveUp) return;
           partnerIdRef.current = previous;
         });
     };
@@ -302,9 +335,9 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // two guards, releasing a channel would immediately reopen the topic it
       // was just asked to release -- on every unmount, and on every retry.
       //
-      // Both release paths are already covered by the time they call
-      // `releaseNoteChannel`: the cleanup lowers `subscriptionActive` first,
-      // and the retry nulls `channelRef` first.
+      // All three release paths are already covered by the time they call
+      // `releaseNoteChannel`: the cleanup lowers `subscriptionActive` first, and
+      // both the retry and the give-up below null `channelRef` first.
       if (!subscriptionActive) return;
       if (source && source !== channelRef.current) return;
 
@@ -382,6 +415,10 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
           if (abandoned) {
             releaseNoteChannel(topic, abandoned);
           }
+
+          // Checked by `openChannel` after each of its awaits, so an open
+          // already in flight abandons rather than resurrecting the topic.
+          gaveUp = true;
 
           // And say so. This is the only terminal state the hook has; until it
           // was reported, the feed just stopped and no consumer could tell.
@@ -489,7 +526,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
         // Snapshot the partner BEFORE the join, so the very first broadcast is
         // already checked against a known sender.
         const partnerId = await resolvePartnerIdForDelivery();
-        if (cancelled) return;
+        if (cancelled || gaveUp) return;
         partnerIdRef.current = partnerId;
         // Only skip the first SUBSCRIBED's refresh when this produced a
         // snapshot. A genuinely unlinked user pays one extra round-trip that
@@ -501,7 +538,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // Required for a private channel: Realtime authorizes the join against
       // the socket's access token, which is the anon key until this runs.
       await supabase.realtime.setAuth();
-      if (cancelled) return;
+      if (cancelled || gaveUp) return;
 
       // Only now is the failed channel let go. Everything above can reject,
       // and a retry that had already released it would leave the hook with no
@@ -540,14 +577,14 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // above, or a previous mount's cleanup. Opening now would just retrieve
       // the dying channel and join nothing.
       await waitForNoteChannelLeaves(topic);
-      if (cancelled) return;
+      if (cancelled || gaveUp) return;
 
       // Closing that channel may have been what removed the LAST channel in
       // the app, which tears the shared socket down; opening inside that window
       // silently never joins. Read last, and acted on with no await in
       // between.
       await waitForSocketReady();
-      if (cancelled) return;
+      if (cancelled || gaveUp) return;
 
       // Created here rather than at the top of the effect: `supabase.channel()`
       // registers synchronously, and anything registered before these awaits
@@ -609,7 +646,9 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // Reset retry count on cleanup
       retryCountRef.current = 0;
     };
-  }, [enabled, userId, handleNewMessage]);
+    // `setReport` is `useCallback`-stable with an empty dependency list, so
+    // listing it satisfies the exhaustive-deps rule without adding a re-run.
+  }, [enabled, userId, handleNewMessage, setReport]);
 
   // Derived, not stored: `idle` and `connecting` are facts about the props and
   // about whether anything has reported yet, so deriving them here keeps the

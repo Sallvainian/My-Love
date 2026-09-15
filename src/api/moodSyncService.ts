@@ -632,7 +632,9 @@ class MoodSyncService {
       }
 
       // Closing that channel may have been what removed the LAST channel in the
-      // app, which tears the socket down for ~100ms. Subscribing inside that
+      // app. That used to tear the socket down for ~100ms; on realtime-js
+      // 2.116.0 the disconnect is deferred instead (see src/api/realtimeSocket.ts,
+      // which measures it), and reopening cancels it. Subscribing inside that
       // window silently never joins -- see realtimeSocket.
       if (!entry) {
         await waitForSocketReady();

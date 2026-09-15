@@ -25,8 +25,11 @@ const mocks = vi.hoisted(() => ({
   removeChannel: vi.fn(),
   /**
    * The shared socket, as `waitForSocketReady` reads it. Removing the last
-   * channel parks the socket in `disconnecting` for ~100ms, and every open
-   * inside that window silently never joins.
+   * channel used to park the socket in `disconnecting` for ~100ms, and every
+   * open inside that window silently never joins. On realtime-js 2.116.0 the
+   * disconnect is deferred and reopening cancels it, so the window is no longer
+   * reachable that way — see src/api/realtimeSocket.ts, which measures it. The
+   * stub stays because `waitForSocketReady` still consults this on every open.
    */
   isDisconnecting: vi.fn(),
   /** Ordered record of the calls whose ORDER is load-bearing */
@@ -1355,6 +1358,15 @@ describe('useRealtimeMessages', () => {
       // unmount path, not an edge case. Answering it would have the hook
       // reopen a topic for a component that no longer exists — once per
       // unmount, forever.
+      //
+      // Honest about what this case is: a REGRESSION GUARD, not a mutant-killer.
+      // Three independent mechanisms already stop it — `subscriptionActive`, the
+      // `source` comparison, and `cancelled` inside `openChannel` — and deleting
+      // any one of them, or all three of the first two, leaves this green. It
+      // pins the composed invariant, so a future edit that moved the CLOSED
+      // branch above the guards would fail here. It is not evidence that any
+      // single guard is load-bearing, and it is listed as such in
+      // verification.md rather than counted among the mutation results.
       await act(async () => {
         report('CLOSED');
         await vi.advanceTimersByTimeAsync(30000);
@@ -1398,6 +1410,76 @@ describe('useRealtimeMessages', () => {
 
       expect(supabase.channel).toHaveBeenCalledTimes(2);
       expect(third.subscribe).not.toHaveBeenCalled();
+    });
+
+    it('does not resurrect the topic when an open is in flight as the ceiling is hit', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const channels = Array.from({ length: 8 }, () => parkedChannel());
+      let created = 0;
+      vi.mocked(supabase.channel).mockImplementation(
+        () => channels[created++] as unknown as RealtimeChannel
+      );
+
+      // Park the FIFTH retry's token install. `openChannel` awaits `setAuth`
+      // before it releases anything, so `channelRef` still holds the old channel
+      // while this is held open — which is the window the retry path's own
+      // comment says the SDK's rejoin loop fires into.
+      let releaseAuth: () => void = () => {};
+      let authCalls = 0;
+      mocks.setAuth.mockImplementation(async () => {
+        authCalls += 1;
+        if (authCalls === 6) {
+          await new Promise<void>((resolve) => {
+            releaseAuth = resolve;
+          });
+        }
+      });
+
+      let result: { current: { status: string } };
+      await act(async () => {
+        result = renderHook(() => useRealtimeMessages()).result as typeof result;
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // Four completed retries: 1 initial channel + 4 replacements.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await act(async () => {
+          reporterFor(channels[attempt])('CHANNEL_ERROR', new Error('boom'));
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(Math.min(1000 * Math.pow(2, attempt), 30000) + 100);
+        });
+      }
+      expect(supabase.channel).toHaveBeenCalledTimes(5);
+
+      // The fifth retry starts and parks on `setAuth`.
+      await act(async () => {
+        reporterFor(channels[4])('CHANNEL_ERROR', new Error('boom'));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30000);
+      });
+      expect(authCalls).toBe(6);
+      expect(supabase.channel).toHaveBeenCalledTimes(5);
+
+      // The still-current old channel fails again from inside that window. The
+      // ceiling is already at five, so this is the give-up.
+      await act(async () => {
+        reporterFor(channels[4])('CHANNEL_ERROR', new Error('boom'));
+      });
+      expect(result!.current.status).toBe('disconnected');
+
+      // Now let the parked open resume. Without the give-up flag it walks on and
+      // builds a sixth channel, leaving the banner reading "not receiving new
+      // notes" while a channel is live — the type calls `disconnected` terminal,
+      // so it has to be.
+      await act(async () => {
+        releaseAuth();
+        await vi.advanceTimersByTimeAsync(30000);
+      });
+
+      expect(supabase.channel).toHaveBeenCalledTimes(5);
+      expect(result!.current.status).toBe('disconnected');
     });
 
     it('reports the feed as connected, then reconnecting, then disconnected', async () => {

@@ -201,19 +201,38 @@ describe('the SDK leave/close contract the channel registries depend on', () => 
     expect(client.getChannels()).not.toContain(channel);
   });
 
-  it('resolves rather than rejects, whatever the leave is answered', async () => {
+  it('never consults the server answer to a leave', async () => {
     const client = newClient();
-    const { channel } = await joinedChannel(client);
+    const { channel, statuses } = await joinedChannel(client);
 
     const leave = client.removeChannel(channel);
     const leaveFrame = frames().find((frame) => frame.event === 'phx_leave');
     expect(leaveFrame, 'the leave must have reached the wire').toBeDefined();
-    answer(leaveFrame as Frame, 'error');
 
-    // `RealtimeChannel.js:604-612` resolves 'ok' | 'timed out' | 'error' and has
-    // no rejection path at all. Both registries wrap their leave in a
-    // `.catch()`; this is the case that says those catches are belt, not
-    // mechanism, so nobody removes the real guard believing the catch covers it.
+    // Settled BEFORE anything is delivered. This is the assertion; everything
+    // below measures that the server's answer then changes nothing.
     await expect(leave).resolves.toBe('ok');
+    expect(channel.state).toBe('closed');
+    expect(client.getChannels()).not.toContain(channel);
+
+    // Now answer it 'error', the case DW-109 was written about, and observe
+    // that it is a no-op. The reply matches nothing: phoenix's local
+    // `leavePush.trigger("ok", {})` already ran the push's reply handler, whose
+    // first act is `cancelRefEvent()` (assets/js/phoenix/push.js:112-117), so
+    // the binding `RealtimeChannel.js:610`'s `.receive('error', ...)` hangs off
+    // is gone before the frame arrives.
+    //
+    // Asserting the no-op rather than presenting it as the exercise: an earlier
+    // version of this case delivered the 'error' and asserted the resolution was
+    // still 'ok', which reads as pinning "no rejection path" but cannot
+    // discriminate it — the 'error' branch is unreachable in this scenario, so
+    // an SDK that DID reject on it would have left that version green.
+    answer(leaveFrame as Frame, 'error');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await expect(leave).resolves.toBe('ok');
+    expect(channel.state).toBe('closed');
+    expect(statuses).toEqual(['SUBSCRIBED', 'CLOSED']);
   });
 });
