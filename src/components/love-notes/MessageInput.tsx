@@ -266,7 +266,7 @@ export function MessageInput() {
           onClick={handleSend}
           disabled={isDisabled}
           aria-label="Send message"
-          className="bg-coral-500 hover:bg-coral-600 focus:ring-coral-500 disabled:hover:bg-coral-500 min-h-[44px] rounded-lg px-6 py-2 font-medium text-white transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-coral-500 hover:bg-coral-600 focus:ring-coral-500 disabled:hover:bg-coral-500 min-h-[44px] rounded-lg px-6 py-2 font-medium text-gray-800 transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSending ? 'Sending...' : 'Send'}
         </button>
