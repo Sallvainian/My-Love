@@ -7,7 +7,11 @@
  * @module api/supabaseClient
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  createClient,
+  isAuthImplicitGrantRedirectError,
+  SupabaseClient,
+} from '@supabase/supabase-js';
 import type { Database } from '../types/database.types';
 import { logger } from '../utils/logger';
 
@@ -83,6 +87,81 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
     },
   }
 );
+
+/**
+ * Did this page load arrive carrying a `?code=` callback parameter?
+ *
+ * Read here, in the same synchronous module body as `createClient` above, and
+ * safe only here: `GoTrueClient`'s constructor calls `this.initialize()`
+ * (`GoTrueClient.js:294`), and `_initialize` runs synchronously only as far as
+ * `await this._isPKCECallback(params)` (`GoTrueClient.js:389`), so this line
+ * runs before the SDK can touch the URL.
+ *
+ * A read taken after `initialize()` resolves would be useless: on a successful
+ * exchange the SDK deletes `code` from the URL
+ * (`GoTrueClient.js:3284-3286`), so a redeemed callback would look exactly like
+ * an ordinary load. Capturing it here makes the value a fact about the URL the
+ * page was opened with.
+ *
+ * Hash as well as query, because the SDK's own `parseParametersFromURL`
+ * (auth-js `lib/helpers.js:66-85`) merges the hash's parameters before the
+ * query's, so a `#code=` is a PKCE callback to `_isPKCECallback` and has to be
+ * one here too. Reading only `window.location.search` would leave that URL
+ * classified as a callback by the SDK and invisible to this classifier.
+ */
+const returnedWithCode = (() => {
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('code')) return true;
+  if (!url.hash.startsWith('#')) return false;
+  return new URLSearchParams(url.hash.substring(1)).has('code');
+})();
+
+/**
+ * What this page load's authentication callback did, when it did something a
+ * signed-out person should be told about.
+ *
+ * `null` covers every load worth saying nothing about: an ordinary one, a
+ * redeemed callback, and a foreign `#access_token=` fragment the client refused
+ * (DW-95, DW-96).
+ */
+export type AuthCallbackOutcome = 'cancelled' | 'needs-original-browser' | null;
+
+/**
+ * Classify this page load's authentication callback, from what the SDK already
+ * produced.
+ *
+ * `initialize()` memoises `initializePromise` (`GoTrueClient.js:344-347`), so
+ * this returns the result of the single initialization the client ran on
+ * construction and starts nothing new -- no second exchange, no extra request.
+ *
+ * The two recoverable outcomes:
+ *
+ *  - `cancelled` -- the provider sent us back with `error` / `error_description`
+ *    / `error_code`, which `_getSessionFromURL` turns into an
+ *    `AuthImplicitGrantRedirectError` at `GoTrueClient.js:3252-3259`, *before*
+ *    the flowType switch. Under `flowType: 'pkce'` that branch is the only route
+ *    to that error class, which is what makes `isAuthImplicitGrantRedirectError`
+ *    an exact test rather than a broad one: a hostile `#access_token=` fragment
+ *    yields `AuthPKCEGrantCodeExchangeError` instead and stays silent, as the
+ *    refusal it is.
+ *
+ *  - `needs-original-browser` -- a `?code=` came back but no code verifier for
+ *    it is in this browser's storage, so `_isPKCECallback`
+ *    (`GoTrueClient.js:3356-3367`) classifies the URL as not-a-callback at all
+ *    and `_initialize` falls through to `_recoverAndRefresh` and returns
+ *    `{ error: null }`. The captured `code` plus the absent session are the
+ *    only discriminator there is.
+ *
+ * A session present means the person is not on the login screen, so there is
+ * nowhere to say it and nothing to say: that reads `null`.
+ */
+export const getAuthCallbackOutcome = async (): Promise<AuthCallbackOutcome> => {
+  const { error } = await supabase.auth.initialize();
+  if (isAuthImplicitGrantRedirectError(error)) return 'cancelled';
+  if (error || !returnedWithCode) return null;
+  const { data } = await supabase.auth.getSession();
+  return data.session ? null : 'needs-original-browser';
+};
 
 /**
  * Attempts the two delivery-side lookups make, and the backoff between them.
