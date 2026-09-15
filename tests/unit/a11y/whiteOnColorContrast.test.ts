@@ -59,33 +59,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
  * The count matters as much as the key. Without it, a file with two bad
  * pairings stays green after only one is fixed.
  */
-const KNOWN_BELOW_FLOOR = new Map<string, { count: number; note: string }>([
-  [
-    'src/components/love-notes/MessageInput.tsx:coral-500',
-    {
-      count: 1,
-      note: 'coral-500 at 1.99:1 — the love-notes send button, and the worst in the tree. DW-141. Not a shade bump: every coral shade fails except coral-900 (4.94:1), so this is a brand decision.',
-    },
-  ],
-  [
-    'src/components/PartnerMoodView/PartnerMoodView.tsx:green-500',
-    {
-      count: 1,
-      note: 'green-500 at 2.22:1 — DW-140. green-700 (4.94:1) is the first shade that clears.',
-    },
-  ],
-  [
-    'src/components/PhotoGallery/PhotoGridItem.tsx:blue-500',
-    {
-      count: 1,
-      note: 'blue-500 at 3.76:1 on text-xs, measured at full opacity though the class is bg-blue-500/90 over a photo — DW-142.',
-    },
-  ],
-  [
-    'src/components/InteractionHistory/InteractionHistory.tsx:purple-500',
-    { count: 1, note: 'purple-500 at 4.12:1 — DW-139.' },
-  ],
-]);
+const KNOWN_BELOW_FLOOR = new Map<string, { count: number; note: string }>();
 
 /**
  * The scripture feature is frozen pending removal (AGENTS.md), so its
@@ -201,24 +175,13 @@ interface Pairing {
 }
 
 /**
- * The one gradient idiom in the tree, and the ten places it is repeated.
+ * Gradient stops below the floor, keyed by swatch rather than by file.
  *
- * Keyed by swatch rather than by file, because this is a single style copied
- * around rather than ten independent decisions — listing eighteen
- * `file:swatch` rows would bury that. Measured: `pink-500` is #f6339a at
- * 3.58:1 and `rose-500` resolves to the project's own override #f43f5e at
- * 3.67:1, so both ends of the sweep fail and every point between them does too.
- *
- * Raised as DW-143. The fix is already written in the tree: several of these
- * carry `hover:from-pink-600 hover:to-rose-600`, and those clear at 4.54:1 and
- * 4.70:1 — so the resting state fails while the hover state passes, which is
- * backwards. Promoting the hover values is a visible change to the app's
- * primary action colour, which is a design decision rather than a class edit.
+ * Empty after DW-143 promoted the resting CTA from `pink-500`/`rose-500`
+ * (3.58:1 / 3.67:1) to `pink-600`/`rose-600`. Kept as a Map so the honesty
+ * loop below still has a place to record a new failing idiom.
  */
-const KNOWN_GRADIENT_BELOW_FLOOR = new Map<string, number>([
-  ['pink-500', 10],
-  ['rose-500', 10],
-]);
+const KNOWN_GRADIENT_BELOW_FLOOR = new Map<string, number>();
 
 /**
  * Every `.tsx` under `src/`, `__tests__` aside.
@@ -257,7 +220,7 @@ function findWhiteOnColourPairings(): Pairing[] {
       // This codebase writes classes both ways — roughly 1300 `className="`
       // against 130 `className={` — and the second form is where conditional
       // pairings live, e.g. `photo.isOwn ? 'bg-pink-600 text-white' :
-      // 'bg-blue-500/90 text-white'`. An attribute-shaped regex walks past all
+      // 'bg-blue-600 text-white'`. An attribute-shaped regex walks past all
       // of them, which is a guard that reports clean over exactly the cases
       // most likely to be wrong. The first version of this file did that.
       //
@@ -366,7 +329,7 @@ describe('white text on a coloured background clears WCAG AA', () => {
     // outside this guard until the stops were matched. A regex that stopped
     // seeing them would leave the gradient allowlist below trivially satisfied.
     expect(gradients.length).toBeGreaterThan(15);
-    expect(gradients.some((pairing) => pairing.swatch === 'pink-500')).toBe(true);
+    expect(gradients.some((pairing) => pairing.swatch === 'pink-600')).toBe(true);
   });
 
   it('has no pairing below the floor except the ones already recorded', () => {

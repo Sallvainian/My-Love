@@ -43,7 +43,7 @@ export function WelcomeButton({ onClick }: WelcomeButtonProps) {
         onHoverStart={() => setShowTooltip(true)}
         onHoverEnd={() => setShowTooltip(false)}
         onClick={onClick}
-        className="group flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg transition-shadow duration-300 hover:shadow-2xl"
+        className="group flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-lg transition-shadow duration-300 hover:shadow-2xl"
         aria-label="View welcome message again"
       >
         <Heart className="h-6 w-6 fill-white" />

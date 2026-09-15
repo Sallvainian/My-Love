@@ -85,7 +85,29 @@ interface MoodChannelEntry {
    * behaviour for an unlinked or signed-out account.
    */
   partnerId: string | null;
+  /**
+   * Unsolicited `CLOSED` retries spent since the last `SUBSCRIBED`. Reset on a
+   * successful join so a later drop can recover again.
+   */
+  closedRetryCount: number;
+  /**
+   * Backoff timer for a close this registry did not ask for. Cleared on
+   * `SUBSCRIBED` and when the last subscriber detaches, so a leave during the
+   * wait does not open a channel nobody is listening to.
+   */
+  reopenTimer: ReturnType<typeof setTimeout> | null;
 }
+
+/**
+ * Same ceiling the love-notes hook uses. CLOSED is the only status retried
+ * here: the SDK rejoins an `errored` channel itself and does not rejoin a
+ * closed one.
+ */
+const RETRY_CONFIG = {
+  maxRetries: 5,
+  baseDelay: 1000,
+  maxDelay: 30000,
+};
 
 /**
  * Sync result summary
@@ -555,6 +577,198 @@ class MoodSyncService {
     return true;
   }
 
+  /** Live row for this topic, still holding at least one consumer. */
+  private isLiveMoodEntry(topic: string, entry: MoodChannelEntry): boolean {
+    return this.moodChannels.get(topic) === entry && entry.subscribers.size > 0;
+  }
+
+  /**
+   * Hand a channel back to the client and record the leave, so the next open
+   * for this topic waits it out instead of being handed the object that is
+   * still going away.
+   */
+  private releaseMoodChannel(topic: string, channel: MoodChannelEntry['channel']): void {
+    // The catch is a belt, not the mechanism. `unsubscribe()` resolves
+    // 'ok' | 'timed out' | 'error' and has no rejection path at all
+    // (RealtimeChannel.js:604-612); it stays because a rejection escaping
+    // into an unrelated subscribe call would be silent.
+    const leaving = supabase.removeChannel(channel).catch((err) => {
+      logger.debug('[MoodSyncService] Mood channel leave failed:', err);
+    });
+    this.closingMoodChannels.set(topic, leaving);
+    void leaving.finally(() => {
+      if (this.closingMoodChannels.get(topic) === leaving) {
+        this.closingMoodChannels.delete(topic);
+      }
+    });
+  }
+
+  private cancelMoodReopen(entry: MoodChannelEntry): void {
+    if (!entry.reopenTimer) return;
+    clearTimeout(entry.reopenTimer);
+    entry.reopenTimer = null;
+  }
+
+  /**
+   * Bind a freshly minted channel to this entry. The status callback closes
+   * over THIS entry so a terminal CLOSED from a channel that has since been
+   * replaced cannot pin its replacement's `lastStatus`.
+   */
+  private bindMoodChannel(topic: string, entry: MoodChannelEntry): MoodChannelEntry['channel'] {
+    const channel = supabase
+      .channel(topic, {
+        config: {
+          broadcast: { self: false },
+          // Authorized by the SELECT policy `couple_broadcast_recipient_can_receive`
+          // on `realtime.messages`: receive only on your own topic.
+          private: true,
+        },
+      })
+      .on('broadcast', { event: 'new_mood' }, (payload) => {
+        logger.debug('[MoodSyncService] Received partner mood broadcast:', payload);
+
+        // The identity check lives HERE rather than in each consumer.
+        // usePartnerMood already filtered on the sender, but PartnerMoodView
+        // raised a toast for any broadcast at all — so a malformed or
+        // non-partner payload has to be dropped where both of them share it.
+        const mood = parseMoodBroadcast(payload?.payload, { partnerId: entry.partnerId });
+        if (!mood) {
+          logger.debug('[MoodSyncService] Dropped an unauthorized or malformed mood broadcast');
+          return;
+        }
+
+        // Snapshot first: a consumer may unsubscribe from inside its own
+        // handler, and that mutates the set being iterated.
+        Array.from(entry.subscribers).forEach((s) => s.onMood(mood));
+      })
+      .subscribe((status) => {
+        this.handleMoodChannelStatus(topic, entry, status);
+      });
+
+    return channel;
+  }
+
+  /**
+   * Arm a bounded replacement join. Used for an unsolicited CLOSED and for a
+   * reopen whose wait/`setAuth` rejected after the live row had already been
+   * swapped off the released channel — nothing else will emit another CLOSED.
+   */
+  private armMoodReopen(topic: string, entry: MoodChannelEntry): void {
+    if (entry.closedRetryCount >= RETRY_CONFIG.maxRetries) {
+      console.error(
+        `[MoodSyncService] Max retries (${RETRY_CONFIG.maxRetries}) exceeded. Giving up.`
+      );
+      return;
+    }
+
+    const delay = Math.min(
+      RETRY_CONFIG.baseDelay * Math.pow(2, entry.closedRetryCount),
+      RETRY_CONFIG.maxDelay
+    );
+    entry.closedRetryCount++;
+
+    logger.debug(
+      `[MoodSyncService] Retry attempt ${entry.closedRetryCount}/${RETRY_CONFIG.maxRetries} in ${delay}ms`
+    );
+
+    this.cancelMoodReopen(entry);
+    entry.reopenTimer = setTimeout(() => {
+      entry.reopenTimer = null;
+      void this.reopenMoodChannel(topic, entry).catch((error) => {
+        console.error('[MoodSyncService] Retry setup failed:', error);
+        const live = this.moodChannels.get(topic);
+        if (live && this.isLiveMoodEntry(topic, live)) {
+          this.armMoodReopen(topic, live);
+        }
+      });
+    }, delay);
+  }
+
+  private handleMoodChannelStatus(topic: string, entry: MoodChannelEntry, status: string): void {
+    logger.debug('[MoodSyncService] Broadcast subscription status:', status);
+
+    entry.lastStatus = status;
+
+    if (status === 'SUBSCRIBED') {
+      entry.closedRetryCount = 0;
+      this.cancelMoodReopen(entry);
+
+      // Only a RE-join re-takes the snapshot. The FIRST SUBSCRIBED already
+      // holds the join-time partner, so refreshing it there would discard a
+      // fresh value and drop every mood arriving during the replacement
+      // round-trip. Caught, not merely voided: a failed lookup leaves the
+      // snapshot null — the safe direction — and must not surface as an
+      // unhandled rejection.
+      const settled = entry.snapshotFresh
+        ? this.verifyChannelOwner(entry).then(() => undefined)
+        : this.refreshChannelIdentity(entry);
+
+      void settled.catch((error) => {
+        logger.debug('[MoodSyncService] Mood channel identity refresh failed:', error);
+      });
+
+      entry.snapshotFresh = false;
+    }
+
+    // Fan only while this callback's entry is the live row. The subscriber set
+    // is aliased onto a replacement, so a CLOSED from the released channel must
+    // not notify consumers already attached to the new one. An unsolicited
+    // CLOSED still owns the row and is fanned.
+    if (this.moodChannels.get(topic) === entry) {
+      Array.from(entry.subscribers).forEach((s) => s.onStatus?.(status));
+    }
+
+    // Unsolicited only while this callback's entry is still the live row and
+    // still has subscribers. Last-subscriber teardown deletes that row before
+    // `removeChannel`, and a replacement swaps the row before releasing the
+    // closed channel, so those CLOSEds never reach the reopen path.
+    if (status !== 'CLOSED' || !this.isLiveMoodEntry(topic, entry)) return;
+
+    logger.info('[MoodSyncService] Channel closed unexpectedly; re-opening');
+    this.armMoodReopen(topic, entry);
+  }
+
+  /**
+   * Replace a channel the server closed out from under live subscribers.
+   *
+   * The subscriber set moves onto a new entry before the old channel is
+   * released, so that leave's CLOSED is not treated as another unsolicited
+   * close. `snapshotFresh` is false: the replacement's first `SUBSCRIBED` is a
+   * re-join and must re-take identity.
+   */
+  private async reopenMoodChannel(topic: string, entry: MoodChannelEntry): Promise<void> {
+    if (!this.isLiveMoodEntry(topic, entry)) return;
+
+    const replacement: MoodChannelEntry = {
+      channel: entry.channel,
+      subscribers: entry.subscribers,
+      lastStatus: entry.lastStatus,
+      snapshotFresh: false,
+      ownerUserId: entry.ownerUserId,
+      partnerId: entry.partnerId,
+      closedRetryCount: entry.closedRetryCount,
+      reopenTimer: null,
+    };
+    this.moodChannels.set(topic, replacement);
+
+    this.releaseMoodChannel(topic, entry.channel);
+
+    const closing = this.closingMoodChannels.get(topic);
+    if (closing) {
+      logger.debug(`[MoodSyncService] Waiting for the previous ${topic} channel to close`);
+      await closing;
+    }
+    if (!this.isLiveMoodEntry(topic, replacement)) return;
+
+    await waitForSocketReady();
+    if (!this.isLiveMoodEntry(topic, replacement)) return;
+
+    await supabase.realtime.setAuth();
+    if (!this.isLiveMoodEntry(topic, replacement)) return;
+
+    replacement.channel = this.bindMoodChannel(topic, replacement);
+  }
+
   /**
    * Subscribe to real-time partner mood updates via Broadcast API
    *
@@ -659,70 +873,11 @@ class MoodSyncService {
         snapshotFresh: partnerIdAtJoin !== null,
         ownerUserId: currentUserId,
         partnerId: partnerIdAtJoin,
+        closedRetryCount: 0,
+        reopenTimer: null,
       };
 
-      const channel = supabase
-        .channel(topic, {
-          config: {
-            broadcast: { self: false }, // Don't receive own broadcasts
-            // Authorized by the SELECT policy `couple_broadcast_recipient_can_receive`
-            // on `realtime.messages`: receive only on your own topic. Public
-            // joins to this topic used to let anyone holding the anon key read
-            // and forge a couple's moods.
-            private: true,
-          },
-        })
-        .on('broadcast', { event: 'new_mood' }, (payload) => {
-          logger.debug('[MoodSyncService] Received partner mood broadcast:', payload);
-
-          // The identity check lives HERE rather than in each consumer.
-          // usePartnerMood already filtered on the sender, but PartnerMoodView
-          // raised a toast for any broadcast at all — so a malformed or
-          // non-partner payload has to be dropped where both of them share it.
-          const mood = parseMoodBroadcast(payload?.payload, { partnerId: newEntry.partnerId });
-          if (!mood) {
-            logger.debug('[MoodSyncService] Dropped an unauthorized or malformed mood broadcast');
-            return;
-          }
-
-          // Snapshot first: a consumer may unsubscribe from inside its own
-          // handler, and that mutates the set being iterated.
-          Array.from(subscribers).forEach((s) => s.onMood(mood));
-        })
-        .subscribe((status) => {
-          logger.debug('[MoodSyncService] Broadcast subscription status:', status);
-
-          newEntry.lastStatus = status;
-
-          // Only a RE-join re-takes the snapshot: Realtime re-evaluates RLS
-          // here, and the relationship may have changed since the channel was
-          // first opened. The FIRST SUBSCRIBED already holds `partnerIdAtJoin`,
-          // assigned before this callback could fire, so refreshing it there
-          // would discard a fresh value and drop every mood arriving during the
-          // replacement round-trip.
-          if (status === 'SUBSCRIBED') {
-            // Caught, not merely voided: a failed lookup leaves the snapshot
-            // null, which drops broadcasts until the next SUBSCRIBED — the safe
-            // direction — and must not surface as an unhandled rejection.
-            const settled = newEntry.snapshotFresh
-              ? // The snapshot was resolved moments ago, so only the account
-                // half runs. Skipping that too would let a channel opened
-                // microseconds before an account switch keep dispatching the
-                // previous couple's moods.
-                this.verifyChannelOwner(newEntry).then(() => undefined)
-              : this.refreshChannelIdentity(newEntry);
-
-            void settled.catch((error) => {
-              logger.debug('[MoodSyncService] Mood channel identity refresh failed:', error);
-            });
-
-            newEntry.snapshotFresh = false;
-          }
-
-          Array.from(subscribers).forEach((s) => s.onStatus?.(status));
-        });
-
-      newEntry.channel = channel;
+      newEntry.channel = this.bindMoodChannel(topic, newEntry);
       entry = newEntry;
       // Nothing is awaited between the LAST read of `entry` above and this
       // insert, so two concurrent subscribers cannot both miss and both open a
@@ -786,27 +941,13 @@ class MoodSyncService {
         return;
       }
 
+      this.cancelMoodReopen(live);
       this.moodChannels.delete(topic);
 
       // Record the leave so the next subscriber for this topic waits it out
-      // instead of being handed the channel that is still going away.
-      //
-      // The catch is a belt, not the mechanism. `unsubscribe()` resolves
-      // 'ok' | 'timed out' | 'error' and has no rejection path at all
-      // (RealtimeChannel.js:604-612), so nothing reaches it today; it stays
-      // because a rejection escaping into an unrelated subscribe call would be
-      // silent, and an SDK bump is free to introduce one.
-      const leaving = supabase.removeChannel(live.channel).catch((err) => {
-        logger.debug('[MoodSyncService] Mood channel leave failed:', err);
-      });
-      this.closingMoodChannels.set(topic, leaving);
-      void leaving.finally(() => {
-        // Only clear our own entry — a later teardown may already have
-        // replaced it.
-        if (this.closingMoodChannels.get(topic) === leaving) {
-          this.closingMoodChannels.delete(topic);
-        }
-      });
+      // instead of being handed the channel that is still going away. The row
+      // is already gone, so the leave's CLOSED is not treated as unsolicited.
+      this.releaseMoodChannel(topic, live.channel);
 
       logger.debug('[MoodSyncService] Unsubscribed from mood broadcasts');
     };
