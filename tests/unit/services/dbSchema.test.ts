@@ -65,12 +65,12 @@ describe('dbSchema', () => {
       expect(db.objectStoreNames.contains('scripture-messages')).toBe(true);
     });
 
-    it('should create exactly 8 stores', async () => {
+    it('should create exactly 9 stores', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
       });
 
-      expect(db.objectStoreNames.length).toBe(8);
+      expect(db.objectStoreNames.length).toBe(9);
     });
   });
 
@@ -124,7 +124,7 @@ describe('dbSchema', () => {
       expect(dbV5.objectStoreNames.contains('moods')).toBe(true);
       expect(dbV5.objectStoreNames.contains('sw-auth')).toBe(true);
 
-      expect(dbV5.objectStoreNames.length).toBe(8);
+      expect(dbV5.objectStoreNames.length).toBe(9);
     });
 
     it('should add the messages by-user index to a store that already exists', async () => {
@@ -341,7 +341,7 @@ describe('dbSchema', () => {
 
       // No store gained or lost, and the v7 moods index is untouched — v8 must
       // not re-run the v7 swap over a store that has already had it.
-      expect(db.objectStoreNames.length).toBe(8);
+      expect(db.objectStoreNames.length).toBe(9);
       const moods = db.transaction('moods', 'readonly').objectStore('moods');
       expect(moods.indexNames.contains('by-user-date')).toBe(true);
       expect((moods.indexNames as DOMStringList).contains('by-date')).toBe(false);
@@ -485,7 +485,7 @@ describe('dbSchema', () => {
       // v6 re-fires upgradeDb so profiles stranded at v5 by storage.ts's old
       // callback get their missing stores created; v7 swaps the moods index;
       // v8 adds by-user to messages.
-      expect(DB_VERSION).toBe(8);
+      expect(DB_VERSION).toBe(9);
     });
   });
 });

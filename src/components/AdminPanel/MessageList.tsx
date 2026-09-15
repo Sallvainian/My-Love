@@ -19,7 +19,7 @@ export function MessageList({ onEdit, onDelete }: MessageListProps) {
   // Combine default messages and custom messages
   // Convert Message to CustomMessage format for display
   const allMessages: CustomMessage[] = useMemo(() => {
-    const defaultAsCustom: CustomMessage[] = messages.map((msg) => ({
+    const defaultAsCustom: CustomMessage[] = messages.filter((msg) => !msg.isCustom).map((msg) => ({
       id: msg.id,
       text: msg.text,
       category: msg.category,

@@ -72,7 +72,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     currentIndex: 0, // Story 3.3: 0 = today, 1 = yesterday, etc.
     shownMessages: new Map(), // Story 3.3: Date → Message ID mapping
     maxHistoryDays: 30, // Story 3.3: History limit
-    favoriteIds: [], // Keep for legacy favorite tracking
+    favoriteIds: [], // Account-specific projection loaded from IndexedDB
     // Deprecated fields (migration):
     lastShownDate: '',
     lastMessageId: 0,
@@ -93,7 +93,15 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     try {
       const messages = await storageService.getAllMessages(requestedBy);
       if (!stillCurrent()) return;
-      set({ messages });
+      set((state) => ({
+        messages,
+        currentMessage: messages.find((message) => message.id === state.currentMessage?.id) ?? null,
+        messageHistory: {
+          ...state.messageHistory,
+          favoriteIds: messages.filter((message) => message.isFavorite).map((message) => message.id),
+        },
+      }));
+      if (stillCurrent() && !get().currentMessage) get().updateCurrentMessage();
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -128,29 +136,30 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
   },
 
   toggleFavorite: async (messageId) => {
-    // The flag lands in the shared `messages` store, which holds every account
-    // that has signed in on this device, so the write has to name the account
-    // that raised it. Captured at entry like `loadMessages` does, and rechecked
-    // before `set()` so a switch (or A → signed out → A) cannot flip the
-    // incoming account's favorites.
+    // Persist under the captured owner, then project the committed value only
+    // if the same account session still owns the UI.
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     const stillCurrent = () =>
       get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
     try {
-      await storageService.toggleFavorite(messageId, requestedBy);
+      const isFavorite = await storageService.toggleFavorite(messageId, requestedBy);
 
       if (!stillCurrent()) return;
 
       set((state) => ({
         messages: state.messages.map((msg) =>
-          msg.id === messageId ? { ...msg, isFavorite: !msg.isFavorite } : msg
+          msg.id === messageId ? { ...msg, isFavorite } : msg
         ),
+        currentMessage:
+          state.currentMessage?.id === messageId
+            ? { ...state.currentMessage, isFavorite }
+            : state.currentMessage,
         messageHistory: {
           ...state.messageHistory,
-          favoriteIds: state.messages.find((m) => m.id === messageId)?.isFavorite
-            ? state.messageHistory.favoriteIds.filter((id) => id !== messageId)
-            : [...state.messageHistory.favoriteIds, messageId],
+          favoriteIds: isFavorite
+            ? [...new Set([...state.messageHistory.favoriteIds, messageId])]
+            : state.messageHistory.favoriteIds.filter((id) => id !== messageId),
         },
       }));
     } catch (error) {
