@@ -1444,4 +1444,6 @@ location: src/components/AdminPanel/AdminPanel.tsx:103
 source_spec: `spec-dw-143-promote-resting-gradient-to-600.md`
 severity: medium
 reason: AdminPanel.tsx:103 is still `bg-gradient-to-r from-pink-500 to-rose-500` with a child span at :104 `text-xl text-white`. The scanner requires both utilities on the same literal, so this pairing is invisible. Intent named :149, not :103. Pre-existing; this change left it.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-dw-admin-title-icon-gradient-600
+resolution-undo: f3c026f60b04855fe1eac063972140e27f6466a97ff4626e6347a8ad9e184001 2026-09-15 7374617475733a206f70656e
