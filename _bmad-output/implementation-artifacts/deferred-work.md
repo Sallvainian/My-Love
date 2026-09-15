@@ -1401,7 +1401,9 @@ origin: raised while closing DW-134, 2026-09-15
 location: src/components/love-notes/MessageInput.tsx:269
 severity: medium
 reason: `className="bg-coral-500 hover:bg-coral-600 focus:ring-coral-500 disabled:hover:bg-coral-500 min-h-[44px] rounded-lg px-6 py-2 font-medium text-white ..."`. `coral` is a project colour, not a Tailwind one — `tailwind.config.js:20`, reached through `src/index.css:4` `@config '../tailwind.config.js'`. Measured from that file: `coral-500` is `#ffa07a`, 1.99:1 against white, less than half the 4.5:1 AA floor and worse than DW-140's green-500. This is the primary action of the love-notes screen. Unlike the red family, where DW-134 moved one step from 500 to 600, no step fixes it: measured across the whole ramp, coral-600 is 2.5:1, coral-700 is 2.95:1, coral-800 is 3.79:1, and only coral-900 (`#c44536`) clears at 4.94:1 — a colour far darker than the brand's coral. So this is a design decision, not a class edit: either the button stops being coral, or the label stops being white. Allowlisted in tests/unit/a11y/whiteOnColorContrast.test.ts with its measured ratio. Settle by choosing between a darker ground and dark text on coral.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-decision-dw-141
+resolution-undo: 3a81584d964cd09861eb5d3d1b59ee312b892f68054f4b2bec7ae3c377aeb673 2026-09-15 7374617475733a206f70656e
 decision: 2026-09-15 Keep coral-500; switch the Send label to dark text — Keep the brand coral-500 ground on the love-notes Send button and replace text-white with a dark text colour that clears 4.5:1 against #ffa07a. Remove the MessageInput.tsx:coral-500 KNOWN_BELOW_FLOOR row. Decide in the same session whether LoveNoteMessage and MessageList bg-[#FF6B6B] text-white stay as hex or join the same treatment.
 
 ### DW-142: The photo owner badge pairs white text with bg-blue-500/90 over a photograph, at 3.76:1 even before the photo shows through.
@@ -1420,3 +1422,11 @@ severity: medium
 reason: One idiom, copied ten times: `bg-gradient-to-r from-pink-500 to-rose-500` with `text-white`. A gradient carries no `bg-<colour>-<shade>`, so it has never been measured by anything — it was outside tests/unit/a11y/whiteOnColorContrast.test.ts until that file learned to read `from-`/`via-`/`to-` stops, which is how this was found. Measured at both ends: `pink-500` is Tailwind's `#f6339a` at 3.58:1, and `rose-500` resolves to this project's own override `#f43f5e` (`tailwind.config.js:65`) at 3.67:1. Both are below the 4.5:1 AA floor, so every point along the sweep is, and `DailyMessage.tsx:260` is `text-xs`, where the large-text allowance does not apply either. The fix is already written in the tree and applied to the wrong state: several of these carry `hover:from-pink-600 hover:to-rose-600`, and those stops clear at 4.54:1 and 4.70:1 — so today the button becomes compliant only while the pointer is on it. Not fixed here: promoting the hover values changes the resting colour of the app's primary action in ten places, which is a design decision rather than a class edit, and DW-134 named two destructive buttons. Allowlisted as a group in that test, keyed by swatch with an expected count of ten each, so fixing some and not others turns it red. Settle by deciding whether the resting gradient becomes the 600 pair.
 status: open
 decision: 2026-09-15 Promote resting stops to pink-600 / rose-600 everywhere the idiom appears — Change the resting gradient from from-pink-500 to-rose-500 to from-pink-600 to-rose-600 with text-white on all ten bg-gradient-to-r sites, plus PokeKissInterface.tsx:439 and src/index.css .btn-primary, in one change. Darken or drop the existing hover:from-pink-600 hover:to-rose-600 so hover is not lighter than rest. Clear both KNOWN_GRADIENT_BELOW_FLOOR counts together; do not ship a subset.
+
+### DW-144: Own-message bubbles still drop below 4.5:1 while isSending applies opacity-70.
+origin: spec-deferred 7390a9ee0dac
+location: src/components/love-notes/LoveNoteMessage.tsx:276
+source_spec: `spec-dw-141-love-notes-send-button-contrast.md`
+severity: low
+reason: LoveNoteMessage.tsx:276 already had `${isSending ? 'opacity-70' : ''}`. Group-composite of canvas gray-800 (30,41,57) on #FF6B6B at 0.7 over LoveNotes bg #FFF5F5 is 2.715:1. Pre-change white on the same stack was 2.07:1. Rest of the own bubble is 5.286:1. Removing the fade would change in-flight send UX this bundle did not restyle.
+status: open
