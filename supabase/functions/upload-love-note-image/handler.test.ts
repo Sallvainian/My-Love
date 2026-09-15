@@ -2,7 +2,11 @@
  * `deno test` coverage for the bounded upload handler (CAP-10 / F10).
  *
  * Run with:
- *   deno test supabase/functions/upload-love-note-image/
+ *   deno test --no-lock supabase/functions/upload-love-note-image/
+ *
+ * `--no-lock` is not optional: a bare run writes a `deno.lock` at the repo
+ * root, and an untested lockfile could change what `supabase functions deploy`
+ * resolves. CI runs the same command (.github/workflows/test.yml, lint job).
  *
  * These cases assert *mechanism*, not only status codes. A handler that
  * buffered the whole body and then returned 413 would pass a status-only test
@@ -208,7 +212,10 @@ Deno.test('an over-limit Content-Length is refused with no body present at all',
   assertEquals(client.uploadCalls.length, 0);
 });
 
-Deno.test('an over-limit body is discarded rather than retained', async () => {
+// Named for what it asserts, not for the retention property: `pulls`/`cancels`/
+// `uploadCalls` cannot distinguish check-then-push from push-then-check. See
+// "Matrix test audit" in the story spec — that ordering rests on review.
+Deno.test('an over-limit body is drained to completion and never reaches Storage', async () => {
   const client = fakeClient();
   const chunkSize = 64 * 1024;
   const declared = 8 * 1024 * 1024;
@@ -342,7 +349,10 @@ Deno.test('a header that lies small is still stopped by the cap, not by the head
   assertEquals(client.uploadCalls.length, 0);
 });
 
-Deno.test('the overflowing chunk itself is never retained', async () => {
+// Likewise named for what it asserts. That the overflowing chunk is never
+// *retained* is the implemented behaviour (`chunks.length = 0` precedes the
+// drain) but is not observable from outside the handler; this pins the refusal.
+Deno.test('the chunk that crosses the cap stops the read and nothing reaches Storage', async () => {
   const client = fakeClient();
   // One byte short of the cap, then a chunk that crosses it. If the handler
   // pushed before checking, it would be holding that second chunk.
@@ -370,8 +380,93 @@ Deno.test('a body that ends short of its declared length is refused with 400', a
 
   assertEquals(response.status, 400);
   const body = await response.json();
-  assertEquals(body.error, 'Incomplete request body');
+  assertEquals(body.error, 'Content-Length mismatch');
   assertStringIncludes(body.message, '1048576');
+  assertEquals(client.uploadCalls.length, 0);
+});
+
+Deno.test('a body longer than its declared length is refused with 400', async () => {
+  const client = fakeClient();
+  // Over-long but still under the cap, so the in-loop 413 never fires and the
+  // final comparison is what refuses it. The label has to read correctly in
+  // this direction too, which is why it is not "incomplete".
+  const { stream } = countedStream(chunked(pngBytes(64 * 1024), 16 * 1024));
+
+  const response = await handleUpload(
+    uploadRequest({ body: stream, contentLength: '10' }),
+    client.deps
+  );
+
+  assertEquals(response.status, 400);
+  const body = await response.json();
+  assertEquals(body.error, 'Content-Length mismatch');
+  assertStringIncludes(body.message, '65536');
+  assertEquals(client.uploadCalls.length, 0);
+});
+
+/**
+ * Replace the four buffering reads with traps, so calling any of them is a test
+ * failure rather than a silent regression.
+ *
+ * This is the one **Always** bullet with no other enforcement: "Never call
+ * `arrayBuffer()`, `formData()`, `text()` or `json()` on the request." Each is
+ * the unbounded read the whole module exists to avoid.
+ */
+function trapUnboundedReads(request: Request): string[] {
+  const called: string[] = [];
+  for (const method of ['arrayBuffer', 'formData', 'text', 'json'] as const) {
+    Object.defineProperty(request, method, {
+      configurable: true,
+      value: () => {
+        called.push(method);
+        return Promise.reject(new Error(`req.${method}() must never be called`));
+      },
+    });
+  }
+  return called;
+}
+
+Deno.test('a successful upload never calls arrayBuffer, formData, text or json', async () => {
+  const client = fakeClient();
+  const size = 64 * 1024;
+  const { stream } = countedStream(chunked(pngBytes(size), 16 * 1024));
+  const request = uploadRequest({ body: stream, contentLength: String(size) });
+  const called = trapUnboundedReads(request);
+
+  const response = await handleUpload(request, client.deps);
+
+  assertEquals(called, [], `handler called ${called.join(', ')} on the request`);
+  assertEquals(response.status, 200);
+  assertEquals(client.uploadCalls.length, 1);
+});
+
+Deno.test('an over-limit refusal never calls arrayBuffer, formData, text or json', async () => {
+  const client = fakeClient();
+  const declared = MAX + 1;
+  const { stream } = countedStream(chunked(pngBytes(64 * 1024), 16 * 1024));
+  const request = uploadRequest({ body: stream, contentLength: String(declared) });
+  const called = trapUnboundedReads(request);
+
+  const response = await handleUpload(request, client.deps);
+
+  assertEquals(called, [], `handler called ${called.join(', ')} on the request`);
+  assertEquals(response.status, 413);
+  assertEquals(client.uploadCalls.length, 0);
+});
+
+Deno.test('a multipart refusal never calls arrayBuffer, formData, text or json', async () => {
+  const client = fakeClient();
+  const request = uploadRequest({
+    body: pngBytes(1024),
+    contentLength: '1024',
+    contentType: 'multipart/form-data; boundary=----x',
+  });
+  const called = trapUnboundedReads(request);
+
+  const response = await handleUpload(request, client.deps);
+
+  assertEquals(called, [], `handler called ${called.join(', ')} on the request`);
+  assertEquals(response.status, 415);
   assertEquals(client.uploadCalls.length, 0);
 });
 
