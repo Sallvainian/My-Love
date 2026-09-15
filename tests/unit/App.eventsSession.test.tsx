@@ -29,6 +29,10 @@ vi.mock('../../src/api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
   getPartnerId: vi.fn(),
   lookupOwnDisplayName: profile.lookupOwnDisplayName,
+  // App's bootstrap reads the callback outcome from this module too. Nothing
+  // here drives a callback, so the ordinary answer is the only one needed --
+  // but it must exist, or `checkAuth` throws before it settles the session.
+  getAuthCallbackOutcome: vi.fn(async () => null),
 }));
 vi.mock('../../src/api/auth/sessionService', () => ({
   getSession: auth.getSession,

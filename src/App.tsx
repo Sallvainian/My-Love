@@ -16,7 +16,11 @@ import { useAppStore } from './stores/useAppStore';
 // PokeKissInterface moved to PartnerMoodView
 import type { Session } from '@supabase/supabase-js';
 import { getSession, onAuthStateChange } from './api/auth/sessionService';
-import { lookupOwnDisplayName } from './api/supabaseClient';
+import {
+  getAuthCallbackOutcome,
+  lookupOwnDisplayName,
+  type AuthCallbackOutcome,
+} from './api/supabaseClient';
 import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
@@ -118,6 +122,9 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [needsDisplayName, setNeedsDisplayName] = useState(false);
+  // DW-95 / DW-96: what this page load's authentication callback did, when it
+  // ended here with nothing to read. Only the login screen renders it.
+  const [callbackOutcome, setCallbackOutcome] = useState<AuthCallbackOutcome>(null);
   // Which profile-name read is allowed to move the gate. Bumped by every new
   // read, by sign-out, and by a completed setup — see resolveDisplayNameGate.
   const displayNameReadRef = useRef(0);
@@ -234,6 +241,11 @@ function App() {
   useEffect(() => {
     let isMounted = true;
     let hasAuthNotification = false;
+    // A notification that ESTABLISHED a session, which is the only thing that
+    // retires a callback outcome. Kept apart from `hasAuthNotification` above,
+    // which every notification sets -- sign-out and the initial signed-out
+    // snapshot included.
+    let hasSessionNotification = false;
 
     const checkAuth = async () => {
       try {
@@ -250,6 +262,22 @@ function App() {
           }
 
           logger.debug('[App] Auth check:', currentSession ? 'authenticated' : 'not authenticated');
+        }
+
+        // The callback this load arrived with, read once. `initialize()` is
+        // memoised, so this is the outcome of the initialization the session
+        // read above already awaited -- no second exchange and no extra
+        // request.
+        //
+        // Guarded on `hasSessionNotification`, NOT `hasAuthNotification`: the
+        // SDK emits INITIAL_SESSION as soon as the listener subscribes, and on
+        // exactly the loads this exists for that notification carries no
+        // session and still arrives first -- so the broader flag would suppress
+        // every notice there is. Only a session supersedes an outcome, and the
+        // session branch below both sets that flag and clears the outcome.
+        const outcome = await getAuthCallbackOutcome();
+        if (isMounted && !hasSessionNotification) {
+          setCallbackOutcome(outcome);
         }
       } catch (error) {
         console.error('[App] Auth check failed:', error);
@@ -316,6 +344,13 @@ function App() {
         // Check if user needs to set display name (for signups without one)
         if (newSession?.user) {
           setAuthUser(newSession.user.id, newSession.user.email);
+          // The callback that raised a notice is settled the moment a session
+          // exists. Cleared here rather than on sign-out because LoginScreen
+          // remounts fresh on the way back: a value left here would greet the
+          // next sign-out with a message about a callback long since over.
+          // The flag keeps a still-in-flight `checkAuth` from putting it back.
+          hasSessionNotification = true;
+          setCallbackOutcome(null);
           // The name lives in the profile row, not in auth metadata, so this is
           // a read and the gate settles a tick later.
           //
@@ -567,6 +602,7 @@ function App() {
     return (
       <ErrorBoundary>
         <LoginScreen
+          callbackOutcome={callbackOutcome}
           onLoginSuccess={() => {
             // Session will be updated by auth state listener
             logger.debug('[App] Login successful');
