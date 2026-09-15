@@ -1435,7 +1435,9 @@ location: src/components/love-notes/LoveNoteMessage.tsx:276
 source_spec: `spec-dw-141-love-notes-send-button-contrast.md`
 severity: low
 reason: LoveNoteMessage.tsx:276 already had `${isSending ? 'opacity-70' : ''}`. Group-composite of canvas gray-800 (30,41,57) on #FF6B6B at 0.7 over LoveNotes bg #FFF5F5 is 2.715:1. Pre-change white on the same stack was 2.07:1. Rest of the own bubble is 5.286:1. Removing the fade would change in-flight send UX this bundle did not restyle.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-decision-dw-144
+resolution-undo: 61e3014acdf427ed3ea44edf2c0c87f856e373f0388f8ba816b0e287173aca1a 2026-09-15 7374617475733a206f70656e
 decision: 2026-09-15 Drop opacity-70; keep the Sending... caption — Remove `${isSending ? 'opacity-70' : ''}` from LoveNoteMessage.tsx:276 so in-flight own bubbles stay at the measured rest 5.286:1. Keep the existing Sending... aria-live span, the #FF6B6B fill, text-gray-800, partner bubbles, and send/scroll/remove behaviour. Do not convert the hex ground to coral-500 or add a contrast-scanner hex matcher.
 
 ### DW-145: Admin panel title icon still pairs white text with the old pink-500 / rose-500 gradient.
@@ -1447,3 +1449,11 @@ reason: AdminPanel.tsx:103 is still `bg-gradient-to-r from-pink-500 to-rose-500`
 status: done 2026-09-15
 resolution: resolved by sweep bundle dw-dw-admin-title-icon-gradient-600
 resolution-undo: f3c026f60b04855fe1eac063972140e27f6466a97ff4626e6347a8ad9e184001 2026-09-15 7374617475733a206f70656e
+
+### DW-146: Sending... caption remains text-gray-400 on Love Notes #FFF5F5 at 2.433:1.
+origin: spec-deferred b7c31fb127b5
+location: src/components/love-notes/LoveNoteMessage.tsx:332
+source_spec: `spec-dw-144-love-notes-sending-opacity.md`
+severity: low
+reason: LoveNoteMessage.tsx:332 is still `text-xs text-gray-400`. Installed --color-gray-400 oklch(70.7% 0.022 261.325) vs #FFF5F5 is 2.433:1. Pre-existing; the human chose to keep the existing caption.
+status: open
