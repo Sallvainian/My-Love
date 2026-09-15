@@ -74,3 +74,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, part
 - Three data models, so check which one a feature uses before writing data-layer code: photos, love notes and partner interactions are Supabase-only; mood and daily/custom messages are offline-first with IndexedDB primary; the frozen scripture feature is server-authoritative with IndexedDB as a read cache.
 
 <!-- /bmad:context -->
+
+## Review workflow (temporary)
+
+Claude Code review is paused (`claude-code-review.yml` starts with `false &&`) while usage is exhausted. The stand-in is `grok-code-review.yml`, which posts one sticky comment as `github-actions[bot]` and embeds `/actions/runs/<id>`. Exact-commit waiters: `claude_review_wait.py --workflow grok-code-review.yml --bot github-actions[bot]`. Restore Claude by deleting the `false &&` line.
