@@ -1456,4 +1456,6 @@ location: src/components/love-notes/LoveNoteMessage.tsx:332
 source_spec: `spec-dw-144-love-notes-sending-opacity.md`
 severity: low
 reason: LoveNoteMessage.tsx:332 is still `text-xs text-gray-400`. Installed --color-gray-400 oklch(70.7% 0.022 261.325) vs #FFF5F5 is 2.433:1. Pre-existing; the human chose to keep the existing caption.
-status: open
+status: done 2026-09-15
+resolution: resolved by sweep bundle dw-sending-caption-contrast
+resolution-undo: c0cd6e970276c3ee6a22291708bddd699135932cedb36f245cc7fc9c74ca96e2 2026-09-15 7374617475733a206f70656e
