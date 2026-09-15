@@ -1,46 +1,46 @@
 /**
  * Shared Realtime socket state
  *
- * Every channel in the app rides one WebSocket, and RealtimeClient tears that
- * socket down whenever the LAST channel is removed:
+ * Every channel in the app rides one WebSocket, and this module exists because
+ * opening a channel while that socket is mid-disconnect silently never joins.
  *
- *   RealtimeClient.js:213-219
- *     async removeChannel(channel) {
- *       const status = await channel.unsubscribe();
- *       if (this.channels.length === 0) { this.disconnect(); }
+ * What this gate was originally written for no longer exists. It documented
+ * `RealtimeClient.removeChannel` disconnecting the socket the moment its last
+ * channel went away, and a ~100 ms `disconnecting` window escaped by a fallback
+ * timer. Measured against the installed realtime-js 2.116.0, all three parts of
+ * that are gone:
  *
- * `disconnect()` then parks the socket in a `disconnecting` state, escaped only
- * by the transport's `onclose` or a 100 ms fallback timer:
+ *   - `removeChannel` no longer disconnects at all. It awaits
+ *     `channel.unsubscribe()` and tears the channel down on 'ok', nothing more
+ *     (dist/module/RealtimeClient.js:254-260).
+ *   - The disconnect moved to `_remove` -> `_schedulePendingDisconnect`
+ *     (`:439-460`), and it is DEFERRED, not immediate:
+ *     `_disconnectOnEmptyChannelsAfterMs` defaults to twice the heartbeat
+ *     interval (`:646-647` x `CONNECTION_TIMEOUTS.HEARTBEAT_INTERVAL: 25000`),
+ *     and this app passes no override (`src/api/supabaseClient.ts:83-87`), so
+ *     the window is 50 SECONDS.
+ *   - Reopening cancels it outright: `channel()` calls
+ *     `_cancelPendingDisconnect()` before registering (`:340`).
+ *   - The 100 ms fallback timer is gone with the state machine that owned it
+ *     (`grep -c "_setConnectionState" RealtimeClient.js` is 0). `isDisconnecting()`
+ *     now reads the raw transport: `socketAdapter.isDisconnecting()` returns
+ *     `socket.connectionState() == 'closing'`, i.e. WebSocket.CLOSING.
  *
- *   RealtimeClient.js:174-183
- *     if (this.isDisconnecting()) { return; }
- *     this._setConnectionState('disconnecting', true);
- *     ... const fallbackTimer = setTimeout(() => {
- *           this._setConnectionState('disconnected'); }, 100);
+ * So the close-then-immediately-reopen race this was built for cannot happen on
+ * a rejoin any more: nothing disconnects in that window, and reopening cancels
+ * the pending disconnect regardless.
  *
- * and every `connect()` inside that window is a silent no-op:
+ * The gate is kept anyway, for two reasons. It still describes something real —
+ * a socket the browser or an explicit `disconnect()` has genuinely put into
+ * CLOSING, which sign-out does — and in that state an open really would fail to
+ * join. And it is close to free: `isDisconnecting()` is a boolean read, and the
+ * poll below runs only when it is already true. Removing it would buy one
+ * property access and reintroduce a failure mode whose only symptom is a
+ * channel that reports TIMED_OUT ten seconds later for no visible reason.
  *
- *   RealtimeClient.js:117-122
- *     connect() {
- *       if (this.isConnecting() || this.isDisconnecting() ||
- *           (this.conn !== null && this.isConnected())) { return; }
- *
- * So closing the last channel and immediately opening another gives a channel
- * whose join is never sent. It reports TIMED_OUT ten seconds later and never
- * recovers -- not because the rejoin loop stops, but because nothing on it ever
- * reconnects the socket: `_rejoinUntilConnected` reschedules itself forever and
- * gates only `_rejoin()` on the connection, and no path from there calls
- * `socket.connect()`. Reconnecting the socket is the missing piece, not
- * restarting the loop.
- *
- * The leave itself does NOT wait for the server, which makes this deterministic
- * rather than a race: with the socket already gone `_canPush()` is false and the
- * leave resolves locally and at once (RealtimeChannel.js:386-387
- * `if (!this._canPush()) { leavePush.trigger('ok', {}); }`).
- *
- * Both places that close a channel and then open another -- the mood
- * subscribe/resubscribe path and the queued one-shot broadcasts -- land squarely
- * inside that window. Waiting it out is what makes reopening work at all.
+ * Line numbers are the `dist/module` build; `dist/main` is the same code at
+ * different offsets. The leave-side half of these measurements is asserted in
+ * tests/unit/api/realtimeLeaveContract.test.ts.
  *
  * @module api/realtimeSocket
  */
@@ -54,9 +54,10 @@ const POLL_MS = 10;
 /**
  * Upper bound on the wait.
  *
- * RealtimeClient's own escape hatch is a 100 ms fallback timer, so anything
- * beyond that means the state machine is stuck. Pressing on and letting the
- * channel report TIMED_OUT beats hanging the caller forever.
+ * A socket in CLOSING reaches CLOSED when the browser finishes the handshake,
+ * which is not something this process can hurry along; anything past a second
+ * means it is not going to. Pressing on and letting the channel report
+ * TIMED_OUT beats hanging the caller forever.
  */
 const MAX_WAIT_MS = 1000;
 
@@ -68,8 +69,10 @@ function delay(ms: number): Promise<void> {
  * Wait until the shared socket is not mid-disconnect, so that opening a channel
  * actually connects.
  *
- * Returns immediately in the overwhelmingly common case -- the socket is only
- * `disconnecting` for the ~100 ms after its last channel goes away.
+ * Returns immediately in the overwhelmingly common case. On the installed SDK
+ * the socket is `disconnecting` only while the transport is genuinely in
+ * WebSocket.CLOSING -- an explicit `disconnect()` such as sign-out, or a socket
+ * the browser is tearing down -- never merely because a channel was released.
  */
 export async function waitForSocketReady(): Promise<void> {
   if (!supabase.realtime.isDisconnecting()) return;

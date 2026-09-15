@@ -133,18 +133,28 @@ class MoodSyncService {
    * Topics whose channel is mid-leave, keyed to the promise that settles when
    * the server acks it.
    *
-   * `removeChannel` does not deregister the channel — it only awaits
-   * `channel.unsubscribe()` (RealtimeClient.js:213-219), which flips the state
-   * to `leaving` and resolves on the server's ack; the client's registry entry
-   * is dropped later, from the `_onClose` hook (RealtimeChannel.js:81-86).
-   * Until that lands, `supabase.channel(topic)` still hands back the dying
-   * object, and calling `.subscribe()` on it does nothing at all because the
-   * whole join is gated on `state == closed` (RealtimeChannel.js:127).
+   * Defensive, and measured to be so. Every line number this block used to
+   * cite was from an older realtime-js and none of them survive in the
+   * installed 2.116.0: `removeChannel` is RealtimeClient.js:254-260, the
+   * `_onClose` hook is RealtimeChannel.js:100-102, and the join gate is
+   * RealtimeChannel.js:134 (`if (this.channelAdapter.isClosed())`).
    *
-   * So the replacement subscriber would silently receive no broadcasts and no
-   * status callback, for the life of the page. Waiting the leave out is what
-   * makes reopening a topic work — which is exactly what happens every time the
-   * user moves between the Mood tab and the Partner tab.
+   * The behaviour changed too. `removeChannel` awaits `channel.unsubscribe()`,
+   * but phoenix sets `state = leaving` BEFORE testing `canPush()`
+   * (@supabase/phoenix assets/js/phoenix/channel.js:242,251), so the leave
+   * always completes locally without waiting for the server and runs its close
+   * hook — the thing that deregisters the channel — synchronously. A leave and
+   * its deregistration are therefore one step today, and no replacement
+   * subscriber can observe the dying object.
+   *
+   * Kept anyway: the cost is a Map entry, and the failure it guards is silent.
+   * Were deregistration to become asynchronous again, `supabase.channel(topic)`
+   * would hand back the dying object and `.subscribe()` on it would do nothing
+   * at all, so the replacement subscriber would receive no broadcasts and no
+   * status callback for the life of the page — which is exactly what happens
+   * every time the user moves between the Mood tab and the Partner tab. The
+   * measurements behind all of this are in
+   * tests/unit/api/realtimeLeaveContract.test.ts.
    */
   private closingMoodChannels = new Map<string, Promise<unknown>>();
 
@@ -777,10 +787,13 @@ class MoodSyncService {
       this.moodChannels.delete(topic);
 
       // Record the leave so the next subscriber for this topic waits it out
-      // instead of being handed the channel that is still going away. The
-      // catch is what makes that wait safe to await: a leave can resolve
-      // 'error' (RealtimeChannel.js:382), and a rejection here must not
-      // propagate into an unrelated subscribe call.
+      // instead of being handed the channel that is still going away.
+      //
+      // The catch is a belt, not the mechanism. `unsubscribe()` resolves
+      // 'ok' | 'timed out' | 'error' and has no rejection path at all
+      // (RealtimeChannel.js:604-612), so nothing reaches it today; it stays
+      // because a rejection escaping into an unrelated subscribe call would be
+      // silent, and an SDK bump is free to introduce one.
       const leaving = supabase.removeChannel(live.channel).catch((err) => {
         logger.debug('[MoodSyncService] Mood channel leave failed:', err);
       });
