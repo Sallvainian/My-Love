@@ -7,7 +7,11 @@
  * @module api/supabaseClient
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  createClient,
+  isAuthImplicitGrantRedirectError,
+  SupabaseClient,
+} from '@supabase/supabase-js';
 import type { Database } from '../types/database.types';
 import { logger } from '../utils/logger';
 
@@ -83,6 +87,109 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
     },
   }
 );
+
+/**
+ * Did this page load arrive carrying a `?code=` callback parameter?
+ *
+ * Read here, in the same synchronous module body as `createClient` above, and
+ * safe only here: `GoTrueClient`'s constructor calls `this.initialize()`
+ * (`GoTrueClient.js:294`), and `_initialize` runs synchronously only as far as
+ * `await this._isPKCECallback(params)` (`GoTrueClient.js:389`), so this line
+ * runs before the SDK can touch the URL.
+ *
+ * A read taken after `initialize()` resolves would be useless: on a successful
+ * exchange the SDK deletes `code` from the URL
+ * (`GoTrueClient.js:3284-3286`), so a redeemed callback would look exactly like
+ * an ordinary load. Capturing it here makes the value a fact about the URL the
+ * page was opened with.
+ *
+ * Hash as well as query, because the SDK's own `parseParametersFromURL`
+ * (auth-js `lib/helpers.js:66-85`) merges the hash's parameters before the
+ * query's, so a `#code=` is a PKCE callback to `_isPKCECallback` and has to be
+ * one here too. Reading only `window.location.search` would leave that URL
+ * classified as a callback by the SDK and invisible to this classifier.
+ */
+const returnedWithCode = (() => {
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('code')) return true;
+  if (!url.hash.startsWith('#')) return false;
+  return new URLSearchParams(url.hash.substring(1)).has('code');
+})();
+
+/**
+ * What this page load's authentication callback did, when it did something a
+ * signed-out person should be told about.
+ *
+ * `null` covers every load worth saying nothing about: an ordinary one, a
+ * redeemed callback, and a foreign `#access_token=` fragment the client refused
+ * (DW-95, DW-96).
+ */
+export type AuthCallbackOutcome =
+  | 'cancelled'
+  | 'provider-error'
+  | 'needs-original-browser'
+  | null;
+
+/**
+ * Classify this page load's authentication callback, from what the SDK already
+ * produced.
+ *
+ * `initialize()` memoises `initializePromise` (`GoTrueClient.js:344-347`), so
+ * this returns the result of the single initialization the client ran on
+ * construction and starts nothing new -- no second exchange, no extra request.
+ *
+ * The two recoverable outcomes:
+ *
+ *  - `cancelled` -- the provider sent us back with `error` / `error_description`
+ *    / `error_code`, which `_getSessionFromURL` turns into an
+ *    `AuthImplicitGrantRedirectError` at `GoTrueClient.js:3252-3259`, *before*
+ *    the flowType switch. Under `flowType: 'pkce'` that branch is the only route
+ *    to that error class, which is what makes `isAuthImplicitGrantRedirectError`
+ *    an exact test rather than a broad one: a hostile `#access_token=` fragment
+ *    yields `AuthPKCEGrantCodeExchangeError` instead and stays silent, as the
+ *    refusal it is.
+ *
+ *  - `needs-original-browser` -- a `?code=` came back but no code verifier for
+ *    it is in this browser's storage, so `_isPKCECallback`
+ *    (`GoTrueClient.js:3356-3367`) classifies the URL as not-a-callback at all
+ *    and `_initialize` falls through to `_recoverAndRefresh` and returns
+ *    `{ error: null }`. The captured `code` plus the absent session are the
+ *    only discriminator there is.
+ *
+ * A session present means the person is not on the login screen, so there is
+ * nowhere to say it and nothing to say: that reads `null`.
+ */
+/**
+ * OAuth error names that are NOT the person changing their mind.
+ *
+ * `AuthImplicitGrantRedirectError` is thrown for every `#error=` fragment
+ * (`GoTrueClient.js:3255-3261`), so the class alone cannot tell a refusal from
+ * a failure -- it carried both, and both read as "you cancelled". The raw
+ * OAuth `error` parameter is preserved on `details.error` (`:3259`), and that
+ * is the discriminator; `details.code` is not, because `:3260` defaults it to
+ * `'unspecified_code'` and it is therefore never absent.
+ *
+ * Only names that are provably not a refusal are listed. RFC 6749 4.1.2.1
+ * reserves `access_denied` for "the resource owner denied the request", and
+ * the SDK's own docblock uses it as the example (`errors.d.ts:129`), so the
+ * refusal case keeps its existing answer. Anything unrecognised also keeps it.
+ * That way this can only ever correct a wrong message, never introduce one:
+ * no hosted denial fragment had to be observed first, which is what kept this
+ * deferred.
+ */
+const PROVIDER_FAILURE_ERRORS = new Set(['server_error', 'temporarily_unavailable']);
+
+export const getAuthCallbackOutcome = async (): Promise<AuthCallbackOutcome> => {
+  const { error } = await supabase.auth.initialize();
+  if (isAuthImplicitGrantRedirectError(error)) {
+    return PROVIDER_FAILURE_ERRORS.has(error.details?.error ?? '')
+      ? 'provider-error'
+      : 'cancelled';
+  }
+  if (error || !returnedWithCode) return null;
+  const { data } = await supabase.auth.getSession();
+  return data.session ? null : 'needs-original-browser';
+};
 
 /**
  * Attempts the two delivery-side lookups make, and the backoff between them.
@@ -254,9 +361,59 @@ export const getPartnerId = async (): Promise<string | null> => {
 };
 
 /**
+ * The name `sync_user_profile()` writes when it seeds a brand-new profile row
+ * and the account has neither a metadata name nor an email
+ * (`20251206024345_remote_schema.sql:164`). It is a placeholder, never a name
+ * anyone chose, so it counts as "not set" here.
+ */
+export const SEED_FALLBACK_NAME = 'Unknown';
+
+/**
+ * Does a stored `display_name` carry only what `sync_user_profile()` seeded,
+ * rather than a name someone chose?
+ *
+ * The trigger seeds a new profile row with
+ * `COALESCE(raw_user_meta_data->>'display_name', email, 'Unknown')`
+ * (`20251206024345_remote_schema.sql:164`), and 20260912030000 deliberately did
+ * not backfill the rows already seeded that way -- so every reader of the column
+ * has to decide for itself which stored values still mean "no name chosen".
+ *
+ * One predicate rather than a copy per reader, because the two readers classify
+ * the same column and used to disagree: this rule was a local `const` inside
+ * `lookupOwnDisplayName` while `getPartnerDisplayName` returned the column
+ * verbatim, so in a couple where neither had chosen a name the chat showed your
+ * own email PREFIX for you and your partner's FULL email address for them.
+ *
+ * Equality, not containment: 'Unknown Soldier' and 'p@example.com (work)' are
+ * names someone typed. `accountEmail` is the email of the row being classified,
+ * so only a name matching its OWN account counts as a seed -- someone else's
+ * address is a deliberate choice, if an odd one.
+ */
+export const isSeedFallbackName = (
+  storedName: string | null | undefined,
+  accountEmail: string | null | undefined
+): boolean => {
+  const stored = storedName?.trim() ?? '';
+  const email = accountEmail?.trim() ?? '';
+
+  return (
+    stored === '' ||
+    stored === SEED_FALLBACK_NAME ||
+    (email !== '' && stored.toLowerCase() === email.toLowerCase())
+  );
+};
+
+/**
  * Get partner's display name
  * Fetches the partner's display_name from the users table.
  * This provides the correct name for each user's partner (not a hardcoded config value).
+ *
+ * A partner row still carrying only the trigger's seed answers `null` -- the
+ * same answer this already gives for "no partner" and "the read failed".
+ * `LoveNotes` is its only caller and does nothing with the difference except
+ * keep its own 'Partner' default, which is exactly what is wanted: before this,
+ * a partner who had never chosen a name was rendered in the chat as their full
+ * email address.
  *
  * @returns Partner's display name or null if not found
  */
@@ -269,10 +426,14 @@ export const getPartnerDisplayName = async (): Promise<string | null> => {
       return null;
     }
 
-    // Query partner's display_name from users table
+    // `email` as well as the name: the seed rule asks whether the stored name
+    // equals THIS row's own address, so the comparison value is the partner's
+    // email, not the caller's. It is readable -- the SELECT policy returns own
+    // + partner rows (`20260205000001_fix_users_rls_recursion.sql:28-37`), and
+    // `partnerService` already selects it; only UPDATE was narrowed.
     const { data, error } = await supabase
       .from('users')
-      .select('display_name')
+      .select('display_name, email')
       .eq('id', partnerId)
       .single();
 
@@ -281,20 +442,19 @@ export const getPartnerDisplayName = async (): Promise<string | null> => {
       return null;
     }
 
-    return data?.display_name ?? null;
+    if (isSeedFallbackName(data?.display_name, data?.email)) {
+      logger.debug('[Supabase] Partner profile still carries the seed name, not rendering it');
+      return null;
+    }
+
+    // Trimmed, matching `lookupOwnDisplayName`: the predicate already proved
+    // there is something left after the trim.
+    return data?.display_name?.trim() ?? null;
   } catch (error) {
     console.error('[Supabase] Error getting partner display name:', error);
     return null;
   }
 };
-
-/**
- * The name `sync_user_profile()` writes when it seeds a brand-new profile row
- * and the account has neither a metadata name nor an email
- * (`20251206024345_remote_schema.sql:164`). It is a placeholder, never a name
- * anyone chose, so it counts as "not set" here.
- */
-export const SEED_FALLBACK_NAME = 'Unknown';
 
 /**
  * The signed-in user's own profile name, with "not chosen yet" and "could not
@@ -366,14 +526,13 @@ export const lookupOwnDisplayName = async (): Promise<OwnDisplayNameLookup> => {
       return { status: 'error', reason: error.message };
     }
 
-    const stored = data?.display_name?.trim() ?? '';
-    const email = user.email?.trim() ?? '';
-    const isSeedFallback =
-      stored === '' ||
-      stored === SEED_FALLBACK_NAME ||
-      (email !== '' && stored.toLowerCase() === email.toLowerCase());
+    // The shared predicate, not a second copy of the rule -- see
+    // `isSeedFallbackName` for why the partner reader has to agree with this one.
+    if (isSeedFallbackName(data?.display_name, user.email)) {
+      return { status: 'unset' };
+    }
 
-    return isSeedFallback ? { status: 'unset' } : { status: 'chosen', displayName: stored };
+    return { status: 'chosen', displayName: data?.display_name?.trim() ?? '' };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     console.error('[Supabase] Error getting own display name:', error);

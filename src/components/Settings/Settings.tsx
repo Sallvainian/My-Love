@@ -11,9 +11,11 @@
  * @component
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { authService } from '../../api/authService';
+import { lookupOwnDisplayName, type OwnDisplayNameLookup } from '../../api/supabaseClient';
 import { logger } from '../../utils/logger';
+import { DisplayNameSetup } from '../DisplayNameSetup/DisplayNameSetup';
 import { AnniversarySettings } from './AnniversarySettings';
 import { EventsSettings } from './EventsSettings';
 import './Settings.css';
@@ -22,6 +24,11 @@ export const Settings: React.FC = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  /** `null` while the read is in flight; the lookup's own three answers after. */
+  const [nameLookup, setNameLookup] = useState<OwnDisplayNameLookup | null>(null);
+  /** Bumped to re-run the read after a save, which is the whole re-read. */
+  const [nameReadToken, setNameReadToken] = useState(0);
+  const [isEditingName, setIsEditingName] = useState(false);
 
   // Get current user email on mount
   useState(() => {
@@ -29,6 +36,54 @@ export const Settings: React.FC = () => {
       setUserEmail(user?.email ?? null);
     });
   });
+
+  // The name is read here rather than taken from a store because nothing keeps
+  // it: `lookupOwnDisplayName` recomputes the seed classification on every read
+  // and no slice caches the answer. A cancelled flag rather than an AbortSignal
+  // — the lookup has no abort to offer, so what is guarded is the `set`, not
+  // the request.
+  useEffect(() => {
+    let cancelled = false;
+
+    // No `setNameLookup(null)` here: a synchronous setState in an effect body is
+    // a lint error (react-hooks/set-state-in-effect). The one caller that needs
+    // the row back in its in-flight state — `onComplete`, so the Change control
+    // is disabled across the re-read — clears it from the event handler instead.
+    void lookupOwnDisplayName().then((result) => {
+      if (cancelled) return;
+
+      if (result.status === 'error') {
+        // Not surfaced in the page-level error banner: that one is for actions
+        // the user just took, and a failed name read still leaves every other
+        // setting usable. The row says so itself and editing stays open.
+        console.error('[Settings] Could not read the profile display name:', result.reason);
+      }
+
+      setNameLookup(result);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nameReadToken]);
+
+  // Only a successfully-read name pre-fills the field. 'unset' has no name to
+  // offer and 'error' does not know one — offering a guess there would invite
+  // the user to save it back over whatever is really stored.
+  const editPrefill = nameLookup?.status === 'chosen' ? nameLookup.displayName : '';
+
+  const displayNameLabel = (() => {
+    switch (nameLookup?.status) {
+      case 'chosen':
+        return nameLookup.displayName;
+      case 'unset':
+        return 'Not set yet';
+      case 'error':
+        return "Couldn't load your name";
+      default:
+        return 'Loading...';
+    }
+  })();
 
   const handleLogout = async () => {
     setError(null);
@@ -99,6 +154,28 @@ export const Settings: React.FC = () => {
                 </div>
               </div>
             )}
+
+            <div className="display-name-row">
+              <div className="display-name-text">
+                <p className="display-name-value" data-testid="settings-display-name">
+                  {displayNameLabel}
+                </p>
+                <p className="user-label">Display name</p>
+              </div>
+              {/* Enabled on a failed read too: the user may well know the name
+                  they want, and the form's own refusals are what protect the
+                  column. Disabled only while the first read is in flight, when
+                  opening would pre-fill from an answer that has not arrived. */}
+              <button
+                type="button"
+                onClick={() => setIsEditingName(true)}
+                disabled={nameLookup === null}
+                className="display-name-edit-button"
+                data-testid="settings-display-name-edit"
+              >
+                Change
+              </button>
+            </div>
 
             <button
               onClick={handleLogout}
@@ -182,6 +259,37 @@ export const Settings: React.FC = () => {
           </div>
         </section>
       </div>
+
+      {/* Mounted only while open, so `useState(initialName)` inside the form
+          actually picks the current name up — kept mounted behind
+          `isOpen={false}` it would hold the name it first saw forever. Outside
+          `.settings-content` because `.settings-section` sets `overflow:
+          hidden`. */}
+      {isEditingName && (
+        <DisplayNameSetup
+          isOpen
+          mode="edit"
+          initialName={editPrefill}
+          onCancel={() => setIsEditingName(false)}
+          onComplete={() => {
+            setIsEditingName(false);
+            // Back to the in-flight state FIRST, so `disabled={nameLookup === null}`
+            // covers the re-read too. Left holding the pre-save answer, the
+            // Change control stays live across that window and reopening the
+            // form there prefills `editPrefill` from the OLD name — which the
+            // next save then writes back over the name just stored.
+            //
+            // Cleared here rather than in the effect body, where a synchronous
+            // setState is a lint error (react-hooks/set-state-in-effect): this
+            // is an event handler, so the same call is fine.
+            setNameLookup(null);
+            // Re-read rather than trust the submitted string: the row is what
+            // the rest of the app renders from, and the read applies the seed
+            // rule the write side only refuses.
+            setNameReadToken((token) => token + 1);
+          }}
+        />
+      )}
     </div>
   );
 };

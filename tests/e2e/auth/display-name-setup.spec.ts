@@ -26,6 +26,8 @@ import type { Page } from '@playwright/test';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 import { test, expect } from '../../support/merged-fixtures';
 import type { TypedSupabaseClient } from '../../support/factories';
+import { resolveOwnPair } from '../../support/helpers/events';
+import { navigateTo } from '../../support/helpers/navigation';
 
 type Dedicated = { email: string; userId: string; cleanup: () => Promise<void> };
 
@@ -207,5 +209,154 @@ test.describe('Display Name Setup', () => {
     if (failures.length > 0) {
       throw new AggregateError(failures, 'Display name setup assertion or account cleanup failed');
     }
+  });
+});
+
+/**
+ * DW-130 / DW-107: the name can be changed after it is first chosen, and the
+ * change reaches the chat and survives a reload.
+ *
+ * The describe above stops at the post-reload app container, so nothing pinned
+ * end to end that a saved name is what love notes actually renders. It also
+ * only ever covers the FIRST save: App shows the setup modal solely while the
+ * profile row still carries the trigger's seed, so once a name exists that
+ * route is closed for good. Settings is the second route, and this is the case
+ * that walks it.
+ *
+ * This describe deliberately does NOT set `authSessionEnabled: false` — `test.use`
+ * above is scoped to its own describe — so the browser arrives signed in as
+ * this worker's own pool account, which is partner-linked and therefore has a
+ * chat to render a name into. A dedicated throwaway account would have no
+ * partner and no `getPartnerId()`, and it is this worker's OWN pool row that is
+ * written here, never the partner's and never another worker's: the pair comes
+ * from `resolveOwnPair`, which is keyed on `TEST_WORKER_INDEX`.
+ */
+test.describe('Display Name Edit', () => {
+  /**
+   * What the teardown needs, recorded by the body as soon as it is known.
+   *
+   * Module-scoped and restored from `test.afterEach` rather than from the end
+   * of the test — the way `tests/e2e/home/events.spec.ts:36-38` clears its
+   * events — because a Playwright TIMEOUT aborts the body outright. A restore
+   * sitting after a `catch` only survives thrown errors, so a timeout would
+   * leave this worker's pool row renamed for every later run.
+   */
+  let renamed: { userId: string; originalName: string | null } | null = null;
+
+  test.afterEach(async ({ supabaseAdmin }) => {
+    if (!renamed) return;
+
+    const { userId, originalName } = renamed;
+    // Cleared first: a failing restore must not be retried against a row a
+    // later test has since renamed again.
+    renamed = null;
+
+    // Written twice if need be, and verified each time. A timeout aborts the
+    // body without closing the page, so the app's own PATCH can still be in
+    // flight and land AFTER this restore, putting the test's name back on the
+    // row. Re-reading and rewriting beats that write; closing the page first
+    // would beat it too, but would cost the failure screenshot and trace this
+    // suite records with `screenshot`/`trace: 'on'`.
+    let stored: string | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const { error } = await supabaseAdmin
+        .from('users')
+        .update({ display_name: originalName, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (error) {
+        throw new Error(`Failed to restore the display name: ${error.message}`);
+      }
+
+      stored = await readProfileName(supabaseAdmin, userId);
+      if (stored === originalName) break;
+    }
+
+    // Asserted, not merely attempted: a silently-lost restore leaves this
+    // worker's pool row renamed for every later run, and the spec that fails
+    // next would be one that never touched the name.
+    expect(stored, "this worker's pool display name must be restored").toBe(originalName);
+  });
+
+  test('[P1] should change the display name in Settings and show it in the chat', async ({
+    page,
+    supabaseAdmin,
+  }) => {
+    // GIVEN: This worker's own pool account, and whatever name it currently has.
+    const { userId } = await resolveOwnPair(supabaseAdmin);
+    const originalName = await readProfileName(supabaseAdmin, userId);
+    // Unique per run so the assertion cannot pass on a name left behind by an
+    // earlier one, and inside the form's 3-30 character rule.
+    const newName = `E2E ${Date.now().toString().slice(-8)}`;
+
+    // Armed BEFORE the write, so the teardown restores even if the very first
+    // assertion below times out.
+    renamed = { userId, originalName };
+
+    await page.goto('/');
+
+    // WHEN: The user opens Settings and changes the name.
+    await navigateTo(page, 'settings');
+
+    const nameRow = page.getByTestId('settings-display-name');
+    await expect(nameRow).toBeVisible();
+    // Premise: the row has finished its read, so the Change control is live
+    // and the form will open pre-filled from a real answer.
+    await expect(nameRow).not.toHaveText('Loading...');
+
+    await page.getByTestId('settings-display-name-edit').click();
+    await expect(page.getByTestId('display-name-setup')).toBeVisible();
+
+    // The field carries the current name, not an empty box — the whole point of
+    // an edit route rather than a second setup screen.
+    //
+    // Guarded on the FIELD, not on the stored column: `readProfileName` returns
+    // `display_name` verbatim, while the form is prefilled only when the row
+    // classifies as `chosen`. A pool row holding a seed value (its own email,
+    // 'Unknown', blank) is legitimately an empty field, and guarding on
+    // `originalName !== null` would fail there pointing at the prefill instead
+    // of at the row's state.
+    const field = page.getByLabel('Display Name');
+    const prefilled = await field.inputValue();
+    if (prefilled !== '') {
+      expect(prefilled).toBe((originalName ?? '').trim());
+    }
+
+    await field.fill(newName);
+    await page.getByTestId('display-name-submit').click();
+
+    // THEN: The form closes and the row shows the new name, with no reload.
+    await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
+    await expect(nameRow).toHaveText(newName);
+
+    // AND the profile row itself holds it — the column is what every other
+    // surface reads, so a green UI over an unwritten row is the failure this
+    // catches.
+    expect(await readProfileName(supabaseAdmin, userId)).toBe(newName);
+
+    // AND the chat puts it on a note. This is the gap DW-107 names: coverage
+    // used to stop at the app container and never reach love notes, where the
+    // name is actually rendered.
+    await navigateTo(page, 'notes');
+
+    const uniqueMessage = `Display name edit E2E ${Date.now()}`;
+    await page.getByLabel(/love note message input/i).fill(uniqueMessage);
+    await page.getByLabel(/send message/i).click();
+
+    const sentNote = page.getByTestId('love-note-message').filter({ hasText: uniqueMessage });
+    await expect(sentNote).toBeVisible();
+    await expect(sentNote).toContainText(newName);
+
+    // AND it is still there after a reload. The assertion above sees the
+    // OPTIMISTIC render, which a send that fails server-side also produces; only
+    // a note re-fetched from `love_notes` proves the row landed. The reload is
+    // also DW-107's own wording — "the name shows in chat after reload" — and it
+    // re-resolves the name from the profile row rather than from the React state
+    // the save left behind.
+    await page.reload();
+    await navigateTo(page, 'notes');
+
+    const persistedNote = page.getByTestId('love-note-message').filter({ hasText: uniqueMessage });
+    await expect(persistedNote).toBeVisible();
+    await expect(persistedNote).toContainText(newName);
   });
 });

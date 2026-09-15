@@ -100,6 +100,53 @@
   margin: 0;
 }
 
+/* Display name row — the route back into the setup form. Sits beside
+   `.user-info` and shares its resting surface. */
+.display-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.display-name-text {
+  min-width: 0;
+}
+
+.display-name-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+  overflow-wrap: anywhere;
+}
+
+.display-name-edit-button {
+  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #c44569;
+  background: transparent;
+  border: 1px solid #f3c6d5;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.display-name-edit-button:hover:not(:disabled) {
+  background: #fff1f5;
+}
+
+.display-name-edit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .logout-button {
   width: 100%;
   padding: 0.875rem 1rem;
@@ -213,7 +260,8 @@
     padding: 1rem;
   }
 
-  .user-info {
+  .user-info,
+  .display-name-row {
     padding: 0.875rem;
   }
 }
@@ -238,12 +286,23 @@
     border-bottom-color: #374151;
   }
 
-  .user-info {
+  .user-info,
+  .display-name-row {
     background: #111827;
   }
 
-  .user-email {
+  .user-email,
+  .display-name-value {
     color: #f9fafb;
+  }
+
+  .display-name-edit-button {
+    color: #ff9ec1;
+    border-color: #4b5563;
+  }
+
+  .display-name-edit-button:hover:not(:disabled) {
+    background: #374151;
   }
 
   .user-label,
