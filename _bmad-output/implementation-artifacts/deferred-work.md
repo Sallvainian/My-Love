@@ -1270,3 +1270,19 @@ location: src/components/LoginScreen/LoginScreen.tsx:88-103
 source_spec: `spec-dw-95-96-auth-callback-messages.md`
 reason: `LoginScreen.handleSubmit` branches on `result.error` then `result.session` (`src/components/LoginScreen/LoginScreen.tsx:88-103`) with no else, and `setNoticeDismissed(true)` has already run. The dead-end branch predates this change; the change only adds the cleared notice. Unverified: nothing was found that makes `signInWithPassword` answer with neither, so the state may be unreachable. Settle by checking whether any GoTrue path (MFA challenge, unconfirmed identity) returns a null session with a null error, and adding an else branch if so.
 status: open
+
+### DW-133: A third reader of `users.display_name` still renders a seeded partner's own email address as their name, on the partner-mood surface.
+origin: spec-deferred 6ea62add7c44
+location: src/api/partnerService.ts:88 (rendered at src/components/PartnerMoodView/PartnerMoodView.tsx:535,565,628)
+source_spec: `spec-dw-104-107-130-display-name-edit-and-fallback.md`
+severity: medium
+reason: `partnerService.getPartner` builds `displayName: partnerRecord.display_name || partnerRecord.email || 'Partner'`, applying no seed rule, and that value reaches `partnerSlice` and is rendered as "<name>'s Moods" and "Connected with <name>". For the exact DW-104 couple -- a partner row still carrying `sync_user_profile()`'s email seed -- love notes now correctly shows 'Partner' while the partner-mood view still shows the full address from the same stored row. No test reaches that `||` chain: the store test stubs `getPartner` with fixtures that already carry a displayName, and the only spec rendering PartnerMoodView passes `partner: null`. Pre-existing and outside this bundle's intent, which names `getPartnerDisplayName` alone.
+status: open
+
+### DW-134: Two sibling destructive buttons still fail WCAG AA contrast with white text on `bg-red-500`.
+origin: spec-deferred b30b9041cf61
+location: src/components/Settings/AnniversarySettings.tsx:207 and src/components/PhotoGallery/PhotoViewer.tsx:671
+source_spec: `spec-dw-104-107-130-display-name-edit-and-fallback.md`
+severity: low
+reason: Measured against this repo's Tailwind 4.3.3 palette: `--color-red-500` is `oklch(63.7% 0.237 25.331)` = #fb2c36, which is 3.82:1 against #ffffff -- below the 4.5:1 AA floor, and the exact figure axe reported for the events delete-confirm button before it was moved to `bg-red-600` (#e7000b, 4.76:1) in this change. The same `bg-red-500` + `text-white` pairing remains on the anniversary reset button and the photo delete button. Neither sits under an axe scan today, so both are silently non-compliant. Pre-existing; only the events button was touched here because only it was under a scan this change's page-height increase brought into evaluation.
+status: open
