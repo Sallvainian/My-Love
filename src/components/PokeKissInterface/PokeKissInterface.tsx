@@ -436,7 +436,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
           onClick={() => setIsExpanded(!isExpanded)}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className={`relative flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-pink-500 to-rose-500 text-white shadow-lg transition-all duration-300 hover:shadow-xl`}
+          className={`relative flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-pink-600 to-rose-600 text-white shadow-lg transition-all duration-300 hover:shadow-xl`}
           data-testid="fab-main-button"
           aria-label={isExpanded ? 'Close actions' : 'Open actions'}
           aria-expanded={isExpanded}

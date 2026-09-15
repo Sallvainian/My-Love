@@ -107,7 +107,7 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
               transition={{ delay: 0.8 }}
               onClick={onContinue}
               data-testid="welcome-continue-button"
-              className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 px-8 py-4 text-lg font-medium text-white transition-all duration-300 hover:scale-105 hover:shadow-xl"
+              className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-600 to-rose-600 px-8 py-4 text-lg font-medium text-white transition-all duration-300 hover:scale-105 hover:shadow-xl"
             >
               Continue
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
