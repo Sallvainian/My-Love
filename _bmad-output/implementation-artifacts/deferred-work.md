@@ -962,7 +962,9 @@ location: src/App.tsx:229-296
 source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: low
 reason: GoTrueClient.js:3356-3366 classifies such a URL as not-a-callback, so _initialize falls through to _recoverAndRefresh and the app renders the login screen with no explanation; measured in tests/unit/api/supabaseClientAuthFlow.test.ts, which asserts exactly that silence. Recoverable -- signing in again from this browser works -- and the fix is user-facing callback handling, which the story's contract excludes ("Never: add ... an exchangeCodeForSession call of our own"). Settle by deciding whether a "finish sign-in in the browser you started in" message is wanted, and where it would live given that the SDK owns callback classification.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-auth-callback-messages
+resolution-undo: 45d33d5c56801a82a03ab02c9101da88d2a9561d993b000e83b939dfb8c7330f 2026-09-14 7374617475733a206f70656e
 decision: 2026-09-14 Show a recoverable message — Detect a returning ?code= that produced no session and render a recoverable explanation on the login screen -- that sign-in has to be finished in the browser it was started in -- without adding an exchangeCodeForSession call of our own. Settle DW-96's provider-denial silence in the same handler and on the same surface, and replace the unit case that currently pins the silence.
 
 ### DW-96: The provider-denial callback is as silent as the missing-verifier one, and only the second was recorded.
@@ -971,7 +973,9 @@ location: src/App.tsx:229-296
 source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: low
 reason: GoTrueClient.js:3252-3259 throws AuthImplicitGrantRedirectError for any `#error=` URL before the flowType switch, _initialize returns it at :417, and nothing in src/App.tsx:229-296 reads _initialize's return value -- so a user who declines Google consent lands on the login screen with no explanation. Pre-existing: the implicit flow behaved identically, so this story neither caused nor changed it. The unit case "preserves an existing session for an error callback" asserts the session and the request count, never the returned error. Settle together with the missing-verifier silence: decide whether a "sign-in was cancelled" message is wanted, and where it lives given that the SDK owns callback classification.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-auth-callback-messages
+resolution-undo: 45d33d5c56801a82a03ab02c9101da88d2a9561d993b000e83b939dfb8c7330f 2026-09-14 7374617475733a206f70656e
 decision: 2026-09-14 Show a cancelled-sign-in message — Read the SDK initialize outcome for an error callback and render a sign-in was cancelled message on the login screen, sharing one handler and one surface with DW-95's missing-verifier case, and extend the existing unit case to assert the returned error rather than only the preserved session.
 
 ### DW-97: Every redirect_to assertion runs where BASE_URL is "/", so the production "/My-Love/" base path is pinned nowhere.
@@ -1096,7 +1100,9 @@ location: src/hooks/useRealtimeMessages.ts:69
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: low
 reason: moodSyncService.ts:149 and ephemeralBroadcast.ts already hold their own; interactionService and the scripture hooks still take none. AGENTS.md says to route new Realtime work through moodSyncService's refcounted registry and never call supabase.channel() directly. Extracting the pair into realtimeSocket.ts would cover the whole channel namespace. Pre-existing duplication, widened rather than created by this change.
-status: open
+status: done 2026-09-14
+resolution: closed by human decision: Three registries is accepted pre-existing duplication; the realtime-note-channel-lifecycle bundle keeps useRealtimeMessages and moodSyncService in sync by applying the same leave fix to both, and ephemeralBroadcast's send chains serve a different purpose.
+decision: 2026-09-14 Accept the duplication and close — Three registries is accepted pre-existing duplication; the realtime-note-channel-lifecycle bundle keeps useRealtimeMessages and moodSyncService in sync by applying the same leave fix to both, and ephemeralBroadcast's send chains serve a different purpose.
 
 ### DW-112: realtimeSocket.ts's header rationale quotes SDK behaviour that no longer matches the installed realtime-js, and this change newly depends on it.
 origin: spec-deferred c8dd2018bb24
@@ -1241,10 +1247,26 @@ source_spec: `spec-dw-99-message-store-ownership-scoping.md`
 severity: medium
 reason: src/types/index.ts:21 gives Message a single `isFavorite` boolean and the bundled daily rows are shared by both accounts, so toggleFavorite on a daily row writes a flag the partner reads. Pre-existing and schema-level — the fix is per-account favorite storage, well past this change's service boundary.
 status: open
+decision: 2026-09-14 Build per-account favorites — Move favorite state off the shared Message row onto per-account storage. Add a favorites store or index keyed on (messageId, userId) in src/services/dbSchema.ts alone, bumping DB_VERSION and gating the upgrade branch on whether the store exists rather than on oldVersion < N, and plan how the existing shared isFavorite booleans on daily rows are carried over or dropped. Then update storage.ts's toggleFavorite and getMessage, messagesSlice.ts's toggleFavorite and messageHistory.favoriteIds, and the UI readers including DailyMessage.tsx, and make sure the new account-scoped field is added to signedOutState() in authSlice.ts in the same commit so a sign-out does not leak it.
 
 ### DW-130: A display name can be set once at signup and never changed, because the only form that writes it is unreachable afterwards.
 origin: operator report during post-merge verification of sweep 7, 2026-09-14
 location: src/App.tsx:581
 severity: medium
 reason: `DisplayNameSetup` is the only UI that writes `display_name`, and src/App.tsx:581 renders it only when `needsDisplayName`, which src/App.tsx:301 sets solely on `result.status === 'unset'`. Nothing under src/components/Settings/ references display_name, so once a name is chosen there is no route back to that form. The backend already supports the change and needs no work: policy `users_update_self_safe` is `USING ((select auth.uid()) = id)`, `authenticated` holds UPDATE on only (display_name, updated_at) on the hosted project, and DisplayNameSetup.tsx:102-108 already issues `.update({ display_name, updated_at }).eq('id', user.id)`. The work is a settings entry point that reopens that form prefilled with the current name -- no schema, migration or grant change. Any edit surface must keep the write-side refusal of a name equal to the account email (DisplayNameSetup.tsx:85), because supabaseClient.ts:373-376 classifies a stored name equal to SEED_FALLBACK_NAME or the account email as 'unset' and would otherwise re-prompt the user forever. Related: DW-104, where a partner who never chose a name renders as their full email address in the love-notes chat.
+status: open
+
+### DW-131: A `?code=` whose exchange fails in the browser that started the flow -- the ordinary expired-or-reused code -- still ends on the login screen with nothing to read.
+origin: spec-deferred 1af676a73b92
+location: src/api/supabaseClient.ts:161
+source_spec: `spec-dw-95-96-auth-callback-messages.md`
+severity: medium
+reason: `getAuthCallbackOutcome` returns null for it (`src/api/supabaseClient.ts:161`, the `error ||` half of the guard), and a unit case now pins that answer. Pre-existing: every callback was silent before this change, and the bundle scoped the fix to exactly two outcomes, so naming a third is a product decision rather than a correction. Probably the most common real callback failure. Settle by deciding whether a third recoverable message is wanted and what it should say.
+status: open
+
+### DW-132: A password sign-in that resolves with neither an error nor a session leaves the login screen with no feedback at all, and now also clears the callback notice.
+origin: spec-deferred 50f5b0ba3a4a
+location: src/components/LoginScreen/LoginScreen.tsx:88-103
+source_spec: `spec-dw-95-96-auth-callback-messages.md`
+reason: `LoginScreen.handleSubmit` branches on `result.error` then `result.session` (`src/components/LoginScreen/LoginScreen.tsx:88-103`) with no else, and `setNoticeDismissed(true)` has already run. The dead-end branch predates this change; the change only adds the cleared notice. Unverified: nothing was found that makes `signInWithPassword` answer with neither, so the state may be unreachable. Settle by checking whether any GoTrue path (MFA challenge, unconfirmed identity) returns a null session with a null error, and adding an else branch if so.
 status: open
