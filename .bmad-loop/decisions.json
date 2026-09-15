@@ -1,1 +1,11 @@
-{}
+{
+  "DW-129": {
+    "answered_at": "2026-09-14",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Move favorite state off the shared Message row onto per-account storage. Add a favorites store or index keyed on (messageId, userId) in src/services/dbSchema.ts alone, bumping DB_VERSION and gating the upgrade branch on whether the store exists rather than on oldVersion < N, and plan how the existing shared isFavorite booleans on daily rows are carried over or dropped. Then update storage.ts's toggleFavorite and getMessage, messagesSlice.ts's toggleFavorite and messageHistory.favoriteIds, and the UI readers including DailyMessage.tsx, and make sure the new account-scoped field is added to signedOutState() in authSlice.ts in the same commit so a sign-out does not leak it.",
+    "key": "1",
+    "label": "Build per-account favorites",
+    "resolution": ""
+  }
+}
