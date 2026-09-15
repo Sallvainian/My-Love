@@ -286,6 +286,8 @@ describe('LoveNoteMessage', () => {
       const sending = screen.getByText('Sending...');
       expect(sending).toBeInTheDocument();
       expect(sending).toHaveAttribute('aria-live', 'polite');
+      expect(sending).toHaveClass('text-gray-500');
+      expect(sending).not.toHaveClass('text-gray-400');
       const bubble = screen.getByTestId('love-note-message').querySelector('.rounded-2xl');
       expect(bubble).toHaveClass('bg-[#FF6B6B]', 'text-gray-800');
       expect(bubble).not.toHaveClass('opacity-70');

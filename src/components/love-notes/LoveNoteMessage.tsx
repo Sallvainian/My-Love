@@ -329,7 +329,7 @@ function LoveNoteMessageComponent({
 
         {/* Status indicators */}
         {isSending && !isImageUploading && (
-          <span className="mt-1 px-1 text-xs text-gray-400" aria-live="polite">
+          <span className="mt-1 px-1 text-xs text-gray-500" aria-live="polite">
             Sending...
           </span>
         )}
