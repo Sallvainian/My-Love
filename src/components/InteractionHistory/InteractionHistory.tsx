@@ -180,7 +180,7 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
 
                         {/* Viewed Badge */}
                         {!sent && !interaction.viewed && (
-                          <div className="rounded-full bg-purple-500 px-3 py-1 text-xs font-medium text-white">
+                          <div className="rounded-full bg-purple-600 px-3 py-1 text-xs font-medium text-white">
                             New
                           </div>
                         )}
