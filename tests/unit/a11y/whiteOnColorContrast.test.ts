@@ -59,15 +59,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
  * The count matters as much as the key. Without it, a file with two bad
  * pairings stays green after only one is fixed.
  */
-const KNOWN_BELOW_FLOOR = new Map<string, { count: number; note: string }>([
-  [
-    'src/components/love-notes/MessageInput.tsx:coral-500',
-    {
-      count: 1,
-      note: 'coral-500 at 1.99:1 — the love-notes send button, and the worst in the tree. DW-141. Not a shade bump: every coral shade fails except coral-900 (4.94:1), so this is a brand decision.',
-    },
-  ],
-]);
+const KNOWN_BELOW_FLOOR = new Map<string, { count: number; note: string }>();
 
 /**
  * The scripture feature is frozen pending removal (AGENTS.md), so its

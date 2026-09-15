@@ -271,7 +271,7 @@ function LoveNoteMessageComponent({
         <div
           className={`max-w-[80%] overflow-hidden rounded-2xl ${
             isOwnMessage
-              ? 'rounded-br-md bg-[#FF6B6B] text-white'
+              ? 'rounded-br-md bg-[#FF6B6B] text-gray-800'
               : 'rounded-bl-md bg-[#E9ECEF] text-gray-800'
           } ${isSending ? 'opacity-70' : ''} ${hasError ? 'border-2 border-red-500' : ''} `}
         >
