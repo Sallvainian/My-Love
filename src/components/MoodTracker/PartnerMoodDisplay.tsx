@@ -16,7 +16,7 @@
 import { m as motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { usePartnerMood } from '../../hooks/usePartnerMood';
-import type { MoodType } from '../../types';
+import { normalizeMoodValues } from '../../types/moods';
 import { getRelativeTime, isJustNow } from '../../utils/dateUtils';
 import { getMoodEmoji } from '../../utils/moodEmojis';
 import { NoMoodLoggedState } from './NoMoodLoggedState';
@@ -102,16 +102,9 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
     return <NoMoodLoggedState />;
   }
 
-  // Read mood_types array, fall back to [mood_type] for legacy entries.
-  //
-  // Array.isArray, not a truthy check: this record can arrive over a Realtime
-  // broadcast, and a non-array `mood_types` would otherwise be indexed and
-  // mapped as if it were one. A string is the worst case -- truthy, with a
-  // length -- so it reaches the mood lookup one character at a time.
-  const allMoods: MoodType[] =
-    Array.isArray(partnerMood.mood_types) && partnerMood.mood_types.length > 0
-      ? (partnerMood.mood_types as MoodType[])
-      : [partnerMood.mood_type as MoodType];
+  const normalized = normalizeMoodValues(partnerMood.mood_type, partnerMood.mood_types);
+  if (!normalized) return <NoMoodLoggedState />;
+  const allMoods = normalized.moods;
 
   const emojis = allMoods.map((m) => getMoodEmoji(m)).join('');
   const timestamp = getRelativeTime(partnerMood.created_at ?? new Date().toISOString());

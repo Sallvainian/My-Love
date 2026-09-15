@@ -1,3 +1,4 @@
+import { MOOD_TYPES } from '../../types/moods';
 import { z } from 'zod/v4';
 
 /**
@@ -89,20 +90,7 @@ export const UserUpdateSchema = z.object({
  * Mood type enum schema (matches database constraint)
  * Includes both positive and negative emotions
  */
-const MoodTypeSchema = z.enum([
-  'loved',
-  'happy',
-  'content',
-  'excited',
-  'thoughtful',
-  'grateful',
-  'sad',
-  'anxious',
-  'frustrated',
-  'angry',
-  'lonely',
-  'tired',
-]);
+const MoodTypeSchema = z.enum(MOOD_TYPES);
 
 /**
  * Supabase Mood Row Schema

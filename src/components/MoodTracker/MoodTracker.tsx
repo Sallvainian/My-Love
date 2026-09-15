@@ -24,6 +24,7 @@ import { getPartnerId } from '../../api/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry, MoodType } from '../../types';
+import { normalizeMoodEntry } from '../../types/moods';
 import { registerBackgroundSync } from '../../utils/backgroundSync';
 import { formatDateISO } from '../../utils/dateUtils';
 import { triggerErrorHaptic, triggerMoodSaveHaptic } from '../../utils/haptics';
@@ -163,22 +164,11 @@ export function MoodTracker() {
     setSeededFrom(moods);
 
     const today = formatDateISO(new Date());
-    const existingMood = getMoodForDate(today);
+    const rawMood = getMoodForDate(today);
+    const existingMood = rawMood ? normalizeMoodEntry(rawMood) : null;
 
     if (existingMood) {
-      // Support both old single mood and new multiple moods.
-      //
-      // Array.isArray, not a truthy check: a truthy value that is not an array
-      // can still clear `.length > 0` and is then seeded straight into
-      // `selectedMoods`. A string survives `selectedMoods.includes(...)` in the
-      // mood grid and then throws `selectedMoods.map is not a function` on the
-      // "Selected:" line below; an array-like object throws one step earlier, on
-      // `.includes`.
-      if (Array.isArray(existingMood.moods) && existingMood.moods.length > 0) {
-        setSelectedMoods(existingMood.moods);
-      } else {
-        setSelectedMoods([existingMood.mood]);
-      }
+      setSelectedMoods(existingMood.moods);
       setNote(existingMood.note || '');
       setIsEditing(true);
       // Auto-expand note field if existing mood has a note
@@ -186,6 +176,14 @@ export function MoodTracker() {
         setShowNoteField(true);
       }
     }
+    // No `else` that clears the form. The trigger above is `moods` ARRAY IDENTITY,
+    // and loadMoods hands back a fresh array after every sync pass — App.tsx runs
+    // one on a 5-minute interval and on every `online` event. On the ordinary
+    // first-entry-of-the-day path there is no saved row to seed from, so an `else`
+    // here fires on that timer and wipes the moods the user just tapped and the
+    // note they are still typing, mid-keystroke. Reseeding only overwrites the
+    // form when there is a saved entry to overwrite it WITH, which is the
+    // behaviour this block has always had.
   }
 
   const handleMoodSelect = (mood: MoodType) => {
