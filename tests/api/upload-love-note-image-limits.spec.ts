@@ -88,6 +88,11 @@ test.describe('Love note image upload limits', () => {
 
       expect(response.status(), 'a supported upload is accepted').toBe(200);
       const body = await response.json();
+      // Registered for cleanup before any assertion can throw: a failure after
+      // a 200 would otherwise leak the object into this worker's prefix and
+      // skew the before/after counts of every later case.
+      if (body.storagePath) created.push(body.storagePath);
+
       expect(body.success).toBe(true);
       expect(body.size).toBe(64 * 1024);
       expect(body.mimeType).toBe('image/png');
@@ -96,7 +101,6 @@ test.describe('Love note image upload limits', () => {
         `storagePath ${body.storagePath} must be under the uploader's own prefix`
       ).toBe(true);
       expect(response.headers()['x-ratelimit-remaining']).toBeDefined();
-      created.push(body.storagePath);
 
       const after = await listOwnPrefix(supabaseAdmin, userId);
       expect(after.length, 'exactly one object was written').toBe(before.length + 1);
@@ -126,8 +130,12 @@ test.describe('Love note image upload limits', () => {
 
       expect(response.status(), 'the cap itself is inclusive').toBe(200);
       const body = await response.json();
+      // Registered for cleanup before any assertion can throw: a failure after
+      // a 200 would otherwise leak the object into this worker's prefix and
+      // skew the before/after counts of every later case.
+      if (body.storagePath) created.push(body.storagePath);
+
       expect(body.size).toBe(MAX_FILE_SIZE_BYTES);
-      created.push(body.storagePath);
 
       const after = await listOwnPrefix(supabaseAdmin, userId);
       expect(after.length).toBe(before.length + 1);
