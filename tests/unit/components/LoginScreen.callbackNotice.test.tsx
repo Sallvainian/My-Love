@@ -102,7 +102,7 @@ describe('LoginScreen callback notice', () => {
     // Driven at OUR contract, not the SDK's. `AuthResult`
     // (src/api/auth/types.ts:8-12) declares both fields nullable, and this is
     // what `LoginScreen` does when handed that shape. The installed auth-js
-    // cannot produce it -- `GoTrueClient.js:960-962` substitutes an
+    // cannot produce it -- `dist/module/GoTrueClient.js:960-962` substitutes an
     // `AuthInvalidTokenResponseError` first -- so mocking the SDK into this
     // state would be asserting against an impossible world. Stubbing the
     // boundary the component actually calls is the honest version (DW-132).

@@ -121,7 +121,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
         // Neither an error nor a session. Unreachable through the installed
         // auth-js: `signInWithPassword` substitutes an
         // `AuthInvalidTokenResponseError` for exactly this shape before it can
-        // reach a caller (`GoTrueClient.js:960-962`), and all four of its
+        // reach a caller (`dist/module/GoTrueClient.js:960-962` — naming the
+        // build because the CJS one is the same code at different offsets, and
+        // `package.json`'s `module` field is what Vite resolves), and all four of its
         // return paths carry an error or a session.
         //
         // Guarded anyway because the contract this code is written against is

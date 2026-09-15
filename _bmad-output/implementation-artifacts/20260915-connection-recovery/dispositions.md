@@ -72,6 +72,30 @@ bases. Ten findings, none a behaviour regression.
 | C-9 | The allowlist cited `DW-141`/`DW-142`, which did not exist in the ledger when C read it. | medium | **Accepted** — both entries were appended in `517c43d3`, before C's report was read. Verified present at `deferred-work.md:1388` and `:1395`. |
 | C-10 | DW-140's "the worst contrast in the tree" is false. | low | **Accepted** — corrected in `517c43d3`, independently of C, from B2's finding. |
 
+## Reviewer B — re-check of the fixes
+
+B was asked to verify its own findings' fixes rather than take them on trust. It compared
+`readProjectPalette()` against actually importing `tailwind.config.js` (50 entries each, no key or
+value differing, and the `extend` merge order correct), confirmed the literal scanner is a strict
+superset of the attribute scan it replaced, and traced all four auth outcomes plus both pinned E2E
+specs against the reordered classifier. It also **withdrew B5**: `dist/module/GoTrueClient.js:960-962`
+is correct for the build Vite resolves, and the `963-966` it first measured is the CJS build. Its
+suggestion to name the build is taken — all three citations now say `dist/module`.
+
+Two new findings from the re-check:
+
+| id | Finding | Severity | Disposition |
+| --- | --- | --- | --- |
+| B-R1 | **Gradients were entirely unmeasured**, and the app's primary call-to-action fails. `bg-gradient-to-r from-pink-500 to-rose-500` carries no `bg-<colour>-<shade>`, so ten components sat outside the guard. Measured: pink-500 3.58:1, and rose-500 resolving to the project's own override at 3.67:1 — both ends below the floor, so every point between them is too. | medium | **Accepted, fixed.** The scanner now reads `from-`/`via-`/`to-` stops. The ten sites are allowlisted as one group, keyed by swatch with an expected count, and raised as DW-143. Reverting the gradient scan turns two cases red. |
+| B-R2 | A template literal left open across lines is still only judged where both utilities land on the same line; two live sites are affected. | low | **Accepted as a documented limitation**, already stated in the file. Both known gaps under-report rather than over-report. |
+
+B-R1 is the same defect as B1 and B2 one level up: the guard's stated property — that a new failure
+fails without anyone remembering the rule — was false for the single most-used button style in the
+app, and stayed false through the first round of fixing it. The fix for DW-143 is already written in
+the tree and applied to the wrong state: several of those buttons carry
+`hover:from-pink-600 hover:to-rose-600`, and those stops clear at 4.54:1 and 4.70:1. The button is
+compliant only while the pointer is on it.
+
 ## What review changed
 
 Two findings were defects, not documentation: **A-6** (giving up was not terminal, contradicting the

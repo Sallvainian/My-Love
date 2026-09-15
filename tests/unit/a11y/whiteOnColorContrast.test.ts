@@ -29,6 +29,14 @@
  *    model; AA is defined on the resting state, which is what this measures.
  *  - Only `text-white`, the pairing the entry is about and by far the most
  *    common way this goes wrong here.
+ *
+ * Gradients ARE measured, via their `from-`/`via-`/`to-` stops. They were not
+ * at first, which made the property above false for the most-used button style
+ * in the app: `bg-gradient-to-r from-pink-500 to-rose-500` has no
+ * `bg-<colour>-<shade>` to match, so ten components' primary call-to-action sat
+ * outside a guard whose whole point was that a new failure fails on its own. A
+ * gradient is judged at its stops, and a stop below the floor fails: the text
+ * has to be readable everywhere along the sweep, not on average.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -188,7 +196,29 @@ interface Pairing {
   line: number;
   swatch: string;
   ratio: number;
+  /** A solid `bg-` utility, or one stop of a gradient. */
+  kind: 'solid' | 'gradient';
 }
+
+/**
+ * The one gradient idiom in the tree, and the ten places it is repeated.
+ *
+ * Keyed by swatch rather than by file, because this is a single style copied
+ * around rather than ten independent decisions — listing eighteen
+ * `file:swatch` rows would bury that. Measured: `pink-500` is #f6339a at
+ * 3.58:1 and `rose-500` resolves to the project's own override #f43f5e at
+ * 3.67:1, so both ends of the sweep fail and every point between them does too.
+ *
+ * Raised as DW-143. The fix is already written in the tree: several of these
+ * carry `hover:from-pink-600 hover:to-rose-600`, and those clear at 4.54:1 and
+ * 4.70:1 — so the resting state fails while the hover state passes, which is
+ * backwards. Promoting the hover values is a visible change to the app's
+ * primary action colour, which is a design decision rather than a class edit.
+ */
+const KNOWN_GRADIENT_BELOW_FLOOR = new Map<string, number>([
+  ['pink-500', 10],
+  ['rose-500', 10],
+]);
 
 /**
  * Every `.tsx` under `src/`, `__tests__` aside.
@@ -257,7 +287,32 @@ function findWhiteOnColourPairings(): Pairing[] {
           const swatch = bg[1];
           const colour = palette.get(swatch);
           if (!colour) continue;
-          found.push({ file, line: index + 1, swatch, ratio: contrastAgainstWhite(colour) });
+          found.push({
+            file,
+            line: index + 1,
+            swatch,
+            ratio: contrastAgainstWhite(colour),
+            kind: 'solid',
+          });
+        }
+
+        // A gradient carries its colours in `from-`/`via-`/`to-`, so the `bg-`
+        // matcher above sees nothing at all in `bg-gradient-to-r from-pink-500
+        // to-rose-500`. Each stop is judged as its own ground.
+        if (!classes.includes('bg-gradient')) continue;
+        for (const stop of classes.matchAll(
+          /(?<![\w:-])(?:from|via|to)-([a-z]+-\d{2,3})(?![\w-])/g
+        )) {
+          const swatch = stop[1];
+          const colour = palette.get(swatch);
+          if (!colour) continue;
+          found.push({
+            file,
+            line: index + 1,
+            swatch,
+            ratio: contrastAgainstWhite(colour),
+            kind: 'gradient',
+          });
         }
       }
     });
@@ -304,10 +359,24 @@ describe('white text on a coloured background clears WCAG AA', () => {
     expect(pairings.some((pairing) => pairing.file.endsWith('PhotoGridItem.tsx'))).toBe(true);
   });
 
+  it('measures gradients, not only solid backgrounds', () => {
+    const gradients = findWhiteOnColourPairings().filter((pairing) => pairing.kind === 'gradient');
+
+    // The most-used button style in the app is a gradient, and it was entirely
+    // outside this guard until the stops were matched. A regex that stopped
+    // seeing them would leave the gradient allowlist below trivially satisfied.
+    expect(gradients.length).toBeGreaterThan(15);
+    expect(gradients.some((pairing) => pairing.swatch === 'pink-500')).toBe(true);
+  });
+
   it('has no pairing below the floor except the ones already recorded', () => {
     const offenders = findWhiteOnColourPairings()
       .filter((pairing) => pairing.ratio < AA_NORMAL_TEXT)
-      .filter((pairing) => !KNOWN_BELOW_FLOOR.has(`${pairing.file}:${pairing.swatch}`))
+      .filter((pairing) =>
+        pairing.kind === 'gradient'
+          ? !KNOWN_GRADIENT_BELOW_FLOOR.has(pairing.swatch)
+          : !KNOWN_BELOW_FLOOR.has(`${pairing.file}:${pairing.swatch}`)
+      )
       .map(
         (pairing) =>
           `${pairing.file}:${pairing.line} bg-${pairing.swatch} ${pairing.ratio.toFixed(2)}:1`
@@ -323,7 +392,7 @@ describe('white text on a coloured background clears WCAG AA', () => {
     // with two bad pairings staying green after only one is fixed.
     const failingByKey = new Map<string, number>();
     for (const pairing of findWhiteOnColourPairings()) {
-      if (pairing.ratio >= AA_NORMAL_TEXT) continue;
+      if (pairing.kind !== 'solid' || pairing.ratio >= AA_NORMAL_TEXT) continue;
       const key = `${pairing.file}:${pairing.swatch}`;
       failingByKey.set(key, (failingByKey.get(key) ?? 0) + 1);
     }
@@ -333,6 +402,20 @@ describe('white text on a coloured background clears WCAG AA', () => {
         failingByKey.get(key),
         `${key} is allowlisted for ${expected.count} pairing(s); if that has changed, update or remove the entry`
       ).toBe(expected.count);
+    }
+
+    // Same rule for the gradient idiom: fix some of the ten and this fails
+    // until the count is corrected or the entry removed.
+    const failingStops = new Map<string, number>();
+    for (const pairing of findWhiteOnColourPairings()) {
+      if (pairing.kind !== 'gradient' || pairing.ratio >= AA_NORMAL_TEXT) continue;
+      failingStops.set(pairing.swatch, (failingStops.get(pairing.swatch) ?? 0) + 1);
+    }
+    for (const [swatch, expected] of KNOWN_GRADIENT_BELOW_FLOOR) {
+      expect(
+        failingStops.get(swatch),
+        `${swatch} is allowlisted as a gradient stop in ${expected} place(s)`
+      ).toBe(expected);
     }
   });
 });
