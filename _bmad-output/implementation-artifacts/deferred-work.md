@@ -1047,7 +1047,9 @@ location: src/api/supabaseClient.ts (getPartnerDisplayName)
 source_spec: `8-separate-profile-names-from-auth-identity.md`
 severity: low
 reason: getPartnerDisplayName returns the stored display_name verbatim and LoveNotes renders it. For a profile still carrying the trigger's email seed that value IS the email. Pre-existing: this function is untouched by story 8 and behaved identically before, because the old trigger also seeded display_name from the email. The fix is to share one seed-fallback classification between the own-name and partner-name readers.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-display-name-edit-and-fallback
+resolution-undo: 2a5be6a21fc8557ab95cbf923102fd327464ac93f3ac85eee86f2e3bd7896463 2026-09-14 7374617475733a206f70656e
 
 ### DW-105: If a public.users row were ever absent while its auth user exists, the setup modal could never be satisfied, and the users INSERT policy now has no client caller.
 origin: spec-deferred 05606ebe644a
@@ -1072,7 +1074,9 @@ location: tests/e2e/auth/display-name-setup.spec.ts
 source_spec: `8-separate-profile-names-from-auth-identity.md`
 severity: low
 reason: display-name-setup.spec.ts asserts the saved profile row and the app container after reload but never navigates to love notes; OwnDisplayName.test.tsx covers the chat rendering with getOwnDisplayName mocked. Closing this needs a partner-linked dedicated account, which the setup spec's throwaway nameless account does not have.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-display-name-edit-and-fallback
+resolution-undo: 2a5be6a21fc8557ab95cbf923102fd327464ac93f3ac85eee86f2e3bd7896463 2026-09-14 7374617475733a206f70656e
 
 ### DW-108: The ledger entry migrated from this story's second deferred item lost its severity when it was written to deferred-work.md.
 origin: spec-deferred 67f592004a06
@@ -1259,7 +1263,9 @@ origin: operator report during post-merge verification of sweep 7, 2026-09-14
 location: src/App.tsx:581
 severity: medium
 reason: `DisplayNameSetup` is the only UI that writes `display_name`, and src/App.tsx:581 renders it only when `needsDisplayName`, which src/App.tsx:301 sets solely on `result.status === 'unset'`. Nothing under src/components/Settings/ references display_name, so once a name is chosen there is no route back to that form. The backend already supports the change and needs no work: policy `users_update_self_safe` is `USING ((select auth.uid()) = id)`, `authenticated` holds UPDATE on only (display_name, updated_at) on the hosted project, and DisplayNameSetup.tsx:102-108 already issues `.update({ display_name, updated_at }).eq('id', user.id)`. The work is a settings entry point that reopens that form prefilled with the current name -- no schema, migration or grant change. Any edit surface must keep the write-side refusal of a name equal to the account email (DisplayNameSetup.tsx:85), because supabaseClient.ts:373-376 classifies a stored name equal to SEED_FALLBACK_NAME or the account email as 'unset' and would otherwise re-prompt the user forever. Related: DW-104, where a partner who never chose a name renders as their full email address in the love-notes chat.
-status: open
+status: done 2026-09-14
+resolution: resolved by sweep bundle dw-display-name-edit-and-fallback
+resolution-undo: 2a5be6a21fc8557ab95cbf923102fd327464ac93f3ac85eee86f2e3bd7896463 2026-09-14 7374617475733a206f70656e
 
 ### DW-131: A `?code=` whose exchange fails in the browser that started the flow -- the ordinary expired-or-reused code -- still ends on the login screen with nothing to read.
 origin: spec-deferred 1af676a73b92
