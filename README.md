@@ -188,7 +188,8 @@ On push to `main`: build → smoke test → deploy to GitHub Pages → health ch
 - `bundle-size.yml` — PR bundle size comparison
 - `codeql.yml` — Security analysis
 - `supabase-migrations.yml` — Migration validation
-- `claude-code-review.yml` — AI-assisted code review
+- `grok-code-review.yml` — AI-assisted code review (Grok stand-in)
+- `claude-code-review.yml` — paused while Claude Code usage is exhausted
 - `lighthouse.yml` — Performance audits
 
 ## Deployment
@@ -200,6 +201,8 @@ On push to `main`: build → smoke test → deploy to GitHub Pages → health ch
 | `VITE_SUPABASE_URL`                     | Supabase project URL (build-time) |
 | `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon key (build-time)    |
 | `SUPABASE_ACCESS_TOKEN`                 | CLI auth for type generation      |
+| `GROK_AUTH_JSON`                        | Grok review: contents of `~/.grok/auth.json` |
+| `XAI_API_KEY`                           | Grok review fallback (console.x.ai) |
 
 ### GitHub Pages
 
