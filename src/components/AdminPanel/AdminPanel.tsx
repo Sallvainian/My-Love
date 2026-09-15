@@ -100,7 +100,7 @@ function AccountAdminPanel({ onExit }: AdminPanelProps) {
           <div className="flex items-center justify-between">
             {/* Title */}
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-r from-pink-500 to-rose-500">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 text-white">
                 <span className="text-xl text-white">⚙️</span>
               </div>
               <div>
