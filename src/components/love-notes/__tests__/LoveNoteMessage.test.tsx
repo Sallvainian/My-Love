@@ -84,6 +84,10 @@ describe('LoveNoteMessage', () => {
 
       const messageContainer = screen.getByTestId('love-note-message');
       expect(messageContainer).toHaveClass('items-end');
+      expect(screen.queryByText('Sending...')).not.toBeInTheDocument();
+      const bubble = messageContainer.querySelector('.rounded-2xl');
+      expect(bubble).toHaveClass('bg-[#FF6B6B]', 'text-gray-800');
+      expect(bubble).not.toHaveClass('opacity-70');
     });
 
     it('should apply partner message styling when isOwnMessage is false', () => {
@@ -91,6 +95,9 @@ describe('LoveNoteMessage', () => {
 
       const messageContainer = screen.getByTestId('love-note-message');
       expect(messageContainer).toHaveClass('items-start');
+      const bubble = messageContainer.querySelector('.rounded-2xl');
+      expect(bubble).toHaveClass('bg-[#E9ECEF]', 'text-gray-800');
+      expect(bubble).not.toHaveClass('opacity-70');
     });
 
     it('should sanitize content to prevent XSS', () => {
@@ -276,7 +283,12 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={sendingMessage} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText('Sending...')).toBeInTheDocument();
+      const sending = screen.getByText('Sending...');
+      expect(sending).toBeInTheDocument();
+      expect(sending).toHaveAttribute('aria-live', 'polite');
+      const bubble = screen.getByTestId('love-note-message').querySelector('.rounded-2xl');
+      expect(bubble).toHaveClass('bg-[#FF6B6B]', 'text-gray-800');
+      expect(bubble).not.toHaveClass('opacity-70');
     });
 
     it('should not show sending indicator when image is uploading', () => {
