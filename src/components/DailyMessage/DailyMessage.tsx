@@ -130,7 +130,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
               setLoadingTimeout(false);
               initializeApp();
             }}
-            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 px-6 py-3 font-medium text-white transition-shadow hover:shadow-lg"
+            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-600 to-rose-600 px-6 py-3 font-medium text-white transition-shadow hover:shadow-lg"
           >
             <RefreshCw className="h-5 w-5" />
             Retry
@@ -257,7 +257,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
                 className="mb-4 inline-block"
               >
                 <span
-                  className="rounded-full bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-1.5 text-xs font-medium text-white shadow-lg"
+                  className="rounded-full bg-gradient-to-r from-pink-600 to-rose-600 px-4 py-1.5 text-xs font-medium text-white shadow-lg"
                   data-testid="message-category-badge"
                 >
                   {currentMessage.category === 'reason' && '💖 Why I Love You'}

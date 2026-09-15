@@ -64,7 +64,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="space-y-3">
               <button
                 onClick={this.handleRetry}
-                className="w-full rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-6 py-3 font-medium text-white shadow-md transition-all duration-200 hover:from-pink-600 hover:to-rose-600 hover:shadow-lg"
+                className="w-full rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 px-6 py-3 font-medium text-white shadow-md transition-all duration-200 hover:from-pink-700 hover:to-rose-700 hover:shadow-lg"
               >
                 Try Again
               </button>

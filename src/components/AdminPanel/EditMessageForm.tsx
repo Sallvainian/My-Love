@@ -249,7 +249,7 @@ export function EditMessageForm({ message, isOpen, onClose }: EditMessageFormPro
             <button
               onClick={handleSave}
               disabled={!isValid || !hasChanges}
-              className="rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-6 py-2.5 font-medium text-white transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none"
+              className="rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 px-6 py-2.5 font-medium text-white transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none"
               data-testid="admin-edit-form-save"
             >
               {hasChanges ? 'Save Changes' : 'No Changes'}
