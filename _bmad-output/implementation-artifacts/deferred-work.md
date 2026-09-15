@@ -1,5 +1,15 @@
 # Deferred Work
 
+Who may edit what. A run closing its own bundle writes two things here and
+nothing else: `status:`/`resolution:` on the entries it actually resolved, and
+new entries appended for what it deferred. Everything else -- another entry's
+status, reason or severity, and any repair to an entry's `location:` -- belongs
+to the orchestrator, because a run has neither the context to judge another
+bundle's entry nor a way to tell the next reader it did so. Several entries
+below say "this run is directed not to edit the ledger" while sitting in a diff
+that closed two entries and appended six; both are true of different edits, and
+this paragraph is the distinction they were missing (DW-116).
+
 ### DW-1: Calendar vs Timeline date grouping mismatch (UTC vs local)
 
 origin: migrated from legacy ledger ("From: Mood Tracker State Issues (2026-03-20)"), 2026-08-17
@@ -871,7 +881,8 @@ location: supabase/migrations/20260912000000_remove_claude_bot_password_row.sql:
 source_spec: `1-contain-the-exposed-bot-credential.md`
 severity: low
 reason: supabase/tests/database/22_claude_bot_config_no_secret.sql runs against a db reset database whose edited seed never inserts test_password, so the DELETE in 20260912000000_remove_claude_bot_password_row.sql matches nothing there; the migration was hand-verified inside a rolled-back transaction (insert placeholder row, apply, before=1 after=0) and the repo has no pattern for replaying one migration against pre-seeded state. Settle by running `select count(*) from public.claude_bot_config where key = 'test_password'` against the linked project after the next deploy and expecting 0.
-status: open
+status: done 2026-09-15
+resolution: verified against the linked project after the deploy, exactly as this entry asked: `select count(*) from public.claude_bot_config where key = 'test_password'` returns 0. Read-only, and only the count is recorded here — the repo is public.
 
 ### DW-86: AGENTS.md carries no durable prose about the bot credential being provisioned out of band or the rotation command.
 origin: spec-deferred 77116e136280
@@ -884,7 +895,7 @@ resolution: AGENTS.md (Running and verifying) now carries the rotation line: upd
 
 ### DW-87: The retry's re-subscribe cannot rejoin an errored channel at all, because the SDK gates the whole of subscribe() on the channel already being closed.
 origin: spec-deferred 7f2be02c1cc5
-location: src/hooks/useRealtimeMessages.ts:190-196
+location: src/hooks/useRealtimeMessages.ts `handleStatus`, the CHANNEL_ERROR retry (baseline d3306502:260; :190-196 was the SUBSCRIBED snapshot comment, not the retry)
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 severity: medium
 reason: node_modules/@supabase/realtime-js/dist/module/RealtimeChannel.js:134 wraps the entire join body in `if (this.channelAdapter.isClosed())` and otherwise returns `this`. After a CHANNEL_ERROR the state is `errored`, not closed, so the retry at useRealtimeMessages.ts is a no-op however many times it fires. Pre-existing and untouched by this story: the baseline retry had the identical shape, and passing `handleStatus` (patched this pass) fixes only the reporting half. Settle by removing and reopening the channel on retry rather than re-subscribing the same object, with a test that drives a real CHANNEL_ERROR.
@@ -922,7 +933,7 @@ resolution-undo: 5c15a4b3473ab95dce8d5efbbfbf9ea1f4df3395307ef5d5fdbbbf666e03049
 
 ### DW-91: An effect re-run that lands while the previous run's un-awaited removeChannel is still deregistering is handed the dying channel.
 origin: spec-deferred 76257cdda80f
-location: src/hooks/useRealtimeMessages.ts:215-232
+location: src/hooks/useRealtimeMessages.ts, the effect cleanup's removeChannel (baseline d3306502:311; :215-232 was the backoff block, not the cleanup)
 source_spec: `2-authorize-and-validate-couple-broadcasts.md`
 severity: low
 reason: useRealtimeMessages' cleanup calls supabase.removeChannel without awaiting it, and src/api/realtimeSocket.ts documents that the registry entry is dropped later still, from the _onClose hook, so supabase.channel(topic) in the replacement run can return the leaving object whose subscribe() is a silent no-op. Pre-existing: the baseline cleanup had the same shape, and the new `cancelled` guard covers only the subscribe-after-unmount half. Settle by awaiting the leave the way moodSyncService's closingMoodChannels registry does.
@@ -985,7 +996,7 @@ source_spec: `3-require-browser-initiated-auth-callbacks.md`
 severity: low
 reason: vite.config.ts:11 is `base: mode === 'production' ? '/My-Love/' : '/'` and playwright.config.ts:178 boots the dev server with `npx vite --mode test`, so both new assertions -- the unit case's `redirect_to` equality and the E2E's `appBaseUrl + '/'` -- only ever observe `/`. The byte-for-byte requirement the story pins is therefore verified at local origins alone. Not fixable from this session for the same reason the deployed-site verification is not. Recorded separately rather than folded into that entry, because the triage log of the previous pass said it had been grouped there and the text does not carry it. Settle by asserting the authorize URL's `redirect_to` once against a production-mode build, or by reading it during the outstanding deployed-site sign-in.
 status: done 2026-09-14
-resolution: resolved by sweep bundle dw-production-base-redirect-assertion
+resolution: resolved by sweep bundle dw-production-base-redirect-assertion — closed on the unit half only, and by a substituted mechanism. This entry's `location:` named two files; `tests/e2e/auth/google-oauth.spec.ts:68` still reads `expect(authorizeParams.get('redirect_to')).toBe(appBaseUrl + '/')` and was deliberately excluded, the story's Never recording that "the deployed-origin round-trip stays operator work under DW-93". The reason text asked this be settled by asserting `redirect_to` against a production-mode build or by reading it during the outstanding deployed-site sign-in; what shipped is neither, but a stubbed `BASE_URL` under happy-dom bound to `vite.config.ts` through `loadConfigFromFile`. That is unit-level evidence, not deployed-site evidence, and DW-93 still carries the hosted half. Recorded here rather than left in the bundle's triage log (DW-126).
 resolution-undo: 9a82e817c408383cfb4ee4e071886a4e6b282feec426a7f3d34cf8aab443dba0 2026-09-14 7374617475733a206f70656e
 
 ### DW-98: Whether an installed PWA returns from Google consent into the same storage partition that wrote the verifier was not established.
@@ -1057,6 +1068,7 @@ resolution-undo: 2a5be6a21fc8557ab95cbf923102fd327464ac93f3ac85eee86f2e3bd789646
 origin: spec-deferred 05606ebe644a
 location: src/components/DisplayNameSetup/DisplayNameSetup.tsx (zero-row branch)
 source_spec: `8-separate-profile-names-from-auth-identity.md`
+severity: medium (unverified)
 reason: lookupOwnDisplayName maps PGRST116 to `unset`, which opens the modal, while DisplayNameSetup's plain UPDATE cannot create the row and `id` is outside the new column grant. No reachable path to that state was demonstrated: public.users.id is REFERENCES auth.users(id) ON DELETE CASCADE and no client code deletes profiles. What would settle it: whether any operator or admin path deletes a public.users row without deleting the auth user. The intent requires the INSERT policy be left untouched, so removing the now-callerless policy is out of scope here regardless.
 status: done 2026-09-14
 resolution: closed by human decision: No client or cascade path produces a profile row without an auth user, the modal surfaces a visible error rather than failing silently, and the INSERT policy is deliberately pinned by supabase/tests/database/25_profile_name_email_ownership.sql:150-153.
@@ -1086,27 +1098,30 @@ location: _bmad-output/implementation-artifacts/deferred-work.md (DW-105)
 source_spec: `8-separate-profile-names-from-auth-identity.md`
 severity: low
 reason: Verified by reading the block: `### DW-105` in _bmad-output/implementation-artifacts/deferred-work.md goes straight from `source_spec:` to `reason:` with no `severity:` line, while DW-104, DW-106 and DW-107 each carry `severity: low`. This spec's frontmatter records that same item as `severity: medium (unverified)`, so DW-105 is the only non-low severity of the four and it is the one the ledger dropped. Not repaired here: this run was instructed not to modify, re-open or rewrite existing ledger entries -- the orchestrator owns them. Raised through this list because it is the only channel back to the owner.
-status: open
+status: done 2026-09-15
+resolution: DW-105's `severity: medium (unverified)` restored. Confirmed against the source spec's frontmatter before writing it: the deferred item whose `location:` is `src/components/DisplayNameSetup/DisplayNameSetup.tsx (zero-row branch)` carries that value at `_bmad-output/specs/spec-security-remediation/stories/8-separate-profile-names-from-auth-identity.md:37`.
 
 ### DW-109: A phx_leave answered 'error' leaves the channel stuck in `leaving`, yet removeChannel still resolves, so the leave-wait clears and the reopen is handed a channel whose subscribe() is gated shut.
 origin: spec-deferred ab6f498a5c7a
-location: src/hooks/useRealtimeMessages.ts:79-96
+location: src/hooks/useRealtimeMessages.ts `releaseNoteChannel`
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: medium
 reason: @supabase/phoenix assets/js/phoenix/channel.js:247-249 wires the close hook to "ok" and "timeout" only, so an 'error' leave never reaches `closed` and never runs `socket.remove(this)`. @supabase/realtime-js dist/module/RealtimeChannel.js:604-612 still resolves 'error', and RealtimeClient.js:254-259 skips `teardown()` unless the status is 'ok'. The same hole exists in moodSyncService's closingMoodChannels, which the intent told this work to mirror, so fixing it here alone would diverge the two. The `.catch()` in releaseNoteChannel guards a rejection the SDK never produces, and the test that exercises it uses a shape the real client cannot return.
-status: open
+status: done 2026-09-15
+resolution: REFUTED, and the refutation pinned rather than asserted. The wedged-channel state is unreachable on the installed @supabase/phoenix 0.4.5: `leave()` sets `state = leaving` (channel.js:242) before testing `canPush()` (:251), and `canPush()` requires `isJoined()` (:188, :326), so the check is always false and `leavePush.trigger("ok", {})` fires locally and synchronously. The close hook runs, `socket.remove(this)` runs, and `removeChannel` sees 'ok'. Measured: a leave the server never answers still resolves 'ok', still closes the channel, still removes it from the registry, and the next `channel(topic)` builds a fresh object. The sub-claim that both `.catch()`s guard a rejection the SDK cannot produce is TRUE and was acted on — `unsubscribe()` resolves 'ok' | 'timed out' | 'error' with no rejection path (RealtimeChannel.js:604-612) — so both comments now say the catch is a belt rather than the mechanism, and the test that drove a rejection is labelled as defensive. tests/unit/api/realtimeLeaveContract.test.ts turns red if an SDK bump reintroduces the wait.
 
 ### DW-110: CLOSED remains an unhandled terminal status, so a close the hook did not ask for leaves the topic permanently silent with no retry scheduled.
 origin: spec-deferred 2b5328606176
-location: src/hooks/useRealtimeMessages.ts
+location: src/hooks/useRealtimeMessages.ts `handleStatus`
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: medium
 reason: subscribe() wires `_onClose(() => callback(CLOSED))` (@supabase/realtime-js dist/module/RealtimeChannel.js:148), but handleStatus retries only CHANNEL_ERROR and TIMED_OUT. Pre-existing: the baseline hook ignored CLOSED too. Any fix must distinguish the hook's own deliberate leave from a close it did not initiate, since ignoring CLOSED is load-bearing for the release path.
-status: open
+status: done 2026-09-15
+resolution: CONFIRMED and fixed. `RealtimeChannel.js:148` delivers CLOSED to the subscribe callback and `handleStatus` branched only on SUBSCRIBED, CHANNEL_ERROR and TIMED_OUT, so a close the app did not ask for left the topic silent for the rest of the mount with nothing logged. CLOSED now routes into the existing backoff. The entry's warning that ignoring CLOSED is load-bearing for the release path is not hypothetical — every deliberate leave produces one too, measured in realtimeLeaveContract.test.ts — so two guards separate them using state that already existed: the cleanup lowers `subscriptionActive` and the retry nulls `channelRef` before releasing, and `subscribe` is wrapped per channel so a status can be attributed. Written independently of `useScripturePresence`, which AGENTS.md forbids copying. Scoped to this entry's stated location: `moodSyncService` reports the same status but has no retry mechanism to route it into, raised as DW-138.
 
 ### DW-111: This is a third uncoordinated per-topic leave registry, against the repo's stated direction to route Realtime work through a shared one.
 origin: spec-deferred 5770bf9b09b4
-location: src/hooks/useRealtimeMessages.ts:69
+location: src/hooks/useRealtimeMessages.ts `closingNoteChannels`
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: low
 reason: moodSyncService.ts:149 and ephemeralBroadcast.ts already hold their own; interactionService and the scripture hooks still take none. AGENTS.md says to route new Realtime work through moodSyncService's refcounted registry and never call supabase.channel() directly. Extracting the pair into realtimeSocket.ts would cover the whole channel namespace. Pre-existing duplication, widened rather than created by this change.
@@ -1120,23 +1135,26 @@ location: src/api/realtimeSocket.ts:1-46
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: low
 reason: The header quotes `RealtimeClient.js:213-219` disconnecting as soon as the last channel is removed. In 2.116.0 removeChannel only tears down on 'ok' (dist/module/RealtimeClient.js:254-259); the disconnect moved to `_remove` -> `_schedulePendingDisconnect`, with `_disconnectOnEmptyChannelsAfterMs` defaulting to 2x heartbeatIntervalMs (:646-647), and `channel()` cancels it (:340). The ~100ms window the helper waits out is likely unreachable on a rejoin now. The gate is cheap and harmless; the comment justifying it should be re-verified.
-status: open
+status: done 2026-09-15
+resolution: CONFIRMED, and worse than filed. `realtimeSocket.ts:7-10` quoted `if (this.channels.length === 0) { this.disconnect(); }`, which no longer exists: `removeChannel` only tears down on 'ok' (RealtimeClient.js:254-260), the disconnect moved to `_remove` -> `_schedulePendingDisconnect` and is deferred by `_disconnectOnEmptyChannelsAfterMs`, which defaults to twice the 25s heartbeat and is not overridden here — a 50 SECOND window, not ~100ms — and `channel()` cancels it on reopen (:340). `_setConnectionState` is gone entirely, taking the 100ms fallback timer with it, and `isDisconnecting()` now reads WebSocket.CLOSING directly. The header is rewritten against 2.116.0. `waitForSocketReady` is KEPT: the race it was written for is unreachable on a rejoin, but it still describes a genuinely closing socket, which sign-out produces, and it costs one boolean read. `moodSyncService`'s matching docblock carried the same stale citations and is corrected alongside.
 
 ### DW-113: Giving up after five retries is entrenched with no exit and no signal to the UI, and closingNoteChannels is unobservable from tests.
 origin: spec-deferred a9a9ffc293cb
-location: src/hooks/useRealtimeMessages.ts
+location: src/hooks/useRealtimeMessages.ts `handleStatus` max-retry branch, and the hook's return value
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: low
 reason: handleStatus returns after the max-retry check, leaving the errored channel in channelRef and in client.channels, and the hook returns {} so no consumer can tell the feed is dead; moodSyncService at least keeps lastStatus and replays it. closingNoteChannels is unexported, so a wedged entry and an empty map look identical from outside the module. Pre-existing give-up behaviour: the baseline had the same five-retry ceiling and the same empty return value.
-status: open
+status: done 2026-09-15
+resolution: fixed in all three halves. The retry ceiling released nothing, leaving the dead channel in `channelRef` and in the client registry — and since a join is gated on the channel being closed, that made the topic unjoinable by any later consumer, not just this hook; it is handed back now. The hook returned `{}`, so its one terminal state was invisible; it now reports a status, `useLoveNotes` passes it through, and `LoveNotes` renders it when the feed is reconnecting or has given up. `closingNoteChannels` stays unexported: the reported status is what makes the wedged state observable, which is what the entry was actually asking for, and the existing leave-wait cases already observe the registry indirectly.
 
 ### DW-114: Both DW ledger entries' `location:` fields point at the wrong code, so a future reader reconciling the bundle against the ledger lands in the wrong block.
 origin: spec-deferred 35b1312c2b70
-location: .bmad-loop/runs/20260914-114531-81a7/bundles/realtime-channel-rejoin-lifecycle/intent.md
+location: this ledger, DW-87 and DW-91 `location:` fields (the bundle intent that carried the correct citations was `.bmad-loop/runs/20260914-114531-81a7/`, which is gitignored and no longer readable)
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: low
 reason: Against baseline d3306502, DW-87's cited src/hooks/useRealtimeMessages.ts:190-196 is inside the SUBSCRIBED snapshot comment, not the retry; DW-91's :215-232 is the backoff block, not the cleanup. The intent prose citations (:260, :311, :174) do match the baseline verbatim, and the implementation followed the prose. Not fixed here: this run is directed not to edit the deferred-work ledger.
-status: open
+status: done 2026-09-15
+resolution: DW-87's and DW-91's `location:` fields corrected, and re-pointed at symbols with the baseline noted rather than bare line numbers, since the file has changed since d3306502 and a number alone would go stale again. This entry's own location is repaired under DW-115.
 
 ### DW-115: The `location:` fields this bundle wrote into the DW ledger are unreliable: one points into a gitignored run directory that cannot be opened later, and the rest land on comment lines or carry no line
 origin: spec-deferred 169b5ae59949
@@ -1144,7 +1162,8 @@ location: _bmad-output/implementation-artifacts/deferred-work.md
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: low
 reason: DW-114's location is `.bmad-loop/runs/20260914-114531-81a7/bundles/realtime-channel-rejoin-lifecycle/intent.md`, but `.gitignore` lists `.bmad-loop/runs/`, and AGENTS.md records that a deleted run directory is unrecoverable -- so the one entry whose whole subject is "location fields point at the wrong code" files a location a future reader cannot open. In the same append, DW-111's `src/hooks/useRealtimeMessages.ts:69` is a comment line (the registry it describes is the `const closingNoteChannels` declaration below it), DW-109's `:79-96` starts on a blank docblock line and runs past the end of `releaseNoteChannel`, and DW-110 and DW-113 carry no line range while DW-87, DW-91, DW-109, DW-111 and DW-112 all do. Not repaired here: this run is directed not to modify, re-open or rewrite ledger entries, and the orchestrator owns them.
-status: open
+status: done 2026-09-15
+resolution: the six `location:` fields corrected. DW-109, DW-110, DW-111 and DW-113 now name symbols rather than line numbers or nothing, which is what survives an edit to the file. DW-114's location no longer points into `.bmad-loop/runs/`, which is gitignored and, per AGENTS.md, unrecoverable once deleted — it names this ledger and records that the bundle intent carrying the correct citations is no longer readable.
 
 ### DW-116: The ledger's own reason text states that the run must not edit the ledger, while the same change rewrites two entry statuses and appends six new entries to it.
 origin: spec-deferred e17ee324ad13
@@ -1152,7 +1171,8 @@ location: _bmad-output/implementation-artifacts/deferred-work.md
 source_spec: `spec-dw-87-91-realtime-channel-rejoin-lifecycle.md`
 severity: low
 reason: DW-114's reason reads "Not fixed here: this run is directed not to edit the deferred-work ledger", and the DW-105 entry above it reads "this run was instructed not to modify, re-open or rewrite existing ledger entries -- the orchestrator owns them"; the same diff sets DW-87 and DW-91 to `status: done 2026-09-14` with `resolution:` and `resolution-undo:` lines and appends DW-109 through DW-114. Both statements are true of different edits -- the run does not touch OTHER entries, while its own done-markers and new entries are exactly what it is supposed to write -- but neither says so, so the next reader meets a file that contradicts itself. Needs a sentence distinguishing the edits the run owns from the ones it does not; the orchestrator owns that text.
-status: open
+status: done 2026-09-15
+resolution: a paragraph at the top of this file now states which edits a run owns — its own entries' status/resolution, and its own appends — and which belong to the orchestrator. The contradiction the entry describes was real and both halves were true of different edits; what was missing was anyone saying so.
 
 ### DW-117: An eighth site, src/services/moodSyncPayload.ts:58, reads MoodEntry.moods with the same bare truthy-plus-length idiom and was left unguarded.
 origin: spec-deferred 717f9a6f63ec
@@ -1196,7 +1216,8 @@ location: eslint.config.js, src/services/moodSyncPayload.ts:58
 source_spec: `spec-dw-89-mood-array-shape-guards.md`
 severity: low
 reason: The change's only stated value is that "a reader copying the idiom can no longer copy the wrong one", but the wrong one is still in the tree: src/services/moodSyncPayload.ts:58 reads `const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];`. No lint rule, no-restricted-syntax entry, or grep-based test enforces the invariant. Not fixed here: any enforcement is config surface beyond the intent's "one-expression shape guard per site", and the rule would immediately flag the one line the intent forbids touching.
-status: open
+status: done 2026-09-15
+resolution: SUPERSEDED, no lint rule added. The entry's premise is that the wrong idiom survives at `src/services/moodSyncPayload.ts:58`, `mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood]`. Commit 5dd934b0 replaced that line with `normalizeMoodValues(mood.mood, mood.moods)`; `grep -rn "\.moods && .*\.moods\.length" src/` now returns nothing, and the single array-shape decision lives at `src/types/moods.ts:29`. There is no surviving form to copy, so the rule would pin an invariant that already has exactly one home.
 
 ### DW-122: Seven hand-rolled copies of one expression and four separate MOOD_CONFIG definitions mean DW-118's element validation would need four key sets rather than one.
 origin: spec-deferred 0ac06de3be9c
@@ -1213,7 +1234,8 @@ location: tests/e2e/partner/partner-mood.spec.ts
 source_spec: `spec-dw-90-realtime-browser-e2e.md`
 severity: low
 reason: src/api/moodSyncService.ts:257 runs the same composition (private topic, sendEphemeralBroadcast, store, UI) under the same policy migration 20260912010000_private_couple_broadcast_policies.sql, whose predicates cover both prefixes. grep -c "realtime\|broadcast" tests/e2e/partner/partner-mood.spec.ts returns 0, and the only other tests/e2e files mentioning realtime are the interaction specs, whose own header states they do not exercise live Realtime. Pre-existing: this story's intent names one deliverable, "sends a love note from one context and asserts it arrives live in the other", so the mood leg was never in scope for it.
-status: open
+status: done 2026-09-15
+resolution: tests/e2e/partner/partner-mood-realtime.spec.ts, the sibling of the notes spec DW-90 produced. Two contexts from this worker's own pooled pair, the receiver parked until PartnerMoodView reports SUBSCRIBED on the console, the 202 asserted before the UI, and the receiving page never reloaded. Verified non-vacuous: with the sender untouched and the receiver listening for a different event name, the send still answers 202 and the delivery assertion fails.
 
 ### DW-124: `resetPasswordForEmail` composes the same `origin + BASE_URL` prefix as the Google flow, but its composed link is asserted at no base, production or dev.
 origin: spec-deferred 6d932a2a3909
@@ -1221,7 +1243,8 @@ location: src/api/auth/actionService.ts:97
 source_spec: `spec-dw-97-production-base-redirect-assertion.md`
 severity: low
 reason: `src/api/auth/actionService.ts:97` is ``redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}reset-password` ``, and the path join is correct only because `BASE_URL` ends in `/`. Measured: `grep -rn "reset-password" tests/ src/` (excluding `tests/e2e-archive/`) returns that one source line and nothing under `tests/`; the only other reference, `src/api/auth/__tests__/authServices.test.ts:41`, registers `resetPasswordForEmail` as a mock and never inspects its options. Pre-existing: the DW-97 intent names only the authorize URL's `redirect_to`, so this change neither caused nor exposed it. Settle by adding a sibling case that stubs `BASE_URL` to the production base and asserts the reset link is `http://localhost:3000/My-Love/reset-password`.
-status: open
+status: done 2026-09-15
+resolution: a sibling case in tests/unit/api/supabaseClientAuthFlow.test.ts pins the composed reset link at the production base, copying the authorize-URL case's `loadConfigFromFile` binding and env leak guard, and capturing `redirect_to` from the recover request rather than restating the template. Verified: dropping BASE_URL from `actionService.ts:97` turns it red.
 
 ### DW-125: `navigationSlice.setView`'s production branch and `App.getRoutePath`'s base-stripping branch read the same `import.meta.env.BASE_URL` this story pinned for the authorize URL, and neither branch is
 origin: spec-deferred 198ce5879b5a
@@ -1229,7 +1252,8 @@ location: src/stores/slices/navigationSlice.ts:63, src/App.tsx:179-180
 source_spec: `spec-dw-97-production-base-redirect-assertion.md`
 severity: medium
 reason: `src/stores/slices/navigationSlice.ts:63` is `const fullPath = base === '/' ? basePath : base.slice(0, -1) + basePath;` and `src/App.tsx:179-180` is `if (base !== '/' && pathname.startsWith(base)) { return pathname.slice(base.length - 1); }`. Both are production-only branches: every test runs at `BASE_URL === '/'`, which takes the other arm each time. Demonstrated by the review's verification-gap layer -- rewriting `navigationSlice.ts:63` to `base + basePath` and `App.tsx:180` to `return pathname;` left `npx vitest run` at 91 files / 1705 passed, both mutants green. On the deployed site those two edits emit `/My-Love//photos` and then fail base-stripping on reload, so no `currentView` arm matches and the app resets to home. E2E cannot reach it either: `playwright.config.ts:178` is `command: 'npx vite --mode test'` and `vite.config.ts:11` serves `/` off production. Pre-existing: this story's intent names only the authorize URL's `redirect_to` and its Never forbids touching `src/`, so
-status: open
+status: done 2026-09-15
+resolution: both production branches now covered, and the cause fixed rather than the symptom. They are inverse operations that lived in different files with nothing asserting either, which is why the round trip — the property that actually matters — could not be expressed at all; they are now `withBasePath` and `stripBasePath` in `src/utils/basePath.ts`, used by both call sites. tests/unit/utils/basePath.test.ts stubs BASE_URL to the production base with hard-coded expectations rather than interpolating it on both sides. Both mutants the entry named now fail. This is unit-level evidence, not deployed-site evidence: no browser runs at the production base, and DW-93 still carries the hosted half.
 
 ### DW-126: DW-97's ledger entry names two files and is closed whole, but only the unit half was addressed and the resolution line records neither the carve-out nor the substituted settle mechanism.
 origin: spec-deferred 59ad7c8a9014
@@ -1237,7 +1261,8 @@ location: _bmad-output/implementation-artifacts/deferred-work.md (DW-97)
 source_spec: `spec-dw-97-production-base-redirect-assertion.md`
 severity: low
 reason: DW-97's `location:` is `tests/unit/api/supabaseClientAuthFlow.test.ts / tests/e2e/auth/google-oauth.spec.ts` and its reason covers `both new assertions`. Verified: `tests/e2e/auth/google-oauth.spec.ts:68` still reads `expect(authorizeParams.get('redirect_to')).toBe(appBaseUrl + '/');` and this story's Never excludes it deliberately (`the deployed-origin round-trip stays operator work under DW-93`). Separately, DW-97's reason ends `Settle by asserting the authorize URL's redirect_to once against a production-mode build, or by reading it during the outstanding deployed-site sign-in.` -- what shipped is a stubbed `BASE_URL` under happy-dom bound to `vite.config.ts` via `loadConfigFromFile`, which is neither. The rationale for accepting that substitution lives only in this spec's triage log, not in the ledger a later sweep reads. Not fixable from this session: the orchestrator owns ledger entry status and resolution text, and this story's Never forbids editing the ledger. Settle by
-status: open
+status: done 2026-09-15
+resolution: DW-97's resolution line rewritten to record both the E2E carve-out and the substituted settle mechanism. See that entry.
 
 ### DW-127: storageService.updateMessage merges `updates` unfiltered, so a caller who may see a row can reassign its owner or convert a shared daily row into a private one.
 origin: spec-deferred 33d30b016bed
@@ -1283,14 +1308,16 @@ location: src/api/supabaseClient.ts:161
 source_spec: `spec-dw-95-96-auth-callback-messages.md`
 severity: medium
 reason: `getAuthCallbackOutcome` returns null for it (`src/api/supabaseClient.ts:161`, the `error ||` half of the guard), and a unit case now pins that answer. Pre-existing: every callback was silent before this change, and the bundle scoped the fix to exactly two outcomes, so naming a third is a product decision rather than a correction. Probably the most common real callback failure. Settle by deciding whether a third recoverable message is wanted and what it should say.
-status: open
+status: done 2026-09-15
+resolution: a third outcome, `code-expired`, with its own copy. The branch is wider than the name — any exchange failure lands there, a GoTrue 5xx included — and the message still names expiry because the recovery is identical whichever it was, and copy vague enough to cover every cause would be indistinguishable from `provider-error`. An error on a load carrying no callback at all stays silent, as before. Closes the incidental gap that `provider-error` had no render coverage.
 
 ### DW-132: A password sign-in that resolves with neither an error nor a session leaves the login screen with no feedback at all, and now also clears the callback notice.
 origin: spec-deferred 50f5b0ba3a4a
 location: src/components/LoginScreen/LoginScreen.tsx:88-103
 source_spec: `spec-dw-95-96-auth-callback-messages.md`
 reason: `LoginScreen.handleSubmit` branches on `result.error` then `result.session` (`src/components/LoginScreen/LoginScreen.tsx:88-103`) with no else, and `setNoticeDismissed(true)` has already run. The dead-end branch predates this change; the change only adds the cleared notice. Unverified: nothing was found that makes `signInWithPassword` answer with neither, so the state may be unreachable. Settle by checking whether any GoTrue path (MFA challenge, unconfirmed identity) returns a null session with a null error, and adding an else branch if so.
-status: open
+status: done 2026-09-15
+resolution: REFUTED at the installed SDK, and guarded anyway. `GoTrueClient.js:960-962` substitutes an `AuthInvalidTokenResponseError` for exactly the null-session/null-error shape before it can reach a caller, and all four returns in `signInWithPassword` carry an error or a session — so the missing `else` is unreachable through auth-js 2.116.0. The `else` was added regardless, because `AuthResult` (src/api/auth/types.ts:8-12) declares both fields nullable and the SDK is pinned only by `^2.116.0`. Its test stubs `actionService.signIn`, our own boundary, rather than mocking an SDK state that cannot occur.
 
 ### DW-133: A third reader of `users.display_name` still renders a seeded partner's own email address as their name, on the partner-mood surface.
 origin: spec-deferred 6ea62add7c44
@@ -1298,7 +1325,8 @@ location: src/api/partnerService.ts:88 (rendered at src/components/PartnerMoodVi
 source_spec: `spec-dw-104-107-130-display-name-edit-and-fallback.md`
 severity: medium
 reason: `partnerService.getPartner` builds `displayName: partnerRecord.display_name || partnerRecord.email || 'Partner'`, applying no seed rule, and that value reaches `partnerSlice` and is rendered as "<name>'s Moods" and "Connected with <name>". For the exact DW-104 couple -- a partner row still carrying `sync_user_profile()`'s email seed -- love notes now correctly shows 'Partner' while the partner-mood view still shows the full address from the same stored row. No test reaches that `||` chain: the store test stubs `getPartner` with fixtures that already carry a displayName, and the only spec rendering PartnerMoodView passes `partner: null`. Pre-existing and outside this bundle's intent, which names `getPartnerDisplayName` alone.
-status: open
+status: done 2026-09-15
+resolution: `partnerService.getPartner` now applies `isSeedFallbackName`, the predicate `getPartnerDisplayName` has used since DW-104, so the two readers of that column cannot disagree again. The `||` chain never fell through because the seed is a non-empty string in all three COALESCE cases. `getPartner` had no test at all; the new one repeats the sibling contract's seed table verbatim, and 9 of its 14 cases fail against the old chain.
 
 ### DW-134: Two sibling destructive buttons still fail WCAG AA contrast with white text on `bg-red-500`.
 origin: spec-deferred b30b9041cf61
@@ -1306,7 +1334,8 @@ location: src/components/Settings/AnniversarySettings.tsx:207 and src/components
 source_spec: `spec-dw-104-107-130-display-name-edit-and-fallback.md`
 severity: low
 reason: Measured against this repo's Tailwind 4.3.3 palette: `--color-red-500` is `oklch(63.7% 0.237 25.331)` = #fb2c36, which is 3.82:1 against #ffffff -- below the 4.5:1 AA floor, and the exact figure axe reported for the events delete-confirm button before it was moved to `bg-red-600` (#e7000b, 4.76:1) in this change. The same `bg-red-500` + `text-white` pairing remains on the anniversary reset button and the photo delete button. Neither sits under an axe scan today, so both are silently non-compliant. Pre-existing; only the events button was touched here because only it was under a scan this change's page-height increase brought into evaluation.
-status: open
+status: done 2026-09-15
+resolution: both buttons moved to bg-red-600/hover:bg-red-700, the precedent set in 2f56c7df. Computed from the installed palette and matching this entry's figures: red-500 is #fb2c36 at 3.82:1, red-600 is #e7000b at 4.76:1. No axe scan was added — AnniversarySettings carries no test ids and the one existing axe spec scopes itself away from that component on purpose — so the guard generalises instead: tests/unit/a11y/whiteOnColorContrast.test.ts measures every text-white + bg-<colour>-<shade> pairing in src/ against the palette read from node_modules at run time. Four pairings were already below the floor; two are in the frozen scripture feature and excluded wholesale, and two are recorded with measured ratios and raised as DW-139 and DW-140.
 
 ### DW-135: initializeApp's mid-flight cases all change userId as well as authSessionVersion, so dropping the version half of stillCurrent() in settingsSlice stays green.
 origin: spec-deferred c2486f7a296d
@@ -1314,7 +1343,8 @@ location: tests/unit/stores/settingsSlice.initializeApp.test.ts:215-335
 source_spec: `spec-dw-100-101-store-identity-guard-gaps-2.md`
 severity: medium
 reason: The three mid-flight cases at settingsSlice.initializeApp.test.ts:215-335 set userId to USER_C or null whenever they bump authSessionVersion. toggleFavorite has a same-account re-login case; initializeApp does not. Pre-existing in 84e6c8ea, not introduced by this pass.
-status: open
+status: done 2026-09-15
+resolution: SUPERSEDED by commit dfca89a9, and verified by mutation rather than by reading. `tests/unit/stores/settingsSlice.initializeApp.test.ts` now carries a version-only case (userId unchanged, authSessionVersion bumped); deleting the version half of `stillCurrent()` turns three cases red.
 
 ### DW-136: No case changes identity a second time while the stale-path loadMessages() handoff is in flight, so deleting the inner pair recheck in the .then() stays green.
 origin: spec-deferred 2102472b0dc6
@@ -1322,7 +1352,8 @@ location: src/stores/slices/settingsSlice.ts:163-165
 source_spec: `spec-dw-100-101-store-identity-guard-gaps-2.md`
 severity: low
 reason: settingsSlice.ts:163-165 re-checks userId and authSessionVersion before updateCurrentMessage(). The three handoff cases settle the handoff under a still-current incoming identity. Pre-existing in 84e6c8ea.
-status: open
+status: done 2026-09-15
+resolution: SUPERSEDED by commit dfca89a9, verified by mutation. "withholds the handoff completion when a second version-only change lands" drives a second identity change while the handoff is in flight; deleting the inner recheck in the `.then()` turns it red.
 
 ### DW-137: Nothing makes the initializeApp stale-path handoff chain reject, so deleting its .catch() stays green. The test double's loadMessages also does not swallow errors the way production does.
 origin: spec-deferred 8dae3341d08c
@@ -1330,4 +1361,26 @@ location: src/stores/slices/settingsSlice.ts:171-173
 source_spec: `spec-dw-100-101-store-identity-guard-gaps-2.md`
 severity: low
 reason: settingsSlice.ts:171-173 attaches .catch() because nothing awaits the chain. settingsSlice.initializeApp.test.ts:124-132's loadMessages rethrows into that catch, unlike messagesSlice.ts:97-99 which swallows. Pre-existing in 84e6c8ea.
+status: done 2026-09-15
+resolution: SUPERSEDED by commit dfca89a9, verified by mutation: deleting the `.catch()` turns "handles a thrown handoff completion without an unhandled rejection" red. The entry's second half was still true and is fixed — the test double's `loadMessages` rethrew where production swallows (messagesSlice.ts:104-107), which gave the chain a rejection route production does not have. It now swallows, and the mutant still dies, so the case was passing for the right reason.
+
+### DW-138: moodSyncService reports an unsolicited CLOSED but has no rejoin for it, so a mood topic closed by the server stays silent for the life of the page.
+origin: raised while closing DW-110, 2026-09-15
+location: src/api/moodSyncService.ts `subscribeMoodUpdates`, the `.subscribe((status) => ...)` callback
+severity: medium
+reason: DW-110 was fixed at its stated location, `useRealtimeMessages`, where a CLOSED now routes into the hook's existing backoff. The mood path has the same hole and no backoff to route into: the subscribe callback records `lastStatus` and fans the status out to subscribers, and `PartnerMoodView.tsx:210` maps CLOSED to a `disconnected` indicator, but nothing reopens the channel. Measured against the installed SDK in tests/unit/api/realtimeLeaveContract.test.ts: a server-initiated `phx_close` moves the channel to `closed`, removes it from the client registry, and schedules no rejoin — so the partner's moods stop arriving until the view is remounted, with the indicator the only sign. Not fixed while closing DW-110 because building a retry loop in the refcounted registry is a different change from adding a branch to one that already exists, and DW-110's `location:` names the hook alone. Settle by giving the registry a bounded reopen, or by deciding the indicator is sufficient and recording that.
+status: open
+
+### DW-139: A non-destructive badge pairs white text with bg-purple-500, at 4.12:1.
+origin: raised while closing DW-134, 2026-09-15
+location: src/components/InteractionHistory/InteractionHistory.tsx:183
+severity: low
+reason: `<div className="rounded-full bg-purple-500 px-3 py-1 text-xs font-medium text-white">`. Measured from the installed Tailwind palette: `--color-purple-500` is oklch(62.7% 0.265 303.9) = #ad46ff, 4.12:1 against white — below the 4.5:1 AA floor, and at `text-xs` it is small text, so the 3:1 large-text allowance does not apply. Pre-existing and outside DW-134, which named two destructive buttons. Allowlisted in tests/unit/a11y/whiteOnColorContrast.test.ts with its measured ratio, and that allowlist fails if the pairing is fixed without removing the entry. Settle by moving to purple-600 or darker, the way DW-28 moved the pink family and DW-134 the red.
+status: open
+
+### DW-140: The partner-mood action button pairs white text with bg-green-500, at 2.22:1 — the worst contrast in the tree.
+origin: raised while closing DW-134, 2026-09-15
+location: src/components/PartnerMoodView/PartnerMoodView.tsx:497
+severity: medium
+reason: `className="flex items-center gap-1 rounded-lg bg-green-500 px-3 py-2 font-medium text-white transition-colors hover:bg-green-600"`. Measured from the installed palette: `--color-green-500` is oklch(72.3% 0.219 149.579) = #00c950, 2.22:1 against white — less than half the AA floor and materially worse than the 3.82:1 that DW-134 was raised for. Severity is medium rather than low on that ratio alone: measured from the same palette, green-600 is 3.22:1 and still fails, and green-700 is 4.94:1 and clears — so unlike the red family, where one step sufficed, this needs a two-step move and a look at how it reads next to the surrounding UI. Pre-existing and outside DW-134's two named buttons. Allowlisted in tests/unit/a11y/whiteOnColorContrast.test.ts with its measured ratio. Settle by moving to green-700 or darker, or by darkening the text instead of the ground.
 status: open
