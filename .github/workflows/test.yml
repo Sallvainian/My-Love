@@ -183,6 +183,27 @@ jobs:
       - name: TypeScript
         run: npm run typecheck
 
+      # `npm run lint` is passed `src tests scripts` and every tsconfig includes
+      # only `src`/`tests`, so nothing above ever parses supabase/functions/**.
+      # Without this step the bounded-body handler could be reverted to
+      # `await req.arrayBuffer()` with the pipeline green: the api Playwright
+      # spec answers cap+1 from the Content-Length precheck before the streaming
+      # read is even reached, so it would not notice.
+      # `deno test` type-checks the modules it imports, which is what covers
+      # handler.ts. `index.ts` is deliberately left out: checking it would pull
+      # @supabase/supabase-js from esm.sh and put this job at the mercy of a
+      # third-party CDN.
+      - name: Install Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+
+      # --no-lock deliberately: a bare run writes a deno.lock at the repo root,
+      # and an untested lockfile could change what `supabase functions deploy`
+      # resolves.
+      - name: Edge Function tests
+        run: deno test --no-lock supabase/functions/upload-love-note-image/
+
   # ============================================
   # Stage 2: Unit Tests (Vitest)
   # ============================================

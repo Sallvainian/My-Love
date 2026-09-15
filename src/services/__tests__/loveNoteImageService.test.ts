@@ -258,6 +258,54 @@ describe('loveNoteImageService', () => {
         'Invalid image type. Please use JPEG, PNG, WebP, or GIF.'
       );
     });
+
+    it('should map a missing Content-Length refusal (411) rather than surface protocol text', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const { imageCompressionService } = await import('../imageCompressionService');
+
+      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
+      vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 411,
+        json: () =>
+          Promise.resolve({
+            error: 'Length required',
+            message: 'A Content-Length header is required',
+          }),
+      });
+
+      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+
+      await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
+        'Image upload was interrupted. Please try again.'
+      );
+    });
+
+    it('should map a truncated-body refusal (400) rather than surface protocol text', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const { imageCompressionService } = await import('../imageCompressionService');
+
+      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
+      vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve({
+            error: 'Content-Length mismatch',
+            message: 'Content-Length declared 1048576 bytes but 524288 were received',
+          }),
+      });
+
+      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+
+      await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
+        'Image upload was interrupted. Please try again.'
+      );
+    });
   });
 
   describe('uploadCompressedBlob', () => {

@@ -46,8 +46,18 @@
  * the property F10 is about; the drain is only what lets the 413 arrive. It is
  * bounded by `MAX_DISCARD_BYTES` and skipped entirely when the declared length
  * is past that ceiling, so an absurd declaration still costs one header read.
- * Every other refusal — 401, 405, 429, 411, 400 and the multipart 415 — reads
- * nothing at all, because none of them is reachable from the app's own client.
+ * Every other refusal — 401, 405, 411, 400 and the multipart 415 — reads
+ * nothing at all, because none of them is reachable from the app's own client:
+ * it always sends a raw octet-stream body whose Content-Length the browser
+ * sets itself.
+ *
+ * 429 is the exception to that reasoning, and is deliberately left as it was.
+ * It *is* reachable from the app — the limiter is 10 uploads/min per user —
+ * and it *is* mapped to a message at `loveNoteImageService.ts:155-157`, so on
+ * this runtime an 11th upload much over 1 MiB stalls instead of showing it.
+ * The rate-limit-before-body ordering predates this change and is unchanged by
+ * it; the limiter is out of contract here, and bounding retained memory (which
+ * this path already does, since it retains nothing) is what this module is for.
  */
 
 /** Configuration — `MAX_DISCARD_BYTES` aside, unchanged from before the split. */
@@ -286,12 +296,15 @@ async function readBoundedBody(
     }
   }
 
+  // Either direction is a malformed request: short of the declared length, or
+  // past it while still under the cap. (A body past the *cap* never reaches
+  // here — it was answered 413 inside the loop above.)
   if (receivedSize !== expectedSize) {
     return {
       ok: false,
       response: json(
         {
-          error: 'Incomplete request body',
+          error: 'Content-Length mismatch',
           message: `Content-Length declared ${expectedSize} bytes but ${receivedSize} were received`,
         },
         400

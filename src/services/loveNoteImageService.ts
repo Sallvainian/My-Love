@@ -161,6 +161,13 @@ export async function uploadLoveNoteImage(file: File, _userId: string): Promise<
     if (response.status === 415) {
       throw new Error('Invalid image type. Please use JPEG, PNG, WebP, or GIF.');
     }
+    // The Edge Function's request-shape refusals: 411 when Content-Length is
+    // absent, 400 when it is malformed or the body did not match it. Their
+    // messages are raw protocol text ("Content-Length declared 1048576 bytes
+    // but 524288 were received"), so they are mapped rather than shown as-is.
+    if (response.status === 411 || response.status === 400) {
+      throw new Error('Image upload was interrupted. Please try again.');
+    }
 
     throw new Error(errorMessage);
   }
