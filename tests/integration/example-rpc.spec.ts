@@ -1,80 +1,55 @@
 /**
- * Integration Test Example: Supabase RPC Business Logic
+ * Integration Test Example: Supabase table write/read without browser overhead.
  *
- * Integration tests validate server-side business logic (RPCs, RLS policies,
- * cross-table operations) without browser overhead. They hit a real local
- * Supabase instance but don't render any UI.
- *
- * Import from merged-fixtures to access supabaseAdmin, apiRequest, and all
- * composed fixtures. Do NOT import from bare '@playwright/test'.
+ * Hits a real local Supabase instance. Import from merged-fixtures to access
+ * supabaseAdmin and composed fixtures. Do NOT import from bare '@playwright/test'.
  *
  * @see _bmad/bmm/testarch/knowledge/test-levels-framework.md
  * @see _bmad/bmm/testarch/knowledge/api-testing-patterns.md
  */
 import { test, expect } from '../support/merged-fixtures';
-import { createTestSession, cleanupTestSession } from '../support/factories';
 
-test.describe('Integration: Scripture Session Lifecycle', () => {
-  test('[P2] [INT-001] scripture_seed_test_data RPC creates session with correct structure', async ({
+test.describe('Integration: Events table lifecycle', () => {
+  test('[P2] [INT-001] events insert creates a row with the requested structure', async ({
+    coupleEvents,
     supabaseAdmin,
   }) => {
-    // GIVEN: A clean test environment
-    // WHEN: We seed a test session via RPC
-    const result = await createTestSession(supabaseAdmin, {
-      sessionCount: 1,
-      preset: 'mid_session',
-    });
+    const [seeded] = await coupleEvents.seed([
+      { dayOffset: 7, label: 'int-001 anniversary', icon: 'ring' },
+    ]);
 
-    try {
-      // THEN: Seed result contains expected structure
-      expect(result.session_ids).toHaveLength(1);
-      expect(result.session_count).toBe(1);
-      expect(result.preset).toBe('mid_session');
-      expect(result.test_user1_id).toBeTruthy();
-
-      // AND: Session exists in database with correct state
-      const { data: session, error } = await supabaseAdmin
-        .from('scripture_sessions')
-        .select('*')
-        .eq('id', result.session_ids[0])
-        .single();
-
-      expect(error).toBeNull();
-      expect(session).toBeTruthy();
-      expect(session!.user1_id).toBe(result.test_user1_id);
-    } finally {
-      await cleanupTestSession(supabaseAdmin, result.session_ids);
-    }
-  });
-
-  test('[P2] [INT-002] cleanup removes all related data in FK order', async ({ supabaseAdmin }) => {
-    // GIVEN: A seeded session with reflections and messages
-    const result = await createTestSession(supabaseAdmin, {
-      sessionCount: 1,
-      includeReflections: true,
-      includeMessages: true,
-    });
-
-    const sessionId = result.session_ids[0];
-
-    // WHEN: We clean up the session
-    await cleanupTestSession(supabaseAdmin, result.session_ids);
-
-    // THEN: Session no longer exists
-    const { data: session } = await supabaseAdmin
-      .from('scripture_sessions')
-      .select('id')
-      .eq('id', sessionId)
+    const { data: event, error } = await supabaseAdmin
+      .from('events')
+      .select('*')
+      .eq('id', seeded.id)
       .single();
 
-    expect(session).toBeNull();
+    expect(error).toBeNull();
+    expect(event).toBeTruthy();
+    expect(event!.user_id).toBe(coupleEvents.userId);
+    expect(event!.label).toBe('int-001 anniversary');
+    expect(event!.icon).toBe('ring');
+    expect(event!.event_date).toBe(seeded.eventDate);
+  });
 
-    // AND: Related step states are also cleaned up
-    const { data: steps } = await supabaseAdmin
-      .from('scripture_step_states')
+  test('[P2] [INT-002] deleting an event removes the row', async ({
+    coupleEvents,
+    supabaseAdmin,
+  }) => {
+    const [seeded] = await coupleEvents.seed([
+      { dayOffset: 3, label: 'int-002 to-delete', icon: 'calendar' },
+    ]);
+
+    const { error: deleteError } = await supabaseAdmin.from('events').delete().eq('id', seeded.id);
+    expect(deleteError).toBeNull();
+
+    const { data: event, error } = await supabaseAdmin
+      .from('events')
       .select('id')
-      .eq('session_id', sessionId);
+      .eq('id', seeded.id)
+      .maybeSingle();
 
-    expect(steps).toHaveLength(0);
+    expect(error).toBeNull();
+    expect(event).toBeNull();
   });
 });
