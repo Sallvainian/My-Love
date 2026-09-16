@@ -26,9 +26,8 @@
  *
  * THE LOADING FLAG IS HALF THE GUARD. It is raised BEFORE the await, so an early
  * return that only skips the write leaves it true forever. `PartnerMoodView`
- * gates both of its branches on `isLoadingPartner`, and `ScriptureOverview`
- * renders nothing but a spinner while `isCheckingSession` is true — so a stranded
- * flag is a permanently blank tab, not a cosmetic wobble.
+ * gates both of its branches on `isLoadingPartner` — so a stranded flag is a
+ * permanently blank tab, not a cosmetic wobble.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -57,10 +56,6 @@ const customUpdateMessage = vi.fn();
 const customDeleteForUser = vi.fn();
 const customExportMessages = vi.fn();
 const customImportMessages = vi.fn();
-const getUserSessions = vi.fn();
-const getCoupleStats = vi.fn();
-const getSession = vi.fn();
-const createSession = vi.fn();
 const loveNotesQuery = vi.fn();
 
 vi.mock('../../../src/api/supabaseClient', () => ({
@@ -159,20 +154,6 @@ vi.mock('../../../src/services/moodService', () => ({
     getUnsyncedMoods: (userId: string) => getUnsyncedMoods(userId),
   },
 }));
-
-vi.mock('../../../src/services/scriptureReadingService', async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    scriptureReadingService: {
-      getUserSessions: (userId: string) => getUserSessions(userId),
-      getCoupleStats: () => getCoupleStats(),
-      getSession: (sessionId: string, onRefresh: (s: unknown) => void) =>
-        getSession(sessionId, onRefresh),
-      createSession: (mode: string, partnerId?: string) => createSession(mode, partnerId),
-    },
-  };
-});
 
 import { useAppStore } from '../../../src/stores/useAppStore';
 import {
@@ -1607,8 +1588,7 @@ describe('loader identity guards', () => {
       pending.settle(PARTNER_A);
       await inFlight;
 
-      // Stuck true renders neither branch of the partner tab and wedges
-      // ScriptureOverview on 'loading'.
+      // Stuck true renders neither branch of the partner tab.
       expect(useAppStore.getState().isLoadingPartner).toBe(false);
     });
 
@@ -1723,172 +1703,6 @@ describe('loader identity guards', () => {
         { id: 'USER-F-ID', displayName: 'C-OWN-SEARCH-HIT' },
       ]);
       expect(useAppStore.getState().isSearching).toBe(false);
-    });
-  });
-
-  // ==========================================================================
-  // scriptureReadingSlice — three loaders fire from ScriptureOverview's mount
-  // effect, and Sign Out is in the bottom nav of that same screen
-  // ==========================================================================
-
-  describe('checkForActiveSession', () => {
-    it("does not restore the previous account's unfinished session", async () => {
-      const pending = deferred<unknown[]>();
-      getUserSessions.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore.getState().checkForActiveSession();
-      switchToUserC({ activeSession: null });
-
-      pending.settle([
-        {
-          id: 'A-SESSION-ID',
-          status: 'in_progress',
-          mode: 'solo',
-          startedAt: new Date('2026-08-03T06:00:00.000Z'),
-        },
-      ]);
-      await inFlight;
-
-      expect(useAppStore.getState().activeSession).toBeNull();
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-SESSION-ID');
-    });
-
-    it('still releases isCheckingSession when it discards', async () => {
-      const pending = deferred<unknown[]>();
-      getUserSessions.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore.getState().checkForActiveSession();
-      expect(useAppStore.getState().isCheckingSession).toBe(true);
-
-      switchToUserC();
-      pending.settle([]);
-      await inFlight;
-
-      // ScriptureOverview renders its checking branch while this is true and
-      // suppresses the mode picker, so a stranded flag is a blank tab.
-      expect(useAppStore.getState().isCheckingSession).toBe(false);
-    });
-  });
-
-  describe('loadCoupleStats', () => {
-    it("does not restore the previous pairing's aggregate stats", async () => {
-      const pending = deferred<unknown>();
-      getCoupleStats.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore.getState().loadCoupleStats();
-      switchToUserC({ coupleStats: null });
-
-      pending.settle({ totalSessions: 42, currentStreak: 7, label: 'A-COUPLE-STATS' });
-      await inFlight;
-
-      expect(useAppStore.getState().coupleStats).toBeNull();
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-COUPLE-STATS');
-    });
-
-    it('still releases isStatsLoading when it discards', async () => {
-      const pending = deferred<unknown>();
-      getCoupleStats.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore.getState().loadCoupleStats();
-      expect(useAppStore.getState().isStatsLoading).toBe(true);
-
-      switchToUserC();
-      pending.settle(null);
-      await inFlight;
-
-      expect(useAppStore.getState().isStatsLoading).toBe(false);
-    });
-  });
-
-  describe('loadSession', () => {
-    // Not always a user tap: ReadingContainer re-fires this when a partner
-    // reconnects, and useScriptureBroadcast re-fires it on channel recovery, so
-    // it can be in flight with nobody touching the screen.
-    const A_SESSION = {
-      id: 'A-SESSION-ID',
-      mode: 'solo',
-      currentPhase: 'reflection',
-      currentStepIndex: 4,
-      status: 'in_progress',
-      version: 1,
-      startedAt: new Date('2026-08-03T06:00:00.000Z'),
-      reflection: 'A-REFLECTION-TEXT',
-    };
-
-    it("does not restore the previous account's session", async () => {
-      const pending = deferred<unknown>();
-      getSession.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore.getState().loadSession('A-SESSION-ID');
-      switchToUserC({ session: null });
-
-      pending.settle(A_SESSION);
-      await inFlight;
-
-      expect(useAppStore.getState().session).toBeNull();
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-REFLECTION-TEXT');
-    });
-
-    it('still releases scriptureLoading when it discards', async () => {
-      const pending = deferred<unknown>();
-      getSession.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore.getState().loadSession('A-SESSION-ID');
-      expect(useAppStore.getState().scriptureLoading).toBe(true);
-
-      switchToUserC();
-      pending.settle(A_SESSION);
-      await inFlight;
-
-      // Stuck true disables the mode cards on ScriptureOverview and makes
-      // loadSession itself a no-op forever after (it early-returns on the flag).
-      expect(useAppStore.getState().scriptureLoading).toBe(false);
-    });
-
-    it('stops the realtime refresh callback writing once the account changes', async () => {
-      // The callback is handed to a live subscription, so it outlives the call
-      // and can fire at any point afterwards.
-      let onRefresh: ((session: unknown) => void) | undefined;
-      getSession.mockImplementation((_id: string, cb: (session: unknown) => void) => {
-        onRefresh = cb;
-        return Promise.resolve(A_SESSION);
-      });
-
-      await useAppStore.getState().loadSession('A-SESSION-ID');
-      expect(useAppStore.getState().session).toMatchObject({ id: 'A-SESSION-ID' });
-
-      switchToUserC({ session: null });
-      onRefresh?.({ ...A_SESSION, reflection: 'A-REFLECTION-PUSHED-AFTER-SWITCH' });
-
-      expect(useAppStore.getState().session).toBeNull();
-      expect(JSON.stringify(useAppStore.getState())).not.toContain(
-        'A-REFLECTION-PUSHED-AFTER-SWITCH'
-      );
-    });
-  });
-
-  describe('createSession', () => {
-    it("does not hand the new account a session it is not a participant in", async () => {
-      const pending = deferred<unknown>();
-      createSession.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore.getState().createSession('solo');
-      switchToUserC({ session: null });
-
-      pending.settle({
-        id: 'A-CREATED-SESSION-ID',
-        mode: 'solo',
-        currentPhase: 'reading',
-        currentStepIndex: 0,
-        status: 'in_progress',
-        version: 1,
-        startedAt: new Date('2026-08-03T06:00:00.000Z'),
-      });
-      await inFlight;
-
-      expect(useAppStore.getState().session).toBeNull();
-      expect(useAppStore.getState().scriptureLoading).toBe(false);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-CREATED-SESSION-ID');
     });
   });
 
@@ -2370,15 +2184,6 @@ describe('loader identity guards', () => {
       expect(getAllStoredMessages).toHaveBeenCalledWith(A);
     });
 
-    it('loadCoupleStats writes normally', async () => {
-      getCoupleStats.mockResolvedValue({ totalSessions: 3 });
-
-      await useAppStore.getState().loadCoupleStats();
-
-      expect(useAppStore.getState().coupleStats).toEqual({ totalSessions: 3 });
-      expect(useAppStore.getState().isStatsLoading).toBe(false);
-    });
-
     it('loadEvents writes normally', async () => {
       getEvents.mockResolvedValue([{ id: 'a-event', label: 'A-EVENT' }]);
 
@@ -2550,22 +2355,6 @@ describe('loader identity guards', () => {
       await useAppStore.getState().updatePhoto('a-photo-1', { caption: 'renamed' });
 
       expect(useAppStore.getState().photos[0].caption).toBe('renamed');
-    });
-
-    it('checkForActiveSession writes normally', async () => {
-      getUserSessions.mockResolvedValue([
-        {
-          id: 'A-SESSION-ID',
-          status: 'in_progress',
-          mode: 'solo',
-          startedAt: new Date('2026-08-03T06:00:00.000Z'),
-        },
-      ]);
-
-      await useAppStore.getState().checkForActiveSession();
-
-      expect(useAppStore.getState().activeSession).toMatchObject({ id: 'A-SESSION-ID' });
-      expect(useAppStore.getState().isCheckingSession).toBe(false);
     });
   });
 });

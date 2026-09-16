@@ -24,8 +24,8 @@
  * an account, and teardown deletes only rows carrying this test's own uuid.
  *
  * playwright-utils deviation: the library has no two-context helper, so the
- * receiving context is opened with `browser.newContext` following the shape of
- * `tests/support/fixtures/together-mode.ts:134`.
+ * receiving context is opened with `browser.newContext` and the partner page
+ * is taken from that context.
  */
 import { randomUUID } from 'node:crypto';
 import type { BrowserContext, Page } from '@playwright/test';
@@ -200,8 +200,8 @@ test.describe('Love notes realtime delivery', () => {
         await log.step('The note reaches the partner live, with no reload and no re-navigation');
         await expect(partnerPage.getByTestId('love-note-message').getByText(noteText)).toBeVisible();
       } finally {
-        // Same idiom as `together-mode.ts:165`: a close that rejects must not
-        // become the failure the report shows instead of the real one.
+        // A close that rejects must not become the failure the report shows
+        // instead of the real one.
         await partnerContext?.close().catch(() => {});
 
         // Keyed on this test's own uuid AND on this worker's own pair, so a

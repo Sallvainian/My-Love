@@ -34,7 +34,6 @@ const ALL_DESTINATIONS: ViewType[] = [
   'notes',
   'partner',
   'photos',
-  'scripture',
   'settings',
 ];
 
@@ -107,13 +106,16 @@ describe('NavigationTray', () => {
   });
 
   describe('Destinations', () => {
-    it('renders all seven destinations, including settings', () => {
+    it('renders all six destinations, including settings', () => {
       renderTray();
       openTray();
 
+      expect(ALL_DESTINATIONS).toHaveLength(6);
       for (const view of ALL_DESTINATIONS) {
         expect(screen.getByTestId(`nav-${view}`)).toBeInTheDocument();
       }
+      expect(screen.queryByTestId('nav-scripture')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Scripture')).not.toBeInTheDocument();
     });
 
     it('keeps the retired bar accessible names', () => {
@@ -125,7 +127,6 @@ describe('NavigationTray', () => {
       expect(screen.getByTestId('nav-notes')).toHaveAttribute('aria-label', 'Love Notes');
       expect(screen.getByTestId('nav-partner')).toHaveAttribute('aria-label', 'Partner');
       expect(screen.getByTestId('nav-photos')).toHaveAttribute('aria-label', 'Photos');
-      expect(screen.getByTestId('nav-scripture')).toHaveAttribute('aria-label', 'Scripture');
       expect(screen.getByTestId('nav-settings')).toHaveAttribute('aria-label', 'Settings');
     });
 
@@ -133,10 +134,10 @@ describe('NavigationTray', () => {
       const { onViewChange } = renderTray();
       openTray();
 
-      fireEvent.click(screen.getByTestId('nav-scripture'));
+      fireEvent.click(screen.getByTestId('nav-notes'));
 
       expect(onViewChange).toHaveBeenCalledTimes(1);
-      expect(onViewChange).toHaveBeenCalledWith('scripture');
+      expect(onViewChange).toHaveBeenCalledWith('notes');
       expect(screen.queryByTestId('nav-tray')).not.toBeInTheDocument();
       expect(screen.getByTestId('nav-menu-toggle')).toHaveAttribute('aria-expanded', 'false');
     });
