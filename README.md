@@ -115,7 +115,7 @@ fnox check                # Verify all secrets resolve
 
 ### Supabase
 
-39 migrations managing tables, RLS policies, RPC functions, and realtime subscriptions. Key tables: `users`, `moods`, `interactions`, `love_notes`, `photos`, and more.
+39 migrations managing tables, RLS policies, RPC functions, and realtime subscriptions. Key tables: `users`, `moods`, `interactions`, `love_notes`, `photos`, `events`, and more.
 
 ```bash
 supabase start                    # Start local instance
@@ -157,7 +157,10 @@ My-Love/
 │   ├── api/                      # API contract tests
 │   └── support/                  # Fixtures, factories, helpers
 ├── supabase/
+│   ├── config.toml
+│   ├── functions/                # Edge Functions
 │   ├── migrations/               # 39 SQL migrations
+│   ├── seed.sql
 │   └── tests/                    # pgTAP database tests
 └── .github/workflows/            # CI/CD pipelines
 ```
