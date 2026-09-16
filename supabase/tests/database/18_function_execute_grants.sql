@@ -26,7 +26,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(21);
+select plan(18);
 
 create or replace function tests.create_test_user(test_email text default 'test@example.com')
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -90,24 +90,13 @@ select is(
   'FN-GRANT-002: no function in public is executable by anon'
 );
 
--- The test seeder writes rows for arbitrary user ids and validates only that
--- they exist, so it must stay off the end-user API surface entirely (lint 0029).
-select ok(
-  not has_function_privilege('authenticated', 'public.scripture_seed_test_data(int, boolean, boolean, text, int[], uuid, uuid)', 'EXECUTE'),
-  'FN-GRANT-003: scripture_seed_test_data is not executable by authenticated'
-);
-
-select ok(
-  has_function_privilege('service_role', 'public.scripture_seed_test_data(int, boolean, boolean, text, int[], uuid, uuid)', 'EXECUTE'),
-  'FN-GRANT-004: scripture_seed_test_data is still executable by service_role'
-);
-
 -- The set of functions `authenticated` may call, pinned exactly. A per-function
 -- ok() cannot catch a function that GAINS a grant it should not have, and that
 -- is the failure mode that actually happened: applying only the anon/PUBLIC
--- revokes left scripture_seed_test_data callable by authenticated on the hosted
--- project, because hosted's default ACL grants authenticated explicitly while
--- local's does not. This assertion goes red on a missing or an extra grant.
+-- revokes left the then-present scripture_seed_test_data callable by
+-- authenticated on the hosted project, because hosted's default ACL grants
+-- authenticated explicitly while local's does not. This assertion goes red on
+-- a missing or an extra grant. The seeder itself is gone (20260916000000).
 --
 -- The list is the LOCAL set. The hosted project also has get_random_daily_message,
 -- which no migration in this repo creates -- it is drift, nothing calls it, and it
@@ -125,11 +114,7 @@ select is(
       and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
       and has_function_privilege('authenticated', p.oid, 'EXECUTE')
   ),
-  'accept_partner_request, decline_partner_request, get_my_partner_id, '
-  || 'is_scripture_session_member, scripture_convert_to_solo, scripture_create_session, '
-  || 'scripture_end_session, scripture_get_couple_stats, scripture_lock_in, '
-  || 'scripture_select_role, scripture_submit_reflection, scripture_toggle_ready, '
-  || 'scripture_undo_lock_in',
+  'accept_partner_request, decline_partner_request, get_my_partner_id',
   'FN-GRANT-008: authenticated holds EXECUTE on exactly the app RPCs'
 );
 
@@ -139,8 +124,8 @@ select ok(
 );
 
 -- Revoking PUBLIC strips the implicit grant these rode on, so the explicit
--- authenticated grants are load-bearing. Without them the partner buttons and
--- every scripture read return 42501.
+-- authenticated grants are load-bearing. Without them the partner buttons
+-- return 42501.
 select ok(
   has_function_privilege('authenticated', 'public.accept_partner_request(uuid)', 'EXECUTE'),
   'FN-GRANT-005: accept_partner_request is executable by authenticated'
@@ -149,15 +134,6 @@ select ok(
 select ok(
   has_function_privilege('authenticated', 'public.decline_partner_request(uuid)', 'EXECUTE'),
   'FN-GRANT-006: decline_partner_request is executable by authenticated'
-);
-
--- Called from nine RLS policies that are declared TO public, so it executes as
--- the invoking role. Losing this grant breaks every authenticated read of
--- scripture_step_states, scripture_reflections, scripture_bookmarks and
--- scripture_messages.
-select ok(
-  has_function_privilege('authenticated', 'public.is_scripture_session_member(uuid)', 'EXECUTE'),
-  'FN-GRANT-007: is_scripture_session_member is executable by authenticated'
 );
 
 -- ============================================

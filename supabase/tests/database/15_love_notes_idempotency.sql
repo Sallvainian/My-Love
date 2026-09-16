@@ -6,7 +6,7 @@
 --
 -- Helpers are declared inline rather than pulled from 00_helpers.sql: that file
 -- creates its schema inside a transaction that rolls back, so the objects do
--- not exist by the time this file runs (matches 03_scripture_rpcs.sql).
+-- not exist by the time this file runs.
 
 begin;
 
