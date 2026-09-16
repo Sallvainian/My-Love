@@ -3,7 +3,7 @@
 
 ## My Love
 
-PWA for couples — daily messages, mood tracking, photos, love-notes chat, partner interactions, and a scripture-reading feature that is frozen pending removal. React 19, TypeScript, Vite, Tailwind v4, Zustand, Supabase; npm, Node 24. Deployed to GitHub Pages at https://sallvainian.github.io/My-Love/. There is no generated documentation tree. `_bmad-output/` holds the loop's specs and implementation/test artifacts; `implementation-artifacts/deferred-work.md` is the deferred-work ledger.
+PWA for couples — daily messages, mood tracking, photos, love-notes chat, and partner interactions. React 19, TypeScript, Vite, Tailwind v4, Zustand, Supabase; npm, Node 24. Deployed to GitHub Pages at https://sallvainian.github.io/My-Love/. There is no generated documentation tree. `_bmad-output/` holds the loop's specs and implementation/test artifacts; `implementation-artifacts/deferred-work.md` is the deferred-work ledger.
 
 ## Policy
 
@@ -11,7 +11,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, part
 - Never recreate a `docs/` tree and never re-add vendored tool docs — both were deleted deliberately so that no stale prose can hand an agent wrong context. Durable prose goes in this block.
 - The repo is public. Never write an email address, query output holding personal data, or a real credential into `_bmad-output/`, `.bmad-loop/` or a commit message; refer to people by role. Two real addresses already sit in history at 69a563ee.
 - Two gitignore mismatches are deliberate; never reconcile them: `.gitignore:132-133` list `CLAUDE.md` and `AGENTS.md` while both are tracked — `git rm --cached` there would delete the repo's only instructions (a plain `git check-ignore` reports tracked files as not ignored; `--no-index` shows the match). Separately, `_bmad-output/` matches no gitignore rule and is tracked on purpose — loop worktrees read their spec from git, so an ignored spec folder stalls the run; do not add one.
-- The scripture-reading feature is frozen for removal (`_bmad-output/specs/spec-remove-scripture-feature/`): its tests were deleted first, so do not add, repair or extend scripture code, and do not copy its modules as templates.
+- The scripture-reading feature has been removed from the application (`_bmad-output/specs/spec-remove-scripture-feature/`). Do not re-add it, and do not copy leftover schema or IndexedDB scripture modules as templates.
 - Never add or repair specs in `tests/e2e-archive/` — frozen documentation, excluded from `tsconfig.test.json` and `tsconfig.tsr.json` and matched by no Playwright project; its `README.md` records the reason for most of them. New E2E goes in `tests/e2e/`.
 - Secrets are age-encrypted inline in the committed `fnox.toml`; never write a secret into `.env` or source. Local runs need `fnox exec -- <cmd>`; CI uses GitHub Secrets, not fnox.
 - Branch as `<type>/<description>` (`feature/`, `fix/`, `chore/`, `docs/`, `ci/`). Commit as `type(scope): description` — feat, fix, test, docs, chore, refactor, revert, deps, ci, perf, style. Documentation-only changes get their own commit. A follow-up to an open PR goes on that PR's branch, never a new branch or PR.
@@ -24,7 +24,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, part
 
 ## Where things are
 
-- State: `src/stores/useAppStore.ts` composes 12 slices from `src/stores/slices/`; `appSlice` is composed first and owns `isLoading`/`error`/`__isHydrated`; `authSlice` owns `userId` and `authSessionVersion` and is not persisted.
+- State: `src/stores/useAppStore.ts` composes 11 slices from `src/stores/slices/`; `appSlice` is composed first and owns `isLoading`/`error`/`__isHydrated`; `authSlice` owns `userId` and `authSessionVersion` and is not persisted.
 - A new view is registered in five hand-maintained places: `ViewType` and `pathMap` in `navigationSlice.ts`, both URL ternaries in `App.tsx` (~189 and ~208), the `currentView ===` render chain (~724), and the `DESTINATIONS` list in `Navigation/NavigationTray.tsx`. Only `pathMap` is typechecked, so missing the rest still compiles, renders nothing, and resets to home on reload.
 - E2E fixtures: import `{ test, expect }` from `tests/support/merged-fixtures.ts`, never from `@playwright/test`.
 - Loop runs live in `.bmad-loop/runs/<id>/`, finished ones in `.bmad-loop/archive/`; both are gitignored, so a deleted run is unrecoverable. Never delete a run directory — one deletion took stories 1-5 of an active run with it; move it to `archive/` instead.
@@ -57,11 +57,11 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, part
 
 ## Known pitfalls
 
-- Any async store action that `set()`s after an `await` must capture `{ userId, authSessionVersion }` first and re-check both before writing — `authSessionVersion` is bumped on every sign-out, so a same-account re-login is caught too. The pair is copy-pasted at 26 sites with no shared helper, and `selectRole` and `sendNote`'s image branch still lack it.
+- Any async store action that `set()`s after an `await` must capture `{ userId, authSessionVersion }` first and re-check both before writing — `authSessionVersion` is bumped on every sign-out, so a same-account re-login is caught too. The pair is copy-pasted at 26 sites with no shared helper, and `sendNote`'s image branch still lacks it.
 - Sign-out discards account state only through `discardAccountState()` in `authSlice.ts`, which spreads `signedOutState()` — the store itself survives sign-out, so a new account-scoped field must be added to `signedOutState()` in the same commit; a partial reset leaks the previous couple's data on a shared device.
 - `BaseIndexedDBService.getAll()` returns every account's rows. Scope by `userId` in the service, as `moodService.getAllForUser` does, before anything reaches UI state.
 - IndexedDB schema changes go in `src/services/dbSchema.ts` alone: bump `DB_VERSION` and gate each branch on whether the store exists, never on `oldVersion < N`. Five modules open `my-love-db` and all delegate to `upgradeDb`; only the one that wins the versionchange transaction runs its callback, so a private upgrade callback anywhere would silently decide the schema for everyone.
-- Route new Realtime work through `moodSyncService`'s refcounted registry or `sendEphemeralBroadcast()`; never call `supabase.channel()` directly. `useRealtimeMessages`, `interactionService` and the frozen scripture hooks still do, and carry the teardown bugs those two modules fixed.
+- Route new Realtime work through `moodSyncService`'s refcounted registry or `sendEphemeralBroadcast()`; never call `supabase.channel()` directly. `useRealtimeMessages` and `interactionService` still do, and carry the teardown bugs those two modules fixed.
 - A partner or session lookup that answers `null` for both "unlinked / signed out" and "the read failed" must never gate Realtime delivery or clear a snapshot: use `lookupPartnerId()`'s status from `supabaseClient.ts`, and let only a successful read overwrite a snapshot — eight fixes in September 2026 chased this one bug across mood, notes and interactions, because `SUBSCRIBED` fires once and nothing re-arms a muted channel.
 - Never `PERFORM realtime.send()` inside an RPC — the local Docker Realtime service has no replication slot to deliver it. Return the snapshot and broadcast client-side with `sendEphemeralBroadcast()`, as `notesSlice.sendNote` and `moodSyncService` do. Four scripture migrations predating `20260301000200` still contain the removed pattern; do not copy them as templates.
 - A retryable INSERT must reuse one client-generated key across attempts, backed by a DB `UNIQUE` constraint plus `.upsert(..., { onConflict, ignoreDuplicates: true })`. Copy `notesSlice.ts` or `photoService.ts`; there is no shared helper. A retryable Storage upload additionally needs an UPDATE policy on `storage.objects` for its bucket, because an overwrite is an UPDATE and without one every retry is rejected.
@@ -71,7 +71,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, part
 - E2E accounts come from the per-worker pool in `tests/support/auth/worker-pool.ts`, keyed on `TEST_WORKER_INDEX` — never `TEST_PARALLEL_INDEX`, which diverges from it on retry. A spec must not link or unlink partners, reset a password, or null a shared row at teardown; those rows belong to other workers.
 - Do not remove the `nodeName` shim from `tests/setup.ts` — without it DOMPurify sees every tag as `''` under happy-dom and text inside `<script>`/`<style>` survives sanitization. It must stay in `setupFiles`.
 - Do not rewrite the shell idioms in `playwright.config.ts` to POSIX — the `stdio` stderr suppression and the double-quoted `docker inspect --format` are required by `cmd.exe`, and without them the whole env block falls into its catch and no local Supabase vars are ever set. Separately, its Supabase env block must stay unguarded: re-guarding it drops the dev server onto the `.env.test` placeholder key and every Realtime handshake is rejected with 403.
-- Three data models, so check which one a feature uses before writing data-layer code: photos, love notes and partner interactions are Supabase-only; mood and daily/custom messages are offline-first with IndexedDB primary; the frozen scripture feature is server-authoritative with IndexedDB as a read cache.
+- Two data models, so check which one a feature uses before writing data-layer code: photos, love notes and partner interactions are Supabase-only; mood and daily/custom messages are offline-first with IndexedDB primary.
 
 <!-- /bmad:context -->
 

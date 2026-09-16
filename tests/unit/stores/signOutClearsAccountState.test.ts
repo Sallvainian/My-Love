@@ -66,26 +66,6 @@ const EXPECTED_RESET: Record<string, unknown> = {
   unviewedCount: 0,
   isSubscribed: false,
   interactionPartnerId: null,
-  session: null,
-  scriptureLoading: false,
-  isSyncing: false,
-  isPendingLockIn: false,
-  isPendingReflection: false,
-  activeSession: null,
-  isCheckingSession: false,
-  coupleStats: null,
-  isStatsLoading: false,
-  myRole: null,
-  partnerJoined: false,
-  myReady: false,
-  partnerReady: false,
-  partnerLocked: false,
-  partnerDisconnected: false,
-  partnerDisconnectedAt: null,
-  countdownStartedAt: null,
-  pendingRetry: null,
-  scriptureError: null,
-  isInitialized: false,
   events: [],
   eventsIsLoading: false,
   eventsError: null,
@@ -103,7 +83,6 @@ const SECRETS = {
   requestedEmail: 'PENDING-REQUEST-EMAIL',
   searchHitName: 'SEARCH-RESULT-DISPLAY-NAME',
   photoCaption: 'PHOTO-CAPTION-TEXT',
-  reflection: 'SCRIPTURE-REFLECTION-TEXT',
   anniversaryLabel: 'OUR-FIRST-KISS-LABEL',
   customMessage: 'MY-OWN-CUSTOM-MESSAGE-TEXT',
   userId: 'USER-A-ID',
@@ -205,10 +184,6 @@ function seedSignedInSession(): void {
 
     interactions: [{ id: 'int-1', from_user_id: 'USER-B-ID', type: 'poke' }],
     unviewedCount: 3,
-
-    activeSession: { id: 'sess-1', userId: SECRETS.userId, notes: SECRETS.reflection },
-    myRole: 'host',
-    partnerJoined: true,
 
     // Anniversaries live INSIDE `settings`, which partialize persists and
     // sign-out must otherwise preserve (theme, notifications are device
@@ -336,7 +311,7 @@ describe('clearAuth on sign-out', () => {
     expect(useAppStore.getState().notes).toEqual([]);
   });
 
-  it('clears photos, interactions and the scripture session', () => {
+  it('clears photos and interactions', () => {
     useAppStore.getState().clearAuth();
 
     const state = useAppStore.getState();
@@ -347,7 +322,6 @@ describe('clearAuth on sign-out', () => {
     // The partner snapshot names the previous couple: a stale one would let
     // the next account accept that couple's incoming traffic.
     expect(state.interactionPartnerId).toBeNull();
-    expect(state.activeSession).toBeNull();
   });
 
   it.each(['clearAuth', 'setAuthUser'] as const)(
@@ -588,23 +562,6 @@ describe('clearAuth on sign-out', () => {
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   });
 
-  it('releases the scripture write lock so the next account is not wedged', () => {
-    // `isSyncing` is a lock, not a spinner: advanceStep, saveAndExit,
-    // saveSession, retryFailedWrite and endSession all early-return while it is
-    // held, and `createSession` does not clear it. Sign out with a scripture
-    // write in flight (a hung fetch has no timeout) and the next account starts
-    // a reading session in which every Next tap is silently dropped.
-    useAppStore.setState({
-      isSyncing: true,
-      isPendingLockIn: true,
-    } as unknown as Parameters<typeof useAppStore.setState>[0]);
-
-    useAppStore.getState().clearAuth();
-
-    expect(useAppStore.getState().isSyncing).toBe(false);
-    expect(useAppStore.getState().isPendingLockIn).toBe(false);
-  });
-
   it('revokes the preview URLs of the notes it is about to drop', () => {
     // A failed image send keeps its blob URL on the note. Every other writer of
     // `notes` revokes through the shared helper, and the unmount cleanup that
@@ -692,5 +649,37 @@ describe('clearAuth on sign-out', () => {
     // Catches drift in the other direction: a field ADDED to the source without
     // being added here would otherwise go unasserted forever.
     expect(Object.keys(signedOutState()).sort()).toEqual(Object.keys(EXPECTED_RESET).sort());
+  });
+
+  it('does not keep scripture-owned fields on the reset object', () => {
+    const resetKeys = Object.keys(signedOutState());
+    const expectedKeys = Object.keys(EXPECTED_RESET);
+    const scriptureOwned = [
+      'session',
+      'scriptureLoading',
+      'isSyncing',
+      'isPendingLockIn',
+      'isPendingReflection',
+      'activeSession',
+      'isCheckingSession',
+      'coupleStats',
+      'isStatsLoading',
+      'myRole',
+      'partnerJoined',
+      'myReady',
+      'partnerReady',
+      'partnerLocked',
+      'partnerDisconnected',
+      'partnerDisconnectedAt',
+      'countdownStartedAt',
+      'pendingRetry',
+      'scriptureError',
+      'isInitialized',
+    ];
+
+    for (const key of scriptureOwned) {
+      expect(resetKeys).not.toContain(key);
+      expect(expectedKeys).not.toContain(key);
+    }
   });
 });

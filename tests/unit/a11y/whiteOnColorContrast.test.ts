@@ -61,13 +61,6 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
  */
 const KNOWN_BELOW_FLOOR = new Map<string, { count: number; note: string }>();
 
-/**
- * The scripture feature is frozen pending removal (AGENTS.md), so its
- * `purple-500` pairings are excluded wholesale rather than allowlisted: a fix
- * there is forbidden, and listing them would invite one.
- */
-const FROZEN = 'src/components/scripture-reading/';
-
 interface Oklch {
   l: number;
   c: number;
@@ -211,7 +204,6 @@ function findWhiteOnColourPairings(): Pairing[] {
 
   for (const absolute of files) {
     const file = relative(repoRoot, absolute).split('\\').join('/');
-    if (file.startsWith(FROZEN)) continue;
 
     const lines = readFileSync(absolute, 'utf8').split('\n');
     lines.forEach((text, index) => {

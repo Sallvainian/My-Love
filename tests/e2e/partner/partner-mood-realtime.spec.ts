@@ -190,8 +190,8 @@ test.describe('Partner mood realtime delivery', () => {
           partnerPage.getByTestId('partner-mood-card').filter({ hasText: moodNote })
         ).toBeVisible();
       } finally {
-        // Same idiom as `together-mode.ts:165`: a close that rejects must not
-        // become the failure the report shows instead of the real one.
+        // A close that rejects must not become the failure the report shows
+        // instead of the real one.
         await partnerContext?.close().catch(() => {});
 
         // Keyed on this test's own uuid AND on this worker's own pair, so a

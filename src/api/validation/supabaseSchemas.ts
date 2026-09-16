@@ -249,22 +249,6 @@ export const InteractionArraySchema = z.array(SupabaseInteractionSchema);
 export const UserArraySchema = z.array(SupabaseUserSchema);
 
 // ============================================================================
-// Scripture Stats Schemas
-// ============================================================================
-
-/**
- * Couple Stats RPC Response Schema
- * Validates the JSONB response from scripture_get_couple_stats RPC
- */
-export const CoupleStatsSchema = z.object({
-  totalSessions: z.number().int().min(0),
-  totalSteps: z.number().int().min(0),
-  lastCompleted: TimestampSchema.nullable(),
-  avgRating: z.number().min(0).max(5),
-  bookmarkCount: z.number().int().min(0),
-});
-
-// ============================================================================
 // Exported Types
 // ============================================================================
 
@@ -280,4 +264,3 @@ export type MoodInsert = z.infer<typeof MoodInsertSchema>;
 export type MoodUpdate = z.infer<typeof MoodUpdateSchema>;
 export type InteractionInsert = z.infer<typeof InteractionInsertSchema>;
 export type InteractionUpdate = z.infer<typeof InteractionUpdateSchema>;
-export type CoupleStats = z.infer<typeof CoupleStatsSchema>;

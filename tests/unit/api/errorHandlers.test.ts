@@ -20,9 +20,8 @@
  * reports the mapped metadata-write message through an optional callback;
  * `notesSlice.ts` sets `notesError` for send/retry failures;
  * `partnerService.ts` replaces the original error's message for
- * send/accept/decline failures; and `scriptureReadingService.ts` wraps the
- * mapped message for reflection submission failures. Other errors retain
- * those callers' existing handling.
+ * send/accept/decline failures. Other errors retain those callers' existing
+ * handling.
  *
  * This suite calls the mapper directly, pinning the `23514` entry, the other
  * mapped codes and the `Database error: ` fallback. It does not exercise

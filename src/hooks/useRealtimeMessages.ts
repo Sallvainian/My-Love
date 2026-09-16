@@ -245,8 +245,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     // go on to create and subscribe a channel this run no longer owns.
     // supabase.channel() dedupes by topic, so a superseded run and its
     // replacement would share one object, and letting both call subscribe()
-    // sends duplicate phx_join frames — the same guard useScriptureBroadcast
-    // carries.
+    // sends duplicate phx_join frames.
     let cancelled = false;
 
     /**

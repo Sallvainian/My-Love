@@ -63,8 +63,8 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       // await and would otherwise stay true forever. Not cosmetic —
       // PartnerMoodView gates BOTH branches on it (the partner view at :505 and
       // the "Connect with Your Partner" branch at :358), so a stuck flag renders
-      // neither, and ScriptureOverview reports 'loading' indefinitely. Cutting
-      // short the new user's own spinner is a flicker; a blank tab is not.
+      // neither. Cutting short the new user's own spinner is a flicker; a blank
+      // tab is not.
       if (get().userId !== requestedBy) {
         set({ isLoadingPartner: false });
         return;

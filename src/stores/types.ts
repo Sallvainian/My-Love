@@ -17,11 +17,7 @@ import type { NavigationSlice } from './slices/navigationSlice';
 import type { NotesSlice } from './slices/notesSlice';
 import type { PartnerSlice } from './slices/partnerSlice';
 import type { PhotosSlice } from './slices/photosSlice';
-import type { ScriptureSlice } from './slices/scriptureReadingSlice';
 import type { SettingsSlice } from './slices/settingsSlice';
-
-// Re-export Zod-inferred CoupleStats type (single source of truth — Story 3.1)
-export type { CoupleStats } from '../api/validation/supabaseSchemas';
 
 /**
  * AppSlice interface - DEFINED HERE to avoid circular imports.
@@ -59,7 +55,6 @@ export interface AppState
     InteractionsSlice,
     PartnerSlice,
     NotesSlice,
-    ScriptureSlice,
     EventsSlice {}
 
 /**
