@@ -1523,3 +1523,26 @@ source_spec: `3-drop-the-scripture-database-objects.md`
 severity: low
 reason: rls-security.ts:4 still says "scripture RLS security E2E tests"; persisted-blob.ts:17 still cites ./scripture-cache.ts. Story 1 leftover comment surgery; live callers are non-scripture.
 status: open
+
+### DW-155: Successful openMyLoveDB connections never register idb blocking/versionchange, so the next version bump can hang on these long-lived holders the same way v9 hangs on the service worker.
+origin: spec-deferred feef7bb9b913
+location: src/services/dbSchema.ts:314-353
+source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
+severity: low
+reason: Pre-existing: storage, mood, and customMessage also omitted blocking before this story. The new helper only adds blocked. A v11 bump would need blocking() { db.close() } (or equivalent) on the live handles.
+status: open
+
+### DW-156: STORE_NAMES core-names test still omits MESSAGE_FAVORITES, the fifth survivor.
+origin: spec-deferred 92e581f40d1d
+location: tests/unit/services/dbSchema.test.ts:566-571
+source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
+severity: low
+reason: Pre-existing: the core it listed MESSAGES/PHOTOS/MOODS/SW_AUTH before this story. Deleting the scripture STORE_NAMES it did not add the favorites name.
+status: open
+
+### DW-157: window.confirm from the IndexedDB blocked listener is not a user gesture; some browsers may suppress the dialog and take the dismiss path.
+origin: spec-deferred 85fc8e2635c1
+location: src/services/dbSchema.ts:322-334
+source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
+reason: Unverified browser behavior. Would settle it: load a v9 profile in Safari iOS PWA with a held connection and see whether confirm appears. If it does not, init rejects with no prompt (medium if true).
+status: open
