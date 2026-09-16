@@ -598,6 +598,71 @@ describe('dbSchema', () => {
     });
   });
 
+  describe('live handle close on next bump', () => {
+    async function withinTimeout<T>(work: Promise<T>, label: string, ms = 2000): Promise<T> {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const guard = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} never settled (${ms}ms)`)), ms);
+      });
+      try {
+        return await Promise.race([work, guard]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }
+
+    it('lets a higher-version open fulfill without a reload confirm', async () => {
+      const holder = await openMyLoveDB();
+      openDbs.push(holder);
+      const confirm = vi.fn().mockReturnValue(false);
+      window.confirm = confirm;
+
+      const next = await withinTimeout(openDB(DB_NAME, DB_VERSION + 1), 'open DB_VERSION+1');
+      openDbs.push(next);
+
+      expect(confirm).not.toHaveBeenCalled();
+    });
+
+    it('does not treat a closed service wrapper as already initialized', async () => {
+      const { moodService } = await import('../../../src/services/moodService');
+      const { customMessageService } = await import('../../../src/services/customMessageService');
+      const { storageService } = await import('../../../src/services/storage');
+
+      type Handle = { db: { close: () => void } | null };
+      const holders: Array<{ service: { init: () => Promise<void> }; handle: Handle }> = [
+        { service: moodService, handle: moodService as unknown as Handle },
+        { service: customMessageService, handle: customMessageService as unknown as Handle },
+        { service: storageService, handle: storageService as unknown as Handle },
+      ];
+
+      for (const { handle } of holders) {
+        handle.db?.close();
+        handle.db = null;
+      }
+
+      for (const { service, handle } of holders) {
+        await service.init();
+        expect(handle.db).not.toBeNull();
+        openDbs.push({ close: () => handle.db?.close() });
+      }
+
+      const confirm = vi.fn().mockReturnValue(false);
+      window.confirm = confirm;
+
+      const next = await withinTimeout(
+        openDB(DB_NAME, DB_VERSION + 1),
+        'open DB_VERSION+1 with live service handles'
+      );
+      openDbs.push(next);
+      expect(confirm).not.toHaveBeenCalled();
+
+      for (const { service, handle } of holders) {
+        expect(handle.db).toBeNull();
+        await expect(service.init()).rejects.toThrow(/lower version|VersionError/i);
+      }
+    });
+  });
+
   describe('store indexes', () => {
     it('should have correct indexes on core stores', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {

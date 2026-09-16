@@ -62,9 +62,22 @@ export abstract class BaseIndexedDBService<
 
     try {
       await this.initPromise;
+      this.forgetHandleOnVersionChange();
     } finally {
       this.initPromise = null;
     }
+  }
+
+  /**
+   * `openMyLoveDB`'s `blocking` closes this connection on a later bump.
+   * Drop the wrapper so the next `init()` reopens instead of returning as ready.
+   */
+  private forgetHandleOnVersionChange(): void {
+    const db = this.db;
+    if (!db) return;
+    db.addEventListener('versionchange', () => {
+      if (this.db === db) this.db = null;
+    });
   }
 
   /**
