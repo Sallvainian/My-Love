@@ -58,37 +58,6 @@ begin
 end;
 $$;
 
--- ============================================
--- Helper: Insert session as service role (bypasses RLS)
--- Returns session UUID
--- ============================================
-create or replace function tests.create_session_as_admin(
-  p_user1_id uuid,
-  p_user2_id uuid default null,
-  p_mode text default 'solo',
-  p_status text default 'in_progress',
-  p_phase text default 'reading'
-) returns uuid language plpgsql security definer set search_path = '' as $$
-declare
-  v_session_id uuid;
-begin
-  insert into public.scripture_sessions (
-    mode, user1_id, user2_id, current_phase,
-    current_step_index, status, version, started_at
-  ) values (
-    p_mode::public.scripture_session_mode,
-    p_user1_id,
-    p_user2_id,
-    p_phase::public.scripture_session_phase,
-    0,
-    p_status::public.scripture_session_status,
-    1,
-    now()
-  ) returning id into v_session_id;
-  return v_session_id;
-end;
-$$;
-
 -- Verify helpers are created
 select pass('Test helpers created');
 

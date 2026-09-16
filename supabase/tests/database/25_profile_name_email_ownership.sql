@@ -25,10 +25,10 @@
 -- update is not proof that a column is protected, and a 42501 raised before the
 -- statement reached the row is not proof either (remediation.md, F5).
 --
--- No policy is added, renamed or dropped on public.users by that migration, and
--- no file in this directory pins the users policy set
--- (`grep -rn policies_are supabase/tests | grep -i users` returns nothing), so
--- there is no array anywhere that has to move with it.
+-- No policy is added, renamed or dropped on public.users by that migration.
+-- The users policy set is pinned in 26_love_notes_and_users_policies.sql; an
+-- add, rename or drop of a users policy must update that array in the same
+-- change.
 -- ============================================
 
 begin;
