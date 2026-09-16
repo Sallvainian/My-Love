@@ -1466,7 +1466,8 @@ location: tests/README.md:72-161
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: medium
 reason: Story 1 owns this rewrite. Chromium testDir is tests/e2e, so these files do not fail this story's verification and still typecheck. The e2e/scripture tree in tests/README.md was already stale after 820be2d2; this story's compile-graph deletes made more of that README false.
-status: open
+status: done 2026-09-16
+resolution: already resolved: 5238b226 rewrote tests/README.md; tests/README.md:67 "example-rpc.spec.ts # Admin-client events seed/cleanup", :85-91 list events factories/helpers with no scripture-cache or reflection, and rg finds zero scripture matches in that file
 
 ### DW-148: AGENTS.md still says five modules open my-love-db after scriptureReadingService was removed.
 origin: spec-deferred 73f04c4b6c19
@@ -1474,7 +1475,9 @@ location: AGENTS.md:64
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: low
 reason: Remaining openers are storage.ts, customMessageService.ts, moodService.ts, and sw-db.ts (four). Agent-context files are deferred by review policy rather than patched here.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-agents-md-stale-context
+resolution-undo: 6a857189626a77e23877d3615f2c6bd8d1dd610b72319b687a5f0ed94145b639 2026-09-16 7374617475733a206f70656e
 
 ### DW-149: AGENTS.md still points the untypechecked render chain at App.tsx (~724); the surviving currentView arms are around :786-797.
 origin: spec-deferred e7ea07c7c0dc
@@ -1482,7 +1485,9 @@ location: AGENTS.md:28
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: low
 reason: The ~724 figure was already wrong before this story (render was near :805). Agent-context files are deferred by review policy.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-agents-md-stale-context
+resolution-undo: 6a857189626a77e23877d3615f2c6bd8d1dd610b72319b687a5f0ed94145b639 2026-09-16 7374617475733a206f70656e
 
 ### DW-150: playwright.config.ts still explains shard policy with scripture specs sorting into one contiguous block.
 origin: spec-deferred a843636f65c9
@@ -1507,7 +1512,8 @@ location: tests/support/helpers/scripture-cache.ts
 source_spec: `3-drop-the-scripture-database-objects.md`
 severity: low
 reason: Story 1 leftover test helpers. tsconfig.test.json includes tests/ but nothing imports these files, so typecheck stays green. Story 1 owns leftover helper deletion.
-status: open
+status: done 2026-09-16
+resolution: already resolved: 5238b226 deleted tests/support/helpers/scripture-cache.ts and tests/support/helpers/reflection.ts; both paths are absent and nothing in tests/ or src/ imports them
 
 ### DW-153: tests/api/check-constraint-error-mapping.spec.ts still inventories scripture_reflections among uncovered CHECKs after the envelopes comment was updated to 13 rows.
 origin: spec-deferred 3ecf2c676f0f
@@ -1546,4 +1552,21 @@ origin: spec-deferred 85fc8e2635c1
 location: src/services/dbSchema.ts:322-334
 source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
 reason: Unverified browser behavior. Would settle it: load a v9 profile in Safari iOS PWA with a held connection and see whether confirm appears. If it does not, init rejects with no prompt (medium if true).
+status: open
+decision: 2026-09-16 Replace confirm with an in-app reload dialog — Replace window.confirm in onUpgradeBlocked with an in-app reload dialog that does not depend on a user gesture, keeping accept=location.reload and dismiss=rejectAllPending.
+
+### DW-158: tests/unit/services/dbSchema.test.ts still says five modules open this database after scriptureReadingService was removed.
+origin: spec-deferred daeb1a075ba2
+location: tests/unit/services/dbSchema.test.ts:303
+source_spec: `spec-dw-148-149-agents-md-stale-context.md`
+severity: low
+reason: tests/unit/services/dbSchema.test.ts:303 "Five modules open this database". The test asserts moodService still creates messages indexes, not opener count. Pre-existing; the bundle surface was AGENTS.md.
+status: open
+
+### DW-159: tests/e2e/navigation/tray.spec.ts cites the five-place registration bullet at AGENTS.md:25; that line is the Where things are heading and the bullet is :28.
+origin: spec-deferred 5edb4251adcc
+location: tests/e2e/navigation/tray.spec.ts:6
+source_spec: `spec-dw-148-149-agents-md-stale-context.md`
+severity: low
+reason: tests/e2e/navigation/tray.spec.ts:6 "(AGENTS.md:25)". AGENTS.md:25 is "## Where things are"; the bullet is AGENTS.md:28 both before and after this change (no line shift).
 status: open
