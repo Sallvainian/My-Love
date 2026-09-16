@@ -2,10 +2,10 @@
 title: 'Remove scripture from the application'
 type: 'chore'
 created: '2026-09-15'
-status: 'blocked'
+status: ready-for-dev
 review_loop_iteration: 0
 followup_review_recommended: false
-baseline_revision: '5b9a18b74f3e89281417cecef32cca974f396b69'
+baseline_revision: 77e71d7e93542d87e910d8dfefb3beaa9431349a
 context: []
 warnings:
   - oversized
