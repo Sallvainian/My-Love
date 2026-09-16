@@ -1573,7 +1573,8 @@ location: tests/unit/services/dbSchema.test.ts:303
 source_spec: `spec-dw-148-149-agents-md-stale-context.md`
 severity: low
 reason: tests/unit/services/dbSchema.test.ts:303 "Five modules open this database". The test asserts moodService still creates messages indexes, not opener count. Pre-existing; the bundle surface was AGENTS.md.
-status: open
+status: done 2026-09-16
+resolution: leftover hygiene Session 1 — comment five→four; test assertions unchanged
 
 ### DW-159: tests/e2e/navigation/tray.spec.ts cites the five-place registration bullet at AGENTS.md:25; that line is the Where things are heading and the bullet is :28.
 origin: spec-deferred 5edb4251adcc
@@ -1581,7 +1582,8 @@ location: tests/e2e/navigation/tray.spec.ts:6
 source_spec: `spec-dw-148-149-agents-md-stale-context.md`
 severity: low
 reason: tests/e2e/navigation/tray.spec.ts:6 "(AGENTS.md:25)". AGENTS.md:25 is "## Where things are"; the bullet is AGENTS.md:28 both before and after this change (no line shift).
-status: open
+status: done 2026-09-16
+resolution: leftover hygiene Session 1 — tray.spec.ts citation AGENTS.md:25→:28; test body unchanged
 
 ### DW-160: tests/README.md:5 still says Vite 7 while package.json depends on Vite 8.
 origin: spec-deferred adc3b5235ada
@@ -1589,7 +1591,8 @@ location: tests/README.md:5
 source_spec: `spec-dw-151-readme-migration-count.md`
 severity: low
 reason: tests/README.md:5 "**Stack**: React 19 + Vite 7 + Supabase (39 migrations, RPCs, RLS policies, pgTAP)". package.json:87 `"vite": "^8.3.0"`. Pre-existing; this change only replaced 21 with 39 on that line.
-status: open
+status: done 2026-09-16
+resolution: leftover hygiene Session 1 — tests/README.md stack line Vite 7→Vite 8
 
 ### DW-161: README.md:118 key-tables list still omits events.
 origin: spec-deferred 81e09e60d583
@@ -1597,7 +1600,8 @@ location: README.md:118
 source_spec: `spec-dw-151-readme-migration-count.md`
 severity: low
 reason: README.md:118 "Key tables: `users`, `moods`, `interactions`, `love_notes`, `photos`, and more." src/types/database.types.ts:55 `events:`. README.md:96 already lists `eventsSlice`. Pre-existing; intent replaced only the 21 figure.
-status: open
+status: done 2026-09-16
+resolution: leftover hygiene Session 1 — README.md key-tables list now includes `events`
 
 ### DW-162: README.md project-structure supabase tree still omits functions/, config.toml, and seed.sql.
 origin: spec-deferred 7e69a56ce63f
@@ -1605,7 +1609,8 @@ location: README.md:159-161
 source_spec: `spec-dw-151-readme-migration-count.md`
 severity: low
 reason: README.md:159-161 lists only migrations/ and tests/. supabase/config.toml, supabase/functions/, and supabase/seed.sql exist on disk. Pre-existing; intent replaced only `# 21 SQL migrations`.
-status: open
+status: done 2026-09-16
+resolution: leftover hygiene Session 1 — README.md supabase tree adds config.toml, functions/, and seed.sql; snippets/ omitted
 
 ### DW-163: The rewritten REJECTIONS comment still says the six uncovered CHECKs none of which route through the mapper, but photos, love_notes, and partner_requests write paths call handleSupabaseError on 23514.
 origin: spec-deferred 026d18064ec4
@@ -1621,7 +1626,8 @@ location: tests/api/events-wire-contract.spec.ts:90
 source_spec: `spec-dw-153-154-leftover-scripture-comments.md`
 severity: low
 reason: tests/api/events-wire-contract.spec.ts:90 `tests/api/scripture-reflection-2.2.spec.ts:63-70`; :93 `SupabaseReflectionSchema` (:231-240); :327 `tests/api/scripture-reflection-rpc.spec.ts:258-266`. tests/api/events-write-wire-shape.spec.ts:53 `tests/api/scripture-reflection-rpc.spec.ts:260-266`. Intent closed the work to "the two remaining comments".
-status: open
+status: done 2026-09-16
+resolution: leftover hygiene Session 1 — live tests/api comments drop deleted scripture spec paths; Prefer/204 explanation kept
 
 ### DW-165: STORE_NAMES core-names it is five independent toBe asserts, not an exact key set, so extra keys still pass.
 origin: spec-deferred 7d861b21c35f
@@ -1629,4 +1635,5 @@ location: tests/unit/services/dbSchema.test.ts:695-699
 source_spec: `spec-dw-156-store-names-message-favorites.md`
 severity: low
 reason: tests/unit/services/dbSchema.test.ts:695-699 five toBe lines. Pre-existing four-expect style; this change added MESSAGE_FAVORITES in the same form. Intent asked to add that expect, not Object.keys or toEqual of the whole map.
-status: open
+status: done 2026-09-16
+resolution: leftover hygiene Session 1 — STORE_NAMES core-names it is an exact key set (toEqual of the whole map); STORE_NAMES itself unchanged
