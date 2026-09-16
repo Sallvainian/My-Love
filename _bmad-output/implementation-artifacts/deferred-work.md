@@ -1618,7 +1618,8 @@ location: tests/api/check-constraint-error-mapping.spec.ts:93-95
 source_spec: `spec-dw-153-154-leftover-scripture-comments.md`
 severity: low
 reason: tests/api/check-constraint-error-mapping.spec.ts:93-95 "none of which route through the mapper". src/services/photoService.ts:22 imports handleSupabaseError; :396-397 maps 23514. src/stores/slices/notesSlice.ts:19 imports it; :519-520 maps 23514. src/api/partnerService.ts:16 imports it; :208-210 maps 23514. Pre-existing taxonomy also in check-constraint-envelopes.ts:70-73 (intent leave-alone). This rewrite only dropped scripture_reflections and seven→six.
-status: open
+status: done 2026-09-16
+resolution: leftover hygiene Session 2 — wire spec covers the six public CHECKs on photos, love_notes, and partner_requests; comments no longer claim they skip the mapper
 
 ### DW-164: Other live tests/api comments still cite deleted scripture specs.
 origin: spec-deferred f4fcf4981e16
