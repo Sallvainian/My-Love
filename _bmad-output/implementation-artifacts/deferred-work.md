@@ -1499,3 +1499,27 @@ source_spec: `2-remove-scripture-from-the-application.md`
 severity: low
 reason: The 21 figure was already wrong before this story. The docs commit dropped scripture table names on that line and left the count.
 status: open
+
+### DW-152: tests/support/helpers/scripture-cache.ts and reflection.ts remain on disk with zero live importers; scripture-cache still calls indexedDB.deleteDatabase('my-love-db').
+origin: spec-deferred 16a62f0fd06d
+location: tests/support/helpers/scripture-cache.ts
+source_spec: `3-drop-the-scripture-database-objects.md`
+severity: low
+reason: Story 1 leftover test helpers. tsconfig.test.json includes tests/ but nothing imports these files, so typecheck stays green. Story 1 owns leftover helper deletion.
+status: open
+
+### DW-153: tests/api/check-constraint-error-mapping.spec.ts still inventories scripture_reflections among uncovered CHECKs after the envelopes comment was updated to 13 rows.
+origin: spec-deferred 3ecf2c676f0f
+location: tests/api/check-constraint-error-mapping.spec.ts:93-95
+source_spec: `3-drop-the-scripture-database-objects.md`
+severity: low
+reason: Sibling comment in check-constraint-envelopes.ts was amended in this story. tests/api/ is an epic leave-alone (story 1 invoke); the API spec comment is now stale relative to the dropped table.
+status: open
+
+### DW-154: rls-security.ts and persisted-blob.ts comments still name scripture after the DB objects are gone.
+origin: spec-deferred 9724daa27986
+location: tests/support/helpers/rls-security.ts:4
+source_spec: `3-drop-the-scripture-database-objects.md`
+severity: low
+reason: rls-security.ts:4 still says "scripture RLS security E2E tests"; persisted-blob.ts:17 still cites ./scripture-cache.ts. Story 1 leftover comment surgery; live callers are non-scripture.
+status: open
