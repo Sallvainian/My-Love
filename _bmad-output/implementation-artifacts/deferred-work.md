@@ -1543,7 +1543,9 @@ location: src/services/dbSchema.ts:314-353
 source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
 severity: low
 reason: Pre-existing: storage, mood, and customMessage also omitted blocking before this story. The new helper only adds blocked. A v11 bump would need blocking() { db.close() } (or equivalent) on the live handles.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-idb-live-handle-blocking
+resolution-undo: 57b1be35c19d4c129fc00a01979c707214a8d5cfaceb76453d4f5955934dafd9 2026-09-16 7374617475733a206f70656e
 
 ### DW-156: STORE_NAMES core-names test still omits MESSAGE_FAVORITES, the fifth survivor.
 origin: spec-deferred 92e581f40d1d
