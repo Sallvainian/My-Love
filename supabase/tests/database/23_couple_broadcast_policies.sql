@@ -12,10 +12,9 @@
 -- websocket, which pgTAP cannot open; that lives in
 -- tests/api/couple-broadcast-authorization.spec.ts.
 --
--- The policies_are assertion lists all six realtime.messages policies on
--- purpose: the four scripture ones from 20260220000001 and 20260222000001 plus
--- the two added here. Adding, renaming or dropping any realtime.messages policy
--- must fail here until this array is updated in the same change.
+-- The policies_are assertion lists the two couple policies on purpose.
+-- Adding, renaming or dropping any realtime.messages policy must fail here
+-- until this array is updated in the same change.
 -- ============================================
 
 begin;
@@ -26,14 +25,10 @@ select policies_are(
   'realtime',
   'messages',
   array[
-    'scripture_session_members_can_receive_broadcasts',
-    'scripture_session_members_can_send_broadcasts',
-    'scripture_presence_members_can_receive_broadcasts',
-    'scripture_presence_members_can_send_broadcasts',
     'couple_broadcast_recipient_can_receive',
     'couple_broadcast_partner_can_send'
   ],
-  'realtime.messages carries exactly the six expected policies'
+  'realtime.messages carries exactly the two couple policies'
 );
 
 select policy_cmd_is(
@@ -126,8 +121,8 @@ select ok(
 -- The topic-prefix guard is what SCOPES these policies. Without it the receive
 -- policy grants read on ANY realtime topic whose second segment is your id,
 -- and the send policy write to any topic whose second segment is your
--- partner's -- scripture topics included. Every other assertion in this file
--- still passes with those two `like` clauses deleted, so they are pinned here.
+-- partner's. Every other assertion in this file still passes with those two
+-- `like` clauses deleted, so they are pinned here.
 select ok(
   strpos(
     (select qual from pg_policies
@@ -166,8 +161,8 @@ select ok(
 
 -- PERMISSIVE, not RESTRICTIVE. policies_are, policy_cmd_is and policy_roles_are
 -- are all indifferent to this, so a policy declared `as restrictive` would pass
--- every assertion above while AND-ing itself against the four scripture
--- policies and breaking scripture broadcast delivery.
+-- every assertion above while AND-ing itself against the other couple policy
+-- and denying traffic the matching PERMISSIVE policy would have allowed.
 select is(
   (select array_agg(permissive order by policyname) from pg_policies
     where schemaname = 'realtime'
@@ -177,7 +172,7 @@ select is(
         'couple_broadcast_partner_can_send'
       )),
   array['PERMISSIVE', 'PERMISSIVE'],
-  'both couple policies are PERMISSIVE, so neither AND-s against the scripture policies'
+  'both couple policies are PERMISSIVE, so neither AND-s against the other'
 );
 
 select * from finish();
