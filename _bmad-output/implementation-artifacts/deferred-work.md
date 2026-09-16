@@ -1475,7 +1475,9 @@ location: AGENTS.md:64
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: low
 reason: Remaining openers are storage.ts, customMessageService.ts, moodService.ts, and sw-db.ts (four). Agent-context files are deferred by review policy rather than patched here.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-agents-md-stale-context
+resolution-undo: 6a857189626a77e23877d3615f2c6bd8d1dd610b72319b687a5f0ed94145b639 2026-09-16 7374617475733a206f70656e
 
 ### DW-149: AGENTS.md still points the untypechecked render chain at App.tsx (~724); the surviving currentView arms are around :786-797.
 origin: spec-deferred e7ea07c7c0dc
@@ -1483,7 +1485,9 @@ location: AGENTS.md:28
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: low
 reason: The ~724 figure was already wrong before this story (render was near :805). Agent-context files are deferred by review policy.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-agents-md-stale-context
+resolution-undo: 6a857189626a77e23877d3615f2c6bd8d1dd610b72319b687a5f0ed94145b639 2026-09-16 7374617475733a206f70656e
 
 ### DW-150: playwright.config.ts still explains shard policy with scripture specs sorting into one contiguous block.
 origin: spec-deferred a843636f65c9
@@ -1550,3 +1554,19 @@ source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
 reason: Unverified browser behavior. Would settle it: load a v9 profile in Safari iOS PWA with a held connection and see whether confirm appears. If it does not, init rejects with no prompt (medium if true).
 status: open
 decision: 2026-09-16 Replace confirm with an in-app reload dialog — Replace window.confirm in onUpgradeBlocked with an in-app reload dialog that does not depend on a user gesture, keeping accept=location.reload and dismiss=rejectAllPending.
+
+### DW-158: tests/unit/services/dbSchema.test.ts still says five modules open this database after scriptureReadingService was removed.
+origin: spec-deferred daeb1a075ba2
+location: tests/unit/services/dbSchema.test.ts:303
+source_spec: `spec-dw-148-149-agents-md-stale-context.md`
+severity: low
+reason: tests/unit/services/dbSchema.test.ts:303 "Five modules open this database". The test asserts moodService still creates messages indexes, not opener count. Pre-existing; the bundle surface was AGENTS.md.
+status: open
+
+### DW-159: tests/e2e/navigation/tray.spec.ts cites the five-place registration bullet at AGENTS.md:25; that line is the Where things are heading and the bullet is :28.
+origin: spec-deferred 5edb4251adcc
+location: tests/e2e/navigation/tray.spec.ts:6
+source_spec: `spec-dw-148-149-agents-md-stale-context.md`
+severity: low
+reason: tests/e2e/navigation/tray.spec.ts:6 "(AGENTS.md:25)". AGENTS.md:25 is "## Where things are"; the bullet is AGENTS.md:28 both before and after this change (no line shift).
+status: open
