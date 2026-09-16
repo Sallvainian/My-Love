@@ -10,14 +10,13 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-/** The seven tray destinations, matching ViewType in navigationSlice.ts. */
+/** The six tray destinations, matching ViewType in navigationSlice.ts. */
 export type NavDestination =
   | 'home'
   | 'mood'
   | 'notes'
   | 'partner'
   | 'photos'
-  | 'scripture'
   | 'settings';
 
 /**
