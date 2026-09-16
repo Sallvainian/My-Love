@@ -20,7 +20,6 @@
  */
 import { AnimatePresence, m as motion } from 'framer-motion';
 import {
-  BookOpen,
   Camera,
   Heart,
   Menu,
@@ -51,7 +50,6 @@ const DESTINATIONS: readonly Destination[] = [
   { view: 'notes', label: 'Love Notes', Icon: MessageCircle },
   { view: 'partner', label: 'Partner', Icon: Users },
   { view: 'photos', label: 'Photos', Icon: Camera },
-  { view: 'scripture', label: 'Scripture', Icon: BookOpen },
   { view: 'settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
@@ -152,7 +150,7 @@ export function NavigationTray({ currentView, onViewChange, badgeCounts }: Navig
           </button>
 
           {/* The app name rather than the active destination, and a span rather
-              than a heading: Mood, Notes, Partner, Scripture and Settings each
+              than a heading: Mood, Notes, Partner and Settings each
               render their own level-1 heading naming themselves, so a chrome
               heading would duplicate that title on screen and make a
               level-1-heading query ambiguous -- which is exactly what broke

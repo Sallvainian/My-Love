@@ -18,9 +18,7 @@ import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-u
 
 // Custom project fixtures (extend as needed)
 import { test as customFixtures } from './fixtures';
-import { test as scriptureNavFixture } from './fixtures/scripture-navigation';
 import { test as authFixture } from './fixtures/auth';
-import { test as togetherModeFixture } from './fixtures/together-mode';
 import { test as interactionRealtimeFixture } from './fixtures/interaction-realtime-control';
 import { test as interactionOwnershipFixture } from './fixtures/interaction-record-ownership';
 import { test as authBootstrapFixture } from './fixtures/auth-bootstrap-notification-order';
@@ -63,9 +61,7 @@ export const test: ReturnType<
       typeof interceptFixture,
       typeof networkMonitorFixture,
       typeof customFixtures,
-      typeof scriptureNavFixture,
       typeof authFixture,
-      typeof togetherModeFixture,
       typeof interactionRealtimeFixture,
       typeof interactionOwnershipFixture,
       typeof authBootstrapFixture,
@@ -79,9 +75,7 @@ export const test: ReturnType<
   interceptFixture,
   networkMonitorFixture,
   customFixtures,
-  scriptureNavFixture,
   authFixture,
-  togetherModeFixture,
   interactionRealtimeFixture,
   interactionOwnershipFixture,
   authBootstrapFixture,

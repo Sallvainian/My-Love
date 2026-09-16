@@ -84,8 +84,8 @@ export function useFocusTrap(
   // dialog, and three consumers already document the return as an acceptance
   // criterion they did not have: components/MoodHistory/MoodDetailModal.tsx:77,
   // components/MoodHistory/MoodHistoryCalendar.tsx:173 and
-  // components/scripture-reading/hooks/useReadingDialogs.ts:28 -- the last of which
-  // hand-rolled it, as does components/love-notes/FullScreenImageViewer.tsx:64.
+  // components/love-notes/FullScreenImageViewer.tsx:64 -- the last of which
+  // hand-rolled it.
   // Doing it here is what those were working around.
   //
   // Keyed on `enabled` alone so it fires on unmount or deactivation, not on
