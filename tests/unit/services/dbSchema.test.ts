@@ -52,6 +52,7 @@ describe('dbSchema', () => {
     }
     openDbs.length = 0;
     vi.restoreAllMocks();
+    document.querySelector('[role="dialog"]')?.remove();
   });
 
   describe('fresh install (v0 → current)', () => {
@@ -492,6 +493,9 @@ describe('dbSchema', () => {
   });
 
   describe('blocked upgrade prompt', () => {
+    const RELOAD_MESSAGE =
+      'A database update is waiting. You must reload this page to finish the update.';
+
     async function holdLowerVersion(): Promise<{ close: () => void }> {
       const holder = await openDB(DB_NAME, 9, {
         upgrade(database) {
@@ -502,29 +506,55 @@ describe('dbSchema', () => {
       return holder;
     }
 
+    function getBlockedDialog(): HTMLElement | null {
+      return document.querySelector('[role="dialog"]');
+    }
+
+    async function waitForBlockedDialog(): Promise<HTMLElement> {
+      return vi.waitFor(() => {
+        const dialog = getBlockedDialog();
+        expect(dialog).not.toBeNull();
+        expect(dialog?.textContent).toContain(RELOAD_MESSAGE);
+        if (!dialog) throw new Error('blocked dialog missing');
+        return dialog;
+      });
+    }
+
+    function clickDialogButton(dialog: HTMLElement, name: 'Reload' | 'Not now'): void {
+      const button = [...dialog.querySelectorAll('button')].find(
+        (el) => el.textContent === name
+      );
+      expect(button).toBeDefined();
+      (button as HTMLButtonElement).click();
+    }
+
     it('shows a reload confirm and rejects the open when dismissed', async () => {
       await holdLowerVersion();
-      const confirm = vi.fn().mockReturnValue(false);
+      const confirm = vi.fn();
       window.confirm = confirm;
 
-      await expect(openMyLoveDB()).rejects.toThrow(/blocked/);
+      const opening = openMyLoveDB();
+      const dialog = await waitForBlockedDialog();
+      expect(confirm).not.toHaveBeenCalled();
 
-      expect(confirm).toHaveBeenCalledTimes(1);
-      expect(String(confirm.mock.calls[0]?.[0])).toMatch(/reload/i);
+      clickDialogButton(dialog, 'Not now');
+
+      await expect(opening).rejects.toThrow(/blocked/);
+      expect(getBlockedDialog()).toBeNull();
     });
 
     it('shows a reload confirm and reloads when accepted', async () => {
       await holdLowerVersion();
-      const confirm = vi.fn().mockReturnValue(true);
+      const confirm = vi.fn();
       window.confirm = confirm;
       const reload = vi.fn();
       vi.stubGlobal('location', { reload });
 
       const opening = openMyLoveDB();
-      await vi.waitFor(() => {
-        expect(confirm).toHaveBeenCalledTimes(1);
-      });
-      expect(String(confirm.mock.calls[0]?.[0])).toMatch(/reload/i);
+      const dialog = await waitForBlockedDialog();
+      expect(confirm).not.toHaveBeenCalled();
+
+      clickDialogButton(dialog, 'Reload');
       expect(reload).toHaveBeenCalledTimes(1);
 
       // Reload is mocked, so the tab stays; close the holder so the pending
@@ -537,16 +567,17 @@ describe('dbSchema', () => {
 
     it('prompts once for concurrent opens and rejects them all on dismiss', async () => {
       await holdLowerVersion();
-      const confirm = vi.fn().mockReturnValue(false);
+      const confirm = vi.fn();
       window.confirm = confirm;
 
-      const results = await Promise.allSettled([
-        openMyLoveDB(),
-        openMyLoveDB(),
-        openMyLoveDB(),
-      ]);
+      const openings = [openMyLoveDB(), openMyLoveDB(), openMyLoveDB()];
+      const dialog = await waitForBlockedDialog();
+      expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+      expect(confirm).not.toHaveBeenCalled();
 
-      expect(confirm).toHaveBeenCalledTimes(1);
+      clickDialogButton(dialog, 'Not now');
+
+      const results = await Promise.allSettled(openings);
       expect(results.map((result) => result.status)).toEqual([
         'rejected',
         'rejected',
@@ -558,19 +589,22 @@ describe('dbSchema', () => {
           expect(String(result.reason)).toMatch(/blocked/);
         }
       }
+      expect(getBlockedDialog()).toBeNull();
     });
 
     it('reloads once when concurrent opens accept the blocked confirm', async () => {
       await holdLowerVersion();
-      const confirm = vi.fn().mockReturnValue(true);
+      const confirm = vi.fn();
       window.confirm = confirm;
       const reload = vi.fn();
       vi.stubGlobal('location', { reload });
 
       const openings = [openMyLoveDB(), openMyLoveDB(), openMyLoveDB()];
-      await vi.waitFor(() => {
-        expect(confirm).toHaveBeenCalledTimes(1);
-      });
+      const dialog = await waitForBlockedDialog();
+      expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+      expect(confirm).not.toHaveBeenCalled();
+
+      clickDialogButton(dialog, 'Reload');
       expect(reload).toHaveBeenCalledTimes(1);
 
       for (const db of openDbs) db.close();
@@ -581,20 +615,22 @@ describe('dbSchema', () => {
 
     it('shows a reload confirm when page-side storeAuthToken is blocked', async () => {
       await holdLowerVersion();
-      const confirm = vi.fn().mockReturnValue(false);
+      const confirm = vi.fn();
       window.confirm = confirm;
 
-      await expect(
-        storeAuthToken({
-          accessToken: 'access',
-          refreshToken: 'refresh',
-          expiresAt: 0,
-          userId: 'user-a',
-        })
-      ).rejects.toThrow(/blocked/);
+      const storing = storeAuthToken({
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        expiresAt: 0,
+        userId: 'user-a',
+      });
+      const dialog = await waitForBlockedDialog();
+      expect(confirm).not.toHaveBeenCalled();
 
-      expect(confirm).toHaveBeenCalledTimes(1);
-      expect(String(confirm.mock.calls[0]?.[0])).toMatch(/reload/i);
+      clickDialogButton(dialog, 'Not now');
+
+      await expect(storing).rejects.toThrow(/blocked/);
+      expect(getBlockedDialog()).toBeNull();
     });
   });
 
@@ -621,6 +657,7 @@ describe('dbSchema', () => {
       openDbs.push(next);
 
       expect(confirm).not.toHaveBeenCalled();
+      expect(document.querySelector('[role="dialog"]')).toBeNull();
     });
 
     it('does not treat a closed service wrapper as already initialized', async () => {
@@ -655,6 +692,7 @@ describe('dbSchema', () => {
       );
       openDbs.push(next);
       expect(confirm).not.toHaveBeenCalled();
+      expect(document.querySelector('[role="dialog"]')).toBeNull();
 
       for (const { service, handle } of holders) {
         expect(handle.db).toBeNull();
