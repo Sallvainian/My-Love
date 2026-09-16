@@ -27,10 +27,6 @@ const ALL_STORES = [
   'photos',
   'moods',
   'sw-auth',
-  'scripture-sessions',
-  'scripture-reflections',
-  'scripture-bookmarks',
-  'scripture-messages',
 ] as const;
 
 /** Every service instance built in a test, so its connection can be closed */
@@ -228,6 +224,46 @@ describe('storageService schema', () => {
       expect(await reopened.getMessage(2, 'owner-a')).toMatchObject({ isFavorite: false });
       expect(await db.getAll('messages')).toEqual(raw);
     } finally { db.close(); }
+  });
+
+  it('migrates v8 when the worker open runs without window', async () => {
+    const legacy = await openDB<MyLoveDBSchema>(DB_NAME, 8, {
+      upgrade(db) {
+        const messages = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+        messages.createIndex('by-category', 'category');
+        messages.createIndex('by-date', 'createdAt');
+        messages.createIndex('by-user', 'userId');
+      },
+    });
+    const raw: Message[] = [
+      { id: 1, text: 'daily', category: 'reason', isCustom: false, isFavorite: true, createdAt: new Date() },
+      { id: 2, text: 'owned', category: 'custom', isCustom: true, userId: 'owner-a', isFavorite: true, createdAt: new Date() },
+      { id: 3, text: 'ownerless', category: 'custom', isCustom: true, isFavorite: true, createdAt: new Date() },
+    ];
+    for (const row of raw) await legacy.put('messages', row);
+    legacy.close();
+
+    const windowDesc = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+    try {
+      vi.resetModules();
+      await (await import('../../../src/sw-db')).getPendingMoods('owner-a');
+    } finally {
+      if (windowDesc) {
+        Object.defineProperty(globalThis, 'window', windowDesc);
+      }
+    }
+
+    const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+    try {
+      expect(await db.getAll('message-favorites')).toEqual([{ messageId: 2, userId: 'owner-a' }]);
+    } finally {
+      db.close();
+    }
   });
 
   describe('message reads are scoped to one account', () => {

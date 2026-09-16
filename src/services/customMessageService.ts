@@ -1,4 +1,3 @@
-import { openDB } from 'idb';
 import { LOG_TRUNCATE_LENGTH } from '../config/performance';
 import type {
   CreateMessageInput,
@@ -16,7 +15,7 @@ import {
 } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
+import { type MyLoveDBSchema, DB_VERSION, openMyLoveDB } from './dbSchema';
 
 /**
  * Custom Message Service - IndexedDB CRUD operations for custom messages
@@ -72,11 +71,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
     try {
       logger.debug(`[CustomMessageService] Initializing IndexedDB (version ${DB_VERSION})...`);
 
-      this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion, transaction) {
-          upgradeDb(db, oldVersion, newVersion, transaction);
-        },
-      });
+      this.db = await openMyLoveDB();
 
       logger.debug(`[CustomMessageService] IndexedDB initialized successfully (v${DB_VERSION})`);
     } catch (error) {

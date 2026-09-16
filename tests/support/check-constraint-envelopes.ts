@@ -67,10 +67,10 @@
  *     "select conrelid::regclass, conname, pg_get_constraintdef(oid)
  *        from pg_constraint where contype='c' and connamespace='public'::regnamespace"
  *
- * It returns 14 rows. Seven sit on tables written through a module that imports
+ * It returns 13 rows. Seven sit on tables written through a module that imports
  * `handleSupabaseError` — `events` (3), `moods` (3), `interactions` (1) — and
- * seven do not: `love_notes` (2), `partner_requests` (2), `photos` (2) and
- * `scripture_reflections` (1). Only the first seven are covered by the map.
+ * six do not: `love_notes` (2), `partner_requests` (2), `photos` (2). Only the
+ * first seven are covered by the map.
  */
 
 /**

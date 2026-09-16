@@ -63,4 +63,37 @@ test.describe('URL Routing', () => {
     await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
     await expect(page.getByTestId('time-together')).toBeVisible();
   });
+
+  test('[P0] should show home and no scripture view on a direct /scripture load', async ({
+    page,
+  }) => {
+    await page.goto('/scripture');
+
+    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('time-together')).toBeVisible();
+    await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
+
+    await openNavTray(page);
+    await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
+  });
+
+  test('[P0] should show home and no scripture view on popstate to /scripture', async ({
+    page,
+  }) => {
+    await page.goto('/scripture');
+    await expect(page.getByTestId('time-together')).toBeVisible();
+
+    await navigateTo(page, 'mood');
+    await page.waitForURL('**/mood');
+
+    await page.goBack();
+
+    await expect(page.getByTestId('time-together')).toBeVisible();
+    await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
+
+    await openNavTray(page);
+    await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
+  });
 });

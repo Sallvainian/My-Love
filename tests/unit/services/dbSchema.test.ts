@@ -9,9 +9,16 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { openDB } from 'idb';
-import { DB_NAME, DB_VERSION, STORE_NAMES, upgradeDb } from '../../../src/services/dbSchema';
+import { openDB, unwrap } from 'idb';
+import {
+  DB_NAME,
+  DB_VERSION,
+  STORE_NAMES,
+  openMyLoveDB,
+  upgradeDb,
+} from '../../../src/services/dbSchema';
 import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
+import { storeAuthToken } from '../../../src/sw-db';
 
 // Mock import.meta.env.DEV to suppress console logs during tests
 vi.stubGlobal('import', {
@@ -44,89 +51,32 @@ describe('dbSchema', () => {
       db.close();
     }
     openDbs.length = 0;
+    vi.restoreAllMocks();
   });
 
-  describe('fresh install (v0 → v5)', () => {
+  describe('fresh install (v0 → current)', () => {
     it('should create all stores on fresh install', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
       });
 
-      // Core stores (v1-v4)
       expect(db.objectStoreNames.contains('messages')).toBe(true);
+      expect(db.objectStoreNames.contains('message-favorites')).toBe(true);
       expect(db.objectStoreNames.contains('photos')).toBe(true);
       expect(db.objectStoreNames.contains('moods')).toBe(true);
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
-
-      // Scripture stores (v5)
-      expect(db.objectStoreNames.contains('scripture-sessions')).toBe(true);
-      expect(db.objectStoreNames.contains('scripture-reflections')).toBe(true);
-      expect(db.objectStoreNames.contains('scripture-bookmarks')).toBe(true);
-      expect(db.objectStoreNames.contains('scripture-messages')).toBe(true);
     });
 
-    it('should create exactly 9 stores', async () => {
+    it('should create exactly 5 stores', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
       });
 
-      expect(db.objectStoreNames.length).toBe(9);
+      expect(db.objectStoreNames.length).toBe(5);
     });
   });
 
   describe('upgrade from v4 to v5', () => {
-    it('should add scripture stores when upgrading from v4', async () => {
-      // First, create v4 database with existing stores
-      const dbV4 = await openDB(DB_NAME, 4, {
-        upgrade(db) {
-          const messageStore = db.createObjectStore('messages', {
-            keyPath: 'id',
-            autoIncrement: true,
-          });
-          messageStore.createIndex('by-category', 'category');
-          messageStore.createIndex('by-date', 'createdAt');
-
-          const photosStore = db.createObjectStore('photos', {
-            keyPath: 'id',
-            autoIncrement: true,
-          });
-          photosStore.createIndex('by-date', 'uploadDate', { unique: false });
-
-          const moodsStore = db.createObjectStore('moods', {
-            keyPath: 'id',
-            autoIncrement: true,
-          });
-          moodsStore.createIndex('by-date', 'date', { unique: true });
-
-          db.createObjectStore('sw-auth', { keyPath: 'id' });
-        },
-      });
-
-      // Verify v4 state
-      expect(dbV4.objectStoreNames.length).toBe(4);
-      expect(dbV4.objectStoreNames.contains('scripture-sessions')).toBe(false);
-      dbV4.close();
-
-      // Upgrade to v5
-      const dbV5 = await openTestDb(DB_NAME, DB_VERSION, {
-        upgrade: upgradeDb,
-      });
-
-      // Verify scripture stores were added
-      expect(dbV5.objectStoreNames.contains('scripture-sessions')).toBe(true);
-      expect(dbV5.objectStoreNames.contains('scripture-reflections')).toBe(true);
-      expect(dbV5.objectStoreNames.contains('scripture-bookmarks')).toBe(true);
-      expect(dbV5.objectStoreNames.contains('scripture-messages')).toBe(true);
-
-      // Verify existing stores are preserved
-      expect(dbV5.objectStoreNames.contains('messages')).toBe(true);
-      expect(dbV5.objectStoreNames.contains('photos')).toBe(true);
-      expect(dbV5.objectStoreNames.contains('moods')).toBe(true);
-      expect(dbV5.objectStoreNames.contains('sw-auth')).toBe(true);
-
-      expect(dbV5.objectStoreNames.length).toBe(9);
-    });
-
     it('should add the messages by-user index to a store that already exists', async () => {
       // The v4 seed above builds `messages` with by-category and by-date only,
       // which is what every already-installed profile has. Adding an index to
@@ -332,16 +282,16 @@ describe('dbSchema', () => {
       expect((await db.getAll('photos'))[0]).toMatchObject({ caption: 'PHOTO-AT-V7' });
       expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V7' });
       expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V7' });
-      expect((await db.getAll('scripture-sessions'))[0]).toMatchObject({ id: 'session-v7' });
-      expect((await db.getAll('scripture-reflections'))[0]).toMatchObject({
-        notes: 'REFLECTION-AT-V7',
-      });
-      expect((await db.getAll('scripture-bookmarks'))[0]).toMatchObject({ id: 'bookmark-v7' });
-      expect((await db.getAll('scripture-messages'))[0]).toMatchObject({ message: 'PRAYER-AT-V7' });
 
-      // No store gained or lost, and the v7 moods index is untouched — v8 must
-      // not re-run the v7 swap over a store that has already had it.
-      expect(db.objectStoreNames.length).toBe(9);
+      // Five survivors; the v7 scripture stores are dropped on the way to v10.
+      // The v7 moods index is untouched — v8 must not re-run the v7 swap over a
+      // store that has already had it.
+      expect(db.objectStoreNames.length).toBe(5);
+      const remaining = Array.from(unwrap(db).objectStoreNames);
+      expect(remaining).not.toContain('scripture-sessions');
+      expect(remaining).not.toContain('scripture-reflections');
+      expect(remaining).not.toContain('scripture-bookmarks');
+      expect(remaining).not.toContain('scripture-messages');
       const moods = db.transaction('moods', 'readonly').objectStore('moods');
       expect(moods.indexNames.contains('by-user-date')).toBe(true);
       expect((moods.indexNames as DOMStringList).contains('by-date')).toBe(false);
@@ -393,47 +343,262 @@ describe('dbSchema', () => {
     });
   });
 
+  describe('upgrade from v9 to v10', () => {
+    async function seedV9(): Promise<void> {
+      const db = await openDB(DB_NAME, 9, {
+        upgrade(database) {
+          const messages = database.createObjectStore('messages', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          messages.createIndex('by-category', 'category');
+          messages.createIndex('by-date', 'createdAt');
+          messages.createIndex('by-user', 'userId');
+
+          const favorites = database.createObjectStore('message-favorites', {
+            keyPath: ['messageId', 'userId'],
+          });
+          favorites.createIndex('by-user', 'userId');
+
+          const photos = database.createObjectStore('photos', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          photos.createIndex('by-date', 'uploadDate', { unique: false });
+
+          const moods = database.createObjectStore('moods', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          moods.createIndex('by-user-date', ['userId', 'date'], { unique: true });
+
+          database.createObjectStore('sw-auth', { keyPath: 'id' });
+
+          const sessions = database.createObjectStore('scripture-sessions', { keyPath: 'id' });
+          sessions.createIndex('by-user', 'userId');
+          for (const name of [
+            'scripture-reflections',
+            'scripture-bookmarks',
+            'scripture-messages',
+          ] as const) {
+            database.createObjectStore(name, { keyPath: 'id' }).createIndex('by-session', 'sessionId');
+          }
+        },
+      });
+
+      const tx = db.transaction(
+        [
+          'messages',
+          'message-favorites',
+          'photos',
+          'moods',
+          'sw-auth',
+          'scripture-sessions',
+          'scripture-reflections',
+          'scripture-bookmarks',
+          'scripture-messages',
+        ],
+        'readwrite'
+      );
+      await tx.objectStore('messages').add({
+        text: 'WRITTEN-AT-V9',
+        category: 'reason',
+        isCustom: false,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      });
+      await tx.objectStore('message-favorites').add({ messageId: 1, userId: 'USER-A' });
+      await tx.objectStore('photos').add({ caption: 'PHOTO-AT-V9' });
+      await tx.objectStore('moods').add({
+        userId: 'USER-A',
+        date: '2026-09-01',
+        mood: 'happy',
+        note: 'MOOD-AT-V9',
+        timestamp: new Date('2026-09-01T00:00:00.000Z'),
+        synced: true,
+      });
+      await tx.objectStore('sw-auth').add({
+        id: 'current',
+        accessToken: 'TOKEN-AT-V9',
+        refreshToken: 'r',
+        expiresAt: 1,
+        userId: 'USER-A',
+      });
+      await tx.objectStore('scripture-sessions').add({
+        id: 'session-v9',
+        userId: 'USER-A',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        status: 'in_progress',
+        version: 1,
+        startedAt: new Date('2026-09-01T00:00:00.000Z'),
+      });
+      await tx.objectStore('scripture-reflections').add({
+        id: 'reflection-v9',
+        sessionId: 'session-v9',
+        stepIndex: 0,
+        userId: 'USER-A',
+        notes: 'REFLECTION-AT-V9',
+        isShared: false,
+        createdAt: new Date('2026-09-01T00:00:00.000Z'),
+      });
+      await tx.objectStore('scripture-bookmarks').add({
+        id: 'bookmark-v9',
+        sessionId: 'session-v9',
+        stepIndex: 0,
+        userId: 'USER-A',
+        shareWithPartner: false,
+        createdAt: new Date('2026-09-01T00:00:00.000Z'),
+      });
+      await tx.objectStore('scripture-messages').add({
+        id: 'message-v9',
+        sessionId: 'session-v9',
+        senderId: 'USER-A',
+        message: 'PRAYER-AT-V9',
+        createdAt: new Date('2026-09-01T00:00:00.000Z'),
+      });
+      await tx.done;
+      expect(db.objectStoreNames.length).toBe(9);
+      db.close();
+    }
+
+    it('drops scripture stores and keeps survivor rows intact', async () => {
+      await seedV9();
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(db.objectStoreNames.contains('messages')).toBe(true);
+      expect(db.objectStoreNames.contains('message-favorites')).toBe(true);
+      expect(db.objectStoreNames.contains('photos')).toBe(true);
+      expect(db.objectStoreNames.contains('moods')).toBe(true);
+      expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
+      expect(db.objectStoreNames.length).toBe(5);
+
+      const remaining = Array.from(unwrap(db).objectStoreNames);
+      expect(remaining).not.toContain('scripture-sessions');
+      expect(remaining).not.toContain('scripture-reflections');
+      expect(remaining).not.toContain('scripture-bookmarks');
+      expect(remaining).not.toContain('scripture-messages');
+
+      expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V9' });
+      expect((await db.getAll('message-favorites'))[0]).toEqual({
+        messageId: 1,
+        userId: 'USER-A',
+      });
+      expect((await db.getAll('photos'))[0]).toMatchObject({ caption: 'PHOTO-AT-V9' });
+      expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V9' });
+      expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V9' });
+    });
+  });
+
+  describe('blocked upgrade prompt', () => {
+    async function holdLowerVersion(): Promise<{ close: () => void }> {
+      const holder = await openDB(DB_NAME, 9, {
+        upgrade(database) {
+          database.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+        },
+      });
+      openDbs.push(holder);
+      return holder;
+    }
+
+    it('shows a reload confirm and rejects the open when dismissed', async () => {
+      await holdLowerVersion();
+      const confirm = vi.fn().mockReturnValue(false);
+      window.confirm = confirm;
+
+      await expect(openMyLoveDB()).rejects.toThrow(/blocked/);
+
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(String(confirm.mock.calls[0]?.[0])).toMatch(/reload/i);
+    });
+
+    it('shows a reload confirm and reloads when accepted', async () => {
+      await holdLowerVersion();
+      const confirm = vi.fn().mockReturnValue(true);
+      window.confirm = confirm;
+      const reload = vi.fn();
+      vi.stubGlobal('location', { reload });
+
+      const opening = openMyLoveDB();
+      await vi.waitFor(() => {
+        expect(confirm).toHaveBeenCalledTimes(1);
+      });
+      expect(String(confirm.mock.calls[0]?.[0])).toMatch(/reload/i);
+      expect(reload).toHaveBeenCalledTimes(1);
+
+      // Reload is mocked, so the tab stays; close the holder so the pending
+      // open can finish instead of spinning the fake-indexeddb wait loop.
+      for (const db of openDbs) db.close();
+      openDbs.length = 0;
+      const upgraded = await opening;
+      openDbs.push(upgraded);
+    });
+
+    it('prompts once for concurrent opens and rejects them all on dismiss', async () => {
+      await holdLowerVersion();
+      const confirm = vi.fn().mockReturnValue(false);
+      window.confirm = confirm;
+
+      const results = await Promise.allSettled([
+        openMyLoveDB(),
+        openMyLoveDB(),
+        openMyLoveDB(),
+      ]);
+
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(results.map((result) => result.status)).toEqual([
+        'rejected',
+        'rejected',
+        'rejected',
+      ]);
+      for (const result of results) {
+        expect(result.status).toBe('rejected');
+        if (result.status === 'rejected') {
+          expect(String(result.reason)).toMatch(/blocked/);
+        }
+      }
+    });
+
+    it('reloads once when concurrent opens accept the blocked confirm', async () => {
+      await holdLowerVersion();
+      const confirm = vi.fn().mockReturnValue(true);
+      window.confirm = confirm;
+      const reload = vi.fn();
+      vi.stubGlobal('location', { reload });
+
+      const openings = [openMyLoveDB(), openMyLoveDB(), openMyLoveDB()];
+      await vi.waitFor(() => {
+        expect(confirm).toHaveBeenCalledTimes(1);
+      });
+      expect(reload).toHaveBeenCalledTimes(1);
+
+      for (const db of openDbs) db.close();
+      openDbs.length = 0;
+      const upgraded = await Promise.all(openings);
+      for (const db of upgraded) openDbs.push(db);
+    });
+
+    it('shows a reload confirm when page-side storeAuthToken is blocked', async () => {
+      await holdLowerVersion();
+      const confirm = vi.fn().mockReturnValue(false);
+      window.confirm = confirm;
+
+      await expect(
+        storeAuthToken({
+          accessToken: 'access',
+          refreshToken: 'refresh',
+          expiresAt: 0,
+          userId: 'user-a',
+        })
+      ).rejects.toThrow(/blocked/);
+
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(String(confirm.mock.calls[0]?.[0])).toMatch(/reload/i);
+    });
+  });
+
   describe('store indexes', () => {
-    it('should have correct index on scripture-sessions', async () => {
-      const db = await openTestDb(DB_NAME, DB_VERSION, {
-        upgrade: upgradeDb,
-      });
-
-      const tx = db.transaction('scripture-sessions', 'readonly');
-      const store = tx.objectStore('scripture-sessions');
-      expect(store.indexNames.contains('by-user')).toBe(true);
-    });
-
-    it('should have correct index on scripture-reflections', async () => {
-      const db = await openTestDb(DB_NAME, DB_VERSION, {
-        upgrade: upgradeDb,
-      });
-
-      const tx = db.transaction('scripture-reflections', 'readonly');
-      const store = tx.objectStore('scripture-reflections');
-      expect(store.indexNames.contains('by-session')).toBe(true);
-    });
-
-    it('should have correct index on scripture-bookmarks', async () => {
-      const db = await openTestDb(DB_NAME, DB_VERSION, {
-        upgrade: upgradeDb,
-      });
-
-      const tx = db.transaction('scripture-bookmarks', 'readonly');
-      const store = tx.objectStore('scripture-bookmarks');
-      expect(store.indexNames.contains('by-session')).toBe(true);
-    });
-
-    it('should have correct index on scripture-messages', async () => {
-      const db = await openTestDb(DB_NAME, DB_VERSION, {
-        upgrade: upgradeDb,
-      });
-
-      const tx = db.transaction('scripture-messages', 'readonly');
-      const store = tx.objectStore('scripture-messages');
-      expect(store.indexNames.contains('by-session')).toBe(true);
-    });
-
     it('should have correct indexes on core stores', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
@@ -461,13 +626,6 @@ describe('dbSchema', () => {
   });
 
   describe('STORE_NAMES constants', () => {
-    it('should have correct scripture store names', () => {
-      expect(STORE_NAMES.SCRIPTURE_SESSIONS).toBe('scripture-sessions');
-      expect(STORE_NAMES.SCRIPTURE_REFLECTIONS).toBe('scripture-reflections');
-      expect(STORE_NAMES.SCRIPTURE_BOOKMARKS).toBe('scripture-bookmarks');
-      expect(STORE_NAMES.SCRIPTURE_MESSAGES).toBe('scripture-messages');
-    });
-
     it('should have correct core store names', () => {
       expect(STORE_NAMES.MESSAGES).toBe('messages');
       expect(STORE_NAMES.PHOTOS).toBe('photos');
@@ -484,8 +642,9 @@ describe('dbSchema', () => {
     it('should export correct database version', () => {
       // v6 re-fires upgradeDb so profiles stranded at v5 by storage.ts's old
       // callback get their missing stores created; v7 swaps the moods index;
-      // v8 adds by-user to messages.
-      expect(DB_VERSION).toBe(9);
+      // v8 adds by-user to messages; v9 stores favorites by account; v10 drops
+      // the four scripture stores.
+      expect(DB_VERSION).toBe(10);
     });
   });
 });

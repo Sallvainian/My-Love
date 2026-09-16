@@ -1,8 +1,7 @@
 import type { IDBPDatabase } from 'idb';
-import { openDB } from 'idb';
 import type { Message, Photo } from '../types';
 import { logger } from '../utils/logger';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
+import { type MyLoveDBSchema, openMyLoveDB } from './dbSchema';
 import { projectMessageFavorites } from './messageFavorites';
 
 class StorageService {
@@ -35,8 +34,8 @@ class StorageService {
   private async _doInit(): Promise<void> {
     try {
       logger.debug('[StorageService] Initializing IndexedDB...');
-      // Delegates to the shared upgradeDb, exactly as moodService,
-      // customMessageService and scriptureReadingService do.
+      // Delegates to the shared upgradeDb, exactly as moodService and
+      // customMessageService do.
       //
       // This used to be a hand-written callback that created only `messages`
       // and `photos`, on the assumption that whichever service owned a store
@@ -46,13 +45,8 @@ class StorageService {
       // same version just connects. On a fresh profile this open() is reached
       // first — initializeApp() calls it from the effect at App.tsx:275,
       // before the mood-sync effects — so its callback was the one that ran,
-      // and `moods`, `sw-auth` and the four scripture stores were never
-      // created at all.
-      this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion, transaction) {
-          upgradeDb(db, oldVersion, newVersion, transaction);
-        },
-      });
+      // and `moods` and `sw-auth` were never created at all.
+      this.db = await openMyLoveDB();
       logger.debug('[StorageService] IndexedDB initialized successfully');
     } catch (error) {
       console.error('[StorageService] Failed to initialize IndexedDB:', error);
@@ -328,8 +322,8 @@ class StorageService {
    * Clear every store (for reset)
    *
    * Named "all data" but only ever cleared photos and messages, so anything
-   * calling it to wipe the device left moods, the background-sync auth token
-   * and the scripture cache in place. It has no callers today; a sign-out
+   * calling it to wipe the device left moods and the background-sync auth
+   * token in place. It has no callers today; a sign-out
    * cleanup reaching for it would have looked complete and still leaked.
    *
    * NOTE: this deletes unsynced moods along with everything else. It is a

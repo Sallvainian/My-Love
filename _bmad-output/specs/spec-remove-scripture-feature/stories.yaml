@@ -107,7 +107,12 @@
     Leave src/services/dbSchema.ts and src/types/database.types.ts entirely alone —
     they are stories 4 and 3.
 
-    Verify with: npm run typecheck && npm run lint && npm run test:ci-local
+    Do NOT run npm run test:ci-local. Its burn-in includes
+    tests/api/upload-love-note-image-limits.spec.ts, which this story must not
+    touch; a 503 there is missing edge-runtime (AGENTS.md), not a scripture
+    regression. (Sallvain, 2026-09-15.)
+
+    Verify with: npm run typecheck && npm run lint && npm run test:unit && npx playwright test --project=chromium
 
 - id: "3"
   title: Drop the scripture database objects
