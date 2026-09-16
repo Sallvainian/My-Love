@@ -1504,7 +1504,9 @@ location: README.md:118
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: low
 reason: The 21 figure was already wrong before this story. The docs commit dropped scripture table names on that line and left the count.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-readme-migration-count
+resolution-undo: c0657b4e23f010076c16d66c6e167b8c45b31c565f8f4166f07460ea6a137870 2026-09-16 7374617475733a206f70656e
 
 ### DW-152: tests/support/helpers/scripture-cache.ts and reflection.ts remain on disk with zero live importers; scripture-cache still calls indexedDB.deleteDatabase('my-love-db').
 origin: spec-deferred 16a62f0fd06d
@@ -1569,4 +1571,28 @@ location: tests/e2e/navigation/tray.spec.ts:6
 source_spec: `spec-dw-148-149-agents-md-stale-context.md`
 severity: low
 reason: tests/e2e/navigation/tray.spec.ts:6 "(AGENTS.md:25)". AGENTS.md:25 is "## Where things are"; the bullet is AGENTS.md:28 both before and after this change (no line shift).
+status: open
+
+### DW-160: tests/README.md:5 still says Vite 7 while package.json depends on Vite 8.
+origin: spec-deferred adc3b5235ada
+location: tests/README.md:5
+source_spec: `spec-dw-151-readme-migration-count.md`
+severity: low
+reason: tests/README.md:5 "**Stack**: React 19 + Vite 7 + Supabase (39 migrations, RPCs, RLS policies, pgTAP)". package.json:87 `"vite": "^8.3.0"`. Pre-existing; this change only replaced 21 with 39 on that line.
+status: open
+
+### DW-161: README.md:118 key-tables list still omits events.
+origin: spec-deferred 81e09e60d583
+location: README.md:118
+source_spec: `spec-dw-151-readme-migration-count.md`
+severity: low
+reason: README.md:118 "Key tables: `users`, `moods`, `interactions`, `love_notes`, `photos`, and more." src/types/database.types.ts:55 `events:`. README.md:96 already lists `eventsSlice`. Pre-existing; intent replaced only the 21 figure.
+status: open
+
+### DW-162: README.md project-structure supabase tree still omits functions/, config.toml, and seed.sql.
+origin: spec-deferred 7e69a56ce63f
+location: README.md:159-161
+source_spec: `spec-dw-151-readme-migration-count.md`
+severity: low
+reason: README.md:159-161 lists only migrations/ and tests/. supabase/config.toml, supabase/functions/, and supabase/seed.sql exist on disk. Pre-existing; intent replaced only `# 21 SQL migrations`.
 status: open
