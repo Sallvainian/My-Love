@@ -693,6 +693,7 @@ describe('dbSchema', () => {
   describe('STORE_NAMES constants', () => {
     it('should have correct core store names', () => {
       expect(STORE_NAMES.MESSAGES).toBe('messages');
+      expect(STORE_NAMES.MESSAGE_FAVORITES).toBe('message-favorites');
       expect(STORE_NAMES.PHOTOS).toBe('photos');
       expect(STORE_NAMES.MOODS).toBe('moods');
       expect(STORE_NAMES.SW_AUTH).toBe('sw-auth');
