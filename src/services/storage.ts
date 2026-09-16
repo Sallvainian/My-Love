@@ -1,8 +1,7 @@
 import type { IDBPDatabase } from 'idb';
-import { openDB } from 'idb';
 import type { Message, Photo } from '../types';
 import { logger } from '../utils/logger';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
+import { type MyLoveDBSchema, openMyLoveDB } from './dbSchema';
 import { projectMessageFavorites } from './messageFavorites';
 
 class StorageService {
@@ -47,11 +46,7 @@ class StorageService {
       // first — initializeApp() calls it from the effect at App.tsx:275,
       // before the mood-sync effects — so its callback was the one that ran,
       // and `moods` and `sw-auth` were never created at all.
-      this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion, transaction) {
-          upgradeDb(db, oldVersion, newVersion, transaction);
-        },
-      });
+      this.db = await openMyLoveDB();
       logger.debug('[StorageService] IndexedDB initialized successfully');
     } catch (error) {
       console.error('[StorageService] Failed to initialize IndexedDB:', error);

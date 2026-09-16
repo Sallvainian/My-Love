@@ -1,4 +1,3 @@
-import { openDB } from 'idb';
 import { ZodError } from 'zod/v4';
 import type { MoodEntry } from '../types';
 import { normalizeMoodEntry } from '../types/moods';
@@ -7,7 +6,7 @@ import { logger } from '../utils/logger';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { MoodEntrySchema } from '../validation/schemas';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
+import { type MyLoveDBSchema, DB_VERSION, openMyLoveDB } from './dbSchema';
 import type { MarkSyncedOutcome } from './moodSyncPayload';
 import { matchesMoodSyncFingerprint } from './moodSyncPayload';
 
@@ -42,11 +41,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
     try {
       logger.debug(`[MoodService] Initializing IndexedDB (version ${DB_VERSION})...`);
 
-      this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion, transaction) {
-          upgradeDb(db, oldVersion, newVersion, transaction);
-        },
-      });
+      this.db = await openMyLoveDB();
 
       logger.debug(`[MoodService] IndexedDB initialized successfully (v${DB_VERSION})`);
     } catch (error) {
