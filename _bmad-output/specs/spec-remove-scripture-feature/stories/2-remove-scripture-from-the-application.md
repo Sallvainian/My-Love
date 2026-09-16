@@ -134,6 +134,7 @@ Re-verified 2026-09-15 on `5b9a18b74f3e89281417cecef32cca974f396b69` (worktree 2
 ## Spec Change Log
 
 - 2026-09-15 — Sallvain: story-2 verification is `npm run typecheck && npm run lint && npm run test:unit && npx playwright test --project=chromium`. Do not run `npm run test:ci-local`; its burn-in of `tests/api/upload-love-note-image-limits.spec.ts` is out of scope (must not touch `tests/api/`) and a 503 is missing edge-runtime, not a scripture regression.
+- 2026-09-15 — Sallvain: strip leftover `## Auto Run Result` / `Status: blocked` from this spec. The loop treats that heading as a fresh blocked verdict, so a re-drive with it still present pauses immediately on the old upload-test 503.
 
 ## Review Triage Log
 
@@ -152,18 +153,3 @@ Inline for `eventsService.ts` from `scriptureReadingService.ts:271-274`: "Typed 
 - `npm run lint` -- expected: exit 0
 - `npm run test:unit` -- expected: exit 0
 - `npx playwright test --project=chromium` -- expected: exit 0 (needs local Supabase)
-
-## Auto Run Result
-
-Status: blocked
-Blocking condition: implementation verification failed
-
-- `npm run typecheck` — exit 0
-- `npm run lint` — exit 0
-- Unit: 100 files, 1892 passed
-- Chromium E2E including the new `/scripture` load and popstate tests — passed (`✅ E2E tests passed` in Stage 3)
-- `npm run test:ci-local` — exit 1 at Stage 4 burn-in iteration 1
-
-Burn-in failure is only `tests/api/upload-love-note-image-limits.spec.ts` (6 tests, all Received 503). That file is in `tests/api/`, which this story must not touch. Local `supabase_edge_runtime_My-Love` logs `failed to determine entrypoint` / `InvalidWorkerCreation` under parallel Playwright load. A curl POST to `http://127.0.0.1:54321/functions/v1/upload-love-note-image` after a container restart returns 401 from the function; the same six Playwright cases still get 503. This is the missing-service 503 AGENTS.md already describes, not a scripture-removal regression.
-
-Implementation is on the branch (`ac18114b`, `50311179`) plus uncommitted follow-ups: `storage.ts:49` comment, tray `nav-scripture` absence assertion, routing `/scripture` tests, `AGENTS.md` `selectRole` drop. Review was not started.
