@@ -1466,7 +1466,8 @@ location: tests/README.md:72-161
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: medium
 reason: Story 1 owns this rewrite. Chromium testDir is tests/e2e, so these files do not fail this story's verification and still typecheck. The e2e/scripture tree in tests/README.md was already stale after 820be2d2; this story's compile-graph deletes made more of that README false.
-status: open
+status: done 2026-09-16
+resolution: already resolved: 5238b226 rewrote tests/README.md; tests/README.md:67 "example-rpc.spec.ts # Admin-client events seed/cleanup", :85-91 list events factories/helpers with no scripture-cache or reflection, and rg finds zero scripture matches in that file
 
 ### DW-148: AGENTS.md still says five modules open my-love-db after scriptureReadingService was removed.
 origin: spec-deferred 73f04c4b6c19
@@ -1507,7 +1508,8 @@ location: tests/support/helpers/scripture-cache.ts
 source_spec: `3-drop-the-scripture-database-objects.md`
 severity: low
 reason: Story 1 leftover test helpers. tsconfig.test.json includes tests/ but nothing imports these files, so typecheck stays green. Story 1 owns leftover helper deletion.
-status: open
+status: done 2026-09-16
+resolution: already resolved: 5238b226 deleted tests/support/helpers/scripture-cache.ts and tests/support/helpers/reflection.ts; both paths are absent and nothing in tests/ or src/ imports them
 
 ### DW-153: tests/api/check-constraint-error-mapping.spec.ts still inventories scripture_reflections among uncovered CHECKs after the envelopes comment was updated to 13 rows.
 origin: spec-deferred 3ecf2c676f0f
