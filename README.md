@@ -186,7 +186,6 @@ On push to `main`: build → smoke test → deploy to GitHub Pages → health ch
 - `bundle-size.yml` — PR bundle size comparison
 - `codeql.yml` — Security analysis
 - `supabase-migrations.yml` — Migration validation
-- `grok-code-review.yml` — AI-assisted code review (Grok stand-in)
 - `claude-code-review.yml` — paused while Claude Code usage is exhausted
 - `lighthouse.yml` — Performance audits
 
