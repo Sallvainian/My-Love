@@ -1553,7 +1553,9 @@ location: tests/unit/services/dbSchema.test.ts:566-571
 source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
 severity: low
 reason: Pre-existing: the core it listed MESSAGES/PHOTOS/MOODS/SW_AUTH before this story. Deleting the scripture STORE_NAMES it did not add the favorites name.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-store-names-favorites-test
+resolution-undo: c92cd01649f5d33922d41bddc7ea9142b7324384e347795f1767cfa5799df86c 2026-09-16 7374617475733a206f70656e
 
 ### DW-157: window.confirm from the IndexedDB blocked listener is not a user gesture; some browsers may suppress the dialog and take the dismiss path.
 origin: spec-deferred 85fc8e2635c1
@@ -1617,4 +1619,12 @@ location: tests/api/events-wire-contract.spec.ts:90
 source_spec: `spec-dw-153-154-leftover-scripture-comments.md`
 severity: low
 reason: tests/api/events-wire-contract.spec.ts:90 `tests/api/scripture-reflection-2.2.spec.ts:63-70`; :93 `SupabaseReflectionSchema` (:231-240); :327 `tests/api/scripture-reflection-rpc.spec.ts:258-266`. tests/api/events-write-wire-shape.spec.ts:53 `tests/api/scripture-reflection-rpc.spec.ts:260-266`. Intent closed the work to "the two remaining comments".
+status: open
+
+### DW-165: STORE_NAMES core-names it is five independent toBe asserts, not an exact key set, so extra keys still pass.
+origin: spec-deferred 7d861b21c35f
+location: tests/unit/services/dbSchema.test.ts:695-699
+source_spec: `spec-dw-156-store-names-message-favorites.md`
+severity: low
+reason: tests/unit/services/dbSchema.test.ts:695-699 five toBe lines. Pre-existing four-expect style; this change added MESSAGE_FAVORITES in the same form. Intent asked to add that expect, not Object.keys or toEqual of the whole map.
 status: open
