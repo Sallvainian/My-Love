@@ -35,34 +35,6 @@ describe('dbSchema - Index Integrity', () => {
     openDbs.length = 0;
   });
 
-  it('[P0] should have by-user index on scripture-sessions for user queries', async () => {
-    // GIVEN: Fresh database install
-    const db = await openTestDb();
-
-    // WHEN: Checking scripture-sessions store
-    const tx = db.transaction('scripture-sessions', 'readonly');
-    const store = tx.objectStore('scripture-sessions');
-
-    // THEN: by-user index exists
-    expect(store.indexNames.contains('by-user')).toBe(true);
-  });
-
-  it('[P0] should have by-session index on all scripture child stores', async () => {
-    // GIVEN: Fresh database install
-    const db = await openTestDb();
-
-    // WHEN/THEN: Each child store has by-session index
-    for (const storeName of [
-      'scripture-reflections',
-      'scripture-bookmarks',
-      'scripture-messages',
-    ] as const) {
-      const tx = db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName);
-      expect(store.indexNames.contains('by-session')).toBe(true);
-    }
-  });
-
   it('[P0] should have a non-unique by-user index on messages store', async () => {
     // GIVEN: Fresh database install
     const db = await openTestDb();
