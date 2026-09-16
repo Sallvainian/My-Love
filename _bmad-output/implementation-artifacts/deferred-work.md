@@ -1523,7 +1523,9 @@ location: tests/api/check-constraint-error-mapping.spec.ts:93-95
 source_spec: `3-drop-the-scripture-database-objects.md`
 severity: low
 reason: Sibling comment in check-constraint-envelopes.ts was amended in this story. tests/api/ is an epic leave-alone (story 1 invoke); the API spec comment is now stale relative to the dropped table.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-leftover-scripture-comments
+resolution-undo: 32ee3f03777cb76a29ae46602a76a0ac800096833f47018609f42d291dcb58d0 2026-09-16 7374617475733a206f70656e
 
 ### DW-154: rls-security.ts and persisted-blob.ts comments still name scripture after the DB objects are gone.
 origin: spec-deferred 9724daa27986
@@ -1531,7 +1533,9 @@ location: tests/support/helpers/rls-security.ts:4
 source_spec: `3-drop-the-scripture-database-objects.md`
 severity: low
 reason: rls-security.ts:4 still says "scripture RLS security E2E tests"; persisted-blob.ts:17 still cites ./scripture-cache.ts. Story 1 leftover comment surgery; live callers are non-scripture.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-leftover-scripture-comments
+resolution-undo: 32ee3f03777cb76a29ae46602a76a0ac800096833f47018609f42d291dcb58d0 2026-09-16 7374617475733a206f70656e
 
 ### DW-155: Successful openMyLoveDB connections never register idb blocking/versionchange, so the next version bump can hang on these long-lived holders the same way v9 hangs on the service worker.
 origin: spec-deferred feef7bb9b913
@@ -1595,4 +1599,20 @@ location: README.md:159-161
 source_spec: `spec-dw-151-readme-migration-count.md`
 severity: low
 reason: README.md:159-161 lists only migrations/ and tests/. supabase/config.toml, supabase/functions/, and supabase/seed.sql exist on disk. Pre-existing; intent replaced only `# 21 SQL migrations`.
+status: open
+
+### DW-163: The rewritten REJECTIONS comment still says the six uncovered CHECKs none of which route through the mapper, but photos, love_notes, and partner_requests write paths call handleSupabaseError on 23514.
+origin: spec-deferred 026d18064ec4
+location: tests/api/check-constraint-error-mapping.spec.ts:93-95
+source_spec: `spec-dw-153-154-leftover-scripture-comments.md`
+severity: low
+reason: tests/api/check-constraint-error-mapping.spec.ts:93-95 "none of which route through the mapper". src/services/photoService.ts:22 imports handleSupabaseError; :396-397 maps 23514. src/stores/slices/notesSlice.ts:19 imports it; :519-520 maps 23514. src/api/partnerService.ts:16 imports it; :208-210 maps 23514. Pre-existing taxonomy also in check-constraint-envelopes.ts:70-73 (intent leave-alone). This rewrite only dropped scripture_reflections and seven→six.
+status: open
+
+### DW-164: Other live tests/api comments still cite deleted scripture specs.
+origin: spec-deferred f4fcf4981e16
+location: tests/api/events-wire-contract.spec.ts:90
+source_spec: `spec-dw-153-154-leftover-scripture-comments.md`
+severity: low
+reason: tests/api/events-wire-contract.spec.ts:90 `tests/api/scripture-reflection-2.2.spec.ts:63-70`; :93 `SupabaseReflectionSchema` (:231-240); :327 `tests/api/scripture-reflection-rpc.spec.ts:258-266`. tests/api/events-write-wire-shape.spec.ts:53 `tests/api/scripture-reflection-rpc.spec.ts:260-266`. Intent closed the work to "the two remaining comments".
 status: open
