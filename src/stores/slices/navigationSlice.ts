@@ -2,7 +2,7 @@
  * Navigation Slice
  *
  * Manages all navigation-related state and actions including:
- * - View switching (home/photos/mood/partner/notes/scripture/settings)
+ * - View switching (home/photos/mood/partner/notes/settings)
  * - Browser history integration
  *
  * Cross-slice dependencies:
@@ -22,7 +22,6 @@ export type ViewType =
   | 'mood'
   | 'partner'
   | 'notes'
-  | 'scripture'
   | 'settings';
 
 export interface NavigationSlice {
@@ -36,7 +35,6 @@ export interface NavigationSlice {
   navigateMood: () => void;
   navigatePartner: () => void;
   navigateNotes: () => void;
-  navigateScripture: () => void;
 }
 
 export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get, _api) => ({
@@ -55,7 +53,6 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
         mood: '/mood',
         partner: '/partner',
         notes: '/notes',
-        scripture: '/scripture',
         settings: '/settings',
       };
       const basePath = pathMap[view];
@@ -93,9 +90,5 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
 
   navigateNotes: () => {
     get().setView('notes');
-  },
-
-  navigateScripture: () => {
-    get().setView('scripture');
   },
 });
