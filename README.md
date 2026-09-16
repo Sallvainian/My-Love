@@ -173,7 +173,7 @@ Runs on every PR targeting `main`:
 - Database Tests (pgTAP)
 - Integration Tests (Playwright)
 - API Tests (Playwright)
-- E2E Tests (Playwright, sharded across 4 runners)
+- E2E Tests (Playwright, sharded across 2 runners)
 - Burn-in (flaky test detection)
 - Test Summary (required status check for merge)
 

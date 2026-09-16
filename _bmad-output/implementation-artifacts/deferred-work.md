@@ -1490,7 +1490,8 @@ location: playwright.config.ts:102-105
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: low
 reason: Those specs were already gone in 820be2d2. Story 5's invoke text owns rewriting playwright.config.ts:102-105.
-status: open
+status: done 2026-09-16
+resolution: Story 5 rewrote playwright.config.ts:102-105; the comment no longer says scripture specs sort into one contiguous block.
 
 ### DW-151: README.md still says 21 migrations; supabase/migrations/ has 38 files.
 origin: spec-deferred 4d45bee2999d
