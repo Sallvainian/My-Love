@@ -1,7 +1,7 @@
 /**
  * RLS Security Test Helpers
  *
- * Shared utilities for scripture RLS security E2E tests.
+ * Shared RLS helpers used by events, auth, and API specs.
  */
 import { createClient } from '@supabase/supabase-js';
 import type { TypedSupabaseClient } from '../factories';
