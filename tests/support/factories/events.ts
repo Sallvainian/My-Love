@@ -87,9 +87,8 @@ export interface SeededEvent {
 /**
  * `email` → `public.users.id`.
  *
- * Mirrors the unexported `resolveAppUserIdByEmail` in `./index.ts`. Kept here
- * rather than exported from there so this module stays the one place the
- * events specs reach for identity.
+ * Kept here so this module stays the one place the events specs reach for
+ * identity.
  */
 async function resolveAppUserId(
   supabaseAdmin: TypedSupabaseClient,
