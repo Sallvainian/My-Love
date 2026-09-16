@@ -301,7 +301,7 @@ describe('dbSchema', () => {
     it('creates it even when a service that does not own the messages store wins the upgrade', async () => {
       // IndexedDB runs the upgrade callback of only the ONE open() that
       // performs the version-change transaction; every other concurrent open()
-      // just connects. Five modules open this database, and which one gets
+      // just connects. Four modules open this database, and which one gets
       // there first is a race decided by app start-up order — so the store a
       // service "owns" says nothing about which callback creates its indexes.
       // moodService reaches for `moods` and never touches `messages`, which
@@ -730,11 +730,13 @@ describe('dbSchema', () => {
 
   describe('STORE_NAMES constants', () => {
     it('should have correct core store names', () => {
-      expect(STORE_NAMES.MESSAGES).toBe('messages');
-      expect(STORE_NAMES.MESSAGE_FAVORITES).toBe('message-favorites');
-      expect(STORE_NAMES.PHOTOS).toBe('photos');
-      expect(STORE_NAMES.MOODS).toBe('moods');
-      expect(STORE_NAMES.SW_AUTH).toBe('sw-auth');
+      expect(STORE_NAMES).toEqual({
+        MESSAGES: 'messages',
+        MESSAGE_FAVORITES: 'message-favorites',
+        PHOTOS: 'photos',
+        MOODS: 'moods',
+        SW_AUTH: 'sw-auth',
+      });
     });
   });
 
