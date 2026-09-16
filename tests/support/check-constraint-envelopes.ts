@@ -42,8 +42,9 @@
  * server never sent it in the first place.
  *
  * Both were confirmed for `events` (label and icon), `interactions` (type) and
- * `moods` (note) — all three tables written through a module that imports
- * `handleSupabaseError`.
+ * `moods` (note). The same authenticated 23514 envelope is what the mapper
+ * consumes for every public CHECK table, including `photos`, `love_notes`, and
+ * `partner_requests` — those write paths also import `handleSupabaseError`.
  *
  * ## Two properties that are load-bearing and easy to lose
  *
@@ -67,10 +68,15 @@
  *     "select conrelid::regclass, conname, pg_get_constraintdef(oid)
  *        from pg_constraint where contype='c' and connamespace='public'::regnamespace"
  *
- * It returns 13 rows. Seven sit on tables written through a module that imports
- * `handleSupabaseError` — `events` (3), `moods` (3), `interactions` (1) — and
- * six do not: `love_notes` (2), `partner_requests` (2), `photos` (2). Only the
- * first seven are covered by the map.
+ * It returns 13 rows. Every one of them sits on a table whose write path
+ * imports `handleSupabaseError` and maps `23514`: `events` (3), `moods` (3),
+ * `interactions` (1), `love_notes` (2), `partner_requests` (2), `photos` (2).
+ * The map is keyed on SQLSTATE, not table. The wire spec
+ * (`tests/api/check-constraint-error-mapping.spec.ts`) drives the original
+ * three (`events_label_check`, `interactions_type_check`, `moods_note_check`)
+ * plus the six on `photos` (`photos_caption_check`, `valid_mime_type`),
+ * `love_notes` (`love_notes_content_check`, `different_users`), and
+ * `partner_requests` (`partner_requests_status_check`, `no_self_requests`).
  */
 
 /**
