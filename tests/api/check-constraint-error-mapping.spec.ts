@@ -90,9 +90,9 @@ test.describe('CHECK-constraint rejections over the wire', () => {
    * The three tables carrying a CHECK constraint that is written through a
    * module importing `handleSupabaseError`. Measured from `pg_constraint`:
    * `events` has three such constraints, `moods` three, `interactions` one.
-   * The other seven CHECK constraints in `public` sit on `love_notes`,
-   * `partner_requests`, `photos` and `scripture_reflections`, none of which
-   * route through the mapper — see this spec's sibling summary.
+   * The other six CHECK constraints in `public` sit on `love_notes`,
+   * `partner_requests`, and `photos`, none of which route through the mapper
+   * — see this spec's sibling summary.
    */
   const REJECTIONS = [
     {
