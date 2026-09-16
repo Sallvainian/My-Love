@@ -49,9 +49,9 @@
  * The wire detail that decides the shape: supabase-js appends `.select()` to
  * both writes, which sends `Prefer: return=representation`. Every request below
  * therefore sends that header explicitly. Without it PostgREST answers 204 No
- * Content and this file would be measuring a shape the service never sees —
- * `tests/api/scripture-reflection-rpc.spec.ts:260-266` is that headerless 204
- * case, and it is deliberately not the shape under test here.
+ * Content and this file would be measuring a shape the service never sees. A
+ * headerless write answers 204; that is deliberately not the shape under
+ * test here.
  *
  * Isolation: rows belong to this worker's own pair only, resolved through
  * `getWorkerPairEmails()` (keyed on `TEST_WORKER_INDEX`, never

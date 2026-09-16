@@ -57,6 +57,21 @@ const OVER_LONG_LABEL = 'x'.repeat(101);
 /** `moods.note` is `check (char_length(note) <= 500)`. */
 const OVER_LONG_NOTE = 'n'.repeat(501);
 
+/** `photos.caption` is `check (char_length(caption) <= 500)` (`photos_caption_check`). */
+const OVER_LONG_CAPTION = 'c'.repeat(501);
+
+/** `love_notes.content` is `check (char_length(content) <= 1000 AND char_length(content) >= 1)`. */
+const OVER_LONG_NOTE_CONTENT = 'x'.repeat(1001);
+
+/**
+ * `valid_mime_type` admits jpeg/png/webp only. gif is a real image type the
+ * CHECK still refuses, so the rejection is the constraint, not a missing column.
+ */
+const DISALLOWED_MIME = 'image/gif';
+
+/** `partner_requests_status_check` admits pending|accepted|declined. */
+const DISALLOWED_REQUEST_STATUS = 'rejected';
+
 /**
  * Resolve this worker's own `public.users.id`.
  *
@@ -87,12 +102,28 @@ async function resolveOwnUserId(supabaseAdmin: TypedSupabaseClient): Promise<str
 
 test.describe('CHECK-constraint rejections over the wire', () => {
   /**
-   * The three tables carrying a CHECK constraint that is written through a
-   * module importing `handleSupabaseError`. Measured from `pg_constraint`:
-   * `events` has three such constraints, `moods` three, `interactions` one.
-   * The other six CHECK constraints in `public` sit on `love_notes`,
-   * `partner_requests`, and `photos`, none of which route through the mapper
-   * — see this spec's sibling summary.
+   * Live `pg_constraint` (`contype='c'`, `public`) is 13 rows. Every table that
+   * carries one has a write path that maps SQLSTATE `23514` through
+   * `handleSupabaseError`:
+   *
+   *   events (3), moods (3), interactions (1) — original adopters
+   *   photos (2)            — `src/services/photoService.ts:396-397`
+   *   love_notes (2)        — `src/stores/slices/notesSlice.ts:519-520`
+   *   partner_requests (2)  — `src/api/partnerService.ts:208-210`
+   *                           (accept/decline around :317 and :345)
+   *
+   * The map is keyed on SQLSTATE, not table. This array drives one live
+   * rejection per listed constraint. The remaining events/moods CHECKs
+   * (`events_icon_check`, `events_description_check`, `moods_mood_type_check`,
+   * `moods_mood_types_values_check`) share those tables' mapper tails and are
+   * not listed here; `events_icon_check` is the "commits no row" probe below.
+   *
+   * INSERT RLS (live `pg_policies`) is `auth.uid()` = owner/sender, so a
+   * self-row still reaches CHECK: `different_users` and `no_self_requests`
+   * fire with `to_user_id = from_user_id`. Content/status CHECKs send to the
+   * already-paired partner so the self-row CHECK does not fire first.
+   * Interactions still need `resolveOwnPair` because their INSERT policy
+   * requires the current partner (`20260912020000`).
    */
   const REJECTIONS = [
     {
@@ -126,6 +157,82 @@ test.describe('CHECK-constraint rejections over the wire', () => {
         user_id: userId,
         mood_type: 'happy',
         note: OVER_LONG_NOTE,
+      }),
+    },
+    {
+      table: 'photos',
+      constraint: 'photos_caption_check',
+      context: 'PhotoService.uploadPhoto',
+      priority: 'P1',
+      body: (userId: string) => ({
+        user_id: userId,
+        storage_path: `${userId}/check-caption.jpg`,
+        filename: 'check-caption.jpg',
+        caption: OVER_LONG_CAPTION,
+        mime_type: 'image/jpeg',
+        file_size: 100,
+        width: 1,
+        height: 1,
+      }),
+    },
+    {
+      table: 'photos',
+      constraint: 'valid_mime_type',
+      context: 'PhotoService.uploadPhoto',
+      priority: 'P1',
+      body: (userId: string) => ({
+        user_id: userId,
+        storage_path: `${userId}/check-mime.gif`,
+        filename: 'check-mime.gif',
+        caption: 'ok',
+        mime_type: DISALLOWED_MIME,
+        file_size: 100,
+        width: 1,
+        height: 1,
+      }),
+    },
+    {
+      table: 'love_notes',
+      constraint: 'love_notes_content_check',
+      context: 'NotesSlice.sendNote',
+      priority: 'P1',
+      body: (userId: string, partnerId: string) => ({
+        from_user_id: userId,
+        to_user_id: partnerId,
+        content: OVER_LONG_NOTE_CONTENT,
+      }),
+    },
+    {
+      table: 'love_notes',
+      constraint: 'different_users',
+      context: 'NotesSlice.sendNote',
+      priority: 'P1',
+      body: (userId: string) => ({
+        from_user_id: userId,
+        to_user_id: userId,
+        content: 'ok',
+      }),
+    },
+    {
+      table: 'partner_requests',
+      constraint: 'partner_requests_status_check',
+      context: 'PartnerService.sendPartnerRequest',
+      priority: 'P1',
+      body: (userId: string, partnerId: string) => ({
+        from_user_id: userId,
+        to_user_id: partnerId,
+        status: DISALLOWED_REQUEST_STATUS,
+      }),
+    },
+    {
+      table: 'partner_requests',
+      constraint: 'no_self_requests',
+      context: 'PartnerService.sendPartnerRequest',
+      priority: 'P1',
+      body: (userId: string) => ({
+        from_user_id: userId,
+        to_user_id: userId,
+        status: 'pending',
       }),
     },
   ] as const;

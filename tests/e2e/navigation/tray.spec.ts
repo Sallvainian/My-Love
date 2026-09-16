@@ -3,7 +3,7 @@
  *
  * The tray's dismissal contract against the real app, plus the /settings deep
  * link. Four of the five `settings` registration sites are untypechecked
- * (AGENTS.md:25) — the two App route ternaries, the render chain and the tray
+ * (AGENTS.md:28) — the two App route ternaries, the render chain and the tray
  * itself — so a missed one still compiles, renders nothing and resets to Home
  * on reload. The reload case below is the only thing that catches that.
  */
