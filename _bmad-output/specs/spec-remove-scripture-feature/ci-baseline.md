@@ -72,6 +72,21 @@ The August estimate of a ~220s worst shard assumed ~76 surviving tests. That ari
 4. Record the worst-shard number against the **historical** 381s baseline here. State clearly that 381s is run `32279178457`, not the pre-story-5 current run.
 5. Only then choose the shard count. Per-shard setup still dominates, so fewer shards likely costs little wall-clock while cutting runner minutes — but decide from the measured numbers, not from this paragraph.
 
-The existing rationale comment at `.github/workflows/test.yml:343-347` records why the split is 4 today (moved from August's 231-235) and is the precedent for how to record the new decision. The burn-in comment at line 414 still names deleted scripture spec files (`scripture-reflection-2.2-errors`, `scripture-stats`); CAP-6 rewrites that comment, it does not restructure the burn-in job.
+Recorded below from run `35056348791`. The e2e-tests matrix comment in `.github/workflows/test.yml` holds the shard-count arithmetic. Burn-in stays 3 shards; only the stale scripture spec names in its comment were rewritten.
 
-`playwright.config.ts:102-105` still describes scripture specs sorting into one contiguous block. That comment is stale; rewrite it when recording the new shard decision.
+## Post-stories-1–4 measurement — run 35056348791
+
+Measured 2026-09-16 with the two `gh run view` commands above from **run 35056348791** (branch `chore/remove-scripture-feature`, head `2e40c7d6`, story 2 publish, conclusion `success`, ~7 min wall). All four `E2E (Shard n/4)` jobs ran and concluded `success` (not skipped). Stories 3–4 (`fe20cf55`, `f055b280`) are not in this run and do not delete E2E specs.
+
+**381s is run `32279178457`, not this run.** This run's worst E2E shard is **259s**.
+
+| Job | Total | Supabase setup | Test step |
+|---|---|---|---|
+| E2E (Shard 1/4) | 197s | 129s | 49s |
+| E2E (Shard 2/4) | 224s | 129s | 70s |
+| E2E (Shard 3/4) | 251s | 138s | 86s |
+| E2E (Shard 4/4) | **259s** | 129s | **101s** |
+
+"Supabase setup" is the `Setup Playwright E2E` step (same composite as the historical table). Setup floor measured 129–138s (the 130–177s band this work cannot move). Combined test-step 306s.
+
+Shard count chosen from these numbers: **2**. Arithmetic is beside the e2e-tests matrix in `.github/workflows/test.yml`.

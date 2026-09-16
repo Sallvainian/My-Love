@@ -27,7 +27,7 @@ function signES256(payload: object, jwk: crypto.JsonWebKey & { kid?: string }): 
  * starts, so the guard skipped the block exactly where it was needed most: the VITE_
  * force-set below never ran, the dev server fell back to the placeholder anon key in
  * .env.test, and every Realtime WebSocket handshake was rejected with 403 — which is
- * what made the Together-Mode scripture P0 specs fail in CI but pass locally.
+ * what made Realtime specs fail in CI but pass locally.
  * `??=` below still preserves any externally-provided SUPABASE_* values.
  */
 // Suppress stderr via stdio rather than a `2>/dev/null` redirect: execSync shells
@@ -100,9 +100,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   // CI ran strictly serial (workers: 1), which left the slowest shard as the
-  // whole pipeline's critical path: shards are balanced by test *count*
-  // (28/28/27/27) but the scripture specs sort into one contiguous block, so
-  // shard 3 took 9m against ~4m for the others.
+  // whole pipeline's critical path. Shards are balanced by test *count*, not
+  // duration, so a wait-heavy slice still sets the wall-clock after the
+  // faster shards have finished.
   //
   // These specs are wait-bound, not CPU-bound — disconnect timeouts, realtime
   // propagation, waitForPartnerDisconnected — so the time is mostly spent

@@ -42,17 +42,47 @@ describe('Playwright shard reporting', () => {
     const shards = job('e2e-tests');
     const merge = job('merge-reports');
 
-    expect(shards).toMatch(/E2E_BLOB_REPORT: '1'\s+run: npx playwright test --project=chromium --shard=/);
+    expect(shards).toContain('name: E2E (Shard ${{ matrix.shard }}/2)');
+    expect(shards).toMatch(/shard: \[1, 2\]/);
+    expect(shards).toMatch(
+      /E2E_BLOB_REPORT: '1'\s+run: npx playwright test --project=chromium --shard=\$\{\{ matrix\.shard \}\}\/2/
+    );
     expect(shards).toContain('name: e2e-blob-report-shard-${{ matrix.shard }}');
     expect(shards).toMatch(/path: blob-report\/\s+if-no-files-found: error\s+retention-days: 30/);
     expect(merge).toMatch(/pattern: e2e-blob-report-shard-\*\s+path: all-blob-reports\/\s+merge-multiple: true/);
     expect(merge).toContain('run: npm ci');
     expect(merge).toContain('reports=(all-blob-reports/*.zip)');
-    expect(merge).toContain('if (( ${#reports[@]} != 4 )); then');
-    expect(merge).toMatch(/Expected 4 shard blob reports[\s\S]+exit 1/);
+    expect(merge).toContain('if (( ${#reports[@]} != 2 )); then');
+    expect(merge).toMatch(/Expected 2 shard blob reports[\s\S]+exit 1/);
     expect(merge).toMatch(/^ {10}npx playwright merge-reports --reporter=html all-blob-reports\/\s*$/m);
     expect(merge).not.toContain('Merge skipped');
     expect(merge).toMatch(/path: playwright-report\/\s+if-no-files-found: error/);
     expect(job('burn-in')).not.toContain('E2E_BLOB_REPORT');
+    expect(job('burn-in')).toMatch(/shard: \[1, 2, 3\]/);
+    expect(workflow).not.toContain('scripture-reflection-2.2-errors');
+    expect(workflow).not.toContain('scripture-stats');
+    expect(shards).toContain('35056348791');
+    expect(shards).toContain('32279178457');
+  });
+
+  it('records the measured CAP-6 baseline and drops the scripture shard-block comment', async () => {
+    const baseline = readFileSync(
+      '_bmad-output/specs/spec-remove-scripture-feature/ci-baseline.md',
+      'utf8'
+    );
+    expect(baseline).toContain('run 35056348791');
+    expect(baseline).toContain('**381s is run `32279178457`, not this run.**');
+    expect(baseline).toContain('This run\'s worst E2E shard is **259s**.');
+    expect(baseline).toMatch(/E2E \(Shard 4\/4\) \| \*\*259s\*\* \| 129s \| \*\*101s\*\*/);
+    expect(baseline).toContain('Shard count chosen from these numbers: **2**.');
+
+    vi.stubEnv('CI', 'true');
+    const { default: config } = await vi.importActual<{ default: PlaywrightTestConfig }>(
+      '../../../playwright.config.ts'
+    );
+    const source = readFileSync('playwright.config.ts', 'utf8');
+    expect(source).not.toContain('scripture specs sort');
+    expect(config.workers).toBe(2);
+    expect(source).toContain('workers: process.env.CI ? 2');
   });
 });
