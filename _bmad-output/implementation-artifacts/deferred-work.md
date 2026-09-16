@@ -1466,7 +1466,8 @@ location: tests/README.md:72-161
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: medium
 reason: Story 1 owns this rewrite. Chromium testDir is tests/e2e, so these files do not fail this story's verification and still typecheck. The e2e/scripture tree in tests/README.md was already stale after 820be2d2; this story's compile-graph deletes made more of that README false.
-status: open
+status: done 2026-09-16
+resolution: already resolved: 5238b226 rewrote tests/README.md; tests/README.md:67 "example-rpc.spec.ts # Admin-client events seed/cleanup", :85-91 list events factories/helpers with no scripture-cache or reflection, and rg finds zero scripture matches in that file
 
 ### DW-148: AGENTS.md still says five modules open my-love-db after scriptureReadingService was removed.
 origin: spec-deferred 73f04c4b6c19
@@ -1474,7 +1475,9 @@ location: AGENTS.md:64
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: low
 reason: Remaining openers are storage.ts, customMessageService.ts, moodService.ts, and sw-db.ts (four). Agent-context files are deferred by review policy rather than patched here.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-agents-md-stale-context
+resolution-undo: 6a857189626a77e23877d3615f2c6bd8d1dd610b72319b687a5f0ed94145b639 2026-09-16 7374617475733a206f70656e
 
 ### DW-149: AGENTS.md still points the untypechecked render chain at App.tsx (~724); the surviving currentView arms are around :786-797.
 origin: spec-deferred e7ea07c7c0dc
@@ -1482,7 +1485,9 @@ location: AGENTS.md:28
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: low
 reason: The ~724 figure was already wrong before this story (render was near :805). Agent-context files are deferred by review policy.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-agents-md-stale-context
+resolution-undo: 6a857189626a77e23877d3615f2c6bd8d1dd610b72319b687a5f0ed94145b639 2026-09-16 7374617475733a206f70656e
 
 ### DW-150: playwright.config.ts still explains shard policy with scripture specs sorting into one contiguous block.
 origin: spec-deferred a843636f65c9
@@ -1499,7 +1504,9 @@ location: README.md:118
 source_spec: `2-remove-scripture-from-the-application.md`
 severity: low
 reason: The 21 figure was already wrong before this story. The docs commit dropped scripture table names on that line and left the count.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-readme-migration-count
+resolution-undo: c0657b4e23f010076c16d66c6e167b8c45b31c565f8f4166f07460ea6a137870 2026-09-16 7374617475733a206f70656e
 
 ### DW-152: tests/support/helpers/scripture-cache.ts and reflection.ts remain on disk with zero live importers; scripture-cache still calls indexedDB.deleteDatabase('my-love-db').
 origin: spec-deferred 16a62f0fd06d
@@ -1507,7 +1514,8 @@ location: tests/support/helpers/scripture-cache.ts
 source_spec: `3-drop-the-scripture-database-objects.md`
 severity: low
 reason: Story 1 leftover test helpers. tsconfig.test.json includes tests/ but nothing imports these files, so typecheck stays green. Story 1 owns leftover helper deletion.
-status: open
+status: done 2026-09-16
+resolution: already resolved: 5238b226 deleted tests/support/helpers/scripture-cache.ts and tests/support/helpers/reflection.ts; both paths are absent and nothing in tests/ or src/ imports them
 
 ### DW-153: tests/api/check-constraint-error-mapping.spec.ts still inventories scripture_reflections among uncovered CHECKs after the envelopes comment was updated to 13 rows.
 origin: spec-deferred 3ecf2c676f0f
@@ -1515,7 +1523,9 @@ location: tests/api/check-constraint-error-mapping.spec.ts:93-95
 source_spec: `3-drop-the-scripture-database-objects.md`
 severity: low
 reason: Sibling comment in check-constraint-envelopes.ts was amended in this story. tests/api/ is an epic leave-alone (story 1 invoke); the API spec comment is now stale relative to the dropped table.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-leftover-scripture-comments
+resolution-undo: 32ee3f03777cb76a29ae46602a76a0ac800096833f47018609f42d291dcb58d0 2026-09-16 7374617475733a206f70656e
 
 ### DW-154: rls-security.ts and persisted-blob.ts comments still name scripture after the DB objects are gone.
 origin: spec-deferred 9724daa27986
@@ -1523,7 +1533,9 @@ location: tests/support/helpers/rls-security.ts:4
 source_spec: `3-drop-the-scripture-database-objects.md`
 severity: low
 reason: rls-security.ts:4 still says "scripture RLS security E2E tests"; persisted-blob.ts:17 still cites ./scripture-cache.ts. Story 1 leftover comment surgery; live callers are non-scripture.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-leftover-scripture-comments
+resolution-undo: 32ee3f03777cb76a29ae46602a76a0ac800096833f47018609f42d291dcb58d0 2026-09-16 7374617475733a206f70656e
 
 ### DW-155: Successful openMyLoveDB connections never register idb blocking/versionchange, so the next version bump can hang on these long-lived holders the same way v9 hangs on the service worker.
 origin: spec-deferred feef7bb9b913
@@ -1531,7 +1543,9 @@ location: src/services/dbSchema.ts:314-353
 source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
 severity: low
 reason: Pre-existing: storage, mood, and customMessage also omitted blocking before this story. The new helper only adds blocked. A v11 bump would need blocking() { db.close() } (or equivalent) on the live handles.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-idb-live-handle-blocking
+resolution-undo: 57b1be35c19d4c129fc00a01979c707214a8d5cfaceb76453d4f5955934dafd9 2026-09-16 7374617475733a206f70656e
 
 ### DW-156: STORE_NAMES core-names test still omits MESSAGE_FAVORITES, the fifth survivor.
 origin: spec-deferred 92e581f40d1d
@@ -1539,11 +1553,80 @@ location: tests/unit/services/dbSchema.test.ts:566-571
 source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
 severity: low
 reason: Pre-existing: the core it listed MESSAGES/PHOTOS/MOODS/SW_AUTH before this story. Deleting the scripture STORE_NAMES it did not add the favorites name.
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-store-names-favorites-test
+resolution-undo: c92cd01649f5d33922d41bddc7ea9142b7324384e347795f1767cfa5799df86c 2026-09-16 7374617475733a206f70656e
 
 ### DW-157: window.confirm from the IndexedDB blocked listener is not a user gesture; some browsers may suppress the dialog and take the dismiss path.
 origin: spec-deferred 85fc8e2635c1
 location: src/services/dbSchema.ts:322-334
 source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
 reason: Unverified browser behavior. Would settle it: load a v9 profile in Safari iOS PWA with a held connection and see whether confirm appears. If it does not, init rejects with no prompt (medium if true).
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-decision-dw-157
+resolution-undo: 0456ae08d7694b93ce5b825997a769499223a36191d708b74de857b116d948c5 2026-09-16 7374617475733a206f70656e
+decision: 2026-09-16 Replace confirm with an in-app reload dialog — Replace window.confirm in onUpgradeBlocked with an in-app reload dialog that does not depend on a user gesture, keeping accept=location.reload and dismiss=rejectAllPending.
+
+### DW-158: tests/unit/services/dbSchema.test.ts still says five modules open this database after scriptureReadingService was removed.
+origin: spec-deferred daeb1a075ba2
+location: tests/unit/services/dbSchema.test.ts:303
+source_spec: `spec-dw-148-149-agents-md-stale-context.md`
+severity: low
+reason: tests/unit/services/dbSchema.test.ts:303 "Five modules open this database". The test asserts moodService still creates messages indexes, not opener count. Pre-existing; the bundle surface was AGENTS.md.
+status: open
+
+### DW-159: tests/e2e/navigation/tray.spec.ts cites the five-place registration bullet at AGENTS.md:25; that line is the Where things are heading and the bullet is :28.
+origin: spec-deferred 5edb4251adcc
+location: tests/e2e/navigation/tray.spec.ts:6
+source_spec: `spec-dw-148-149-agents-md-stale-context.md`
+severity: low
+reason: tests/e2e/navigation/tray.spec.ts:6 "(AGENTS.md:25)". AGENTS.md:25 is "## Where things are"; the bullet is AGENTS.md:28 both before and after this change (no line shift).
+status: open
+
+### DW-160: tests/README.md:5 still says Vite 7 while package.json depends on Vite 8.
+origin: spec-deferred adc3b5235ada
+location: tests/README.md:5
+source_spec: `spec-dw-151-readme-migration-count.md`
+severity: low
+reason: tests/README.md:5 "**Stack**: React 19 + Vite 7 + Supabase (39 migrations, RPCs, RLS policies, pgTAP)". package.json:87 `"vite": "^8.3.0"`. Pre-existing; this change only replaced 21 with 39 on that line.
+status: open
+
+### DW-161: README.md:118 key-tables list still omits events.
+origin: spec-deferred 81e09e60d583
+location: README.md:118
+source_spec: `spec-dw-151-readme-migration-count.md`
+severity: low
+reason: README.md:118 "Key tables: `users`, `moods`, `interactions`, `love_notes`, `photos`, and more." src/types/database.types.ts:55 `events:`. README.md:96 already lists `eventsSlice`. Pre-existing; intent replaced only the 21 figure.
+status: open
+
+### DW-162: README.md project-structure supabase tree still omits functions/, config.toml, and seed.sql.
+origin: spec-deferred 7e69a56ce63f
+location: README.md:159-161
+source_spec: `spec-dw-151-readme-migration-count.md`
+severity: low
+reason: README.md:159-161 lists only migrations/ and tests/. supabase/config.toml, supabase/functions/, and supabase/seed.sql exist on disk. Pre-existing; intent replaced only `# 21 SQL migrations`.
+status: open
+
+### DW-163: The rewritten REJECTIONS comment still says the six uncovered CHECKs none of which route through the mapper, but photos, love_notes, and partner_requests write paths call handleSupabaseError on 23514.
+origin: spec-deferred 026d18064ec4
+location: tests/api/check-constraint-error-mapping.spec.ts:93-95
+source_spec: `spec-dw-153-154-leftover-scripture-comments.md`
+severity: low
+reason: tests/api/check-constraint-error-mapping.spec.ts:93-95 "none of which route through the mapper". src/services/photoService.ts:22 imports handleSupabaseError; :396-397 maps 23514. src/stores/slices/notesSlice.ts:19 imports it; :519-520 maps 23514. src/api/partnerService.ts:16 imports it; :208-210 maps 23514. Pre-existing taxonomy also in check-constraint-envelopes.ts:70-73 (intent leave-alone). This rewrite only dropped scripture_reflections and seven→six.
+status: open
+
+### DW-164: Other live tests/api comments still cite deleted scripture specs.
+origin: spec-deferred f4fcf4981e16
+location: tests/api/events-wire-contract.spec.ts:90
+source_spec: `spec-dw-153-154-leftover-scripture-comments.md`
+severity: low
+reason: tests/api/events-wire-contract.spec.ts:90 `tests/api/scripture-reflection-2.2.spec.ts:63-70`; :93 `SupabaseReflectionSchema` (:231-240); :327 `tests/api/scripture-reflection-rpc.spec.ts:258-266`. tests/api/events-write-wire-shape.spec.ts:53 `tests/api/scripture-reflection-rpc.spec.ts:260-266`. Intent closed the work to "the two remaining comments".
+status: open
+
+### DW-165: STORE_NAMES core-names it is five independent toBe asserts, not an exact key set, so extra keys still pass.
+origin: spec-deferred 7d861b21c35f
+location: tests/unit/services/dbSchema.test.ts:695-699
+source_spec: `spec-dw-156-store-names-message-favorites.md`
+severity: low
+reason: tests/unit/services/dbSchema.test.ts:695-699 five toBe lines. Pre-existing four-expect style; this change added MESSAGE_FAVORITES in the same form. Intent asked to add that expect, not Object.keys or toEqual of the whole map.
 status: open
