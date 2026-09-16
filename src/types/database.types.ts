@@ -309,218 +309,6 @@ export type Database = {
         }
         Relationships: []
       }
-      scripture_bookmarks: {
-        Row: {
-          created_at: string
-          id: string
-          session_id: string
-          share_with_partner: boolean
-          step_index: number
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          session_id: string
-          share_with_partner?: boolean
-          step_index: number
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          session_id?: string
-          share_with_partner?: boolean
-          step_index?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scripture_bookmarks_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "scripture_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      scripture_messages: {
-        Row: {
-          created_at: string
-          id: string
-          message: string
-          sender_id: string
-          session_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          message: string
-          sender_id: string
-          session_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          message?: string
-          sender_id?: string
-          session_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scripture_messages_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "scripture_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      scripture_reflections: {
-        Row: {
-          created_at: string
-          id: string
-          is_shared: boolean
-          notes: string | null
-          rating: number | null
-          session_id: string
-          step_index: number
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_shared?: boolean
-          notes?: string | null
-          rating?: number | null
-          session_id: string
-          step_index: number
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_shared?: boolean
-          notes?: string | null
-          rating?: number | null
-          session_id?: string
-          step_index?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scripture_reflections_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "scripture_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      scripture_sessions: {
-        Row: {
-          completed_at: string | null
-          countdown_started_at: string | null
-          current_phase: Database["public"]["Enums"]["scripture_session_phase"]
-          current_step_index: number
-          id: string
-          mode: Database["public"]["Enums"]["scripture_session_mode"]
-          snapshot_json: Json | null
-          started_at: string
-          status: Database["public"]["Enums"]["scripture_session_status"]
-          user1_id: string
-          user1_ready: boolean
-          user1_role:
-            | Database["public"]["Enums"]["scripture_session_role"]
-            | null
-          user2_id: string | null
-          user2_ready: boolean
-          user2_role:
-            | Database["public"]["Enums"]["scripture_session_role"]
-            | null
-          version: number
-        }
-        Insert: {
-          completed_at?: string | null
-          countdown_started_at?: string | null
-          current_phase?: Database["public"]["Enums"]["scripture_session_phase"]
-          current_step_index?: number
-          id?: string
-          mode: Database["public"]["Enums"]["scripture_session_mode"]
-          snapshot_json?: Json | null
-          started_at?: string
-          status?: Database["public"]["Enums"]["scripture_session_status"]
-          user1_id: string
-          user1_ready?: boolean
-          user1_role?:
-            | Database["public"]["Enums"]["scripture_session_role"]
-            | null
-          user2_id?: string | null
-          user2_ready?: boolean
-          user2_role?:
-            | Database["public"]["Enums"]["scripture_session_role"]
-            | null
-          version?: number
-        }
-        Update: {
-          completed_at?: string | null
-          countdown_started_at?: string | null
-          current_phase?: Database["public"]["Enums"]["scripture_session_phase"]
-          current_step_index?: number
-          id?: string
-          mode?: Database["public"]["Enums"]["scripture_session_mode"]
-          snapshot_json?: Json | null
-          started_at?: string
-          status?: Database["public"]["Enums"]["scripture_session_status"]
-          user1_id?: string
-          user1_ready?: boolean
-          user1_role?:
-            | Database["public"]["Enums"]["scripture_session_role"]
-            | null
-          user2_id?: string | null
-          user2_ready?: boolean
-          user2_role?:
-            | Database["public"]["Enums"]["scripture_session_role"]
-            | null
-          version?: number
-        }
-        Relationships: []
-      }
-      scripture_step_states: {
-        Row: {
-          advanced_at: string | null
-          id: string
-          session_id: string
-          step_index: number
-          user1_locked_at: string | null
-          user2_locked_at: string | null
-        }
-        Insert: {
-          advanced_at?: string | null
-          id?: string
-          session_id: string
-          step_index: number
-          user1_locked_at?: string | null
-          user2_locked_at?: string | null
-        }
-        Update: {
-          advanced_at?: string | null
-          id?: string
-          session_id?: string
-          step_index?: number
-          user1_locked_at?: string | null
-          user2_locked_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scripture_step_states_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "scripture_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       users: {
         Row: {
           created_at: string | null
@@ -605,79 +393,9 @@ export type Database = {
         Returns: undefined
       }
       get_my_partner_id: { Args: never; Returns: string }
-      is_scripture_session_member: {
-        Args: { p_session_id: string }
-        Returns: boolean
-      }
-      scripture_convert_to_solo: {
-        Args: { p_session_id: string }
-        Returns: Json
-      }
-      scripture_create_session: {
-        Args: { p_mode: string; p_partner_id?: string }
-        Returns: Json
-      }
-      scripture_end_session: { Args: { p_session_id: string }; Returns: Json }
-      scripture_get_couple_stats: { Args: never; Returns: Json }
-      scripture_lock_in: {
-        Args: {
-          p_expected_version: number
-          p_session_id: string
-          p_step_index: number
-        }
-        Returns: Json
-      }
-      scripture_seed_test_data: {
-        Args: {
-          p_bookmark_steps?: number[]
-          p_include_messages?: boolean
-          p_include_reflections?: boolean
-          p_preset?: string
-          p_session_count?: number
-          p_user1_id?: string
-          p_user2_id?: string
-        }
-        Returns: Json
-      }
-      scripture_select_role: {
-        Args: { p_role: string; p_session_id: string }
-        Returns: Json
-      }
-      scripture_submit_reflection: {
-        Args: {
-          p_is_shared: boolean
-          p_notes: string
-          p_rating: number
-          p_session_id: string
-          p_step_index: number
-        }
-        Returns: Json
-      }
-      scripture_toggle_ready: {
-        Args: { p_is_ready: boolean; p_session_id: string }
-        Returns: Json
-      }
-      scripture_undo_lock_in: {
-        Args: { p_session_id: string; p_step_index: number }
-        Returns: Json
-      }
     }
     Enums: {
-      scripture_session_mode: "solo" | "together"
-      scripture_session_phase:
-        | "lobby"
-        | "countdown"
-        | "reading"
-        | "reflection"
-        | "report"
-        | "complete"
-      scripture_session_role: "reader" | "responder"
-      scripture_session_status:
-        | "pending"
-        | "in_progress"
-        | "complete"
-        | "abandoned"
-        | "ended_early"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -693,12 +411,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -722,11 +440,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -747,11 +465,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -772,11 +490,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -789,11 +507,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -807,25 +525,7 @@ export const Constants = {
     Enums: {},
   },
   public: {
-    Enums: {
-      scripture_session_mode: ["solo", "together"],
-      scripture_session_phase: [
-        "lobby",
-        "countdown",
-        "reading",
-        "reflection",
-        "report",
-        "complete",
-      ],
-      scripture_session_role: ["reader", "responder"],
-      scripture_session_status: [
-        "pending",
-        "in_progress",
-        "complete",
-        "abandoned",
-        "ended_early",
-      ],
-    },
+    Enums: {},
   },
 } as const
 

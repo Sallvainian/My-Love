@@ -1,5 +1,5 @@
 import type { DBSchema, IDBPDatabase, IDBPTransaction, StoreNames } from 'idb';
-import { unwrap } from 'idb';
+import { openDB, unwrap } from 'idb';
 import type { Message, MoodEntry, Photo } from '../types';
 import { logger } from '../utils/logger';
 
@@ -20,80 +20,6 @@ export interface StoredAuthToken {
  */
 export type StoredMoodEntry = MoodEntry;
 
-// ============================================
-// Scripture Reading IndexedDB Types (v5)
-// ============================================
-
-export type ScriptureSessionMode = 'solo' | 'together';
-export type ScriptureSessionPhase =
-  | 'lobby'
-  | 'countdown'
-  | 'reading'
-  | 'reflection'
-  | 'report'
-  | 'complete';
-type ScriptureSessionStatus = 'pending' | 'in_progress' | 'complete' | 'abandoned';
-
-/**
- * Scripture session stored in IndexedDB for offline support
- */
-export interface ScriptureSession {
-  id: string; // UUID from Supabase
-  mode: ScriptureSessionMode;
-  userId: string; // Current user's ID
-  partnerId?: string; // Partner's ID (together mode)
-  currentPhase: ScriptureSessionPhase;
-  currentStepIndex: number;
-  status: ScriptureSessionStatus;
-  version: number;
-  snapshotJson?: Record<string, unknown>;
-  startedAt: Date;
-  completedAt?: Date;
-  // Story 4.1: Role and ready state (populated from server snapshot)
-  myRole?: 'reader' | 'responder';
-  partnerRole?: 'reader' | 'responder';
-  user1Ready?: boolean;
-  user2Ready?: boolean;
-  countdownStartedAt?: Date;
-}
-
-/**
- * Scripture reflection stored in IndexedDB
- */
-export interface ScriptureReflection {
-  id: string; // UUID
-  sessionId: string;
-  stepIndex: number;
-  userId: string;
-  rating?: number; // 1-5
-  notes?: string;
-  isShared: boolean;
-  createdAt: Date;
-}
-
-/**
- * Scripture bookmark stored in IndexedDB
- */
-export interface ScriptureBookmark {
-  id: string; // UUID
-  sessionId: string;
-  stepIndex: number;
-  userId: string;
-  shareWithPartner: boolean;
-  createdAt: Date;
-}
-
-/**
- * Scripture message (Daily Prayer Report) stored in IndexedDB
- */
-export interface ScriptureMessage {
-  id: string; // UUID
-  sessionId: string;
-  senderId: string;
-  message: string;
-  createdAt: Date;
-}
-
 /**
  * Shared IndexedDB Schema Definition
  * Defines the structure of all object stores in the my-love-db database
@@ -109,6 +35,7 @@ export interface ScriptureMessage {
  * - v3: Added moods store with by-date unique index
  * - v4: Added sw-auth store for Background Sync
  * - v5: Added scripture stores (sessions, reflections, bookmarks, messages)
+ * - v10: Dropped the four scripture stores
  */
 export interface MyLoveDBSchema extends DBSchema {
   'message-favorites': {
@@ -158,34 +85,6 @@ export interface MyLoveDBSchema extends DBSchema {
     key: 'current';
     value: StoredAuthToken;
   };
-  'scripture-sessions': {
-    key: string;
-    value: ScriptureSession;
-    indexes: {
-      'by-user': string;
-    };
-  };
-  'scripture-reflections': {
-    key: string;
-    value: ScriptureReflection;
-    indexes: {
-      'by-session': string;
-    };
-  };
-  'scripture-bookmarks': {
-    key: string;
-    value: ScriptureBookmark;
-    indexes: {
-      'by-session': string;
-    };
-  };
-  'scripture-messages': {
-    key: string;
-    value: ScriptureMessage;
-    indexes: {
-      'by-session': string;
-    };
-  };
 }
 
 /**
@@ -194,8 +93,8 @@ export interface MyLoveDBSchema extends DBSchema {
 export const DB_NAME = 'my-love-db';
 // v6 added no stores. It existed to re-fire upgradeDb on profiles that reached
 // v5 through storage.ts's old callback and are missing moods, sw-auth and the
-// scripture stores; upgradeDb's existence checks then create what is absent.
-// A healthy database takes a no-op upgrade.
+// scripture stores; upgradeDb's existence checks then created what was absent.
+// A healthy database took a no-op upgrade.
 //
 // v7 replaces the moods `by-date` unique index with `by-user-date`, unique on
 // [userId, date], so two accounts on one device can each hold today's mood.
@@ -205,7 +104,12 @@ export const DB_NAME = 'my-love-db';
 // in on this device, and an unscoped read handed one partner the other's
 // private custom messages to list, edit, delete, export and rotate through.
 // v9 stores favorites by account and message, preserving only attributable legacy flags.
-export const DB_VERSION = 9;
+//
+// v10 drops the four scripture stores (`scripture-sessions`,
+// `scripture-reflections`, `scripture-bookmarks`, `scripture-messages`) that
+// v5 created. The drop is existence-gated so a profile that never had them
+// (or already lost them) is a no-op, and survivor rows are left intact.
+export const DB_VERSION = 10;
 
 /**
  * Store name constants for consistent access across services
@@ -216,15 +120,11 @@ export const STORE_NAMES = {
   PHOTOS: 'photos',
   MOODS: 'moods',
   SW_AUTH: 'sw-auth',
-  SCRIPTURE_SESSIONS: 'scripture-sessions',
-  SCRIPTURE_REFLECTIONS: 'scripture-reflections',
-  SCRIPTURE_BOOKMARKS: 'scripture-bookmarks',
-  SCRIPTURE_MESSAGES: 'scripture-messages',
 } as const;
 
 /**
  * Centralized IndexedDB upgrade function
- * Handles all store creation and migrations for v1-v9
+ * Handles all store creation and migrations for v1-v10
  *
  * Called by all services to ensure consistent database schema.
  * This fixes the tech debt where each service had duplicate upgrade logic.
@@ -245,12 +145,13 @@ export function upgradeDb(
   // alone. A version guard assumes the store was created at the version that
   // introduced it, which was not true for any profile that upgraded through
   // storage.ts's own (now deleted) callback: it created only messages and
-  // photos, so those databases reached v5 missing moods, sw-auth and the four
-  // scripture stores, and no `oldVersion < N` branch could ever fire again to
-  // create them. Existence checks make this function repair such a database
-  // instead of skipping past it. The v6 bump is what makes those profiles
-  // re-enter the upgrade at all — the checks alone would never run. (v7 has
-  // since superseded it; see DB_VERSION.)
+  // photos, so those databases reached v5 missing moods, sw-auth and (at the
+  // time) the four scripture stores, and no `oldVersion < N` branch could ever
+  // fire again to create them. Existence checks make this function repair such
+  // a database instead of skipping past it. The v6 bump is what makes those
+  // profiles re-enter the upgrade at all — the checks alone would never run.
+  // (v7 has since superseded it; see DB_VERSION.) The v10 scripture drop uses
+  // the same rule: delete the store if it EXISTS, never because oldVersion < 10.
 
   // v1: messages store
   if (!db.objectStoreNames.contains('messages')) {
@@ -381,32 +282,103 @@ export function upgradeDb(
     logger.debug('[dbSchema] Created sw-auth store for Background Sync (v4)');
   }
 
-  // v5: scripture stores for offline support
-  //
-  // Checked one store at a time rather than behind a single guard: a database
-  // can be missing some of these and not others, and a combined check would
-  // skip the whole group as soon as one existed.
-  if (!db.objectStoreNames.contains('scripture-sessions')) {
-    const sessionsStore = db.createObjectStore('scripture-sessions', { keyPath: 'id' });
-    sessionsStore.createIndex('by-user', 'userId');
-    logger.debug('[dbSchema] Created scripture-sessions store with by-user index (v5)');
+  // v10: drop the four scripture stores if they still exist. Names are gone
+  // from MyLoveDBSchema, so the typed wrapper cannot mention them — same
+  // unwrap path as the v7 `by-date` index drop. Gated on existence, not on
+  // `oldVersion < 10`, because a profile that never had them (storage.ts's old
+  // callback; a later partial drop) must not throw.
+  const nativeDb = unwrap(db);
+  for (const storeName of [
+    'scripture-sessions',
+    'scripture-reflections',
+    'scripture-bookmarks',
+    'scripture-messages',
+  ] as const) {
+    if (nativeDb.objectStoreNames.contains(storeName)) {
+      nativeDb.deleteObjectStore(storeName);
+      logger.debug(`[dbSchema] Dropped ${storeName} store (v10)`);
+    }
   }
+}
 
-  if (!db.objectStoreNames.contains('scripture-reflections')) {
-    const reflectionsStore = db.createObjectStore('scripture-reflections', { keyPath: 'id' });
-    reflectionsStore.createIndex('by-session', 'sessionId');
-    logger.debug('[dbSchema] Created scripture-reflections store with by-session index (v5)');
-  }
+const UPGRADE_BLOCKED_RELOAD_MESSAGE =
+  'A database update is waiting. You must reload this page to finish the update.';
 
-  if (!db.objectStoreNames.contains('scripture-bookmarks')) {
-    const bookmarksStore = db.createObjectStore('scripture-bookmarks', { keyPath: 'id' });
-    bookmarksStore.createIndex('by-session', 'sessionId');
-    logger.debug('[dbSchema] Created scripture-bookmarks store with by-session index (v5)');
-  }
+type PendingOpen = {
+  settled: boolean;
+  resolve: (db: IDBPDatabase<MyLoveDBSchema>) => void;
+  reject: (error: unknown) => void;
+};
 
-  if (!db.objectStoreNames.contains('scripture-messages')) {
-    const messagesStore = db.createObjectStore('scripture-messages', { keyPath: 'id' });
-    messagesStore.createIndex('by-session', 'sessionId');
-    logger.debug('[dbSchema] Created scripture-messages store with by-session index (v5)');
+const pendingOpens: PendingOpen[] = [];
+let blockedPromptShown = false;
+
+function removePending(pending: PendingOpen): void {
+  const idx = pendingOpens.indexOf(pending);
+  if (idx !== -1) pendingOpens.splice(idx, 1);
+  if (pendingOpens.length === 0) blockedPromptShown = false;
+}
+
+function rejectAllPending(error: unknown): void {
+  const waiting = pendingOpens.splice(0);
+  blockedPromptShown = false;
+  for (const pending of waiting) {
+    if (pending.settled) continue;
+    pending.settled = true;
+    pending.reject(error);
   }
+}
+
+function onUpgradeBlocked(): void {
+  if (blockedPromptShown) return;
+  blockedPromptShown = true;
+  const accepted = window.confirm(UPGRADE_BLOCKED_RELOAD_MESSAGE);
+  if (accepted) {
+    location.reload();
+    return;
+  }
+  rejectAllPending(new Error('IndexedDB upgrade blocked: reload dismissed'));
+}
+
+/**
+ * Open `my-love-db` at `DB_VERSION` with the shared upgrade and a `blocked`
+ * handler. App-side services must use this rather than calling `openDB`
+ * themselves so a service worker still holding v9 cannot stall the v10
+ * upgrade with no UI.
+ *
+ * Concurrent opens share one confirm: accept reloads once, dismiss rejects
+ * every waiting open. The worker has no `window`; it must keep the upgrade-only
+ * `openDB` path. New SW code also cannot fix an already-installed v9 worker;
+ * the app-side prompt is what unblocks.
+ */
+export function openMyLoveDB(): Promise<IDBPDatabase<MyLoveDBSchema>> {
+  return new Promise((resolve, reject) => {
+    const pending: PendingOpen = { settled: false, resolve, reject };
+    pendingOpens.push(pending);
+
+    const opening = openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
+      upgrade(db, oldVersion, newVersion, transaction) {
+        upgradeDb(db, oldVersion, newVersion, transaction);
+      },
+      blocked: onUpgradeBlocked,
+    });
+
+    void opening.then(
+      (db) => {
+        removePending(pending);
+        if (pending.settled) {
+          db.close();
+          return;
+        }
+        pending.settled = true;
+        resolve(db);
+      },
+      (error: unknown) => {
+        removePending(pending);
+        if (pending.settled) return;
+        pending.settled = true;
+        reject(error);
+      }
+    );
+  });
 }

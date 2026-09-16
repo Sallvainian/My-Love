@@ -9,8 +9,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { test as base } from '@playwright/test';
-import { createTestSession, cleanupTestSession, linkTestPartners } from '../factories';
-import type { SeedResult, TypedSupabaseClient } from '../factories';
+import type { TypedSupabaseClient } from '../factories';
 import {
   clearPairEvents,
   resolveWorkerPairIds,
@@ -45,8 +44,6 @@ export type CoupleEventsFixture = {
 type CustomFixtures = {
   /** Supabase admin client with service role key for test data manipulation */
   supabaseAdmin: TypedSupabaseClient;
-  /** Pre-seeded test session with automatic cleanup */
-  testSession: SeedResult;
   /**
    * A Supabase client speaking as this worker's own user, so RLS applies.
    *
@@ -65,9 +62,6 @@ type CustomFixtures = {
  *
  * supabaseAdmin: Creates a Supabase client with service role key.
  * Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars.
- *
- * testSession: Creates test scripture sessions via seeding RPC,
- * automatically cleans up after test completes.
  */
 export const test = base.extend<CustomFixtures>({
   supabaseAdmin: async ({}, use) => {
@@ -84,22 +78,6 @@ export const test = base.extend<CustomFixtures>({
     const client = createSupabaseAdminClient(url, serviceRoleKey);
 
     await use(client);
-  },
-
-  testSession: async ({ supabaseAdmin }, use) => {
-    const result = await createTestSession(supabaseAdmin);
-
-    // Link test users as partners for together-mode sessions
-    if (result.test_user2_id) {
-      await linkTestPartners(supabaseAdmin, result.test_user1_id, result.test_user2_id);
-    }
-
-    await use(result);
-
-    // Cleanup: only remove session data, NOT partner linkage.
-    // Partner linkage is shared state across parallel workers — unlinking here
-    // would break other workers' tests that depend on hasPartner = true.
-    await cleanupTestSession(supabaseAdmin, result.session_ids);
   },
 
   supabaseAsUser: async ({ supabaseAdmin }, use) => {

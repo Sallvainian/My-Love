@@ -1459,3 +1459,91 @@ reason: LoveNoteMessage.tsx:332 is still `text-xs text-gray-400`. Installed --co
 status: done 2026-09-15
 resolution: resolved by sweep bundle dw-sending-caption-contrast
 resolution-undo: c0cd6e970276c3ee6a22291708bddd699135932cedb36f245cc7fc9c74ca96e2 2026-09-15 7374617475733a206f70656e
+
+### DW-147: Leftover scripture test docs and helpers still name deleted modules (tests/README.md tree, example-rpc, factories seed/cleanup, scripture-cache, reflection).
+origin: spec-deferred 42650e8d0a15
+location: tests/README.md:72-161
+source_spec: `2-remove-scripture-from-the-application.md`
+severity: medium
+reason: Story 1 owns this rewrite. Chromium testDir is tests/e2e, so these files do not fail this story's verification and still typecheck. The e2e/scripture tree in tests/README.md was already stale after 820be2d2; this story's compile-graph deletes made more of that README false.
+status: open
+
+### DW-148: AGENTS.md still says five modules open my-love-db after scriptureReadingService was removed.
+origin: spec-deferred 73f04c4b6c19
+location: AGENTS.md:64
+source_spec: `2-remove-scripture-from-the-application.md`
+severity: low
+reason: Remaining openers are storage.ts, customMessageService.ts, moodService.ts, and sw-db.ts (four). Agent-context files are deferred by review policy rather than patched here.
+status: open
+
+### DW-149: AGENTS.md still points the untypechecked render chain at App.tsx (~724); the surviving currentView arms are around :786-797.
+origin: spec-deferred e7ea07c7c0dc
+location: AGENTS.md:28
+source_spec: `2-remove-scripture-from-the-application.md`
+severity: low
+reason: The ~724 figure was already wrong before this story (render was near :805). Agent-context files are deferred by review policy.
+status: open
+
+### DW-150: playwright.config.ts still explains shard policy with scripture specs sorting into one contiguous block.
+origin: spec-deferred a843636f65c9
+location: playwright.config.ts:102-105
+source_spec: `2-remove-scripture-from-the-application.md`
+severity: low
+reason: Those specs were already gone in 820be2d2. Story 5's invoke text owns rewriting playwright.config.ts:102-105.
+status: done 2026-09-16
+resolution: Story 5 rewrote playwright.config.ts:102-105; the comment no longer says scripture specs sort into one contiguous block.
+
+### DW-151: README.md still says 21 migrations; supabase/migrations/ has 38 files.
+origin: spec-deferred 4d45bee2999d
+location: README.md:118
+source_spec: `2-remove-scripture-from-the-application.md`
+severity: low
+reason: The 21 figure was already wrong before this story. The docs commit dropped scripture table names on that line and left the count.
+status: open
+
+### DW-152: tests/support/helpers/scripture-cache.ts and reflection.ts remain on disk with zero live importers; scripture-cache still calls indexedDB.deleteDatabase('my-love-db').
+origin: spec-deferred 16a62f0fd06d
+location: tests/support/helpers/scripture-cache.ts
+source_spec: `3-drop-the-scripture-database-objects.md`
+severity: low
+reason: Story 1 leftover test helpers. tsconfig.test.json includes tests/ but nothing imports these files, so typecheck stays green. Story 1 owns leftover helper deletion.
+status: open
+
+### DW-153: tests/api/check-constraint-error-mapping.spec.ts still inventories scripture_reflections among uncovered CHECKs after the envelopes comment was updated to 13 rows.
+origin: spec-deferred 3ecf2c676f0f
+location: tests/api/check-constraint-error-mapping.spec.ts:93-95
+source_spec: `3-drop-the-scripture-database-objects.md`
+severity: low
+reason: Sibling comment in check-constraint-envelopes.ts was amended in this story. tests/api/ is an epic leave-alone (story 1 invoke); the API spec comment is now stale relative to the dropped table.
+status: open
+
+### DW-154: rls-security.ts and persisted-blob.ts comments still name scripture after the DB objects are gone.
+origin: spec-deferred 9724daa27986
+location: tests/support/helpers/rls-security.ts:4
+source_spec: `3-drop-the-scripture-database-objects.md`
+severity: low
+reason: rls-security.ts:4 still says "scripture RLS security E2E tests"; persisted-blob.ts:17 still cites ./scripture-cache.ts. Story 1 leftover comment surgery; live callers are non-scripture.
+status: open
+
+### DW-155: Successful openMyLoveDB connections never register idb blocking/versionchange, so the next version bump can hang on these long-lived holders the same way v9 hangs on the service worker.
+origin: spec-deferred feef7bb9b913
+location: src/services/dbSchema.ts:314-353
+source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
+severity: low
+reason: Pre-existing: storage, mood, and customMessage also omitted blocking before this story. The new helper only adds blocked. A v11 bump would need blocking() { db.close() } (or equivalent) on the live handles.
+status: open
+
+### DW-156: STORE_NAMES core-names test still omits MESSAGE_FAVORITES, the fifth survivor.
+origin: spec-deferred 92e581f40d1d
+location: tests/unit/services/dbSchema.test.ts:566-571
+source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
+severity: low
+reason: Pre-existing: the core it listed MESSAGES/PHOTOS/MOODS/SW_AUTH before this story. Deleting the scripture STORE_NAMES it did not add the favorites name.
+status: open
+
+### DW-157: window.confirm from the IndexedDB blocked listener is not a user gesture; some browsers may suppress the dialog and take the dismiss path.
+origin: spec-deferred 85fc8e2635c1
+location: src/services/dbSchema.ts:322-334
+source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
+reason: Unverified browser behavior. Would settle it: load a v9 profile in Safari iOS PWA with a held connection and see whether confirm appears. If it does not, init rejects with no prompt (medium if true).
+status: open

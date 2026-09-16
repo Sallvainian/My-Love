@@ -71,6 +71,17 @@ test.describe('Navigation Tray', () => {
     await page.waitForURL('**/mood');
   });
 
+  test('[P0] should list six destinations and not scripture', async ({ page }) => {
+    await page.goto('/');
+    await openNavTray(page);
+
+    for (const view of ['home', 'mood', 'notes', 'partner', 'photos', 'settings']) {
+      await expect(page.getByTestId(`nav-${view}`)).toBeVisible();
+    }
+    await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
+    await expect(page.getByLabel('Scripture')).toHaveCount(0);
+  });
+
   test('[P0] should mark only the active destination with aria-current', async ({ page }) => {
     await page.goto('/');
     await navigateTo(page, 'photos');
@@ -79,7 +90,7 @@ test.describe('Navigation Tray', () => {
     await openNavTray(page);
 
     await expect(page.getByTestId('nav-photos')).toHaveAttribute('aria-current', 'page');
-    for (const view of ['home', 'mood', 'notes', 'partner', 'scripture', 'settings']) {
+    for (const view of ['home', 'mood', 'notes', 'partner', 'settings']) {
       await expect(page.getByTestId(`nav-${view}`)).not.toHaveAttribute('aria-current', 'page');
     }
   });

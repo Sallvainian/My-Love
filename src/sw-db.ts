@@ -12,7 +12,7 @@
 
 import { openDB } from 'idb';
 import type { MyLoveDBSchema, StoredAuthToken, StoredMoodEntry } from './services/dbSchema';
-import { DB_NAME, DB_VERSION, STORE_NAMES, upgradeDb } from './services/dbSchema';
+import { DB_NAME, DB_VERSION, STORE_NAMES, openMyLoveDB, upgradeDb } from './services/dbSchema';
 import type { MarkSyncedOutcome } from './services/moodSyncPayload';
 import { matchesMoodSyncFingerprint } from './services/moodSyncPayload';
 
@@ -24,17 +24,24 @@ export type { StoredMoodEntry } from './services/dbSchema';
  * SW must be self-sufficient for Background Sync (app may be closed)
  */
 async function openDatabase() {
+  // storeAuthToken / clearAuthToken also run on the page (actionService,
+  // sessionService). A v9 holder during sign-in or TOKEN_REFRESHED must
+  // surface the shared reload prompt rather than hang. The worker has no
+  // window; it keeps the upgrade-only open so Background Sync still works
+  // while the app is closed.
+  if (typeof globalThis.window !== 'undefined') {
+    return openMyLoveDB();
+  }
+
   return openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, newVersion, transaction) {
       // Delegates to the shared upgradeDb rather than carrying its own copy.
       //
       // This was a third hand-written implementation of the schema, alongside
-      // storage.ts's. It created messages, photos, moods and sw-auth and had no
-      // branch for the scripture stores, so if the worker's open() happened to
-      // be the one performing the version-change transaction, those stores were
-      // never created. It also built the moods index as unique on `date` alone,
-      // which is the cross-account collision v7 exists to remove -- a stale copy
-      // here would silently reintroduce it.
+      // storage.ts's. It created messages, photos, moods and sw-auth. It also
+      // built the moods index as unique on `date` alone, which is the
+      // cross-account collision v7 exists to remove -- a stale copy here would
+      // silently reintroduce it.
       upgradeDb(db, oldVersion, newVersion, transaction);
     },
   });

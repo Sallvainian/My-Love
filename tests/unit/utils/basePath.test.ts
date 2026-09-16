@@ -35,7 +35,7 @@ import { stripBasePath, withBasePath } from '../../../src/utils/basePath';
 const PRODUCTION_BASE = '/My-Love/';
 
 /** Every route the app can be on, from `navigationSlice`'s own pathMap. */
-const ROUTES = ['/', '/photos', '/mood', '/partner', '/notes', '/scripture', '/settings'];
+const ROUTES = ['/', '/photos', '/mood', '/partner', '/notes', '/settings'];
 
 describe('base path composition and stripping', () => {
   beforeAll(async () => {

@@ -14,10 +14,10 @@
  *
  * ## Why a helper module and not a fixture
  *
- * Pure functions over a `Page`, matching `./scripture-cache.ts`, rather than a
- * `mergeTests` entry. A fixture shell earns its place when it owns a lifecycle;
- * this owns none. The auth fixture builds a fresh `browser.newContext()` per
- * test and closes it afterwards (`tests/support/fixtures/auth.ts`), and the
+ * Pure functions over a `Page`, rather than a `mergeTests` entry. A fixture
+ * shell earns its place when it owns a lifecycle; this owns none. The auth
+ * fixture builds a fresh `browser.newContext()` per test and closes it
+ * afterwards (`tests/support/fixtures/auth.ts`), and the
  * storage state that context loads carries only the Supabase auth token and
  * `lastWelcomeView` (`tests/support/auth/supabase-auth-provider.ts:146-157`) —
  * never `my-love-storage`. So nothing seeded here survives into the next test

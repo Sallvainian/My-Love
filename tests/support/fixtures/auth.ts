@@ -89,7 +89,7 @@ export const test = base.extend<AuthTestFixtures, AuthWorkerFixtures>({
     await use(page);
   },
 
-  // Worker-scoped: partner user identifier for together-mode tests
+  // Worker-scoped: partner user identifier for two-context specs
   partnerUserIdentifier: [
     async ({}, use, workerInfo) => {
       const normalizedIndex = normalizeWorkerIndex(workerInfo.workerIndex, getAuthPoolSize());
