@@ -341,30 +341,38 @@ function onUpgradeBlocked(): void {
 }
 
 /**
- * Open `my-love-db` at `DB_VERSION` with the shared upgrade and a `blocked`
- * handler. App-side services must use this rather than calling `openDB`
- * themselves so a service worker still holding v9 cannot stall the v10
- * upgrade with no UI.
+ * Open `my-love-db` at `DB_VERSION` with the shared upgrade, a `blocked`
+ * handler, and a `blocking` handler. App-side services must use this rather
+ * than calling `openDB` themselves so a service worker still holding v9 cannot
+ * stall the v10 upgrade with no UI.
  *
  * Concurrent opens share one confirm: accept reloads once, dismiss rejects
  * every waiting open. The worker has no `window`; it must keep the upgrade-only
  * `openDB` path. New SW code also cannot fix an already-installed v9 worker;
  * the app-side prompt is what unblocks.
+ *
+ * `blocking` closes this live handle when a newer version wants the database.
+ * Holders that do not close still hit `blocked: onUpgradeBlocked`.
  */
 export function openMyLoveDB(): Promise<IDBPDatabase<MyLoveDBSchema>> {
   return new Promise((resolve, reject) => {
     const pending: PendingOpen = { settled: false, resolve, reject };
     pendingOpens.push(pending);
 
+    let liveDb: IDBPDatabase<MyLoveDBSchema> | undefined;
     const opening = openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion, newVersion, transaction) {
         upgradeDb(db, oldVersion, newVersion, transaction);
       },
       blocked: onUpgradeBlocked,
+      blocking() {
+        liveDb?.close();
+      },
     });
 
     void opening.then(
       (db) => {
+        liveDb = db;
         removePending(pending);
         if (pending.settled) {
           db.close();
