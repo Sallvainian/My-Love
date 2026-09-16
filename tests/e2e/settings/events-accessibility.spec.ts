@@ -114,12 +114,9 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
         icon: 'calendar',
       });
 
-      // Set for parity with scripture-accessibility.spec.ts:281-291, and it
-      // costs nothing — but be clear about what it does NOT do here. That spec
-      // works because every scripture component routes its durations through
-      // `useMotionConfig`, which maps `useReducedMotion()` to `duration: 0`
-      // (src/hooks/useMotionConfig.ts:11-16). EventsSettings does not: its rows
-      // and both dialogs carry hardcoded framer-motion props
+      // emulateMedia reducedMotion is set here, and it costs nothing — but
+      // EventsSettings does not map that preference to zero-duration motion:
+      // its rows and both dialogs carry hardcoded framer-motion props
       // (EventsSettings.tsx:313-314, 585-586, 598-599, 932-933, 945-946), and
       // `grep -rn "MotionConfig" src/` finds no wrapper that would apply the
       // preference globally. So the explicit settle below — not this line — is

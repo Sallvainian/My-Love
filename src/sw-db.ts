@@ -29,12 +29,10 @@ async function openDatabase() {
       // Delegates to the shared upgradeDb rather than carrying its own copy.
       //
       // This was a third hand-written implementation of the schema, alongside
-      // storage.ts's. It created messages, photos, moods and sw-auth and had no
-      // branch for the scripture stores, so if the worker's open() happened to
-      // be the one performing the version-change transaction, those stores were
-      // never created. It also built the moods index as unique on `date` alone,
-      // which is the cross-account collision v7 exists to remove -- a stale copy
-      // here would silently reintroduce it.
+      // storage.ts's. It created messages, photos, moods and sw-auth. It also
+      // built the moods index as unique on `date` alone, which is the
+      // cross-account collision v7 exists to remove -- a stale copy here would
+      // silently reintroduce it.
       upgradeDb(db, oldVersion, newVersion, transaction);
     },
   });

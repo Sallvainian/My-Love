@@ -12,7 +12,6 @@ import { createNavigationSlice } from './slices/navigationSlice';
 import { createNotesSlice } from './slices/notesSlice';
 import { createPartnerSlice } from './slices/partnerSlice';
 import { createPhotosSlice } from './slices/photosSlice';
-import { createScriptureReadingSlice } from './slices/scriptureReadingSlice';
 import { createSettingsSlice } from './slices/settingsSlice';
 import type { AppState } from './types';
 
@@ -92,7 +91,6 @@ export const useAppStore = create<AppState>()(
       ...createInteractionsSlice(set, get, api),
       ...createPartnerSlice(set, get, api),
       ...createNotesSlice(set, get, api),
-      ...createScriptureReadingSlice(set, get, api),
       ...createEventsSlice(set, get, api),
     }),
     {

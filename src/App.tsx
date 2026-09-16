@@ -48,11 +48,6 @@ const LoveNotes = lazy(() =>
   import('./components/love-notes').then((m) => ({ default: m.LoveNotes }))
 );
 
-// Story 1.1: Scripture Reading Entry Point
-const ScriptureOverview = lazy(() =>
-  import('./components/scripture-reading').then((m) => ({ default: m.ScriptureOverview }))
-);
-
 // Story 4 (dynamic events): Settings is the app's only sign-out and, from
 // story 5, the home of events CRUD. It was unreachable dead code until the
 // navigation tray gave it a destination.
@@ -193,11 +188,9 @@ function App() {
             ? 'partner'
             : routePath === '/notes'
               ? 'notes'
-              : routePath === '/scripture'
-                ? 'scripture'
-                : routePath === '/settings'
-                  ? 'settings'
-                  : 'home';
+              : routePath === '/settings'
+                ? 'settings'
+                : 'home';
     setView(initialView, true); // Skip history update on initial load
 
     // AC-4.5.6: Browser back/forward button support
@@ -212,11 +205,9 @@ function App() {
               ? 'partner'
               : routePath === '/notes'
                 ? 'notes'
-                : routePath === '/scripture'
-                  ? 'scripture'
-                  : routePath === '/settings'
-                    ? 'settings'
-                    : 'home';
+                : routePath === '/settings'
+                  ? 'settings'
+                  : 'home';
       setView(view, true); // Skip history update to prevent loop
       logger.debug(`[App] Popstate: navigated to ${view}`);
     };
@@ -801,9 +792,6 @@ function App() {
                 {currentView === 'partner' && <PartnerMoodView />}
 
                 {currentView === 'notes' && <LoveNotes />}
-
-                {/* Story 1.1: Scripture Reading Entry Point */}
-                {currentView === 'scripture' && <ScriptureOverview />}
 
                 {/* Story 4 (dynamic events): Settings, home of the only sign-out */}
                 {currentView === 'settings' && <Settings />}

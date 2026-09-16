@@ -3,7 +3,7 @@
 ![Tests](https://github.com/Sallvainian/My-Love/actions/workflows/test.yml/badge.svg)
 ![Deploy](https://github.com/Sallvainian/My-Love/actions/workflows/deploy.yml/badge.svg)
 
-A Progressive Web App for couples to exchange daily love messages, track moods, share photos, chat via love notes, read scripture together, and send playful interactions. Built with React 19, TypeScript, Vite, Tailwind CSS v4, Framer Motion, Zustand, and Supabase.
+A Progressive Web App for couples to exchange daily love messages, track moods, share photos, chat via love notes, and send playful interactions. Built with React 19, TypeScript, Vite, Tailwind CSS v4, Framer Motion, Zustand, and Supabase.
 
 **Live**: https://sallvainian.github.io/My-Love/
 
@@ -15,7 +15,6 @@ A Progressive Web App for couples to exchange daily love messages, track moods, 
 - **Partner Mood View** — See your partner's current mood in real-time
 - **Partner Interactions** — Send pokes, kisses, and farts with animations and real-time delivery
 - **Photo Gallery** — Upload, view, edit, and share photos with captions and lazy loading
-- **Scripture Reading** — Solo and Together mode scripture sessions with lobby, role selection, countdown, and synchronized reading
 - **Anniversary Timers** — Real-time countdowns to special dates with celebration animations
 - **Themes** — Sunset, Ocean, Lavender, and Rose
 - **PWA** — Installable on mobile, works offline
@@ -92,9 +91,9 @@ npm run test:smoke
 
 ### State Management
 
-Single Zustand store (`src/stores/useAppStore.ts`) composed from 10 slices:
+Single Zustand store (`src/stores/useAppStore.ts`) composed from 11 slices:
 
-`appSlice` | `settingsSlice` | `navigationSlice` | `messagesSlice` | `moodSlice` | `interactionsSlice` | `partnerSlice` | `notesSlice` | `photosSlice` | `scriptureReadingSlice`
+`appSlice` | `authSlice` | `settingsSlice` | `navigationSlice` | `messagesSlice` | `moodSlice` | `interactionsSlice` | `partnerSlice` | `notesSlice` | `photosSlice` | `eventsSlice`
 
 ### Secrets Management
 
@@ -116,7 +115,7 @@ fnox check                # Verify all secrets resolve
 
 ### Supabase
 
-21 migrations managing tables, RLS policies, RPC functions, and realtime subscriptions. Key tables: `users`, `moods`, `interactions`, `love_notes`, `photos`, `scripture_sessions`, `scripture_session_participants`, and more.
+21 migrations managing tables, RLS policies, RPC functions, and realtime subscriptions. Key tables: `users`, `moods`, `interactions`, `love_notes`, `photos`, and more.
 
 ```bash
 supabase start                    # Start local instance
@@ -135,7 +134,6 @@ Production uses `/My-Love/` for GitHub Pages. Development uses `/`. Configured i
 My-Love/
 ├── src/
 │   ├── components/
-│   │   ├── scripture-reading/    # Together/Solo mode scripture sessions
 │   │   ├── love-notes/           # Real-time chat
 │   │   ├── DailyMessage/         # Main message card
 │   │   ├── MoodTracker/          # Mood logging
@@ -146,7 +144,7 @@ My-Love/
 │   │   └── ...
 │   ├── stores/
 │   │   ├── useAppStore.ts        # Root Zustand store
-│   │   └── slices/               # 10 state slices
+│   │   └── slices/               # 11 state slices
 │   ├── services/                 # Supabase, IndexedDB, sync, realtime
 │   ├── config/                   # App constants
 │   ├── data/                     # Default messages

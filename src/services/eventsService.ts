@@ -622,9 +622,9 @@ class EventsService {
    * client-maintained and has deliberately no trigger.
    *
    * The payload is typed with the generated `Update` row rather than a
-   * `Record<string, unknown>`: postgrest-js wraps `.update()` payloads in
-   * `RejectExcessProperties`, which resolves an index signature to `never`
-   * (recorded at `scriptureReadingService.ts:270-275`).
+   * `Record<string, unknown>`: postgrest-js (>= supabase-js 2.105) wraps
+   * `.update()` payloads in `RejectExcessProperties`, which resolves an
+   * index signature to `never`.
    *
    * @returns The updated event
    * @throws {EventWriteError} if the update matched no row — RLS filters a

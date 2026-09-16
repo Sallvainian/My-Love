@@ -99,21 +99,6 @@ export default tseslint.config(
           message:
             'Do not assign getState from useAppStore. Use useAppStore with a useShallow selector.',
         },
-        {
-          selector:
-            "JSXOpeningElement[name.name='button']:has(JSXAttribute[name.name='data-testid'][value.value='scripture-message-send-btn']):not(:has(JSXAttribute[name.name='disabled']))",
-          message: 'Submission controls must include a disabled prop.',
-        },
-        {
-          selector:
-            "JSXOpeningElement[name.name='button']:has(JSXAttribute[name.name='data-testid'][value.value='scripture-reflection-continue']):not(:has(JSXAttribute[name.name='disabled']))",
-          message: 'Submission controls must include a disabled prop.',
-        },
-        {
-          selector:
-            "JSXOpeningElement[name.name='button']:has(JSXAttribute[name.name='data-testid'][value.value='scripture-reflection-summary-continue']):not(:has(JSXAttribute[name.name='disabled']))",
-          message: 'Submission controls must include a disabled prop.',
-        },
       ],
     },
   },
@@ -173,56 +158,6 @@ export default tseslint.config(
           ],
         },
       ],
-    },
-  },
-  // Scripture containers must not import Supabase clients directly
-  {
-    files: ['src/components/scripture-reading/containers/**/*.{ts,tsx}'],
-    rules: {
-      // Flat config replaces a rule key rather than merging it, so the zod entry
-      // from the src/ block above is repeated here to survive this override.
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            {
-              name: '@supabase/supabase-js',
-              message:
-                'Container components must use Zustand slice actions instead of direct Supabase imports.',
-            },
-            {
-              name: 'zod',
-              message: "Import from 'zod/v4' instead of bare 'zod'.",
-            },
-          ],
-          patterns: [
-            {
-              group: [
-                '**/api/supabaseClient',
-                '@/api/supabaseClient',
-                '**/services/*',
-                '@/services/*',
-                '!**/services/scriptureReadingService',
-                '!@/services/scriptureReadingService',
-              ],
-              message:
-                'Container components must use Zustand slice actions instead of importing Supabase or service modules directly.',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // Scripture Reading feature - strict no-explicit-any enforcement
-  {
-    files: [
-      'src/services/scriptureReadingService.ts',
-      'src/stores/slices/scriptureReadingSlice.ts',
-      'src/hooks/useScriptureBroadcast.ts',
-      'src/components/scripture-reading/**/*.{ts,tsx}',
-    ],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'error',
     },
   }
 );

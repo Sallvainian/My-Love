@@ -1459,3 +1459,43 @@ reason: LoveNoteMessage.tsx:332 is still `text-xs text-gray-400`. Installed --co
 status: done 2026-09-15
 resolution: resolved by sweep bundle dw-sending-caption-contrast
 resolution-undo: c0cd6e970276c3ee6a22291708bddd699135932cedb36f245cc7fc9c74ca96e2 2026-09-15 7374617475733a206f70656e
+
+### DW-147: Leftover scripture test docs and helpers still name deleted modules (tests/README.md tree, example-rpc, factories seed/cleanup, scripture-cache, reflection).
+origin: spec-deferred 42650e8d0a15
+location: tests/README.md:72-161
+source_spec: `2-remove-scripture-from-the-application.md`
+severity: medium
+reason: Story 1 owns this rewrite. Chromium testDir is tests/e2e, so these files do not fail this story's verification and still typecheck. The e2e/scripture tree in tests/README.md was already stale after 820be2d2; this story's compile-graph deletes made more of that README false.
+status: open
+
+### DW-148: AGENTS.md still says five modules open my-love-db after scriptureReadingService was removed.
+origin: spec-deferred 73f04c4b6c19
+location: AGENTS.md:64
+source_spec: `2-remove-scripture-from-the-application.md`
+severity: low
+reason: Remaining openers are storage.ts, customMessageService.ts, moodService.ts, and sw-db.ts (four). Agent-context files are deferred by review policy rather than patched here.
+status: open
+
+### DW-149: AGENTS.md still points the untypechecked render chain at App.tsx (~724); the surviving currentView arms are around :786-797.
+origin: spec-deferred e7ea07c7c0dc
+location: AGENTS.md:28
+source_spec: `2-remove-scripture-from-the-application.md`
+severity: low
+reason: The ~724 figure was already wrong before this story (render was near :805). Agent-context files are deferred by review policy.
+status: open
+
+### DW-150: playwright.config.ts still explains shard policy with scripture specs sorting into one contiguous block.
+origin: spec-deferred a843636f65c9
+location: playwright.config.ts:102-105
+source_spec: `2-remove-scripture-from-the-application.md`
+severity: low
+reason: Those specs were already gone in 820be2d2. Story 5's invoke text owns rewriting playwright.config.ts:102-105.
+status: open
+
+### DW-151: README.md still says 21 migrations; supabase/migrations/ has 38 files.
+origin: spec-deferred 4d45bee2999d
+location: README.md:118
+source_spec: `2-remove-scripture-from-the-application.md`
+severity: low
+reason: The 21 figure was already wrong before this story. The docs commit dropped scripture table names on that line and left the count.
+status: open
