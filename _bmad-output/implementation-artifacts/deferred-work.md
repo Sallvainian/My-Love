@@ -1549,3 +1549,4 @@ location: src/services/dbSchema.ts:322-334
 source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
 reason: Unverified browser behavior. Would settle it: load a v9 profile in Safari iOS PWA with a held connection and see whether confirm appears. If it does not, init rejects with no prompt (medium if true).
 status: open
+decision: 2026-09-16 Replace confirm with an in-app reload dialog — Replace window.confirm in onUpgradeBlocked with an in-app reload dialog that does not depend on a user gesture, keeping accept=location.reload and dismiss=rejectAllPending.
