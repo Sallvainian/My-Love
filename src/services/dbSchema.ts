@@ -329,15 +329,73 @@ function rejectAllPending(error: unknown): void {
   }
 }
 
+const UPGRADE_BLOCKED_DIALOG_ID = 'idb-upgrade-blocked-dialog';
+const UPGRADE_BLOCKED_TITLE_ID = 'idb-upgrade-blocked-title';
+
+function removeUpgradeBlockedDialog(): void {
+  document.getElementById(UPGRADE_BLOCKED_DIALOG_ID)?.remove();
+}
+
+function showUpgradeBlockedDialog(): void {
+  if (document.getElementById(UPGRADE_BLOCKED_DIALOG_ID)) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = UPGRADE_BLOCKED_DIALOG_ID;
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', UPGRADE_BLOCKED_TITLE_ID);
+  overlay.className = 'fixed inset-0 z-[80] flex items-center justify-center bg-black/80';
+
+  const panel = document.createElement('div');
+  panel.className = 'mx-4 w-full max-w-md rounded-lg bg-gray-800 shadow-xl';
+
+  const header = document.createElement('div');
+  header.className = 'border-b border-gray-700 px-6 py-4';
+  const title = document.createElement('h2');
+  title.id = UPGRADE_BLOCKED_TITLE_ID;
+  title.className = 'text-xl font-semibold text-white';
+  title.textContent = UPGRADE_BLOCKED_RELOAD_MESSAGE;
+  header.append(title);
+
+  const footer = document.createElement('div');
+  footer.className = 'flex items-center justify-end gap-3 px-6 py-4';
+
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.textContent = 'Not now';
+  dismiss.className =
+    'rounded-lg px-4 py-2 text-gray-300 transition-colors hover:bg-gray-700';
+  dismiss.addEventListener('click', () => {
+    rejectAllPending(new Error('IndexedDB upgrade blocked: reload dismissed'));
+    removeUpgradeBlockedDialog();
+  });
+
+  const accept = document.createElement('button');
+  accept.type = 'button';
+  accept.textContent = 'Reload';
+  accept.className =
+    'rounded-lg bg-pink-600 px-6 py-2 font-medium text-white transition-colors hover:bg-pink-700';
+  accept.addEventListener(
+    'click',
+    () => {
+      location.reload();
+    },
+    { once: true }
+  );
+
+  footer.append(dismiss, accept);
+  panel.append(header, footer);
+  overlay.append(panel);
+  document.body.append(overlay);
+}
+
 function onUpgradeBlocked(): void {
   if (blockedPromptShown) return;
   blockedPromptShown = true;
-  const accepted = window.confirm(UPGRADE_BLOCKED_RELOAD_MESSAGE);
-  if (accepted) {
-    location.reload();
-    return;
-  }
-  rejectAllPending(new Error('IndexedDB upgrade blocked: reload dismissed'));
+  // DOM dialog, not a React modal: this runs from openMyLoveDB's blocked
+  // callback (mood/storage/custom-message init, page-side storeAuthToken)
+  // and must appear without a user gesture or a mounted React tree.
+  showUpgradeBlockedDialog();
 }
 
 /**
@@ -346,10 +404,10 @@ function onUpgradeBlocked(): void {
  * than calling `openDB` themselves so a service worker still holding v9 cannot
  * stall the v10 upgrade with no UI.
  *
- * Concurrent opens share one confirm: accept reloads once, dismiss rejects
- * every waiting open. The worker has no `window`; it must keep the upgrade-only
- * `openDB` path. New SW code also cannot fix an already-installed v9 worker;
- * the app-side prompt is what unblocks.
+ * Concurrent opens share one in-app reload dialog: accept reloads once, dismiss
+ * rejects every waiting open. The worker has no `window`; it must keep the
+ * upgrade-only `openDB` path. New SW code also cannot fix an already-installed
+ * v9 worker; the app-side prompt is what unblocks.
  *
  * `blocking` closes this live handle when a newer version wants the database.
  * Holders that do not close still hit `blocked: onUpgradeBlocked`.

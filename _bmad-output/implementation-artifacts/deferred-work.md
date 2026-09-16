@@ -1562,7 +1562,9 @@ origin: spec-deferred 85fc8e2635c1
 location: src/services/dbSchema.ts:322-334
 source_spec: `4-remove-the-scripture-indexeddb-object-stores.md`
 reason: Unverified browser behavior. Would settle it: load a v9 profile in Safari iOS PWA with a held connection and see whether confirm appears. If it does not, init rejects with no prompt (medium if true).
-status: open
+status: done 2026-09-16
+resolution: resolved by sweep bundle dw-decision-dw-157
+resolution-undo: 0456ae08d7694b93ce5b825997a769499223a36191d708b74de857b116d948c5 2026-09-16 7374617475733a206f70656e
 decision: 2026-09-16 Replace confirm with an in-app reload dialog — Replace window.confirm in onUpgradeBlocked with an in-app reload dialog that does not depend on a user gesture, keeping accept=location.reload and dismiss=rejectAllPending.
 
 ### DW-158: tests/unit/services/dbSchema.test.ts still says five modules open this database after scriptureReadingService was removed.
