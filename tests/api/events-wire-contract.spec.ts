@@ -86,13 +86,13 @@
  * `EventRowSchema` below is TEST-LOCAL. There is no `events` schema anywhere
  * under `src/validation/` — the ATDD run recorded "no schema to hand it" as its
  * biggest deviation, and this file closes that gap by declaring one and handing
- * it to `apiRequest(...).validateSchema(...)`, the house idiom at
- * `tests/api/scripture-reflection-2.2.spec.ts:63-70`. It mirrors
+ * it to `apiRequest(...).validateSchema(...)`, the house idiom used by other
+ * live `tests/api` contract specs (for example
+ * `tests/api/interaction-record-ownership.spec.ts:63-74`). It mirrors
  * `supabase/migrations/20260818000002_create_events_table.sql:17-26` column for
- * column. It would ideally live in `src/validation/schemas.ts` beside
- * `SupabaseReflectionSchema` (:231-240) so production and tests validate the
- * same shape; it is not put there here because the story's acceptance criterion
- * pins the production diff to five files.
+ * column. It would ideally live in `src/validation/schemas.ts` so production and
+ * tests validate the same shape; it is not put there here because the story's
+ * acceptance criterion pins the production diff to five files.
  *
  * ── Isolation ──────────────────────────────────────────────────────────────
  *
@@ -324,8 +324,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     // `Prefer: return=representation` is what supabase-js's `.select()` sends
     // (`eventsService.createEvent`, src/services/eventsService.ts:322). Without
     // it PostgREST answers 204 and this would measure a shape the service never
-    // sees — `tests/api/scripture-reflection-rpc.spec.ts:258-266` is that
-    // headerless case, and it is deliberately not the shape under test here.
+    // sees. A headerless POST is deliberately not the shape under test here.
     const { status, body } = await apiRequest<EventRow[]>({
       method: 'POST',
       path: '/rest/v1/events',
