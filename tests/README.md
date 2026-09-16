@@ -2,7 +2,7 @@
 
 Production-ready **fullstack** test infrastructure using Playwright with `@seontechnologies/playwright-utils`.
 
-**Stack**: React 19 + Vite 7 + Supabase (21 migrations, RPCs, RLS policies, pgTAP)
+**Stack**: React 19 + Vite 7 + Supabase (39 migrations, RPCs, RLS policies, pgTAP)
 
 ## Quick Start
 
