@@ -25,6 +25,12 @@ paths-ignore:
   # resolve. ESLint likewise disables no-unused-vars under tests/**. Retained only
   # as documentation — see tests/e2e-archive/README.md.
   - 'tests/e2e-archive/**'
+  # Parked TEA specs for the removed scripture-reading feature. Not in any
+  # Playwright project (testDir is ./tests/e2e|api|integration); imports of
+  # deleted modules (SupabaseReflectionSchema, scriptureSteps) no longer
+  # resolve, so CodeQL reports property access on undefined. Retained as TEA
+  # run evidence — see the pack README.
+  - '_bmad-output/test-artifacts/automation-dw-solo-report-test-synchronization/**'
 
 queries:
   - uses: security-extended
