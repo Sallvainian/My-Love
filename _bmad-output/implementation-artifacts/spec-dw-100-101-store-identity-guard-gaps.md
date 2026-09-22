@@ -2,7 +2,7 @@
 title: 'DW-100/DW-101: close the last two messages-writing identity-guard gaps'
 type: 'bugfix'
 created: '2026-09-14'
-status: ready-for-dev
+status: done
 review_loop_iteration: 0
 followup_review_recommended: false
 context: []
