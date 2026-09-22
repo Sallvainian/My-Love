@@ -204,14 +204,33 @@ function seedSignedInSession(): void {
   } as unknown as Parameters<typeof useAppStore.setState>[0]);
 }
 
+/**
+ * Every switch to a new user starts a fire-and-forget IndexedDB reload of the
+ * rotation pool (`reloadRotationPool` in authSlice.ts). Nothing here asserts on
+ * it -- loaderIdentityGuards.test.ts does -- but left running it can log after
+ * the file's worker has closed, which Vitest reports as an unhandled
+ * EnvironmentTeardownError and fails the whole run on. So each reload is
+ * recorded and every test waits for its own to settle.
+ */
+const realLoadMessages = useAppStore.getState().loadMessages;
+const pendingReloads: Promise<void>[] = [];
+
 describe('clearAuth on sign-out', () => {
   beforeEach(() => {
     localStorage.removeItem(VAULT_STORAGE_KEY);
     localStorage.removeItem(OWNER_STORAGE_KEY);
+    useAppStore.setState({
+      loadMessages: () => {
+        const reload = realLoadMessages();
+        pendingReloads.push(reload);
+        return reload;
+      },
+    });
     seedSignedInSession();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await Promise.allSettled(pendingReloads.splice(0));
     localStorage.removeItem(VAULT_STORAGE_KEY);
     localStorage.removeItem(OWNER_STORAGE_KEY);
   });
