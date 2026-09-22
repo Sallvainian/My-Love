@@ -213,6 +213,17 @@ async function renderHome() {
 function expectUnsettled() {
   expect(screen.queryByTestId('events-empty-placeholder')).not.toBeInTheDocument();
   expect(screen.queryByTestId('events-load-error')).not.toBeInTheDocument();
+  // The Upcoming row does not wait for the slot below it.
+  expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeInTheDocument();
+  expect(screen.getByTestId('home-add-event')).toHaveAccessibleName('Add event');
+}
+
+/** A slot placeholder is a kit card with muted text that announces itself. */
+function expectKitPlaceholder(testId: 'events-empty-placeholder' | 'events-load-error') {
+  const placeholder = screen.getByTestId(testId);
+  expect(placeholder).toHaveAttribute('role', 'status');
+  expect(placeholder).toHaveClass('bg-card', 'border-line', 'shadow-card');
+  expect(placeholder.querySelector('p')).toHaveClass('text-muted');
 }
 
 /** The production auth listener calls the real clearAuth/setAuthUser actions. */
@@ -503,6 +514,7 @@ describe('Home event-load session ownership', () => {
 
     await act(async () => requests[1].resolve(success));
     expect(screen.getByTestId('events-empty-placeholder')).toHaveTextContent('No upcoming events yet.');
+    expectKitPlaceholder('events-empty-placeholder');
     expect(screen.queryByTestId('events-load-error')).not.toBeInTheDocument();
   });
 
@@ -561,6 +573,7 @@ describe('Home event-load session ownership', () => {
     await act(async () => reauthenticate());
     await act(async () => requests[1].resolve({ status: 'failure', error: 'Current request failed' }));
     expect(screen.getByTestId('events-load-error')).toHaveTextContent('Unable to load events');
+    expectKitPlaceholder('events-load-error');
     expect(screen.queryByTestId('events-empty-placeholder')).not.toBeInTheDocument();
 
     await act(async () => requests[0].resolve(success));

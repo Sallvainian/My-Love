@@ -2,14 +2,17 @@
  * EventCountdown Component
  *
  * Generic countdown for the wedding date and the couple's stored events.
- * Shows XX:XX:XX placeholder when date is not yet set.
- * Updates every second for real-time countdown display.
+ * Shows the muted placeholder text as its value when the date is not yet set.
+ * The card shows only a day count; its 1s interval exists to flip the
+ * today/retire state when local midnight passes.
+ *
+ * Rendered as the shared CountdownCard in the `you` tone: colour lives only in
+ * the tile, which switches to the highlight fill on the day itself.
  */
 
-import { m as motion } from 'framer-motion';
 import { Calendar, Gem, Plane } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { calculateTimeDifference, type TimeDifference } from '../../config/relationshipDates';
+import { CountdownCard } from './CountdownCard';
 import { getCalendarDaysDiff } from './eventCountdownHelpers';
 
 type IconType = 'ring' | 'plane' | 'calendar';
@@ -36,39 +39,18 @@ const iconComponents: Record<IconType, typeof Gem> = {
   calendar: Calendar,
 };
 
-const iconColors: Record<IconType, { bg: string; text: string; border: string }> = {
-  ring: {
-    bg: 'bg-amber-100 dark:bg-amber-900',
-    text: 'text-amber-500 dark:text-amber-300',
-    border: 'border-amber-300 dark:border-amber-500',
-  },
-  plane: {
-    bg: 'bg-blue-100 dark:bg-blue-900',
-    text: 'text-blue-500 dark:text-blue-300',
-    border: 'border-blue-300 dark:border-blue-500',
-  },
-  calendar: {
-    bg: 'bg-green-100 dark:bg-green-900',
-    text: 'text-green-500 dark:text-green-300',
-    border: 'border-green-300 dark:border-green-500',
-  },
-};
-
 function computeEventCountdownState(date: Date | null): {
-  timeDiff: TimeDifference | null;
   calendarDays: number;
   isEventToday: boolean;
 } {
   if (!date) {
     return {
-      timeDiff: null,
       calendarDays: 0,
       isEventToday: false,
     };
   }
 
   const now = new Date();
-  const diff = calculateTimeDifference(now, date);
   const daysDiff = getCalendarDaysDiff(date, now);
 
   const isToday =
@@ -77,7 +59,6 @@ function computeEventCountdownState(date: Date | null): {
     now.getDate() === date.getDate();
 
   return {
-    timeDiff: diff,
     calendarDays: daysDiff,
     isEventToday: isToday,
   };
@@ -95,21 +76,20 @@ export function EventCountdown({
   // initializers each ran computeEventCountdownState independently, so a mount
   // straddling local midnight could take `isEventToday` from 23:59:59.9 and
   // `calendarDays` from 00:00:00.0 — `true` and `-1` together, which slips past
-  // the past-date guard below and prints "Today! 🎉" a day late until the next
+  // the past-date guard below and prints "Today!" a day late until the next
   // tick. Sampling once makes that combination unrepresentable.
   const [countdownState, setCountdownState] = useState<{
-    timeDiff: TimeDifference | null;
     calendarDays: number;
     isEventToday: boolean;
   }>(() => computeEventCountdownState(date));
 
-  const { timeDiff, calendarDays, isEventToday } = countdownState;
+  const { calendarDays, isEventToday } = countdownState;
 
   const updateCountdown = useCallback(() => {
     setCountdownState(computeEventCountdownState(date));
   }, [date]);
 
-  // Update every second for real-time countdown
+  // Tick every second so the today/retire state flips at local midnight
   useEffect(() => {
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
@@ -133,7 +113,6 @@ export function EventCountdown({
   }, [isRetired, onRetire]);
 
   const IconComponent = iconComponents[icon];
-  const colors = iconColors[icon];
 
   // Returning null lets that same interval retire the card at local midnight
   // without a dedicated midnight timer.
@@ -141,63 +120,23 @@ export function EventCountdown({
     return null;
   }
 
-  return (
-    <motion.div
-      className={`relative overflow-hidden rounded-2xl border-2 p-4 shadow-lg transition-all duration-300 ${
-        isEventToday
-          ? 'border-green-400 bg-green-50 dark:border-green-500 dark:bg-gray-900'
-          : `bg-white dark:bg-gray-900 ${colors.border}`
-      }`}
-      whileHover={{ scale: 1.02 }}
-      transition={{ duration: 0.2 }}
-      data-testid={`event-countdown-${label.toLowerCase().replace(/\s+/g, '-')}`}
-    >
-      {/* Header */}
-      <div className="mb-2 flex items-center gap-2">
-        <div className={`rounded-lg p-2 ${colors.bg}`}>
-          <IconComponent className={`h-5 w-5 ${colors.text}`} />
-        </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-800 dark:text-white">{label}</h3>
-          {description && <p className="text-sm text-gray-600 dark:text-gray-300">{description}</p>}
-        </div>
-      </div>
+  // Not retired, so a dated card is today or ahead: `calendarDays >= 0`.
+  const value = !date
+    ? placeholderText
+    : isEventToday
+      ? 'Today!'
+      : `${calendarDays} ${calendarDays === 1 ? 'day' : 'days'}`;
 
-      {/* Countdown Display */}
-      <div className="py-2 text-center">
-        {!date ? (
-          // No date set - show placeholder
-          <div className="space-y-1">
-            <p className="font-mono text-2xl font-bold text-gray-400 dark:text-gray-500">
-              XX:XX:XX
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{placeholderText}</p>
-          </div>
-        ) : isEventToday ? (
-          // Event is today!
-          <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{ scale: [0.8, 1.1, 1] }}
-            transition={{ duration: 0.5 }}
-          >
-            <p className="text-2xl font-bold text-green-500 dark:text-green-300">Today! 🎉</p>
-          </motion.div>
-        ) : timeDiff && calendarDays >= 0 ? (
-          // Show countdown using calendar days for intuitive display
-          <>
-            <p className={`text-xl font-bold ${colors.text}`}>
-              {calendarDays} {calendarDays === 1 ? 'day' : 'days'}
-            </p>
-            <div className="mt-2 flex justify-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-              <span className="font-mono">
-                {String(timeDiff.hours).padStart(2, '0')}:
-                {String(timeDiff.minutes).padStart(2, '0')}:
-                {String(timeDiff.seconds).padStart(2, '0')}
-              </span>
-            </div>
-          </>
-        ) : null}
-      </div>
-    </motion.div>
+  return (
+    <CountdownCard
+      icon={IconComponent}
+      tone="you"
+      highlight={isEventToday}
+      label={label}
+      value={value}
+      valueMuted={!date}
+      description={description}
+      testId={`event-countdown-${label.toLowerCase().replace(/\s+/g, '-')}`}
+    />
   );
 }

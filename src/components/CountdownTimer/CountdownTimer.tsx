@@ -7,6 +7,7 @@
  * - Celebration animations using Framer Motion when countdown reaches zero
  * - Support for multiple anniversaries (displays next 3)
  * - Responsive mobile-first design
+ * - Each anniversary renders the shared CountdownCard (CAP-3)
  */
 
 import { AnimatePresence, m as motion } from 'framer-motion';
@@ -14,9 +15,9 @@ import { Calendar, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import type { Anniversary } from '../../types';
+import { CountdownCard } from '../RelationshipTimers/CountdownCard';
 import {
   calculateTimeRemaining,
-  formatCountdownDisplay,
   getNextAnniversaryDate,
   getUpcomingAnniversaries,
   shouldTriggerCelebration,
@@ -127,6 +128,7 @@ export function CountdownTimer({
           <motion.div
             key={countdown.anniversary.id}
             data-testid={`countdown-card-${index}`}
+            className="relative"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -135,10 +137,9 @@ export function CountdownTimer({
               delay: index * 0.1,
             }}
           >
-            <CountdownCard
+            <AnniversaryCard
               countdown={countdown}
               isCelebrating={celebratingId === countdown.anniversary.id}
-              isPrimary={index === 0}
             />
           </motion.div>
         ))}
@@ -147,83 +148,30 @@ export function CountdownTimer({
   );
 }
 
-interface CountdownCardProps {
+interface AnniversaryCardProps {
   countdown: AnniversaryWithCountdown;
   isCelebrating: boolean;
-  isPrimary: boolean;
 }
 
-function CountdownCard({ countdown, isCelebrating, isPrimary }: CountdownCardProps) {
+function AnniversaryCard({ countdown, isCelebrating }: AnniversaryCardProps) {
   const { anniversary, timeRemaining, shouldCelebrate } = countdown;
-  const displayText = formatCountdownDisplay(timeRemaining, anniversary.label);
+  const { days, hours, minutes } = timeRemaining;
+  const pad = (n: number) => String(n).padStart(2, '0');
 
   return (
-    <motion.div
-      className={`relative overflow-hidden rounded-2xl border-2 border-transparent bg-white/80 p-4 shadow-lg backdrop-blur-sm transition-all duration-300 sm:p-6 dark:bg-gray-800/80 ${isPrimary ? 'border-pink-200 dark:border-pink-800' : ''} ${isCelebrating ? 'border-pink-400 dark:border-pink-600' : ''} `}
-      whileHover={{ scale: 1.02 }}
-      transition={{ duration: 0.2 }}
-    >
-      {/* Celebration Animation */}
+    <>
+      <CountdownCard
+        icon={shouldCelebrate ? Sparkles : Calendar}
+        highlight={shouldCelebrate}
+        label={anniversary.label}
+        value={shouldCelebrate ? 'Today!' : `${days} ${days === 1 ? 'day' : 'days'}`}
+        trailing={shouldCelebrate ? undefined : `${pad(hours)}h ${pad(minutes)}m`}
+        description={anniversary.description}
+      />
+
+      {/* Celebration Animation, over the card and clipped to its corners */}
       <AnimatePresence>{isCelebrating && <CelebrationAnimation />}</AnimatePresence>
-
-      {/* Header */}
-      <div className="mb-3 flex items-center gap-3">
-        <div
-          className={`rounded-lg p-2 ${shouldCelebrate ? 'bg-pink-100 dark:bg-pink-900' : 'bg-purple-100 dark:bg-purple-900'} `}
-        >
-          {shouldCelebrate ? (
-            <Sparkles className="h-5 w-5 text-pink-600 dark:text-pink-400" />
-          ) : (
-            <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-          )}
-        </div>
-
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {anniversary.label}
-          </h3>
-          {anniversary.description && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">{anniversary.description}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Countdown Display */}
-      <div className={`py-4 text-center ${shouldCelebrate ? 'animate-pulse' : ''} `}>
-        <p
-          className={`text-2xl font-bold sm:text-3xl ${
-            shouldCelebrate
-              ? 'text-pink-600 dark:text-pink-400'
-              : 'text-purple-600 dark:text-purple-400'
-          } `}
-        >
-          {displayText}
-        </p>
-
-        {!shouldCelebrate && (
-          <div className="mt-4 flex justify-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-            <div className="flex flex-col items-center">
-              <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {timeRemaining.days}
-              </span>
-              <span>days</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {timeRemaining.hours}
-              </span>
-              <span>hours</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {timeRemaining.minutes}
-              </span>
-              <span>min</span>
-            </div>
-          </div>
-        )}
-      </div>
-    </motion.div>
+    </>
   );
 }
 
@@ -243,7 +191,10 @@ function CelebrationAnimation() {
   );
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-10" data-testid="celebration-animation">
+    <div
+      className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-[20px]"
+      data-testid="celebration-animation"
+    >
       {hearts.map((i) => (
         <motion.div
           key={i}
@@ -267,7 +218,7 @@ function CelebrationAnimation() {
             ease: 'easeOut',
           }}
         >
-          <Sparkles className="h-6 w-6 text-pink-500" />
+          <Sparkles className="h-6 w-6 text-accent" />
         </motion.div>
       ))}
     </div>
