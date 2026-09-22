@@ -1,8 +1,0 @@
-
-> my-love@0.0.0 typecheck
-> tsc -b --force
-
-tests/e2e/settings/event-helper-calendar-day-offsets.spec.ts(75,5): error TS2345: Argument of type '(snapshot: { loading: boolean; rows: { label: string; userId: string; calendar: number[]; }[]; }) => void' is not assignable to parameter of type '(value: { loading: boolean; rows: { label: string; userId: string; calendar: number[]; }[]; }) => boolean'.
-  Type 'void' is not assignable to type 'boolean'.
-tests/e2e/settings/event-helper-calendar-day-offsets.spec.ts(94,5): error TS2345: Argument of type '(snapshot: { loading: boolean; rows: { label: string; userId: string; calendar: number[]; }[]; }) => void' is not assignable to parameter of type '(value: { loading: boolean; rows: { label: string; userId: string; calendar: number[]; }[]; }) => boolean'.
-  Type 'void' is not assignable to type 'boolean'.

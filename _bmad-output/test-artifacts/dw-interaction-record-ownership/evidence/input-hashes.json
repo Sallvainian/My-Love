@@ -1,5 +1,0 @@
-{
-  "src/stores/slices/interactionsSlice.ts": "d97531cb3545cd1301dccb5c2d6f752a432bbd34b6f021dd55b2d83fc4bf2890",
-  "tests/unit/stores/interactionsSubscription.test.ts": "9f880e1e3e2043f04a421ece5cc69fdc312f5167415ac459d75e10f19ab3a195",
-  "_bmad-output/implementation-artifacts/deferred-work.md": "37abb80efe231c064a8b24400ef9d1ddea218c2ec098310380b9bc814c375721"
-}

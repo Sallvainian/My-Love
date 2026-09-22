@@ -1,9 +1,0 @@
-{
-  "src/api/auth/sessionService.ts": "f8c9761c46ca34368cc4dfff24ad32a9095d3c83ce55cb3a82cd8bd89d1335fd",
-  "src/stores/slices/authSlice.ts": "cc857733cc23da536616a427e146c3235b2e02c0d35ff4be5b70b965063d4492",
-  "src/stores/slices/eventsSlice.ts": "02f9cdabba6a5bdae86aed445c90357cecc5c304db64f94f55556097b90d8b6a",
-  "src/App.tsx": "2dd4c6c251df0d653625a958a6030664b281693b1b2965cbe3157a87651b3e4d",
-  "src/components/Settings/EventsSettings.tsx": "c9b71c0866ef1fdfec3bdcfd102eb18096923d2f51c2e48af0a8d111a7853d2a",
-  "_bmad-output/implementation-artifacts/spec-dw-54-55-56-event-load-session-ownership.md": "6f5748921d4c59a86e6d38021b5f25e03a20e593df10f38977ff14cb9c9d9d47",
-  "_bmad-output/implementation-artifacts/deferred-work.md": "147cf3b7b0aaf74cfd358115f79b88d05e6a857428bb244b2c96aa434185c03b"
-}
