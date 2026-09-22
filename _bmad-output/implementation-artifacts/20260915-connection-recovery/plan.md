@@ -2,7 +2,7 @@
 title: Connection recovery and user-facing behaviour
 type: bugfix
 created: '2026-09-15'
-status: in-progress
+status: done
 route: dispatch
 baseline_commit: 3f0d951bc52ce0257a6db34d9f6091a8a1dc619c
 review_loop_iteration: 0
