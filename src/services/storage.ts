@@ -1,8 +1,12 @@
 import type { IDBPDatabase } from 'idb';
 import type { Message, Photo } from '../types';
 import { logger } from '../utils/logger';
+import { AccountDataError, notSyncedMessage } from './accountDataError';
+import { serializeAccountDataWrite } from './accountDataQueue';
+import { customMessagesApi } from './customMessagesApi';
 import { type MyLoveDBSchema, openMyLoveDB } from './dbSchema';
 import { projectMessageFavorites } from './messageFavorites';
+import { bundledMessageKey, messageFavoritesApi } from './messageFavoritesApi';
 
 class StorageService {
   private db: IDBPDatabase<MyLoveDBSchema> | null = null;
@@ -295,25 +299,127 @@ class StorageService {
     await tx.done;
   }
 
-  /** Read and toggle atomically; return the committed account-specific value. */
+  /**
+   * Toggle one account's favorite, server first; return the committed value.
+   *
+   * Supabase is the source of truth: a custom message's favorite is its row's
+   * `is_favorite`, a bundled message's is a `message_favorites` row keyed by a
+   * hash of its text. The `message-favorites` store is the read mirror, written
+   * only after the server accepted the change, so an offline toggle throws and
+   * changes nothing.
+   *
+   * The read, the request and the mirror write cannot share one IndexedDB
+   * transaction — it would commit at the network await — so toggles go
+   * through the account-data queue instead (`accountDataQueue.ts`). Two taps
+   * still resolve to on, then off, rather than both reading "off" and both
+   * writing "on", and a mirror refresh cannot erase a toggle mid-flight.
+   */
   async toggleFavorite(messageId: number, userId: string | null): Promise<boolean> {
     if (!userId) throw new Error('Favorites require a signed-in user');
+    return serializeAccountDataWrite(() => this.toggleFavoriteNow(messageId, userId));
+  }
+
+  private async toggleFavoriteNow(messageId: number, userId: string): Promise<boolean> {
     await this.init();
-    const tx = this.db!.transaction(['messages', 'message-favorites'], 'readwrite');
-    // A failed request also rejects tx.done; observe both failure channels.
-    void tx.done.catch(() => {});
-    const message = await tx.objectStore('messages').get(messageId);
+    const key: [number, string] = [messageId, userId];
+    // Both reads in one explicit transaction whose `done` is observed: the
+    // idb shortcut reads open their own and leave an abort unobserved.
+    const read = this.db!.transaction(['messages', 'message-favorites'], 'readonly');
+    void read.done.catch(() => {});
+    const message = await read.objectStore('messages').get(messageId);
     if (!message || !this.isVisibleTo(message, userId)) {
-      await tx.done;
       throw new Error('Message not found for this user');
     }
-    const favorites = tx.objectStore('message-favorites');
-    const key: [number, string] = [messageId, userId];
-    const isFavorite = !(await favorites.get(key));
-    if (isFavorite) await favorites.put({ messageId, userId });
-    else await favorites.delete(key);
+    const isFavorite = !(await read.objectStore('message-favorites').get(key));
+
+    if (message.isCustom) {
+      if (!message.serverId) {
+        throw new AccountDataError('not-synced', notSyncedMessage(message.localOnly));
+      }
+      await customMessagesApi.updateCustomMessage(message.serverId, { isFavorite });
+    } else {
+      const messageKey = await bundledMessageKey(message.text);
+      if (isFavorite) await messageFavoritesApi.addFavorite(userId, messageKey);
+      else await messageFavoritesApi.removeFavorite(userId, messageKey);
+    }
+
+    const tx = this.db!.transaction('message-favorites', 'readwrite');
+    // A failed request also rejects tx.done; observe both failure channels.
+    void tx.done.catch(() => {});
+    if (isFavorite) await tx.store.put({ messageId, userId });
+    else await tx.store.delete(key);
     await tx.done;
     return isFavorite;
+  }
+
+  /**
+   * Replace `userId`'s favorites of BUNDLED messages with the server's keys.
+   *
+   * Bundled ids are device-local, so each bundled row's text is hashed to find
+   * the key the server knows it by. Favorites of custom rows are left alone —
+   * `customMessageService.replaceMirrorForUser` owns those. Hashing happens
+   * before the transaction opens, because an IndexedDB transaction commits at
+   * the first await that is not one of its own requests.
+   */
+  async replaceBundledFavoritesForUser(userId: string, messageKeys: string[]): Promise<void> {
+    await this.init();
+    const wanted = new Set(messageKeys);
+    const read = this.db!.transaction('messages', 'readonly');
+    void read.done.catch(() => {});
+    const bundled = (await read.store.getAll()).filter((message) => !message.isCustom);
+    const favorite = new Map<number, boolean>(
+      await Promise.all(
+        bundled.map(
+          async (message) =>
+            [message.id, wanted.has(await bundledMessageKey(message.text))] as [number, boolean]
+        )
+      )
+    );
+
+    const tx = this.db!.transaction('message-favorites', 'readwrite');
+    void tx.done.catch(() => {});
+    const current = await tx.store.index('by-user').getAll(userId);
+    for (const entry of current) {
+      if (favorite.get(entry.messageId) === false) {
+        await tx.store.delete([entry.messageId, userId]);
+      }
+    }
+    for (const [messageId, isFavorite] of favorite) {
+      if (isFavorite) await tx.store.put({ messageId, userId });
+    }
+    await tx.done;
+  }
+
+  /**
+   * This account's local copy, for the one-time upload (`localDataUpload.ts`).
+   *
+   * THROWS on failure, unlike the reads above. Those degrade to `[]`, and an
+   * upload that read "nothing" would still set its flag — after which the
+   * mirror refresh deletes the very rows the failed read could not see.
+   *
+   * `customMessages` are the rows this account owns (legacy unowned rows are
+   * nobody's and are left out), each with its favorite projected on.
+   * `favoriteBundledTexts` are the texts of the bundled rows it favorited.
+   */
+  async readLocalAccountData(
+    userId: string
+  ): Promise<{ customMessages: Message[]; favoriteBundledTexts: string[] }> {
+    await this.init();
+    const tx = this.db!.transaction(['messages', 'message-favorites'], 'readonly');
+    const [messages, favorites] = await Promise.all([
+      tx.objectStore('messages').getAll(),
+      tx.objectStore('message-favorites').index('by-user').getAll(userId),
+      tx.done,
+    ]);
+    const favoriteIds = new Set(favorites.map((favorite) => favorite.messageId));
+    return {
+      customMessages: messages
+        .filter((message) => message.isCustom && message.userId === userId)
+        .map((message) => ({ ...message, isFavorite: favoriteIds.has(message.id) })),
+      favoriteBundledTexts: messages
+        .filter((message) => !message.isCustom && favoriteIds.has(message.id))
+        .map((message) => message.text),
+    };
   }
 
   // Bulk operations

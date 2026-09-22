@@ -57,6 +57,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   notesPendingRemoval: [],
   customMessages: [],
   customMessagesLoaded: false,
+  favoriteError: null,
   photos: [],
   selectedPhotoId: null,
   isUploading: false,
@@ -154,6 +155,7 @@ function seedSignedInSession(): void {
       },
     ],
     customMessagesLoaded: true,
+    favoriteError: 'A favorite write failed',
     messages: [
       {
         id: 1,

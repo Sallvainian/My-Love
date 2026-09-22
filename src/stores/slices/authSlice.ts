@@ -100,6 +100,8 @@ export function signedOutState() {
     // instead — see the comment there.
     customMessages: [],
     customMessagesLoaded: false,
+    // Names why THIS account's favorite write failed; stale for the next one.
+    favoriteError: null,
 
     // photosSlice
     photos: [],

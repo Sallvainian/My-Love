@@ -76,9 +76,18 @@ async function signIn(page: Page, email: string) {
 test.describe('Account data through the real browser and local services', () => {
   test.setTimeout(90_000);
 
-  test('[P1] favorites survive reload and stay separate across A/B/A and same-account re-login', async ({ page }) => {
+  test('[P1] favorites survive reload and stay separate across A/B/A and same-account re-login', async ({ page, supabaseAdmin }) => {
     const pair = getWorkerPairEmails();
     if (!pair) throw new Error('This test requires its worker-owned account pair');
+    // Favorites are server rows now and outlive a run: start this worker
+    // pair's own favorites empty, or a re-run opens on "Remove from favorites".
+    const { data: accounts, error: accountsError } = await supabaseAdmin
+      .from('users').select('id').in('email', [pair.user1Email, pair.user2Email]);
+    expect(accountsError).toBeNull();
+    expect(accounts).toHaveLength(2);
+    const cleared = await supabaseAdmin.from('message_favorites').delete()
+      .in('user_id', (accounts ?? []).map((account) => account.id));
+    expect(cleared.error).toBeNull();
     await page.goto('/');
     const favorite = page.getByTestId('message-favorite-button');
     await expect(favorite).toHaveAccessibleName('Add to favorites');

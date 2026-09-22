@@ -23,6 +23,13 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: string;
 
   /**
+   * Set ONLY in the temporary GitHub Pages bridge build
+   * (`.github/workflows/pages-bridge.yml`): the origin to forward to once this
+   * device's local data has been uploaded (`src/services/localDataUpload.ts`).
+   */
+  readonly VITE_LEGACY_BRIDGE_TARGET?: string;
+
+  /**
    * Test user email for E2E tests (optional - only needed for E2E testing)
    */
   readonly VITE_TEST_USER_EMAIL?: string;

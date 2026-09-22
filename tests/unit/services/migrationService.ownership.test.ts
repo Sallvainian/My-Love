@@ -26,6 +26,17 @@ import { DB_NAME, DB_VERSION, upgradeDb } from '../../../src/services/dbSchema';
 import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 import type { Message } from '../../../src/types';
 
+// The server half of custom messages and favorites; these tests drive the
+// IndexedDB mirror, which is written only after the server accepted a write.
+vi.mock('../../../src/services/customMessagesApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/services/customMessagesApi')>()),
+  customMessagesApi: (await import('../helpers/fakeAccountDataApis')).fakeCustomMessagesApi,
+}));
+vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/services/messageFavoritesApi')>()),
+  messageFavoritesApi: (await import('../helpers/fakeAccountDataApis')).fakeMessageFavoritesApi,
+}));
+
 const LOCALSTORAGE_KEY = 'my-love-custom-messages';
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';

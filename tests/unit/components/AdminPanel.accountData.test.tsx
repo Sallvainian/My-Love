@@ -12,6 +12,17 @@ import { storageService } from '../../../src/services/storage';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import type { CustomMessage } from '../../../src/types';
 
+// The server half of custom messages and favorites; these tests drive the
+// IndexedDB mirror, which is written only after the server accepted a write.
+vi.mock('../../../src/services/customMessagesApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/services/customMessagesApi')>()),
+  customMessagesApi: (await import('../helpers/fakeAccountDataApis')).fakeCustomMessagesApi,
+}));
+vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/services/messageFavoritesApi')>()),
+  messageFavoritesApi: (await import('../helpers/fakeAccountDataApis')).fakeMessageFavoritesApi,
+}));
+
 // Animation timing/WAAPI is outside this boundary; all data/store/UI handlers
 // below remain real. happy-dom's canceled WAAPI promises otherwise reject.
 type MotionProps = HTMLAttributes<HTMLElement> & {

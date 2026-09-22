@@ -14,16 +14,31 @@
  * Persistence:
  * - settings: Persisted to LocalStorage
  * - isOnboarded: Persisted to LocalStorage
+ *
+ * Anniversaries: `public.anniversaries` is the source of truth, and
+ * `settings.relationship.anniversaries` is its read mirror — so Home still
+ * renders the countdowns offline. Every write goes to the server first and to
+ * the mirror only after it succeeded, with the usual `{ userId,
+ * authSessionVersion }` capture-and-recheck around the await. Writes throw, so
+ * the Settings form can show the reason (offline included).
  */
 
 import { ZodError } from 'zod/v4';
 import { APP_CONFIG } from '../../config/constants';
 import { loadDefaultMessages } from '../../data/defaultMessagesLoader';
+import { AccountDataError } from '../../services/accountDataError';
+import { serializeAccountDataWrite } from '../../services/accountDataQueue';
+import {
+  anniversariesService,
+  type AnniversaryInput,
+  type ServerAnniversary,
+} from '../../services/anniversariesService';
+import { hasCompletedLocalUpload } from '../../services/localDataUpload';
 import { storageService } from '../../services/storage';
 import type { Anniversary, Settings, ThemeName } from '../../types';
 import { logger } from '../../utils/logger';
 import { createValidationError, isZodError } from '../../validation/errorMessages';
-import { SettingsSchema } from '../../validation/schemas';
+import { AnniversarySchema, SettingsSchema } from '../../validation/schemas';
 import type { AppStateCreator } from '../types';
 
 export interface SettingsSlice {
@@ -37,12 +52,62 @@ export interface SettingsSlice {
   updateSettings: (updates: Partial<Settings>) => void;
   setOnboarded: (onboarded: boolean) => void;
 
-  // Anniversary actions
-  addAnniversary: (anniversary: Omit<Anniversary, 'id'>) => void;
-  removeAnniversary: (id: number) => void;
+  // Anniversary actions — server first, then the settings mirror. Writes throw.
+  /** `clientKey`: minted once per submit and reused on its retry (useSubmitKey). */
+  addAnniversary: (anniversary: AnniversaryInput, clientKey?: string) => Promise<void>;
+  updateAnniversary: (id: number, anniversary: AnniversaryInput) => Promise<void>;
+  removeAnniversary: (id: number) => Promise<void>;
+  /** Replace the mirror with the server's rows, once this device's upload is done. */
+  loadAnniversariesFromServer: () => Promise<void>;
 
   // Theme actions
   setTheme: (theme: ThemeName) => void;
+}
+
+const AnniversaryInputSchema = AnniversarySchema.omit({ id: true, serverId: true });
+
+/** Validate a form's anniversary before it is sent, with the form's error shape. */
+function parseAnniversaryInput(input: AnniversaryInput): AnniversaryInput {
+  try {
+    return AnniversaryInputSchema.parse(input);
+  } catch (error) {
+    if (isZodError(error)) throw createValidationError(error as ZodError);
+    throw error;
+  }
+}
+
+function toMirrored(id: number, row: ServerAnniversary): Anniversary {
+  return {
+    id,
+    date: row.date,
+    label: row.label,
+    ...(row.description ? { description: row.description } : {}),
+    serverId: row.serverId,
+  };
+}
+
+/**
+ * The server's list in mirror form. An entry already mirrored keeps its local
+ * id — an open edit form and the countdown keys refer to it — and a new one
+ * takes the next free id.
+ */
+function mirrorAnniversaries(current: Anniversary[], rows: ServerAnniversary[]): Anniversary[] {
+  const idByServerId = new Map(
+    current.filter((a) => a.serverId).map((a) => [a.serverId as string, a.id])
+  );
+  let nextId = Math.max(0, ...current.map((a) => a.id));
+  return rows.map((row) => toMirrored(idByServerId.get(row.serverId) ?? ++nextId, row));
+}
+
+function withAnniversaries(settings: Settings, anniversaries: Anniversary[]): Settings {
+  return { ...settings, relationship: { ...settings.relationship, anniversaries } };
+}
+
+function notSynced(): AccountDataError {
+  return new AccountDataError(
+    'not-synced',
+    'This anniversary has not been saved to your account yet. Try again in a moment.'
+  );
 }
 
 // Initialization guards to prevent concurrent/duplicate initialization (StrictMode protection)
@@ -248,37 +313,114 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
     set({ isOnboarded: onboarded });
   },
 
-  // Anniversary actions
-  addAnniversary: (anniversary) => {
-    const { settings } = get();
-    if (settings) {
-      const newId = Math.max(0, ...settings.relationship.anniversaries.map((a) => a.id)) + 1;
-      const newAnniversary: Anniversary = { ...anniversary, id: newId };
+  // Anniversary actions. Each runs in the account-data queue, so the mirror
+  // refresh cannot read the server before a write and replace the list after it.
+  addAnniversary: async (anniversary, clientKey = crypto.randomUUID()) => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    if (!requestedBy) throw new Error('You must be signed in to add an anniversary');
+    const input = parseAnniversaryInput(anniversary);
 
-      set({
-        settings: {
-          ...settings,
-          relationship: {
-            ...settings.relationship,
-            anniversaries: [...settings.relationship.anniversaries, newAnniversary],
-          },
-        },
+    await serializeAccountDataWrite(async () => {
+      const created = await anniversariesService.createAnniversary(requestedBy, input, clientKey);
+
+      // The row is the requesting account's either way; only this session's
+      // mirror is withheld once the account changed under the request.
+      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+      set((state) => {
+        if (!state.settings) return {};
+        const current = state.settings.relationship.anniversaries;
+        // A retried submit resolves to the row the first attempt stored, which
+        // a refresh may already have mirrored: never list it twice.
+        if (current.some((a) => a.serverId === created.serverId)) return {};
+        const newId = Math.max(0, ...current.map((a) => a.id)) + 1;
+        return {
+          settings: withAnniversaries(state.settings, [...current, toMirrored(newId, created)]),
+        };
       });
-    }
+    });
   },
 
-  removeAnniversary: (id) => {
-    const { settings } = get();
-    if (settings) {
-      set({
-        settings: {
-          ...settings,
-          relationship: {
-            ...settings.relationship,
-            anniversaries: settings.relationship.anniversaries.filter((a) => a.id !== id),
-          },
-        },
+  updateAnniversary: async (id, anniversary) => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    if (!requestedBy) throw new Error('You must be signed in to edit an anniversary');
+    const input = parseAnniversaryInput(anniversary);
+
+    await serializeAccountDataWrite(async () => {
+      // The queue may have held this task across an account switch; the local
+      // id would then name the NEW account's row, under the new session.
+      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+      const existing = get().settings?.relationship.anniversaries.find((a) => a.id === id);
+      if (!existing) throw new AccountDataError('not-found', 'Anniversary not found');
+      if (!existing.serverId) throw notSynced();
+
+      const updated = await anniversariesService.updateAnniversary(existing.serverId, input);
+
+      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+      set((state) => {
+        if (!state.settings) return {};
+        return {
+          settings: withAnniversaries(
+            state.settings,
+            state.settings.relationship.anniversaries.map((a) =>
+              a.serverId === updated.serverId ? toMirrored(a.id, updated) : a
+            )
+          ),
+        };
       });
+    });
+  },
+
+  removeAnniversary: async (id) => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    if (!requestedBy) throw new Error('You must be signed in to delete an anniversary');
+
+    await serializeAccountDataWrite(async () => {
+      // Same re-check as updateAnniversary: a queued delete must not reach the
+      // next account's row through a shared local id.
+      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+      const existing = get().settings?.relationship.anniversaries.find((a) => a.id === id);
+      if (!existing) return;
+      if (!existing.serverId) throw notSynced();
+      const { serverId } = existing;
+
+      await anniversariesService.deleteAnniversary(serverId);
+
+      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+      set((state) => {
+        if (!state.settings) return {};
+        return {
+          settings: withAnniversaries(
+            state.settings,
+            state.settings.relationship.anniversaries.filter((a) => a.serverId !== serverId)
+          ),
+        };
+      });
+    });
+  },
+
+  loadAnniversariesFromServer: async () => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    // Until the upload flag is set, the local list may hold items the server
+    // does not, and replacing it would destroy them.
+    if (!requestedBy || !hasCompletedLocalUpload(requestedBy)) return;
+
+    try {
+      await serializeAccountDataWrite(async () => {
+        const rows = await anniversariesService.fetchAnniversaries(requestedBy);
+        if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+        set((state) => {
+          if (!state.settings) return {};
+          return {
+            settings: withAnniversaries(
+              state.settings,
+              mirrorAnniversaries(state.settings.relationship.anniversaries, rows)
+            ),
+          };
+        });
+      });
+    } catch (error) {
+      // The mirror stays as it was, so Home keeps its countdowns offline.
+      console.error('[Settings] Failed to load anniversaries from the server:', error);
     }
   },
 
