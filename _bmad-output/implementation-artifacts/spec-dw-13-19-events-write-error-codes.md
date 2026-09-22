@@ -2,7 +2,7 @@
 title: 'DW-13 / DW-19: Events write error codes'
 type: 'feature'
 created: '2026-08-20'
-status: ready-for-dev
+status: done
 baseline_revision: '5910a5ded94e3910bd646094f29871719671b9eb'
 review_loop_iteration: 0
 followup_review_recommended: false
