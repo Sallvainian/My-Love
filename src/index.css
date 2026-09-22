@@ -129,6 +129,13 @@
     background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 50%, #f48fb1 100%);
   }
 
+  /* Space the fixed bottom dock (AppNavigation) takes from the viewport: its
+     60px height, its 1rem inset and a gap above it. The one source for that
+     space -- <main>, LoveNotes' height and the floating buttons all read it. */
+  :root {
+    --dock-clearance: calc(6rem + env(safe-area-inset-bottom));
+  }
+
   /* Safe area support for mobile */
   .safe-top {
     padding-top: env(safe-area-inset-top);

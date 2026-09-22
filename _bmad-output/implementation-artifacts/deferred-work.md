@@ -1638,3 +1638,19 @@ severity: low
 reason: tests/unit/services/dbSchema.test.ts:695-699 five toBe lines. Pre-existing four-expect style; this change added MESSAGE_FAVORITES in the same form. Intent asked to add that expect, not Object.keys or toEqual of the whole map.
 status: done 2026-09-16
 resolution: leftover hygiene Session 1 — STORE_NAMES core-names it is an exact key set (toEqual of the whole map); STORE_NAMES itself unchanged
+
+### DW-166: Dock badge counts are never announced, because each dock button's aria-label overrides its content.
+origin: spec-deferred spec-bottom-dock-navigation, 2026-09-22
+location: src/components/Navigation/AppNavigation.tsx (dock button `aria-label={label}` and badge `<span aria-label=…>`)
+source_spec: `spec-bottom-dock-navigation.md`
+severity: low
+reason: An `aria-label` on a `<button>` replaces its accessible name, so a badge span inside it (`aria-label="3 new items"`, no role) is not read out; a screen-reader user hears "Love Notes" with no count. The tray had the same pattern, so this predates the change, and it cannot be reached yet because no caller passes `badgeCounts` (grep over `src` finds only AppNavigation and its tests). Settle when badges are wired up: fold the count into the button's name (e.g. `Love Notes, 3 new items`) or use `aria-describedby`, and assert the name in the test.
+status: open
+
+### DW-167: AGENTS.md lacks the --dock-clearance rule for fixed-bottom elements and the dock's five-slot limit.
+origin: spec-deferred spec-bottom-dock-navigation, 2026-09-22
+location: AGENTS.md "Where things are" / "Known pitfalls"
+source_spec: `spec-bottom-dock-navigation.md`
+severity: low
+reason: The dock is `fixed` and `z-40`, so layout cannot see it. A new fixed-bottom button or full-height view that does not read `--dock-clearance` (src/index.css) ends up under the dock, and nothing typechecks that. The dock also has no room on a phone for a sixth item, so the next view has to go somewhere other than `DESTINATIONS`. Neither is written down for agents. Agent-context edits are deferred by the build workflow.
+status: open

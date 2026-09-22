@@ -4,12 +4,11 @@
  * Critical path: Direct URL navigation and browser back/forward must work.
  * Covers deep linking and popstate handling.
  *
- * The readiness proxy is `nav-menu-toggle`: the destinations now live inside a
- * tray that opens on demand, so the hamburger is the only navigation element
- * permanently on screen — the role the retired bar's container testid played.
+ * The readiness proxy is `nav-dock`: the bottom dock is on screen on every
+ * view, the role the retired bar's container testid played.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { navigateTo, openNavTray } from '../../support/helpers/navigation';
+import { navigateTo } from '../../support/helpers/navigation';
 
 test.describe('URL Routing', () => {
   test.beforeEach(async ({ page }) => {
@@ -26,17 +25,16 @@ test.describe('URL Routing', () => {
     await page.goto('/mood');
 
     // THEN: Mood view is loaded (app chrome is visible)
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
 
-    // AND: The tray marks Mood as the current destination
-    await openNavTray(page);
+    // AND: The dock marks Mood as the current destination
     await expect(page.getByTestId('nav-mood')).toHaveAttribute('aria-current', 'page');
   });
 
   test('[P0] should support browser back button', async ({ page }) => {
     // GIVEN: User navigated from home to photos to mood
     await page.goto('/');
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
 
     // Navigate to photos
     await navigateTo(page, 'photos');
@@ -51,7 +49,7 @@ test.describe('URL Routing', () => {
 
     // THEN: Previous view is displayed (URL goes back to /photos)
     await page.waitForURL('**/photos');
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
   });
 
   test('[P0] should fallback to home view for unknown routes', async ({ page }) => {
@@ -60,7 +58,7 @@ test.describe('URL Routing', () => {
     await page.goto('/nonexistent-page');
 
     // THEN: Home view is displayed (app falls back to home)
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
     await expect(page.getByTestId('time-together')).toBeVisible();
   });
 
@@ -69,11 +67,8 @@ test.describe('URL Routing', () => {
   }) => {
     await page.goto('/scripture');
 
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
     await expect(page.getByTestId('time-together')).toBeVisible();
-    await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
-
-    await openNavTray(page);
     await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
   });
@@ -90,9 +85,6 @@ test.describe('URL Routing', () => {
     await page.goBack();
 
     await expect(page.getByTestId('time-together')).toBeVisible();
-    await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
-
-    await openNavTray(page);
     await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
   });

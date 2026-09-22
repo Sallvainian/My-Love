@@ -202,7 +202,7 @@ test.describe('An event survives the round trip through the server', () => {
     await expect(page.getByTestId('events-form-icon-calendar')).not.toBeChecked();
     await expect(page.getByTestId('events-form-icon-plane')).not.toBeChecked();
 
-    // The form is a full-viewport overlay, so it has to go before the tray is
+    // The form is a full-viewport overlay, so it has to go before the dock is
     // reachable again.
     await page.getByTestId('events-form-cancel').click();
     await expect(page.getByTestId('events-form')).toHaveCount(0);

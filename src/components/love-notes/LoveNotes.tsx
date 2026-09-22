@@ -123,7 +123,7 @@ export function LoveNotes(): ReactElement {
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-4rem-env(safe-area-inset-top))] flex-col bg-[#FFF5F5] pb-[env(safe-area-inset-bottom)]">
+    <div className="flex h-[calc(100dvh-4rem-env(safe-area-inset-top)-var(--dock-clearance))] flex-col bg-[#FFF5F5]">
       {/* Header */}
       <header className="safe-area-top flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
         <button

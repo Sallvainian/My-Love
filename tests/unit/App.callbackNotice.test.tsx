@@ -65,8 +65,8 @@ vi.mock('../../src/services/eventsService', () => {
 vi.mock('../../src/components/DailyMessage/DailyMessage', () => ({
   DailyMessage: () => null,
 }));
-vi.mock('../../src/components/Navigation/NavigationTray', () => ({
-  NavigationTray: () => null,
+vi.mock('../../src/components/Navigation/AppNavigation', () => ({
+  AppNavigation: () => null,
 }));
 vi.mock('../../src/components/RelationshipTimers/BirthdayCountdown', () => ({
   BirthdayCountdown: () => null,

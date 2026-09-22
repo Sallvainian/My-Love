@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
-import { NavigationTray } from './components/Navigation/NavigationTray';
+import { AppNavigation } from './components/Navigation/AppNavigation';
 import {
   BirthdayCountdown,
   EventCountdown,
@@ -730,10 +730,10 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen" data-testid="app-container">
-        {/* Story 4 (dynamic events): sticky app chrome. It sits in normal flow
-            above <main>, so no view needs a compensating pad -- which is why
-            the retired bottom bar's `pb-16` is gone rather than mirrored. */}
-        <NavigationTray currentView={currentView} onViewChange={setView} />
+        {/* App chrome: a sticky top bar in normal flow above <main>, so no view
+            needs a compensating top pad, and a fixed bottom dock, which layout
+            cannot see -- hence <main>'s `--dock-clearance` bottom pad. */}
+        <AppNavigation currentView={currentView} onViewChange={setView} />
 
         {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
         <NetworkStatusIndicator showOnlyWhenOffline />
@@ -743,10 +743,10 @@ function App() {
 
         {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
 
-        <main id="main-content">
+        <main id="main-content" className="pb-(--dock-clearance)">
           {/* Home view - inline, not lazy-loaded, always works offline */}
           {currentView === 'home' && (
-            <div className="mx-auto max-w-4xl space-y-6 px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <div className="mx-auto max-w-4xl space-y-6 px-4 pt-4 pb-4">
               {/* Time Together - replaces Day 37 Together header */}
               <TimeTogether />
 
