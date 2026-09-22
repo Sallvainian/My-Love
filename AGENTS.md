@@ -74,7 +74,3 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, and 
 - Two data models, so check which one a feature uses before writing data-layer code: photos, love notes and partner interactions are Supabase-only; mood and daily/custom messages are offline-first with IndexedDB primary.
 
 <!-- /bmad:context -->
-
-## Review workflow (temporary)
-
-Claude Code review is paused (`claude-code-review.yml` starts with `false &&`) while usage is exhausted. The Grok stand-in workflow was removed. Restore Claude by deleting the `false &&` line.
