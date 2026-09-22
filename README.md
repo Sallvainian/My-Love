@@ -206,7 +206,7 @@ On push to `main`: apply migrations → build → smoke test → `wrangler deplo
 | `CLOUDFLARE_API_TOKEN`                  | `production` environment: "Edit Cloudflare Workers" token for `wrangler deploy` |
 | `CLOUDFLARE_ACCOUNT_ID`                 | `production` environment: Cloudflare account the Worker lives in |
 
-The repository variable `SITE_URL` (`https://my-love.sallvain.workers.dev/`, trailing slash required) is the address the health check and Lighthouse audit.
+The repository variable `SITE_URL` (`https://my-love.sallvain.workers.dev/`, trailing slash required) is the address that both the post-deploy health check and the Lighthouse workflow test.
 
 ### Cloudflare Workers
 
