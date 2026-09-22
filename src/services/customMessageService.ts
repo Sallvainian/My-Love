@@ -8,6 +8,9 @@ import type {
 } from '../types';
 import { projectMessageFavorites } from './messageFavorites';
 import { logger } from '../utils/logger';
+import { AccountDataError, notSyncedMessage } from './accountDataError';
+import { serializeAccountDataWrite } from './accountDataQueue';
+import { customMessagesApi, type ServerCustomMessage } from './customMessagesApi';
 import {
   CreateMessageInputSchema,
   CustomMessagesExportSchema,
@@ -41,6 +44,18 @@ import { type MyLoveDBSchema, DB_VERSION, openMyLoveDB } from './dbSchema';
  * The id is passed IN rather than read from the store, so the service stays
  * store-free and a continuation that resolves after an account switch writes
  * under the id it was raised with instead of whoever is signed in now.
+ *
+ * SUPABASE IS THE SOURCE OF TRUTH
+ *
+ * Custom messages live in `public.custom_messages` (`customMessagesApi`). The
+ * owned rows in IndexedDB are a read mirror: every write here goes to the
+ * server first and to the mirror only after the server accepted it, so an
+ * offline write fails with a clear error and leaves nothing half-written. Each
+ * mirrored row carries its server id as `serverId`; a row without one has not
+ * been uploaded yet (`localDataUpload.ts`) and cannot be edited or deleted
+ * until it is. `replaceMirrorForUser()` swaps the mirror for the server's rows
+ * once the upload has completed, keeping any row the upload could not send;
+ * such a row can then only be deleted, and only from this device.
  *
  * Extends: BaseIndexedDBService<Message>
  * - Inherits: init(), add()
@@ -192,26 +207,71 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
    * @param userId - The authenticated user the row belongs to. Required.
    * @param input - Message content
    */
-  async create(userId: string | null, input: CreateMessageInput): Promise<Message> {
+  async create(
+    userId: string | null,
+    input: CreateMessageInput,
+    clientKey: string = crypto.randomUUID()
+  ): Promise<Message> {
+    // Queued with the mirror refresh — see accountDataQueue.ts.
+    return serializeAccountDataWrite(() => this.createNow(userId, input, clientKey));
+  }
+
+  private async createNow(
+    userId: string | null,
+    input: CreateMessageInput,
+    clientKey: string
+  ): Promise<Message> {
     try {
       const owner = this.requireOwner(userId, 'create');
 
       // Validate input at service boundary
       const validated = CreateMessageInputSchema.parse(input);
 
+      // Server first: an offline or rejected write throws here, before the
+      // mirror is touched.
+      const remote = await customMessagesApi.createCustomMessage(
+        owner,
+        {
+          text: validated.text,
+          category: validated.category,
+          active: validated.active ?? true, // Default: true
+          tags: validated.tags || [],
+        },
+        clientKey
+      );
+
+      // A retried submit resolves to the row its first attempt stored, which a
+      // mirror refresh may already have brought onto this device.
+      const mirrored = (await this.readOwnedRows(owner)).find(
+        (row) => row.serverId === remote.serverId
+      );
+      if (mirrored) return mirrored;
+
       const message: Omit<Message, 'id'> = {
-        text: validated.text,
-        category: validated.category,
+        text: remote.text,
+        category: remote.category,
         isCustom: true,
         userId: owner,
-        active: validated.active ?? true, // Default: true
+        serverId: remote.serverId,
+        active: remote.active,
         isFavorite: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        tags: validated.tags || [],
+        createdAt: remote.createdAt,
+        updatedAt: remote.updatedAt,
+        tags: remote.tags,
       };
 
-      const created = await super.add(message);
+      let created: Message;
+      try {
+        created = await super.add(message);
+      } catch (mirrorError) {
+        // The message IS saved; saying "failed" would invite a retry that
+        // stores it twice. The next mirror refresh brings it onto this device.
+        console.error('[CustomMessageService] Saved remotely, mirror write failed:', mirrorError);
+        throw new Error(
+          'Your message was saved to your account, but this device could not store its copy. Reload to see it.',
+          { cause: mirrorError }
+        );
+      }
       logger.debug('[CustomMessageService] Custom message created, id:', created.id);
 
       return created;
@@ -310,6 +370,11 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
    *         else — a write never fails silently
    */
   async updateMessage(userId: string | null, input: UpdateMessageInput): Promise<void> {
+    // Queued with the mirror refresh — see accountDataQueue.ts.
+    return serializeAccountDataWrite(() => this.updateMessageNow(userId, input));
+  }
+
+  private async updateMessageNow(userId: string | null, input: UpdateMessageInput): Promise<void> {
     try {
       const owner = this.requireOwner(userId, 'updateMessage');
 
@@ -317,6 +382,14 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       const validated = UpdateMessageInputSchema.parse(input);
 
       await this.init();
+
+      const serverId = await this.requireSyncedRow(owner, validated.id);
+      await customMessagesApi.updateCustomMessage(serverId, {
+        ...(validated.text !== undefined && { text: validated.text }),
+        ...(validated.category !== undefined && { category: validated.category }),
+        ...(validated.active !== undefined && { active: validated.active }),
+        ...(validated.tags !== undefined && { tags: validated.tags }),
+      });
 
       const tx = this.getTypedDB().transaction('messages', 'readwrite');
       const current = await tx.store.get(validated.id);
@@ -352,6 +425,44 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
   }
 
   /**
+   * The server id of a row the caller owns, or a throw.
+   *
+   * Read outside the write transaction on purpose: the server request sits
+   * between this read and the mirror write, and an IndexedDB transaction does
+   * not survive a network await. The mirror write re-checks ownership.
+   */
+  private async requireSyncedRow(owner: string, id: number): Promise<string> {
+    const current = await this.readRow(id);
+    if (!current || !this.isOwnedBy(current, owner)) {
+      throw new Error(`Custom message ${id} not found for this user`);
+    }
+    if (!current.serverId) {
+      throw new AccountDataError('not-synced', notSyncedMessage(current.localOnly));
+    }
+    return current.serverId;
+  }
+
+  /**
+   * One row by id, through an explicit readonly transaction whose `done` is
+   * observed — the idb `db.get` shortcut leaves an aborted transaction's
+   * rejection unhandled.
+   */
+  private async readRow(id: number): Promise<Message | undefined> {
+    const tx = this.getTypedDB().transaction('messages', 'readonly');
+    void tx.done.catch(() => {});
+    return tx.store.get(id);
+  }
+
+  /** This account's own custom rows, through the same observed-transaction read. */
+  private async readOwnedRows(owner: string): Promise<Message[]> {
+    await this.init();
+    const tx = this.getTypedDB().transaction('messages', 'readonly');
+    void tx.done.catch(() => {});
+    const rows = await tx.store.index('by-user').getAll(owner);
+    return rows.filter((row) => this.isOwnedBy(row, owner));
+  }
+
+  /**
    * Delete a custom message the caller owns
    *
    * Absent rows are a no-op, as the base class's delete was, so a retry that
@@ -362,10 +473,28 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
    * @param id - Row id
    */
   async deleteForUser(userId: string | null, id: number): Promise<void> {
+    // Queued with the mirror refresh — see accountDataQueue.ts.
+    return serializeAccountDataWrite(() => this.deleteForUserNow(userId, id));
+  }
+
+  private async deleteForUserNow(userId: string | null, id: number): Promise<void> {
     try {
       const owner = this.requireOwner(userId, 'deleteForUser');
 
       await this.init();
+
+      const stored = await this.readRow(id);
+      if (!stored) {
+        logger.debug('[CustomMessageService] Nothing to delete, id:', id);
+        return;
+      }
+      // Server first; an already-deleted server row counts as deleted. A row
+      // marked `localOnly` is one the upload could not send and the refresh
+      // kept (replaceMirrorForUser): the server holds nothing to delete, so
+      // only the local copy goes.
+      if (!stored.localOnly) {
+        await customMessagesApi.deleteCustomMessage(await this.requireSyncedRow(owner, id));
+      }
 
       const tx = this.getTypedDB().transaction(['messages', 'message-favorites'], 'readwrite');
       const current = await tx.objectStore('messages').get(id);
@@ -390,6 +519,84 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       console.error(`[CustomMessageService] Failed to delete custom message ${id}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Replace `userId`'s mirrored custom rows with the server's.
+   *
+   * Called only after this device's one-time upload has completed, so every
+   * owned row without a `serverId` has either been uploaded or deliberately
+   * skipped as a duplicate of a server row. A row matched by `serverId` keeps
+   * its local id (the rotation history and any open dialog refer to it); a
+   * server row with no local copy is added; an owned row the server no longer
+   * holds is deleted with its favorite — except a row with no `serverId` whose
+   * text matches no server row, which the upload skipped as invalid and the
+   * server never received, so it is kept untouched. Legacy unowned rows and every other
+   * account's rows are not touched. Favorites of these rows follow the
+   * server's `is_favorite`.
+   *
+   * One readwrite transaction, so a reader never sees half a swap.
+   */
+  async replaceMirrorForUser(userId: string, rows: ServerCustomMessage[]): Promise<void> {
+    const owner = this.requireOwner(userId, 'replaceMirrorForUser');
+    await this.init();
+
+    const tx = this.getTypedDB().transaction(['messages', 'message-favorites'], 'readwrite');
+    // A failed request also rejects tx.done; observe both failure channels.
+    void tx.done.catch(() => {});
+    const messages = tx.objectStore('messages');
+    const favorites = tx.objectStore('message-favorites');
+
+    const owned = (await messages.getAll()).filter((row) => this.isOwnedBy(row, owner));
+    const byServerId = new Map(
+      owned.filter((row) => row.serverId).map((row) => [row.serverId as string, row])
+    );
+    const kept = new Set<number>();
+
+    for (const row of rows) {
+      const existing = byServerId.get(row.serverId);
+      const record: Omit<Message, 'id'> = {
+        text: row.text,
+        category: row.category,
+        isCustom: true,
+        userId: owner,
+        serverId: row.serverId,
+        active: row.active,
+        isFavorite: false, // never authoritative; `message-favorites` is
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        tags: row.tags,
+      };
+      let id: number;
+      if (existing) {
+        id = existing.id;
+        await messages.put({ ...record, id });
+      } else {
+        id = await messages.add(record as Message);
+      }
+      kept.add(id);
+      if (row.isFavorite) await favorites.put({ messageId: id, userId: owner });
+      else await favorites.delete([id, owner]);
+    }
+
+    // A row with no server id and no server row of the same text was never
+    // received — the upload skipped it as one the server would reject — so it
+    // stays. Same normalisation the upload dedupes with.
+    const serverTexts = new Set(rows.map((row) => row.text.trim().toLowerCase()));
+    for (const row of owned) {
+      if (kept.has(row.id)) continue;
+      // Never sent (the upload skipped it as invalid): keep it, marked so it
+      // can still be deleted from this device.
+      if (!row.serverId && !serverTexts.has(row.text.trim().toLowerCase())) {
+        if (!row.localOnly) await messages.put({ ...row, localOnly: true });
+        continue;
+      }
+      await messages.delete(row.id);
+      await favorites.delete([row.id, owner]);
+    }
+
+    await tx.done;
+    logger.debug('[CustomMessageService] Mirror replaced from server, rows:', rows.length);
   }
 
   /**
@@ -590,6 +797,9 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
             msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
           );
         } else {
+          // A fresh key per row, deliberately not one derived from the text:
+          // an imported message edited since would own that key, and a
+          // re-import would get the edited row back and store nothing.
           await this.create(owner, {
             text: msg.text,
             category: msg.category,

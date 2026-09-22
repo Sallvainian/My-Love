@@ -20,6 +20,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
     settings,
     messageHistory,
     toggleFavorite,
+    favoriteError,
     error,
     initializeApp,
     navigateToPreviousMessage,
@@ -301,6 +302,16 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
                     }`}
                   />
                 </button>
+
+                {favoriteError && (
+                  <p
+                    role="alert"
+                    className="mx-2 flex-1 text-center text-sm text-red-600"
+                    data-testid="message-favorite-error"
+                  >
+                    {favoriteError}
+                  </p>
+                )}
 
                 <button
                   onClick={handleShare}
