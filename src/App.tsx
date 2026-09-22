@@ -717,62 +717,62 @@ function App() {
               {/* Time Together - replaces Day 37 Together header */}
               <TimeTogether />
 
-              {/* Countdown timers grid: Birthdays (left) | Wedding+Events (right) */}
+              {/* Birthdays, side by side */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {/* Left column - Birthdays */}
-                <div className="space-y-4">
-                  <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.casey} />
-                  <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.harper} />
-                </div>
-
-                {/* Right column - Wedding & Events */}
-                <div className="space-y-4">
-                  <EventCountdown
-                    label="Wedding"
-                    icon="ring"
-                    date={RELATIONSHIP_DATES.wedding}
-                    placeholderText="Date TBD"
-                  />
-                  {eventsSlotView === 'hidden' ? null : eventsSlotView === 'error' ? (
-                    <div
-                      className="rounded-2xl border-2 border-gray-200 bg-white p-4 text-center shadow-lg dark:border-gray-700 dark:bg-gray-900"
-                      data-testid="events-load-error"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Unable to load events — check your connection, then come back to Home.
-                      </p>
-                    </div>
-                  ) : eventsSlotView === 'empty' ? (
-                    <div
-                      className="rounded-2xl border-2 border-gray-200 bg-white p-4 text-center shadow-lg dark:border-gray-700 dark:bg-gray-900"
-                      data-testid="events-empty-placeholder"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No upcoming events yet.
-                      </p>
-                    </div>
-                  ) : (
-                    // Already filtered and capped by getUpcomingEventCards,
-                    // which hands the slot decision above the UNCAPPED count —
-                    // so hiding the tail can never turn a real list into the
-                    // empty placeholder.
-                    visibleEvents.map((event) => (
-                      <EventCountdown
-                        key={event.id}
-                        label={event.label}
-                        icon={event.icon}
-                        date={event.date}
-                        description={event.description ?? undefined}
-                        onRetire={handleEventRetired}
-                      />
-                    ))
-                  )}
-                </div>
+                <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.casey} />
+                <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.harper} />
               </div>
+
+              {/* Wedding - full width */}
+              <EventCountdown
+                label="Wedding"
+                icon="ring"
+                date={RELATIONSHIP_DATES.wedding}
+                placeholderText="Date TBD"
+              />
+
+              {/* Events slot: the two placeholders below speak for the whole
+                  slot, so they span the full width; real cards flow two-up like
+                  the birthday pair above. */}
+              {eventsSlotView === 'hidden' ? null : eventsSlotView === 'error' ? (
+                <div
+                  className="rounded-2xl border-2 border-gray-200 bg-white p-4 text-center shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                  data-testid="events-load-error"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Unable to load events — check your connection, then come back to Home.
+                  </p>
+                </div>
+              ) : eventsSlotView === 'empty' ? (
+                <div
+                  className="rounded-2xl border-2 border-gray-200 bg-white p-4 text-center shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                  data-testid="events-empty-placeholder"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No upcoming events yet.</p>
+                </div>
+              ) : (
+                // Already filtered and capped by getUpcomingEventCards, which
+                // hands the slot decision above the UNCAPPED count — so hiding
+                // the tail can never turn a real list into the empty
+                // placeholder. A card that retires returns null, which occupies
+                // no grid cell, so the survivors reflow with no gap.
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {visibleEvents.map((event) => (
+                    <EventCountdown
+                      key={event.id}
+                      label={event.label}
+                      icon={event.icon}
+                      date={event.date}
+                      description={event.description ?? undefined}
+                      onRetire={handleEventRetired}
+                    />
+                  ))}
+                </div>
+              )}
 
               {/* Daily Message */}
               <DailyMessage onShowWelcome={showWelcomeManually} />
