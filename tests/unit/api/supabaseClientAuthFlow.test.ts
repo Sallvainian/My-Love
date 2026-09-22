@@ -30,14 +30,14 @@ const APP_ORIGIN = 'http://localhost:3000';
 
 /**
  * The deployed base path. `vite.config.ts:11` is the source of truth
- * (`base: mode === 'production' ? '/My-Love/' : '/'`) and the case below binds
- * this constant to it at runtime: `loadConfigFromFile` takes a path string, so
- * a repo rename or custom-domain switch turns the suite red instead of shipping
- * green. It is read that way rather than imported because a static
+ * (`base: '/'`, the root of the Cloudflare Workers origin) and the case below
+ * binds this constant to it at runtime: `loadConfigFromFile` takes a path
+ * string, so moving the app under a sub-path turns the suite red instead of
+ * shipping green. It is read that way rather than imported because a static
  * `import '../../../vite.config'` raises TS6307 -- that file belongs to
  * `tsconfig.node.json` while this suite builds under `tsconfig.test.json`.
  */
-const PRODUCTION_BASE = '/My-Love/';
+const PRODUCTION_BASE = '/';
 
 /**
  * A complete implicit grant fragment, in the shape `_getSessionFromURL`
@@ -370,7 +370,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     expect(error).toBeNull();
     expect(assignSpy).toHaveBeenCalledTimes(1);
     const authorizeUrl = new URL(String(assignSpy.mock.calls[0][0]));
-    expect(authorizeUrl.searchParams.get('redirect_to')).toBe('http://localhost:3000/My-Love/');
+    expect(authorizeUrl.searchParams.get('redirect_to')).toBe('http://localhost:3000/');
   });
 
   it('says nothing about a failed exchange to someone who is already signed in', async () => {
@@ -426,11 +426,11 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     // `resetPasswordForEmail` as a mock and never inspects its options
     // (DW-124).
     //
-    // The path join is correct only because `BASE_URL` ends in `/`. At the dev
-    // base that is invisible: `'/' + 'reset-password'` and
-    // `'/My-Love/' + 'reset-password'` are both well-formed, and it is only a
-    // base without the trailing slash that would silently produce
-    // `/My-Lovereset-password`.
+    // The path join is correct only because `BASE_URL` ends in `/`. At the root
+    // base that is invisible: `'/' + 'reset-password'` is well-formed, and so
+    // is any sub-path base Vite would hand over, since Vite guarantees the
+    // trailing slash; only a base without it would silently produce
+    // `/sub-pathreset-password`.
     const viteConfig = await loadConfigFromFile(
       { command: 'build', mode: 'production' },
       resolve(dirname(fileURLToPath(import.meta.url)), '../../../vite.config.ts')
@@ -472,7 +472,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     };
     expect(body.email).toBe('someone@example.com');
     const redirectTo = new URL(String(recoverCall?.[0])).searchParams.get('redirect_to');
-    expect(redirectTo).toBe('http://localhost:3000/My-Love/reset-password');
+    expect(redirectTo).toBe('http://localhost:3000/reset-password');
   });
 
   it('redeems a code callback for a flow this browser started', async () => {

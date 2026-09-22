@@ -1,0 +1,48 @@
+name: Retire GitHub Pages
+
+# One-shot, run by hand, AFTER every device has exported its local-only data
+# from the old app (Admin panel > Export custom messages; anniversaries and
+# favorites by hand). The old origin's IndexedDB and localStorage cannot be
+# read from https://my-love.sallvain.workers.dev/, and once this runs the old
+# app no longer opens. It replaces https://sallvainian.github.io/My-Love/ with
+# a page that unregisters the old service worker and redirects every path to
+# the same path on Cloudflare Workers. Disable Pages in the repo settings only
+# after installed copies have had time to open once and pick it up.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
+jobs:
+  redirect:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # One page, published twice: GitHub Pages serves 404.html for every path
+      # that is not a file, which is how old deep links reach the redirect.
+      - name: Assemble redirect site
+        run: |
+          mkdir -p _site
+          cp .github/pages-redirect/index.html _site/index.html
+          cp .github/pages-redirect/index.html _site/404.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./_site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -56,7 +56,7 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
         settings: '/settings',
       };
       const basePath = pathMap[view];
-      // Respect base URL in production (e.g., /My-Love/ for GitHub Pages).
+      // Respect the configured base URL (`/` on Cloudflare Workers).
       // Shared with `App`'s inverse so the round trip can be asserted at the
       // production base, which neither call site could express alone (DW-125).
       const fullPath = withBasePath(basePath);

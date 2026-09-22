@@ -3,7 +3,7 @@
 
 ## My Love
 
-PWA for couples — daily messages, mood tracking, photos, love-notes chat, and partner interactions. React 19, TypeScript, Vite, Tailwind v4, Zustand, Supabase; npm, Node 24. Deployed to GitHub Pages at https://sallvainian.github.io/My-Love/. There is no generated documentation tree. `_bmad-output/` holds the loop's specs and implementation/test artifacts; `implementation-artifacts/deferred-work.md` is the deferred-work ledger.
+PWA for couples — daily messages, mood tracking, photos, love-notes chat, and partner interactions. React 19, TypeScript, Vite, Tailwind v4, Zustand, Supabase; npm, Node 24. Deployed to Cloudflare Workers at https://my-love.sallvain.workers.dev/ (an assets-only Worker defined in `wrangler.jsonc`). There is no generated documentation tree. `_bmad-output/` holds the loop's specs and implementation/test artifacts; `implementation-artifacts/deferred-work.md` is the deferred-work ledger.
 
 ## Policy
 
@@ -34,7 +34,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, and 
 - Build and dev need decrypted secrets: `fnox exec -- npm run build`. A bare `npm run build` still exits 0 and writes `dist/`, but Vite inlines the env vars at build time and never evaluates the guard, so the artifact throws "Supabase configuration missing" in the browser.
 - `npm run dev` is `scripts/dev-with-cleanup.sh` wrapping a bare `npx vite`, and `dev:raw` is plain `vite` — neither injects secrets, so both need the same `fnox exec --` prefix and both otherwise start a healthy-looking server whose app throws in the browser.
 - `npm run test:smoke` only stats and string-matches files in `dist/`; it never loads the app, so it passes on exactly that secret-less artifact.
-- Never run `npm run deploy` — the site ships from `.github/workflows/deploy.yml`, and `deploy`'s implicit `predeploy` runs a bare `npm run build` plus `test:smoke`, which would publish a secret-less bundle.
+- The site ships from `.github/workflows/deploy.yml`, which applies migrations before it deploys. `npx wrangler deploy` uploads whatever is in `dist/` without building, so deploy by hand only right after `fnox exec -- npm run build` — a bare build is a secret-less bundle. Never rename the Worker in `wrangler.jsonc`: the name is part of the origin, and a new origin strands every device's IndexedDB and localStorage.
 - E2E needs `supabase start` running first, on CLI 2.117.0 or newer — older releases bundle a Realtime without the `httpSend` route, so `tests/api/couple-broadcast-authorization.spec.ts` fails with a 404 that reads like an app bug. `npm run dev:local` is `vite --mode test`: it reads the committed `.env.test`, points at local Supabase, and needs no secrets.
 - A spec that calls an Edge Function belongs in the `api` Playwright project — CI starts `edge-runtime` only for that leg (`needs-edge-functions` in `test.yml`), and elsewhere Kong answers 503 from `/functions/v1/…`, which is a missing service, not a broken function.
 - `npm run typecheck` is `tsc -b --force`, building the three projects referenced from `tsconfig.json`. No test script runs it — `npm run test:ci-local` and CI's `lint` job do.

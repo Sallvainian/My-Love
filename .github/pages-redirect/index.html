@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>My Love has moved</title>
+    <link rel="canonical" href="https://my-love.sallvain.workers.dev/" />
+    <script>
+      // The app moved from https://sallvainian.github.io/My-Love/ to its own
+      // origin on Cloudflare Workers. Same file is published as 404.html, so
+      // every old deep link lands here: strip the old /My-Love base, keep the
+      // rest of the path, the query and the hash.
+      (function (l) {
+        var target =
+          'https://my-love.sallvain.workers.dev' +
+          (l.pathname.replace(/^\/My-Love(?=\/|$)/, '') || '/') +
+          l.search +
+          l.hash;
+        // Retire the old origin's service worker so an installed copy stops
+        // serving the cached app from here. Redirect whether or not it works.
+        var done = false;
+        function go() {
+          if (!done) {
+            done = true;
+            l.replace(target);
+          }
+        }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker
+            .getRegistrations()
+            .then(function (regs) {
+              return Promise.all(
+                regs.map(function (r) {
+                  return r.unregister();
+                })
+              );
+            })
+            .then(go, go);
+          setTimeout(go, 1500);
+        } else {
+          go();
+        }
+      })(window.location);
+    </script>
+  </head>
+  <body>
+    <p>
+      My Love has moved to
+      <a href="https://my-love.sallvain.workers.dev/">my-love.sallvain.workers.dev</a>.
+    </p>
+  </body>
+</html>
