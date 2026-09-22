@@ -143,6 +143,10 @@ gha-creds-*.json
 .bmad-loop/cache/
 .bmad-loop/archive/
 _bmad/render/
+# BMAD specs, ledger and artifacts stay local. Loop worktrees get the specs from
+# `worktree_seed = ["_bmad-output/specs"]` in .bmad-loop/policy.toml, and the
+# loop seeds and carries back the ledger and sprint board itself.
+_bmad-output/
 
 # BMAD customization overrides are deliberate configuration, not installed
 # module content: `_bmad/custom/.gitignore` ignores only `*.user.toml`, so the

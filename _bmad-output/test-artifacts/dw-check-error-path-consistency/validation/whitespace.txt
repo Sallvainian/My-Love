@@ -1,4 +1,0 @@
-git diff --check: exit 0
-New source trailing whitespace check: pass
-Source snapshot SHA-256 integrity: pass (4 files)
-Generated-source mandate/focus/skip scan: pass
