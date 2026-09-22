@@ -2,10 +2,9 @@
  * EventsSettings — focus behaviour
  *
  * The house standard is a dedicated focus test per dialog
- * (NavigationTray.focus.test.tsx, MoodDetailModal.focus.test.tsx,
- * PhotoViewer.focus.test.tsx). This section adds two of them at once, and the
- * delete dialog is the second consumer anywhere whose opener does not survive
- * the action it confirms — the case useFocusTrap explicitly declines to handle
+ * (MoodDetailModal.focus.test.tsx, PhotoViewer.focus.test.tsx). This section
+ * adds two of them at once, and the delete dialog is the second consumer
+ * anywhere whose opener does not survive the action it confirms — the case useFocusTrap explicitly declines to handle
  * (`useFocusTrap.ts:92-104`: the restore is skipped when the opener is no
  * longer connected, and the caller chooses a surviving destination).
  *
@@ -176,7 +175,7 @@ async function renderSection() {
 /**
  * The trap captures document.activeElement when it arms, and fireEvent.click
  * does not focus the way a real pointer does — so the opener is focused
- * explicitly first, exactly as NavigationTray.focus.test.tsx does.
+ * explicitly first, exactly as MoodDetailModal.focus.test.tsx does.
  */
 function openBy(testId: string) {
   const opener = screen.getByTestId(testId);

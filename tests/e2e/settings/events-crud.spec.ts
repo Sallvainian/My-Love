@@ -6,7 +6,7 @@
  * anywhere that exercises `addEvent` / `editEvent` / `removeEvent` from a
  * caller, and the only one that reaches Settings' own `loadEvents()` effect.
  *
- * - reach Settings through the tray, add an event, and see it in the list
+ * - reach Settings through the gear, add an event, and see it in the list
  *   (CAP-1's write half, CAP-5)
  * - the same event is on Home afterwards, with no reload (CAP-1)
  * - edit its label and date, and see both change in the list

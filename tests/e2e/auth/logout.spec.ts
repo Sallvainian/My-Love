@@ -29,7 +29,7 @@ test.describe('Logout Flow', () => {
     // GIVEN: User is authenticated (via auth fixture)
     await page.goto('/');
 
-    // WHEN: User opens the tray, enters Settings and signs out there
+    // WHEN: User taps the gear, enters Settings and signs out there
     await navigateTo(page, 'settings');
     await expect(page.getByTestId('settings-view')).toBeVisible();
     await page.getByTestId('settings-sign-out').click();
@@ -83,7 +83,7 @@ test.describe('Logout Flow', () => {
     // already empty and the assertion below passes even when the reset is
     // removed entirely. These are the shapes the loaders themselves produce.
     await page.goto('/');
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
 
     await page.evaluate(() => {
       window.__APP_STORE__?.setState({

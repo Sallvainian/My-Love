@@ -261,7 +261,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   // 3 columns (mobile), 4 columns (desktop md:768px+)
   return (
     <div
-      className="min-h-screen p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+      className="min-h-screen p-4"
       data-testid="photo-gallery"
     >
       <div
@@ -306,7 +306,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       {/* Floating action button (FAB) for uploading more photos */}
       <button
         onClick={onUploadClick}
-        className="fixed right-4 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-lg transition-shadow hover:shadow-xl"
+        className="fixed right-4 bottom-(--dock-clearance) z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-lg transition-shadow hover:shadow-xl"
         aria-label="Upload photo"
         data-testid="photo-gallery-upload-fab"
       >
