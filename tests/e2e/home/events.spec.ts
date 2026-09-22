@@ -271,8 +271,8 @@ test.describe('Home dashboard reads events from the store', () => {
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
     // Seven upcoming events against a cap of six (DW-22). Without the cap the
-    // right-hand column keeps growing past the fixed two-card birthdays column
-    // beside it. Seeded out of date order and across both halves of the couple,
+    // events grid below Wedding keeps growing, pushing Daily Message further off
+    // screen. Seeded out of date order and across both halves of the couple,
     // so the assertion pins "the six SOONEST" rather than "the first six
     // rows the query happened to return".
     const anchor = new Date();
