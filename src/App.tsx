@@ -606,7 +606,7 @@ function App() {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="mb-4 animate-pulse text-6xl">💕</div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-muted">Loading...</p>
         </div>
       </div>
     );
@@ -653,7 +653,7 @@ function App() {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="mb-4 animate-pulse text-6xl">💕</div>
-          <p className="text-gray-600">Loading your data...</p>
+          <p className="text-muted">Loading your data...</p>
         </div>
       </div>
     );

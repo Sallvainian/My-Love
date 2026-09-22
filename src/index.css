@@ -1,9 +1,91 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Dancing+Script:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Dancing+Script:wght@400;500;600;700&family=Lora:ital,wght@1,500;1,600&display=swap');
 
 @import 'tailwindcss';
 @config '../tailwind.config.js';
 
+/* Style kit (the approved style kit) -- the one source for every kit
+   colour, shadow and the wordmark font. Each colour and shadow utility
+   (`bg-card`, `text-ink`, `shadow-card`, ...) resolves to a `--kit-*` variable
+   whose value switches under `prefers-color-scheme: dark`, so a component needs
+   no `dark:` variant; `font-lora` is the same in both themes. `inline` makes
+   `text-accent` emit `color: var(--kit-accent)` rather than
+   `var(--color-accent)`: applyTheme() (utils/themes.ts) writes
+   `--color-accent`, `--color-primary`, ... inline on <html>, which would
+   otherwise override these. */
+@theme inline {
+  --color-page: var(--kit-page);
+  --color-card: var(--kit-card);
+  --color-card2: var(--kit-card2);
+  --color-ink: var(--kit-ink);
+  --color-muted: var(--kit-muted);
+  --color-accent: var(--kit-accent);
+  --color-fill: var(--kit-fill);
+  --color-tint: var(--kit-tint);
+  --color-partner: var(--kit-partner);
+  --color-ptint: var(--kit-ptint);
+  --color-good: var(--kit-good);
+  --color-danger: var(--kit-danger);
+  --color-dtint: var(--kit-dtint);
+  --color-line: var(--kit-line);
+  --color-glass: var(--kit-glass);
+  --color-field: var(--kit-field);
+  --shadow-card: var(--kit-shadow-card);
+  --shadow-float: var(--kit-shadow-float);
+  --font-lora: 'Lora', serif;
+}
+
 @layer base {
+  /* Kit values. Light is the approved kit except three text colours darkened
+     along their own hue to clear 4.5:1 on every kit surface (the approved ones
+     fail on the kit's own tinted fills; ratios are before -> after): accent
+     #db2777 -> #c8216b (3.91 -> 4.60:1 on tint), muted #6b7280 -> #646b78
+     (4.24 -> 4.71:1 on card2, 4.48 -> 4.97:1 on page), danger #dc2626 -> #cf2121
+     (4.23 -> 4.72:1 on dtint). fill stays #db2777 (white on it
+     4.60:1). Every dark value already passes and is used as given. */
+  :root {
+    --kit-page: #fdf4f7;
+    --kit-card: #ffffff;
+    --kit-card2: #f6eef2;
+    --kit-ink: #1f2430;
+    --kit-muted: #646b78;
+    --kit-accent: #c8216b;
+    --kit-fill: #db2777;
+    --kit-tint: #fce7f3;
+    --kit-partner: #7c3aed;
+    --kit-ptint: #f1eafe;
+    --kit-good: #15803d;
+    --kit-danger: #cf2121;
+    --kit-dtint: #fdecec;
+    --kit-line: rgba(157, 23, 77, 0.09);
+    --kit-glass: rgba(255, 255, 255, 0.8);
+    --kit-field: #fbf7f9;
+    --kit-shadow-card: 0 1px 2px rgba(157, 23, 77, 0.05), 0 8px 24px rgba(157, 23, 77, 0.06);
+    --kit-shadow-float: 0 10px 30px rgba(157, 23, 77, 0.16);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --kit-page: #0b0e14;
+      --kit-card: #141925;
+      --kit-card2: #1c2230;
+      --kit-ink: #f3f4f6;
+      --kit-muted: #9aa3b2;
+      --kit-accent: #f472b6;
+      --kit-fill: #db2777;
+      --kit-tint: rgba(244, 114, 182, 0.14);
+      --kit-partner: #a78bfa;
+      --kit-ptint: rgba(167, 139, 250, 0.16);
+      --kit-good: #4ade80;
+      --kit-danger: #f87171;
+      --kit-dtint: rgba(248, 113, 113, 0.12);
+      --kit-line: rgba(255, 255, 255, 0.07);
+      --kit-glass: rgba(17, 21, 30, 0.78);
+      --kit-field: #0f131b;
+      --kit-shadow-card: 0 0 #0000;
+      --kit-shadow-float: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+  }
+
   html {
     @apply antialiased;
     -webkit-tap-highlight-color: transparent;
@@ -12,7 +94,7 @@
   }
 
   body {
-    @apply min-h-screen bg-linear-to-br from-pink-50 via-rose-50 to-pink-100 font-sans;
+    @apply min-h-screen bg-page font-sans;
   }
 
   /* Custom scrollbar styling - webkit prefix for Safari/Chrome, standard for Firefox */

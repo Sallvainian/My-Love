@@ -16,11 +16,12 @@
  * in one place, `--dock-clearance` in index.css; <main>, LoveNotes' height and
  * the floating buttons all read it rather than hardcoding the dock's size.
  *
- * Colours are a notch deeper than the design artboard's in both themes. The
- * chrome is translucent, and in dark mode what shows through it is the pink
- * page background, so the artboard's pink-300 wordmark and pink-400 pill label
- * measure under 4.5:1 there; pink-700 (light) and pink-200 / pink-300 (dark)
- * hold it over white, pink and gray-900 alike.
+ * Every colour is a style-kit token from index.css (`bg-glass`, `text-ink`,
+ * `text-muted`, `bg-tint`/`text-accent`, `bg-fill`, `ring-line`,
+ * `shadow-float`), matching the approved style kit. Each token switches with the
+ * OS theme on its own, so nothing here carries a `dark:` variant; the kit's
+ * light accent and muted are already deepened to hold 4.5:1 on its own tinted
+ * fills and on the page ground seen through the glass.
  */
 import { Camera, Heart, MessageCircle, Settings as SettingsIcon, Smile, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -47,8 +48,11 @@ const DESTINATIONS: readonly Destination[] = [
   { view: 'partner', label: 'Partner', Icon: Users },
 ];
 
-/** Shared by the bar and the dock so the two surfaces never drift apart. */
-const GLASS = 'bg-white/70 backdrop-blur-lg backdrop-saturate-150 dark:bg-gray-900/70';
+/**
+ * Shared by the bar and the dock. The dock alone adds `backdrop-saturate-[1.4]`
+ * on top of it, on purpose, as the approved style kit's dock does.
+ */
+const GLASS = 'bg-glass backdrop-blur-[16px]';
 
 export interface AppNavigationProps {
   currentView: ViewType;
@@ -80,29 +84,33 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
               would duplicate that title on screen and make a level-1-heading
               query ambiguous -- which is exactly what broke
               notes/love-notes.spec.ts:27 when this was an h1. */}
-          <span className="flex-1 truncate text-center font-cursive text-[28px] font-bold text-pink-700 dark:text-pink-200">
-            My Love
+          <span
+            className="flex min-w-0 flex-1 items-center justify-center gap-1.5"
+            data-testid="app-wordmark"
+          >
+            <Heart className="h-3.5 w-3.5 shrink-0 fill-current text-accent" strokeWidth={0} />
+            <span className="truncate font-lora text-[19px] font-semibold text-ink italic">
+              My Love
+            </span>
           </span>
 
           <button
             type="button"
             onClick={() => onViewChange('settings')}
             className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full transition-colors ${
-              isSettings
-                ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300'
-                : 'text-gray-500 hover:bg-gray-100/70 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100'
+              isSettings ? 'bg-tint text-accent' : 'text-muted hover:text-ink'
             }`}
             data-testid="nav-settings"
             aria-label="Settings"
             aria-current={isSettings ? 'page' : undefined}
           >
-            <SettingsIcon className="h-[21px] w-[21px]" />
+            <SettingsIcon className="h-5 w-5" />
           </button>
         </div>
       </header>
 
       <nav
-        className={`fixed inset-x-4 mx-auto max-w-md bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex h-[60px] items-center justify-between gap-1 rounded-full px-2 shadow-[0_8px_24px_rgba(190,24,93,0.12)] ring-1 ring-pink-600/15 dark:shadow-[0_8px_24px_rgba(0,0,0,0.45)] dark:ring-white/10 ${GLASS}`}
+        className={`fixed inset-x-4 mx-auto max-w-md bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex h-[60px] items-center justify-between gap-1 rounded-full px-2 shadow-float ring-1 ring-line backdrop-saturate-[1.4] ${GLASS}`}
         aria-label="Primary"
         data-testid="nav-dock"
       >
@@ -117,8 +125,8 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
               onClick={() => onViewChange(view)}
               className={`relative flex h-11 items-center justify-center rounded-full transition-colors ${
                 isActive
-                  ? 'min-w-0 shrink gap-1.5 bg-pink-100 px-3.5 text-sm font-semibold text-pink-700 dark:bg-pink-900/50 dark:text-pink-300'
-                  : 'w-11 shrink-0 text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100'
+                  ? 'min-w-0 shrink gap-1.5 bg-tint px-3.5 text-sm font-semibold text-accent'
+                  : 'w-11 shrink-0 text-muted hover:text-ink'
               }`}
               data-testid={`nav-${view}`}
               aria-label={label}
@@ -134,7 +142,7 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
                   so a tap on it bubbles to the button and selects the view. */}
               {count > 0 && (
                 <span
-                  className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-purple-600 px-1 text-xs font-bold text-white shadow-md"
+                  className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1 text-[11px] leading-none font-bold text-white"
                   data-testid={`nav-${view}-badge`}
                   aria-label={pluralisedBadgeLabel(count)}
                 >
