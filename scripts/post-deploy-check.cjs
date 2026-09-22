@@ -18,9 +18,9 @@
  *
  * Usage:
  *   node scripts/post-deploy-check.js [URL]
- *   node scripts/post-deploy-check.js https://yourusername.github.io/My-Love/
+ *   node scripts/post-deploy-check.js https://my-love.sallvain.workers.dev/
  *
- * If no URL provided, uses default GitHub Pages pattern from package.json
+ * If no URL is provided, prints this usage and exits 0.
  */
 
 const https = require('https');
@@ -317,10 +317,10 @@ async function main() {
 
   if (!siteUrl) {
     console.log(
-      `${colors.yellow}ℹ️  No URL provided. Please provide your GitHub Pages URL:${colors.reset}`
+      `${colors.yellow}ℹ️  No URL provided. Please provide the deployed site URL:${colors.reset}`
     );
     console.log(
-      `${colors.cyan}   node scripts/post-deploy-check.js https://yourusername.github.io/My-Love/${colors.reset}\n`
+      `${colors.cyan}   node scripts/post-deploy-check.js https://my-love.sallvain.workers.dev/${colors.reset}\n`
     );
     process.exit(0);
   }

@@ -1,9 +1,10 @@
 /**
  * The two halves of the deployed base path, kept together.
  *
- * The app is served from `/` in development and from `/My-Love/` on GitHub
- * Pages (`vite.config.ts:11`), so every route has to be written with the base
- * on and read with the base off. Those are inverse operations, and they used to
+ * The app is served from `/` in development and in production on Cloudflare
+ * Workers (`vite.config.ts:11`); until September 2026 production was `/My-Love/`
+ * on GitHub Pages. Under any sub-path base every route has to be written with
+ * the base on and read with the base off. Those are inverse operations, and they used to
  * live in different files -- the composition inline in
  * `navigationSlice.setView`, the stripping inline in `App.getRoutePath` -- with
  * nothing asserting either, because every test and the whole E2E suite run at
@@ -11,7 +12,7 @@
  *
  * That is not a theoretical gap. DW-125 measured it: rewriting the composition
  * to `base + basePath` and the stripping to `return pathname` left the entire
- * unit suite green, while on the deployed site the first emits `/My-Love//photos`
+ * unit suite green, while on the then-deployed site the first emits `/My-Love//photos`
  * and the second then fails to strip, so no `currentView` arm matches and the
  * app resets to home on every reload.
  *

@@ -12,7 +12,7 @@
  * 1. Edit defaultPartnerName below with your partner's name
  * 2. Edit defaultStartDate below with your relationship start date (YYYY-MM-DD format)
  * 3. Run `npm run build` to create production bundle
- * 4. Run `npm run deploy` to deploy to GitHub Pages
+ * 4. Push to `main`; `.github/workflows/deploy.yml` deploys to Cloudflare Workers
  */
 export const APP_CONFIG = {
   /**
