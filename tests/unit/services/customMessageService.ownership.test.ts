@@ -23,6 +23,7 @@ import { openDB, type IDBPDatabase } from 'idb';
 import { DB_NAME, DB_VERSION, upgradeDb } from '../../../src/services/dbSchema';
 import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 import type { CustomMessagesExport, Message } from '../../../src/types';
+import { hashText } from '../../../src/services/messageFavoritesApi';
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { fakeCustomMessagesApi } from '../helpers/fakeAccountDataApis';
 
@@ -573,6 +574,19 @@ describe('customMessageService ownership', () => {
       const result = await service.importMessages(A, exportFile(['A-PRIVATE-ONE', 'A-NEW-ONE']));
 
       expect(result).toEqual({ imported: 1, skipped: 1 });
+    });
+
+    it('keys each imported row by its text, so a re-import after a lost response cannot duplicate it', async () => {
+      const service = await freshService();
+      fakeCustomMessagesApi.createCustomMessage.mockClear();
+
+      await service.importMessages(A, exportFile(['  Imported Once  ']));
+
+      expect(fakeCustomMessagesApi.createCustomMessage).toHaveBeenLastCalledWith(
+        A,
+        expect.objectContaining({ text: 'Imported Once' }),
+        `i:${await hashText('imported once')}`
+      );
     });
 
     it('does not deduplicate against a legacy unowned row', async () => {

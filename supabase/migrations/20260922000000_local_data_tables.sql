@@ -6,12 +6,15 @@
 -- All four are private to their author, exactly as the local copies were: no
 -- policy here reads get_my_partner_id(), and the partner sees nothing new.
 --
--- client_key is the idempotency key for the one-time upload. The upload derives
--- it deterministically from the local row (a:<date>:<hash(label)>,
+-- client_key is the idempotency key for every insert. The one-time upload
+-- derives it deterministically from the local row (a:<date>:<hash(label)>,
 -- c:<createdAt ms>:<hash(text)>), so a re-run -- or the service-worker reload
 -- that interrupts the first run -- collides on UNIQUE (user_id, client_key)
 -- and is ignored (ON CONFLICT DO NOTHING) instead of inserting a duplicate.
--- Rows created in the app take the random default. A plain constraint, not a
+-- The in-app creates send a key minted once per submit and reused on its
+-- retry (a custom-message import keys each row by its text), and read the
+-- stored row back on a conflict. The random default is only a fallback. A
+-- plain constraint, not a
 -- partial index: PostgREST's on_conflict cannot express an index predicate
 -- (same reasoning as 20260727000000_love_notes_idempotency.sql).
 --
@@ -48,7 +51,7 @@ comment on table public.anniversaries is
 comment on column public.anniversaries.event_date is
   'A calendar date, not an instant: every viewer reads the same YYYY-MM-DD.';
 comment on column public.anniversaries.client_key is
-  'Idempotency key. Deterministic for rows from the one-time local upload, random otherwise.';
+  'Idempotency key. Deterministic for rows from the one-time local upload, and one per submit (reused on its retry) for in-app creates.';
 
 -- ---------------------------------------------------------------------------
 -- custom_messages

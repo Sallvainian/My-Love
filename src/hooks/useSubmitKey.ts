@@ -8,25 +8,29 @@ import { useCallback, useRef } from 'react';
  * resolve that retry to the row it already stored (ON CONFLICT DO NOTHING on
  * `UNIQUE (user_id, client_key)`) instead of storing a second one.
  *
- * The key is bound to the payload: if the user changes anything before
- * retrying, a new key is minted. Reusing a key across different content would
- * make the server hand back the FIRST row and silently drop the edit.
+ * The key is bound to the payload: different content gets a different key.
+ * Reusing a key across different content would make the server hand back the
+ * FIRST row and silently drop the edit. Every payload tried since the last
+ * success keeps its key, so going back to an earlier version (X, then Y, then
+ * X again) still resolves to X's row if X's first attempt had committed.
  *
  * Call `reset()` after a successful save so the next submit starts fresh.
  */
 export function useSubmitKey(): { keyFor: (payload: unknown) => string; reset: () => void } {
-  const current = useRef<{ fingerprint: string; key: string } | null>(null);
+  const keys = useRef(new Map<string, string>());
 
   const keyFor = useCallback((payload: unknown) => {
     const fingerprint = JSON.stringify(payload);
-    if (!current.current || current.current.fingerprint !== fingerprint) {
-      current.current = { fingerprint, key: crypto.randomUUID() };
+    let key = keys.current.get(fingerprint);
+    if (!key) {
+      key = crypto.randomUUID();
+      keys.current.set(fingerprint, key);
     }
-    return current.current.key;
+    return key;
   }, []);
 
   const reset = useCallback(() => {
-    current.current = null;
+    keys.current.clear();
   }, []);
 
   return { keyFor, reset };

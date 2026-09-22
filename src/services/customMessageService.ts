@@ -11,6 +11,7 @@ import { logger } from '../utils/logger';
 import { AccountDataError, notSyncedMessage } from './accountDataError';
 import { serializeAccountDataWrite } from './accountDataQueue';
 import { customMessagesApi, type ServerCustomMessage } from './customMessagesApi';
+import { hashText } from './messageFavoritesApi';
 import {
   CreateMessageInputSchema,
   CustomMessagesExportSchema,
@@ -797,12 +798,19 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
             msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
           );
         } else {
-          await this.create(owner, {
-            text: msg.text,
-            category: msg.category,
-            active: msg.active,
-            tags: msg.tags,
-          });
+          // Keyed by the text, so importing the same file again after a
+          // request whose response was lost resolves to the stored row
+          // instead of a second copy the local dedupe above cannot see yet.
+          await this.create(
+            owner,
+            {
+              text: msg.text,
+              category: msg.category,
+              active: msg.active,
+              tags: msg.tags,
+            },
+            `i:${await hashText(normalizedText)}`
+          );
           existingTexts.add(normalizedText); // Prevent duplicates within same import
           importedCount++;
         }

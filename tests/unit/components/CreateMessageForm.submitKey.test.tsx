@@ -69,6 +69,23 @@ describe('CreateMessageForm submit key', () => {
     expect(keys[2]).not.toBe(keys[0]);
   });
 
+  it('going back to an earlier version reuses that version’s key', async () => {
+    createCustomMessage.mockRejectedValue(new Error('Network error'));
+    render(<CreateMessageForm isOpen onClose={() => {}} />);
+
+    for (const [index, text] of ['Version X', 'Version Y', 'Version X'].entries()) {
+      type(text);
+      save();
+      await waitFor(() => expect(createCustomMessage).toHaveBeenCalledTimes(index + 1));
+    }
+
+    const keys = createCustomMessage.mock.calls.map((call) => call[1]);
+    // X may have committed before its response was lost; retrying X must
+    // resolve to that row, even after a failed Y in between.
+    expect(keys[2]).toBe(keys[0]);
+    expect(keys[1]).not.toBe(keys[0]);
+  });
+
   it('starts a fresh key after a successful save', async () => {
     createCustomMessage.mockResolvedValue(undefined);
     render(<CreateMessageForm isOpen onClose={() => {}} />);
