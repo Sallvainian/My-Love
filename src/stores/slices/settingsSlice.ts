@@ -53,7 +53,8 @@ export interface SettingsSlice {
   setOnboarded: (onboarded: boolean) => void;
 
   // Anniversary actions — server first, then the settings mirror. Writes throw.
-  addAnniversary: (anniversary: AnniversaryInput) => Promise<void>;
+  /** `clientKey`: minted once per submit and reused on its retry (useSubmitKey). */
+  addAnniversary: (anniversary: AnniversaryInput, clientKey?: string) => Promise<void>;
   updateAnniversary: (id: number, anniversary: AnniversaryInput) => Promise<void>;
   removeAnniversary: (id: number) => Promise<void>;
   /** Replace the mirror with the server's rows, once this device's upload is done. */
@@ -314,13 +315,13 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
 
   // Anniversary actions. Each runs in the account-data queue, so the mirror
   // refresh cannot read the server before a write and replace the list after it.
-  addAnniversary: async (anniversary) => {
+  addAnniversary: async (anniversary, clientKey = crypto.randomUUID()) => {
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     if (!requestedBy) throw new Error('You must be signed in to add an anniversary');
     const input = parseAnniversaryInput(anniversary);
 
     await serializeAccountDataWrite(async () => {
-      const created = await anniversariesService.createAnniversary(requestedBy, input);
+      const created = await anniversariesService.createAnniversary(requestedBy, input, clientKey);
 
       // The row is the requesting account's either way; only this session's
       // mirror is withheld once the account changed under the request.
@@ -328,6 +329,9 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
       set((state) => {
         if (!state.settings) return {};
         const current = state.settings.relationship.anniversaries;
+        // A retried submit resolves to the row the first attempt stored, which
+        // a refresh may already have mirrored: never list it twice.
+        if (current.some((a) => a.serverId === created.serverId)) return {};
         const newId = Math.max(0, ...current.map((a) => a.id)) + 1;
         return {
           settings: withAnniversaries(state.settings, [...current, toMirrored(newId, created)]),

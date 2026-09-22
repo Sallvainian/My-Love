@@ -83,18 +83,45 @@ export const customMessagesApi = {
     }
   },
 
-  async createCustomMessage(userId: string, fields: CustomMessageFields): Promise<ServerCustomMessage> {
+  /**
+   * Retry-safe create: `clientKey` is minted once per submit and reused on a
+   * retry of the same submit, so a lost response resolves to the stored row
+   * rather than a duplicate (ON CONFLICT DO NOTHING, then a read-back by key —
+   * the notesSlice pattern). Same contract as `anniversariesService`.
+   */
+  async createCustomMessage(
+    userId: string,
+    fields: CustomMessageFields,
+    clientKey: string
+  ): Promise<ServerCustomMessage> {
     requireOnline(WHAT);
     try {
       const { data, error } = await supabase
         .from('custom_messages')
-        .insert({ user_id: userId, ...fields })
+        .upsert(
+          { user_id: userId, ...fields, client_key: clientKey },
+          { onConflict: 'user_id,client_key', ignoreDuplicates: true }
+        )
         .select()
-        .single();
+        .abortSignal(requestTimeout())
+        .maybeSingle();
       if (error) throw error;
-      if (!data) throw new AccountDataError('invalid-response', 'The message was not created');
-      logger.debug('[CustomMessagesApi] Created custom message:', data.id);
-      return toServerCustomMessage(data);
+
+      let stored = data;
+      if (!stored) {
+        const existing = await supabase
+          .from('custom_messages')
+          .select()
+          .eq('user_id', userId)
+          .eq('client_key', clientKey)
+          .abortSignal(requestTimeout())
+          .maybeSingle();
+        if (existing.error) throw existing.error;
+        stored = existing.data;
+      }
+      if (!stored) throw new AccountDataError('invalid-response', 'The message was not created');
+      logger.debug('[CustomMessagesApi] Created custom message:', stored.id);
+      return toServerCustomMessage(stored);
     } catch (error) {
       throw toAccountDataError('CustomMessagesApi.createCustomMessage', error);
     }

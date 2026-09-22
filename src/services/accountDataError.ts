@@ -62,10 +62,12 @@ export function notSyncedMessage(localOnly: boolean | undefined): string {
  * (`accountDataQueue.ts`), so a request left pending by a stalled mobile socket
  * would hold every later write. Bounding the request, not the queue, keeps the
  * queue strict: an abandoned request rejects, its task ends, and the next one
- * starts with nothing still running. Applied to reads and to writes that are
- * safe to repeat (updates, deletes, ON CONFLICT DO NOTHING inserts, receipts);
- * NOT to the two plain creates, where a timeout after the server committed
- * would report a failure and invite a retry that stores the row twice.
+ * starts with nothing still running. Applied to every request here. Each is
+ * safe to repeat after a timeout that fired once the server had committed:
+ * updates and deletes are absolute, the upload and both user creates are
+ * ON CONFLICT DO NOTHING on a key the caller reuses across a retry (the
+ * creates read the stored row back by that key), and a repeated receipt only
+ * double-counts evidence.
  */
 export const REQUEST_TIMEOUT_MS = 30_000;
 

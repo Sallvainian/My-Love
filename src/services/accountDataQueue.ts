@@ -11,8 +11,9 @@
  *
  * Tasks run strictly one at a time in call order: a task holds the queue until
  * it settles, and nothing ever starts beside it. A hung request cannot hold it
- * forever because the requests themselves are bounded (`requestTimeout()` in
- * `accountDataError.ts`); releasing the queue on a timer instead would let the
+ * forever because every Supabase request a queued task makes is bounded
+ * (`requestTimeout()` in `accountDataError.ts`, creates included — they are
+ * retry-safe); releasing the queue on a timer instead would let the
  * stalled task finish later, beside its successor, and erase that write.
  *
  * A task must not call another queued function, or it waits on itself

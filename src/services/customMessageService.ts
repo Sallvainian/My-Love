@@ -207,12 +207,20 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
    * @param userId - The authenticated user the row belongs to. Required.
    * @param input - Message content
    */
-  async create(userId: string | null, input: CreateMessageInput): Promise<Message> {
+  async create(
+    userId: string | null,
+    input: CreateMessageInput,
+    clientKey: string = crypto.randomUUID()
+  ): Promise<Message> {
     // Queued with the mirror refresh — see accountDataQueue.ts.
-    return serializeAccountDataWrite(() => this.createNow(userId, input));
+    return serializeAccountDataWrite(() => this.createNow(userId, input, clientKey));
   }
 
-  private async createNow(userId: string | null, input: CreateMessageInput): Promise<Message> {
+  private async createNow(
+    userId: string | null,
+    input: CreateMessageInput,
+    clientKey: string
+  ): Promise<Message> {
     try {
       const owner = this.requireOwner(userId, 'create');
 
@@ -221,12 +229,23 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
 
       // Server first: an offline or rejected write throws here, before the
       // mirror is touched.
-      const remote = await customMessagesApi.createCustomMessage(owner, {
-        text: validated.text,
-        category: validated.category,
-        active: validated.active ?? true, // Default: true
-        tags: validated.tags || [],
-      });
+      const remote = await customMessagesApi.createCustomMessage(
+        owner,
+        {
+          text: validated.text,
+          category: validated.category,
+          active: validated.active ?? true, // Default: true
+          tags: validated.tags || [],
+        },
+        clientKey
+      );
+
+      // A retried submit resolves to the row its first attempt stored, which a
+      // mirror refresh may already have brought onto this device.
+      const mirrored = (await this.readOwnedRows(owner)).find(
+        (row) => row.serverId === remote.serverId
+      );
+      if (mirrored) return mirrored;
 
       const message: Omit<Message, 'id'> = {
         text: remote.text,
@@ -432,6 +451,15 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
     const tx = this.getTypedDB().transaction('messages', 'readonly');
     void tx.done.catch(() => {});
     return tx.store.get(id);
+  }
+
+  /** This account's own custom rows, through the same observed-transaction read. */
+  private async readOwnedRows(owner: string): Promise<Message[]> {
+    await this.init();
+    const tx = this.getTypedDB().transaction('messages', 'readonly');
+    void tx.done.catch(() => {});
+    const rows = await tx.store.index('by-user').getAll(owner);
+    return rows.filter((row) => this.isOwnedBy(row, owner));
   }
 
   /**

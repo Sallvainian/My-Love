@@ -12,6 +12,7 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { Calendar, Check, Edit2, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
+import { useSubmitKey } from '../../hooks/useSubmitKey';
 import { parseEventDate } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
 import type { Anniversary } from '../../types';
@@ -162,12 +163,12 @@ export function AnniversarySettings() {
           <AnniversaryForm
             anniversary={editingAnniversary}
             onClose={handleFormClose}
-            onSave={async (data) => {
+            onSave={async (data, clientKey) => {
               // Throws on failure; the form shows the reason and stays open.
               if (editingId) {
                 await updateAnniversary(editingId, data);
               } else {
-                await addAnniversary(data);
+                await addAnniversary(data, clientKey);
               }
               handleFormClose();
             }}
@@ -229,7 +230,8 @@ export function AnniversarySettings() {
 interface AnniversaryFormProps {
   anniversary?: Anniversary;
   onClose: () => void;
-  onSave: (data: Omit<Anniversary, 'id' | 'serverId'>) => Promise<void>;
+  /** `clientKey` is reused when the same submit is retried (useSubmitKey). */
+  onSave: (data: Omit<Anniversary, 'id' | 'serverId'>, clientKey: string) => Promise<void>;
 }
 
 function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps) {
@@ -239,6 +241,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const { keyFor } = useSubmitKey();
 
   const isEditing = Boolean(anniversary);
 
@@ -281,11 +284,12 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
 
       // Submit form — saved to the account first, so this can fail offline
       setIsSaving(true);
-      await onSave({
+      const data = {
         label: label.trim(),
         date,
         description: description.trim() || undefined,
-      });
+      };
+      await onSave(data, keyFor(data));
     } catch (error) {
       if (isValidationError(error)) {
         const fieldErrors: Record<string, string> = {};

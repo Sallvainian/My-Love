@@ -295,6 +295,25 @@ describe('customMessageService ownership', () => {
       ]);
     });
 
+    it('a create that resolves to a row already mirrored returns it instead of adding a copy', async () => {
+      // A retried submit reuses its key, so the server hands back the row the
+      // first attempt stored — which a mirror refresh may already have added.
+      const [mirroredId] = await seed([{ ...customRow(A, 'A-RETRIED'), serverId: 'srv-retried' }]);
+      const service = await freshService();
+      fakeCustomMessagesApi.createCustomMessage.mockResolvedValueOnce({
+        serverId: 'srv-retried', text: 'A-RETRIED', category: 'custom', active: true,
+        isFavorite: false, tags: [], createdAt: new Date(), updatedAt: new Date(),
+      });
+
+      const created = await service.create(A, { text: 'A-RETRIED', category: 'custom' }, 'submit-1');
+
+      expect(fakeCustomMessagesApi.createCustomMessage).toHaveBeenLastCalledWith(
+        A, expect.objectContaining({ text: 'A-RETRIED' }), 'submit-1'
+      );
+      expect(created.id).toBe(mirroredId);
+      expect((await rowsOnDisk()).filter((row) => row.serverId === 'srv-retried')).toHaveLength(1);
+    });
+
     it('refuses to create a row with no owner', async () => {
       const service = await freshService();
 

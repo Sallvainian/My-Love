@@ -70,7 +70,8 @@ export interface MessagesSlice {
 
   // Custom message actions
   loadCustomMessages: () => Promise<void>;
-  createCustomMessage: (input: CreateMessageInput) => Promise<void>;
+  /** `clientKey`: minted once per submit and reused on its retry (useSubmitKey). */
+  createCustomMessage: (input: CreateMessageInput, clientKey?: string) => Promise<void>;
   updateCustomMessage: (input: UpdateMessageInput) => Promise<void>;
   deleteCustomMessage: (id: number) => Promise<void>;
   getCustomMessages: (filter?: MessageFilter) => CustomMessage[];
@@ -468,7 +469,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     }
   },
 
-  createCustomMessage: async (input: CreateMessageInput) => {
+  createCustomMessage: async (input: CreateMessageInput, clientKey?: string) => {
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     const stillCurrent = () =>
       get().userId === requestedBy && get().authSessionVersion === requestedInSession;
@@ -476,7 +477,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     try {
       // Story 3.5: Save to IndexedDB via customMessageService.
       // Throws when signed out — there is no owner to stamp the row with.
-      const message = await customMessageService.create(requestedBy, input);
+      const message = await customMessageService.create(requestedBy, input, clientKey);
 
       // Convert to CustomMessage format for state
       const newCustomMessage: CustomMessage = {
@@ -496,9 +497,13 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       if (!stillCurrent()) return;
 
       // Update state (optimistic UI update)
-      set((state) => ({
-        customMessages: [...state.customMessages, newCustomMessage],
-      }));
+      // A retried submit can resolve to a row already listed (see
+      // customMessageService.create); never list it twice.
+      set((state) =>
+        state.customMessages.some((existing) => existing.id === newCustomMessage.id)
+          ? {}
+          : { customMessages: [...state.customMessages, newCustomMessage] }
+      );
 
       // Also update main messages array for rotation
       await get().loadMessages();

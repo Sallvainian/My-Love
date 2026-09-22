@@ -119,8 +119,22 @@ describe('anniversaries: server first, then the settings mirror', () => {
 
     await useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'First date' });
 
-    expect(server.createAnniversary).toHaveBeenCalledWith(A, { date: '2024-02-14', label: 'First date' });
+    expect(server.createAnniversary).toHaveBeenCalledWith(
+      A,
+      { date: '2024-02-14', label: 'First date' },
+      expect.any(String)
+    );
     expect(anniversaries()).toEqual([{ id: 1, date: '2024-02-14', label: 'First date', serverId: 'ann-1' }]);
+  });
+
+  it('a retried add that resolves to an already mirrored row does not list it twice', async () => {
+    setAnniversaries([{ id: 3, date: '2024-02-14', label: 'First date', serverId: 'ann-1' }]);
+    server.createAnniversary.mockResolvedValue(created);
+
+    await useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'First date' }, 'submit-1');
+
+    expect(server.createAnniversary).toHaveBeenCalledWith(A, { date: '2024-02-14', label: 'First date' }, 'submit-1');
+    expect(anniversaries()).toEqual([{ id: 3, date: '2024-02-14', label: 'First date', serverId: 'ann-1' }]);
   });
 
   it('offline: rejects with the reason and leaves the mirror as it was', async () => {

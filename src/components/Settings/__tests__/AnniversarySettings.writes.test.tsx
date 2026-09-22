@@ -92,9 +92,35 @@ describe('AnniversarySettings writes', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(await screen.findByText(OFFLINE)).toBeInTheDocument();
-    expect(addAnniversary).toHaveBeenCalledWith({ label: 'Moving day', date: '2025-06-01', description: undefined });
+    expect(addAnniversary).toHaveBeenCalledWith(
+      { label: 'Moving day', date: '2025-06-01', description: undefined },
+      expect.any(String)
+    );
     expect(screen.getByRole('heading', { name: 'Add Anniversary' })).toBeInTheDocument();
     expect(screen.getByLabelText(/^Label/)).toHaveValue('Moving day');
+  });
+
+  it('retrying the same add reuses its key; changing the form mints a new one', async () => {
+    addAnniversary.mockRejectedValue(new Error(OFFLINE));
+    render(<AnniversarySettings />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Anniversary' }));
+    fillForm('Moving day', '2025-06-01');
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await screen.findByText(OFFLINE);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(addAnniversary).toHaveBeenCalledTimes(2));
+
+    fillForm('Moving day!', '2025-06-01');
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(addAnniversary).toHaveBeenCalledTimes(3));
+
+    const keys = addAnniversary.mock.calls.map((call) => call[1]);
+    // A lost response then a retry resolves to one row only if the key repeats.
+    expect(keys[1]).toBe(keys[0]);
+    // Different content must not reuse it, or the server would hand back the
+    // first row and drop the edit.
+    expect(keys[2]).not.toBe(keys[0]);
   });
 
   it('a rejected update keeps the form open and shows why', async () => {

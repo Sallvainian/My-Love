@@ -82,24 +82,54 @@ export const anniversariesService = {
     }
   },
 
-  async createAnniversary(userId: string, input: AnniversaryInput): Promise<ServerAnniversary> {
+  /**
+   * Retry-safe create. `clientKey` is minted once per submit by the caller and
+   * reused when the user retries the same submit, so a response lost after the
+   * server committed resolves to the stored row instead of a second one:
+   * ON CONFLICT DO NOTHING on `UNIQUE (user_id, client_key)`, then a read-back
+   * by key when the conflict returns no row (the notesSlice pattern). That is
+   * also what makes the request timeout safe here.
+   */
+  async createAnniversary(
+    userId: string,
+    input: AnniversaryInput,
+    clientKey: string
+  ): Promise<ServerAnniversary> {
     requireOnline(WHAT);
     requireCalendarDate(input.date);
     try {
       const { data, error } = await supabase
         .from('anniversaries')
-        .insert({
-          user_id: userId,
-          event_date: input.date,
-          label: input.label,
-          description: input.description ?? null,
-        })
+        .upsert(
+          {
+            user_id: userId,
+            event_date: input.date,
+            label: input.label,
+            description: input.description ?? null,
+            client_key: clientKey,
+          },
+          { onConflict: 'user_id,client_key', ignoreDuplicates: true }
+        )
         .select()
-        .single();
+        .abortSignal(requestTimeout())
+        .maybeSingle();
       if (error) throw error;
-      if (!data) throw new AccountDataError('invalid-response', 'The anniversary was not created');
-      logger.debug('[AnniversariesService] Created anniversary:', data.id);
-      return toServerAnniversary(data);
+
+      let stored = data;
+      if (!stored) {
+        const existing = await supabase
+          .from('anniversaries')
+          .select()
+          .eq('user_id', userId)
+          .eq('client_key', clientKey)
+          .abortSignal(requestTimeout())
+          .maybeSingle();
+        if (existing.error) throw existing.error;
+        stored = existing.data;
+      }
+      if (!stored) throw new AccountDataError('invalid-response', 'The anniversary was not created');
+      logger.debug('[AnniversariesService] Created anniversary:', stored.id);
+      return toServerAnniversary(stored);
     } catch (error) {
       throw toAccountDataError('AnniversariesService.createAnniversary', error);
     }

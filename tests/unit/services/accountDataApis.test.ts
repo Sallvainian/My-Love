@@ -24,7 +24,7 @@ function builder(table: string) {
   const entry = { table, chain: [] as Array<[string, unknown[]]> };
   calls.push(entry);
   const proxy: Record<string, unknown> = {};
-  for (const method of ['select', 'insert', 'update', 'upsert', 'delete', 'eq', 'order', 'single', 'abortSignal']) {
+  for (const method of ['select', 'insert', 'update', 'upsert', 'delete', 'eq', 'order', 'single', 'maybeSingle', 'abortSignal']) {
     proxy[method] = (...args: unknown[]) => {
       entry.chain.push([method, args]);
       return proxy;
@@ -100,11 +100,11 @@ afterEach(() => {
 
 describe('offline writes fail before any request', () => {
   it.each([
-    ['createAnniversary', () => anniversariesService.createAnniversary(A, { date: '2024-02-14', label: 'x' })],
+    ['createAnniversary', () => anniversariesService.createAnniversary(A, { date: '2024-02-14', label: 'x' }, 'k-1')],
     ['updateAnniversary', () => anniversariesService.updateAnniversary('ann-1', { date: '2024-02-14', label: 'x' })],
     ['deleteAnniversary', () => anniversariesService.deleteAnniversary('ann-1')],
     ['createCustomMessage', () =>
-      customMessagesApi.createCustomMessage(A, { text: 'x', category: 'custom', active: true, tags: [] })],
+      customMessagesApi.createCustomMessage(A, { text: 'x', category: 'custom', active: true, tags: [] }, 'k-1')],
     ['updateCustomMessage', () => customMessagesApi.updateCustomMessage('cm-1', { isFavorite: true })],
     ['deleteCustomMessage', () => customMessagesApi.deleteCustomMessage('cm-1')],
     ['addFavorite', () => messageFavoritesApi.addFavorite(A, 'b:1')],
@@ -120,10 +120,10 @@ describe('offline writes fail before any request', () => {
 });
 
 describe('request bounds', () => {
-  // Every request that is safe to repeat is abandoned after REQUEST_TIMEOUT_MS,
-  // so a stalled socket cannot hold the strict account-data queue. The two
-  // plain creates are not: a timeout after the server committed would invite a
-  // retry that stores the row twice.
+  // Every request is abandoned after REQUEST_TIMEOUT_MS, so a stalled socket
+  // cannot hold the strict account-data queue. That includes both creates:
+  // they reuse the caller's key on a retry, so a timeout that fired after the
+  // server committed resolves to the stored row rather than a second one.
   const signalOf = (index = 0) => argsOf('abortSignal', index)?.[0];
 
   it.each([
@@ -151,15 +151,15 @@ describe('request bounds', () => {
   });
 
   it.each([
-    ['createAnniversary', () => anniversariesService.createAnniversary(A, { date: '2024-02-14', label: 'x' }),
+    ['createAnniversary', () => anniversariesService.createAnniversary(A, { date: '2024-02-14', label: 'x' }, 'k-1'),
       { data: anniversaryRow, error: null }],
     ['createCustomMessage', () =>
-      customMessagesApi.createCustomMessage(A, { text: 'x', category: 'custom', active: true, tags: [] }),
+      customMessagesApi.createCustomMessage(A, { text: 'x', category: 'custom', active: true, tags: [] }, 'k-1'),
       { data: customRow, error: null }],
-  ])('%s is not abandoned on a timer', async (_name, request, result) => {
+  ])('%s carries a timeout signal too — it is retry-safe', async (_name, request, result) => {
     results.push(result as Result);
     await request();
-    expect(signalOf()).toBeUndefined();
+    expect(signalOf()).toBeInstanceOf(AbortSignal);
   });
 });
 
@@ -177,20 +177,21 @@ describe('anniversariesService', () => {
   it('creates under the caller and returns the server id', async () => {
     results.push({ data: { ...anniversaryRow, description: 'dinner' }, error: null });
 
-    const created = await anniversariesService.createAnniversary(A, {
-      date: '2024-02-14',
-      label: 'First date',
-      description: 'dinner',
-    });
+    const created = await anniversariesService.createAnniversary(
+      A,
+      { date: '2024-02-14', label: 'First date', description: 'dinner' },
+      'k-1'
+    );
 
     expect(created).toEqual({ serverId: 'ann-1', date: '2024-02-14', label: 'First date', description: 'dinner' });
-    expect(argsOf('insert')).toEqual([
-      { user_id: A, event_date: '2024-02-14', label: 'First date', description: 'dinner' },
+    expect(argsOf('upsert')).toEqual([
+      { user_id: A, event_date: '2024-02-14', label: 'First date', description: 'dinner', client_key: 'k-1' },
+      { onConflict: 'user_id,client_key', ignoreDuplicates: true },
     ]);
   });
 
   it('refuses a date the mirror schema could not read back', async () => {
-    await expect(anniversariesService.createAnniversary(A, { date: '2026-02-30', label: 'x' })).rejects.toThrow(
+    await expect(anniversariesService.createAnniversary(A, { date: '2026-02-30', label: 'x' }, 'k-1')).rejects.toThrow(
       'Not a valid calendar date'
     );
     expect(calls).toHaveLength(0);

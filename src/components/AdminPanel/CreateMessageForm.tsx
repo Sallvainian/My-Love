@@ -1,6 +1,7 @@
 import { m as motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useState } from 'react';
+import { useSubmitKey } from '../../hooks/useSubmitKey';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MessageCategory } from '../../types';
 import { isValidationError } from '../../validation/errorMessages';
@@ -15,6 +16,9 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
   const [text, setText] = useState('');
   const [category, setCategory] = useState<MessageCategory>('custom');
   const [active, setActive] = useState(true); // Story 3.5: Default to active
+  // Reused when the user retries the same submit, so a save whose response was
+  // lost resolves to the stored message instead of a duplicate.
+  const { keyFor, reset: resetSubmitKey } = useSubmitKey();
 
   // Error state
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +37,9 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
       setTextError(null);
       setCategoryError(null);
 
-      await createCustomMessage({ text: text.trim(), category, active });
+      const input = { text: text.trim(), category, active };
+      await createCustomMessage(input, keyFor(input));
+      resetSubmitKey();
       setText('');
       setCategory('custom');
       setActive(true);
@@ -62,6 +68,7 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
   };
 
   const handleCancel = () => {
+    resetSubmitKey();
     setText('');
     setCategory('custom');
     setActive(true);
