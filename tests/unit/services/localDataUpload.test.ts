@@ -21,7 +21,9 @@ const api = vi.hoisted(() => ({
 
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: {
-    from: (table: string) => ({ insert: (row: unknown) => api.receiptInsert(table, row) }),
+    from: (table: string) => ({
+      insert: (row: unknown) => ({ abortSignal: () => api.receiptInsert(table, row) }),
+    }),
   },
 }));
 

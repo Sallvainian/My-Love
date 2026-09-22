@@ -24,7 +24,7 @@ function builder(table: string) {
   const entry = { table, chain: [] as Array<[string, unknown[]]> };
   calls.push(entry);
   const proxy: Record<string, unknown> = {};
-  for (const method of ['select', 'insert', 'update', 'upsert', 'delete', 'eq', 'order', 'single']) {
+  for (const method of ['select', 'insert', 'update', 'upsert', 'delete', 'eq', 'order', 'single', 'abortSignal']) {
     proxy[method] = (...args: unknown[]) => {
       entry.chain.push([method, args]);
       return proxy;
@@ -116,6 +116,50 @@ describe('offline writes fail before any request', () => {
     expect((failure as AccountDataError).code).toBe('offline');
     expect((failure as AccountDataError).message).toMatch(/offline/i);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('request bounds', () => {
+  // Every request that is safe to repeat is abandoned after REQUEST_TIMEOUT_MS,
+  // so a stalled socket cannot hold the strict account-data queue. The two
+  // plain creates are not: a timeout after the server committed would invite a
+  // retry that stores the row twice.
+  const signalOf = (index = 0) => argsOf('abortSignal', index)?.[0];
+
+  it.each([
+    ['fetchAnniversaries', () => anniversariesService.fetchAnniversaries(A), { data: [], error: null }],
+    ['updateAnniversary', () => anniversariesService.updateAnniversary('ann-1', { date: '2024-02-14', label: 'x' }),
+      { data: [anniversaryRow], error: null }],
+    ['deleteAnniversary', () => anniversariesService.deleteAnniversary('ann-1'), { data: null, error: null }],
+    ['insertAnniversariesOnce', () =>
+      anniversariesService.insertAnniversariesOnce([{ user_id: A, event_date: '2024-02-14', label: 'x', client_key: 'k' }]),
+      { data: null, error: null }],
+    ['fetchCustomMessages', () => customMessagesApi.fetchCustomMessages(A), { data: [], error: null }],
+    ['updateCustomMessage', () => customMessagesApi.updateCustomMessage('cm-1', { text: 'x' }),
+      { data: [customRow], error: null }],
+    ['deleteCustomMessage', () => customMessagesApi.deleteCustomMessage('cm-1'), { data: null, error: null }],
+    ['insertCustomMessagesOnce', () =>
+      customMessagesApi.insertCustomMessagesOnce([{ user_id: A, text: 'x', category: 'custom', client_key: 'k' }]),
+      { data: null, error: null }],
+    ['fetchFavoriteKeys', () => messageFavoritesApi.fetchFavoriteKeys(A), { data: [], error: null }],
+    ['addFavorite', () => messageFavoritesApi.addFavorite(A, 'b:1'), { data: null, error: null }],
+    ['removeFavorite', () => messageFavoritesApi.removeFavorite(A, 'b:1'), { data: null, error: null }],
+  ])('%s carries a timeout signal', async (_name, request, result) => {
+    results.push(result as Result);
+    await request();
+    expect(signalOf()).toBeInstanceOf(AbortSignal);
+  });
+
+  it.each([
+    ['createAnniversary', () => anniversariesService.createAnniversary(A, { date: '2024-02-14', label: 'x' }),
+      { data: anniversaryRow, error: null }],
+    ['createCustomMessage', () =>
+      customMessagesApi.createCustomMessage(A, { text: 'x', category: 'custom', active: true, tags: [] }),
+      { data: customRow, error: null }],
+  ])('%s is not abandoned on a timer', async (_name, request, result) => {
+    results.push(result as Result);
+    await request();
+    expect(signalOf()).toBeUndefined();
   });
 });
 
@@ -222,7 +266,7 @@ describe('customMessagesApi', () => {
   it('treats deleting an already-deleted row as done', async () => {
     results.push({ data: null, error: null });
     await expect(customMessagesApi.deleteCustomMessage('cm-1')).resolves.toBeUndefined();
-    expect(methods()).toEqual(['delete', 'eq']);
+    expect(methods()).toEqual(['delete', 'eq', 'abortSignal']);
   });
 
   it('uploads with ON CONFLICT DO NOTHING on (user_id, client_key)', async () => {
@@ -266,6 +310,7 @@ describe('messageFavoritesApi', () => {
       ['delete', []],
       ['eq', ['user_id', A]],
       ['eq', ['message_key', 'b:1']],
+      ['abortSignal', [expect.any(AbortSignal)]],
     ]);
   });
 

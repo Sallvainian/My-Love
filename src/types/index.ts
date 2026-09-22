@@ -33,6 +33,12 @@ export interface Message {
    * not yet uploaded (`localDataUpload.ts`).
    */
   serverId?: string;
+  /**
+   * Set by the mirror refresh on an owned custom row the one-time upload could
+   * not send (blank, or over the length limit). It never syncs; the only write
+   * it allows is a delete from this device.
+   */
+  localOnly?: boolean;
   active?: boolean;
   createdAt: Date;
   isFavorite?: boolean;

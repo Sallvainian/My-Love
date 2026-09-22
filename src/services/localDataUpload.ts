@@ -38,7 +38,7 @@
 import { supabase } from '../api/supabaseClient';
 import type { Anniversary, Message } from '../types';
 import { logger } from '../utils/logger';
-import { requireOnline, toAccountDataError } from './accountDataError';
+import { requestTimeout, requireOnline, toAccountDataError } from './accountDataError';
 import { serializeAccountDataWrite } from './accountDataQueue';
 import { anniversariesService, type AnniversaryInsert } from './anniversariesService';
 import { customMessagesApi, isMessageCategory, type CustomMessageInsert } from './customMessagesApi';
@@ -179,7 +179,7 @@ async function writeReceipt(userId: string, origin: string, counts: LocalUploadC
       anniversaries_count: counts.anniversaries,
       custom_messages_count: counts.customMessages,
       favorites_count: counts.favorites,
-    });
+    }).abortSignal(requestTimeout());
     if (error) throw error;
   } catch (error) {
     throw toAccountDataError('LocalDataUpload.writeReceipt', error);

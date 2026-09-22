@@ -8,7 +8,7 @@ import type {
 } from '../types';
 import { projectMessageFavorites } from './messageFavorites';
 import { logger } from '../utils/logger';
-import { AccountDataError } from './accountDataError';
+import { AccountDataError, notSyncedMessage } from './accountDataError';
 import { serializeAccountDataWrite } from './accountDataQueue';
 import { customMessagesApi, type ServerCustomMessage } from './customMessagesApi';
 import {
@@ -54,7 +54,8 @@ import { type MyLoveDBSchema, DB_VERSION, openMyLoveDB } from './dbSchema';
  * mirrored row carries its server id as `serverId`; a row without one has not
  * been uploaded yet (`localDataUpload.ts`) and cannot be edited or deleted
  * until it is. `replaceMirrorForUser()` swaps the mirror for the server's rows
- * once the upload has completed.
+ * once the upload has completed, keeping any row the upload could not send;
+ * such a row can then only be deleted, and only from this device.
  *
  * Extends: BaseIndexedDBService<Message>
  * - Inherits: init(), add()
@@ -417,10 +418,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       throw new Error(`Custom message ${id} not found for this user`);
     }
     if (!current.serverId) {
-      throw new AccountDataError(
-        'not-synced',
-        'This message has not been saved to your account yet. Try again in a moment.'
-      );
+      throw new AccountDataError('not-synced', notSyncedMessage(current.localOnly));
     }
     return current.serverId;
   }
@@ -462,8 +460,13 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
         logger.debug('[CustomMessageService] Nothing to delete, id:', id);
         return;
       }
-      // Server first; an already-deleted server row counts as deleted.
-      await customMessagesApi.deleteCustomMessage(await this.requireSyncedRow(owner, id));
+      // Server first; an already-deleted server row counts as deleted. A row
+      // marked `localOnly` is one the upload could not send and the refresh
+      // kept (replaceMirrorForUser): the server holds nothing to delete, so
+      // only the local copy goes.
+      if (!stored.localOnly) {
+        await customMessagesApi.deleteCustomMessage(await this.requireSyncedRow(owner, id));
+      }
 
       const tx = this.getTypedDB().transaction(['messages', 'message-favorites'], 'readwrite');
       const current = await tx.objectStore('messages').get(id);
@@ -554,7 +557,12 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
     const serverTexts = new Set(rows.map((row) => row.text.trim().toLowerCase()));
     for (const row of owned) {
       if (kept.has(row.id)) continue;
-      if (!row.serverId && !serverTexts.has(row.text.trim().toLowerCase())) continue;
+      // Never sent (the upload skipped it as invalid): keep it, marked so it
+      // can still be deleted from this device.
+      if (!row.serverId && !serverTexts.has(row.text.trim().toLowerCase())) {
+        if (!row.localOnly) await messages.put({ ...row, localOnly: true });
+        continue;
+      }
       await messages.delete(row.id);
       await favorites.delete([row.id, owner]);
     }

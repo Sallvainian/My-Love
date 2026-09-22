@@ -1,6 +1,9 @@
 /**
- * accountDataQueue — one account-data write or refresh at a time, but never
- * held hostage by a request that never settles (a stalled mobile socket).
+ * accountDataQueue — strictly one account-data write, refresh or upload at a
+ * time. Nothing ever starts beside a running task, however long it takes: a
+ * stalled request is bounded where it is made (`requestTimeout()`), never by
+ * releasing the queue, which would let the stalled task finish beside its
+ * successor and erase that write from the mirror.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,8 +13,8 @@ let queue: QueueModule;
 
 beforeEach(async () => {
   vi.useFakeTimers();
-  // A fresh module per case: the queue is module state, and a stalled task
-  // from one case must not delay the next.
+  // A fresh module per case: the queue is module state, and a task left
+  // pending by one case must not hold the next.
   vi.resetModules();
   queue = await import('../../../src/services/accountDataQueue');
 });
@@ -19,8 +22,6 @@ beforeEach(async () => {
 afterEach(() => {
   vi.useRealTimers();
 });
-
-const never = () => new Promise<never>(() => {});
 
 describe('serializeAccountDataWrite', () => {
   it('runs tasks one at a time, in call order', async () => {
@@ -56,37 +57,22 @@ describe('serializeAccountDataWrite', () => {
     await expect(next).resolves.toBe('ran');
   });
 
-  it('a task that never settles holds the queue for QUEUE_STALL_MS, then lets the next one run', async () => {
-    const stalled = queue.serializeAccountDataWrite(never);
+  it('never starts a task beside a slow one, however long it runs', async () => {
+    let finishSlow: () => void = () => {};
+    const slow = queue.serializeAccountDataWrite(
+      () => new Promise<void>((resolve) => {
+        finishSlow = resolve;
+      })
+    );
     const next = vi.fn(async () => 'ran');
     const queued = queue.serializeAccountDataWrite(next);
 
-    await vi.advanceTimersByTimeAsync(queue.QUEUE_STALL_MS - 1);
+    // Far past any timer a release-on-timeout queue would use.
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
     expect(next).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1);
+
+    finishSlow();
+    await slow;
     await expect(queued).resolves.toBe('ran');
-
-    // The stalled caller's own promise is unchanged: still pending.
-    const probe = Symbol('pending');
-    expect(await Promise.race([stalled, Promise.resolve(probe)])).toBe(probe);
-  });
-
-  it('each task’s bound starts when it starts, so two stalls never overlap', async () => {
-    queue.serializeAccountDataWrite(never);
-    const secondStarted = vi.fn();
-    queue.serializeAccountDataWrite(() => {
-      secondStarted();
-      return never();
-    });
-    const third = vi.fn(async () => {});
-    queue.serializeAccountDataWrite(third);
-
-    await vi.advanceTimersByTimeAsync(queue.QUEUE_STALL_MS);
-    expect(secondStarted).toHaveBeenCalled();
-    expect(third).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(queue.QUEUE_STALL_MS - 1);
-    expect(third).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(third).toHaveBeenCalled();
   });
 });

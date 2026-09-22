@@ -494,7 +494,9 @@ describe('messages: favorites and the mirror refresh', () => {
     expect(ids).toContain(invalidId);
     expect(ids).not.toContain(duplicateId);
     expect(ids).not.toContain(goneId);
-    expect(mine.find((row) => row.id === invalidId)).toMatchObject({ text: tooLong });
+    // Kept and marked: the only row a local-only delete may remove.
+    expect(mine.find((row) => row.id === invalidId)).toMatchObject({ text: tooLong, localOnly: true });
+    expect(mine.filter((row) => row.localOnly).map((row) => row.id)).toEqual([invalidId]);
     expect(mine.some((row) => row.serverId === `srv-same-${A}`)).toBe(true);
     // Untouched means its favorite too.
     expect((await diskFavorites(A)).map((f) => f.messageId)).toEqual([invalidId]);

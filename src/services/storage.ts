@@ -1,7 +1,7 @@
 import type { IDBPDatabase } from 'idb';
 import type { Message, Photo } from '../types';
 import { logger } from '../utils/logger';
-import { AccountDataError } from './accountDataError';
+import { AccountDataError, notSyncedMessage } from './accountDataError';
 import { serializeAccountDataWrite } from './accountDataQueue';
 import { customMessagesApi } from './customMessagesApi';
 import { type MyLoveDBSchema, openMyLoveDB } from './dbSchema';
@@ -334,10 +334,7 @@ class StorageService {
 
     if (message.isCustom) {
       if (!message.serverId) {
-        throw new AccountDataError(
-          'not-synced',
-          'This message has not been saved to your account yet. Try again in a moment.'
-        );
+        throw new AccountDataError('not-synced', notSyncedMessage(message.localOnly));
       }
       await customMessagesApi.updateCustomMessage(message.serverId, { isFavorite });
     } else {

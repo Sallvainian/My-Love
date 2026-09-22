@@ -17,7 +17,7 @@
  */
 
 import { supabase } from '../api/supabaseClient';
-import { requireOnline, toAccountDataError } from './accountDataError';
+import { requestTimeout, requireOnline, toAccountDataError } from './accountDataError';
 
 const WHAT = 'Favorites';
 
@@ -42,7 +42,8 @@ export const messageFavoritesApi = {
       const { data, error } = await supabase
         .from('message_favorites')
         .select('message_key')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .abortSignal(requestTimeout());
       if (error) throw error;
       return (data ?? []).map((row) => row.message_key);
     } catch (error) {
@@ -63,7 +64,8 @@ export const messageFavoritesApi = {
         .from('message_favorites')
         .delete()
         .eq('user_id', userId)
-        .eq('message_key', messageKey);
+        .eq('message_key', messageKey)
+        .abortSignal(requestTimeout());
       if (error) throw error;
     } catch (error) {
       throw toAccountDataError('MessageFavoritesApi.removeFavorite', error);
@@ -75,10 +77,13 @@ export const messageFavoritesApi = {
     if (messageKeys.length === 0) return;
     requireOnline(WHAT);
     try {
-      const { error } = await supabase.from('message_favorites').upsert(
-        messageKeys.map((message_key) => ({ user_id: userId, message_key })),
-        { onConflict: 'user_id,message_key', ignoreDuplicates: true }
-      );
+      const { error } = await supabase
+        .from('message_favorites')
+        .upsert(
+          messageKeys.map((message_key) => ({ user_id: userId, message_key })),
+          { onConflict: 'user_id,message_key', ignoreDuplicates: true }
+        )
+        .abortSignal(requestTimeout());
       if (error) throw error;
     } catch (error) {
       throw toAccountDataError('MessageFavoritesApi.insertFavoritesOnce', error);

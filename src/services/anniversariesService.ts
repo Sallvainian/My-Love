@@ -21,7 +21,7 @@
 import type { Database } from '../api/supabaseClient';
 import { supabase } from '../api/supabaseClient';
 import { logger } from '../utils/logger';
-import { AccountDataError, requireOnline, toAccountDataError } from './accountDataError';
+import { AccountDataError, requestTimeout, requireOnline, toAccountDataError } from './accountDataError';
 import { parseEventDate } from './eventsService';
 
 export type SupabaseAnniversaryRecord = Database['public']['Tables']['anniversaries']['Row'];
@@ -72,7 +72,8 @@ export const anniversariesService = {
         .eq('user_id', userId)
         .order('event_date', { ascending: true })
         .order('created_at', { ascending: true })
-        .order('id', { ascending: true });
+        .order('id', { ascending: true })
+        .abortSignal(requestTimeout());
       if (error) throw error;
       // An unreadable date is dropped rather than poisoning the mirror.
       return (data ?? []).filter((row) => parseEventDate(row.event_date)).map(toServerAnniversary);
@@ -118,7 +119,8 @@ export const anniversariesService = {
           updated_at: new Date().toISOString(),
         })
         .eq('id', serverId)
-        .select();
+        .select()
+        .abortSignal(requestTimeout());
       if (error) throw error;
       if (!data || data.length === 0) {
         throw new AccountDataError('not-found', 'Anniversary not found');
@@ -136,7 +138,11 @@ export const anniversariesService = {
   async deleteAnniversary(serverId: string): Promise<void> {
     requireOnline(WHAT);
     try {
-      const { error } = await supabase.from('anniversaries').delete().eq('id', serverId);
+      const { error } = await supabase
+        .from('anniversaries')
+        .delete()
+        .eq('id', serverId)
+        .abortSignal(requestTimeout());
       if (error) throw error;
     } catch (error) {
       throw toAccountDataError('AnniversariesService.deleteAnniversary', error);
@@ -154,7 +160,8 @@ export const anniversariesService = {
     try {
       const { error } = await supabase
         .from('anniversaries')
-        .upsert(rows, { onConflict: 'user_id,client_key', ignoreDuplicates: true });
+        .upsert(rows, { onConflict: 'user_id,client_key', ignoreDuplicates: true })
+        .abortSignal(requestTimeout());
       if (error) throw error;
     } catch (error) {
       throw toAccountDataError('AnniversariesService.insertAnniversariesOnce', error);

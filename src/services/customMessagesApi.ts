@@ -19,7 +19,7 @@ import type { Database } from '../api/supabaseClient';
 import { supabase } from '../api/supabaseClient';
 import type { MessageCategory } from '../types';
 import { logger } from '../utils/logger';
-import { AccountDataError, requireOnline, toAccountDataError } from './accountDataError';
+import { AccountDataError, requestTimeout, requireOnline, toAccountDataError } from './accountDataError';
 
 export type SupabaseCustomMessageRecord = Database['public']['Tables']['custom_messages']['Row'];
 export type CustomMessageInsert = Database['public']['Tables']['custom_messages']['Insert'];
@@ -74,7 +74,8 @@ export const customMessagesApi = {
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: true })
-        .order('id', { ascending: true });
+        .order('id', { ascending: true })
+        .abortSignal(requestTimeout());
       if (error) throw error;
       return (data ?? []).map(toServerCustomMessage);
     } catch (error) {
@@ -119,7 +120,8 @@ export const customMessagesApi = {
         .from('custom_messages')
         .update(payload)
         .eq('id', serverId)
-        .select();
+        .select()
+        .abortSignal(requestTimeout());
       if (error) throw error;
       if (!data || data.length === 0) {
         throw new AccountDataError('not-found', 'Custom message not found');
@@ -134,7 +136,11 @@ export const customMessagesApi = {
   async deleteCustomMessage(serverId: string): Promise<void> {
     requireOnline(WHAT);
     try {
-      const { error } = await supabase.from('custom_messages').delete().eq('id', serverId);
+      const { error } = await supabase
+        .from('custom_messages')
+        .delete()
+        .eq('id', serverId)
+        .abortSignal(requestTimeout());
       if (error) throw error;
     } catch (error) {
       throw toAccountDataError('CustomMessagesApi.deleteCustomMessage', error);
@@ -151,7 +157,8 @@ export const customMessagesApi = {
     try {
       const { error } = await supabase
         .from('custom_messages')
-        .upsert(rows, { onConflict: 'user_id,client_key', ignoreDuplicates: true });
+        .upsert(rows, { onConflict: 'user_id,client_key', ignoreDuplicates: true })
+        .abortSignal(requestTimeout());
       if (error) throw error;
     } catch (error) {
       throw toAccountDataError('CustomMessagesApi.insertCustomMessagesOnce', error);
