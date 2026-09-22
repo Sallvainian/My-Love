@@ -5,7 +5,7 @@
 
 A Progressive Web App for couples to exchange daily love messages, track moods, share photos, chat via love notes, and send playful interactions. Built with React 19, TypeScript, Vite, Tailwind CSS v4, Framer Motion, Zustand, and Supabase.
 
-**Live**: https://sallvainian.github.io/My-Love/
+**Live**: https://my-love.sallvain.workers.dev/
 
 ## Features
 
@@ -126,7 +126,7 @@ supabase gen types typescript --local | grep -v '^Connecting to' > src/types/dat
 
 ### Base Path
 
-Production uses `/My-Love/` for GitHub Pages. Development uses `/`. Configured in `vite.config.ts`.
+Production and development both serve from `/` — the app sits at the root of its Cloudflare Workers origin. Configured in `vite.config.ts`.
 
 ## Project Structure
 
@@ -182,7 +182,7 @@ Runs on every PR targeting `main`:
 
 ### Deploy Pipeline (`.github/workflows/deploy.yml`)
 
-On push to `main`: build → smoke test → deploy to GitHub Pages → health check.
+On push to `main`: apply migrations → build → smoke test → `wrangler deploy` to Cloudflare Workers → health check.
 
 ### Other Workflows
 
@@ -203,11 +203,15 @@ On push to `main`: build → smoke test → deploy to GitHub Pages → health ch
 | `SUPABASE_ACCESS_TOKEN`                 | CLI auth for type generation      |
 | `GROK_AUTH_JSON`                        | Grok review: contents of `~/.grok/auth.json` |
 | `XAI_API_KEY`                           | Grok review fallback (console.x.ai) |
+| `CLOUDFLARE_API_TOKEN`                  | `production` environment: "Edit Cloudflare Workers" token for `wrangler deploy` |
+| `CLOUDFLARE_ACCOUNT_ID`                 | `production` environment: Cloudflare account the Worker lives in |
 
-### GitHub Pages
+The repository variable `SITE_URL` (`https://my-love.sallvain.workers.dev/`, trailing slash required) is the address the health check and Lighthouse audit.
 
-1. **Settings** > **Pages** > **Source**: "GitHub Actions"
-2. Pushes to `main` auto-deploy via the deploy workflow
+### Cloudflare Workers
+
+1. `wrangler.jsonc` defines the Worker: an assets-only Worker named `my-love` serving `dist/` in single-page-application mode.
+2. Pushes to `main` auto-deploy via the deploy workflow. To deploy by hand, build with secrets first — `fnox exec -- npm run build`, then `npx wrangler deploy` (after `npx wrangler login`).
 
 ## Installing on Mobile
 
