@@ -1,9 +1,0 @@
-{
-  "head": "79d3218651ddf2598c9875c4880cbe3aaed14a73",
-  "baseline": "07335c0da9f77ab2f70e1a00223630288592aadb",
-  "status": " M _bmad-output/implementation-artifacts/deferred-work.md\n",
-  "protected_sha256": {
-    "_bmad-output/implementation-artifacts/deferred-work.md": "eb0f437a07cc11f3123c6069ba975420d2f675fdb189ce762fa962c4c0f89d6c"
-  },
-  "scope": "Committed test changes at bb04e444 plus current checkout; pre-existing ledger change preserved."
-}
