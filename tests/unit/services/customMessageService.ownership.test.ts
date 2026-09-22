@@ -23,7 +23,6 @@ import { openDB, type IDBPDatabase } from 'idb';
 import { DB_NAME, DB_VERSION, upgradeDb } from '../../../src/services/dbSchema';
 import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 import type { CustomMessagesExport, Message } from '../../../src/types';
-import { hashText } from '../../../src/services/messageFavoritesApi';
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { fakeCustomMessagesApi } from '../helpers/fakeAccountDataApis';
 
@@ -576,17 +575,20 @@ describe('customMessageService ownership', () => {
       expect(result).toEqual({ imported: 1, skipped: 1 });
     });
 
-    it('keys each imported row by its text, so a re-import after a lost response cannot duplicate it', async () => {
+    it('gives each imported row its own key, never one derived from the text', async () => {
+      // A text-derived key would belong to a message edited since its import,
+      // so a re-import would get the edited row back and store nothing.
       const service = await freshService();
       fakeCustomMessagesApi.createCustomMessage.mockClear();
 
-      await service.importMessages(A, exportFile(['  Imported Once  ']));
+      await service.importMessages(A, exportFile(['Imported Once']));
+      await service.deleteForUser(A, (await service.getAllForUser(A, { isCustom: true }))[0].id);
+      await service.importMessages(A, exportFile(['Imported Once']));
 
-      expect(fakeCustomMessagesApi.createCustomMessage).toHaveBeenLastCalledWith(
-        A,
-        expect.objectContaining({ text: 'Imported Once' }),
-        `i:${await hashText('imported once')}`
-      );
+      const keys = fakeCustomMessagesApi.createCustomMessage.mock.calls.map((call) => call[2]);
+      expect(keys).toHaveLength(2);
+      expect(keys[1]).not.toBe(keys[0]);
+      expect(keys[0]).not.toMatch(/^i:/);
     });
 
     it('does not deduplicate against a legacy unowned row', async () => {

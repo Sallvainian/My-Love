@@ -12,10 +12,9 @@
 -- that interrupts the first run -- collides on UNIQUE (user_id, client_key)
 -- and is ignored (ON CONFLICT DO NOTHING) instead of inserting a duplicate.
 -- The in-app creates send a key minted once per submit and reused on its
--- retry (a custom-message import keys each row by its text), and read the
--- stored row back on a conflict. The random default is only a fallback. A
--- plain constraint, not a
--- partial index: PostgREST's on_conflict cannot express an index predicate
+-- retry, and read the stored row back on a conflict. The random default is
+-- only a fallback. A plain constraint, not a partial index: PostgREST's
+-- on_conflict cannot express an index predicate
 -- (same reasoning as 20260727000000_love_notes_idempotency.sql).
 --
 -- updated_at is client-maintained, as on public.events: there is deliberately

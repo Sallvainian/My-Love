@@ -23,7 +23,11 @@ let nextServerId = 0;
 export const fakeCustomMessagesApi = {
   fetchCustomMessages: vi.fn(async (_userId: string): Promise<ServerCustomMessage[]> => []),
   createCustomMessage: vi.fn(
-    async (_userId: string, fields: CustomMessageFields): Promise<ServerCustomMessage> => ({
+    async (
+      _userId: string,
+      fields: CustomMessageFields,
+      _clientKey: string
+    ): Promise<ServerCustomMessage> => ({
       serverId: `server-${++nextServerId}`,
       ...fields,
       isFavorite: false,
