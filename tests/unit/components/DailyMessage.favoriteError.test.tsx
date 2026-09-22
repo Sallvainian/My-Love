@@ -78,3 +78,17 @@ describe('DailyMessage favorite error', () => {
     expect(screen.queryByTestId('message-favorite-error')).toBeNull();
   });
 });
+
+describe('DailyMessage category chip', () => {
+  it('labels a reason message "Why I Love You" with a lucide heart and no emoji', () => {
+    showMessage(null);
+
+    render(<DailyMessage />);
+
+    const chip = screen.getByTestId('message-category-badge');
+    expect(chip).toHaveTextContent('Why I Love You');
+    expect(chip.textContent?.trim()).toBe('Why I Love You');
+    expect(chip.querySelector('svg.lucide-heart')).not.toBeNull();
+    expect(chip.textContent ?? '').not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+});
