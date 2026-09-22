@@ -17,6 +17,20 @@ updates:
       - 'dependencies'
       - 'npm'
     groups:
+      # vitest and its companion packages peer-pin each other on an exact
+      # version, so a major that arrives as one PR per package can never
+      # install: each PR leaves the other two pinned to the old major and
+      # every job dies at `npm ci` with ERESOLVE. This group is listed first
+      # and names them explicitly so they always travel together, majors
+      # included. The two groups below deliberately stay minor/patch-only.
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+        update-types:
+          - 'major'
+          - 'minor'
+          - 'patch'
       # Group minor and patch updates together
       production-dependencies:
         dependency-type: 'production'
