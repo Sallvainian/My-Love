@@ -79,7 +79,4 @@ export function applyTheme(themeName: ThemeName): void {
   root.style.setProperty('--color-accent', theme.colors.accent);
   root.style.setProperty('--gradient-background', theme.gradients.background);
   root.style.setProperty('--gradient-card', theme.gradients.card);
-
-  // Apply body background
-  document.body.style.background = theme.gradients.background;
 }
