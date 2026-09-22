@@ -34,6 +34,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      anniversaries: {
+        Row: {
+          client_key: string
+          created_at: string
+          description: string | null
+          event_date: string
+          id: string
+          label: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_key?: string
+          created_at?: string
+          description?: string | null
+          event_date: string
+          id?: string
+          label: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_key?: string
+          created_at?: string
+          description?: string | null
+          event_date?: string
+          id?: string
+          label?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       claude_bot_config: {
         Row: {
           created_at: string | null
@@ -49,6 +82,45 @@ export type Database = {
           created_at?: string | null
           key?: string
           value?: string
+        }
+        Relationships: []
+      }
+      custom_messages: {
+        Row: {
+          active: boolean
+          category: string
+          client_key: string
+          created_at: string
+          id: string
+          is_favorite: boolean
+          tags: string[]
+          text: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          category: string
+          client_key?: string
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          tags?: string[]
+          text: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          client_key?: string
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          tags?: string[]
+          text?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -127,6 +199,36 @@ export type Database = {
           },
         ]
       }
+      local_data_uploads: {
+        Row: {
+          anniversaries_count: number
+          created_at: string
+          custom_messages_count: number
+          favorites_count: number
+          id: string
+          origin: string
+          user_id: string
+        }
+        Insert: {
+          anniversaries_count: number
+          created_at?: string
+          custom_messages_count: number
+          favorites_count: number
+          id?: string
+          origin: string
+          user_id: string
+        }
+        Update: {
+          anniversaries_count?: number
+          created_at?: string
+          custom_messages_count?: number
+          favorites_count?: number
+          id?: string
+          origin?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       love_note_removals: {
         Row: {
           note_id: string
@@ -187,6 +289,24 @@ export type Database = {
           idempotency_key?: string
           image_url?: string | null
           to_user_id?: string
+        }
+        Relationships: []
+      }
+      message_favorites: {
+        Row: {
+          created_at: string
+          message_key: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          message_key: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          message_key?: string
+          user_id?: string
         }
         Relationships: []
       }

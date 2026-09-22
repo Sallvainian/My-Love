@@ -21,6 +21,17 @@ import { DB_NAME, DB_VERSION } from '../../../src/services/dbSchema';
 import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 import type { Message } from '../../../src/types';
 
+// The server half of custom messages and favorites; these tests drive the
+// IndexedDB mirror, which is written only after the server accepted a write.
+vi.mock('../../../src/services/customMessagesApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/services/customMessagesApi')>()),
+  customMessagesApi: (await import('../helpers/fakeAccountDataApis')).fakeCustomMessagesApi,
+}));
+vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/services/messageFavoritesApi')>()),
+  messageFavoritesApi: (await import('../helpers/fakeAccountDataApis')).fakeMessageFavoritesApi,
+}));
+
 const ALL_STORES = [
   'messages',
   'message-favorites',
@@ -196,7 +207,7 @@ describe('storageService schema', () => {
     });
     const raw: Message[] = [
       { id: 1, text: 'daily', category: 'reason', isCustom: false, isFavorite: true, createdAt: new Date() },
-      { id: 2, text: 'owned', category: 'custom', isCustom: true, userId: 'owner-a', isFavorite: true, createdAt: new Date() },
+      { id: 2, text: 'owned', category: 'custom', isCustom: true, userId: 'owner-a', serverId: 'server-owned', isFavorite: true, createdAt: new Date() },
       { id: 3, text: 'ownerless', category: 'custom', isCustom: true, isFavorite: true, createdAt: new Date() },
     ];
     for (const row of raw) await legacy.put('messages', row);
@@ -237,7 +248,7 @@ describe('storageService schema', () => {
     });
     const raw: Message[] = [
       { id: 1, text: 'daily', category: 'reason', isCustom: false, isFavorite: true, createdAt: new Date() },
-      { id: 2, text: 'owned', category: 'custom', isCustom: true, userId: 'owner-a', isFavorite: true, createdAt: new Date() },
+      { id: 2, text: 'owned', category: 'custom', isCustom: true, userId: 'owner-a', serverId: 'server-owned', isFavorite: true, createdAt: new Date() },
       { id: 3, text: 'ownerless', category: 'custom', isCustom: true, isFavorite: true, createdAt: new Date() },
     ];
     for (const row of raw) await legacy.put('messages', row);
@@ -292,6 +303,7 @@ describe('storageService schema', () => {
         category: 'custom',
         isCustom: true,
         userId: A,
+        serverId: 'server-a',
         isFavorite: false,
         createdAt: new Date('2026-08-03T06:00:00.000Z'),
       });
@@ -300,6 +312,7 @@ describe('storageService schema', () => {
         category: 'custom',
         isCustom: true,
         userId: B,
+        serverId: 'server-b',
         isFavorite: false,
         createdAt: new Date('2026-08-03T06:00:00.000Z'),
       });

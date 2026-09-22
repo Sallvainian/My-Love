@@ -145,6 +145,9 @@ export const AnniversarySchema = z.object({
   date: IsoDateStringSchema,
   label: z.string().min(1, 'Anniversary label cannot be empty'),
   description: z.string().optional(),
+  // Optional, so a blob persisted before anniversaries moved to Supabase still
+  // parses: a failed SettingsSchema parse drops ALL persisted settings.
+  serverId: z.string().optional(),
 });
 
 /**

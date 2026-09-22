@@ -16,13 +16,26 @@
  * before `userId` existed, or migrated from the Story 3.4 LocalStorage list. It
  * belongs to nobody, must stay on disk, and must never surface to anyone.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { openDB, type IDBPDatabase } from 'idb';
 import { DB_NAME, DB_VERSION, upgradeDb } from '../../../src/services/dbSchema';
 import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 import type { CustomMessagesExport, Message } from '../../../src/types';
+import { AccountDataError } from '../../../src/services/accountDataError';
+import { fakeCustomMessagesApi } from '../helpers/fakeAccountDataApis';
+
+// The server half of custom messages and favorites; these tests drive the
+// IndexedDB mirror, which is written only after the server accepted a write.
+vi.mock('../../../src/services/customMessagesApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/services/customMessagesApi')>()),
+  customMessagesApi: (await import('../helpers/fakeAccountDataApis')).fakeCustomMessagesApi,
+}));
+vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/services/messageFavoritesApi')>()),
+  messageFavoritesApi: (await import('../helpers/fakeAccountDataApis')).fakeMessageFavoritesApi,
+}));
 
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
@@ -86,8 +99,12 @@ function customRow(userId: string | undefined, text: string): Omit<Message, 'id'
   };
   // Set the key only when there is an owner: an own-property `userId` that is
   // undefined is a different row shape from one with no such key, and the
-  // legacy rows genuinely have no key.
-  if (userId !== undefined) row.userId = userId;
+  // legacy rows genuinely have no key. An owned row is an uploaded mirror row,
+  // so it carries the server id its edits and deletes are addressed by.
+  if (userId !== undefined) {
+    row.userId = userId;
+    row.serverId = `server-${userId}-${text}`;
+  }
   return row;
 }
 
@@ -345,6 +362,60 @@ describe('customMessageService ownership', () => {
       expect((await service.getAllForUser(A, { isCustom: true })).map((m) => m.text).sort()).toEqual(
         ['A-PRIVATE-THREE', 'A-PRIVATE-TWO']
       );
+    });
+
+    it('sends an update and a delete to the server by the row’s serverId', async () => {
+      const { aIds } = await seedSharedDevice();
+      const service = await freshService();
+      fakeCustomMessagesApi.updateCustomMessage.mockClear();
+      fakeCustomMessagesApi.deleteCustomMessage.mockClear();
+
+      await service.updateMessage(A, { id: aIds[0], text: 'A-EDITED', active: false });
+      await service.deleteForUser(A, aIds[1]);
+
+      expect(fakeCustomMessagesApi.updateCustomMessage).toHaveBeenCalledWith(
+        `server-${A}-A-PRIVATE-ONE`,
+        { text: 'A-EDITED', active: false }
+      );
+      expect(fakeCustomMessagesApi.deleteCustomMessage).toHaveBeenCalledWith(
+        `server-${A}-A-PRIVATE-TWO`
+      );
+    });
+
+    it('leaves the disk untouched when the server refuses (offline)', async () => {
+      const { aIds } = await seedSharedDevice();
+      const service = await freshService();
+      const before = await rowsOnDisk();
+      fakeCustomMessagesApi.updateCustomMessage.mockRejectedValueOnce(
+        new AccountDataError('offline', 'You are offline.')
+      );
+      fakeCustomMessagesApi.deleteCustomMessage.mockRejectedValueOnce(
+        new AccountDataError('offline', 'You are offline.')
+      );
+
+      await expect(service.updateMessage(A, { id: aIds[0], text: 'A-EDITED' })).rejects.toMatchObject({
+        code: 'offline',
+      });
+      await expect(service.deleteForUser(A, aIds[0])).rejects.toMatchObject({ code: 'offline' });
+
+      expect(await rowsOnDisk()).toEqual(before);
+    });
+
+    it('refuses to edit or delete an owned row not yet uploaded, without calling the server', async () => {
+      const [localId] = await seed([{ ...customRow(A, 'A-LOCAL-ONLY'), serverId: undefined }]);
+      const service = await freshService();
+      const before = await rowsOnDisk();
+      fakeCustomMessagesApi.updateCustomMessage.mockClear();
+      fakeCustomMessagesApi.deleteCustomMessage.mockClear();
+
+      await expect(service.updateMessage(A, { id: localId, text: 'X' })).rejects.toMatchObject({
+        code: 'not-synced',
+      });
+      await expect(service.deleteForUser(A, localId)).rejects.toMatchObject({ code: 'not-synced' });
+
+      expect(fakeCustomMessagesApi.updateCustomMessage).not.toHaveBeenCalled();
+      expect(fakeCustomMessagesApi.deleteCustomMessage).not.toHaveBeenCalled();
+      expect(await rowsOnDisk()).toEqual(before);
     });
 
     it('refuses every write when nobody is signed in', async () => {

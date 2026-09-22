@@ -30,10 +30,12 @@ function formatAnniversaryDate(date: string): string {
 }
 
 export function AnniversarySettings() {
-  const { settings, addAnniversary, removeAnniversary, updateSettings } = useAppStore();
+  const { settings, addAnniversary, updateAnniversary, removeAnniversary } = useAppStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const anniversaries = settings?.relationship.anniversaries || [];
 
@@ -48,13 +50,23 @@ export function AnniversarySettings() {
   };
 
   const handleDelete = (id: number) => {
+    setDeleteError(null);
     setDeleteConfirmId(id);
   };
 
-  const confirmDelete = () => {
-    if (deleteConfirmId !== null) {
-      removeAnniversary(deleteConfirmId);
+  // Server first: the dialog stays open with the reason when the delete fails
+  // (offline included), rather than closing as if it had worked.
+  const confirmDelete = async () => {
+    if (deleteConfirmId === null) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await removeAnniversary(deleteConfirmId);
       setDeleteConfirmId(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Failed to delete anniversary');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -150,21 +162,12 @@ export function AnniversarySettings() {
           <AnniversaryForm
             anniversary={editingAnniversary}
             onClose={handleFormClose}
-            onSave={(data) => {
-              if (editingId && settings) {
-                // Update existing anniversary
-                const updatedAnniversaries = settings.relationship.anniversaries.map((a) =>
-                  a.id === editingId ? { ...a, ...data } : a
-                );
-                updateSettings({
-                  relationship: {
-                    ...settings.relationship,
-                    anniversaries: updatedAnniversaries,
-                  },
-                });
+            onSave={async (data) => {
+              // Throws on failure; the form shows the reason and stays open.
+              if (editingId) {
+                await updateAnniversary(editingId, data);
               } else {
-                // Add new anniversary
-                addAnniversary(data);
+                await addAnniversary(data);
               }
               handleFormClose();
             }}
@@ -195,6 +198,11 @@ export function AnniversarySettings() {
               <p className="mb-6 text-gray-600 dark:text-gray-400">
                 This action cannot be undone. The countdown will be removed.
               </p>
+              {deleteError && (
+                <p role="alert" className="mb-4 text-sm text-red-700 dark:text-red-400">
+                  {deleteError}
+                </p>
+              )}
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirmId(null)}
@@ -204,9 +212,10 @@ export function AnniversarySettings() {
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-red-700"
+                  disabled={isDeleting}
+                  className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-red-700 disabled:opacity-60"
                 >
-                  Delete
+                  {isDeleting ? 'Deleting…' : 'Delete'}
                 </button>
               </div>
             </motion.div>
@@ -220,7 +229,7 @@ export function AnniversarySettings() {
 interface AnniversaryFormProps {
   anniversary?: Anniversary;
   onClose: () => void;
-  onSave: (data: Omit<Anniversary, 'id'>) => void;
+  onSave: (data: Omit<Anniversary, 'id' | 'serverId'>) => Promise<void>;
 }
 
 function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps) {
@@ -229,10 +238,11 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
   const [description, setDescription] = useState(anniversary?.description || '');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const isEditing = Boolean(anniversary);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
     setGeneralError(null);
@@ -269,8 +279,9 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
         return;
       }
 
-      // Submit form
-      onSave({
+      // Submit form — saved to the account first, so this can fail offline
+      setIsSaving(true);
+      await onSave({
         label: label.trim(),
         date,
         description: description.trim() || undefined,
@@ -284,8 +295,10 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
         setErrors(fieldErrors);
         setGeneralError(error.message);
       } else {
-        setGeneralError('Failed to save anniversary');
+        setGeneralError(error instanceof Error ? error.message : 'Failed to save anniversary');
       }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -398,7 +411,8 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
             </button>
             <button
               type="submit"
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-700"
+              disabled={isSaving}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-700 disabled:opacity-60"
             >
               <Check className="h-4 w-4" />
               {isEditing ? 'Update' : 'Add'}

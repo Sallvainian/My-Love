@@ -27,6 +27,12 @@ export interface Message {
    * `customMessageService` is the only place that should be doing so.
    */
   userId?: string;
+  /**
+   * Id of the `public.custom_messages` row this CUSTOM row mirrors. Absent on
+   * bundled rows, on legacy unowned rows, and on a custom row this device has
+   * not yet uploaded (`localDataUpload.ts`).
+   */
+  serverId?: string;
   active?: boolean;
   createdAt: Date;
   isFavorite?: boolean;
@@ -64,10 +70,11 @@ export interface CompressionResult {
 }
 
 export interface Anniversary {
-  id: number;
+  id: number; // Device-local; the list in settings is a mirror of the server
   date: string; // ISO date string
   label: string;
   description?: string;
+  serverId?: string; // `public.anniversaries.id`; absent until uploaded
 }
 
 export interface MoodEntry {

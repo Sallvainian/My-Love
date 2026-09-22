@@ -17,9 +17,18 @@
  *   again is distinguishable from an uninterrupted A: `clearAuth` bumps it on
  *   every sign-out, and an id-only compare would let a request raised in the
  *   dead session write as if it were live.
+ * - Supabase is the source of truth for custom messages and favorites; the
+ *   IndexedDB rows are read mirrors. The services write the server first
+ *   (`customMessageService`, `storageService.toggleFavorite`), and
+ *   `loadMessageDataFromServer` replaces the mirrors once this device's
+ *   one-time upload has completed (`localDataUpload.ts`).
  */
 
+import { serializeAccountDataWrite } from '../../services/accountDataQueue';
+import { customMessagesApi } from '../../services/customMessagesApi';
 import { customMessageService } from '../../services/customMessageService';
+import { hasCompletedLocalUpload } from '../../services/localDataUpload';
+import { messageFavoritesApi } from '../../services/messageFavoritesApi';
 import { storageService } from '../../services/storage';
 import type {
   CreateMessageInput,
@@ -42,9 +51,13 @@ export interface MessagesSlice {
   currentDayOffset: number; // @deprecated Story 3.3: Use messageHistory.currentIndex instead
   customMessages: CustomMessage[];
   customMessagesLoaded: boolean;
+  /** Why the last favorite toggle failed (offline included); null after a success. */
+  favoriteError: string | null;
 
   // Actions
   loadMessages: () => Promise<void>;
+  /** Replace the custom-message and favorite mirrors with the server's, once uploaded. */
+  loadMessageDataFromServer: () => Promise<void>;
   addMessage: (text: string, category: Message['category']) => Promise<void>;
   toggleFavorite: (messageId: number) => Promise<void>;
   updateCurrentMessage: () => void;
@@ -82,6 +95,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
   currentDayOffset: 0, // @deprecated Story 3.3: Use messageHistory.currentIndex instead
   customMessages: [],
   customMessagesLoaded: false,
+  favoriteError: null,
 
   // Actions
   loadMessages: async () => {
@@ -105,6 +119,38 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     } catch (error) {
       console.error('Error loading messages:', error);
     }
+  },
+
+  loadMessageDataFromServer: async () => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    const stillCurrent = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+    // Until the upload flag is set, the mirrors may hold rows the server does
+    // not, and replacing them would destroy those rows.
+    if (!requestedBy || !hasCompletedLocalUpload(requestedBy)) return;
+
+    try {
+      // Read and replace as one queued step, so a favorite or custom-message
+      // write cannot land between them and be erased (accountDataQueue.ts).
+      await serializeAccountDataWrite(async () => {
+        const [customRows, favoriteKeys] = await Promise.all([
+          customMessagesApi.fetchCustomMessages(requestedBy),
+          messageFavoritesApi.fetchFavoriteKeys(requestedBy),
+        ]);
+        // Written under the captured owner even after a switch: these are that
+        // account's mirror rows, and no other account can read them.
+        await customMessageService.replaceMirrorForUser(requestedBy, customRows);
+        await storageService.replaceBundledFavoritesForUser(requestedBy, favoriteKeys);
+      });
+    } catch (error) {
+      // The mirrors stay as they were, so Home still renders offline.
+      console.error('[Messages] Failed to load messages data from the server:', error);
+      return;
+    }
+
+    if (!stillCurrent()) return;
+    await get().loadMessages();
+    if (stillCurrent() && get().customMessagesLoaded) await get().loadCustomMessages();
   },
 
   /**
@@ -142,6 +188,8 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     const stillCurrent = () =>
       get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
+    set({ favoriteError: null });
+
     try {
       const isFavorite = await storageService.toggleFavorite(messageId, requestedBy);
 
@@ -164,6 +212,10 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       }));
     } catch (error) {
       console.error('Error toggling favorite:', error);
+      if (!stillCurrent()) return;
+      set({
+        favoriteError: error instanceof Error ? error.message : 'Could not save this favorite.',
+      });
     }
   },
 
@@ -231,9 +283,10 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       }
     }
 
-    // Load the message object
+    // Load the message object. A favorite error named the message that was on
+    // screen, so it goes when the shown message is recomputed.
     const currentMessage = messages.find((m) => m.id === messageId);
-    set({ currentMessage });
+    set({ currentMessage, favoriteError: null });
   },
 
   // Navigation actions (Story 3.3)
@@ -300,7 +353,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     // Update currentMessage to trigger UI re-render
     const targetMessage = messages.find((m) => m.id === messageId);
     if (targetMessage) {
-      set({ currentMessage: targetMessage });
+      set({ currentMessage: targetMessage, favoriteError: null });
     }
 
     logger.debug(`[MessageHistory] Navigated to ${dateString}, message ID: ${messageId}`);
@@ -357,7 +410,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     // Update currentMessage to trigger UI re-render
     const targetMessage = messages.find((m) => m.id === messageId);
     if (targetMessage) {
-      set({ currentMessage: targetMessage });
+      set({ currentMessage: targetMessage, favoriteError: null });
     }
 
     logger.debug(`[MessageHistory] Navigated to ${dateString}, message ID: ${messageId}`);
