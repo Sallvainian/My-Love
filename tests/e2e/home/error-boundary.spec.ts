@@ -25,29 +25,29 @@ test.describe('Error Boundary', () => {
     await page.goto('/');
 
     // THEN: Navigation remains visible regardless of view state
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
 
     // WHEN: User navigates to a lazy-loaded view
     await navigateTo(page, 'photos');
 
     // THEN: Navigation is still visible
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
   });
 
   test('[P0] should allow navigating home from any view', async ({ page }) => {
     // GIVEN: User is authenticated and on a non-home view
     await page.goto('/');
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
 
     // Navigate to photos view
     await navigateTo(page, 'photos');
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
 
-    // WHEN: User navigates back to home via the tray
+    // WHEN: User navigates back to home via the dock
     await navigateTo(page, 'home');
 
     // THEN: Home view loads and navigation remains functional
-    await expect(page.getByTestId('nav-menu-toggle')).toBeVisible();
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
     await expect(page.getByTestId('time-together')).toBeVisible();
   });
 });

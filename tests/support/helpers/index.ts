@@ -10,9 +10,8 @@
 import type { Page, Locator } from '@playwright/test';
 import { faker } from '@faker-js/faker';
 
-// Navigation now goes through a tray that has to be opened first; the helpers
-// that do it live in their own module so every spec touching navigation shares
-// one implementation.
+// Navigation helpers live in their own module so every spec touching
+// navigation shares one implementation.
 export * from './navigation';
 
 /**

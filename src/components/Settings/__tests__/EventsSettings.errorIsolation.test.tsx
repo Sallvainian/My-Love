@@ -41,8 +41,8 @@
  * tests preserve both fixes without weakening the original red assertions.
  *
  * HARNESS: duplicated from `EventsSettings.test.tsx:20-180` rather than
- * extracted. That is the house pattern here — `NavigationTray.test.tsx` and
- * `NavigationTray.focus.test.tsx` duplicate the same way, and the story's review
+ * extracted. That is the house pattern here — `EventsSettings.test.tsx` and
+ * `EventsSettings.focus.test.tsx` duplicate the same way, and the story's review
  * pass explicitly dismissed extracting it.
  */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
