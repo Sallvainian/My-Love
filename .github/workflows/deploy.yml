@@ -137,7 +137,9 @@ jobs:
           retention-days: 7
 
   # The Cloudflare credentials live on the production environment, so only this
-  # job can read them -- not the build, which runs third-party npm code.
+  # job can read them -- not the build, which runs third-party npm code. This
+  # job installs with --ignore-scripts for the same reason: no dependency's
+  # install script runs beside the token. wrangler deploy needs none of them.
   deploy:
     environment:
       name: production
@@ -156,7 +158,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Download build
         uses: actions/download-artifact@v8
@@ -230,13 +232,24 @@ jobs:
             fi
             echo "✅ JavaScript bundle reference found: $JS_CHECK"
 
-            # Check PWA manifest exists
-            MANIFEST_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "${DEPLOYMENT_URL}manifest.webmanifest" || echo "000")
+            # Check PWA manifest exists. The status alone proves nothing: in
+            # single-page-application mode a missing file is answered with
+            # index.html and a 200, so the content type is what tells a real
+            # manifest from the fallback page.
+            MANIFEST_RESULT=$(curl -s -o /dev/null -w "%{http_code} %{content_type}" -L "${DEPLOYMENT_URL}manifest.webmanifest" || echo "000")
+            MANIFEST_CODE=${MANIFEST_RESULT%% *}
             if [ "$MANIFEST_CODE" != "200" ]; then
               echo "❌ PWA manifest returned HTTP $MANIFEST_CODE (expected 200)"
               return 1
             fi
-            echo "✅ PWA manifest accessible (HTTP 200)"
+            case "$MANIFEST_RESULT" in
+              *application/manifest+json*) ;;
+              *)
+                echo "❌ PWA manifest served as '${MANIFEST_RESULT#* }' (expected application/manifest+json) -- the file is missing and the SPA fallback answered"
+                return 1
+                ;;
+            esac
+            echo "✅ PWA manifest accessible (HTTP 200, application/manifest+json)"
 
             return 0
           }
