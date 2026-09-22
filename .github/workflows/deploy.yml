@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy to Cloudflare Workers
 
 on:
   # A denylist, not an allowlist. The migrate job below is the only path
@@ -30,15 +30,15 @@ on:
       - '.github/workflows/bundle-size.yml'
       - '.github/workflows/dependency-review.yml'
       - '.github/workflows/supabase-migrations.yml'
+      - '.github/workflows/pages-redirect.yml'
+      - '.github/pages-redirect/**'
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: 'pages'
+  group: 'deploy'
   cancel-in-progress: false
 
 jobs:
@@ -126,23 +126,51 @@ jobs:
       - name: Run smoke tests
         run: npm run test:smoke
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
+      - name: Upload build
+        uses: actions/upload-artifact@v7
         with:
+          name: dist
           path: ./dist
+          # dist/.assetsignore is a dotfile, which upload-artifact skips by
+          # default; without it wrangler would publish dist/stats.html.
+          include-hidden-files: true
+          retention-days: 7
 
+  # The Cloudflare credentials live on the production environment, so only this
+  # job can read them -- not the build, which runs third-party npm code. This
+  # job installs with --ignore-scripts for the same reason: no dependency's
+  # install script runs beside the token. wrangler deploy needs none of them.
   deploy:
     environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      name: production
+      url: ${{ vars.SITE_URL }}
     runs-on: ubuntu-latest
     needs: build
-    outputs:
-      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+      # For wrangler.jsonc and the lockfile-pinned wrangler.
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Download build
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: ./dist
+
+      - name: Deploy to Cloudflare Workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
 
   health-check:
     runs-on: ubuntu-latest
@@ -159,15 +187,15 @@ jobs:
       - name: Install dependencies for health check
         run: npm install --no-save @supabase/supabase-js
 
-      - name: Wait for GitHub Pages propagation
+      - name: Wait for Cloudflare propagation
         run: |
-          echo "⏳ Waiting for GitHub Pages to propagate changes..."
+          echo "⏳ Waiting for the new Worker version to propagate..."
           sleep 10
 
       - name: Health Check - HTTP Status (with retry)
         run: |
           echo "🔍 Running HTTP health checks..."
-          DEPLOYMENT_URL="${{ needs.deploy.outputs.page_url }}"
+          DEPLOYMENT_URL="${{ vars.SITE_URL }}"
           MAX_ATTEMPTS=3
           RETRY_DELAY=10
 
@@ -204,13 +232,24 @@ jobs:
             fi
             echo "✅ JavaScript bundle reference found: $JS_CHECK"
 
-            # Check PWA manifest exists
-            MANIFEST_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "${DEPLOYMENT_URL}manifest.webmanifest" || echo "000")
+            # Check PWA manifest exists. The status alone proves nothing: in
+            # single-page-application mode a missing file is answered with
+            # index.html and a 200, so the content type is what tells a real
+            # manifest from the fallback page.
+            MANIFEST_RESULT=$(curl -s -o /dev/null -w "%{http_code} %{content_type}" -L "${DEPLOYMENT_URL}manifest.webmanifest" || echo "000")
+            MANIFEST_CODE=${MANIFEST_RESULT%% *}
             if [ "$MANIFEST_CODE" != "200" ]; then
               echo "❌ PWA manifest returned HTTP $MANIFEST_CODE (expected 200)"
               return 1
             fi
-            echo "✅ PWA manifest accessible (HTTP 200)"
+            case "$MANIFEST_RESULT" in
+              *application/manifest+json*) ;;
+              *)
+                echo "❌ PWA manifest served as '${MANIFEST_RESULT#* }' (expected application/manifest+json) -- the file is missing and the SPA fallback answered"
+                return 1
+                ;;
+            esac
+            echo "✅ PWA manifest accessible (HTTP 200, application/manifest+json)"
 
             return 0
           }
@@ -229,7 +268,7 @@ jobs:
           done
 
           echo "❌ Health check failed after $MAX_ATTEMPTS attempts"
-          echo "💡 Suggestion: Check GitHub Pages deployment status or try re-running the workflow"
+          echo "💡 Suggestion: Check the Worker in the Cloudflare dashboard or try re-running the workflow"
           exit 1
 
       - name: Health Check - Supabase Connection
@@ -293,6 +332,6 @@ jobs:
           echo "✅ All health checks passed"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
-          echo "Deployment URL: ${{ needs.deploy.outputs.page_url }}"
+          echo "Deployment URL: ${{ vars.SITE_URL }}"
           echo "Status: Healthy"
           echo ""

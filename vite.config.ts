@@ -5,10 +5,10 @@ import { visualizer } from 'rollup-plugin-visualizer';
 import checker from 'vite-plugin-checker';
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
-  // GitHub Pages deployment requires repository name as subpath
-  // Use base path only in production, root path in development
-  base: mode === 'production' ? '/My-Love/' : '/',
+export default defineConfig(() => ({
+  // Cloudflare Workers serves the app from the root of its own origin
+  // (wrangler.jsonc), so production and development share one base.
+  base: '/',
   build: {
     sourcemap: false,
     // Vite 8 bundles with Rolldown, which dropped the object form of

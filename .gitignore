@@ -30,6 +30,7 @@ node_modules
 dist
 dist-ssr
 dev-dist
+.wrangler
 .code
 *.local
 !.env.local

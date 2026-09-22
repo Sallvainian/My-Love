@@ -1,0 +1,3 @@
+# Read by wrangler deploy (wrangler.jsonc assets.directory is ./dist); never served.
+# The bundle visualizer (vite.config.ts) writes its report into dist/ -- keep it off the live site.
+stats.html

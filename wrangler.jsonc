@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Served at https://my-love.sallvain.workers.dev/ -- the name is the first
+  // label of that host, so renaming the Worker moves the site to a new origin
+  // and strands every device's IndexedDB and localStorage on the old one.
+  "name": "my-love",
+  // No later than the runtime the pinned wrangler ships (workerd 2026-09-21);
+  // a newer date makes `wrangler dev` fall back with a warning.
+  "compatibility_date": "2026-09-21",
+  // Opt out of wrangler's anonymous usage telemetry.
+  "send_metrics": false,
+  // Assets only, no Worker script: the build output is served as-is.
+  "assets": {
+    "directory": "./dist",
+    // Every path that is not a file gets index.html with a 200, so a reload on
+    // /photos or /settings reaches the app. This replaces the GitHub Pages
+    // 404.html redirect.
+    "not_found_handling": "single-page-application"
+  }
+}
