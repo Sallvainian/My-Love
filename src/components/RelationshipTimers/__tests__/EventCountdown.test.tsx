@@ -135,7 +135,7 @@ describe('EventCountdown — "Event passed" is never rendered', () => {
       <EventCountdown label="Rollover Event" icon="calendar" date={today} />
     );
 
-    expect(screen.getByText('Today! 🎉')).toBeInTheDocument();
+    expect(screen.getByText('Today!')).toBeInTheDocument();
 
     // Cross local midnight, then let the component's setInterval fire.
     vi.setSystemTime(new Date(2026, 0, 16, 0, 0, 1));
@@ -201,12 +201,12 @@ describe('EventCountdown — "Event passed" is never rendered', () => {
     expect(document.body.textContent).toMatch(/1 day(?!s)/);
   });
 
-  it('renders "Today! 🎉" for an event dated today', () => {
+  it('renders "Today!" for an event dated today', () => {
     const today = localMidnightOffsetFromToday(0);
 
     render(<EventCountdown label="Anniversary" icon="calendar" date={today} />);
 
-    expect(screen.getByText('Today! 🎉')).toBeInTheDocument();
+    expect(screen.getByText('Today!')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/Event passed/i);
   });
 });

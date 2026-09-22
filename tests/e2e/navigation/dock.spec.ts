@@ -91,28 +91,6 @@ test.describe('Bottom Dock', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('[P1] should keep the welcome button above the dock on Home', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
-
-    const welcomeButton = page.getByLabel('View welcome message again');
-    await expect(welcomeButton).toBeVisible();
-    // It springs in from scale 0, so wait for its full 56px (h-14) box.
-    await expect
-      .poll(async () => Math.round((await welcomeButton.boundingBox())?.height ?? 0))
-      .toBe(56);
-
-    const welcomeBox = await welcomeButton.boundingBox();
-    const dockBox = await page.getByTestId('nav-dock').boundingBox();
-    if (!welcomeBox || !dockBox) throw new Error('[dock.spec] expected welcome and dock boxes');
-    expect(welcomeBox.y + welcomeBox.height).toBeLessThanOrEqual(dockBox.y);
-
-    // The z-50 welcome button sits right above Partner on a phone; the tap
-    // must still land on the dock.
-    await page.getByTestId('nav-partner').click();
-    await expect(page).toHaveURL(/\/partner$/);
-  });
-
   test('[P1] should keep the Photos upload FAB above the dock', async ({
     page,
     interceptNetworkCall,

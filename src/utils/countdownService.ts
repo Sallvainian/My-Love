@@ -116,39 +116,3 @@ export function shouldTriggerCelebration(targetDate: Date): boolean {
   const { days, hours, minutes } = calculateTimeRemaining(targetDate);
   return days === 0 && hours === 0 && minutes === 0;
 }
-
-/**
- * Format countdown for display
- *
- * @param timeRemaining - Time breakdown object
- * @param label - Anniversary label
- * @returns Formatted countdown string
- */
-export function formatCountdownDisplay(timeRemaining: TimeRemaining, label: string): string {
-  const { days, hours, minutes } = timeRemaining;
-
-  if (days === 0 && hours === 0 && minutes === 0) {
-    return `Today is ${label}!`;
-  }
-
-  const parts: string[] = [];
-
-  if (days > 0) {
-    parts.push(`${days} ${days === 1 ? 'day' : 'days'}`);
-  }
-
-  if (hours > 0) {
-    parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
-  }
-
-  if (minutes > 0) {
-    parts.push(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`);
-  }
-
-  // If all zeros but not celebration time, show "Less than a minute"
-  if (parts.length === 0) {
-    return `Less than a minute until ${label}`;
-  }
-
-  return `${parts.join(', ')} until ${label}`;
-}
