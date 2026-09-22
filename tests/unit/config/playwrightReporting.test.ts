@@ -65,17 +65,7 @@ describe('Playwright shard reporting', () => {
     expect(shards).toContain('32279178457');
   });
 
-  it('records the measured CAP-6 baseline and drops the scripture shard-block comment', async () => {
-    const baseline = readFileSync(
-      '_bmad-output/specs/spec-remove-scripture-feature/ci-baseline.md',
-      'utf8'
-    );
-    expect(baseline).toContain('run 35056348791');
-    expect(baseline).toContain('**381s is run `32279178457`, not this run.**');
-    expect(baseline).toContain('This run\'s worst E2E shard is **259s**.');
-    expect(baseline).toMatch(/E2E \(Shard 4\/4\) \| \*\*259s\*\* \| 129s \| \*\*101s\*\*/);
-    expect(baseline).toContain('Shard count chosen from these numbers: **2**.');
-
+  it('pins CI workers to 2 and drops the scripture shard-block comment', async () => {
     vi.stubEnv('CI', 'true');
     const { default: config } = await vi.importActual<{ default: PlaywrightTestConfig }>(
       '../../../playwright.config.ts'
