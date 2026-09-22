@@ -25,7 +25,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, and 
 ## Where things are
 
 - State: `src/stores/useAppStore.ts` composes 11 slices from `src/stores/slices/`; `appSlice` is composed first and owns `isLoading`/`error`/`__isHydrated`; `authSlice` owns `userId` and `authSessionVersion` and is not persisted.
-- A new view is registered in five hand-maintained places: `ViewType` and `pathMap` in `navigationSlice.ts`, both URL ternaries in `App.tsx` (~189 and ~208), the `currentView ===` render chain (home ~715, lazy views ~786-797), and the `DESTINATIONS` list in `Navigation/NavigationTray.tsx`. Only `pathMap` is typechecked, so missing the rest still compiles, renders nothing, and resets to home on reload.
+- A new view is registered in five hand-maintained places: `ViewType` and `pathMap` in `navigationSlice.ts`, both URL ternaries in `App.tsx` (~189 and ~208), the `currentView ===` render chain (home ~715, lazy views ~786-797), and the `DESTINATIONS` list in `Navigation/AppNavigation.tsx` (the bottom dock; Settings is the top-bar gear, not a dock item). Only `pathMap` is typechecked, so missing the rest still compiles, renders nothing, and resets to home on reload.
 - E2E fixtures: import `{ test, expect }` from `tests/support/merged-fixtures.ts`, never from `@playwright/test`.
 - Loop runs live in `.bmad-loop/runs/<id>/`, finished ones in `.bmad-loop/archive/`; both are gitignored, so a deleted run is unrecoverable. Never delete a run directory — one deletion took stories 1-5 of an active run with it; move it to `archive/` instead.
 
