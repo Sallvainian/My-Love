@@ -129,7 +129,9 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
                   : 'w-11 shrink-0 text-muted hover:text-ink'
               }`}
               data-testid={`nav-${view}`}
-              aria-label={label}
+              // The label replaces the button's content as its accessible name,
+              // so the badge count has to be folded in here to be announced.
+              aria-label={count > 0 ? `${label}, ${pluralisedBadgeLabel(count)}` : label}
               aria-current={isActive ? 'page' : undefined}
             >
               <Icon
@@ -144,7 +146,7 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
                 <span
                   className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1 text-[11px] leading-none font-bold text-white"
                   data-testid={`nav-${view}-badge`}
-                  aria-label={pluralisedBadgeLabel(count)}
+                  aria-hidden="true"
                 >
                   {count}
                 </span>
