@@ -98,12 +98,9 @@ select is(
 -- authenticated explicitly while local's does not. This assertion goes red on
 -- a missing or an extra grant. The seeder itself is gone (20260916000000).
 --
--- The list is the LOCAL set. The hosted project also has get_random_daily_message,
--- which no migration in this repo creates -- it is drift, nothing calls it, and it
--- is left executable by authenticated because that is its pre-existing behaviour.
--- This file only ever runs against a stack built from these migrations, so the
--- extra function cannot appear here; if it ever does, that means the drift got
--- committed and this list should grow with it.
+-- The hosted project once also had get_random_daily_message, which no
+-- migration in this repo created; 20260923010000 drops it, so once that
+-- migration is applied the hosted set should match this local list.
 select is(
   (
     select coalesce(string_agg(p.proname, ', ' order by p.proname), '')
