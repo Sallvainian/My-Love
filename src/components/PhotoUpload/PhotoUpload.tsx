@@ -51,6 +51,11 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
     const validation = imageCompressionService.validateImageFile(file);
     if (!validation.valid) {
       setError(validation.error || 'Invalid file');
+      // Picking the same file again must fire a change, or the user can only
+      // retry by choosing a different file first.
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
     if (validation.warning) {
@@ -203,6 +208,15 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
 
   const isFormValid = selectedFile && tagErrors.length === 0;
 
+  // One error block, placed by step: a rejected pick leaves the dialog on the
+  // select step, an upload failure on the preview/error steps. The steps are
+  // exclusive, so it never renders twice.
+  const errorAlert = error ? (
+    <div className="rounded-[14px] bg-dtint p-4" role="alert" data-testid="photo-upload-error">
+      <p className="text-sm font-medium text-danger">{error}</p>
+    </div>
+  ) : null;
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -275,6 +289,9 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     <p className="text-sm font-medium text-ink">{storageWarning}</p>
                   </div>
                 )}
+
+                {/* A file rejected at pick time (DW-202) */}
+                {step === 'select' && errorAlert}
 
                 {/* Step: Select */}
                 {step === 'select' && (
@@ -419,15 +436,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     </div>
 
                     {/* Error Display */}
-                    {error && (
-                      <div
-                        className="rounded-[14px] bg-dtint p-4"
-                        role="alert"
-                        data-testid="photo-upload-error"
-                      >
-                        <p className="text-sm font-medium text-danger">{error}</p>
-                      </div>
-                    )}
+                    {errorAlert}
 
                     {/* Warning Display */}
                     {warning && (
