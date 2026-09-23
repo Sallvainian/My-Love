@@ -50,7 +50,9 @@ import { PhotoViewer } from '../PhotoViewer';
 const observers: Array<{ fire: () => void; observing: boolean }> = [];
 class ControlledObserver {
   private entry: { fire: () => void; observing: boolean };
-  constructor(callback: IntersectionObserverCallback) {
+  // Same signature as the real constructor, so a scanner that resolves
+  // IntersectionObserver to this class does not flag the options argument.
+  constructor(callback: IntersectionObserverCallback, _options?: IntersectionObserverInit) {
     this.entry = {
       observing: false,
       fire: () =>
