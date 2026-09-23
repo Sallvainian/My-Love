@@ -326,9 +326,9 @@ describe('white text on a coloured background clears WCAG AA', () => {
     // past a `> 10` canary while blind to 16 more.
     //
     // Re-set to just under the count as each kit story styles pairings out:
-    // 41 before the Photos restyle, 26 after it.
+    // 41 before the Photos restyle, 26 after it, 17 after the Settings restyle.
     const pairings = findWhiteOnColourPairings();
-    expect(pairings.length).toBeGreaterThan(24);
+    expect(pairings.length).toBeGreaterThan(15);
 
     // And both idioms must be seen. A pairing inside `className={…}` is the
     // specific blindness that shipped here once already. The last one in `src/`
