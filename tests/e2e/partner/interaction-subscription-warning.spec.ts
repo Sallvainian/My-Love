@@ -17,7 +17,7 @@ test.describe('Interaction Realtime connection status', () => {
       await log.step('Mount the authenticated production interaction boundary');
       await interactionRealtimeControl.mount(userId);
 
-      await expect(page.getByTestId('fab-main-button')).toBeVisible();
+      await expect(page.getByTestId('poke-button')).toBeVisible();
 
       await log.step('Wait for the controlled incoming-interactions join to fail');
       await interactionRealtimeControl.waitForFailureInjected();

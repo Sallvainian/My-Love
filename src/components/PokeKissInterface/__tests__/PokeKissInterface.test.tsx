@@ -5,20 +5,24 @@ import type { InteractionSubscriptionStatus } from '../../../api/interactionServ
 const storeMocks = vi.hoisted(() => ({
   sendPoke: vi.fn(),
   sendKiss: vi.fn(),
-  getUnviewedInteractions: vi.fn(() => []),
+  getUnviewedInteractions: vi.fn((): unknown[] => []),
   markInteractionViewed: vi.fn(),
   subscribeToInteractions: vi.fn(),
 }));
 
+const storeState = vi.hoisted(() => ({ unviewedCount: 0 }));
+
 vi.mock('../../../stores/useAppStore', () => ({
   useAppStore: () => ({
     ...storeMocks,
-    unviewedCount: 0,
+    unviewedCount: storeState.unviewedCount,
   }),
 }));
 
+// Stands in for the sheet so a test can tell whether History opened.
 vi.mock('../../InteractionHistory', () => ({
-  InteractionHistory: () => null,
+  InteractionHistory: ({ isOpen }: { isOpen: boolean }) =>
+    isOpen ? <div data-testid="interaction-history-modal" /> : null,
 }));
 
 import { NoPartnerError } from '../../../utils/interactionValidation';
@@ -28,6 +32,7 @@ describe('PokeKissInterface interaction subscription', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    storeState.unviewedCount = 0;
   });
 
   it.each(['CHANNEL_ERROR', 'TIMED_OUT'] as const)(
@@ -92,7 +97,6 @@ describe('PokeKissInterface interaction subscription', () => {
     await waitFor(() => expect(reportStatus).toBeDefined());
     act(() => reportStatus?.('TIMED_OUT'));
 
-    fireEvent.click(screen.getByTestId('fab-main-button'));
     fireEvent.click(screen.getByTestId('fart-button'));
 
     expect(screen.getByTestId('toast-notification')).toHaveTextContent('Fart sent!');
@@ -135,6 +139,7 @@ describe('PokeKissInterface sending', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    storeState.unviewedCount = 0;
     storeMocks.subscribeToInteractions.mockResolvedValue(vi.fn());
   });
 
@@ -142,7 +147,6 @@ describe('PokeKissInterface sending', () => {
     storeMocks.sendPoke.mockResolvedValue({ id: 'poke-1' });
 
     render(<PokeKissInterface />);
-    fireEvent.click(screen.getByTestId('fab-main-button'));
     fireEvent.click(screen.getByTestId('poke-button'));
 
     await waitFor(() =>
@@ -163,7 +167,6 @@ describe('PokeKissInterface sending', () => {
       storeMocks[action].mockRejectedValue(new NoPartnerError());
 
       render(<PokeKissInterface />);
-      fireEvent.click(screen.getByTestId('fab-main-button'));
       fireEvent.click(screen.getByTestId(testId));
 
       await waitFor(() =>
@@ -178,13 +181,106 @@ describe('PokeKissInterface sending', () => {
     storeMocks.sendKiss.mockRejectedValue(new Error('network went away'));
 
     render(<PokeKissInterface />);
-    fireEvent.click(screen.getByTestId('fab-main-button'));
     fireEvent.click(screen.getByTestId('kiss-button'));
 
     await waitFor(() =>
       expect(screen.getByTestId('toast-notification')).toHaveTextContent(
         'Failed to send kiss. Try again.'
       )
+    );
+  });
+});
+
+describe('PokeKissInterface on the kit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    storeState.unviewedCount = 0;
+    storeMocks.getUnviewedInteractions.mockReturnValue([]);
+    storeMocks.subscribeToInteractions.mockResolvedValue(vi.fn());
+  });
+
+  it('renders the three action tiles and History without any click', () => {
+    render(<PokeKissInterface />);
+
+    expect(screen.getByText('Send a little something')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Poke' })).toHaveAttribute('data-testid', 'poke-button');
+    expect(screen.getByRole('button', { name: 'Kiss' })).toHaveAttribute('data-testid', 'kiss-button');
+    expect(screen.getByRole('button', { name: 'Fart' })).toHaveAttribute('data-testid', 'fart-button');
+    expect(screen.getByTestId('history-button')).toHaveTextContent('History');
+    expect(screen.queryByTestId('fab-main-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('notification-badge')).not.toBeInTheDocument();
+  });
+
+  it('opens the history sheet from the History button', () => {
+    render(<PokeKissInterface />);
+    expect(screen.queryByTestId('interaction-history-modal')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('history-button'));
+
+    expect(screen.getByTestId('interaction-history-modal')).toBeInTheDocument();
+  });
+
+  it('plays the unviewed interaction from the badge without opening history', () => {
+    storeState.unviewedCount = 2;
+    storeMocks.getUnviewedInteractions.mockReturnValue([
+      {
+        id: 'interaction-1',
+        type: 'poke',
+        fromUserId: 'partner',
+        toUserId: 'me',
+        viewed: false,
+        createdAt: new Date(),
+      },
+    ]);
+
+    render(<PokeKissInterface />);
+    const badge = screen.getByTestId('notification-badge');
+    expect(badge).toHaveTextContent('2');
+    expect(badge).toHaveAttribute('aria-label', '2 unviewed interactions');
+    expect(screen.getByTestId('history-button')).toContainElement(badge);
+
+    fireEvent.click(badge);
+
+    expect(screen.getByTestId('poke-animation')).toBeInTheDocument();
+    expect(screen.getByTestId('poke-animation').textContent).not.toMatch(
+      /\p{Extended_Pictographic}/u
+    );
+    expect(screen.queryByTestId('interaction-history-modal')).not.toBeInTheDocument();
+  });
+
+  it('disables a tile in cooldown and shows the remaining m:ss under its label', () => {
+    localStorage.setItem('lastPokeTime', String(Date.now() - 60_000));
+
+    render(<PokeKissInterface />);
+
+    expect(screen.getByTestId('poke-button')).toBeDisabled();
+    expect(screen.getByTestId('poke-cooldown').textContent).toMatch(/^2[89]:\d{2}$/);
+    expect(screen.getByTestId('kiss-button')).toBeEnabled();
+    expect(screen.queryByTestId('kiss-cooldown')).not.toBeInTheDocument();
+  });
+
+  it('sends toasts with no emoji', async () => {
+    storeMocks.sendPoke.mockResolvedValue({ id: 'poke-1' });
+    storeMocks.sendKiss.mockResolvedValue({ id: 'kiss-1' });
+
+    render(<PokeKissInterface />);
+    const toast = () => screen.getByTestId('toast-notification');
+
+    fireEvent.click(screen.getByTestId('poke-button'));
+    await waitFor(() => expect(toast()).toHaveTextContent('Poke sent!'));
+    expect(toast().textContent).toBe('Poke sent!');
+
+    fireEvent.click(screen.getByTestId('kiss-button'));
+    await waitFor(() => expect(toast()).toHaveTextContent('Kiss sent!'));
+    expect(toast().textContent).toBe('Kiss sent!');
+
+    fireEvent.click(screen.getByTestId('fart-button'));
+    await waitFor(() => expect(toast()).toHaveTextContent('Fart sent!'));
+    expect(toast().textContent).toBe('Fart sent!');
+    expect(toast().textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+    expect(screen.getByTestId('fart-animation').textContent).not.toMatch(
+      /\p{Extended_Pictographic}/u
     );
   });
 });
