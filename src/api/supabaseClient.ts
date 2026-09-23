@@ -438,10 +438,10 @@ export const isSeedFallbackName = (
  *
  * A partner row still carrying only the trigger's seed answers `null` -- the
  * same answer this already gives for "no partner" and "the read failed".
- * `LoveNotes` is its only caller and does nothing with the difference except
- * keep its own 'Partner' default, which is exactly what is wanted: before this,
- * a partner who had never chosen a name was rendered in the chat as their full
- * email address.
+ * Its callers, `LoveNotes` and `PhotoGallery`, do nothing with the difference
+ * except keep their own defaults ('Partner'; a "P" badge and no "shared with"),
+ * which is exactly what is wanted: before this, a partner who had never chosen
+ * a name was rendered in the chat as their full email address.
  *
  * @returns Partner's display name or null if not found
  */
