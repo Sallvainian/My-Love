@@ -58,10 +58,13 @@ export function MoodTracker() {
   // Tab navigation state (Story 6.3: Task 7)
   const [activeTab, setActiveTab] = useState<MoodTabType>('tracker');
 
-  // Page subtitle, e.g. "Tuesday, September 22". Read once per mount.
-  const [todayLabel] = useState(() =>
-    new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-  );
+  // Page subtitle, e.g. "Tuesday, September 22". Read on every render so it names the same
+  // fresh "today" that addMoodEntry saves under, even with the view left open past midnight.
+  const todayLabel = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
 
   // Form state - now supports multiple mood selection
   const [selectedMoods, setSelectedMoods] = useState<MoodType[]>([]);
