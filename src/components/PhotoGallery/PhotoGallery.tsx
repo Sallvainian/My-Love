@@ -117,7 +117,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         setHasLoadedOnce(true);
         setIsLoading(false);
 
-        // BUGFIX: Load photos into store so PhotoCarousel can access them
+        // Load photos into the store too: the refresh effect below watches its count
         await loadPhotos();
       } catch (error) {
         if (cancelled) return;

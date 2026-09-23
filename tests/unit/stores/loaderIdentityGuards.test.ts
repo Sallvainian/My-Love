@@ -40,7 +40,6 @@ const getUnsyncedMoods = vi.fn();
 const getPhotos = vi.fn();
 const uploadPhotoService = vi.fn();
 const deletePhotoService = vi.fn();
-const updatePhotoService = vi.fn();
 const getSignedUrl = vi.fn();
 const checkStorageQuota = vi.fn();
 const getEvents = vi.fn();
@@ -90,7 +89,6 @@ vi.mock('../../../src/services/photoService', () => ({
       onCheckError?: (message: string) => void
     ) => uploadPhotoService(input, onProgress, onCheckError),
     deletePhoto: (photoId: string) => deletePhotoService(photoId),
-    updatePhoto: (photoId: string, updates: unknown) => updatePhotoService(photoId, updates),
     getSignedUrl: (storagePath: string) => getSignedUrl(storagePath),
     checkStorageQuota: () => checkStorageQuota(),
   },
@@ -1139,7 +1137,7 @@ describe('loader identity guards', () => {
   });
 
   // ==========================================================================
-  // photosSlice — upload / delete / caption save (CAP-12)
+  // photosSlice — upload / delete (CAP-12)
   //
   // An upload spans four awaits and a progress callback, so the window here is
   // seconds wide rather than one round trip. Every case seeds C's own gallery
@@ -1147,11 +1145,10 @@ describe('loader identity guards', () => {
   // and a guard that fails to release `isUploading`/`uploadProgress` is caught
   // separately.
   //
-  // Those two flags reach no mounted component today — `usePhotos` has no
-  // consumer. They are asserted because `signedOutState()` resets them
-  // (`authSlice.ts:92-96`) and a stale continuation would write them straight
-  // back into the next session's store, and because `usePhotos` is a public
-  // hook the next consumer will read them through.
+  // Those two flags reach no mounted component today. They are asserted
+  // because `signedOutState()` resets them and a stale continuation would
+  // write them straight back into the next session's store, where the next
+  // component to read them would show another account's upload.
   // ==========================================================================
 
   describe('uploadPhoto', () => {
@@ -1434,93 +1431,6 @@ describe('loader identity guards', () => {
 
       expect(useAppStore.getState().userId).toBe(A);
       expect(useAppStore.getState().photos).toEqual([aGalleryRow()]);
-    });
-  });
-
-  describe('updatePhoto', () => {
-    it("does not apply the previous account's caption to this one's gallery", async () => {
-      const pending = deferred<boolean>();
-      updatePhotoService.mockReturnValue(pending.promise);
-      const shared = { ...cPhoto(), id: 'a-photo-1' };
-
-      const inFlight = useAppStore
-        .getState()
-        .updatePhoto('a-photo-1', { caption: 'A-PRIVATE-CAPTION' });
-      switchToUserC({ photos: [shared] });
-
-      pending.settle(true);
-      await inFlight;
-
-      expect(useAppStore.getState().photos).toEqual([shared]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CAPTION');
-    });
-
-    it('writes nothing when the caption save completes after sign-out', async () => {
-      const pending = deferred<boolean>();
-      updatePhotoService.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore.getState().updatePhoto('a-photo-1', { caption: 'x' });
-      useAppStore.getState().clearAuth();
-
-      pending.settle(false);
-      await inFlight;
-
-      expect(useAppStore.getState().error).toBeNull();
-      expect(useAppStore.getState().photos).toEqual([]);
-    });
-
-    it("does not paint the previous account's rejected save onto the new one", async () => {
-      const pending = deferred<boolean>();
-      updatePhotoService.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore.getState().updatePhoto('a-photo-1', { caption: 'x' });
-      switchToUserC({ photos: [cPhoto()], error: null });
-
-      // A rejected write returns false rather than throwing — the path that
-      // writes 'Failed to save photo changes'.
-      pending.settle(false);
-      await inFlight;
-
-      expect(useAppStore.getState().error).toBeNull();
-    });
-
-    it("does not paint the previous account's thrown save onto the new one", async () => {
-      const pending = deferred<boolean>();
-      updatePhotoService.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore.getState().updatePhoto('a-photo-1', { caption: 'x' });
-      switchToUserC({ photos: [cPhoto()], error: null });
-
-      // The other half: photoService throwing reaches the catch, which is a
-      // different write from the `!persisted` branch above.
-      pending.fail(new Error('A-SAVE-FAILURE'));
-      await inFlight;
-
-      expect(useAppStore.getState().error).toBeNull();
-    });
-
-    it('writes nothing when the SAME account signs back in mid-flight', async () => {
-      // The case that discriminates the authSessionVersion half of ownsUpdate,
-      // for the same reason as deletePhoto's row above.
-      const pending = deferred<boolean>();
-      updatePhotoService.mockReturnValue(pending.promise);
-
-      const inFlight = useAppStore
-        .getState()
-        .updatePhoto('a-photo-1', { caption: 'A-STALE-CAPTION' });
-      useAppStore.getState().clearAuth();
-      useAppStore.getState().setAuthUser(A);
-      // What A's own loadPhotos puts back on screen for the NEW session.
-      useAppStore.setState({ photos: [aGalleryRow()] } as unknown as Parameters<
-        typeof useAppStore.setState
-      >[0]);
-
-      pending.settle(true);
-      await inFlight;
-
-      expect(useAppStore.getState().userId).toBe(A);
-      expect(useAppStore.getState().photos).toEqual([aGalleryRow()]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-STALE-CAPTION');
     });
   });
 
@@ -2325,35 +2235,5 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().photos).toEqual([aGalleryRow()]);
     });
 
-    it('updatePhoto surfaces a rejected save and a thrown one', async () => {
-      useAppStore.setState({ photos: [aGalleryRow()] } as unknown as Parameters<
-        typeof useAppStore.setState
-      >[0]);
-      // `false` is the `!persisted` branch — a different write from the catch.
-      updatePhotoService.mockResolvedValue(false);
-
-      await useAppStore.getState().updatePhoto('a-photo-1', { caption: 'renamed' });
-
-      expect(useAppStore.getState().error).toBe('Failed to save photo changes');
-      expect(useAppStore.getState().photos[0].caption).toBe('A-PRIVATE-PHOTO');
-
-      useAppStore.setState({ error: null });
-      updatePhotoService.mockRejectedValue(new Error('save exploded'));
-
-      await useAppStore.getState().updatePhoto('a-photo-1', { caption: 'renamed' });
-
-      expect(useAppStore.getState().error).toBe('save exploded');
-    });
-
-    it('updatePhoto writes normally', async () => {
-      useAppStore.setState({ photos: [{ ...aPhoto(), signedUrl: null, isOwn: true }] } as unknown as Parameters<
-        typeof useAppStore.setState
-      >[0]);
-      updatePhotoService.mockResolvedValue(true);
-
-      await useAppStore.getState().updatePhoto('a-photo-1', { caption: 'renamed' });
-
-      expect(useAppStore.getState().photos[0].caption).toBe('renamed');
-    });
   });
 });

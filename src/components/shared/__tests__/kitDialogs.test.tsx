@@ -4,10 +4,10 @@
  * The scrim pads clear of the notch and home indicator (`viewport-fit=cover`
  * lets the page draw under both), and the panel is capped at the scrim's
  * padded height and scrolls, so no dialog runs off a short screen with its
- * buttons out of reach. The dialogs that open over another overlay (the photo
- * pair over the carousel, the note removal over the chat) keep their own
- * layer: a second z utility in the same class list would be resolved by CSS
- * order, not by string order, so each asserts it carries exactly one.
+ * buttons out of reach. A dialog that opens over another overlay (the note
+ * removal over the chat) keeps its own layer: a second z utility in the same
+ * class list would be resolved by CSS order, not by string order, so each
+ * dialog asserts it carries exactly one.
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
@@ -37,25 +37,16 @@ vi.mock('framer-motion', () => {
   };
 });
 
-import type { PhotoWithUrls } from '../../../services/photoService';
 import type { AppState } from '../../../stores/types';
 import { useAppStore } from '../../../stores/useAppStore';
 import type { LoveNote } from '../../../types/models';
 import { DisplayNameSetup } from '../../DisplayNameSetup';
 import { NoteRemoveConfirmation } from '../../love-notes/NoteRemoveConfirmation';
-import { PhotoDeleteConfirmation } from '../../PhotoDeleteConfirmation/PhotoDeleteConfirmation';
-import { PhotoEditModal } from '../../PhotoEditModal/PhotoEditModal';
 import { AnniversarySettings } from '../../Settings/AnniversarySettings';
 import { DIALOG_BACKDROP, DIALOG_PANEL } from '../kitClasses';
 
 const SAFE_TOP = 'pt-[calc(1rem+env(safe-area-inset-top))]';
 const SAFE_BOTTOM = 'pb-[calc(1rem+env(safe-area-inset-bottom))]';
-
-const photo = {
-  id: 'photo-1',
-  caption: 'Beach day',
-  signedUrl: 'https://example.test/photo.jpg',
-} as unknown as PhotoWithUrls;
 
 const note: LoveNote = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -120,18 +111,6 @@ describe('the delete dialogs scroll on a short screen', () => {
     expectSafeScrim(panel.parentElement!);
   });
 
-  it('the photo delete panel, on the layer above the edit modal', () => {
-    render(<PhotoDeleteConfirmation photo={photo} onClose={vi.fn()} onConfirmDelete={vi.fn()} />);
-
-    const scrim = screen.getByTestId('photo-delete-confirmation');
-    expectSafeScrim(scrim);
-    expect(zClasses(scrim)).toEqual(['z-[70]']);
-    const panel = scrim.firstElementChild as HTMLElement;
-    expect(panel).toHaveClass('max-h-full', 'overflow-y-auto', 'max-w-md');
-    // The bordered header runs edge to edge, so the panel itself is unpadded.
-    expect(panel).not.toHaveClass('p-5');
-  });
-
   it('the note removal panel, on the layer above the chat', () => {
     render(
       <NoteRemoveConfirmation
@@ -152,23 +131,6 @@ describe('the delete dialogs scroll on a short screen', () => {
 });
 
 describe('the other centred dialogs', () => {
-  it('the photo edit modal keeps its layer and scrolls within the padded scrim', () => {
-    render(<PhotoEditModal photo={photo} onClose={vi.fn()} onSave={vi.fn()} />);
-
-    const scrim = screen.getByTestId('photo-edit-modal');
-    expectSafeScrim(scrim);
-    expect(zClasses(scrim)).toEqual(['z-[60]']);
-    const panel = scrim.firstElementChild as HTMLElement;
-    expect(panel).toHaveClass('max-h-full', 'overflow-y-auto', 'max-w-2xl');
-    expect(panel).not.toHaveClass('p-5');
-    expect(screen.getByTestId('photo-edit-modal-caption-input')).toHaveClass(
-      'bg-field',
-      'resize-none',
-      'ring-line-strong'
-    );
-    expect(screen.getByTestId('photo-edit-modal-tags-input')).toHaveClass('bg-field', 'h-12');
-  });
-
   it('the display-name dialog scrolls and pads clear of the safe areas', () => {
     render(<DisplayNameSetup isOpen onComplete={vi.fn()} />);
 

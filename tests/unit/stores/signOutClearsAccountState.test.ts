@@ -59,7 +59,6 @@ const EXPECTED_RESET: Record<string, unknown> = {
   customMessagesLoaded: false,
   favoriteError: null,
   photos: [],
-  selectedPhotoId: null,
   isUploading: false,
   uploadProgress: 0,
   storageWarning: null,
@@ -139,7 +138,6 @@ function seedSignedInSession(): void {
     notesPendingRemoval: ['note-1'],
 
     photos: [{ id: 'photo-1', caption: SECRETS.photoCaption }],
-    selectedPhotoId: 'photo-1',
 
     // The AdminPanel list, plus the rotation pool the same rows feed into.
     // `messages` deliberately mixes the two kinds: a bundled daily row shared
@@ -337,7 +335,6 @@ describe('clearAuth on sign-out', () => {
 
     const state = useAppStore.getState();
     expect(state.photos).toEqual([]);
-    expect(state.selectedPhotoId).toBeNull();
     expect(state.interactions).toEqual([]);
     expect(state.unviewedCount).toBe(0);
     // The partner snapshot names the previous couple: a stale one would let

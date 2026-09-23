@@ -55,8 +55,6 @@ vi.mock('../../../services/imageCompressionService', () => ({
 import type { PhotoWithUrls } from '../../../services/photoService';
 import { PhotoGridItem } from '../../PhotoGallery/PhotoGridItem';
 import { PhotoViewer } from '../../PhotoGallery/PhotoViewer';
-import { PhotoDeleteConfirmation } from '../../PhotoDeleteConfirmation/PhotoDeleteConfirmation';
-import { PhotoEditModal } from '../../PhotoEditModal/PhotoEditModal';
 import { PhotoUpload } from '../../PhotoUpload/PhotoUpload';
 
 const photo = {
@@ -269,31 +267,6 @@ describe('DW-182: photo dialog errors are announced', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toBe(screen.getByTestId('photo-upload-error'));
     expect(alert).toHaveTextContent('Storage is full');
-  });
-
-  it('the edit modal save failure', async () => {
-    const onSave = vi.fn().mockRejectedValue(new Error('network'));
-    render(<PhotoEditModal photo={photo} onClose={vi.fn()} onSave={onSave} />);
-
-    fireEvent.change(screen.getByTestId('photo-edit-modal-caption-input'), {
-      target: { value: 'New caption' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-
-    const alert = await screen.findByRole('alert');
-    expect(alert).toBe(screen.getByTestId('photo-edit-modal-error'));
-  });
-
-  it('the delete confirmation failure', async () => {
-    const onConfirmDelete = vi.fn().mockRejectedValue(new Error('network'));
-    render(
-      <PhotoDeleteConfirmation photo={photo} onClose={vi.fn()} onConfirmDelete={onConfirmDelete} />
-    );
-
-    fireEvent.click(screen.getByTestId('photo-delete-confirmation-delete-button'));
-
-    const alert = await screen.findByRole('alert');
-    expect(alert).toBe(screen.getByTestId('photo-delete-confirmation-error'));
   });
 });
 

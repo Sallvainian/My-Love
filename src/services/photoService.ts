@@ -565,53 +565,6 @@ class PhotoService {
       return null;
     }
   }
-
-  /**
-   * Update a photo's metadata (caption only - other fields are immutable)
-   *
-   * @param photoId - Photo ID to update
-   * @param updates - Partial photo update (only caption is mutable)
-   * @returns true if updated successfully
-   *
-   * AC 6.0.6: Users can UPDATE only their own photos
-   */
-  async updatePhoto(photoId: string, updates: Partial<SupabasePhoto>): Promise<boolean> {
-    try {
-      const { data: currentUser } = await supabase.auth.getUser();
-      if (!currentUser?.user) {
-        throw new Error('Not authenticated');
-      }
-
-      // Only allow updating caption - all other fields are immutable
-      const allowedUpdates: Partial<SupabasePhoto> = {};
-      if (updates.caption !== undefined) {
-        allowedUpdates.caption = updates.caption;
-      }
-
-      if (Object.keys(allowedUpdates).length === 0) {
-        console.warn('[PhotoService] No valid fields to update');
-        return false;
-      }
-
-      const { error } = await supabase
-        .from('photos')
-        .update(allowedUpdates)
-        .eq('id', photoId)
-        .eq('user_id', currentUser.user.id); // Ensure ownership
-
-      if (error) {
-        console.error('[PhotoService] Update error:', error);
-        return false;
-      }
-
-      logger.debug('[PhotoService] Photo updated:', photoId);
-
-      return true;
-    } catch (error) {
-      console.error('[PhotoService] Error in updatePhoto:', error);
-      return false;
-    }
-  }
 }
 
 // Export singleton instance

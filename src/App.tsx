@@ -63,9 +63,6 @@ const WelcomeSplash = lazy(() =>
 const PhotoUpload = lazy(() =>
   import('./components/PhotoUpload/PhotoUpload').then((m) => ({ default: m.PhotoUpload }))
 );
-const PhotoCarousel = lazy(() =>
-  import('./components/PhotoCarousel/PhotoCarousel').then((m) => ({ default: m.PhotoCarousel }))
-);
 
 // Loading spinner component for Suspense fallback
 const LoadingSpinner = () => (
@@ -855,11 +852,6 @@ function App() {
         {/* Photo upload modal - Story 4.1 (lazy loaded) */}
         <Suspense fallback={null}>
           <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
-        </Suspense>
-
-        {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected (lazy loaded) */}
-        <Suspense fallback={null}>
-          <PhotoCarousel />
         </Suspense>
       </div>
     </ErrorBoundary>

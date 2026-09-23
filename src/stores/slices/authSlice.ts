@@ -105,7 +105,6 @@ export function signedOutState() {
 
     // photosSlice
     photos: [],
-    selectedPhotoId: null,
     isUploading: false,
     uploadProgress: 0,
     storageWarning: null,

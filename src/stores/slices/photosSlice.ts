@@ -10,7 +10,7 @@
  * Story 6.2: Photo Upload with Progress Indicator
  *
  * Cross-slice dependencies:
- * - authSlice: `uploadPhoto`, `deletePhoto` and `updatePhoto` each capture
+ * - authSlice: `uploadPhoto` and `deletePhoto` each capture
  *   `userId` + `authSessionVersion` first and recheck the pair before every
  *   post-await write, so a continuation raised by one account cannot land in
  *   the next one's store on a shared device. `loadPhotos` carries the older,
@@ -25,7 +25,7 @@
  * - No local persistence (photos loaded on demand)
  */
 
-import type { PhotoUploadInput, PhotoWithUrls, SupabasePhoto } from '../../services/photoService';
+import type { PhotoUploadInput, PhotoWithUrls } from '../../services/photoService';
 import { photoService } from '../../services/photoService';
 import type { AppStateCreator } from '../types';
 
@@ -39,7 +39,6 @@ export type PhotoUploadResult = { success: true } | { success: false; error: str
 export interface PhotosSlice {
   // State
   photos: PhotoWithUrls[];
-  selectedPhotoId: string | null;
   isUploading: boolean;
   uploadProgress: number; // 0-100%
   error: string | null;
@@ -49,9 +48,6 @@ export interface PhotosSlice {
   uploadPhoto: (input: PhotoUploadInput) => Promise<PhotoUploadResult>;
   loadPhotos: () => Promise<void>;
   deletePhoto: (photoId: string) => Promise<boolean>;
-  updatePhoto: (photoId: string, updates: Partial<SupabasePhoto>) => Promise<void>;
-  selectPhoto: (photoId: string | null) => void;
-  clearPhotoSelection: () => void;
   clearError: () => void;
   clearStorageWarning: () => void;
 }
@@ -59,7 +55,6 @@ export interface PhotosSlice {
 export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) => ({
   // Initial state
   photos: [],
-  selectedPhotoId: null,
   isUploading: false,
   uploadProgress: 0,
   error: null,
@@ -258,62 +253,5 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
    */
   clearStorageWarning: () => {
     set({ storageWarning: null });
-  },
-
-  /**
-   * Update a photo's caption.
-   *
-   * Caption is the only mutable column: `photos` is (id, user_id, storage_path,
-   * filename, caption, mime_type, file_size, width, height, created_at), and
-   * photoService.updatePhoto drops everything else. Anything extra passed in
-   * here — `tags`, most notably — is therefore NOT persisted, so it must not be
-   * merged into local state either.
-   */
-  updatePhoto: async (photoId: string, updates: Partial<SupabasePhoto>) => {
-    // A caption save is a photo continuation too: it writes `photos` and the
-    // app-wide `error`, the two keys the guard above exists to protect.
-    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    const ownsUpdate = () =>
-      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
-
-    try {
-      // Returns false on a rejected write or when no updatable field was
-      // supplied. Previously unchecked, so a failed save still updated the UI
-      // and the change silently disappeared on reload.
-      const persisted = await photoService.updatePhoto(photoId, updates);
-
-      if (!ownsUpdate()) return;
-
-      if (!persisted) {
-        set({ error: 'Failed to save photo changes' });
-        return;
-      }
-
-      set((state) => ({
-        photos: state.photos.map((p) =>
-          p.id === photoId
-            ? { ...p, ...(updates.caption !== undefined ? { caption: updates.caption } : {}) }
-            : p
-        ),
-      }));
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Update failed';
-      if (!ownsUpdate()) return;
-      set({ error: errorMsg });
-    }
-  },
-
-  /**
-   * Select a photo for viewing in carousel
-   */
-  selectPhoto: (photoId: string | null) => {
-    set({ selectedPhotoId: photoId });
-  },
-
-  /**
-   * Clear photo selection (close carousel)
-   */
-  clearPhotoSelection: () => {
-    set({ selectedPhotoId: null });
   },
 });

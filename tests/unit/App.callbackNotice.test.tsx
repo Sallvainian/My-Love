@@ -78,7 +78,6 @@ vi.mock('../../src/components/DisplayNameSetup', () => ({
   DisplayNameSetup: () => null,
 }));
 vi.mock('../../src/components/PhotoUpload/PhotoUpload', () => ({ PhotoUpload: () => null }));
-vi.mock('../../src/components/PhotoCarousel/PhotoCarousel', () => ({ PhotoCarousel: () => null }));
 vi.mock('../../src/components/shared', () => ({
   NetworkStatusIndicator: () => null,
   SyncToast: () => null,
