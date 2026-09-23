@@ -499,6 +499,24 @@ describe('Auth bootstrap notification ownership', () => {
   });
 });
 
+describe('App data loader', () => {
+  it('shows the kit heart, not an emoji, while app data loads after auth resolves', async () => {
+    controlHomeLoads();
+    // `initializeApp` is a stub here, so nothing clears the flag once auth settles.
+    useAppStore.setState({ isLoading: true });
+    render(<App />);
+    await act(async () => {});
+    expect(useAppStore.getState()).toMatchObject({ userId: USER_ID, isAuthenticated: true });
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
+
+    // Same kit mark as the auth loader: a kit-accent lucide icon, not an emoji.
+    const loader = screen.getByText('Loading your data...').parentElement!;
+    expect(loader.querySelector('svg')).toHaveClass('text-accent');
+    expect(loader.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+});
+
 describe('Home event-load session ownership', () => {
   it.each([
     ['success', success],
