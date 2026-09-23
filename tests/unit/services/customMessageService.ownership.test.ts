@@ -99,8 +99,8 @@ function customRow(userId: string | undefined, text: string): Omit<Message, 'id'
   };
   // Set the key only when there is an owner: an own-property `userId` that is
   // undefined is a different row shape from one with no such key, and the
-  // legacy rows genuinely have no key. An owned row is an uploaded mirror row,
-  // so it carries the server id its edits and deletes are addressed by.
+  // legacy rows genuinely have no key. An owned row is a mirror row, so it
+  // carries the server id its edits and deletes are addressed by.
   if (userId !== undefined) {
     row.userId = userId;
     row.serverId = `server-${userId}-${text}`;
@@ -420,8 +420,8 @@ describe('customMessageService ownership', () => {
       expect(await rowsOnDisk()).toEqual(before);
     });
 
-    it('refuses to edit or delete an owned row not yet uploaded, without calling the server', async () => {
-      const [localId] = await seed([{ ...customRow(A, 'A-LOCAL-ONLY'), serverId: undefined }]);
+    it('refuses to edit or delete an owned row with no server id, without calling the server', async () => {
+      const [localId] = await seed([{ ...customRow(A, 'A-NO-SERVER-ID'), serverId: undefined }]);
       const service = await freshService();
       const before = await rowsOnDisk();
       fakeCustomMessagesApi.updateCustomMessage.mockClear();
@@ -435,44 +435,6 @@ describe('customMessageService ownership', () => {
       expect(fakeCustomMessagesApi.updateCustomMessage).not.toHaveBeenCalled();
       expect(fakeCustomMessagesApi.deleteCustomMessage).not.toHaveBeenCalled();
       expect(await rowsOnDisk()).toEqual(before);
-    });
-
-    it('a row the refresh marked localOnly cannot be edited but can be deleted from this device', async () => {
-      const [localId] = await seed([{ ...customRow(A, 'A-UNSENDABLE'), serverId: undefined, localOnly: true }]);
-      const service = await freshService();
-      fakeCustomMessagesApi.updateCustomMessage.mockClear();
-      fakeCustomMessagesApi.deleteCustomMessage.mockClear();
-
-      await expect(service.updateMessage(A, { id: localId, text: 'X' })).rejects.toMatchObject({
-        code: 'not-synced',
-        message: expect.stringMatching(/only on this device.*delete it/),
-      });
-
-      await service.deleteForUser(A, localId);
-
-      expect(fakeCustomMessagesApi.updateCustomMessage).not.toHaveBeenCalled();
-      expect(fakeCustomMessagesApi.deleteCustomMessage).not.toHaveBeenCalled();
-      expect((await rowsOnDisk()).some((row) => row.id === localId)).toBe(false);
-    });
-
-    it('an unmarked row without a server id is never deleted locally only, even after the upload flag is set', async () => {
-      // Upload done, refresh failed: the row IS on the server under a server
-      // id this mirror has not learned yet. A local-only delete would let the
-      // next refresh bring it back.
-      const [pendingId] = await seed([{ ...customRow(A, 'A-UPLOADED-NOT-REFRESHED'), serverId: undefined }]);
-      const service = await freshService();
-      fakeCustomMessagesApi.deleteCustomMessage.mockClear();
-      localStorage.setItem(`my-love-local-upload-v1:${A}`, 'done');
-      try {
-        await expect(service.deleteForUser(A, pendingId)).rejects.toMatchObject({
-          code: 'not-synced',
-          message: expect.stringMatching(/Try again in a moment/),
-        });
-        expect(fakeCustomMessagesApi.deleteCustomMessage).not.toHaveBeenCalled();
-        expect((await rowsOnDisk()).some((row) => row.id === pendingId)).toBe(true);
-      } finally {
-        localStorage.removeItem(`my-love-local-upload-v1:${A}`);
-      }
     });
 
     it('refuses every write when nobody is signed in', async () => {

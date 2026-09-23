@@ -1,6 +1,6 @@
 /**
  * One queue for every write to, and every refresh of, the account-data mirrors
- * (anniversaries, custom messages, favorites), and for the one-time upload.
+ * (anniversaries, custom messages, favorites).
  *
  * A mirror refresh is "read the server, then replace the local copy". A write
  * is "write the server, then patch the local copy". Interleaved, a write that
@@ -19,7 +19,7 @@
  * A task must not call another queued function, or it waits on itself
  * forever; queued entry points are the leaf writes
  * (`storageService.toggleFavorite`, `customMessageService` create / update /
- * delete, the anniversary actions), the two refreshes, and the upload.
+ * delete, the anniversary actions) and the two refreshes.
  *
  * @module services/accountDataQueue
  */

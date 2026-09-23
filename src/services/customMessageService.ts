@@ -8,7 +8,7 @@ import type {
 } from '../types';
 import { projectMessageFavorites } from './messageFavorites';
 import { logger } from '../utils/logger';
-import { AccountDataError, notSyncedMessage } from './accountDataError';
+import { AccountDataError, NOT_SYNCED_MESSAGE } from './accountDataError';
 import { serializeAccountDataWrite } from './accountDataQueue';
 import { customMessagesApi, type ServerCustomMessage } from './customMessagesApi';
 import {
@@ -51,11 +51,9 @@ import { type MyLoveDBSchema, DB_VERSION, openMyLoveDB } from './dbSchema';
  * owned rows in IndexedDB are a read mirror: every write here goes to the
  * server first and to the mirror only after the server accepted it, so an
  * offline write fails with a clear error and leaves nothing half-written. Each
- * mirrored row carries its server id as `serverId`; a row without one has not
- * been uploaded yet (`localDataUpload.ts`) and cannot be edited or deleted
- * until it is. `replaceMirrorForUser()` swaps the mirror for the server's rows
- * once the upload has completed, keeping any row the upload could not send;
- * such a row can then only be deleted, and only from this device.
+ * mirrored row carries its server id as `serverId`; a row without one is not
+ * in the account and cannot be edited or deleted. `replaceMirrorForUser()`
+ * swaps the mirror for the server's rows on every signed-in start.
  *
  * Extends: BaseIndexedDBService<Message>
  * - Inherits: init(), add()
@@ -437,7 +435,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       throw new Error(`Custom message ${id} not found for this user`);
     }
     if (!current.serverId) {
-      throw new AccountDataError('not-synced', notSyncedMessage(current.localOnly));
+      throw new AccountDataError('not-synced', NOT_SYNCED_MESSAGE);
     }
     return current.serverId;
   }
@@ -488,13 +486,8 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
         logger.debug('[CustomMessageService] Nothing to delete, id:', id);
         return;
       }
-      // Server first; an already-deleted server row counts as deleted. A row
-      // marked `localOnly` is one the upload could not send and the refresh
-      // kept (replaceMirrorForUser): the server holds nothing to delete, so
-      // only the local copy goes.
-      if (!stored.localOnly) {
-        await customMessagesApi.deleteCustomMessage(await this.requireSyncedRow(owner, id));
-      }
+      // Server first; an already-deleted server row counts as deleted.
+      await customMessagesApi.deleteCustomMessage(await this.requireSyncedRow(owner, id));
 
       const tx = this.getTypedDB().transaction(['messages', 'message-favorites'], 'readwrite');
       const current = await tx.objectStore('messages').get(id);
@@ -524,15 +517,11 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
   /**
    * Replace `userId`'s mirrored custom rows with the server's.
    *
-   * Called only after this device's one-time upload has completed, so every
-   * owned row without a `serverId` has either been uploaded or deliberately
-   * skipped as a duplicate of a server row. A row matched by `serverId` keeps
-   * its local id (the rotation history and any open dialog refer to it); a
-   * server row with no local copy is added; an owned row the server no longer
-   * holds is deleted with its favorite — except a row with no `serverId` whose
-   * text matches no server row, which the upload skipped as invalid and the
-   * server never received, so it is kept untouched. Legacy unowned rows and every other
-   * account's rows are not touched. Favorites of these rows follow the
+   * A row matched by `serverId` keeps its local id (the rotation history and
+   * any open dialog refer to it); a server row with no local copy is added;
+   * every other owned row — one the server no longer holds, or one with no
+   * `serverId` — is deleted with its favorite. Legacy unowned rows and every
+   * other account's rows are not touched. Favorites of these rows follow the
    * server's `is_favorite`.
    *
    * One readwrite transaction, so a reader never sees half a swap.
@@ -579,18 +568,8 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       else await favorites.delete([id, owner]);
     }
 
-    // A row with no server id and no server row of the same text was never
-    // received — the upload skipped it as one the server would reject — so it
-    // stays. Same normalisation the upload dedupes with.
-    const serverTexts = new Set(rows.map((row) => row.text.trim().toLowerCase()));
     for (const row of owned) {
       if (kept.has(row.id)) continue;
-      // Never sent (the upload skipped it as invalid): keep it, marked so it
-      // can still be deleted from this device.
-      if (!row.serverId && !serverTexts.has(row.text.trim().toLowerCase())) {
-        if (!row.localOnly) await messages.put({ ...row, localOnly: true });
-        continue;
-      }
       await messages.delete(row.id);
       await favorites.delete([row.id, owner]);
     }

@@ -4,8 +4,7 @@
  *
  * Supabase is the source of truth; `settings.relationship.anniversaries` is a
  * read mirror that `settingsSlice` keeps in step after every successful write
- * and replaces wholesale from `fetchAnniversaries` once this device's one-time
- * upload has completed (`localDataUpload.ts`).
+ * and replaces wholesale from `fetchAnniversaries` on every signed-in start.
  *
  * Private to the author: the table's RLS admits the owner only, so nothing here
  * filters for a partner. Writes are server-first and throw — see
@@ -25,7 +24,6 @@ import { AccountDataError, requestTimeout, requireOnline, toAccountDataError } f
 import { parseEventDate } from './eventsService';
 
 export type SupabaseAnniversaryRecord = Database['public']['Tables']['anniversaries']['Row'];
-export type AnniversaryInsert = Database['public']['Tables']['anniversaries']['Insert'];
 
 /** What a caller writes. `date` is a bare `"YYYY-MM-DD"`. */
 export interface AnniversaryInput {
@@ -176,25 +174,6 @@ export const anniversariesService = {
       if (error) throw error;
     } catch (error) {
       throw toAccountDataError('AnniversariesService.deleteAnniversary', error);
-    }
-  },
-
-  /**
-   * Insert-only upload of rows that each carry a deterministic `client_key`.
-   * A key already stored is ignored (ON CONFLICT DO NOTHING), so a re-run never
-   * duplicates and never touches a server row.
-   */
-  async insertAnniversariesOnce(rows: AnniversaryInsert[]): Promise<void> {
-    if (rows.length === 0) return;
-    requireOnline(WHAT);
-    try {
-      const { error } = await supabase
-        .from('anniversaries')
-        .upsert(rows, { onConflict: 'user_id,client_key', ignoreDuplicates: true })
-        .abortSignal(requestTimeout());
-      if (error) throw error;
-    } catch (error) {
-      throw toAccountDataError('AnniversariesService.insertAnniversariesOnce', error);
     }
   },
 };

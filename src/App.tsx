@@ -25,7 +25,6 @@ import {
 import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
-import { syncAccountDataAfterSignIn } from './services/localDataUpload';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { stripBasePath } from './utils/basePath';
@@ -413,33 +412,16 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]); // Initialize when session is established
 
-  // Account data moved to Supabase: once per user per device, upload whatever
-  // this device still holds locally; once that has succeeded (now or on an
-  // earlier launch), refresh the local mirrors from the server. On the old
-  // GitHub Pages origin the bridge build then forwards to Cloudflare — and only
-  // then, so no device leaves the origin still holding data the server lacks.
-  // Keyed on the auth lifetime, so an in-place account switch syncs the new
-  // account too. Failures are logged inside and never block the app.
+  // Anniversaries, custom messages and favorites live in Supabase; refresh
+  // their local mirrors from the server on every signed-in start. Keyed on the
+  // auth lifetime, so an in-place account switch refreshes the new account
+  // too. Each loader captures the account it was raised for and logs its own
+  // failure, leaving the mirror as it was.
   useEffect(() => {
     if (!authUserId || !messagesSeeded) return;
-    const stillCurrent = () => {
-      const state = useAppStore.getState();
-      return state.userId === authUserId && state.authSessionVersion === authSessionVersion;
-    };
-
-    // Read now, after setAuthUser's vault pop, while authUserId is signed in.
-    const localAnniversaries = useAppStore.getState().settings?.relationship.anniversaries ?? [];
-    void syncAccountDataAfterSignIn(authUserId, localAnniversaries, {
-      isStillCurrent: stillCurrent,
-      refresh: () => {
-        const { loadAnniversariesFromServer, loadMessageDataFromServer } = useAppStore.getState();
-        return Promise.all([loadAnniversariesFromServer(), loadMessageDataFromServer()]);
-      },
-      bridgeTarget: import.meta.env.VITE_LEGACY_BRIDGE_TARGET,
-    }).catch((error) => {
-      // Upload and refreshes log their own failures; this catches anything else.
-      console.error('[App] Account data sync failed:', error);
-    });
+    const { loadAnniversariesFromServer, loadMessageDataFromServer } = useAppStore.getState();
+    void loadAnniversariesFromServer();
+    void loadMessageDataFromServer();
   }, [authUserId, authSessionVersion, messagesSeeded]);
 
   // Story 6.4: Task 2 - Network state detection with auto-sync on reconnect (AC #2)

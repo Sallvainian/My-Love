@@ -21,10 +21,7 @@ import { requestTimeout, requireOnline, toAccountDataError } from './accountData
 
 const WHAT = 'Favorites';
 
-/**
- * Stable SHA-256 hex digest of a string's UTF-8 bytes. Used for the bundled
- * favorite key and for the upload's deterministic `client_key`s.
- */
+/** Stable SHA-256 hex digest of a string's UTF-8 bytes; the bundled favorite key. */
 export async function hashText(text: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -51,9 +48,21 @@ export const messageFavoritesApi = {
     }
   },
 
-  /** Idempotent: favoriting twice leaves one row. */
+  /** Idempotent: favoriting twice leaves one row (ON CONFLICT DO NOTHING). */
   async addFavorite(userId: string, messageKey: string): Promise<void> {
-    await messageFavoritesApi.insertFavoritesOnce(userId, [messageKey]);
+    requireOnline(WHAT);
+    try {
+      const { error } = await supabase
+        .from('message_favorites')
+        .upsert(
+          { user_id: userId, message_key: messageKey },
+          { onConflict: 'user_id,message_key', ignoreDuplicates: true }
+        )
+        .abortSignal(requestTimeout());
+      if (error) throw error;
+    } catch (error) {
+      throw toAccountDataError('MessageFavoritesApi.addFavorite', error);
+    }
   },
 
   /** Idempotent: removing a favorite that is not there is success. */
@@ -69,24 +78,6 @@ export const messageFavoritesApi = {
       if (error) throw error;
     } catch (error) {
       throw toAccountDataError('MessageFavoritesApi.removeFavorite', error);
-    }
-  },
-
-  /** Insert-only: a key already stored is ignored (ON CONFLICT DO NOTHING). */
-  async insertFavoritesOnce(userId: string, messageKeys: string[]): Promise<void> {
-    if (messageKeys.length === 0) return;
-    requireOnline(WHAT);
-    try {
-      const { error } = await supabase
-        .from('message_favorites')
-        .upsert(
-          messageKeys.map((message_key) => ({ user_id: userId, message_key })),
-          { onConflict: 'user_id,message_key', ignoreDuplicates: true }
-        )
-        .abortSignal(requestTimeout());
-      if (error) throw error;
-    } catch (error) {
-      throw toAccountDataError('MessageFavoritesApi.insertFavoritesOnce', error);
     }
   },
 };

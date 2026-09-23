@@ -27,16 +27,10 @@ export interface Message {
   userId?: string;
   /**
    * Id of the `public.custom_messages` row this CUSTOM row mirrors. Absent on
-   * bundled rows, on legacy unowned rows, and on a custom row this device has
-   * not yet uploaded (`localDataUpload.ts`).
+   * bundled rows, on legacy unowned rows, and on an owned row from before the
+   * move to Supabase, which the next mirror refresh deletes.
    */
   serverId?: string;
-  /**
-   * Set by the mirror refresh on an owned custom row the one-time upload could
-   * not send (blank, or over the length limit). It never syncs; the only write
-   * it allows is a delete from this device.
-   */
-  localOnly?: boolean;
   active?: boolean;
   createdAt: Date;
   isFavorite?: boolean;
@@ -78,7 +72,7 @@ export interface Anniversary {
   date: string; // ISO date string
   label: string;
   description?: string;
-  serverId?: string; // `public.anniversaries.id`; absent until uploaded
+  serverId?: string; // `public.anniversaries.id`
 }
 
 export interface MoodEntry {

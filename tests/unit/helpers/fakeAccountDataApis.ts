@@ -52,12 +52,10 @@ export const fakeCustomMessagesApi = {
     })
   ),
   deleteCustomMessage: vi.fn(async (_serverId: string): Promise<void> => {}),
-  insertCustomMessagesOnce: vi.fn(async (_rows: unknown[]): Promise<void> => {}),
 };
 
 export const fakeMessageFavoritesApi = {
   fetchFavoriteKeys: vi.fn(async (_userId: string): Promise<string[]> => []),
   addFavorite: vi.fn(async (_userId: string, _key: string): Promise<void> => {}),
   removeFavorite: vi.fn(async (_userId: string, _key: string): Promise<void> => {}),
-  insertFavoritesOnce: vi.fn(async (_userId: string, _keys: string[]): Promise<void> => {}),
 };
