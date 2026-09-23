@@ -126,10 +126,9 @@ jobs:
                attempt, or lacks the DB `UNIQUE` constraint plus
                `.upsert(..., { onConflict, ignoreDuplicates: true })`. Compare against
                `notesSlice.ts` or `photoService.ts`.
-            4. **Wrong data model.** Data-layer code written for a model the feature
-               does not use: photos, love notes and partner interactions are
-               Supabase-only, while mood and the bundled daily messages are
-               offline-first with IndexedDB primary. Check how the feature is wired.
+            4. **Wrong data model.** Data-layer code written for the wrong one of the
+               three: scripture reading is online-first, photos is Supabase-only, the
+               rest are offline-first with IndexedDB primary.
             5. **Error contract.** Assuming IndexedDB semantics (reads return
                `null`/`[]`, writes throw) of a Supabase API function or the reverse.
                The Supabase layer is inconsistent — check the specific function called.
