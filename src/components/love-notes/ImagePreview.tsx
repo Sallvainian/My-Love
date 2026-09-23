@@ -81,7 +81,7 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
       data-testid="image-preview"
     >
       {/* Image thumbnail */}
-      <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+      <div className="relative overflow-hidden rounded-[14px] border border-line bg-card2">
         {previewUrl && (
           <img
             src={previewUrl}
@@ -117,12 +117,12 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
       </div>
 
       {/* File size info */}
-      <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+      <div className="mt-1 flex items-center gap-2 text-xs text-muted">
         <span>{formatFileSize(originalSize)}</span>
         <span>→</span>
-        <span className="text-green-600">~{formatFileSize(estimatedCompressedSize)}</span>
+        <span className="text-good">~{formatFileSize(estimatedCompressedSize)}</span>
         {showCompressionIndicator && !isCompressing && (
-          <span className="text-amber-600">(large file)</span>
+          <span className="text-muted">(large file)</span>
         )}
       </div>
     </motion.div>

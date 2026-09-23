@@ -5,10 +5,11 @@
  * Displays message content with sender name and timestamp.
  * Supports image attachments with inline display and full-screen viewer.
  *
- * Styling:
- * - Own messages: coral background (#FF6B6B), right-aligned
- * - Partner messages: light gray background (#E9ECEF), left-aligned
- * - Border radius: 16px for soft bubbles
+ * Styling (style-kit bubbles, tokens from index.css):
+ * - Own messages: `fill` pink with white text, right-aligned, 6px bottom-right tail
+ * - Partner messages: `card` with an inset 1px `line` edge, left-aligned,
+ *   6px bottom-left tail
+ * - Radius 20px, max 78% of the row
  *
  * Story 2.1: AC-2.1.1 (message styling), AC-2.1.2 (timestamp display)
  * Love Notes Images: AC-7 (inline display), AC-9 (full-screen view)
@@ -236,7 +237,7 @@ function LoveNoteMessageComponent({
           matches the caption's own 16px line box.
         */}
         <span
-          className={`mb-1 flex items-center gap-2 px-1 text-xs leading-4 text-gray-500 ${
+          className={`mb-1 flex items-center gap-2 px-1 text-xs leading-4 text-muted ${
             isOwnMessage ? 'flex-row-reverse' : ''
           }`}
         >
@@ -258,7 +259,7 @@ function LoveNoteMessageComponent({
             <button
               type="button"
               onClick={() => onRequestRemove?.(message)}
-              className="relative flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center rounded text-gray-400 opacity-60 transition after:absolute after:-inset-x-2 after:-inset-y-1 after:content-[''] hover:text-red-500 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
+              className="relative flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center rounded text-muted opacity-60 transition after:absolute after:-inset-x-2 after:-inset-y-1 after:content-[''] hover:text-danger hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-danger focus-visible:outline-none"
               aria-label={`Remove message from ${senderName} at ${fullTimestamp} from your history`}
               data-testid="note-remove-button"
             >
@@ -268,24 +269,36 @@ function LoveNoteMessageComponent({
         </span>
 
         {/* Message bubble */}
+        {/* Edges are outlines, not borders or rings: an outline adds no
+            height to calculateRowHeight's budget and paints above an image
+            child, where an inset ring would be covered. The partner hairline
+            sits just inside the edge; a failed send swaps it (or nothing, for
+            your own) for a `danger` outline outside the bubble, against the
+            page, because on the pink `fill` a danger edge is invisible. */}
         <div
-          className={`max-w-[80%] overflow-hidden rounded-2xl ${
+          className={`max-w-[78%] overflow-hidden rounded-[20px] ${
             isOwnMessage
-              ? 'rounded-br-md bg-[#FF6B6B] text-gray-800'
-              : 'rounded-bl-md bg-[#E9ECEF] text-gray-800'
-          } ${hasError ? 'border-2 border-red-500' : ''} `}
+              ? 'rounded-br-[6px] bg-fill text-white'
+              : 'rounded-bl-[6px] bg-card text-ink'
+          } ${
+            hasError
+              ? 'outline-2 outline-offset-2 outline-danger'
+              : isOwnMessage
+                ? ''
+                : 'outline-1 -outline-offset-1 outline-line'
+          }`}
         >
           {/* Image (displayed above text if both present) */}
           {hasImage && (
             <div className="relative">
               {imageLoading && (
-                <div className="flex h-48 w-full items-center justify-center bg-gray-200">
-                  <Loader2 className="animate-spin text-gray-400" size={24} />
+                <div className="flex h-48 w-full items-center justify-center bg-card2">
+                  <Loader2 className="animate-spin text-muted" size={24} />
                 </div>
               )}
 
               {imageError && (
-                <div className="flex h-32 w-full items-center justify-center bg-gray-200 text-sm text-gray-500">
+                <div className="flex h-32 w-full items-center justify-center bg-card2 text-sm text-muted">
                   Failed to load image
                 </div>
               )}
@@ -294,7 +307,7 @@ function LoveNoteMessageComponent({
                 <button
                   type="button"
                   onClick={handleImageClick}
-                  className="focus:ring-coral-500 block w-full cursor-pointer focus:ring-2 focus:outline-none focus:ring-inset"
+                  className="block w-full cursor-pointer focus:ring-2 focus:ring-accent focus:outline-none focus:ring-inset"
                   aria-label={`View full size: ${imageAltText}`}
                 >
                   <img
@@ -321,22 +334,22 @@ function LoveNoteMessageComponent({
 
           {/* Text content (only if not empty) */}
           {sanitizedContent && (
-            <div className="px-4 py-3">
-              <p className="text-base leading-relaxed wrap-break-word">{sanitizedContent}</p>
+            <div className="px-3.5 py-2.5">
+              <p className="text-[15px] leading-[1.4] wrap-break-word">{sanitizedContent}</p>
             </div>
           )}
         </div>
 
         {/* Status indicators */}
         {isSending && !isImageUploading && (
-          <span className="mt-1 px-1 text-xs text-gray-500" aria-live="polite">
+          <span className="mt-1 px-1 text-xs text-muted" aria-live="polite">
             Sending...
           </span>
         )}
         {hasError && (
           <button
             onClick={() => onRetry?.(message.tempId || message.id)}
-            className="mt-1 flex cursor-pointer items-center gap-1 px-1 text-xs text-red-500 hover:text-red-700 hover:underline"
+            className="mt-1 flex cursor-pointer items-center gap-1 px-1 text-xs text-danger hover:underline"
             aria-live="assertive"
             aria-label="Retry sending message"
           >

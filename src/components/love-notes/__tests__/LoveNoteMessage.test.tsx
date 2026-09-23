@@ -85,8 +85,11 @@ describe('LoveNoteMessage', () => {
       const messageContainer = screen.getByTestId('love-note-message');
       expect(messageContainer).toHaveClass('items-end');
       expect(screen.queryByText('Sending...')).not.toBeInTheDocument();
-      const bubble = messageContainer.querySelector('.rounded-2xl');
-      expect(bubble).toHaveClass('bg-[#FF6B6B]', 'text-gray-800');
+      const bubble = messageContainer.querySelector('.rounded-\\[20px\\]');
+      // Own bubble: kit `fill` with white text and the 6px bottom-right tail,
+      // no hairline (the fill is the edge).
+      expect(bubble).toHaveClass('max-w-[78%]', 'rounded-br-[6px]', 'bg-fill', 'text-white');
+      expect(bubble).not.toHaveClass('outline-line');
       expect(bubble).not.toHaveClass('opacity-70');
     });
 
@@ -95,8 +98,18 @@ describe('LoveNoteMessage', () => {
 
       const messageContainer = screen.getByTestId('love-note-message');
       expect(messageContainer).toHaveClass('items-start');
-      const bubble = messageContainer.querySelector('.rounded-2xl');
-      expect(bubble).toHaveClass('bg-[#E9ECEF]', 'text-gray-800');
+      const bubble = messageContainer.querySelector('.rounded-\\[20px\\]');
+      // Partner bubble: kit `card` with an inset 1px `line` edge and the 6px
+      // bottom-left tail.
+      expect(bubble).toHaveClass(
+        'max-w-[78%]',
+        'rounded-bl-[6px]',
+        'bg-card',
+        'text-ink',
+        'outline-1',
+        '-outline-offset-1',
+        'outline-line'
+      );
       expect(bubble).not.toHaveClass('opacity-70');
     });
 
@@ -286,10 +299,9 @@ describe('LoveNoteMessage', () => {
       const sending = screen.getByText('Sending...');
       expect(sending).toBeInTheDocument();
       expect(sending).toHaveAttribute('aria-live', 'polite');
-      expect(sending).toHaveClass('text-gray-500');
-      expect(sending).not.toHaveClass('text-gray-400');
-      const bubble = screen.getByTestId('love-note-message').querySelector('.rounded-2xl');
-      expect(bubble).toHaveClass('bg-[#FF6B6B]', 'text-gray-800');
+      expect(sending).toHaveClass('text-muted');
+      const bubble = screen.getByTestId('love-note-message').querySelector('.rounded-\\[20px\\]');
+      expect(bubble).toHaveClass('bg-fill', 'text-white');
       expect(bubble).not.toHaveClass('opacity-70');
     });
 
@@ -318,7 +330,11 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={failedMessage} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByText(/Failed to send/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+      const retry = screen.getByRole('button', { name: /retry/i });
+      expect(retry).toBeInTheDocument();
+      expect(retry).toHaveClass('text-danger');
+      const bubble = screen.getByTestId('love-note-message').querySelector('.rounded-\\[20px\\]');
+      expect(bubble).toHaveClass('outline-2', 'outline-offset-2', 'outline-danger');
     });
 
     it('should call onRetry when retry button clicked', () => {
