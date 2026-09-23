@@ -3,10 +3,10 @@
  * (`EventsSettings`, `AnniversarySettings`), by the surfaces with no artboard
  * of their own that borrow the same pieces (`LoginScreen`, `DisplayNameSetup`,
  * `WelcomeSplash`, `ErrorBoundary` and `ViewErrorBoundary`), by the mood
- * screens' section labels and by the centred dialogs. The dialog pieces follow
- * the kit dialog `PhotoEditModal` / `PhotoDeleteConfirmation` established;
- * every colour is a kit token that switches with the OS theme, so no per-theme
- * variant is needed.
+ * screens' section labels and by the centred dialogs. The dialog pieces are
+ * the kit dialog, as `NoteRemoveConfirmation` renders it; every colour is a
+ * kit token that switches with the OS theme, so no per-theme variant is
+ * needed.
  */
 
 /** A Settings card. Its `p-3` is what `DIVIDER`'s `-mx-3` cancels. */

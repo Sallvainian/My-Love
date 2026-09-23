@@ -7,6 +7,7 @@
  * exact layout; load error card with retry; owner badges.
  */
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PhotoWithUrls } from '../../../services/photoService';
 
@@ -86,6 +87,14 @@ describe('PhotoGallery grid', () => {
     expect(grid.className).toContain('grid-cols-3');
     expect(grid.className).toContain('gap-1.5');
     expect(grid.className).not.toMatch(/(sm|md|lg):grid-cols/);
+  });
+
+  it('hands the header Upload to uploadButtonRef, for the upload dialog focus return', async () => {
+    const uploadButtonRef = createRef<HTMLButtonElement>();
+    render(<PhotoGallery onUploadClick={vi.fn()} uploadButtonRef={uploadButtonRef} />);
+    await act(async () => {});
+
+    expect(uploadButtonRef.current).toBe(screen.getByTestId('photo-gallery-upload-fab'));
   });
 
   it('suffixes "+" while more pages remain', async () => {

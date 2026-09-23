@@ -9,9 +9,8 @@
    whose value switches under `prefers-color-scheme: dark`, so a component needs
    no `dark:` variant; `font-lora` is the same in both themes. `inline` makes
    `text-accent` emit `color: var(--kit-accent)` rather than
-   `var(--color-accent)`: applyTheme() (utils/themes.ts) writes
-   `--color-accent`, `--color-primary`, ... inline on <html>, which would
-   otherwise override these. */
+   `var(--color-accent)`, so a utility resolves straight to its kit variable
+   and nothing that sets a `--color-*` variable can repaint it. */
 @theme inline {
   --color-page: var(--kit-page);
   --color-card: var(--kit-card);

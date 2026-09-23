@@ -39,13 +39,10 @@ const FIELD_NAME_MAP: Record<string, string> = {
   date: 'Date',
   mood: 'Mood',
   note: 'Note',
-  themeName: 'Theme',
   notificationTime: 'Notification time',
   'relationship.startDate': 'Relationship start date',
   'relationship.partnerName': 'Partner name',
   'relationship.anniversaries': 'Anniversaries',
-  'customization.accentColor': 'Accent color',
-  'customization.fontFamily': 'Font family',
   'notifications.enabled': 'Notifications enabled',
   'notifications.time': 'Notification time',
 };

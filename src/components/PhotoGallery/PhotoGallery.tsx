@@ -1,5 +1,5 @@
 import { AlertCircle, Camera, Loader2, Plus } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { getOwnDisplayName, getPartnerDisplayName } from '../../api/supabaseClient';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { photoService } from '../../services/photoService';
@@ -10,6 +10,12 @@ import { PhotoViewer } from './PhotoViewer';
 
 interface PhotoGalleryProps {
   onUploadClick?: () => void;
+  /**
+   * Attached to the header Upload button, which replaces the empty state's
+   * Upload once the album has a photo -- so the upload dialog can return focus
+   * to it when the button that opened the dialog is gone.
+   */
+  uploadButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 // AC-4.2.4: Pagination configuration
@@ -35,7 +41,7 @@ function initialOf(name: string | null, fallback: string): string {
  * - Page header over a skeleton grid during the first fetch
  * - Lazy loading pagination with Intersection Observer
  */
-export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
+export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryProps) {
   const { photos: storePhotos, loadPhotos } = useAppStore();
 
   // AC-4.2.4: Pagination state
@@ -117,7 +123,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         setHasLoadedOnce(true);
         setIsLoading(false);
 
-        // BUGFIX: Load photos into store so PhotoCarousel can access them
+        // Load photos into the store too: the refresh effect below watches its count
         await loadPhotos();
       } catch (error) {
         if (cancelled) return;
@@ -140,12 +146,20 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   // BUG FIX: Refresh gallery when store photos change (after upload)
   // This fixes the issue where uploaded photos don't appear until page refresh
   // P1 FIX: Added cleanup to prevent memory leak on unmount
+  //
+  // An upload prepends to the store, so it shows as a newest store row this
+  // list does not hold. Counts cannot tell: the store loads up to 50 rows and
+  // this list grows 20 at a time, so comparing lengths reloaded page one after
+  // the first load and again after each scroll, snapping the album back to 20
+  // (DW-201). A delete only removes rows from both lists, so it never trips this.
+  const newestStorePhotoId = storePhotos[0]?.id;
+  const newestStorePhotoMissing =
+    newestStorePhotoId !== undefined && !photos.some((p) => p.id === newestStorePhotoId);
   useEffect(() => {
     // Skip if we haven't loaded once yet (initial load handles this)
     if (!hasLoadedOnce) return;
 
-    // Check if store has more photos than local state (new upload detected)
-    if (storePhotos.length > photos.length) {
+    if (newestStorePhotoMissing) {
       let cancelled = false;
 
       // Refresh the gallery to show new photos
@@ -171,7 +185,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         cancelled = true;
       };
     }
-  }, [storePhotos.length, photos.length, hasLoadedOnce]); // Watch store photo count
+  }, [newestStorePhotoId, newestStorePhotoMissing, hasLoadedOnce]);
 
   // AC-4.2.4: Load next page of photos
   const loadMorePhotos = useCallback(async () => {
@@ -256,6 +270,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       </div>
       {showUpload && (
         <button
+          ref={uploadButtonRef}
           type="button"
           onClick={onUploadClick}
           className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"

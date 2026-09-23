@@ -241,4 +241,43 @@ test.describe('Interaction record ownership', () => {
       await expect(badge).toHaveAttribute('aria-label', 'Play the oldest of 2 unviewed interactions');
     }
   );
+
+  test(
+    '[P1] DW-200-E2E-001 plays from a tap outside the visible badge without covering History',
+    async ({ page, interactionOwnership }) => {
+      const userId = randomUUID();
+      const partnerId = randomUUID();
+      const badge = page.getByTestId('notification-badge');
+      const history = page.getByTestId('history-button');
+
+      await log.step('Show one unviewed interaction');
+      await interactionOwnership.mount(userId, partnerId);
+      await interactionOwnership.dispatch(
+        0,
+        createInteractionRecord({ from_user_id: partnerId, to_user_id: userId })
+      );
+      await expect(badge).toHaveText('1');
+      // The badge scales in from 0; measure it only once it is full size.
+      await expect.poll(async () => (await badge.boundingBox())?.height).toBe(20);
+      const box = (await badge.boundingBox())!;
+      const historyBox = (await history.boundingBox())!;
+      const centreY = box.y + box.height / 2;
+
+      await log.step('Hit-test the free space right of the badge and History beside it');
+      const hits = await page.evaluate(
+        ({ right, historyEdge, y }) => {
+          const hit = (x: number) =>
+            document.elementFromPoint(x, y)?.closest('[data-testid]')?.getAttribute('data-testid');
+          return { right: hit(right), historyEdge: hit(historyEdge) };
+        },
+        // 1px inside History's edge: the pulse ring overlaps it but takes no pointer events.
+        { right: box.x + box.width + 10, historyEdge: historyBox.x + historyBox.width - 1, y: centreY }
+      );
+      expect(hits).toEqual({ right: 'notification-badge', historyEdge: 'history-button' });
+
+      await log.step('Tap 6px above the visible badge');
+      await page.mouse.click(box.x + box.width / 2, box.y - 6);
+      await expect(page.getByTestId('poke-animation')).toBeVisible();
+    }
+  );
 });

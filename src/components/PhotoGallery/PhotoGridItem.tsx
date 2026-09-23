@@ -61,7 +61,7 @@ export function PhotoGridItem({
     };
   }, [isVisible]);
 
-  // AC-4.2.7: Handle photo click for carousel view (Story 4.3)
+  // AC-4.2.7: Handle photo click to open the full-screen viewer
   // The tile's aria-label (the caption) overrides its content, so the badge's
   // screen-reader text is attached as a description instead.
   const ownerTextId = `photo-owner-${photo.id}`;

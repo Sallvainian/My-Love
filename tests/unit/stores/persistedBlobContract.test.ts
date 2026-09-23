@@ -32,10 +32,8 @@ const STORAGE_KEY = 'my-love-storage';
 
 /** Shaped to pass `SettingsSchema` — the adapter drops `settings` when it does not. */
 const PERSISTED_SETTINGS = {
-  themeName: 'ocean',
   notificationTime: '09:00',
   relationship: { startDate: '2020-01-01', partnerName: 'A', anniversaries: [] },
-  customization: { accentColor: '#ff8888', fontFamily: 'serif' },
   notifications: { enabled: true, time: '09:00' },
 };
 

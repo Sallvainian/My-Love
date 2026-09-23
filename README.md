@@ -14,7 +14,7 @@ A Progressive Web App for couples to exchange daily love messages, track moods, 
 - **Mood Tracker** — Daily mood logging with emoji moods, optional notes, and mood history timeline
 - **Partner Mood View** — See your partner's current mood in real-time
 - **Partner Interactions** — Send pokes, kisses, and farts with animations and real-time delivery
-- **Photo Gallery** — Upload, view, edit, and share photos with captions and lazy loading
+- **Photo Gallery** — Upload, view, and share photos with captions and lazy loading
 - **Anniversary Timers** — Real-time countdowns to special dates with celebration animations
 - **Themes** — Sunset, Ocean, Lavender, and Rose
 - **PWA** — Installable on mobile, works offline
@@ -140,7 +140,6 @@ My-Love/
 │   │   ├── PartnerMoodView/      # Partner mood display
 │   │   ├── PokeKissInterface/    # Playful interactions
 │   │   ├── PhotoGallery/         # Photo grid
-│   │   ├── PhotoEditModal/       # Photo editing
 │   │   └── ...
 │   ├── stores/
 │   │   ├── useAppStore.ts        # Root Zustand store

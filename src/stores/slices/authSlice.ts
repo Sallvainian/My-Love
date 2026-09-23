@@ -105,9 +105,6 @@ export function signedOutState() {
 
     // photosSlice
     photos: [],
-    selectedPhotoId: null,
-    isUploading: false,
-    uploadProgress: 0,
     storageWarning: null,
 
     // interactionsSlice — the partner snapshot names the previous couple, and
@@ -214,8 +211,8 @@ function discardAccountState(
   // re-derivable: these are read caches of Supabase and IndexedDB, and unsynced
   // local entries stay in IndexedDB for their owner to pick up.
   //
-  // `settings` survives as a whole — it is device configuration (theme,
-  // notifications) — except relationship.anniversaries inside it, which is
+  // `settings` survives as a whole — it is device configuration
+  // (notifications) — except relationship.anniversaries inside it, which is
   // couple data: user-writable from Settings, persisted by `partialize`, and
   // rendered on Home. It is also localStorage-only, so a plain clear would
   // destroy it: the outgoing user's list is stashed in the per-user vault

@@ -59,9 +59,6 @@ const EXPECTED_RESET: Record<string, unknown> = {
   customMessagesLoaded: false,
   favoriteError: null,
   photos: [],
-  selectedPhotoId: null,
-  isUploading: false,
-  uploadProgress: 0,
   storageWarning: null,
   interactions: [],
   unviewedCount: 0,
@@ -139,7 +136,6 @@ function seedSignedInSession(): void {
     notesPendingRemoval: ['note-1'],
 
     photos: [{ id: 'photo-1', caption: SECRETS.photoCaption }],
-    selectedPhotoId: 'photo-1',
 
     // The AdminPanel list, plus the rotation pool the same rows feed into.
     // `messages` deliberately mixes the two kinds: a bundled daily row shared
@@ -337,7 +333,6 @@ describe('clearAuth on sign-out', () => {
 
     const state = useAppStore.getState();
     expect(state.photos).toEqual([]);
-    expect(state.selectedPhotoId).toBeNull();
     expect(state.interactions).toEqual([]);
     expect(state.unviewedCount).toBe(0);
     // The partner snapshot names the previous couple: a stale one would let
@@ -478,11 +473,11 @@ describe('clearAuth on sign-out', () => {
     }
   });
 
-  it("drops the previous couple's anniversaries but keeps the device's theme", () => {
+  it("drops the previous couple's anniversaries but keeps the device's notification time", () => {
     useAppStore.setState({
       settings: {
         ...useAppStore.getState().settings!,
-        themeName: 'ocean',
+        notificationTime: '21:30',
       },
     } as unknown as Parameters<typeof useAppStore.setState>[0]);
 
@@ -493,8 +488,8 @@ describe('clearAuth on sign-out', () => {
     // no service re-derives them — left in place they rehydrate into the next
     // account's Home countdown and Settings list.
     expect(settings.relationship.anniversaries).toEqual([]);
-    // The theme is device preference, not account state.
-    expect(settings.themeName).toBe('ocean');
+    // The notification time is device preference, not account state.
+    expect(settings.notificationTime).toBe('21:30');
   });
 
   it("restores the same user's anniversaries on their next sign-in", () => {

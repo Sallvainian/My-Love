@@ -196,7 +196,7 @@ describe('photoService upload idempotency', () => {
     backend.errorCode = '23514';
     backend.failNextInsert = true;
     const callback = vi.fn();
-    await expect(photoService.uploadPhoto(input, undefined, callback)).resolves.toBeNull();
+    await expect(photoService.uploadPhoto(input, callback)).resolves.toBeNull();
     expect(callback).toHaveBeenCalledWith('Some values are not allowed - check length and format limits');
     expect(backend.objects.size).toBe(1);
     expect(backend.rows).toHaveLength(1);

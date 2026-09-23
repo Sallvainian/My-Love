@@ -20,7 +20,7 @@
 
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { Heart, History, Wind, Zap, type LucideIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import type { InteractionSubscriptionStatus } from '../../api/interactionService';
 import { useAppStore } from '../../stores/useAppStore';
@@ -87,6 +87,15 @@ export function PokeKissInterface() {
   const [connectionWarning, setConnectionWarning] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
+  // Playing the last unviewed interaction unmounts the badge, and a focused
+  // element that unmounts drops focus to <body>. Whether the badge held focus
+  // is recorded when it starts playback, because by the time playback ends a
+  // click on the overlay may already have blurred it.
+  const historyButtonRef = useRef<HTMLButtonElement>(null);
+  const badgeRef = useRef<HTMLButtonElement>(null);
+  const badgeOwnedFocusRef = useRef(false);
+  const [badgeFocusCheck, setBadgeFocusCheck] = useState(0);
+
   // Cooldown state
   const [pokeCooldown, setPokeCooldown] = useState(getCooldownRemaining('poke'));
   const [kissCooldown, setKissCooldown] = useState(getCooldownRemaining('kiss'));
@@ -102,6 +111,15 @@ export function PokeKissInterface() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Runs after the commit that follows playback, so the badge has already
+  // unmounted if the count reached 0. Only focus that fell to <body> is moved;
+  // a control the user focused meanwhile keeps it.
+  useEffect(() => {
+    if (badgeFocusCheck === 0 || badgeRef.current) return;
+    if (document.activeElement !== document.body) return;
+    if (historyButtonRef.current?.isConnected) historyButtonRef.current.focus();
+  }, [badgeFocusCheck]);
 
   // Subscribe to real-time interactions on mount
   useEffect(() => {
@@ -244,6 +262,7 @@ export function PokeKissInterface() {
     if (unviewed.length === 0) return;
 
     const interaction = unviewed[0];
+    badgeOwnedFocusRef.current = document.activeElement === badgeRef.current;
     setCurrentInteraction(interaction);
     setShowAnimation(interaction.type);
   };
@@ -260,6 +279,10 @@ export function PokeKissInterface() {
     } finally {
       setShowAnimation(null);
       setCurrentInteraction(null);
+      if (badgeOwnedFocusRef.current) {
+        badgeOwnedFocusRef.current = false;
+        setBadgeFocusCheck((check) => check + 1);
+      }
     }
   };
 
@@ -335,6 +358,7 @@ export function PokeKissInterface() {
           </h2>
           <div className="flex shrink-0 items-center">
             <button
+              ref={historyButtonRef}
               type="button"
               onClick={() => setShowHistory(true)}
               className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-1 text-[13px] font-semibold text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -347,13 +371,22 @@ export function PokeKissInterface() {
                 than inside it (a button inside a button is invalid and cannot
                 be reached by keyboard): it plays the oldest unviewed
                 interaction -- the only path that marks one viewed. The margin
-                plus History's right padding keeps the old inline gap. */}
+                plus History's right padding keeps the old inline gap.
+
+                The visible 20px badge is far under the kit's 44px icon
+                buttons, so the ::after pseudo-element widens the hit area
+                without occupying any layout. Growth on each side is capped at
+                the free space on that side, so it never covers History: 8px
+                up and down fills the 36px row History sets, 2px left is the
+                ml-0.5 gap, and 16px right stays inside the row's 4px padding
+                plus the page's 16px gutter, clear of the viewport edge. */}
             {unviewedCount > 0 && (
               <motion.button
+                ref={badgeRef}
                 type="button"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="relative isolate ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1.5 text-[11px] font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+                className="relative isolate ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1.5 text-[11px] font-bold text-white after:absolute after:-inset-y-2 after:-right-4 after:-left-0.5 after:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page"
                 onClick={handleBadgeClick}
                 data-testid="notification-badge"
                 aria-label={
@@ -364,7 +397,7 @@ export function PokeKissInterface() {
               >
                 {unviewedCount}
                 <motion.span
-                  className="absolute inset-0 -z-10 rounded-full bg-fill"
+                  className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-fill"
                   animate={{ scale: [1, 1.3, 1] }}
                   transition={{ repeat: Infinity, duration: 2 }}
                   style={{ opacity: 0.4 }}

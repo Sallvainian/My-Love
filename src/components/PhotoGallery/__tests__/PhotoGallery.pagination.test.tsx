@@ -8,6 +8,9 @@
  * silently or re-fire the trigger.
  * DW-181: the viewer's "Photo N of M" must not present the loaded page as the
  * whole album.
+ * DW-201: the store holds its own, longer list (50 rows against the gallery's
+ * pages of 20), so its length says nothing about an upload -- comparing the two
+ * reloaded page one and snapped a scrolled album back to 20 photos.
  */
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
@@ -35,7 +38,7 @@ vi.mock('../../../api/supabaseClient', () => ({
 }));
 // Stable identity: the initial-load effect depends on loadPhotos.
 const storeState = vi.hoisted(() => ({
-  photos: [],
+  photos: [] as PhotoWithUrls[],
   loadPhotos: async () => {},
   deletePhoto: vi.fn<(photoId: string) => Promise<boolean>>(),
 }));
@@ -115,6 +118,7 @@ const originalObserver = window.IntersectionObserver;
 beforeEach(() => {
   observers.length = 0;
   window.IntersectionObserver = ControlledObserver as unknown as typeof IntersectionObserver;
+  storeState.photos = [];
   storeState.deletePhoto.mockResolvedValue(true);
 });
 
@@ -221,6 +225,86 @@ describe('PhotoGallery: a failed "load more" (DW-179)', () => {
     expect(getPhotos).toHaveBeenLastCalledWith(20, 20);
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getAllByTestId('photo-grid-item')).toHaveLength(25);
+  });
+});
+
+describe('PhotoGallery: the store\'s own list (DW-201)', () => {
+  /** Serve getPhotos from an album of `size`, newest first, as the server would. */
+  function serveAlbum(album: PhotoWithUrls[]) {
+    getPhotos.mockImplementation(async (limit, offset) => album.slice(offset, offset + limit));
+  }
+
+  it('keeps page two when the store holds more rows than the gallery shows', async () => {
+    // loadPhotos fills the store with photoService.getPhotos()'s default 50.
+    storeState.photos = page(50);
+    serveAlbum(page(60));
+    await renderGallery();
+
+    await scrollToTrigger();
+
+    expect(screen.getAllByTestId('photo-grid-item')).toHaveLength(40);
+    const calls = getPhotos.mock.calls;
+    const pageTwo = calls.findIndex(([limit, offset]) => limit === 20 && offset === 20);
+    expect(pageTwo).toBeGreaterThan(-1);
+    expect(calls.slice(pageTwo + 1)).not.toContainEqual([20, 0]);
+    expect(calls).toEqual([
+      [20, 0],
+      [20, 20],
+    ]);
+  });
+
+  it('shows a photo that arrives as the store\'s newest row', async () => {
+    storeState.photos = page(50);
+    const album = page(60);
+    serveAlbum(album);
+    const { rerender } = render(<PhotoGallery onUploadClick={vi.fn()} />);
+    await act(async () => {});
+
+    const uploaded = { ...photo(99), id: 'photo-new', caption: 'cap-new' } as PhotoWithUrls;
+    album.unshift(uploaded);
+    storeState.photos = [uploaded, ...storeState.photos];
+    rerender(<PhotoGallery onUploadClick={vi.fn()} />);
+    await act(async () => {});
+
+    const grid = screen.getByTestId('photo-gallery-grid');
+    expect(within(grid).getByLabelText('cap-new')).toBeTruthy();
+    expect(within(grid).getAllByTestId('photo-grid-item')[0]).toBe(
+      within(grid).getByLabelText('cap-new').closest('[data-testid="photo-grid-item"]')
+    );
+  });
+
+  it('switches an empty album to the grid on its first upload', async () => {
+    const album: PhotoWithUrls[] = [];
+    serveAlbum(album);
+    const { rerender } = render(<PhotoGallery onUploadClick={vi.fn()} />);
+    await act(async () => {});
+    expect(screen.getByTestId('photo-gallery-empty-state')).toBeTruthy();
+
+    album.push(photo(0));
+    storeState.photos = [photo(0)];
+    rerender(<PhotoGallery onUploadClick={vi.fn()} />);
+    await act(async () => {});
+
+    expect(screen.getAllByTestId('photo-grid-item')).toHaveLength(1);
+  });
+
+  it('keeps page two when the newest photo is deleted', async () => {
+    storeState.photos = page(50);
+    storeState.deletePhoto.mockImplementation(async (photoId) => {
+      storeState.photos = storeState.photos.filter((p) => p.id !== photoId);
+      return true;
+    });
+    serveAlbum(page(60));
+    await renderGallery();
+    await scrollToTrigger();
+
+    await openAndDelete('cap-0');
+
+    expect(screen.getAllByTestId('photo-grid-item')).toHaveLength(39);
+    expect(getPhotos.mock.calls).toEqual([
+      [20, 0],
+      [20, 20],
+    ]);
   });
 });
 

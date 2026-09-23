@@ -203,30 +203,6 @@ export const SupabaseMessageSchema = z.object({
 });
 
 // ============================================================================
-// Photo Schemas (for future use)
-// ============================================================================
-
-/**
- * Supabase Photo Schema (placeholder for future implementation)
- * Note: Photos table not yet implemented in Supabase
- */
-export const SupabasePhotoSchema = z.object({
-  id: UUIDSchema,
-  user_id: UUIDSchema,
-  storage_path: z.string().min(1),
-  caption: z.string().max(500).nullable(),
-  tags: z.array(z.string()).nullable(),
-  upload_date: TimestampSchema,
-  original_size: z.number().positive(),
-  compressed_size: z.number().positive(),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-  mime_type: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-  created_at: TimestampSchema,
-  updated_at: TimestampSchema,
-});
-
-// ============================================================================
 // Array Response Schemas
 // ============================================================================
 
@@ -256,7 +232,6 @@ export type SupabaseUser = z.infer<typeof SupabaseUserSchema>;
 export type SupabaseMood = z.infer<typeof SupabaseMoodSchema>;
 export type SupabaseInteraction = z.infer<typeof SupabaseInteractionSchema>;
 export type SupabaseMessage = z.infer<typeof SupabaseMessageSchema>;
-export type SupabasePhoto = z.infer<typeof SupabasePhotoSchema>;
 
 export type UserInsert = z.infer<typeof UserInsertSchema>;
 export type UserUpdate = z.infer<typeof UserUpdateSchema>;

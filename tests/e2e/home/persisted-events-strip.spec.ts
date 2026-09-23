@@ -52,7 +52,7 @@ import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
   PERSISTED_ALLOWLIST,
-  SEEDED_THEME_PRIMARY,
+  SEEDED_SETTINGS,
   eventCardTestId,
   readStoredBlob,
   seedPersistedBlob,
@@ -110,16 +110,23 @@ test.describe('stale persisted events never rehydrate', () => {
 
     await expect(page.getByTestId('time-together')).toBeVisible();
 
-    // `settings` survived AND was applied: `App.tsx:352` calls
-    // `applyTheme(settings.themeName)`, which sets `--color-primary` on the
-    // documentElement (`src/utils/themes.ts:70-80`). The seeded theme is
-    // 'ocean', deliberately not the 'sunset' default, so this distinguishes
-    // "the seeded settings were used" from "defaults were used after the blob
-    // was thrown away".
-    const primary = await page.evaluate(() =>
-      getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim()
-    );
-    expect(primary).toBe(SEEDED_THEME_PRIMARY);
+    // `settings` survived AND was applied: the running store holds the seeded
+    // relationship, whose start date and partner name are deliberately not the
+    // `APP_CONFIG` defaults, so this distinguishes "the seeded settings were
+    // used" from "defaults were used after the blob was thrown away". Read from
+    // the store because no settings field renders by itself: the only one on
+    // screen is the anniversaries mirror, and seeding one would upload it to
+    // this worker's account on sign-in.
+    const relationship = await page.evaluate(() => {
+      const settings = window.__APP_STORE__?.getState().settings;
+      if (!settings) return null;
+      const { startDate, partnerName } = settings.relationship;
+      return { startDate, partnerName };
+    });
+    expect(relationship).toEqual({
+      startDate: SEEDED_SETTINGS.relationship.startDate,
+      partnerName: SEEDED_SETTINGS.relationship.partnerName,
+    });
 
     // `isOnboarded` survived: the sign-in screen is what an onboarding reset
     // would show, and the events column is what Home shows.
@@ -133,7 +140,7 @@ test.describe('stale persisted events never rehydrate', () => {
     // message logic resets it to 0 (today) after hydration, so the seeded 7 is
     // gone by the time this reads — measured, and correct app behaviour rather
     // than a strip failure. The seeded-blob-was-used claim is carried by the
-    // theme assertion above, which the app does not overwrite.
+    // relationship assertion above, which the app does not overwrite.
     const stored = await readStoredBlob(page);
     expect(stored).not.toBeNull();
     expect(stored?.isOnboarded).toBe(true);

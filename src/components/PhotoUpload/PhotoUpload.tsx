@@ -1,6 +1,6 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { AlertTriangle, Camera, Check, Loader, Upload, X } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { useFocusTrap } from '../../hooks';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { useAppStore } from '../../stores/useAppStore';
@@ -8,11 +8,17 @@ import { useAppStore } from '../../stores/useAppStore';
 interface PhotoUploadProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * Where focus goes on close when the button that opened this is gone: the
+   * empty album's Upload unmounts once the first photo lands, and the gallery
+   * header's Upload replaces it.
+   */
+  fallbackFocusRef?: RefObject<HTMLElement | null>;
 }
 
 type UploadStep = 'select' | 'preview' | 'uploading' | 'success' | 'error';
 
-export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
+export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadProps) {
   const { uploadPhoto, storageWarning } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   /**
@@ -51,6 +57,11 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
     const validation = imageCompressionService.validateImageFile(file);
     if (!validation.valid) {
       setError(validation.error || 'Invalid file');
+      // Picking the same file again must fire a change, or the user can only
+      // retry by choosing a different file first.
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
     if (validation.warning) {
@@ -107,11 +118,6 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
       }
 
       setStep('success');
-
-      // Auto-close after showing success (AC-4.1.8: 3 seconds)
-      setTimeout(() => {
-        handleClose();
-      }, 3000);
     } catch (err) {
       console.error('[PhotoUpload] Upload failed:', err);
       setError((err as Error).message || 'Failed to upload photo');
@@ -143,6 +149,15 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
     onClose();
   };
 
+  // An outside tap lands on the full-screen overlay that centres the panel,
+  // not on the backdrop beneath it, so the overlay owns the close. Ignored mid-
+  // upload, like the disabled close button.
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && step !== 'uploading') {
+      handleClose();
+    }
+  };
+
   // Escape does what the close button does, and is ignored while it is
   // disabled mid-upload. Read through refs so the handler stays referentially
   // stable: App passes an inline onClose, and a new onEscape would re-run the
@@ -159,7 +174,16 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
     if (stepRef.current === 'uploading') return;
     handleCloseRef.current();
   }, []);
-  useFocusTrap(modalRef, isOpen, { onEscape: handleEscape });
+  useFocusTrap(modalRef, isOpen, { onEscape: handleEscape, fallbackFocusRef });
+
+  // Auto-close after showing success (AC-4.1.8: 3 seconds). Owned by the step,
+  // so any close -- which resets the step -- cancels it, and a dialog reopened
+  // within the 3 seconds is never closed by the previous upload's timer.
+  useEffect(() => {
+    if (!isOpen || step !== 'success') return;
+    const timer = setTimeout(() => handleCloseRef.current(), 3000);
+    return () => clearTimeout(timer);
+  }, [isOpen, step]);
 
   // Every step change unmounts the control that started it -- Select, Upload,
   // Retry -- and a focused element that unmounts blurs to <body>. <body> is an
@@ -203,6 +227,15 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
 
   const isFormValid = selectedFile && tagErrors.length === 0;
 
+  // One error block, placed by step: a rejected pick leaves the dialog on the
+  // select step, an upload failure on the preview/error steps. The steps are
+  // exclusive, so it never renders twice.
+  const errorAlert = error ? (
+    <div className="rounded-[14px] bg-dtint p-4" role="alert" data-testid="photo-upload-error">
+      <p className="text-sm font-medium text-danger">{error}</p>
+    </div>
+  ) : null;
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -212,7 +245,6 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={handleClose}
             className="fixed inset-0 z-50 bg-black/50"
             data-testid="photo-upload-backdrop"
           />
@@ -224,6 +256,8 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ type: 'spring', duration: 0.3 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={handleBackdropClick}
+            data-testid="photo-upload-overlay"
           >
             <div
               ref={modalRef}
@@ -275,6 +309,9 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     <p className="text-sm font-medium text-ink">{storageWarning}</p>
                   </div>
                 )}
+
+                {/* A file rejected at pick time (DW-202) */}
+                {step === 'select' && errorAlert}
 
                 {/* Step: Select */}
                 {step === 'select' && (
@@ -419,15 +456,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     </div>
 
                     {/* Error Display */}
-                    {error && (
-                      <div
-                        className="rounded-[14px] bg-dtint p-4"
-                        role="alert"
-                        data-testid="photo-upload-error"
-                      >
-                        <p className="text-sm font-medium text-danger">{error}</p>
-                      </div>
-                    )}
+                    {errorAlert}
 
                     {/* Warning Display */}
                     {warning && (

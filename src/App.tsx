@@ -31,7 +31,6 @@ import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { stripBasePath } from './utils/basePath';
 import { logger } from './utils/logger';
 import { logStorageQuota } from './utils/storageMonitor';
-import { applyTheme } from './utils/themes';
 
 // Lazy load route components for code splitting
 const PhotoGallery = lazy(() =>
@@ -64,9 +63,6 @@ const WelcomeSplash = lazy(() =>
 const PhotoUpload = lazy(() =>
   import('./components/PhotoUpload/PhotoUpload').then((m) => ({ default: m.PhotoUpload }))
 );
-const PhotoCarousel = lazy(() =>
-  import('./components/PhotoCarousel/PhotoCarousel').then((m) => ({ default: m.PhotoCarousel }))
-);
 
 // Loading spinner component for Suspense fallback
 const LoadingSpinner = () => (
@@ -97,10 +93,9 @@ const HOME_MAX_EVENT_CARDS = 6;
 
 function App() {
   const {
-    settings, isLoading, currentView, isOnline, events, authUserId, authSessionVersion,
+    isLoading, currentView, isOnline, events, authUserId, authSessionVersion,
   } = useAppStore(
     useShallow((s) => ({
-      settings: s.settings,
       isLoading: s.isLoading,
       currentView: s.currentView,
       isOnline: s.syncStatus.isOnline,
@@ -168,6 +163,9 @@ function App() {
   // handleAdminExit, whose pushState is URL bookkeeping and never reads back into state.
   const [showAdmin, setShowAdmin] = useState(() => window.location.pathname.includes('/admin'));
   const [isPhotoUploadOpen, setIsPhotoUploadOpen] = useState(false);
+  // The gallery header's Upload: where the upload dialog returns focus when the
+  // empty album's Upload that opened it has been replaced by the grid.
+  const photoUploadButtonRef = useRef<HTMLButtonElement>(null);
 
   // Story 1.5: Sync completion feedback state (AC-1.5.4)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
@@ -443,13 +441,6 @@ function App() {
       console.error('[App] Account data sync failed:', error);
     });
   }, [authUserId, authSessionVersion, messagesSeeded]);
-
-  // Apply theme when settings change
-  useEffect(() => {
-    if (settings) {
-      applyTheme(settings.themeName);
-    }
-  }, [settings]);
 
   // Story 6.4: Task 2 - Network state detection with auto-sync on reconnect (AC #2)
   useEffect(() => {
@@ -845,7 +836,10 @@ function App() {
             <ViewErrorBoundary viewName={currentView} onNavigateHome={() => setView('home')}>
               <Suspense fallback={<LoadingSpinner />}>
                 {currentView === 'photos' && (
-                  <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
+                  <PhotoGallery
+                    onUploadClick={() => setIsPhotoUploadOpen(true)}
+                    uploadButtonRef={photoUploadButtonRef}
+                  />
                 )}
 
                 {currentView === 'mood' && <MoodTracker />}
@@ -863,12 +857,11 @@ function App() {
 
         {/* Photo upload modal - Story 4.1 (lazy loaded) */}
         <Suspense fallback={null}>
-          <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
-        </Suspense>
-
-        {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected (lazy loaded) */}
-        <Suspense fallback={null}>
-          <PhotoCarousel />
+          <PhotoUpload
+            isOpen={isPhotoUploadOpen}
+            onClose={() => setIsPhotoUploadOpen(false)}
+            fallbackFocusRef={photoUploadButtonRef}
+          />
         </Suspense>
       </div>
     </ErrorBoundary>

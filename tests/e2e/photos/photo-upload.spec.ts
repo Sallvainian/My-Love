@@ -83,4 +83,32 @@ test.describe('Photo Upload', () => {
     await expect(page.getByTestId('photo-upload-submit-button')).toBeVisible();
     await expect(page.getByTestId('photo-upload-cancel')).toBeVisible();
   });
+
+  test('[P1] DW-206-E2E-001 tapping outside the upload modal closes it', async ({ page }) => {
+    await page.goto('/photos');
+    await expect(
+      page.getByTestId('photo-gallery').or(page.getByTestId('photo-gallery-empty-state'))
+    ).toBeVisible();
+    await page
+      .getByTestId('photo-gallery-upload-fab')
+      .or(page.getByTestId('photo-gallery-empty-upload-button'))
+      .click();
+    const modal = page.getByTestId('photo-upload-modal');
+    await expect(modal).toBeVisible();
+
+    // A real pointer tap, not a dispatched click: the bug was which layer sits
+    // on top, which only hit-testing sees. The overlay scales in from 0.9, and
+    // mid-animation the corner still reaches the backdrop beneath it, so tap
+    // only once the overlay covers the corner.
+    const box = (await modal.boundingBox())!;
+    expect(box.y).toBeGreaterThan(8);
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.elementFromPoint(4, 4)?.getAttribute('data-testid'))
+      )
+      .toBe('photo-upload-overlay');
+    await page.mouse.click(4, 4);
+
+    await expect(modal).toBeHidden();
+  });
 });
