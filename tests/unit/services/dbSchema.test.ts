@@ -63,17 +63,18 @@ describe('dbSchema', () => {
 
       expect(db.objectStoreNames.contains('messages')).toBe(true);
       expect(db.objectStoreNames.contains('message-favorites')).toBe(true);
-      expect(db.objectStoreNames.contains('photos')).toBe(true);
       expect(db.objectStoreNames.contains('moods')).toBe(true);
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
+      // v11: photos live in Supabase; a fresh profile never gets the store.
+      expect(unwrap(db).objectStoreNames.contains('photos')).toBe(false);
     });
 
-    it('should create exactly 5 stores', async () => {
+    it('should create exactly 4 stores', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
       });
 
-      expect(db.objectStoreNames.length).toBe(5);
+      expect(db.objectStoreNames.length).toBe(4);
     });
   });
 
@@ -276,19 +277,18 @@ describe('dbSchema', () => {
       expect(messages.indexNames.contains('by-date')).toBe(true);
 
       // "rows and other stores intact": asserted on CONTENT, store by store. A
-      // count check would pass on rows some branch had silently rewritten, and
-      // the photos store in particular has a deliberately destructive branch
-      // one version boundary away.
+      // count check would pass on rows some branch had silently rewritten.
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V7' });
-      expect((await db.getAll('photos'))[0]).toMatchObject({ caption: 'PHOTO-AT-V7' });
       expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V7' });
       expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V7' });
 
-      // Five survivors; the v7 scripture stores are dropped on the way to v10.
+      // Four survivors (message-favorites is created at v9); the v7 scripture
+      // stores are dropped on the way to v10 and photos on the way to v11.
       // The v7 moods index is untouched — v8 must not re-run the v7 swap over a
       // store that has already had it.
-      expect(db.objectStoreNames.length).toBe(5);
+      expect(db.objectStoreNames.length).toBe(4);
       const remaining = Array.from(unwrap(db).objectStoreNames);
+      expect(remaining).not.toContain('photos');
       expect(remaining).not.toContain('scripture-sessions');
       expect(remaining).not.toContain('scripture-reflections');
       expect(remaining).not.toContain('scripture-bookmarks');
@@ -344,7 +344,7 @@ describe('dbSchema', () => {
     });
   });
 
-  describe('upgrade from v9 to v10', () => {
+  describe('upgrade from v9', () => {
     async function seedV9(): Promise<void> {
       const db = await openDB(DB_NAME, 9, {
         upgrade(database) {
@@ -463,19 +463,19 @@ describe('dbSchema', () => {
       db.close();
     }
 
-    it('drops scripture stores and keeps survivor rows intact', async () => {
+    it('drops the scripture and photos stores and keeps survivor rows intact', async () => {
       await seedV9();
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
       expect(db.objectStoreNames.contains('messages')).toBe(true);
       expect(db.objectStoreNames.contains('message-favorites')).toBe(true);
-      expect(db.objectStoreNames.contains('photos')).toBe(true);
       expect(db.objectStoreNames.contains('moods')).toBe(true);
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
-      expect(db.objectStoreNames.length).toBe(5);
+      expect(db.objectStoreNames.length).toBe(4);
 
       const remaining = Array.from(unwrap(db).objectStoreNames);
+      expect(remaining).not.toContain('photos');
       expect(remaining).not.toContain('scripture-sessions');
       expect(remaining).not.toContain('scripture-reflections');
       expect(remaining).not.toContain('scripture-bookmarks');
@@ -486,9 +486,96 @@ describe('dbSchema', () => {
         messageId: 1,
         userId: 'USER-A',
       });
-      expect((await db.getAll('photos'))[0]).toMatchObject({ caption: 'PHOTO-AT-V9' });
       expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V9' });
       expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V9' });
+    });
+  });
+
+  describe('upgrade from v10 to v11', () => {
+    /** v10's shape: the five survivors of the scripture drop, photos among them. */
+    async function seedV10({ withPhotos }: { withPhotos: boolean }): Promise<void> {
+      const db = await openDB(DB_NAME, 10, {
+        upgrade(database) {
+          const messages = database.createObjectStore('messages', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          messages.createIndex('by-category', 'category');
+          messages.createIndex('by-date', 'createdAt');
+          messages.createIndex('by-user', 'userId');
+
+          database
+            .createObjectStore('message-favorites', { keyPath: ['messageId', 'userId'] })
+            .createIndex('by-user', 'userId');
+
+          if (withPhotos) {
+            database
+              .createObjectStore('photos', { keyPath: 'id', autoIncrement: true })
+              .createIndex('by-date', 'uploadDate', { unique: false });
+          }
+
+          database
+            .createObjectStore('moods', { keyPath: 'id', autoIncrement: true })
+            .createIndex('by-user-date', ['userId', 'date'], { unique: true });
+
+          database.createObjectStore('sw-auth', { keyPath: 'id' });
+        },
+      });
+
+      const stores = ['messages', 'message-favorites', 'moods', 'sw-auth'];
+      const tx = db.transaction(withPhotos ? [...stores, 'photos'] : stores, 'readwrite');
+      await tx.objectStore('messages').add({
+        text: 'WRITTEN-AT-V10',
+        category: 'reason',
+        isCustom: false,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      });
+      await tx.objectStore('message-favorites').add({ messageId: 1, userId: 'USER-A' });
+      if (withPhotos) await tx.objectStore('photos').add({ caption: 'PHOTO-AT-V10' });
+      await tx.objectStore('moods').add({
+        userId: 'USER-A',
+        date: '2026-09-01',
+        mood: 'happy',
+        note: 'MOOD-AT-V10',
+        timestamp: new Date('2026-09-01T00:00:00.000Z'),
+        synced: true,
+      });
+      await tx.objectStore('sw-auth').add({
+        id: 'current',
+        accessToken: 'TOKEN-AT-V10',
+        refreshToken: 'r',
+        expiresAt: 1,
+        userId: 'USER-A',
+      });
+      await tx.done;
+      db.close();
+    }
+
+    it('drops the photos store and keeps every other row', async () => {
+      await seedV10({ withPhotos: true });
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('photos');
+      expect(db.objectStoreNames.length).toBe(4);
+      expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
+      expect((await db.getAll('message-favorites'))[0]).toEqual({
+        messageId: 1,
+        userId: 'USER-A',
+      });
+      expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V10' });
+      expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V10' });
+    });
+
+    it('is a no-op for a profile that has no photos store', async () => {
+      // Existence-gated, not version-gated: deleting a store that is absent
+      // throws NotFoundError and would abort the whole upgrade.
+      await seedV10({ withPhotos: false });
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(db.objectStoreNames.length).toBe(4);
+      expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
     });
   });
 
@@ -716,11 +803,6 @@ describe('dbSchema', () => {
       // separated from another's on a shared device.
       expect(messagesStore.indexNames.contains('by-user')).toBe(true);
 
-      // photos index
-      const photosTx = db.transaction('photos', 'readonly');
-      const photosStore = photosTx.objectStore('photos');
-      expect(photosStore.indexNames.contains('by-date')).toBe(true);
-
       // moods index (compound, unique on [userId, date])
       const moodsTx = db.transaction('moods', 'readonly');
       const moodsStore = moodsTx.objectStore('moods');
@@ -733,7 +815,6 @@ describe('dbSchema', () => {
       expect(STORE_NAMES).toEqual({
         MESSAGES: 'messages',
         MESSAGE_FAVORITES: 'message-favorites',
-        PHOTOS: 'photos',
         MOODS: 'moods',
         SW_AUTH: 'sw-auth',
       });
@@ -749,8 +830,8 @@ describe('dbSchema', () => {
       // v6 re-fires upgradeDb so profiles stranded at v5 by storage.ts's old
       // callback get their missing stores created; v7 swaps the moods index;
       // v8 adds by-user to messages; v9 stores favorites by account; v10 drops
-      // the four scripture stores.
-      expect(DB_VERSION).toBe(10);
+      // the four scripture stores; v11 drops the unused photos store.
+      expect(DB_VERSION).toBe(11);
     });
   });
 });

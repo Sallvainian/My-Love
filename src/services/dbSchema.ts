@@ -1,6 +1,6 @@
 import type { DBSchema, IDBPDatabase, IDBPTransaction, StoreNames } from 'idb';
 import { openDB, unwrap } from 'idb';
-import type { Message, MoodEntry, Photo } from '../types';
+import type { Message, MoodEntry } from '../types';
 import { logger } from '../utils/logger';
 
 /**
@@ -36,6 +36,7 @@ export type StoredMoodEntry = MoodEntry;
  * - v4: Added sw-auth store for Background Sync
  * - v5: Added scripture stores (sessions, reflections, bookmarks, messages)
  * - v10: Dropped the four scripture stores
+ * - v11: Dropped the photos store (photos live in Supabase; nothing read it)
  */
 export interface MyLoveDBSchema extends DBSchema {
   'message-favorites': {
@@ -56,13 +57,6 @@ export interface MyLoveDBSchema extends DBSchema {
        * reading this index alone.
        */
       'by-user': string;
-    };
-  };
-  photos: {
-    key: number;
-    value: Photo;
-    indexes: {
-      'by-date': Date;
     };
   };
   moods: {
@@ -109,7 +103,11 @@ export const DB_NAME = 'my-love-db';
 // `scripture-reflections`, `scripture-bookmarks`, `scripture-messages`) that
 // v5 created. The drop is existence-gated so a profile that never had them
 // (or already lost them) is a no-op, and survivor rows are left intact.
-export const DB_VERSION = 10;
+//
+// v11 drops the `photos` store that v1/v2 created. Photos have been
+// Supabase-only since the gallery moved there, and no code has read or written
+// the store since. Same existence gate as v10.
+export const DB_VERSION = 11;
 
 /**
  * Store name constants for consistent access across services
@@ -117,14 +115,13 @@ export const DB_VERSION = 10;
 export const STORE_NAMES = {
   MESSAGES: 'messages',
   MESSAGE_FAVORITES: 'message-favorites',
-  PHOTOS: 'photos',
   MOODS: 'moods',
   SW_AUTH: 'sw-auth',
 } as const;
 
 /**
  * Centralized IndexedDB upgrade function
- * Handles all store creation and migrations for v1-v10
+ * Handles all store creation and migrations for v1-v11
  *
  * Called by all services to ensure consistent database schema.
  * This fixes the tech debt where each service had duplicate upgrade logic.
@@ -150,8 +147,9 @@ export function upgradeDb(
   // fire again to create them. Existence checks make this function repair such
   // a database instead of skipping past it. The v6 bump is what makes those
   // profiles re-enter the upgrade at all — the checks alone would never run.
-  // (v7 has since superseded it; see DB_VERSION.) The v10 scripture drop uses
-  // the same rule: delete the store if it EXISTS, never because oldVersion < 10.
+  // (v7 has since superseded it; see DB_VERSION.) The v10 scripture drop and
+  // the v11 photos drop use the same rule: delete the store if it EXISTS, never
+  // because oldVersion < N.
 
   // v1: messages store
   if (!db.objectStoreNames.contains('messages')) {
@@ -213,35 +211,6 @@ export function upgradeDb(
     if (!favorites.indexNames.contains('by-user')) favorites.createIndex('by-user', 'userId');
   }
 
-  // v2: photos store
-  //
-  // This upgrade is DESTRUCTIVE for a v1 database: the v1 store is dropped and
-  // recreated, losing any cached rows. The data-preserving path used to live in
-  // photoStorageService.ts (it needed async transaction access, which an
-  // upgrade callback cannot do), and that file no longer exists.
-  //
-  // Left destructive deliberately. Photos are Supabase-first — IndexedDB is a
-  // read cache, so a dropped store refills on the next fetch. A v1 database
-  // also predates the current schema by a wide margin. Restoring preservation
-  // would mean reintroducing an async migration step for a cache that costs
-  // nothing to rebuild.
-  // The drop stays gated on oldVersion: it exists to discard the INCOMPATIBLE
-  // v1 schema, so it must fire for a genuine v1 database and never for a v2+
-  // one that already holds good rows.
-  if (oldVersion < 2 && db.objectStoreNames.contains('photos')) {
-    db.deleteObjectStore('photos');
-    logger.debug('[dbSchema] Deleted old photos store from v1');
-  }
-
-  if (!db.objectStoreNames.contains('photos')) {
-    const photosStore = db.createObjectStore('photos', {
-      keyPath: 'id',
-      autoIncrement: true,
-    });
-    photosStore.createIndex('by-date', 'uploadDate', { unique: false });
-    logger.debug('[dbSchema] Created photos store with by-date index (v2)');
-  }
-
   // v3: moods store
   if (!db.objectStoreNames.contains('moods')) {
     const moodsStore = db.createObjectStore('moods', {
@@ -298,6 +267,14 @@ export function upgradeDb(
       nativeDb.deleteObjectStore(storeName);
       logger.debug(`[dbSchema] Dropped ${storeName} store (v10)`);
     }
+  }
+
+  // v11: drop the photos store if it still exists. Photos live in Supabase and
+  // nothing has read or written this store since the gallery moved there.
+  // Existence-gated like v10, so a profile that never had it is a no-op.
+  if (nativeDb.objectStoreNames.contains('photos')) {
+    nativeDb.deleteObjectStore('photos');
+    logger.debug('[dbSchema] Dropped photos store (v11)');
   }
 }
 

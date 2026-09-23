@@ -54,9 +54,8 @@ const SYNC_PROMISING_SYMBOLS = ['handleNetworkError', 'OFFLINE_ERROR_MESSAGE'] a
  *     Supabase-only — no offline queue, no IndexedDB mirror, no retry".
  *   - `eventsService.ts:32` — "No realtime, no IndexedDB mirror: events are
  *     Supabase-only".
- *   - `photoService.ts` — imports exactly `supabase` and `logger`. The
- *     IndexedDB `photos` store (`dbSchema.ts:268`) belongs to the separate
- *     legacy `storage.ts` layer, which this module never touches.
+ *   - `photoService.ts` — imports exactly `supabase` and `logger`. There is
+ *     no IndexedDB `photos` store; `dbSchema.ts` dropped it at v11.
  *   - `notesSlice.ts` — contains no IndexedDB reference at all; writes go
  *     straight to Supabase.
  *   - `eventsSlice.ts:12` — "Supabase only. NOT persisted to localStorage and
