@@ -4,7 +4,7 @@
  * Text input field for sending love notes with:
  * - Optimistic updates via sendNote action
  * - Character counter (visible at 900+ chars)
- * - Auto-resize textarea
+ * - Textarea that grows with its content
  * - Keyboard shortcuts (Enter to send, Shift+Enter for new line, Escape to clear)
  * - Haptic feedback via Vibration API
  * - Validation (max 1000 chars, no empty messages)
@@ -17,7 +17,7 @@
  */
 
 import { AnimatePresence } from 'framer-motion';
-import { ImageIcon } from 'lucide-react';
+import { ImageIcon, Loader2, Send } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
 import { useVibration } from '../../hooks/useVibration';
@@ -50,7 +50,7 @@ export function MessageInput() {
   const { sendNote } = useLoveNotes(false);
   const { vibrate } = useVibration();
 
-  // Auto-resize textarea as content grows
+  // Grow the textarea with its content
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
@@ -190,11 +190,11 @@ export function MessageInput() {
   const showCounter = characterCount >= SHOW_COUNTER_AT;
 
   // Determine counter color based on state
-  let counterColor = 'text-gray-500'; // Default (900-949)
+  let counterColor = 'text-muted'; // Default (900-949)
   if (isOverLimit) {
-    counterColor = 'text-red-500 font-semibold'; // Over limit (1001+)
+    counterColor = 'text-danger font-semibold'; // Over limit (1001+)
   } else if (isNearLimit) {
-    counterColor = 'text-yellow-600 font-medium'; // Warning (950-1000)
+    counterColor = 'text-ink font-medium'; // Warning (950-1000)
   }
 
   // Determine if send button should be disabled
@@ -205,7 +205,9 @@ export function MessageInput() {
   const isDisabled = !canSend;
 
   return (
-    <div className="relative z-10 flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white p-4">
+    // Transparent over the page ground, as the kit artboard draws it: the
+    // composer is a row of kit controls, not a bar of its own.
+    <div className="relative z-10 flex shrink-0 flex-col gap-2 px-4 pt-2 pb-3">
       {/* Image preview (when image selected) */}
       <AnimatePresence>
         {selectedImage && (
@@ -232,9 +234,9 @@ export function MessageInput() {
           onClick={handleImageButtonClick}
           disabled={isSending}
           aria-label="Attach image"
-          className="hover:text-coral-500 focus:ring-coral-500 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 focus:ring-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <ImageIcon size={24} />
+          <ImageIcon size={20} aria-hidden="true" />
         </button>
 
         {/* Hidden file input */}
@@ -256,7 +258,7 @@ export function MessageInput() {
           placeholder={selectedImage ? 'Add a caption...' : 'Send a love note...'}
           aria-label="Love note message input"
           disabled={isSending}
-          className="focus:ring-coral-500 max-h-[200px] min-h-[44px] flex-1 resize-none overflow-y-auto rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="max-h-[200px] min-h-[44px] flex-1 resize-none overflow-y-auto rounded-[22px] bg-card px-4 py-[11px] text-[15px] leading-[22px] text-ink ring-1 ring-line ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           rows={1}
         />
 
@@ -266,20 +268,24 @@ export function MessageInput() {
           onClick={handleSend}
           disabled={isDisabled}
           aria-label="Send message"
-          className="bg-coral-500 hover:bg-coral-600 focus:ring-coral-500 disabled:hover:bg-coral-500 min-h-[44px] rounded-lg px-6 py-2 font-medium text-gray-800 transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fill text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isSending ? 'Sending...' : 'Send'}
+          {isSending ? (
+            <Loader2 size={19} className="animate-spin" aria-hidden="true" />
+          ) : (
+            <Send size={19} aria-hidden="true" />
+          )}
         </button>
       </div>
 
       {/* Error messages */}
       {imageError && (
-        <div className="text-sm text-red-500" role="alert">
+        <div className="text-sm text-danger" role="alert">
           {imageError}
         </div>
       )}
       {content.length > 0 && isOverLimit && (
-        <div className="text-sm text-red-500" role="alert">
+        <div className="text-sm text-danger" role="alert">
           Message is too long (max {MAX_CHARACTERS} characters)
         </div>
       )}
