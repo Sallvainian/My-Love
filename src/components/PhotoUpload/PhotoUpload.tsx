@@ -1,5 +1,5 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
-import { Camera, Loader, Upload, X } from 'lucide-react';
+import { AlertTriangle, Camera, Check, Loader, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { useAppStore } from '../../stores/useAppStore';
@@ -188,15 +188,15 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <div
-              className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
+              className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[20px] bg-card shadow-float"
               data-testid="photo-upload-modal"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-gray-200 p-6">
+              <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Upload Photo</h2>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <h2 className="text-lg font-semibold text-ink">Upload Photo</h2>
+                  <p className="mt-0.5 text-sm text-muted">
                     {step === 'select' && 'Select a photo to upload'}
                     {step === 'preview' && 'Add details and upload'}
                     {step === 'uploading' && 'Compressing and saving...'}
@@ -206,46 +206,36 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                 </div>
                 <button
                   onClick={handleClose}
-                  className="rounded-lg p-2 transition-colors hover:bg-gray-100"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
                   aria-label="Close"
                   data-testid="photo-upload-close"
                   disabled={step === 'uploading'}
                 >
-                  <X className="h-6 w-6 text-gray-500" />
+                  <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
 
               {/* Content */}
-              <div className="space-y-6 p-6">
+              <div className="space-y-6 px-5 py-5">
                 {/* Storage Warning (AC-4.1.9) */}
                 {storageWarning && (
                   <div
-                    className="flex items-start gap-3 rounded-lg border border-orange-300 bg-orange-50 p-4"
+                    className="flex items-start gap-3 rounded-[14px] bg-card2 p-4"
                     data-testid="storage-warning-banner"
                   >
-                    <svg
-                      className="mt-0.5 h-5 w-5 shrink-0 text-orange-600"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <p className="text-sm font-medium text-orange-800">{storageWarning}</p>
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
+                    <p className="text-sm font-medium text-ink">{storageWarning}</p>
                   </div>
                 )}
 
                 {/* Step: Select */}
                 {step === 'select' && (
                   <div className="flex flex-col items-center justify-center py-12">
-                    <div className="mb-6 rounded-full bg-pink-50 p-6">
-                      <Camera className="h-12 w-12 text-pink-500" />
+                    <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-tint text-accent">
+                      <Camera className="h-[30px] w-[30px]" aria-hidden="true" />
                     </div>
-                    <h3 className="mb-2 text-lg font-semibold text-gray-900">Choose a Photo</h3>
-                    <p className="mb-6 max-w-md text-center text-sm text-gray-500">
+                    <h3 className="mb-2 text-lg font-semibold text-ink">Choose a Photo</h3>
+                    <p className="mb-6 max-w-md text-center text-sm text-muted">
                       Select a JPEG, PNG, or WebP image to upload. We'll compress it to save space.
                     </p>
                     <input
@@ -258,10 +248,10 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     />
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-2 rounded-lg bg-pink-600 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-700"
+                      className="flex h-12 items-center gap-2 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                       data-testid="photo-upload-select-button"
                     >
-                      <Upload className="h-5 w-5" />
+                      <Upload className="h-5 w-5" aria-hidden="true" />
                       Select Photo
                     </button>
                   </div>
@@ -272,10 +262,10 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                   <>
                     {/* Photo Preview */}
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                      <label className="mb-2 block text-[13px] font-semibold text-ink">
                         Preview
                       </label>
-                      <div className="relative w-full overflow-hidden rounded-lg bg-gray-100">
+                      <div className="relative w-full overflow-hidden rounded-[14px] bg-card2">
                         <img
                           src={previewUrl}
                           alt="Preview"
@@ -283,7 +273,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                           data-testid="photo-upload-preview-image"
                         />
                       </div>
-                      <div className="mt-2 flex items-center justify-between text-sm text-gray-500">
+                      <div className="mt-2 flex items-center justify-between text-sm text-muted">
                         <span>
                           Original size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                         </span>
@@ -297,7 +287,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     <div>
                       <label
                         htmlFor="photo-caption"
-                        className="mb-2 block text-sm font-medium text-gray-700"
+                        className="mb-2 block text-[13px] font-semibold text-ink"
                       >
                         Caption (optional)
                       </label>
@@ -308,13 +298,13 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         placeholder="Add a caption to your photo..."
                         maxLength={maxCaptionLength}
                         rows={3}
-                        className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-pink-500"
+                        className="w-full resize-none rounded-[14px] bg-field px-4 text-[15px] text-ink ring-1 ring-line ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none py-3"
                         data-testid="photo-upload-caption-input"
                       />
                       <div className="mt-2 flex items-center justify-between">
-                        <p className="text-sm text-gray-500">Supports emoji and multiple lines</p>
+                        <p className="text-sm text-muted">Supports emoji and multiple lines</p>
                         <p
-                          className={`text-sm ${remainingCaptionChars < 50 ? 'text-orange-500' : 'text-gray-500'}`}
+                          className={`text-sm ${remainingCaptionChars < 50 ? 'font-semibold text-ink' : 'text-muted'}`}
                         >
                           {remainingCaptionChars} characters remaining
                         </p>
@@ -325,7 +315,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     <div>
                       <label
                         htmlFor="photo-tags"
-                        className="mb-2 block text-sm font-medium text-gray-700"
+                        className="mb-2 block text-[13px] font-semibold text-ink"
                       >
                         Tags (optional)
                       </label>
@@ -335,11 +325,11 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         value={tags}
                         onChange={(e) => setTags(e.target.value)}
                         placeholder="beach, sunset, memories"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-pink-500"
+                        className="h-12 w-full rounded-[14px] bg-field px-4 text-[15px] text-ink ring-1 ring-line ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none"
                         data-testid="photo-upload-tags-input"
                       />
                       <div className="mt-2 space-y-1">
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted">
                           Comma-separated, max 10 tags, 50 characters each
                         </p>
                         {parsedTags.length > 0 && (
@@ -347,10 +337,8 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                             {parsedTags.slice(0, 10).map((tag, index) => (
                               <span
                                 key={index}
-                                className={`rounded-full px-2 py-1 text-xs ${
-                                  tag.length > 50
-                                    ? 'bg-red-100 text-red-700'
-                                    : 'bg-pink-100 text-pink-700'
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                  tag.length > 50 ? 'bg-dtint text-danger' : 'bg-tint text-accent'
                                 }`}
                                 data-testid={`photo-upload-tag-${index}`}
                               >
@@ -358,7 +346,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                               </span>
                             ))}
                             {parsedTags.length > 10 && (
-                              <span className="rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-700">
+                              <span className="rounded-full bg-card2 px-2.5 py-1 text-xs font-semibold text-ink">
                                 +{parsedTags.length - 10} more (max 10)
                               </span>
                             )}
@@ -369,7 +357,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                             {tagErrors.map((err, index) => (
                               <p
                                 key={index}
-                                className="text-sm text-red-600"
+                                className="text-sm text-danger"
                                 data-testid="photo-upload-tag-error"
                               >
                                 {err}
@@ -383,28 +371,28 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     {/* Error Display */}
                     {error && (
                       <div
-                        className="rounded-lg border border-red-200 bg-red-50 p-4"
+                        className="rounded-[14px] bg-dtint p-4"
                         data-testid="photo-upload-error"
                       >
-                        <p className="text-sm font-medium text-red-700">{error}</p>
+                        <p className="text-sm font-medium text-danger">{error}</p>
                       </div>
                     )}
 
                     {/* Warning Display */}
                     {warning && (
                       <div
-                        className="rounded-lg border border-orange-200 bg-orange-50 p-4"
+                        className="rounded-[14px] bg-card2 p-4"
                         data-testid="photo-upload-warning"
                       >
-                        <p className="text-sm text-orange-700">{warning}</p>
+                        <p className="text-sm text-ink">{warning}</p>
                       </div>
                     )}
 
                     {/* Actions */}
-                    <div className="flex items-center justify-end gap-3 border-t border-gray-200 pt-4">
+                    <div className="-mx-5 flex items-center justify-end gap-3 border-t border-line px-5 pt-4">
                       <button
                         onClick={handleClose}
-                        className="rounded-lg px-6 py-2 text-gray-700 transition-colors hover:bg-gray-100"
+                        className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                         data-testid="photo-upload-cancel"
                       >
                         Cancel
@@ -412,7 +400,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                       {step === 'error' && (
                         <button
                           onClick={handleRetry}
-                          className="rounded-lg bg-pink-600 px-6 py-2 font-medium text-white transition-colors hover:bg-pink-700"
+                          className="h-12 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                           data-testid="photo-upload-retry"
                         >
                           Retry
@@ -422,10 +410,10 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         <button
                           onClick={handleUpload}
                           disabled={!isFormValid}
-                          className="flex items-center gap-2 rounded-lg bg-pink-600 px-6 py-2 font-medium text-white transition-colors hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex h-12 items-center gap-2 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
                           data-testid="photo-upload-submit-button"
                         >
-                          <Upload className="h-5 w-5" />
+                          <Upload className="h-5 w-5" aria-hidden="true" />
                           Upload
                         </button>
                       )}
@@ -436,34 +424,22 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                 {/* Step: Uploading */}
                 {step === 'uploading' && (
                   <div className="flex flex-col items-center justify-center py-12">
-                    <Loader className="mb-4 h-12 w-12 animate-spin text-pink-500" />
-                    <h3 className="mb-2 text-lg font-semibold text-gray-900">
+                    <Loader className="mb-4 h-12 w-12 animate-spin text-accent" aria-hidden="true" />
+                    <h3 className="mb-2 text-lg font-semibold text-ink">
                       Compressing & Saving...
                     </h3>
-                    <p className="text-sm text-gray-500">This may take a moment</p>
+                    <p className="text-sm text-muted">This may take a moment</p>
                   </div>
                 )}
 
                 {/* Step: Success */}
                 {step === 'success' && (
                   <div className="flex flex-col items-center justify-center py-12">
-                    <div className="mb-6 rounded-full bg-green-50 p-6">
-                      <svg
-                        className="h-12 w-12 text-green-500"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
+                    <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-tint text-accent">
+                      <Check className="h-[30px] w-[30px]" aria-hidden="true" />
                     </div>
-                    <h3 className="mb-2 text-lg font-semibold text-gray-900">Photo uploaded! ✨</h3>
-                    <p className="text-sm text-gray-500">Your photo has been saved</p>
+                    <h3 className="mb-2 text-lg font-semibold text-ink">Photo uploaded!</h3>
+                    <p className="text-sm text-muted">Your photo has been saved</p>
                   </div>
                 )}
               </div>
