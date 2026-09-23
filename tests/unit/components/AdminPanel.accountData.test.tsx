@@ -42,6 +42,7 @@ const A = '00000000-0000-4000-8000-000000000001';
 const B = '00000000-0000-4000-8000-000000000002';
 let aId: number;
 let bId: number;
+let aServerId: string;
 
 function deferred() {
   let resolve!: () => void;
@@ -76,7 +77,9 @@ beforeEach(async () => {
   useAppStore.setState(useAppStore.getInitialState(), true);
   await storageService.init();
   await storageService.addMessage({ text: 'Shared daily', category: 'reason', isCustom: false, createdAt: new Date() });
-  aId = (await customMessageService.create(A, { text: 'Account A message', category: 'custom' })).id;
+  const aCreated = await customMessageService.create(A, { text: 'Account A message', category: 'custom' });
+  aId = aCreated.id;
+  aServerId = aCreated.serverId!;
   bId = (await customMessageService.create(B, { text: 'Account B message', category: 'custom' })).id;
   await switchAccount(A);
 });
@@ -103,11 +106,25 @@ describe('AdminPanel with real IndexedDB and store', () => {
     expect(screen.queryByTestId('admin-edit-form')).toBeNull();
     expect(screen.queryByTestId('admin-delete-dialog')).toBeNull();
     expect(screen.getByText('Account B message')).toBeInTheDocument();
-    await switchAccount(A);
-    expect(screen.getAllByText('Account A message')).toHaveLength(1);
-    expect(screen.queryByText('Account B message')).toBeNull();
-    expect(await diskRow(aId)).toBeDefined();
+    // A's mirror rows left the device with A's session (CAP-7); B's stay.
+    await waitFor(async () => expect(await diskRow(aId)).toBeUndefined());
     expect(await diskRow(bId)).toBeDefined();
+    await switchAccount(A);
+    expect(screen.queryByText('Account B message')).toBeNull();
+    await waitFor(async () => expect(await diskRow(bId)).toBeUndefined());
+    // A's own rows come back from the server on A's refresh, listed once.
+    const { fakeCustomMessagesApi } = await import('../helpers/fakeAccountDataApis');
+    fakeCustomMessagesApi.fetchCustomMessages.mockResolvedValueOnce([
+      {
+        serverId: aServerId, text: 'Account A message', category: 'custom', active: true,
+        isFavorite: false, tags: [], createdAt: new Date(), updatedAt: new Date(),
+      },
+    ]);
+    await act(async () => {
+      await useAppStore.getState().loadMessageDataFromServer();
+      await useAppStore.getState().loadCustomMessages();
+    });
+    expect(screen.getAllByText('Account A message')).toHaveLength(1);
   });
 
   it('keeps deletion pending, prevents dismissal and duplicate submits, then closes after persisted success', async () => {

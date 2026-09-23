@@ -317,6 +317,22 @@ class StorageService {
     await tx.done;
   }
 
+  /**
+   * Delete every favorite `userId` holds — of bundled and custom rows alike.
+   * Called on sign-out with the OUTGOING account; other accounts' favorites
+   * and every message row are untouched. Local only: the server keeps them,
+   * and the next signed-in refresh mirrors them back. Throws on failure.
+   */
+  async deleteFavoritesForUser(userId: string): Promise<void> {
+    if (!userId) throw new Error('Deleting favorites requires an owner');
+    await this.init();
+    const tx = this.db!.transaction('message-favorites', 'readwrite');
+    void tx.done.catch(() => {});
+    const keys = await tx.store.index('by-user').getAllKeys(userId);
+    for (const key of keys) await tx.store.delete(key);
+    await tx.done;
+  }
+
   // Bulk operations
   async addMessages(messages: Omit<Message, 'id'>[]): Promise<void> {
     try {

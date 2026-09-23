@@ -11,15 +11,65 @@
  * - NOT persisted (derived from Supabase session on each app load)
  */
 
-import {
-  getAnniversaryOwner,
-  setAnniversaryOwner,
-  stashAnniversaries,
-  takeAnniversaries,
-} from '../../services/anniversaryVault';
+import { serializeAccountDataWrite } from '../../services/accountDataQueue';
+import { customMessageService } from '../../services/customMessageService';
 import { deleteAccountCopies } from '../../services/localCopy';
+import { storageService } from '../../services/storage';
 import type { AppState, AppStateCreator } from '../types';
 import { revokePreviewUrlsFromNotes } from './notesSlice';
+
+/**
+ * localStorage key naming the account whose saved data is on this device.
+ *
+ * `userId` is not persisted, so a boot with no recoverable session (expired or
+ * revoked refresh token, sign-out-everywhere from another device) reaches
+ * `clearAuth` with `userId` never set. This marker is how that path still
+ * knows whose local copies, custom-message rows and favorites to delete. It
+ * holds only an id — never the data itself.
+ */
+export const ACCOUNT_OWNER_STORAGE_KEY = 'my-love-account-owner';
+
+function setAccountOwner(userId: string | null): void {
+  try {
+    if (userId === null) localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
+    else localStorage.setItem(ACCOUNT_OWNER_STORAGE_KEY, userId);
+  } catch (error) {
+    console.error('[AuthSlice] Failed to record the device account owner:', error);
+  }
+}
+
+function getAccountOwner(): string | null {
+  try {
+    return localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Delete one account's saved data from this device: its local copies
+ * (anniversaries, partner, …), its custom-message rows and its favorites.
+ * Nothing else — unsynced `moods` rows and any other queued write stay for
+ * their owner to send on the next sign-in. The server keeps everything, so the
+ * next signed-in refresh brings it back.
+ *
+ * Fire-and-forget: sign-out must not wait on IndexedDB, and a failed delete is
+ * logged rather than blocking it. The mirror rows are deleted through the
+ * account-data queue, so a refresh or write the outgoing account already
+ * started finishes first and cannot put rows back afterwards; loaders re-check
+ * identity before writing a copy or a mirror, so none is re-created later.
+ */
+function deleteAccountData(userId: string): void {
+  deleteAccountCopies(userId).catch((error: unknown) => {
+    console.error('[AuthSlice] Failed to delete the outgoing account\'s local copies:', error);
+  });
+  serializeAccountDataWrite(async () => {
+    await customMessageService.deleteMirrorForUser(userId);
+    await storageService.deleteFavoritesForUser(userId);
+  }).catch((error: unknown) => {
+    console.error('[AuthSlice] Failed to delete the outgoing account\'s messages data:', error);
+  });
+}
 
 /**
  * Every field that belongs to one account and must not outlive its session.
@@ -215,34 +265,23 @@ function discardAccountState(
   //
   // `settings` survives as a whole — it is device configuration
   // (notifications) — except relationship.anniversaries inside it, which is
-  // couple data: user-writable from Settings, persisted by `partialize`, and
-  // rendered on Home. It is also localStorage-only, so a plain clear would
-  // destroy it: the outgoing user's list is stashed in the per-user vault
-  // instead, and the incoming user's (if any) popped back. This cannot live in
-  // signedOutState(), which has no access to the current object it must
-  // otherwise preserve.
+  // couple data rendered on Home. It is reset to `[]`: the account's saved copy
+  // is its local copy (kind `anniversaries`), which the incoming account's
+  // refresher reads for itself. This cannot live in signedOutState(), which has
+  // no access to the current object it must otherwise preserve.
   const settings = get().settings;
   // A no-session boot (expired or revoked refresh token, sign-out-everywhere
   // from the partner's device) reaches here with userId never populated —
   // authSlice is not persisted. The owner marker recorded at the last sign-in
-  // is what lets that path stash the list instead of destroying it.
-  const outgoingUserId = get().userId ?? getAnniversaryOwner();
-  if (outgoingUserId && settings) {
-    stashAnniversaries(outgoingUserId, settings.relationship.anniversaries);
-  }
-  const restored = identity.userId && settings ? takeAnniversaries(identity.userId) : null;
-  setAnniversaryOwner(identity.userId);
+  // is what tells that path whose data to delete.
+  const outgoingUserId = get().userId ?? getAccountOwner();
+  setAccountOwner(identity.userId);
 
-  // The outgoing account's saved local copies (services/localCopy.ts) go too,
-  // so the next account on this device can never read them. Only that store:
-  // unsynced `moods` rows and any other queued write stay for their owner to
-  // send on the next sign-in. Fire-and-forget — sign-out must not wait on
-  // IndexedDB, and a failed delete is logged rather than blocking it. Loaders
-  // re-check identity before writing a copy, so none is re-created afterwards.
+  // The outgoing account's saved data goes too, so the next account on this
+  // device can never read it: its local copies, custom-message rows and
+  // favorites. Unsynced `moods` rows stay for their owner (deleteAccountData).
   if (outgoingUserId && outgoingUserId !== identity.userId) {
-    deleteAccountCopies(outgoingUserId).catch((error: unknown) => {
-      console.error('[AuthSlice] Failed to delete the outgoing account\'s local copies:', error);
-    });
+    deleteAccountData(outgoingUserId);
   }
 
   // `messages` is the daily-rotation pool: the shared bundled messages PLUS
@@ -313,7 +352,7 @@ function discardAccountState(
       ? {
           settings: {
             ...settings,
-            relationship: { ...settings.relationship, anniversaries: restored ?? [] },
+            relationship: { ...settings.relationship, anniversaries: [] },
           },
         }
       : null),
@@ -356,27 +395,15 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => (
       return;
     }
 
-    // A fresh sign-in (previous === null) pops this user's stashed
-    // anniversaries back into settings. Pop semantics make the plain-boot case
-    // a no-op: INITIAL_SESSION also lands here with previous === null, but the
-    // vault only holds an entry when this user's last session ended in
-    // sign-out, so a live persisted list is never overwritten by a stale
-    // stash. Repeat calls for the same user (previous === userId) skip this.
+    // A fresh sign-in (previous === null, including a plain boot's
+    // INITIAL_SESSION) records this user as the device's account owner. If the
+    // marker still names someone else, that account's session ended without
+    // this device seeing it, and its saved data is deleted now. Repeat calls
+    // for the same user (previous === userId) skip this.
     if (previous === null) {
-      const settings = get().settings;
-      const restored = settings ? takeAnniversaries(userId) : null;
-      setAnniversaryOwner(userId);
-      if (restored !== null && settings) {
-        set({
-          ...identity,
-          settings: {
-            ...settings,
-            relationship: { ...settings.relationship, anniversaries: restored },
-          },
-        } as Partial<AppState>);
-        reloadRotationPool(get);
-        return;
-      }
+      const leftover = getAccountOwner();
+      setAccountOwner(userId);
+      if (leftover && leftover !== userId) deleteAccountData(leftover);
     }
 
     set(identity);

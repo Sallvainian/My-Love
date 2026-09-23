@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { logger } from '../utils/logger';
 import { SettingsSchema } from '../validation/schemas';
 import { createAppSlice } from './slices/appSlice';
-import { createAuthSlice } from './slices/authSlice';
+import { ACCOUNT_OWNER_STORAGE_KEY, createAuthSlice } from './slices/authSlice';
 import { createEventsSlice } from './slices/eventsSlice';
 import { createInteractionsSlice } from './slices/interactionsSlice';
 import { createMessagesSlice } from './slices/messagesSlice';
@@ -83,6 +83,35 @@ const STALE_PERSISTED_KEYS = [
  * leave them out.
  */
 const STALE_PERSISTED_SETTINGS_KEYS = ['themeName', 'customization'] as const;
+
+/**
+ * The retired anniversary vault's two localStorage keys. The vault stashed each
+ * signed-out account's anniversaries under a device-global key, readable by
+ * whoever used the device next; anniversaries now live in the per-account local
+ * copy instead. Both keys are removed on load. The old owner marker named the
+ * same account the new one does, so it seeds `ACCOUNT_OWNER_STORAGE_KEY` when
+ * that is unset — a no-session boot right after the upgrade still knows whose
+ * saved data to delete.
+ */
+const RETIRED_VAULT_KEYS = {
+  vault: 'my-love-anniversary-vault',
+  owner: 'my-love-anniversary-owner',
+} as const;
+
+function retireAnniversaryVault(): void {
+  try {
+    const owner = localStorage.getItem(RETIRED_VAULT_KEYS.owner);
+    if (owner && !localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)) {
+      localStorage.setItem(ACCOUNT_OWNER_STORAGE_KEY, owner);
+    }
+    localStorage.removeItem(RETIRED_VAULT_KEYS.vault);
+    localStorage.removeItem(RETIRED_VAULT_KEYS.owner);
+  } catch (error) {
+    console.error('[Storage] Failed to remove the retired anniversary vault:', error);
+  }
+}
+
+if (typeof localStorage !== 'undefined') retireAnniversaryVault();
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -169,6 +198,20 @@ export const useAppStore = create<AppState>()(
               }
             }
 
+            // Anniversaries are account data kept in the per-account local copy,
+            // never in this device-global blob. A blob written before that move
+            // still carries the last account's list; blank it so it never shows.
+            const relationship = data.state?.settings?.relationship;
+            if (
+              relationship &&
+              typeof relationship === 'object' &&
+              Array.isArray(relationship.anniversaries) &&
+              relationship.anniversaries.length > 0
+            ) {
+              relationship.anniversaries = [];
+              mutated = true;
+            }
+
             // Schema-validate persisted settings; drop just `settings` on failure
             // so Zustand's shallow merge falls back to the settingsSlice defaults.
             if (data.state?.settings) {
@@ -198,7 +241,14 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         // Only persist small, critical state to LocalStorage
         // Large data (messages, photos, custom messages) is stored in IndexedDB
-        settings: state.settings,
+        // Anniversaries are written as `[]`: they are account data, kept in the
+        // per-account local copy (settingsSlice), not in this device-global blob.
+        settings: state.settings
+          ? {
+              ...state.settings,
+              relationship: { ...state.settings.relationship, anniversaries: [] },
+            }
+          : state.settings,
         isOnboarded: state.isOnboarded,
         // Story 3.3: Serialize Map to Array for JSON storage
         messageHistory: {

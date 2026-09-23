@@ -25,14 +25,9 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 }));
 
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { signedOutState } from '../../../src/stores/slices/authSlice';
+import { ACCOUNT_OWNER_STORAGE_KEY, signedOutState } from '../../../src/stores/slices/authSlice';
 import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
-import {
-  OWNER_STORAGE_KEY,
-  VAULT_STORAGE_KEY,
-  setAnniversaryOwner,
-} from '../../../src/services/anniversaryVault';
 
 const EXPECTED_RESET: Record<string, unknown> = {
   moods: [],
@@ -217,8 +212,7 @@ const pendingReloads: Promise<void>[] = [];
 
 describe('clearAuth on sign-out', () => {
   beforeEach(() => {
-    localStorage.removeItem(VAULT_STORAGE_KEY);
-    localStorage.removeItem(OWNER_STORAGE_KEY);
+    localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
     useAppStore.setState({
       loadMessages: () => {
         const reload = realLoadMessages();
@@ -231,8 +225,7 @@ describe('clearAuth on sign-out', () => {
 
   afterEach(async () => {
     await Promise.allSettled(pendingReloads.splice(0));
-    localStorage.removeItem(VAULT_STORAGE_KEY);
-    localStorage.removeItem(OWNER_STORAGE_KEY);
+    localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
   });
 
   it('clears the identity', () => {
@@ -296,10 +289,6 @@ describe('clearAuth on sign-out', () => {
       authSessionVersion: version + 1,
     });
     expect(JSON.stringify(useAppStore.getState())).not.toContain(SECRETS.anniversaryLabel);
-    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
-    expect(useAppStore.getState().settings!.relationship.anniversaries[0]!.label).toBe(
-      SECRETS.anniversaryLabel
-    );
   });
 
   it('clears both mood arrays', () => {
@@ -496,65 +485,34 @@ describe('clearAuth on sign-out', () => {
     expect(settings.notificationTime).toBe('21:30');
   });
 
-  it("restores the same user's anniversaries on their next sign-in", () => {
+  it('keeps no copy of the anniversaries anywhere in localStorage', () => {
+    // The retired vault stashed each signed-out account's list under a
+    // device-global key. The saved copy is the account's local copy now, which
+    // its own refresher reads; nothing brings a list back at sign-in.
     useAppStore.getState().clearAuth();
-    expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
-
     useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
 
-    // Anniversaries are localStorage-only, so the sign-out clear must not be
-    // destruction: the vault stashed them per-user and sign-in pops them back.
-    const anniversaries = useAppStore.getState().settings!.relationship.anniversaries;
-    expect(anniversaries).toHaveLength(1);
-    expect(anniversaries[0]!.label).toBe(SECRETS.anniversaryLabel);
+    expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)!;
+      expect(localStorage.getItem(key), key).not.toContain(SECRETS.anniversaryLabel);
+    }
   });
 
-  it("never hands one user's stash to a different account", () => {
+  it("never shows one account's anniversaries to a different account", () => {
     useAppStore.getState().clearAuth();
     useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
 
     expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
     expect(JSON.stringify(useAppStore.getState())).not.toContain(SECRETS.anniversaryLabel);
-
-    // …while A's entry keeps waiting for A.
-    useAppStore.getState().clearAuth();
-    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
-    expect(useAppStore.getState().settings!.relationship.anniversaries[0]!.label).toBe(
-      SECRETS.anniversaryLabel
-    );
   });
 
-  it('stashes under the recorded owner when sign-out fires on a no-session boot', () => {
-    // Boot after refresh-token expiry (or sign-out-everywhere): persisted
-    // settings survived, but authSlice — not persisted — never learned who
-    // was signed in. Only the owner marker, written at A's last sign-in,
-    // still says whose list this is.
-    useAppStore.setState({
-      userId: null,
-      userEmail: null,
-      isAuthenticated: false,
-    } as unknown as Parameters<typeof useAppStore.setState>[0]);
-    setAnniversaryOwner(SECRETS.userId);
-
-    useAppStore.getState().clearAuth();
-    expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
-
-    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
-    expect(useAppStore.getState().settings!.relationship.anniversaries[0]!.label).toBe(
-      SECRETS.anniversaryLabel
-    );
-  });
-
-  it('stashes across a direct account switch that never passes through sign-out', () => {
+  it('drops the anniversaries across a direct account switch that never passes through sign-out', () => {
     // Signing in over a live session hits setAuthUser's switched-account path.
     useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
 
     expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
-
-    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
-    expect(useAppStore.getState().settings!.relationship.anniversaries[0]!.label).toBe(
-      SECRETS.anniversaryLabel
-    );
+    expect(JSON.stringify(useAppStore.getState())).not.toContain(SECRETS.anniversaryLabel);
   });
 
   it("drops the previous account's pending count but keeps the device's network state", () => {
@@ -665,34 +623,183 @@ describe('clearAuth on sign-out', () => {
     expect(useAppStore.getState().authSessionVersion).toBe(version);
   });
 
-  it("deletes the outgoing account's local copies and nothing else", async () => {
-    // CAP-7: another account on the device keeps its copies, and the outgoing
-    // account's unsynced mood — a queued write — survives for its next sign-in.
-    await writeLocalCopy(SECRETS.userId, 'partner', { status: 'unlinked' });
-    await writeLocalCopy('OTHER-ACCOUNT', 'partner', { status: 'unlinked' });
+  /**
+   * Seed the device the way a shared phone looks: the outgoing account's local
+   * copy, custom row, favorites and an unsynced mood, beside another account's
+   * data and the unowned rows (bundled daily, legacy custom) nobody owns.
+   */
+  async function seedDevice(outgoing: string) {
+    await writeLocalCopy(outgoing, 'anniversaries', [
+      { id: 1, date: '2025-11-26', label: SECRETS.anniversaryLabel },
+    ]);
+    await writeLocalCopy('OTHER-ACCOUNT', 'anniversaries', []);
     const db = await openMyLoveDB();
-    const { id: _seedId, ...pendingMood } = moodEntry(SECRETS.userId, SECRETS.ownNote);
-    const moodId = await db.add('moods', {
-      ...pendingMood,
-      date: '2026-08-04',
-      synced: false,
-    } as never);
-    db.close();
+    try {
+      const at = new Date('2026-08-03T06:00:00.000Z');
+      const bundledId = await db.add('messages', {
+        text: SHARED_DAILY_TEXT, category: 'reason', isCustom: false, createdAt: at,
+      } as never);
+      const legacyId = await db.add('messages', {
+        text: 'LEGACY-UNOWNED', category: 'custom', isCustom: true, createdAt: at,
+      } as never);
+      const ownId = await db.add('messages', {
+        text: SECRETS.customMessage, category: 'custom', isCustom: true, userId: outgoing,
+        serverId: 'srv-own', createdAt: at,
+      } as never);
+      const otherId = await db.add('messages', {
+        text: 'OTHER-CUSTOM', category: 'custom', isCustom: true, userId: 'OTHER-ACCOUNT',
+        serverId: 'srv-other', createdAt: at,
+      } as never);
+      await db.put('message-favorites', { messageId: bundledId, userId: outgoing });
+      await db.put('message-favorites', { messageId: ownId, userId: outgoing });
+      await db.put('message-favorites', { messageId: bundledId, userId: 'OTHER-ACCOUNT' });
+      const { id: _seedId, ...pendingMood } = moodEntry(outgoing, SECRETS.ownNote);
+      const moodId = await db.add('moods', {
+        ...pendingMood,
+        date: '2026-08-04',
+        synced: false,
+      } as never);
+      return { bundledId, legacyId, ownId, otherId, moodId };
+    } finally {
+      db.close();
+    }
+  }
+
+  async function expectOnlyOutgoingDataDeleted(
+    outgoing: string,
+    ids: Awaited<ReturnType<typeof seedDevice>>
+  ) {
+    await vi.waitFor(async () => {
+      expect(await readLocalCopy(outgoing, 'anniversaries')).toBeNull();
+      const db = await openMyLoveDB();
+      try {
+        expect(await db.get('messages', ids.ownId)).toBeUndefined();
+        expect(await db.getAllFromIndex('message-favorites', 'by-user', outgoing)).toEqual([]);
+      } finally {
+        db.close();
+      }
+    });
+    expect(await readLocalCopy('OTHER-ACCOUNT', 'anniversaries')).toEqual([]);
+    const db = await openMyLoveDB();
+    try {
+      // Unowned rows and the other account's rows are untouched…
+      expect(await db.get('messages', ids.bundledId)).toBeDefined();
+      expect(await db.get('messages', ids.legacyId)).toBeDefined();
+      expect(await db.get('messages', ids.otherId)).toBeDefined();
+      expect(await db.getAllFromIndex('message-favorites', 'by-user', 'OTHER-ACCOUNT')).toEqual([
+        { messageId: ids.bundledId, userId: 'OTHER-ACCOUNT' },
+      ]);
+      // …and the outgoing account's unsynced mood, a queued write, survives.
+      expect(await db.get('moods', ids.moodId)).toMatchObject({ synced: false });
+    } finally {
+      db.close();
+    }
+  }
+
+  async function clearDevice() {
+    const db = await openMyLoveDB();
+    try {
+      await Promise.all(
+        (['moods', 'local-copies', 'messages', 'message-favorites'] as const).map((store) =>
+          db.clear(store)
+        )
+      );
+    } finally {
+      db.close();
+    }
+  }
+
+  it("deletes the outgoing account's local copies, custom rows and favorites, and nothing else", async () => {
+    // CAP-7: another account on the device keeps its data, and the outgoing
+    // account's unsynced mood — a queued write — survives for its next sign-in.
+    const ids = await seedDevice(SECRETS.userId);
 
     useAppStore.getState().clearAuth();
 
-    await vi.waitFor(async () => {
-      expect(await readLocalCopy(SECRETS.userId, 'partner')).toBeNull();
-    });
-    expect(await readLocalCopy('OTHER-ACCOUNT', 'partner')).toEqual({ status: 'unlinked' });
-    const after = await openMyLoveDB();
+    await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
+    await clearDevice();
+  });
+
+  it("deletes the outgoing account's saved data on a direct account switch", async () => {
+    const ids = await seedDevice(SECRETS.userId);
+
+    useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
+
+    await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
+    await clearDevice();
+  });
+
+  it('records the signed-in account as the device owner, and clears it on sign-out', () => {
+    useAppStore.getState().clearAuth();
+    expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBeNull();
+    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
+    expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBe(SECRETS.userId);
+    useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
+    expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBe('USER-B-ID');
+    useAppStore.getState().clearAuth();
+    expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBeNull();
+  });
+
+  it("deletes the recorded owner's saved data on a no-session boot", async () => {
+    // Boot after refresh-token expiry (or sign-out-everywhere): authSlice — not
+    // persisted — never learned who was signed in. Only the owner marker,
+    // written at A's last sign-in, still says whose data is on the device.
+    localStorage.setItem(ACCOUNT_OWNER_STORAGE_KEY, SECRETS.userId);
+    useAppStore.setState({
+      userId: null,
+      userEmail: null,
+      isAuthenticated: false,
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+    const ids = await seedDevice(SECRETS.userId);
+
+    expect(() => useAppStore.getState().clearAuth()).not.toThrow();
+
+    expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBeNull();
+    expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
+    await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
+    await clearDevice();
+  });
+
+  it('deletes a previous owner\'s leftover data when a different account signs in fresh', async () => {
+    // A's session ended without this device seeing it (no clearAuth ran), and
+    // B's session is the first thing the next boot reports.
+    localStorage.setItem(ACCOUNT_OWNER_STORAGE_KEY, SECRETS.userId);
+    useAppStore.setState({
+      userId: null,
+      userEmail: null,
+      isAuthenticated: false,
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+    const ids = await seedDevice(SECRETS.userId);
+
+    useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
+
+    expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBe('USER-B-ID');
+    await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
+    await clearDevice();
+  });
+
+  it("a fresh boot of the recorded owner's own session deletes nothing", async () => {
+    localStorage.setItem(ACCOUNT_OWNER_STORAGE_KEY, SECRETS.userId);
+    useAppStore.setState({
+      userId: null,
+      userEmail: null,
+      isAuthenticated: false,
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+    const ids = await seedDevice(SECRETS.userId);
+
+    useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
+
+    // Let any stray queued delete run before asserting nothing went.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(await readLocalCopy(SECRETS.userId, 'anniversaries')).not.toBeNull();
+    const db = await openMyLoveDB();
     try {
-      expect(await after.get('moods', moodId)).toMatchObject({ synced: false });
-      await after.delete('moods', moodId);
-      await after.clear('local-copies');
+      expect(await db.get('messages', ids.ownId)).toBeDefined();
+      expect(await db.getAllFromIndex('message-favorites', 'by-user', SECRETS.userId)).toHaveLength(2);
     } finally {
-      after.close();
+      db.close();
     }
+    await clearDevice();
   });
 
   it('signedOutState() and this test agree on which fields exist', () => {

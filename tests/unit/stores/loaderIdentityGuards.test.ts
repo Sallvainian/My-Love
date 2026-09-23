@@ -124,6 +124,7 @@ vi.mock('../../../src/services/storage', () => ({
     init: vi.fn(),
     addMessage: vi.fn(),
     addMessages: vi.fn(),
+    deleteFavoritesForUser: vi.fn(async () => {}),
     // Same shape as getAllMessages above, and for the same reason: the
     // `messages` store is shared by every account on the device, so a case has
     // to be able to assert WHICH id the write was made for.
@@ -140,6 +141,8 @@ vi.mock('../../../src/services/customMessageService', () => ({
     deleteForUser: (userId: string | null, id: number) => customDeleteForUser(userId, id),
     exportMessages: (userId: string | null) => customExportMessages(userId),
     importMessages: (userId: string | null, data: unknown) => customImportMessages(userId, data),
+    // Sign-out's per-owner delete (authSlice); nothing here asserts on it.
+    deleteMirrorForUser: vi.fn(async () => {}),
   },
 }));
 
@@ -165,11 +168,7 @@ vi.mock('../../../src/services/moodService', () => ({
 }));
 
 import { useAppStore } from '../../../src/stores/useAppStore';
-import {
-  OWNER_STORAGE_KEY,
-  VAULT_STORAGE_KEY,
-  stashAnniversaries,
-} from '../../../src/services/anniversaryVault';
+import { ACCOUNT_OWNER_STORAGE_KEY } from '../../../src/stores/slices/authSlice';
 // Type-only, so `vi.mock` above still replaces the runtime module. Annotating
 // the photo fixtures against the real types is what makes a field rename on
 // PhotoUploadInput/SupabasePhoto fail typecheck instead of silently leaving
@@ -316,14 +315,9 @@ describe('loader identity guards', () => {
     >[0]);
     useAppStore.getState().clearAuth();
     useAppStore.getState().setAuthUser(A);
-    // AFTER the identity setup, not before: the anniversary vault is
-    // localStorage-backed and outlives a test, and the `clearAuth()` above
-    // re-stashes whichever id the PREVIOUS test left signed in. A stash sitting
-    // under the id a case then signs in as sends `setAuthUser` down its
-    // "restored anniversaries" exit instead of the plain one — a different
-    // branch, which silently masks defects in the one under test.
-    localStorage.removeItem(VAULT_STORAGE_KEY);
-    localStorage.removeItem(OWNER_STORAGE_KEY);
+    // AFTER the identity setup: the device owner marker is localStorage-backed
+    // and outlives a test, so a case starts with no recorded owner.
+    localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
     useAppStore.setState({ error: null });
 
     const { getPartnerId } = await import('../../../src/api/supabaseClient');
@@ -812,28 +806,6 @@ describe('loader identity guards', () => {
       useAppStore.getState().setAuthUser(C);
       await flush();
 
-      expect(getAllStoredMessages).toHaveBeenLastCalledWith(C);
-      expect(useAppStore.getState().messages).toEqual(cRotationPool());
-    });
-
-    it('reloads on the exit that restores stashed anniversaries', async () => {
-      // `setAuthUser` has a THIRD exit: a fresh sign-in whose anniversaries
-      // were stashed at their last sign-out returns from its own `set()`,
-      // before the plain one at the bottom. It is a real production path — it
-      // is how a returning user gets their countdown dates back — and it needs
-      // the reload exactly as much as the other two.
-      stashAnniversaries(C, [{ id: 1, date: '2025-11-26', label: 'C-ANNIVERSARY' }]);
-      useAppStore.setState({ messages: aPool() } as unknown as Parameters<
-        typeof useAppStore.setState
-      >[0]);
-      getAllStoredMessages.mockResolvedValue(cRotationPool());
-
-      useAppStore.getState().clearAuth();
-      useAppStore.getState().setAuthUser(C);
-      await flush();
-
-      // It really did leave by that exit, not one of the others.
-      expect(useAppStore.getState().settings!.relationship.anniversaries).toHaveLength(1);
       expect(getAllStoredMessages).toHaveBeenLastCalledWith(C);
       expect(useAppStore.getState().messages).toEqual(cRotationPool());
     });

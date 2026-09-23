@@ -113,16 +113,16 @@ test.describe('Account data through the real browser and local services', () => 
     await expect(favorite).toHaveAccessibleName('Add to favorites');
     expect((await snapshot(page)).favoriteIds).toEqual([]);
 
-    // B can add and remove the same daily favorite without changing A's row.
+    // A's favorite left the device with A's session (CAP-7) — it stays on
+    // the server — and B can add and remove the same daily favorite.
+    await expect.poll(() => localRows(page, 'message-favorites')).toEqual([]);
     await favorite.click();
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
     await favorite.click();
     await expect(favorite).toHaveAccessibleName('Add to favorites');
-    expect(await localRows(page, 'message-favorites')).toEqual([{
-      messageId: original.currentId,
-      userId: original.userId,
-    }]);
+    expect(await localRows(page, 'message-favorites')).toEqual([]);
 
+    // A's sign-in refreshes the favorite back from the server.
     await signOut(page);
     await signIn(page, pair.user1Email);
     await expect(favorite).toHaveAccessibleName('Remove from favorites');

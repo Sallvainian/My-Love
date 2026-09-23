@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../../../src/App';
 import { supabase } from '../../../src/api/supabaseClient';
+import { anniversariesService } from '../../../src/services/anniversariesService';
 import { eventsService, type CoupleEvent, type EventsPage } from '../../../src/services/eventsService';
 import { formatDateISO } from '../../../src/utils/dateUtils';
 import { useAppStore } from '../../../src/stores/useAppStore';
@@ -82,6 +83,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
   const originalGetSession = supabase.auth.getSession;
   const originalOnAuthStateChange = supabase.auth.onAuthStateChange;
   const originalGetEventsPage = eventsService.getEventsPage;
+  const originalFetchAnniversaries = anniversariesService.fetchAnniversaries;
   const previousWelcome = localStorage.getItem('lastWelcomeView');
   type LookupResult = Awaited<ReturnType<typeof supabase.auth.getSession>>;
   type AuthCallback = (event: AuthChangeEvent, session: Session | null) => void | Promise<void>;
@@ -144,6 +146,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       supabase.auth.getSession = originalGetSession;
       supabase.auth.onAuthStateChange = originalOnAuthStateChange;
       eventsService.getEventsPage = originalGetEventsPage;
+      anniversariesService.fetchAnniversaries = originalFetchAnniversaries;
       useAppStore.setState(originalState, true);
       if (previousWelcome === null) localStorage.removeItem('lastWelcomeView');
       else localStorage.setItem('lastWelcomeView', previousWelcome);
@@ -179,6 +182,11 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       requests.push(request);
       return request.promise;
     };
+    // A signed-in start refreshes every registered local copy. The anniversaries
+    // refresher's PostgREST request would read the token through
+    // supabase.auth.getSession — the very call this harness counts and defers
+    // — and with `initialIdentity` it runs before the bootstrap lookup.
+    anniversariesService.fetchAnniversaries = async () => [];
     localStorage.setItem('lastWelcomeView', String(Date.now()));
     useAppStore.setState({
       isLoading: false,
