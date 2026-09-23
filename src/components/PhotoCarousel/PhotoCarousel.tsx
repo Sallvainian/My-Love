@@ -217,7 +217,9 @@ export function PhotoCarousel() {
         <PhotoDeleteConfirmation
           photo={currentPhoto}
           onClose={handleCloseDeleteConfirm}
-          onConfirmDelete={(id) => deletePhoto(String(id))}
+          onConfirmDelete={async (id) => {
+            await deletePhoto(String(id));
+          }}
         />
       )}
     </div>

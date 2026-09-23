@@ -47,6 +47,9 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
+  // A failed next page. Kept apart from `error`, which replaces the whole grid,
+  // and it pauses the scroll trigger until the user asks for a retry.
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
 
   // Story 6.4: Photo viewer state
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
@@ -91,6 +94,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
     setPhotos([]);
     setCurrentOffset(0);
     setHasMore(true);
+    setLoadMoreFailed(false);
     setRetryTrigger((prev) => prev + 1); // Increment to trigger useEffect
   }, []);
 
@@ -186,15 +190,32 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       }
     } catch (error) {
       console.error('[PhotoGallery] Failed to load more photos:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load more photos');
+      setLoadMoreFailed(true);
     } finally {
       setIsLoadingMore(false);
     }
   }, [currentOffset, hasMore, isLoadingMore]);
 
+  const handleRetryLoadMore = useCallback(() => {
+    setLoadMoreFailed(false);
+    loadMorePhotos();
+  }, [loadMorePhotos]);
+
+  // Viewer delete (DW-176). The store filters its own list, not this page, so
+  // the row is dropped here. The server's rows shift up by one behind it, so
+  // the next page starts one earlier or its first photo would be skipped.
+  const handlePhotoDeleted = useCallback(
+    (photoId: string) => {
+      if (!photos.some((p) => p.id === photoId)) return;
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      setCurrentOffset((prev) => Math.max(0, prev - 1));
+    },
+    [photos]
+  );
+
   // AC-4.2.4: Setup Intersection Observer for infinite scroll
   useEffect(() => {
-    if (!hasMore || isLoadingMore || photos.length === 0) return;
+    if (!hasMore || isLoadingMore || loadMoreFailed || photos.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -220,7 +241,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         observer.unobserve(target);
       }
     };
-  }, [hasMore, isLoadingMore, loadMorePhotos, photos.length]);
+  }, [hasMore, isLoadingMore, loadMoreFailed, loadMorePhotos, photos.length]);
 
   // Page header, shared by every state. The Upload pill replaces the old
   // floating FAB and only exists once there is a grid to add to -- the empty
@@ -356,6 +377,21 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
               <p className="text-sm text-muted">Loading more photos...</p>
             </div>
           )}
+          {loadMoreFailed && !isLoadingMore && (
+            <div className="flex flex-col items-center gap-3">
+              <p className="rounded-[14px] bg-dtint px-3 py-2 text-sm text-danger" role="alert">
+                Couldn't load more photos
+              </p>
+              <button
+                type="button"
+                onClick={handleRetryLoadMore}
+                className="h-12 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                data-testid="photo-gallery-load-more-retry-button"
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -374,7 +410,9 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         <PhotoViewer
           photos={photos}
           selectedPhotoId={selectedPhotoId}
+          hasMore={hasMore}
           onClose={() => setSelectedPhotoId(null)}
+          onDeleted={handlePhotoDeleted}
         />
       )}
     </div>

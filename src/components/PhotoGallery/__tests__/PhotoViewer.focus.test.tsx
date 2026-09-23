@@ -175,9 +175,8 @@ describe('PhotoViewer focus', () => {
   });
 
   it('deletes exactly one photo on a double-tap of Delete', async () => {
-    // The optimistic setCurrentIndex has already applied while the request is
-    // in flight, so a re-entered handleDeleteConfirm would resolve
-    // photos[currentIndex] to a DIFFERENT photo and delete it too.
+    // A re-entered handleDeleteConfirm would send a second delete while the
+    // first is still in flight.
     deletePhotoMock.mockClear();
     let resolveDelete!: () => void;
     deletePhotoMock.mockReturnValue(new Promise<void>((r) => (resolveDelete = r)));

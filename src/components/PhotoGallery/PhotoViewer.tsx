@@ -9,7 +9,14 @@ import { useAppStore } from '../../stores/useAppStore';
 interface PhotoViewerProps {
   photos: PhotoWithUrls[];
   selectedPhotoId: string;
+  /** More pages exist beyond `photos`, so its length is only a lower bound. */
+  hasMore?: boolean;
   onClose: () => void;
+  /**
+   * Called after a successful delete. The caller owns `photos` and must drop
+   * the row: the viewer keeps its index, which then holds the next photo.
+   */
+  onDeleted?: (photoId: string) => void;
 }
 
 // AC 6.4.2: Swipe gesture configuration
@@ -37,7 +44,13 @@ const DOUBLE_TAP_DELAY = 300; // ms
  * - Photo preloading
  * - Loading and error states
  */
-export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerProps) {
+export function PhotoViewer({
+  photos,
+  selectedPhotoId,
+  hasMore = false,
+  onClose,
+  onDeleted,
+}: PhotoViewerProps) {
   const { deletePhoto } = useAppStore();
 
   // Calculate current photo index from selectedPhotoId
@@ -310,7 +323,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     liveRegion.setAttribute('aria-atomic', 'true');
     liveRegion.className = 'sr-only';
 
-    const announcement = `Photo ${currentIndex + 1} of ${photos.length}${
+    const announcement = `Photo ${currentIndex + 1} of ${photos.length}${hasMore ? '+' : ''}${
       currentPhoto.caption ? '. ' + currentPhoto.caption : ''
     }`;
     liveRegion.textContent = announcement;
@@ -323,7 +336,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         document.body.removeChild(liveRegion);
       }
     };
-  }, [currentIndex, photos.length, currentPhoto.caption]);
+  }, [currentIndex, photos.length, hasMore, currentPhoto.caption]);
 
   // AC 6.4.2: Swipe navigation
   const handleDragEnd = useCallback(
@@ -374,12 +387,15 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
   // AC 6.4.10: Delete photo handler.
   //
-  // Re-entry is the wrong-photo hazard again: the optimistic setCurrentIndex
-  // has already applied when the request is in flight, so a second tap on
-  // Delete would resolve photos[currentIndex] to a DIFFERENT photo and delete
-  // it too. The ref is the guard (state lags a render); the state disables the
-  // Delete button so a double-tap has nothing to land on. Cancel stays enabled
-  // as the trap's one focusable, guarded in its handler instead.
+  // Navigation waits for the outcome. deletePhoto resolves false rather than
+  // rejecting, and on false the viewer stays where it is. On success the
+  // parent drops the row through onDeleted, so the same index then holds the
+  // next photo; only the last photo steps back, and the only photo closes.
+  //
+  // Re-entry would send a second delete while the first is in flight. The
+  // ref is the guard (state lags a render); the state disables the Delete
+  // button so a double-tap has nothing to land on. Cancel stays enabled as
+  // the trap's one focusable, guarded in its handler instead.
   const handleDeleteConfirm = useCallback(async () => {
     if (isDeletingRef.current) return;
     isDeletingRef.current = true;
@@ -387,37 +403,17 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     const photoToDelete = photos[currentIndex];
 
     try {
-      // Navigate first (optimistic update)
+      // Delete from storage + database + store
+      const deleted = await deletePhoto(photoToDelete.id);
+      if (!deleted) return;
+
+      onDeleted?.(photoToDelete.id);
       if (photos.length === 1) {
         onClose();
       } else {
-        const nextIndex = canNavigateNext ? currentIndex : currentIndex - 1;
-        setCurrentIndex(nextIndex);
+        if (currentIndex === photos.length - 1) setCurrentIndex(currentIndex - 1);
         resetTransform();
       }
-
-      // Delete from storage + database + state
-      await deletePhoto(photoToDelete.id);
-    } catch (error) {
-      console.error('[PhotoViewer] Failed to delete photo:', error);
-
-      // CRITICAL 2: Better error handling for RLS policy violations
-      const errorMessage = (error as Error)?.message || '';
-      // PostgreSQL/Supabase errors may have a code property
-      const errorCode = (error as { code?: string })?.code || '';
-
-      if (
-        errorMessage.toLowerCase().includes('permission') ||
-        errorMessage.toLowerCase().includes('policy') ||
-        errorCode === '42501'
-      ) {
-        console.error(
-          '[PhotoViewer] RLS policy blocked deletion - user does not own this photo. Server-side security working correctly.'
-        );
-      }
-
-      // Note: UI already updated optimistically. In production, may want to revert navigation
-      // or show error toast to user. For now, logging is sufficient as RLS prevents unauthorized deletion.
     } finally {
       isDeletingRef.current = false;
       setIsDeleting(false);
@@ -426,7 +422,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
       // container otherwise. By then unmounts and re-enables have committed.
       closeDeleteDialog();
     }
-  }, [photos, currentIndex, canNavigateNext, onClose, deletePhoto, resetTransform, closeDeleteDialog]);
+  }, [photos, currentIndex, onClose, onDeleted, deletePhoto, resetTransform, closeDeleteDialog]);
 
   // AC 6.4.15: Image loading handlers
   const handleImageLoad = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
@@ -613,7 +609,8 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           transition={{ delay: 0.2 }}
         >
           <div className="mb-1 text-sm text-muted">
-            Photo {currentIndex + 1} of {photos.length} •{' '}
+            Photo {currentIndex + 1} of {photos.length}
+            {hasMore ? '+' : ''} •{' '}
             {currentPhoto.isOwn ? 'Your photo' : 'Partner photo'}
           </div>
           {currentPhoto.caption && (
