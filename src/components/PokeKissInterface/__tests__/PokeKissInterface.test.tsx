@@ -275,6 +275,52 @@ describe('PokeKissInterface on the kit', () => {
     expect(screen.queryByTestId('interaction-history-modal')).not.toBeInTheDocument();
   });
 
+  // The overlay is ended with fireEvent.click, which moves no focus -- the same
+  // as a keyboard user waiting for the animation to finish on its own.
+  it('moves focus to History when playing the last unviewed interaction removes the badge', async () => {
+    withUnviewed(1);
+    storeMocks.markInteractionViewed.mockImplementation(async () => {
+      storeState.unviewedCount = 0;
+    });
+    const user = userEvent.setup();
+
+    render(<PokeKissInterface />);
+    await user.tab();
+    await user.tab();
+    expect(screen.getByTestId('notification-badge')).toHaveFocus();
+    await user.keyboard('{Enter}');
+    fireEvent.click(screen.getByTestId('poke-animation'));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('notification-badge')).not.toBeInTheDocument()
+    );
+    await waitFor(() => expect(screen.getByTestId('history-button')).toHaveFocus());
+    expect(storeMocks.markInteractionViewed).toHaveBeenCalledWith('interaction-1');
+  });
+
+  it('leaves focus on the badge when unviewed interactions remain after playing one', async () => {
+    withUnviewed(2);
+    storeMocks.markInteractionViewed.mockImplementation(async () => {
+      storeState.unviewedCount = 1;
+    });
+    const user = userEvent.setup();
+
+    render(<PokeKissInterface />);
+    await user.tab();
+    await user.tab();
+    await user.keyboard('{Enter}');
+    fireEvent.click(screen.getByTestId('poke-animation'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('notification-badge')).toHaveAttribute(
+        'aria-label',
+        'Play 1 unviewed interaction'
+      )
+    );
+    expect(screen.getByTestId('notification-badge')).toHaveFocus();
+    expect(screen.getByTestId('history-button')).not.toHaveFocus();
+  });
+
   it('plays the unviewed interaction from the badge without opening history', () => {
     withUnviewed(2);
 
