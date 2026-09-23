@@ -88,9 +88,11 @@ export function PhotoViewer({
   // confines the trap's Tab cycle to Cancel/Delete), and focusing a
   // still-disabled button before the re-enabling render commits is a no-op.
   const restoreAfterDialogRef = useRef(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const closeDeleteDialog = useCallback(() => {
     restoreAfterDialogRef.current = true;
     setShowDeleteDialog(false);
+    setDeleteError(null);
   }, []);
   useEffect(() => {
     if (!showDeleteDialog && restoreAfterDialogRef.current) {
@@ -117,6 +119,17 @@ export function PhotoViewer({
     showDeleteDialogRef.current = showDeleteDialog;
     onCloseRef.current = onClose;
   }, [showDeleteDialog, onClose]);
+  // A failed delete keeps the confirmation open with its alert. The Delete
+  // button that held focus was disabled for the request, so hand focus to
+  // Cancel -- still inside the dialog, and the safe choice on an irreversible
+  // action -- once the re-enabling render has committed.
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (deleteError && !isDeleting) {
+      cancelButtonRef.current?.focus();
+    }
+  }, [deleteError, isDeleting]);
+
   const handleCancelDialog = useCallback(() => {
     if (isDeletingRef.current) return;
     closeDeleteDialog();
@@ -388,7 +401,8 @@ export function PhotoViewer({
   // AC 6.4.10: Delete photo handler.
   //
   // Navigation waits for the outcome. deletePhoto resolves false rather than
-  // rejecting, and on false the viewer stays where it is. On success the
+  // rejecting, and on false the viewer stays where it is and the confirmation
+  // stays open with an error, so Delete can be retried. On success the
   // parent drops the row through onDeleted, so the same index then holds the
   // next photo; only the last photo steps back, and the only photo closes.
   //
@@ -400,11 +414,13 @@ export function PhotoViewer({
     if (isDeletingRef.current) return;
     isDeletingRef.current = true;
     setIsDeleting(true);
+    setDeleteError(null);
     const photoToDelete = photos[currentIndex];
+    let deleted = false;
 
     try {
       // Delete from storage + database + store
-      const deleted = await deletePhoto(photoToDelete.id);
+      deleted = await deletePhoto(photoToDelete.id);
       if (!deleted) return;
 
       onDeleted?.(photoToDelete.id);
@@ -417,10 +433,16 @@ export function PhotoViewer({
     } finally {
       isDeletingRef.current = false;
       setIsDeleting(false);
-      // Routed through closeDeleteDialog so the post-commit effect places
-      // focus: the trash button if the next photo is the user's own, the
-      // container otherwise. By then unmounts and re-enables have committed.
-      closeDeleteDialog();
+      if (deleted) {
+        // Routed through closeDeleteDialog so the post-commit effect places
+        // focus: the trash button if the next photo is the user's own, the
+        // container otherwise. By then unmounts and re-enables have committed.
+        closeDeleteDialog();
+      } else {
+        // The photo is still here; say so, and leave the dialog open for a
+        // retry. The deleteError effect moves focus onto Cancel.
+        setDeleteError('Failed to delete photo. Please try again.');
+      }
     }
   }, [photos, currentIndex, onClose, onDeleted, deletePhoto, resetTransform, closeDeleteDialog]);
 
@@ -657,6 +679,15 @@ export function PhotoViewer({
                     "{currentPhoto.caption}"
                   </p>
                 )}
+                {deleteError && (
+                  <div
+                    className="rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
+                    role="alert"
+                    data-testid="photo-viewer-delete-error"
+                  >
+                    {deleteError}
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-3 border-t border-line px-5 py-4">
                 {/* autoFocus: nothing else moves focus into this dialog, and
@@ -668,6 +699,7 @@ export function PhotoViewer({
                     out of the modal -- but its handler is guarded like Escape:
                     dismissing mid-flight would orphan the pending finally. */}
                 <button
+                  ref={cancelButtonRef}
                   autoFocus
                   onClick={handleCancelDialog}
                   className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
