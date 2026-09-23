@@ -1,41 +1,37 @@
 /**
+ * The gallery grid's layout: 3 columns at every width with a 6px gap. Shared
+ * with PhotoGallery so the skeleton cannot drift from the grid it stands in for.
+ */
+export const PHOTO_GRID_CLASS = 'grid w-full grid-cols-3 gap-1.5';
+
+/**
  * Photo Grid Skeleton Loader Component
  * Story 5.2: AC-4 - Loading states with skeleton loaders
  *
- * Features:
- * - Matches PhotoGridItem visual structure (aspect-square, rounded-lg)
- * - CSS shimmer animation (better performance than JS animation)
- * - Responsive to match grid layout
+ * Matches PhotoGridItem's tile (aspect-square, 14px radius, card2 ground).
  */
 function PhotoGridSkeleton() {
   return (
     <div
-      className="relative aspect-square overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-700"
+      className="aspect-square animate-pulse rounded-[14px] bg-card2"
       data-testid="photo-grid-skeleton"
       aria-label="Loading photo"
-    >
-      {/* Shimmer animation overlay */}
-      <div className="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-    </div>
+    />
   );
 }
 
 /**
  * Photo Grid Skeleton Grid Component
- * Displays a 3x3 grid of skeleton loaders during initial load
- * Story 5.2: Subtask 2.3 - Replace simple spinner with skeleton grid
+ * Displays a 3x3 grid of skeleton loaders during initial load, in exactly the
+ * gallery grid's columns and gap. The page header and padding belong to
+ * PhotoGallery.
  */
 export function PhotoGridSkeletonGrid() {
-  // Display 9 skeleton items (3x3 grid approximation)
-  // Actual grid columns will be 2-3-4 based on screen size (responsive)
   const skeletonCount = 9;
 
   return (
-    <div className="min-h-screen p-4" data-testid="photo-gallery-skeleton">
-      <div
-        className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 lg:gap-4"
-        data-testid="photo-gallery-skeleton-grid"
-      >
+    <div data-testid="photo-gallery-skeleton">
+      <div className={PHOTO_GRID_CLASS} data-testid="photo-gallery-skeleton-grid">
         {Array.from({ length: skeletonCount }).map((_, index) => (
           <PhotoGridSkeleton key={`skeleton-${index}`} />
         ))}

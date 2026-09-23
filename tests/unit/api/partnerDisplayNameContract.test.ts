@@ -19,8 +19,8 @@
  *
  * `null` is the answer for a seed, which is the same answer this function
  * already gives for "no partner" and "the read failed". That collapse is
- * deliberate: `LoveNotes.tsx:86` is the only caller and does nothing with the
- * difference except keep its own 'Partner' default.
+ * deliberate: its callers, `LoveNotes.tsx:86` and `PhotoGallery.tsx:67`, do
+ * nothing with the difference except keep their own defaults.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

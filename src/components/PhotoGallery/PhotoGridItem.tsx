@@ -1,10 +1,15 @@
-import { User } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { logger } from '../../utils/logger';
 
 interface PhotoGridItemProps {
   photo: PhotoWithUrls;
+  /** Initial on the badge of the viewer's own photos */
+  ownInitial: string;
+  /** Initial on the badge of the partner's photos */
+  partnerInitial: string;
+  /** Partner's display name for the badge's screen-reader text, null when unknown */
+  partnerName: string | null;
   onPhotoClick: (photoId: string) => void;
 }
 
@@ -15,12 +20,18 @@ interface PhotoGridItemProps {
  * Features:
  * - Square aspect ratio thumbnail (aspect-square)
  * - Lazy loading with IntersectionObserver (AC-6.3.5)
- * - Caption overlay on hover/tap (gradient backdrop)
- * - Owner badge display (AC-6.3.11)
+ * - Caption overlay on hover/tap (flat dark backdrop)
+ * - Owner badge display (AC-6.3.11): initial in a fill (own) or partner circle
  * - Click handler for photo selection
  * - Uses Supabase signed URLs
  */
-export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
+export function PhotoGridItem({
+  photo,
+  ownInitial,
+  partnerInitial,
+  partnerName,
+  onPhotoClick,
+}: PhotoGridItemProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -51,6 +62,10 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
   }, [isVisible]);
 
   // AC-4.2.7: Handle photo click for carousel view (Story 4.3)
+  // The tile's aria-label (the caption) overrides its content, so the badge's
+  // screen-reader text is attached as a description instead.
+  const ownerTextId = `photo-owner-${photo.id}`;
+
   const handleClick = () => {
     onPhotoClick(photo.id);
     logger.debug(`[PhotoGallery] Selected photo: ${photo.id}`);
@@ -58,11 +73,12 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
 
   return (
     <div
-      className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg transition-transform duration-200 hover:scale-105"
+      className="group relative aspect-square cursor-pointer overflow-hidden rounded-[14px] bg-card2 transition-transform duration-200 hover:scale-105"
       onClick={handleClick}
       role="button"
       tabIndex={0}
       aria-label={photo.caption || `Photo ${photo.id}`}
+      aria-describedby={ownerTextId}
       data-testid="photo-grid-item"
       onKeyDown={(e) => {
         // Accessibility: Support Enter/Space for keyboard navigation
@@ -74,7 +90,7 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
     >
       {/* AC-6.3.6: Blur placeholder while loading */}
       {!isLoaded && isVisible && (
-        <div className="absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700" />
+        <div className="absolute inset-0 animate-pulse bg-card2" />
       )}
 
       {/* Photo thumbnail with lazy loading */}
@@ -94,22 +110,22 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
       />
 
       {/* AC-6.3.11: Owner badge */}
-      <div className="absolute top-2 right-2">
-        <div
-          className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-            photo.isOwn ? 'bg-pink-600 text-white' : 'bg-blue-600 text-white'
-          }`}
-          data-testid="photo-grid-item-owner-badge"
-        >
-          <User className="h-3 w-3" />
-          <span>{photo.isOwn ? 'You' : 'Partner'}</span>
-        </div>
+      <div
+        className={`absolute bottom-1.5 left-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+          photo.isOwn ? 'bg-fill text-white' : 'bg-partner text-card'
+        }`}
+        data-testid="photo-grid-item-owner-badge"
+      >
+        <span aria-hidden="true">{photo.isOwn ? ownInitial : partnerInitial}</span>
+        <span id={ownerTextId} className="sr-only">
+          {photo.isOwn ? 'Uploaded by you' : `Uploaded by ${partnerName ?? 'your partner'}`}
+        </span>
       </div>
 
       {/* Caption overlay on hover/tap */}
       {photo.caption && (
         <div
-          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          className="absolute inset-x-0 bottom-0 bg-black/55 p-3 pl-8 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
           data-testid="photo-grid-item-caption-overlay"
         >
           <p className="line-clamp-2 text-sm font-medium text-white">{photo.caption}</p>

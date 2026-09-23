@@ -21,7 +21,7 @@ interface PhotoDeleteConfirmationProps {
  * - Warning title: "Delete this photo?"
  * - Warning message: "This action cannot be undone."
  * - Cancel button (closes dialog without deleting)
- * - Delete button (red/destructive styling, confirms deletion)
+ * - Delete button (kit destructive styling, confirms deletion)
  * - Backdrop prevents interaction with lower layers
  */
 export function PhotoDeleteConfirmation({
@@ -58,40 +58,40 @@ export function PhotoDeleteConfirmation({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50"
       onClick={handleBackdropClick}
       data-testid="photo-delete-confirmation"
       role="dialog"
       aria-modal="true"
       aria-labelledby="delete-dialog-title"
     >
-      <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 shadow-xl">
+      <div className="mx-4 w-full max-w-md rounded-[20px] bg-card shadow-float">
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-gray-700 px-6 py-4">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-900/50">
-            <AlertTriangle className="h-5 w-5 text-red-400" />
+        <div className="flex items-center gap-3 border-b border-line px-5 py-4">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           </div>
-          <h2 id="delete-dialog-title" className="text-xl font-semibold text-white">
+          <h2 id="delete-dialog-title" className="text-lg font-semibold text-ink">
             Delete this photo?
           </h2>
         </div>
 
         {/* Content */}
-        <div className="space-y-4 px-6 py-4">
-          <p className="text-gray-300">This action cannot be undone.</p>
+        <div className="space-y-4 px-5 py-4">
+          <p className="text-[15px] text-ink">This action cannot be undone.</p>
 
           {/* Show photo caption if it exists */}
           {photo.caption && (
-            <div className="rounded-lg bg-gray-700/50 px-4 py-3">
-              <p className="mb-1 text-sm text-gray-400">Caption:</p>
-              <p className="line-clamp-2 text-sm text-white">{photo.caption}</p>
+            <div className="rounded-[14px] bg-card2 px-3 py-2">
+              <p className="mb-1 text-sm text-muted">Caption:</p>
+              <p className="line-clamp-2 text-sm text-ink">{photo.caption}</p>
             </div>
           )}
 
           {/* Error Message */}
           {error && (
             <div
-              className="rounded-lg border border-red-700 bg-red-900/50 px-4 py-3 text-red-200"
+              className="rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
               data-testid="photo-delete-confirmation-error"
             >
               {error}
@@ -100,11 +100,11 @@ export function PhotoDeleteConfirmation({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-gray-700 px-6 py-4">
+        <div className="flex items-center justify-end gap-3 border-t border-line px-5 py-4">
           <button
             onClick={onClose}
             disabled={isDeleting}
-            className="rounded-lg px-4 py-2 text-gray-300 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Cancel without deleting"
             data-testid="photo-delete-confirmation-cancel-button"
           >
@@ -113,7 +113,7 @@ export function PhotoDeleteConfirmation({
           <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className="flex items-center gap-2 rounded-lg bg-red-600 px-6 py-2 font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Delete this photo permanently"
             data-testid="photo-delete-confirmation-delete-button"
           >
