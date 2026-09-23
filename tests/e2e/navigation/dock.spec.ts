@@ -91,35 +91,13 @@ test.describe('Bottom Dock', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('[P1] should keep the welcome button above the dock on Home', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
-
-    const welcomeButton = page.getByLabel('View welcome message again');
-    await expect(welcomeButton).toBeVisible();
-    // It springs in from scale 0, so wait for its full 56px (h-14) box.
-    await expect
-      .poll(async () => Math.round((await welcomeButton.boundingBox())?.height ?? 0))
-      .toBe(56);
-
-    const welcomeBox = await welcomeButton.boundingBox();
-    const dockBox = await page.getByTestId('nav-dock').boundingBox();
-    if (!welcomeBox || !dockBox) throw new Error('[dock.spec] expected welcome and dock boxes');
-    expect(welcomeBox.y + welcomeBox.height).toBeLessThanOrEqual(dockBox.y);
-
-    // The z-50 welcome button sits right above Partner on a phone; the tap
-    // must still land on the dock.
-    await page.getByTestId('nav-partner').click();
-    await expect(page).toHaveURL(/\/partner$/);
-  });
-
-  test('[P1] should keep the Photos upload FAB above the dock', async ({
+  test('[P1] should put the Photos Upload button in the page header, not floating', async ({
     page,
     interceptNetworkCall,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
 
-    // The FAB renders only beside a non-empty grid, so photos are mocked
+    // The header Upload button renders only beside a non-empty grid, so photos are mocked
     // rather than left to whatever the pool account holds.
     const photosCall = interceptNetworkCall({
       url: '**/rest/v1/photos?**',
@@ -157,15 +135,14 @@ test.describe('Bottom Dock', () => {
     await page.goto('/photos');
     await photosCall;
 
-    const fab = page.getByTestId('photo-gallery-upload-fab');
-    await expect(fab).toBeVisible();
+    // The testid is kept from the old floating FAB it replaced.
+    const upload = page.getByTestId('photo-gallery-upload-fab');
+    await expect(upload).toBeVisible();
 
-    const fabBox = await fab.boundingBox();
-    const dockBox = await page.getByTestId('nav-dock').boundingBox();
-    if (!fabBox || !dockBox) throw new Error('[dock.spec] expected FAB and dock boxes');
-    expect(fabBox.y + fabBox.height).toBeLessThanOrEqual(dockBox.y);
+    const position = await upload.evaluate((el) => getComputedStyle(el).position);
+    expect(position).not.toBe('fixed');
 
-    await fab.click();
+    await upload.click();
     await expect(page.getByTestId('photo-upload-modal')).toBeVisible();
   });
 

@@ -2,10 +2,15 @@
  * BirthdayCountdown Component
  *
  * Countdown to a person's birthday with their upcoming age displayed.
- * Updates every second for real-time countdown display.
+ * The card shows only a day count; its 1s interval exists to flip the
+ * "today" state (and the day count) when local midnight passes.
+ *
+ * Rendered as the shared CountdownCard: "{name} turns {age}" over the day
+ * count, or a highlighted tile and "Happy Birthday!" on the day itself.
+ * `tone` picks the tile colour pair; birthdays come from static config, so the
+ * caller decides which person reads as `partner`.
  */
 
-import { m as motion } from 'framer-motion';
 import { Cake } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -15,9 +20,11 @@ import {
   getUpcomingAge,
   type TimeDifference,
 } from '../../config/relationshipDates';
+import { CountdownCard, type CountdownTone } from './CountdownCard';
 
 interface BirthdayCountdownProps {
   birthday: BirthdayInfo;
+  tone?: CountdownTone;
 }
 
 function computeBirthdayCountdownState(birthday: BirthdayInfo): {
@@ -38,7 +45,7 @@ function computeBirthdayCountdownState(birthday: BirthdayInfo): {
   };
 }
 
-export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
+export function BirthdayCountdown({ birthday, tone = 'you' }: BirthdayCountdownProps) {
   const [timeDiff, setTimeDiff] = useState<TimeDifference>(
     () => computeBirthdayCountdownState(birthday).timeDiff
   );
@@ -56,79 +63,25 @@ export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
     setIsBirthdayToday(nextState.isBirthdayToday);
   }, [birthday]);
 
-  // Update every second for real-time countdown
+  // Tick every second so the "today" state and day count flip at local midnight
   useEffect(() => {
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
   }, [updateCountdown]);
 
   const totalDays = timeDiff.years * 365 + timeDiff.days;
+  const value = isBirthdayToday
+    ? 'Happy Birthday!'
+    : `${totalDays} ${totalDays === 1 ? 'day' : 'days'}`;
 
   return (
-    <motion.div
-      className={`relative overflow-hidden rounded-2xl border-2 p-4 shadow-lg transition-all duration-300 ${
-        isBirthdayToday
-          ? 'border-yellow-400 bg-yellow-50 dark:border-yellow-500 dark:bg-gray-900'
-          : 'border-purple-300 bg-white dark:border-purple-500 dark:bg-gray-900'
-      }`}
-      whileHover={{ scale: 1.02 }}
-      transition={{ duration: 0.2 }}
-      data-testid={`birthday-countdown-${birthday.name.toLowerCase()}`}
-    >
-      {/* Header */}
-      <div className="mb-2 flex items-center gap-2">
-        <div
-          className={`rounded-lg p-2 ${
-            isBirthdayToday
-              ? 'bg-yellow-100 dark:bg-yellow-900'
-              : 'bg-purple-100 dark:bg-purple-900'
-          }`}
-        >
-          <Cake
-            className={`h-5 w-5 ${
-              isBirthdayToday
-                ? 'text-yellow-500 dark:text-yellow-300'
-                : 'text-purple-500 dark:text-purple-300'
-            }`}
-          />
-        </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-800 dark:text-white">
-            {birthday.name}'s Birthday
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Turning <span className="font-bold">{upcomingAge}</span>
-          </p>
-        </div>
-      </div>
-
-      {/* Countdown Display */}
-      <div className="py-2 text-center">
-        {isBirthdayToday ? (
-          <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{ scale: [0.8, 1.1, 1] }}
-            transition={{ duration: 0.5 }}
-          >
-            <p className="text-2xl font-bold text-yellow-500 dark:text-yellow-300">
-              Happy Birthday! 🎉
-            </p>
-          </motion.div>
-        ) : (
-          <>
-            <p className="text-xl font-bold text-purple-500 dark:text-purple-300">
-              {totalDays} {totalDays === 1 ? 'day' : 'days'}
-            </p>
-            <div className="mt-2 flex justify-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-              <span className="font-mono">
-                {String(timeDiff.hours).padStart(2, '0')}:
-                {String(timeDiff.minutes).padStart(2, '0')}:
-                {String(timeDiff.seconds).padStart(2, '0')}
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-    </motion.div>
+    <CountdownCard
+      icon={Cake}
+      tone={tone}
+      highlight={isBirthdayToday}
+      label={`${birthday.name} turns ${upcomingAge}`}
+      value={value}
+      testId={`birthday-countdown-${birthday.name.toLowerCase()}`}
+    />
   );
 }

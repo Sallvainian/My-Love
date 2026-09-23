@@ -1,10 +1,11 @@
-import { Camera, Loader2 } from 'lucide-react';
+import { AlertCircle, Camera, Loader2, Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getOwnDisplayName, getPartnerDisplayName } from '../../api/supabaseClient';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { photoService } from '../../services/photoService';
 import { useAppStore } from '../../stores/useAppStore';
 import { PhotoGridItem } from './PhotoGridItem';
-import { PhotoGridSkeletonGrid } from './PhotoGridSkeleton';
+import { PHOTO_GRID_CLASS, PhotoGridSkeletonGrid } from './PhotoGridSkeleton';
 import { PhotoViewer } from './PhotoViewer';
 
 interface PhotoGalleryProps {
@@ -15,15 +16,23 @@ interface PhotoGalleryProps {
 const PHOTOS_PER_PAGE = 20;
 const SCROLL_THRESHOLD = 200; // pixels from bottom to trigger load
 
+// Subtitle while there is no count to show (loading, empty, error)
+const ALBUM_SUBTITLE = 'Your shared album';
+
+/** First code point, upper-cased, so a name opening with an emoji is not split. */
+function initialOf(name: string | null, fallback: string): string {
+  return Array.from(name?.trim() ?? '')[0]?.toUpperCase() || fallback;
+}
+
 /**
  * Photo Gallery Grid View Component
  * Story 4.2: AC-4.2.1, AC-4.2.2, AC-4.2.4, AC-4.2.5, AC-4.2.6
  *
  * Features:
- * - Responsive grid layout (2-3-4 columns)
+ * - 3-column grid at every width, under a page header with an Upload pill
  * - Photos sorted newest first (by-date index)
  * - Empty state with upload CTA
- * - Loading spinner during fetch
+ * - Page header over a skeleton grid during the first fetch
  * - Lazy loading pagination with Intersection Observer
  */
 export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
@@ -42,8 +51,37 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   // Story 6.4: Photo viewer state
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
 
+  // Owner badges and the subtitle: display names read once on mount. A null or
+  // failed read leaves the fallback ("Y" / "P", no "shared with ...").
+  const [ownName, setOwnName] = useState<string | null>(null);
+  const [partnerName, setPartnerName] = useState<string | null>(null);
+
   // Intersection Observer ref for infinite scroll
   const observerTarget = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadNames = async () => {
+      try {
+        const [own, partner] = await Promise.all([getOwnDisplayName(), getPartnerDisplayName()]);
+        if (cancelled) return;
+        setOwnName(own?.trim() || null);
+        setPartnerName(partner?.trim() || null);
+      } catch {
+        // Names are decoration here; the fallbacks already cover a failed read.
+      }
+    };
+
+    loadNames();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const ownInitial = initialOf(ownName, 'Y');
+  const partnerInitial = initialOf(partnerName, 'P');
 
   // Retry handler for error state
   const handleRetry = useCallback(() => {
@@ -184,36 +222,51 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
     };
   }, [hasMore, isLoadingMore, loadMorePhotos, photos.length]);
 
+  // Page header, shared by every state. The Upload pill replaces the old
+  // floating FAB and only exists once there is a grid to add to -- the empty
+  // state carries its own primary Upload button.
+  const renderHeader = (subtitle: string, showUpload: boolean) => (
+    <header className="flex items-end justify-between gap-3 px-1 pt-1">
+      <div className="flex min-w-0 flex-col gap-1">
+        <h1 className="font-serif text-[30px] leading-[1.1] font-semibold text-ink">Photos</h1>
+        <p className="text-sm text-muted" data-testid="photo-gallery-subtitle">
+          {subtitle}
+        </p>
+      </div>
+      {showUpload && (
+        <button
+          type="button"
+          onClick={onUploadClick}
+          className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          aria-label="Upload photo"
+          data-testid="photo-gallery-upload-fab"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Upload
+        </button>
+      )}
+    </header>
+  );
+
+  const pageClass = 'flex min-h-screen flex-col gap-4 px-4 pt-3 pb-6';
+
   // Error state - show error message with retry button
   if (error && photos.length === 0) {
     return (
-      <div
-        className="flex min-h-screen flex-col items-center justify-center px-4"
-        data-testid="photo-gallery-error-state"
-      >
-        <div className="max-w-md text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
-            <svg
-              className="h-8 w-8 text-red-600 dark:text-red-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+      <div className={pageClass} data-testid="photo-gallery-error-state">
+        {renderHeader(ALBUM_SUBTITLE, false)}
+        <div className="flex flex-col items-center gap-3 rounded-[20px] border border-line bg-card px-4 py-8 text-center shadow-card">
+          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-dtint text-danger">
+            <AlertCircle className="h-7 w-7" aria-hidden="true" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Failed to load photos
-          </h3>
-          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">{error}</p>
+          <h2 className="text-lg font-semibold text-ink">Failed to load photos</h2>
+          <p className="max-w-xs rounded-[14px] bg-dtint px-3 py-2 text-sm text-danger" role="alert">
+            {error}
+          </p>
           <button
+            type="button"
             onClick={handleRetry}
-            className="rounded-lg bg-pink-600 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-700"
+            className="mt-1 h-12 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             data-testid="photo-gallery-error-retry-button"
           >
             Try Again
@@ -228,7 +281,8 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   // Wrapped with photo-gallery testid so E2E tests can proceed during loading
   if ((isLoading || !hasLoadedOnce) && photos.length === 0) {
     return (
-      <div data-testid="photo-gallery">
+      <div className={pageClass} data-testid="photo-gallery">
+        {renderHeader(ALBUM_SUBTITLE, false)}
         <PhotoGridSkeletonGrid />
       </div>
     );
@@ -238,40 +292,52 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   // Only show empty state AFTER we've loaded once and confirmed no photos exist
   if (!isLoading && hasLoadedOnce && photos.length === 0) {
     return (
-      <div
-        className="flex min-h-screen flex-col items-center justify-center px-4"
-        data-testid="photo-gallery-empty-state"
-      >
-        <div className="max-w-md text-center">
-          <Camera className="mx-auto mb-4 h-16 w-16 text-gray-400" />
-          <p className="mb-6 text-lg text-gray-500">No photos yet. Start building your memories!</p>
-          <button
-            onClick={onUploadClick}
-            className="rounded-lg bg-pink-600 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-700"
-            data-testid="photo-gallery-empty-upload-button"
-          >
-            Upload Photo
-          </button>
+      <div className={pageClass} data-testid="photo-gallery-empty-state">
+        {renderHeader(ALBUM_SUBTITLE, false)}
+        <div className="rounded-[20px] border border-line bg-card p-4 shadow-card">
+          <div className="flex flex-col items-center gap-3.5 px-2 py-9 text-center">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-tint text-accent">
+              <Camera className="h-[30px] w-[30px]" aria-hidden="true" />
+            </div>
+            <h2 className="font-serif text-[22px] font-semibold text-ink">No photos yet</h2>
+            <p className="max-w-[240px] text-[15px] leading-[1.45] text-muted">
+              Start building your album — every photo you add shows up for both of you.
+            </p>
+            <button
+              type="button"
+              onClick={onUploadClick}
+              className="flex h-12 items-center justify-center gap-2 rounded-full bg-fill px-[22px] text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              data-testid="photo-gallery-empty-upload-button"
+            >
+              <Camera className="h-[18px] w-[18px]" aria-hidden="true" />
+              Upload a photo
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // AC-4.2.1: Responsive grid layout
-  // 3 columns (mobile), 4 columns (desktop md:768px+)
+  // "20+ photos" while more pages remain: the local list is paginated, so its
+  // length is only a lower bound until pagination ends.
+  const countLabel = hasMore
+    ? `${photos.length}+ photos`
+    : `${photos.length} ${photos.length === 1 ? 'photo' : 'photos'}`;
+  const subtitle = partnerName ? `${countLabel} · shared with ${partnerName}` : countLabel;
+
+  // AC-4.2.1: 3 columns at every width, matching the skeleton exactly
   return (
-    <div
-      className="min-h-screen p-4"
-      data-testid="photo-gallery"
-    >
-      <div
-        className="grid w-full grid-cols-3 gap-2 md:grid-cols-4 md:gap-3"
-        data-testid="photo-gallery-grid"
-      >
+    <div className={pageClass} data-testid="photo-gallery">
+      {renderHeader(subtitle, true)}
+
+      <div className={PHOTO_GRID_CLASS} data-testid="photo-gallery-grid">
         {photos.map((photo) => (
           <PhotoGridItem
             key={photo.id}
             photo={photo}
+            ownInitial={ownInitial}
+            partnerInitial={partnerInitial}
+            partnerName={partnerName}
             onPhotoClick={() => setSelectedPhotoId(photo.id)}
           />
         ))}
@@ -286,8 +352,8 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         >
           {isLoadingMore && (
             <div className="flex flex-col items-center">
-              <Loader2 className="mb-2 h-8 w-8 animate-spin text-pink-500" />
-              <p className="text-sm text-gray-500">Loading more photos...</p>
+              <Loader2 className="mb-2 h-8 w-8 animate-spin text-accent" aria-hidden="true" />
+              <p className="text-sm text-muted">Loading more photos...</p>
             </div>
           )}
         </div>
@@ -299,19 +365,9 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
           className="flex w-full items-center justify-center py-8"
           data-testid="photo-gallery-end-message"
         >
-          <p className="text-sm text-gray-400">You've reached the end of your memories</p>
+          <p className="text-sm text-muted">You've reached the end of your memories</p>
         </div>
       )}
-
-      {/* Floating action button (FAB) for uploading more photos */}
-      <button
-        onClick={onUploadClick}
-        className="fixed right-4 bottom-(--dock-clearance) z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-lg transition-shadow hover:shadow-xl"
-        aria-label="Upload photo"
-        data-testid="photo-gallery-upload-fab"
-      >
-        <Camera className="h-6 w-6" />
-      </button>
 
       {/* Story 6.4: PhotoViewer modal */}
       {selectedPhotoId && (

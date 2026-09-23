@@ -2,7 +2,7 @@
  * FullScreenImageViewer Component
  *
  * Modal overlay for viewing images at full size.
- * Simple implementation without pinch-to-zoom (MVP).
+ * Simple implementation without pinch zoom (MVP).
  *
  * Features:
  * - Dark overlay background
@@ -96,10 +96,10 @@ function FullScreenImageViewerComponent({
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-10 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 focus:ring-2 focus:ring-white focus:outline-none"
+            className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-card text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Close image viewer"
           >
-            <X size={24} aria-hidden="true" />
+            <X size={20} aria-hidden="true" />
           </button>
 
           {/* Image container */}
@@ -114,7 +114,7 @@ function FullScreenImageViewerComponent({
             <img
               src={imageUrl}
               alt={alt}
-              className="max-h-[90vh] max-w-full rounded-lg object-contain"
+              className="max-h-[90vh] max-w-full rounded-[14px] object-contain"
               loading="eager"
             />
           </motion.div>

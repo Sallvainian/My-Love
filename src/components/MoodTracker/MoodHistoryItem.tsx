@@ -9,9 +9,9 @@
 
 import { useState } from 'react';
 import type { SupabaseMood } from '../../api/validation/supabaseSchemas';
+import { MOOD_DISPLAY } from '../../constants/moodDisplay';
 import { normalizeMoodValues } from '../../types/moods';
 import { getRelativeTime } from '../../utils/dateUtils';
-import { getMoodEmoji } from '../../utils/moodEmojis';
 
 interface MoodHistoryItemProps {
   mood: SupabaseMood;
@@ -24,7 +24,7 @@ const NOTE_TRUNCATE_LENGTH = 100;
  * Individual mood entry display component
  *
  * Features:
- * - Displays mood emoji, type, and timestamp
+ * - Displays mood icons (shared MOOD_DISPLAY map), labels, and timestamp
  * - Shows optional note with truncation for long text
  * - Expand/collapse functionality for notes > 100 chars
  * - Clean visual separation between entries
@@ -47,25 +47,25 @@ export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
 
   return (
     <div
-      className="relative flex items-start gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
+      className="relative flex items-start gap-3 px-4 py-3"
       data-testid="mood-history-item"
       data-timestamp={mood.created_at}
     >
-      {/* Emojis - show all selected moods */}
-      <div className="flex-shrink-0" data-testid="mood-emoji">
-        <span className="text-3xl">{allMoods.map((m) => getMoodEmoji(m)).join('')}</span>
+      {/* Icons - one per selected mood, owner-toned (`you` = accent) */}
+      <div className="flex shrink-0 gap-1 pt-0.5 text-accent" data-testid="mood-emoji">
+        {allMoods.map((m, index) => {
+          const Icon = MOOD_DISPLAY[m].icon;
+          return <Icon key={`${m}-${index}`} className="h-5 w-5" aria-hidden="true" />;
+        })}
       </div>
 
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <h4
-            className="font-medium text-gray-900 capitalize dark:text-gray-100"
-            data-testid="mood-label"
-          >
-            {allMoods.join(', ')}
+          <h4 className="text-[15px] font-medium text-ink" data-testid="mood-label">
+            {allMoods.map((m) => MOOD_DISPLAY[m].label).join(', ')}
           </h4>
-          <span className="text-sm text-gray-500 dark:text-gray-400" data-testid="mood-timestamp">
+          <span className="shrink-0 text-[13px] text-muted" data-testid="mood-timestamp">
             {getRelativeTime(mood.created_at || '')}
           </span>
         </div>
@@ -73,14 +73,14 @@ export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
         {/* Note with expand/collapse */}
         {mood.note && (
           <div className="mt-1">
-            <p className="text-sm text-gray-700 dark:text-gray-300" data-testid="mood-note">
+            <p className="text-sm text-muted" data-testid="mood-note">
               {displayNote}
             </p>
 
             {shouldTruncate && (
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="mt-1 text-xs font-medium text-pink-500 hover:text-pink-600 dark:text-pink-400 dark:hover:text-pink-300"
+                className="mt-1 text-xs font-semibold text-accent"
                 data-testid="mood-note-toggle"
               >
                 {isExpanded ? 'Show less' : 'Show more'}
@@ -91,7 +91,7 @@ export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
       </div>
 
       {/* Divider line */}
-      <div className="absolute right-0 bottom-0 left-0 h-px bg-gray-200 dark:bg-gray-700" />
+      <div className="absolute right-0 bottom-0 left-0 h-px bg-line" />
     </div>
   );
 }

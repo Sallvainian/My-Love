@@ -13,10 +13,29 @@
  * @component
  */
 
+import { CircleAlert, Heart, Info, Loader2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { signIn, signInWithGoogle } from '../../api/auth/actionService';
 import type { AuthCallbackOutcome } from '../../api/supabaseClient';
-import './LoginScreen.css';
+import {
+  FAILURE_BOX,
+  NOTICE,
+  PRIMARY_BUTTON,
+  fieldClass,
+} from '../Settings/kitClasses';
+
+/** Field label, per the Sign in artboard: 600 13px `ink`, 6px above its input. */
+const LABEL = 'text-[13px] font-semibold text-ink';
+
+/** Dims a field while the sign-in request is in flight. */
+const FIELD_DISABLED = 'disabled:cursor-not-allowed disabled:opacity-60';
+
+/**
+ * The neutral 48px pill the artboard draws for Google: `card2` fill, `ink`
+ * label, no multicolour logo (its brand hex has no kit token).
+ */
+const GOOGLE_BUTTON =
+  'flex h-12 w-full items-center justify-center gap-2 rounded-full bg-card2 px-5 text-[15px] font-semibold text-ink transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50';
 
 interface LoginScreenProps {
   /** Callback when login is successful */
@@ -165,214 +184,150 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
   };
 
   return (
-    <div className="login-screen" data-testid="login-screen">
-      <div className="login-container">
-        <div className="login-header">
-          <h1 className="login-title">Welcome Back</h1>
-          <p className="login-subtitle">Sign in to continue</p>
+    <div
+      className="flex min-h-screen flex-col justify-center bg-page px-5 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+      data-testid="login-screen"
+    >
+      <div className="mx-auto flex w-full max-w-[400px] flex-col gap-7">
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <h1 className="flex items-center justify-center gap-[11px]">
+            <Heart
+              className="h-6 w-6 shrink-0 fill-current text-accent"
+              strokeWidth={0}
+              aria-hidden="true"
+            />
+            <span className="font-lora text-[34px] leading-none font-semibold text-ink italic">
+              My Love
+            </span>
+          </h1>
+          <p className="text-[15px] text-muted">Welcome back — sign in to continue</p>
         </div>
 
-        {callbackNotice && (
-          <div className="login-notice" data-testid="login-notice" role="status" aria-live="polite">
-            <svg
-              className="notice-icon"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden="true"
+        <div className="grid gap-3.5 rounded-[20px] border border-line bg-card p-5 shadow-card">
+          {callbackNotice && (
+            <div
+              className={`${NOTICE} flex items-start gap-2 text-sm text-ink`}
+              data-testid="login-notice"
+              role="status"
+              aria-live="polite"
             >
-              <path
-                fillRule="evenodd"
-                d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span>{callbackNotice}</span>
-          </div>
-        )}
-
-        <form className="login-form" onSubmit={handleSubmit}>
-          {error && (
-            <div className="login-error" data-testid="login-error" role="alert" aria-live="polite">
-              <svg
-                className="error-icon"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span>{error}</span>
+              <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>{callbackNotice}</span>
             </div>
           )}
 
-          <div className="form-group">
-            <label htmlFor="email" className="form-label">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              className="form-input"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
-              required
-              autoComplete="email"
-              aria-required="true"
-              aria-invalid={error ? 'true' : 'false'}
-            />
-          </div>
+          <form className="grid gap-3.5" onSubmit={handleSubmit}>
+            {error && (
+              <div
+                className={`${FAILURE_BOX} flex items-start gap-2`}
+                data-testid="login-error"
+                role="alert"
+                aria-live="polite"
+              >
+                <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{error}</span>
+              </div>
+            )}
 
-          <div className="form-group">
-            <label htmlFor="password" className="form-label">
-              Password
-            </label>
-            <input
-              id="password"
-              data-testid="password-input"
-              type="password"
-              className="form-input"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              required
-              autoComplete="current-password"
-              aria-required="true"
-              aria-invalid={error ? 'true' : 'false'}
-              minLength={6}
-            />
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="email" className={LABEL}>
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                className={`${fieldClass(Boolean(error))} ${FIELD_DISABLED}`}
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                required
+                autoComplete="email"
+                aria-required="true"
+                aria-invalid={error ? 'true' : 'false'}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="password" className={LABEL}>
+                Password
+              </label>
+              <input
+                id="password"
+                data-testid="password-input"
+                type="password"
+                className={`${fieldClass(Boolean(error))} ${FIELD_DISABLED}`}
+                placeholder="Your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                required
+                autoComplete="current-password"
+                aria-required="true"
+                aria-invalid={error ? 'true' : 'false'}
+                minLength={6}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className={`${PRIMARY_BUTTON} mt-[18px] w-full`}
+              data-testid="submit-button"
+              disabled={isLoading || isGoogleLoading || !email || !password}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign in'
+              )}
+            </button>
+          </form>
+
+          <div
+            className="flex items-center gap-3 text-xs font-semibold tracking-[.08em] text-muted"
+            aria-hidden="true"
+          >
+            <span className="h-px flex-1 bg-line" />
+            OR
+            <span className="h-px flex-1 bg-line" />
           </div>
 
           <button
-            type="submit"
-            className="submit-button"
-            data-testid="submit-button"
-            disabled={isLoading || isGoogleLoading || !email || !password}
+            type="button"
+            className={GOOGLE_BUTTON}
+            data-testid="google-signin-button"
+            onClick={handleGoogleSignIn}
+            disabled={isLoading || isGoogleLoading}
           >
-            {isLoading ? (
-              <span className="loading-spinner">
-                <svg
-                  className="spinner-icon"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <circle
-                    className="spinner-track"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="spinner-head"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Signing in...
-              </span>
+            {isGoogleLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Redirecting to Google...
+              </>
             ) : (
-              'Sign In'
+              'Continue with Google'
             )}
           </button>
-        </form>
-
-        <div className="oauth-divider">
-          <span className="divider-line"></span>
-          <span className="divider-text">OR</span>
-          <span className="divider-line"></span>
         </div>
 
-        <button
-          type="button"
-          className="google-signin-button"
-          data-testid="google-signin-button"
-          onClick={handleGoogleSignIn}
-          disabled={isLoading || isGoogleLoading}
-        >
-          {isGoogleLoading ? (
-            <span className="loading-spinner">
-              <svg
-                className="spinner-icon"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <circle
-                  className="spinner-track"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="spinner-head"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              Redirecting to Google...
-            </span>
-          ) : (
-            <>
-              <svg
-                className="google-icon"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              Continue with Google
-            </>
-          )}
-        </button>
-
-        <div className="login-footer">
-          <p className="footer-text">
-            Don't have an account?{' '}
-            <button
-              type="button"
-              className="signup-link"
-              onClick={() => {
-                setError(
-                  'Sign-up functionality coming soon. Please contact your administrator for account creation.'
-                );
-              }}
-              disabled={isLoading}
-            >
-              Contact Admin
-            </button>
-          </p>
-        </div>
+        <p className="text-center text-sm text-muted">
+          Need an account?{' '}
+          <button
+            type="button"
+            className="rounded font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => {
+              setError(
+                'Sign-up functionality coming soon. Please contact your administrator for account creation.'
+              );
+            }}
+            disabled={isLoading}
+          >
+            Contact admin
+          </button>
+        </p>
       </div>
     </div>
   );

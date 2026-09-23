@@ -1147,9 +1147,8 @@ describe('loader identity guards', () => {
   // and a guard that fails to release `isUploading`/`uploadProgress` is caught
   // separately.
   //
-  // Those two flags reach no mounted component today — the only consumer of
-  // `usePhotos` is `src/components/photos/PhotoUploader.tsx`, which nothing
-  // imports. They are asserted because `signedOutState()` resets them
+  // Those two flags reach no mounted component today — `usePhotos` has no
+  // consumer. They are asserted because `signedOutState()` resets them
   // (`authSlice.ts:92-96`) and a stale continuation would write them straight
   // back into the next session's store, and because `usePhotos` is a public
   // hook the next consumer will read them through.

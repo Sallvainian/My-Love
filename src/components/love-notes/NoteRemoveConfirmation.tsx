@@ -168,7 +168,7 @@ export function NoteRemoveConfirmation({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50"
       onClick={handleBackdropClick}
       data-testid="note-remove-confirmation"
       role="dialog"
@@ -178,41 +178,41 @@ export function NoteRemoveConfirmation({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="mx-4 w-full max-w-md rounded-lg bg-gray-800 shadow-xl outline-none"
+        className="mx-4 w-full max-w-md rounded-[20px] bg-card shadow-float outline-none"
       >
-        <div className="flex items-center gap-3 border-b border-gray-700 px-6 py-4">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-900/50">
-            <AlertTriangle className="h-5 w-5 text-red-400" />
+        <div className="flex items-center gap-3 border-b border-line px-5 py-4">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           </div>
-          <h2 id="remove-note-dialog-title" className="text-xl font-semibold text-white">
+          <h2 id="remove-note-dialog-title" className="text-lg font-semibold text-ink">
             Remove this message?
           </h2>
         </div>
 
-        <div className="space-y-4 px-6 py-4">
-          <p className="line-clamp-3 rounded bg-gray-900/60 px-3 py-2 text-sm text-gray-300 italic">
+        <div className="space-y-4 px-5 py-4">
+          <p className="line-clamp-3 rounded-[14px] bg-card2 px-3 py-2 text-sm text-muted italic">
             {preview}
           </p>
-          <p className="text-gray-300">
-            This removes it from <span className="font-medium text-white">your</span> history only.
+          <p className="text-[15px] text-ink">
+            This removes it from <span className="font-semibold">your</span> history only.
             Your partner keeps their copy and will not be told.
           </p>
-          <p className="text-sm text-gray-400">You cannot undo this.</p>
+          <p className="text-sm text-muted">You cannot undo this.</p>
 
           {error && (
-            <p className="text-sm text-red-400" role="alert">
+            <p className="text-sm text-danger" role="alert">
               {error}
             </p>
           )}
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-gray-700 px-6 py-4">
+        <div className="flex justify-end gap-3 border-t border-line px-5 py-4">
           <button
             ref={cancelButtonRef}
             type="button"
             onClick={onClose}
             disabled={isRemoving}
-            className="rounded px-4 py-2 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white disabled:opacity-50"
+            className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
           >
             Cancel
           </button>
@@ -221,7 +221,7 @@ export function NoteRemoveConfirmation({
             onClick={handleRemove}
             disabled={isRemoving}
             data-testid="note-remove-confirm"
-            className="flex items-center gap-2 rounded bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+            className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
           >
             {isRemoving && <Loader2 className="h-4 w-4 animate-spin" />}
             {isRemoving ? 'Removing...' : 'Remove for me'}
