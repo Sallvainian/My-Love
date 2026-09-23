@@ -89,7 +89,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
     await authBootstrap.resolveLookup(createAuthBootstrapSession());
     await expect(page.getByText('Loading...', { exact: true })).not.toBeVisible();
     await expect(page.getByTestId('login-screen')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Welcome Back' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'My Love' })).toBeVisible();
     await expect(page.getByTestId('app-container')).not.toBeVisible();
     expect(await authBootstrap.snapshot()).toMatchObject({
       userId: null,
