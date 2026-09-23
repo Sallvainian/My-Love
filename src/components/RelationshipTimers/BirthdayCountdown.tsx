@@ -13,14 +13,9 @@
 
 import { Cake } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  type BirthdayInfo,
-  calculateTimeDifference,
-  getNextBirthday,
-  getUpcomingAge,
-  type TimeDifference,
-} from '../../config/relationshipDates';
+import { type BirthdayInfo, getNextBirthday, getUpcomingAge } from '../../config/relationshipDates';
 import { CountdownCard, type CountdownTone } from './CountdownCard';
+import { getCalendarDaysDiff } from './eventCountdownHelpers';
 
 interface BirthdayCountdownProps {
   birthday: BirthdayInfo;
@@ -28,26 +23,31 @@ interface BirthdayCountdownProps {
 }
 
 function computeBirthdayCountdownState(birthday: BirthdayInfo): {
-  timeDiff: TimeDifference;
+  calendarDays: number;
   upcomingAge: number;
   isBirthdayToday: boolean;
 } {
-  const nextBirthday = getNextBirthday(birthday);
+  // Sample now first: getNextBirthday reads its own clock, and if midnight
+  // falls between the two reads at the end of the birthday, isToday still
+  // holds instead of the count reading -1 days for one tick.
   const now = new Date();
-  const diff = calculateTimeDifference(now, nextBirthday);
-  const today = new Date();
-  const isToday = today.getMonth() === birthday.month - 1 && today.getDate() === birthday.day;
+  const nextBirthday = getNextBirthday(birthday);
+  // Calendar days, the same count EventCountdown shows, so a birthday and an
+  // event on one date never read a day apart (whole 24h periods drop a day
+  // after midnight and across a 23-hour DST day).
+  const calendarDays = getCalendarDaysDiff(nextBirthday, now);
+  const isToday = now.getMonth() === birthday.month - 1 && now.getDate() === birthday.day;
 
   return {
-    timeDiff: diff,
+    calendarDays,
     upcomingAge: getUpcomingAge(birthday),
     isBirthdayToday: isToday,
   };
 }
 
 export function BirthdayCountdown({ birthday, tone = 'you' }: BirthdayCountdownProps) {
-  const [timeDiff, setTimeDiff] = useState<TimeDifference>(
-    () => computeBirthdayCountdownState(birthday).timeDiff
+  const [calendarDays, setCalendarDays] = useState<number>(
+    () => computeBirthdayCountdownState(birthday).calendarDays
   );
   const [upcomingAge, setUpcomingAge] = useState<number>(
     () => computeBirthdayCountdownState(birthday).upcomingAge
@@ -58,7 +58,7 @@ export function BirthdayCountdown({ birthday, tone = 'you' }: BirthdayCountdownP
 
   const updateCountdown = useCallback(() => {
     const nextState = computeBirthdayCountdownState(birthday);
-    setTimeDiff(nextState.timeDiff);
+    setCalendarDays(nextState.calendarDays);
     setUpcomingAge(nextState.upcomingAge);
     setIsBirthdayToday(nextState.isBirthdayToday);
   }, [birthday]);
@@ -69,10 +69,9 @@ export function BirthdayCountdown({ birthday, tone = 'you' }: BirthdayCountdownP
     return () => clearInterval(interval);
   }, [updateCountdown]);
 
-  const totalDays = timeDiff.years * 365 + timeDiff.days;
   const value = isBirthdayToday
     ? 'Happy Birthday!'
-    : `${totalDays} ${totalDays === 1 ? 'day' : 'days'}`;
+    : `${calendarDays} ${calendarDays === 1 ? 'day' : 'days'}`;
 
   return (
     <CountdownCard

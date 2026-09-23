@@ -105,6 +105,23 @@ test.describe('Login Flow', () => {
       fulfillResponse: { status: 200, body: { display_name: 'Test User' } },
     });
 
+    // Same reason, for the account-data sync App runs after sign-in
+    // (syncAccountDataAfterSignIn in localDataUpload.ts). With nothing stored
+    // locally, the one-time upload sends only its receipt; once that succeeds,
+    // the anniversary and message mirrors refresh from the server.
+    interceptNetworkCall({
+      url: '**/rest/v1/local_data_uploads**',
+      method: 'POST',
+      fulfillResponse: { status: 201, body: null },
+    });
+    for (const table of ['anniversaries', 'custom_messages', 'message_favorites']) {
+      interceptNetworkCall({
+        url: `**/rest/v1/${table}?**`,
+        method: 'GET',
+        fulfillResponse: { status: 200, body: [] },
+      });
+    }
+
     // GIVEN: User is on login screen
     await page.goto('/');
     await expect(page.getByTestId('login-screen')).toBeVisible();

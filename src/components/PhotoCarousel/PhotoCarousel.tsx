@@ -217,7 +217,11 @@ export function PhotoCarousel() {
         <PhotoDeleteConfirmation
           photo={currentPhoto}
           onClose={handleCloseDeleteConfirm}
-          onConfirmDelete={(id) => deletePhoto(String(id))}
+          onConfirmDelete={async (id) => {
+            // deletePhoto resolves false on failure; the confirmation shows its
+            // error only on a rejection, so turn false into one.
+            if (!(await deletePhoto(String(id)))) throw new Error('Delete failed');
+          }}
         />
       )}
     </div>

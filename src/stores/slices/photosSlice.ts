@@ -48,7 +48,7 @@ export interface PhotosSlice {
   // Actions
   uploadPhoto: (input: PhotoUploadInput) => Promise<PhotoUploadResult>;
   loadPhotos: () => Promise<void>;
-  deletePhoto: (photoId: string) => Promise<void>;
+  deletePhoto: (photoId: string) => Promise<boolean>;
   updatePhoto: (photoId: string, updates: Partial<SupabasePhoto>) => Promise<void>;
   selectPhoto: (photoId: string | null) => void;
   clearPhotoSelection: () => void;
@@ -207,6 +207,10 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
   /**
    * Delete a photo
    * Only owner can delete (enforced by RLS)
+   *
+   * Resolves true once the photo is gone from the server, false on failure. It
+   * never rejects, so the result is the only way a caller holding its own copy
+   * of the list (the gallery's paginated page) can tell whether to drop the row.
    */
   deletePhoto: async (photoId: string) => {
     // Same identity guard as uploadPhoto, for the same reason: the delete is
@@ -228,16 +232,17 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
       // gallery — but whether that row should go is the new session's own
       // question, answered by its next loadPhotos, not by a continuation raised
       // under a session that has already ended.
-      if (!ownsDelete()) return;
+      if (!ownsDelete()) return true;
 
       // Remove from state on successful deletion
       set((state) => ({
         photos: state.photos.filter((p) => p.id !== photoId),
       }));
+      return true;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Delete failed';
-      if (!ownsDelete()) return;
-      set({ error: errorMsg });
+      if (ownsDelete()) set({ error: errorMsg });
+      return false;
     }
   },
 

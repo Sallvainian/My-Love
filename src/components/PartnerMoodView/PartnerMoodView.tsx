@@ -22,6 +22,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
 import { logger } from '../../utils/logger';
 import { PokeKissInterface } from '../PokeKissInterface';
+import { SECTION_LABEL } from '../shared/kitClasses';
 
 /**
  * Partner Mood View Component
@@ -44,9 +45,8 @@ import { PokeKissInterface } from '../PokeKissInterface';
  */
 type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
 
-/** Kit card surface, section label and small pill button (design-tokens.md). */
+/** Kit card surface and small pill button (design-tokens.md). */
 const CARD = 'rounded-[20px] border border-line bg-card shadow-card';
-const SECTION_LABEL = 'px-1 text-xs font-semibold tracking-[.08em] text-muted uppercase';
 const PILL =
   'flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2';
 
@@ -409,7 +409,7 @@ export function PartnerMoodView() {
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Enter email or name..."
-                  className="h-12 w-full rounded-[14px] bg-field pr-4 pl-11 text-[15px] text-ink ring-1 ring-line ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none"
+                  className="h-12 w-full rounded-[14px] bg-field pr-4 pl-11 text-[15px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none"
                   data-testid="partner-search-input"
                 />
               </div>

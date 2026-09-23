@@ -154,9 +154,9 @@ export function LoveNotes(): ReactElement {
             </p>
           )}
           {realtimeNotice && (
-            // `role="status"` with a polite live region, matching the error
-            // banner's treatment below: this appears without the person having
-            // done anything, so it has to be announced rather than only seen.
+            // `role="status"` with a polite live region: this appears without
+            // the person having done anything, so it has to be announced rather
+            // than only seen. The error banner below is `role="alert"` instead.
             <p
               // Suffixed, not bare. `PartnerMoodView.tsx:548` already uses
               // `realtime-connection-status` for a different feed with a
@@ -192,7 +192,9 @@ export function LoveNotes(): ReactElement {
           className="mx-4 mt-3 flex shrink-0 items-center gap-3 rounded-[14px] bg-dtint p-3"
         >
           <AlertCircle className="h-5 w-5 shrink-0 text-danger" aria-hidden="true" />
-          <p className="flex-1 text-sm text-danger">{error}</p>
+          <p className="flex-1 text-sm text-danger" role="alert">
+            {error}
+          </p>
           <button onClick={clearError} className="text-sm font-semibold text-danger hover:underline">
             Dismiss
           </button>

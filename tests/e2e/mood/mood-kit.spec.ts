@@ -63,6 +63,31 @@ async function chromeText(page: Page): Promise<string> {
 }
 
 /**
+ * Rows in this device's IndexedDB `moods` store, or null until the app has
+ * created the database — opening it first would create an empty one ahead of
+ * the app's own upgrade.
+ */
+async function savedMoodCount(page: Page): Promise<number | null> {
+  return page.evaluate(async () => {
+    if (!(await indexedDB.databases()).some(({ name }) => name === 'my-love-db')) return null;
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('my-love-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<number>((resolve, reject) => {
+        const request = db.transaction('moods').objectStore('moods').count();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      db.close();
+    }
+  });
+}
+
+/**
  * Compared with clientWidth, never a literal 390: a classic (non-overlay)
  * scrollbar narrows clientWidth, and scrollWidth follows it.
  */
@@ -120,8 +145,8 @@ test.describe('Mood on the style kit', () => {
       // All twelve moods stay selectable.
       await expect(page.locator('[data-testid^="mood-button-"]')).toHaveCount(12);
 
-      // An unselected tile sits on the kit card. A saved entry for today can
-      // pre-select any mood, so take whichever tile is not pressed.
+      // An unselected tile sits on the kit card. Each test starts on an empty
+      // mood store, so no tile is pre-selected; the first unpressed one serves.
       const unselected = page.locator('[data-testid^="mood-button-"][aria-pressed="false"]').first();
       await expect(unselected).toHaveCSS('background-color', KIT_CARD[colorScheme]);
 
@@ -158,18 +183,20 @@ test.describe('Mood on the style kit', () => {
 
     test(`[P1] should select Happy as a tint/accent tile in ${colorScheme}`, async ({
       page,
-      interceptNetworkCall,
     }) => {
-      const moodCall = interceptNetworkCall({ url: '**/rest/v1/moods**' });
       await openMood(page, colorScheme);
-      await moodCall;
 
+      // Nothing may pre-select Happy or re-seed the form under the click.
+      // MoodTracker re-seeds only from a saved entry for today, whenever a
+      // loadMoods reload (mount, or after App's mount sync) swaps `moods`.
+      // Saved entries live only in this device's IndexedDB, which is empty in
+      // every fresh test context: nothing copies the account's server rows into
+      // it, and this test never submits. Assert that precondition at its source
+      // rather than branching on the tile, so a late reload has nothing to seed
+      // from.
+      await expect.poll(() => savedMoodCount(page)).toBe(0);
       const happy = page.getByTestId('mood-button-happy');
-      // A saved entry for today can pre-select Happy; start from unselected.
-      if ((await happy.getAttribute('aria-pressed')) === 'true') {
-        await happy.click();
-        await expect(happy).toHaveAttribute('aria-pressed', 'false');
-      }
+      await expect(happy).toHaveAttribute('aria-pressed', 'false');
 
       await happy.click();
 

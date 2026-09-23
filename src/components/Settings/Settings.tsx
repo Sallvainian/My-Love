@@ -22,11 +22,16 @@ import { authService } from '../../api/authService';
 import { lookupOwnDisplayName, type OwnDisplayNameLookup } from '../../api/supabaseClient';
 import { logger } from '../../utils/logger';
 import { DisplayNameSetup } from '../DisplayNameSetup/DisplayNameSetup';
+import {
+  CARD,
+  DIVIDER,
+  GROUP_ROW as ROW,
+  GROUP_TILE as TILE,
+  SECTION_LABEL,
+} from '../shared/kitClasses';
 import { AnniversarySettings } from './AnniversarySettings';
 import { EventsSettings } from './EventsSettings';
-import { CARD, DIVIDER, GROUP_ROW as ROW, GROUP_TILE as TILE } from './kitClasses';
 
-const SECTION_LABEL = 'px-1 text-xs font-semibold tracking-[.08em] text-muted uppercase';
 const ROW_BUTTON = `${ROW} w-full rounded-[14px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
 
 interface SettingsProps {
@@ -224,7 +229,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <p className="text-[15px] font-medium text-ink">My Love</p>
-              <p className="text-[13px] text-muted">Version 1.0.0 · made for the two of you</p>
+              <p className="text-[13px] text-muted">Version {__APP_VERSION__} · made for the two of you</p>
             </div>
           </div>
           {onShowWelcome && (

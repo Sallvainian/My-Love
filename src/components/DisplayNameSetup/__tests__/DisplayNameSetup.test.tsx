@@ -258,6 +258,17 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
+  // DW-192: the ring mirrors aria-invalid, as it does on the sign-in fields.
+  it('rings the field in danger while an error shows', async () => {
+    submitPastNativeValidation('ab');
+
+    await waitFor(() => expect(screen.getByTestId('display-name-error')).toBeInTheDocument());
+    const field = screen.getByLabelText('Display Name');
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field).toHaveClass('ring-danger');
+    expect(field).not.toHaveClass('ring-line-strong');
+  });
+
   /**
    * DW-130: the same form, reached a second time.
    *

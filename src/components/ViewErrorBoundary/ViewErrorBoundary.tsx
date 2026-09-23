@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { TriangleAlert, WifiOff } from 'lucide-react';
 import { Component } from 'react';
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../Settings/kitClasses';
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
 
 interface ViewErrorFallbackProps {
   error: Error | null;
@@ -104,10 +104,11 @@ export class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErr
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<ViewErrorBoundaryState> {
+  static getDerivedStateFromError(error: unknown): Partial<ViewErrorBoundaryState> {
+    // Anything can be thrown; the fallback reads `.message` (DW-193).
     return {
       hasError: true,
-      error,
+      error: error instanceof Error ? error : new Error(String(error)),
     };
   }
 

@@ -234,7 +234,9 @@ class PhotoService {
    *
    * @param limit - Maximum photos to fetch (default: 50)
    * @param offset - Offset for pagination (default: 0)
-   * @returns Array of photos with signed URLs
+   * @returns Array of photos with signed URLs; [] only when the page really is empty
+   * @throws When the read fails. Answering [] here made a dead network look like
+   * the end of the album to the gallery's "load more" (DW-179).
    *
    * AC 6.0.3: Users can view own photos
    * AC 6.0.4: Partners can view each other's photos
@@ -255,7 +257,7 @@ class PhotoService {
 
       if (error) {
         console.error('[PhotoService] Error fetching photos:', error);
-        return [];
+        throw new Error(error.message);
       }
 
       if (!data || data.length === 0) {
@@ -278,7 +280,7 @@ class PhotoService {
       return photosWithUrls;
     } catch (error) {
       console.error('[PhotoService] Error in getPhotos:', error);
-      return [];
+      throw error;
     }
   }
 
