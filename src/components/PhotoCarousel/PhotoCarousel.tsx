@@ -218,7 +218,9 @@ export function PhotoCarousel() {
           photo={currentPhoto}
           onClose={handleCloseDeleteConfirm}
           onConfirmDelete={async (id) => {
-            await deletePhoto(String(id));
+            // deletePhoto resolves false on failure; the confirmation shows its
+            // error only on a rejection, so turn false into one.
+            if (!(await deletePhoto(String(id)))) throw new Error('Delete failed');
           }}
         />
       )}
