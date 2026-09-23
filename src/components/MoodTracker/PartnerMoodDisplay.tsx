@@ -172,7 +172,7 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
         className="flex flex-wrap gap-2"
         data-testid="partner-mood-emoji"
         role="img"
-        aria-label={`${allMoods.join(', ')} mood emoji`}
+        aria-label={`${allMoods.join(', ')} mood`}
       >
         {allMoods.map((m, index) => {
           const { icon: Icon, label } = MOOD_DISPLAY[m];

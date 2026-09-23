@@ -218,6 +218,7 @@ describe('PartnerMoodDisplay mood_types guard', () => {
     expect(chips.querySelector(HAPPY_ICON)).not.toBeNull();
     expect(chips.querySelector(TIRED_ICON)).not.toBeNull();
     expect(screen.getByTestId('partner-mood-label')).toHaveTextContent('Happy, Tired');
+    expect(chips).toHaveAttribute('aria-label', 'happy, tired mood');
   });
 
   it('renders no emoji in the partner card', () => {
