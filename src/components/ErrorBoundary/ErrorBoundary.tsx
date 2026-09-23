@@ -21,10 +21,12 @@ export class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: unknown): State {
+    // Anything can be thrown. A string or plain object has no `.message`, and
+    // reading one below would throw inside this, the root boundary (DW-193).
     return {
       hasError: true,
-      error,
+      error: error instanceof Error ? error : new Error(String(error)),
     };
   }
 
@@ -63,7 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 : 'We encountered an unexpected error. Please try again.'}
             </p>
             {this.state.error && (
-              <p className="mb-5 rounded-[14px] bg-card2 p-3 font-mono text-sm break-words text-muted">
+              <p className="mb-5 max-h-24 overflow-auto rounded-[14px] bg-card2 p-3 text-left font-mono text-sm break-words text-muted">
                 {this.state.error.message}
               </p>
             )}

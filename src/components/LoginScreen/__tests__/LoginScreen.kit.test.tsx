@@ -141,6 +141,28 @@ describe('LoginScreen on the kit', () => {
     expectOnKit(container.innerHTML);
   });
 
+  // DW-197: while the Google redirect is pending nothing else on the screen
+  // may start a second, competing action.
+  it('disables every other control while the Google redirect is pending', async () => {
+    actions.signInWithGoogle.mockReturnValue(new Promise(() => {}));
+    render(<LoginScreen />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
+      target: { value: 'person@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-pass' } });
+
+    await act(async () => fireEvent.click(screen.getByTestId('google-signin-button')));
+
+    expect(screen.getByTestId('google-signin-button')).toHaveTextContent('Redirecting to Google...');
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeDisabled();
+    expect(screen.getByLabelText('Password')).toBeDisabled();
+    expect(screen.getByTestId('submit-button')).toBeDisabled();
+    const contact = screen.getByRole('button', { name: 'Contact admin' });
+    expect(contact).toBeDisabled();
+    fireEvent.click(contact);
+    expect(screen.queryByTestId('login-error')).not.toBeInTheDocument();
+  });
+
   it('shows the callback notice on card2 in ink with an icon, and retires it on the next attempt', () => {
     const { container } = render(<LoginScreen callbackOutcome="cancelled" />);
 

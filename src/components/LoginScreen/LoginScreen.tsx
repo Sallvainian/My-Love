@@ -240,7 +240,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || isGoogleLoading}
                 required
                 autoComplete="email"
                 aria-required="true"
@@ -260,7 +260,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
                 placeholder="Your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || isGoogleLoading}
                 required
                 autoComplete="current-password"
                 aria-required="true"
@@ -323,7 +323,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
                 'Sign-up functionality coming soon. Please contact your administrator for account creation.'
               );
             }}
-            disabled={isLoading}
+            disabled={isLoading || isGoogleLoading}
           >
             Contact admin
           </button>

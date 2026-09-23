@@ -104,10 +104,11 @@ export class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErr
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<ViewErrorBoundaryState> {
+  static getDerivedStateFromError(error: unknown): Partial<ViewErrorBoundaryState> {
+    // Anything can be thrown; the fallback reads `.message` (DW-193).
     return {
       hasError: true,
-      error,
+      error: error instanceof Error ? error : new Error(String(error)),
     };
   }
 

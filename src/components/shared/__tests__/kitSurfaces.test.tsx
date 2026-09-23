@@ -82,7 +82,8 @@ function expectOnKit(html: string) {
   expect(html).not.toMatch(/\bdark:/);
 }
 
-function Thrower({ error }: { error: Error }): ReactNode {
+/** Throws whatever it is given -- not always an Error, as with `throw 'x'`. */
+function Thrower({ error }: { error: unknown }): ReactNode {
   throw error;
 }
 
@@ -196,6 +197,34 @@ describe('ErrorBoundary fallback on the kit', () => {
     );
     expectOnKit(container.innerHTML);
   });
+
+  // DW-193: a thrown string or plain object has no `.message`, and the fallback
+  // itself used to throw reading it -- with no boundary left above the root one.
+  it.each([
+    ['a string', 'boom as a string', 'boom as a string'],
+    ['a plain object', { reason: 'boom' }, '[object Object]'],
+  ])('renders the fallback when a child throws %s', (_label, thrown, shown) => {
+    render(
+      <ErrorBoundary>
+        <Thrower error={thrown} />
+      </ErrorBoundary>
+    );
+
+    expect(screen.getByRole('heading', { name: 'Something went wrong' })).toBeInTheDocument();
+    expect(screen.getByText(shown)).toBeInTheDocument();
+  });
+
+  // DW-195: a long message scrolls inside its box, left-aligned, instead of
+  // pushing the buttons down the page.
+  it('bounds the message box and aligns its monospace text left', () => {
+    render(
+      <ErrorBoundary>
+        <Thrower error={new Error('boom')} />
+      </ErrorBoundary>
+    );
+
+    expect(screen.getByText('boom')).toHaveClass('max-h-24', 'overflow-auto', 'text-left');
+  });
 });
 
 describe('ViewErrorBoundary fallback on the kit', () => {
@@ -235,6 +264,21 @@ describe('ViewErrorBoundary fallback on the kit', () => {
     expect(screen.getByRole('heading', { name: "Can't load this page offline" })).toBeInTheDocument();
     expect(screen.queryByText('Failed to fetch dynamically imported module')).not.toBeInTheDocument();
     expectOnKit(container.innerHTML);
+  });
+
+  // DW-193, the view-level copy of the same pattern.
+  it.each([
+    ['a string', 'render failed as a string', 'render failed as a string'],
+    ['a plain object', { reason: 'render failed' }, '[object Object]'],
+  ])('renders the fallback when a child throws %s', (_label, thrown, shown) => {
+    render(
+      <ViewErrorBoundary viewName="photos" onNavigateHome={vi.fn()}>
+        <Thrower error={thrown} />
+      </ViewErrorBoundary>
+    );
+
+    expect(screen.getByRole('heading', { name: 'Error loading photos' })).toBeInTheDocument();
+    expect(screen.getByText(shown)).toBeInTheDocument();
   });
 });
 
