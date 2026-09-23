@@ -236,21 +236,24 @@ export function MoodHistoryCalendar() {
   });
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6" data-testid="mood-calendar">
+    <div
+      className="w-full rounded-[20px] border border-line bg-card p-3 shadow-card"
+      data-testid="mood-calendar"
+    >
       {/* Calendar Header - AC-3: Month/year display with navigation */}
       {/* Task 10: Enhanced ARIA labels for screen readers */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between">
         <button
           onClick={handlePreviousMonth}
-          className="rounded-lg p-2 transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 focus:outline-none"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-card2 text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           aria-label={`Go to previous month from ${monthName} ${currentYear}`}
           data-testid="calendar-nav-prev"
         >
-          <ChevronLeft className="h-6 w-6 text-gray-600" />
+          <ChevronLeft className="h-5 w-5" aria-hidden="true" />
         </button>
 
         <h2
-          className="text-2xl font-semibold text-gray-800"
+          className="text-lg font-semibold text-ink"
           data-testid="calendar-month-header"
           aria-live="polite"
           aria-atomic="true"
@@ -260,21 +263,21 @@ export function MoodHistoryCalendar() {
 
         <button
           onClick={handleNextMonth}
-          className="rounded-lg p-2 transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 focus:outline-none"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-card2 text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           aria-label={`Go to next month from ${monthName} ${currentYear}`}
           data-testid="calendar-nav-next"
         >
-          <ChevronRight className="h-6 w-6 text-gray-600" />
+          <ChevronRight className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
 
       {/* Day of week headers */}
       {/* Task 10: Added role and ARIA for screen reader support */}
-      <div className="mb-2 grid grid-cols-7 gap-2" role="row">
+      <div className="mb-1 grid grid-cols-7 gap-1" role="row">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
           <div
             key={day}
-            className="py-2 text-center text-sm font-medium text-gray-500"
+            className="py-2 text-center text-[13px] font-medium text-muted"
             role="columnheader"
             aria-label={
               day === 'Sun'
@@ -299,9 +302,9 @@ export function MoodHistoryCalendar() {
 
       {/* Loading state - AC-5: Show loading skeleton during mood fetch */}
       {isLoading ? (
-        <div className="grid grid-cols-7 gap-2" data-testid="calendar-loading">
+        <div className="grid grid-cols-7 gap-1" data-testid="calendar-loading">
           {Array.from({ length: 35 }).map((_, i) => (
-            <div key={i} className="aspect-square animate-pulse rounded-lg bg-gray-100" />
+            <div key={i} className="aspect-square animate-pulse rounded-xl bg-card2" />
           ))}
         </div>
       ) : (
@@ -312,7 +315,7 @@ export function MoodHistoryCalendar() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="grid grid-cols-7 gap-2"
+          className="grid grid-cols-7 gap-1"
           role="grid"
           aria-label={`Calendar for ${monthName} ${currentYear}`}
         >
@@ -350,7 +353,7 @@ export function MoodHistoryCalendar() {
 
       {/* Footer: Mood count summary */}
       {!isLoading && moods.length > 0 && (
-        <div className="mt-4 text-center text-sm text-gray-600">
+        <div className="mt-3 text-center text-sm text-muted">
           {moods.length} {moods.length === 1 ? 'mood' : 'moods'} logged this month
         </div>
       )}

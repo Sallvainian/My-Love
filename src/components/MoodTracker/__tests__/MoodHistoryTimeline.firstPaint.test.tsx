@@ -87,5 +87,17 @@ describe('MoodHistoryTimeline first paint', () => {
     await waitFor(() => {
       expect(screen.getByTestId('empty-mood-history-state')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('empty-mood-history-state').textContent).not.toMatch(
+      /\p{Extended_Pictographic}/u
+    );
+  });
+
+  it('renders no emoji in the error state when the load fails', async () => {
+    mockedGetMoodHistory.mockRejectedValue(new Error('x'));
+
+    render(<MoodHistoryTimeline userId={USER_ID} />);
+
+    const errorState = await screen.findByTestId('error-state');
+    expect(errorState.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 });
