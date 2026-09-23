@@ -2,7 +2,7 @@
  * storageService IndexedDB schema — the open-race and repair paths
  *
  * `storage.ts` used to hand-write its own upgrade callback that created only
- * `messages` and `photos`, on the assumption that whichever service owned a
+ * `messages` and the since-dropped `photos`, on the assumption that whichever service owned a
  * store would create it. IndexedDB runs the upgrade callback of only the ONE
  * `open()` that performs the version-change transaction, and `storage.ts`'s is
  * reached first on a fresh profile (`initializeApp()` at App.tsx:275, before
@@ -32,13 +32,7 @@ vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => (
   messageFavoritesApi: (await import('../helpers/fakeAccountDataApis')).fakeMessageFavoritesApi,
 }));
 
-const ALL_STORES = [
-  'messages',
-  'message-favorites',
-  'photos',
-  'moods',
-  'sw-auth',
-] as const;
+const ALL_STORES = ['messages', 'message-favorites', 'moods', 'sw-auth'] as const;
 
 /** Every service instance built in a test, so its connection can be closed */
 const openServices: Array<{ db: IDBPDatabase<MyLoveDBSchema> | null }> = [];
@@ -142,7 +136,8 @@ describe('storageService schema', () => {
       messages.createIndex('by-category', 'category');
       messages.createIndex('by-date', 'createdAt');
 
-      const photos = db.createObjectStore('photos', { keyPath: 'id', autoIncrement: true });
+      // No longer in MyLoveDBSchema (dropped at v11), so created untyped.
+      const photos = unwrap(db).createObjectStore('photos', { keyPath: 'id', autoIncrement: true });
       photos.createIndex('by-date', 'uploadDate', { unique: false });
     });
 
@@ -736,25 +731,29 @@ describe('storageService schema', () => {
       db.close();
     }
 
-    it('[from v1] drops the incompatible photos store, as designed', async () => {
-      // The v1 photos store used a different shape, so the upgrade is
-      // deliberately destructive for it. This is the assertion that pins the
-      // branch `if (oldVersion < 2 && db.objectStoreNames.contains('photos'))`
-      // as still firing — deleting that line leaves this failing.
-      await seedLegacy(1, 'localId');
+    it.each([1, 2, 5])(
+      '[from v%i] drops the photos store and keeps the other rows',
+      async (version) => {
+        // v11 drops the store for every starting version, existence-gated. The
+        // v1 seed uses the incompatible v1 key path the old v2 branch discarded.
+        await seedLegacy(version, version === 1 ? 'localId' : 'id');
 
-      const storageService = await freshStorageService();
-      await storageService.init();
+        const storageService = await freshStorageService();
+        await storageService.init();
 
-      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
-      try {
-        expect(await db.getAll('photos')).toHaveLength(0);
-        // Everything else is additive, so the message survives the same upgrade.
-        expect(await db.getAll('messages')).toHaveLength(1);
-      } finally {
-        db.close();
+        const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
+        try {
+          expect(unwrap(db).objectStoreNames.contains('photos')).toBe(false);
+          expect(await db.getAll('messages')).toHaveLength(1);
+          expect(await db.getAll('moods')).toHaveLength(1);
+          for (const store of ALL_STORES) {
+            expect(db.objectStoreNames.contains(store)).toBe(true);
+          }
+        } finally {
+          db.close();
+        }
       }
-    });
+    );
 
     it('[from v5] migrates the moods index to by-user-date', async () => {
       // The branch's headline migration, reached through storageService rather
@@ -801,46 +800,6 @@ describe('storageService schema', () => {
 
         expect(indexNames).toContain('by-user');
         expect(await db.getAll('messages')).toHaveLength(1);
-      } finally {
-        db.close();
-      }
-    });
-
-    it('[from v2] keeps photos rows — the drop boundary is below v2', async () => {
-      // Pins WHERE the boundary sits, not merely that it exists. v2 already
-      // holds the modern photos schema, so widening the gate to `oldVersion < 3`
-      // would start destroying good rows, and the v1/v5 cases alone cannot see
-      // that.
-      await seedLegacy(2, 'id');
-
-      const storageService = await freshStorageService();
-      await storageService.init();
-
-      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
-      try {
-        expect(await db.getAll('photos')).toHaveLength(1);
-      } finally {
-        db.close();
-      }
-    });
-
-    it('[from v5] keeps photos rows, because the drop is version-gated', async () => {
-      // This is the case the repair path must not damage: a healthy modern
-      // database that merely needs the missing stores added. Ungating the drop
-      // — `contains('photos')` alone — leaves this failing.
-      await seedLegacy(5, 'id');
-
-      const storageService = await freshStorageService();
-      await storageService.init();
-
-      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
-      try {
-        expect(await db.getAll('photos')).toHaveLength(1);
-        expect(await db.getAll('messages')).toHaveLength(1);
-        // And the repair still happened: the stores that were missing exist.
-        for (const store of ALL_STORES) {
-          expect(db.objectStoreNames.contains(store)).toBe(true);
-        }
       } finally {
         db.close();
       }

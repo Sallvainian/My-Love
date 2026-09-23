@@ -38,19 +38,6 @@ export interface Message {
   tags?: string[];
 }
 
-export interface Photo {
-  id: number;
-  imageBlob: Blob; // Renamed from 'blob' for clarity
-  caption?: string; // Optional caption (max 500 chars)
-  tags: string[]; // Array of tags
-  uploadDate: Date; // Upload timestamp
-  originalSize: number; // Original file size in bytes
-  compressedSize: number; // Compressed size in bytes
-  width: number; // Image width in pixels
-  height: number; // Image height in pixels
-  mimeType: string; // 'image/jpeg' | 'image/png' | 'image/webp'
-}
-
 export interface CompressionOptions {
   maxWidth: number; // Default: 2048px (Story 6.1)
   maxHeight: number; // Default: 2048px (Story 6.1)

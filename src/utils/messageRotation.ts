@@ -1,5 +1,6 @@
 import type { Message, MessageHistory, Settings } from '../types';
 import { formatDateISO } from './dateUtils';
+import { parseEventDate } from '../services/eventsService';
 
 /**
  * Hash a date string to a deterministic number
@@ -53,14 +54,20 @@ export function getAvailableHistoryDays(
   messageHistory: MessageHistory,
   settings: Settings
 ): number {
-  const relationshipStartDate = new Date(settings.relationship.startDate);
+  // startDate is a bare YYYY-MM-DD. `new Date()` on it is UTC midnight, which
+  // west of UTC is the previous local evening and counts a day too many.
+  const relationshipStartDate = parseEventDate(settings.relationship.startDate);
+  const configuredMax = Math.min(messageHistory.maxHistoryDays || 30, 30);
+  // An unreadable start date cannot bound history; the configured cap still does.
+  if (!relationshipStartDate) return configuredMax;
+
   const today = new Date();
   const daysSinceStart = Math.floor(
     (today.getTime() - relationshipStartDate.getTime()) / (1000 * 60 * 60 * 24)
   );
 
   // Return minimum of: configured max, days since start, or 30 default
-  return Math.min(messageHistory.maxHistoryDays || 30, daysSinceStart, 30);
+  return Math.min(configuredMax, daysSinceStart);
 }
 
 /**
