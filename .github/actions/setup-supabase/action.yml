@@ -43,7 +43,8 @@ runs:
     # time-bounded and checksum-verified. Cache scoping means a new PR branch
     # takes the cold path once (it can only read caches from its own ref or
     # main), so a cold download on a fresh branch is normal, not a broken cache.
-    # deploy.yml:58,106 and supabase-migrations.yml:22 still use setup-cli.
+    # deploy.yml's migrate job and supabase-migrations.yml still use setup-cli,
+    # pinned to this same version.
     - name: Cache Supabase CLI
       id: cli-cache
       uses: actions/cache@v5

@@ -24,8 +24,8 @@ cleanup() {
 # Trap signals
 trap cleanup SIGINT SIGTERM EXIT
 
-# Start vite in the background. Nothing here injects secrets: .mise.toml sets only
-# CODEX_HOME, so run this as `fnox exec -- npm run dev`, or use `npm run dev:local`
+# Start vite in the background. Nothing here injects secrets: .mise.toml sets no
+# env vars, so run this as `fnox exec -- npm run dev`, or use `npm run dev:local`
 # to point at local Supabase via .env.test instead.
 echo "🚀 Starting Vite dev server..."
 npx vite &

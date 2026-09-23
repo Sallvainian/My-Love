@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
   hashDateString,
   getDailyMessage,
@@ -112,13 +112,18 @@ describe('getMessageForDate', () => {
 });
 
 describe('getAvailableHistoryDays', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns days since start when less than 30', () => {
-    // Subtract exact ms to avoid DST off-by-one from setDate()
-    const tenDaysAgo = new Date(Date.now() - 10 * 86400000);
+    // Fixed clock: a real "now" near midnight across a DST change can land on 9.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 22, 12, 0, 0));
 
     const history: MessageHistory = { maxHistoryDays: 30 } as MessageHistory;
     const settings: Settings = {
-      relationship: { startDate: tenDaysAgo.toISOString() },
+      relationship: { startDate: '2026-09-12' },
     } as Settings;
 
     expect(getAvailableHistoryDays(history, settings)).toBe(10);
@@ -130,7 +135,7 @@ describe('getAvailableHistoryDays', () => {
 
     const history: MessageHistory = { maxHistoryDays: 100 } as MessageHistory;
     const settings: Settings = {
-      relationship: { startDate: twoYearsAgo.toISOString() },
+      relationship: { startDate: formatDateISO(twoYearsAgo) },
     } as Settings;
 
     expect(getAvailableHistoryDays(history, settings)).toBe(30);
@@ -142,7 +147,7 @@ describe('getAvailableHistoryDays', () => {
 
     const history: MessageHistory = { maxHistoryDays: 14 } as MessageHistory;
     const settings: Settings = {
-      relationship: { startDate: twoYearsAgo.toISOString() },
+      relationship: { startDate: formatDateISO(twoYearsAgo) },
     } as Settings;
 
     expect(getAvailableHistoryDays(history, settings)).toBe(14);
@@ -154,10 +159,50 @@ describe('getAvailableHistoryDays', () => {
 
     const history: MessageHistory = {} as MessageHistory;
     const settings: Settings = {
-      relationship: { startDate: twoYearsAgo.toISOString() },
+      relationship: { startDate: formatDateISO(twoYearsAgo) },
     } as Settings;
 
     expect(getAvailableHistoryDays(history, settings)).toBe(30);
+  });
+
+  // startDate is a bare YYYY-MM-DD (IsoDateStringSchema). `new Date('YYYY-MM-DD')`
+  // is UTC midnight, which under the suite's TZ=America/New_York is 20:00 the
+  // PREVIOUS local evening — so from 20:00 local every day the count ran one high.
+  describe('with a YYYY-MM-DD start date west of UTC', () => {
+    it('counts from LOCAL midnight of the start date, not UTC midnight', () => {
+      vi.useFakeTimers();
+      // 21:00 local on the start date itself: zero whole days have elapsed.
+      vi.setSystemTime(new Date(2026, 8, 12, 21, 0, 0));
+
+      const history: MessageHistory = { maxHistoryDays: 30 } as MessageHistory;
+      const settings: Settings = { relationship: { startDate: '2026-09-12' } } as Settings;
+
+      expect(getAvailableHistoryDays(history, settings)).toBe(0);
+    });
+
+    it('counts whole local days since the start date', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2026, 8, 22, 21, 0, 0));
+
+      const history: MessageHistory = { maxHistoryDays: 30 } as MessageHistory;
+      const settings: Settings = { relationship: { startDate: '2026-09-12' } } as Settings;
+
+      expect(getAvailableHistoryDays(history, settings)).toBe(10);
+    });
+  });
+
+  // An unreadable start date cannot bound history, so only the configured cap
+  // (itself capped at 30) applies — never NaN, which Math.min would propagate.
+  it.each([
+    ['empty', ''],
+    ['non-date text', 'not-a-date'],
+    ['impossible date', '2026-02-30'],
+  ])('falls back to the configured cap for an unreadable start date (%s)', (_label, startDate) => {
+    const settings: Settings = { relationship: { startDate } } as Settings;
+
+    expect(getAvailableHistoryDays({ maxHistoryDays: 14 } as MessageHistory, settings)).toBe(14);
+    expect(getAvailableHistoryDays({ maxHistoryDays: 100 } as MessageHistory, settings)).toBe(30);
+    expect(getAvailableHistoryDays({} as MessageHistory, settings)).toBe(30);
   });
 });
 

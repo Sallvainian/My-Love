@@ -5,7 +5,7 @@
  *
  * Fast checks against built output in dist/ directory.
  * This script runs BEFORE deployment to catch critical build failures early.
- * Called by predeploy script: npm run build && npm run test:smoke
+ * Called by deploy.yml's build job (`npm run test:smoke`) right after `npm run build`.
  *
  * Tests performed:
  * 1. Verify dist/ directory exists
