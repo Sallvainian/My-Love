@@ -1,42 +1,8 @@
 import { m as motion } from 'framer-motion';
-import {
-  AlertCircle,
-  Angry,
-  Battery,
-  Frown,
-  Heart,
-  Meh,
-  MessageCircle,
-  Smile,
-  Sparkles,
-  UserMinus,
-  Zap,
-} from 'lucide-react';
 import { memo } from 'react';
+import { MOOD_DISPLAY } from '../../constants/moodDisplay';
 import type { MoodEntry } from '../../types';
 import { normalizeMoodEntry } from '../../types/moods';
-
-/**
- * Mood icon configuration
- * Story 6.3: Task 9 - Performance optimization with React.memo
- * Updated: Added negative emotions support
- */
-const MOOD_CONFIG = {
-  // Positive emotions
-  loved: { icon: Heart, color: 'text-pink-500', bgColor: 'bg-pink-100' },
-  happy: { icon: Smile, color: 'text-yellow-500', bgColor: 'bg-yellow-100' },
-  content: { icon: Meh, color: 'text-blue-500', bgColor: 'bg-blue-100' },
-  excited: { icon: Zap, color: 'text-amber-500', bgColor: 'bg-amber-100' },
-  thoughtful: { icon: MessageCircle, color: 'text-purple-500', bgColor: 'bg-purple-100' },
-  grateful: { icon: Sparkles, color: 'text-green-500', bgColor: 'bg-green-100' },
-  // Negative emotions
-  sad: { icon: Frown, color: 'text-gray-500', bgColor: 'bg-gray-100' },
-  anxious: { icon: AlertCircle, color: 'text-orange-500', bgColor: 'bg-orange-100' },
-  frustrated: { icon: Angry, color: 'text-red-500', bgColor: 'bg-red-100' },
-  angry: { icon: Angry, color: 'text-rose-600', bgColor: 'bg-rose-100' },
-  lonely: { icon: UserMinus, color: 'text-indigo-500', bgColor: 'bg-indigo-100' },
-  tired: { icon: Battery, color: 'text-slate-500', bgColor: 'bg-slate-100' },
-} as const;
 
 interface CalendarDayProps {
   dateKey: string;
@@ -71,31 +37,30 @@ export const CalendarDay = memo<CalendarDayProps>(function CalendarDay({
   const allMoods = normalized?.moods ?? [];
   const primaryMood = normalized?.mood;
 
-  // Visual hierarchy: current day > mood days > empty days
+  // Visual hierarchy: current day (accent ring) > mood days (tint) > empty days.
+  // Colour is by owner (always `you` here), never per mood.
   // Task 10: Added focus indicators for accessibility
   const dayClasses = [
     'aspect-square',
-    'rounded-lg',
+    'rounded-xl',
     'flex',
     'flex-col',
     'items-center',
     'justify-center',
     'relative',
-    'transition-all',
+    'transition-colors',
     'duration-200',
     'border-none',
-    // Task 10: Focus indicators for keyboard navigation
-    'focus:outline-none',
-    'focus:ring-2',
-    'focus:ring-pink-500',
-    'focus:ring-offset-2',
-    hasMood ? 'cursor-pointer' : '',
-    isToday
-      ? 'bg-pink-100 border-2 border-pink-500'
-      : hasMood && primaryMood
-        ? MOOD_CONFIG[primaryMood].bgColor
-        : 'bg-gray-50 hover:bg-gray-100',
+    // Task 10: Focus indicators for keyboard navigation. An outline, not a
+    // ring, so focus stays visible on today, which already wears the ring.
+    'focus-visible:outline-2',
+    'focus-visible:outline-offset-2',
+    'focus-visible:outline-accent',
+    hasMood ? 'cursor-pointer bg-tint' : '',
+    isToday ? 'ring-2 ring-accent ring-inset' : '',
   ].join(' ');
+
+  const PrimaryIcon = primaryMood ? MOOD_DISPLAY[primaryMood].icon : null;
 
   return (
     <motion.button
@@ -116,22 +81,19 @@ export const CalendarDay = memo<CalendarDayProps>(function CalendarDay({
       whileTap={hasMood ? { scale: 0.95 } : undefined}
     >
       {/* Day number */}
-      <span className={`text-sm font-medium ${isToday ? 'text-pink-700' : 'text-gray-700'}`}>
+      <span className={`text-sm font-medium ${hasMood ? 'text-ink' : 'text-muted'}`}>
         {dayNumber}
       </span>
 
       {/* Mood indicator - use first mood for icon */}
-      {hasMood && primaryMood && (
+      {hasMood && PrimaryIcon && (
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.1, type: 'spring' }}
-          className={`mt-1 ${MOOD_CONFIG[primaryMood].color}`}
+          className="mt-0.5 text-accent"
         >
-          {(() => {
-            const Icon = MOOD_CONFIG[primaryMood].icon;
-            return <Icon className="h-4 w-4" />;
-          })()}
+          <PrimaryIcon className="h-4 w-4" aria-hidden="true" />
         </motion.div>
       )}
     </motion.button>

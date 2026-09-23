@@ -1,61 +1,12 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
-import {
-  AlertCircle,
-  Angry,
-  Battery,
-  Frown,
-  Heart,
-  Meh,
-  MessageCircle,
-  Smile,
-  Sparkles,
-  UserMinus,
-  X,
-  Zap,
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useRef } from 'react';
+import { MOOD_DISPLAY, MOOD_TONE } from '../../constants/moodDisplay';
 import { useFocusTrap } from '../../hooks';
 import type { MoodEntry } from '../../types';
 import { normalizeMoodEntry } from '../../types/moods';
 import { formatModalDate, formatModalTime } from '../../utils/calendarHelpers';
-
-/**
- * Mood icon and color configuration
- * Story 6.3: AC-4 - Mood type with icon and color
- * Updated: Added negative emotions support
- */
-const MOOD_CONFIG = {
-  // Positive emotions
-  loved: { icon: Heart, color: 'text-pink-500', bgColor: 'bg-pink-100', label: 'Loved' },
-  happy: { icon: Smile, color: 'text-yellow-500', bgColor: 'bg-yellow-100', label: 'Happy' },
-  content: { icon: Meh, color: 'text-blue-500', bgColor: 'bg-blue-100', label: 'Content' },
-  excited: { icon: Zap, color: 'text-amber-500', bgColor: 'bg-amber-100', label: 'Excited' },
-  thoughtful: {
-    icon: MessageCircle,
-    color: 'text-purple-500',
-    bgColor: 'bg-purple-100',
-    label: 'Thoughtful',
-  },
-  grateful: {
-    icon: Sparkles,
-    color: 'text-green-500',
-    bgColor: 'bg-green-100',
-    label: 'Grateful',
-  },
-  // Negative emotions
-  sad: { icon: Frown, color: 'text-gray-500', bgColor: 'bg-gray-100', label: 'Sad' },
-  anxious: {
-    icon: AlertCircle,
-    color: 'text-orange-500',
-    bgColor: 'bg-orange-100',
-    label: 'Anxious',
-  },
-  frustrated: { icon: Angry, color: 'text-red-500', bgColor: 'bg-red-100', label: 'Frustrated' },
-  angry: { icon: Angry, color: 'text-rose-600', bgColor: 'bg-rose-100', label: 'Angry' },
-  lonely: { icon: UserMinus, color: 'text-indigo-500', bgColor: 'bg-indigo-100', label: 'Lonely' },
-  tired: { icon: Battery, color: 'text-slate-500', bgColor: 'bg-slate-100', label: 'Tired' },
-} as const;
 
 interface MoodDetailModalProps {
   mood: MoodEntry | null;
@@ -67,7 +18,7 @@ interface MoodDetailModalProps {
  * Story 6.3: AC-4 - Modal showing mood details
  *
  * Features:
- * - Displays mood type with icon and color
+ * - Displays each mood as a kit icon tile (shared MOOD_DISPLAY map)
  * - Formatted date: "Monday, Nov 15, 2025"
  * - Formatted timestamp: "3:42 PM"
  * - Shows note text if present
@@ -89,7 +40,6 @@ function MoodDetailContent({
 
   // The outer component only mounts this content for a recoverable record.
   const allMoods = mood.moods!;
-  const primaryMoodConfig = MOOD_CONFIG[mood.mood];
   const moodDate = new Date(mood.timestamp);
   const formattedDate = formatModalDate(moodDate);
   const formattedTime = formatModalTime(moodDate);
@@ -125,7 +75,7 @@ function MoodDetailContent({
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="pointer-events-auto relative w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
+          className="pointer-events-auto relative w-full max-w-md rounded-t-[20px] bg-card p-5 shadow-float sm:rounded-[20px]"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close button - AC-4: X icon in top-right */}
@@ -133,22 +83,24 @@ function MoodDetailContent({
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="absolute top-4 right-4 rounded-full p-2 transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-pink-500 focus:outline-none"
+            className="absolute top-3 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-card2 text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Close mood details modal"
             data-testid="modal-close-button"
           >
-            <X className="h-5 w-5 text-gray-500" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
 
-          {/* Mood icons and type - AC-4: Icons with color */}
-          <div className="mb-6 flex items-center gap-4">
-            <div className="flex gap-2" aria-hidden="true">
+          {/* Mood icons and type - AC-4: one kit icon tile per mood */}
+          <div className="mb-5 flex flex-col gap-3 pr-12">
+            <div className="flex flex-wrap gap-2" aria-hidden="true">
               {allMoods.map((m, index) => {
-                const cfg = MOOD_CONFIG[m];
-                const MoodIcon = cfg.icon;
+                const MoodIcon = MOOD_DISPLAY[m].icon;
                 return (
-                  <div key={`${m}-${index}`} className={`rounded-full p-4 ${cfg.bgColor}`}>
-                    <MoodIcon className={`h-8 w-8 ${cfg.color}`} />
+                  <div
+                    key={`${m}-${index}`}
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${MOOD_TONE.you}`}
+                  >
+                    <MoodIcon className="h-5 w-5" />
                   </div>
                 );
               })}
@@ -156,32 +108,36 @@ function MoodDetailContent({
             <div>
               <h2
                 id="mood-modal-title"
-                className={`text-2xl font-semibold ${primaryMoodConfig.color}`}
+                className="text-lg font-semibold text-ink"
                 data-testid="modal-mood-type"
               >
-                {allMoods.map((m) => MOOD_CONFIG[m].label).join(', ')}
+                {allMoods.map((m) => MOOD_DISPLAY[m].label).join(', ')}
               </h2>
-              <p className="mt-1 text-sm text-gray-500">How you were feeling</p>
+              <p className="mt-0.5 text-sm text-muted">How you were feeling</p>
             </div>
           </div>
 
           {/* Date and timestamp - AC-4: Formatted display */}
-          <div className="mb-6 space-y-2">
-            <div className="flex items-center gap-2 text-gray-700">
-              <span className="font-medium">Date:</span>
-              <span data-testid="modal-date">{formattedDate}</span>
+          <div className="mb-5 space-y-2 text-[15px]">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-ink">Date:</span>
+              <span className="text-muted" data-testid="modal-date">
+                {formattedDate}
+              </span>
             </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <span className="font-medium">Time:</span>
-              <span data-testid="modal-time">{formattedTime}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-ink">Time:</span>
+              <span className="text-muted" data-testid="modal-time">
+                {formattedTime}
+              </span>
             </div>
           </div>
 
           {/* Note text - AC-4: Display if present */}
           {mood.note && (
-            <div className="border-t border-gray-200 pt-4">
-              <h3 className="mb-2 text-sm font-medium text-gray-700">Note:</h3>
-              <p className="whitespace-pre-wrap text-gray-600" data-testid="modal-note">
+            <div className="border-t border-line pt-4">
+              <h3 className="mb-2 text-[13px] font-semibold text-ink">Note:</h3>
+              <p className="text-[15px] whitespace-pre-wrap text-ink" data-testid="modal-note">
                 {mood.note}
               </p>
             </div>
@@ -189,8 +145,8 @@ function MoodDetailContent({
 
           {/* No note message */}
           {!mood.note && (
-            <div className="border-t border-gray-200 pt-4">
-              <p className="text-sm text-gray-400 italic">No note for this mood</p>
+            <div className="border-t border-line pt-4">
+              <p className="text-sm text-muted italic">No note for this mood</p>
             </div>
           )}
         </motion.div>
