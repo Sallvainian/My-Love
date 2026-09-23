@@ -26,6 +26,8 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { signedOutState } from '../../../src/stores/slices/authSlice';
+import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
+import { openMyLoveDB } from '../../../src/services/dbSchema';
 import {
   OWNER_STORAGE_KEY,
   VAULT_STORAGE_KEY,
@@ -44,6 +46,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   },
   partner: null,
   isLoadingPartner: false,
+  partnerLoadError: false,
   sentRequests: [],
   receivedRequests: [],
   isLoadingRequests: false,
@@ -117,6 +120,7 @@ function seedSignedInSession(): void {
       displayName: SECRETS.partnerName,
       email: 'b@example.com',
     },
+    partnerLoadError: true,
     sentRequests: [{ id: 'req-1', toEmail: SECRETS.requestedEmail }],
     receivedRequests: [{ id: 'req-2', fromEmail: SECRETS.requestedEmail }],
     searchResults: [{ id: 'USER-C-ID', displayName: SECRETS.searchHitName }],
@@ -659,6 +663,36 @@ describe('clearAuth on sign-out', () => {
     expect(useAppStore.getState().userId).toBe(SECRETS.userId);
     expect(useAppStore.getState().userEmail).toBe('updated@example.com');
     expect(useAppStore.getState().authSessionVersion).toBe(version);
+  });
+
+  it("deletes the outgoing account's local copies and nothing else", async () => {
+    // CAP-7: another account on the device keeps its copies, and the outgoing
+    // account's unsynced mood — a queued write — survives for its next sign-in.
+    await writeLocalCopy(SECRETS.userId, 'partner', { status: 'unlinked' });
+    await writeLocalCopy('OTHER-ACCOUNT', 'partner', { status: 'unlinked' });
+    const db = await openMyLoveDB();
+    const { id: _seedId, ...pendingMood } = moodEntry(SECRETS.userId, SECRETS.ownNote);
+    const moodId = await db.add('moods', {
+      ...pendingMood,
+      date: '2026-08-04',
+      synced: false,
+    } as never);
+    db.close();
+
+    useAppStore.getState().clearAuth();
+
+    await vi.waitFor(async () => {
+      expect(await readLocalCopy(SECRETS.userId, 'partner')).toBeNull();
+    });
+    expect(await readLocalCopy('OTHER-ACCOUNT', 'partner')).toEqual({ status: 'unlinked' });
+    const after = await openMyLoveDB();
+    try {
+      expect(await after.get('moods', moodId)).toMatchObject({ synced: false });
+      await after.delete('moods', moodId);
+      await after.clear('local-copies');
+    } finally {
+      after.close();
+    }
   });
 
   it('signedOutState() and this test agree on which fields exist', () => {

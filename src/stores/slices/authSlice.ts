@@ -17,6 +17,7 @@ import {
   stashAnniversaries,
   takeAnniversaries,
 } from '../../services/anniversaryVault';
+import { deleteAccountCopies } from '../../services/localCopy';
 import type { AppState, AppStateCreator } from '../types';
 import { revokePreviewUrlsFromNotes } from './notesSlice';
 
@@ -73,6 +74,7 @@ export function signedOutState() {
     // partnerSlice — identity, pending requests and search hits all name real people
     partner: null,
     isLoadingPartner: false,
+    partnerLoadError: false,
     sentRequests: [],
     receivedRequests: [],
     isLoadingRequests: false,
@@ -230,6 +232,18 @@ function discardAccountState(
   }
   const restored = identity.userId && settings ? takeAnniversaries(identity.userId) : null;
   setAnniversaryOwner(identity.userId);
+
+  // The outgoing account's saved local copies (services/localCopy.ts) go too,
+  // so the next account on this device can never read them. Only that store:
+  // unsynced `moods` rows and any other queued write stay for their owner to
+  // send on the next sign-in. Fire-and-forget — sign-out must not wait on
+  // IndexedDB, and a failed delete is logged rather than blocking it. Loaders
+  // re-check identity before writing a copy, so none is re-created afterwards.
+  if (outgoingUserId && outgoingUserId !== identity.userId) {
+    deleteAccountCopies(outgoingUserId).catch((error: unknown) => {
+      console.error('[AuthSlice] Failed to delete the outgoing account\'s local copies:', error);
+    });
+  }
 
   // `messages` is the daily-rotation pool: the shared bundled messages PLUS
   // whichever custom rows the outgoing account owned. Only the second half is

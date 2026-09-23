@@ -60,9 +60,11 @@ export function NetworkStatusIndicator({
         textColor: 'text-muted',
         icon: WifiOff,
         label: 'Offline',
-        description: "You're offline. Changes will sync when reconnected.",
+        // Most writes do not queue offline, so this does not promise a sync;
+        // it says what the screen is showing instead (CAP-8).
+        description: "You're offline. Showing saved data, which may be out of date.",
         showBanner: true,
-        ariaLabel: 'Network status: Offline. Your changes will sync when you reconnect.',
+        ariaLabel: 'Network status: Offline. Showing saved data, which may be out of date.',
       };
     }
 

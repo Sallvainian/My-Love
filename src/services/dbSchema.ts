@@ -37,6 +37,7 @@ export type StoredMoodEntry = MoodEntry;
  * - v5: Added scripture stores (sessions, reflections, bookmarks, messages)
  * - v10: Dropped the four scripture stores
  * - v11: Dropped the photos store (photos live in Supabase; nothing read it)
+ * - v12: Added local-copies, the one per-account store for server-derived copies
  */
 export interface MyLoveDBSchema extends DBSchema {
   'message-favorites': {
@@ -79,6 +80,27 @@ export interface MyLoveDBSchema extends DBSchema {
     key: 'current';
     value: StoredAuthToken;
   };
+  /**
+   * The shared per-account local copy (`src/services/localCopy.ts`). One row
+   * per account and data kind; `value` is whatever that kind last received
+   * from the server, a Realtime event or the user's own write.
+   */
+  'local-copies': {
+    key: [string, string];
+    value: StoredLocalCopy;
+    indexes: { 'by-user': string };
+  };
+}
+
+/**
+ * One saved copy of one data kind for one account.
+ */
+export interface StoredLocalCopy {
+  userId: string;
+  kind: string;
+  value: unknown;
+  /** Epoch ms of the write that saved this copy. */
+  savedAt: number;
 }
 
 /**
@@ -107,7 +129,11 @@ export const DB_NAME = 'my-love-db';
 // v11 drops the `photos` store that v1/v2 created. Photos have been
 // Supabase-only since the gallery moved there, and no code has read or written
 // the store since. Same existence gate as v10.
-export const DB_VERSION = 11;
+//
+// v12 adds `local-copies`, keyed [userId, kind] with a `by-user` index: the one
+// store every data kind's saved copy lives in (see src/services/localCopy.ts).
+// Created only if absent, so a profile that already has it is a no-op.
+export const DB_VERSION = 12;
 
 /**
  * Store name constants for consistent access across services
@@ -117,11 +143,12 @@ export const STORE_NAMES = {
   MESSAGE_FAVORITES: 'message-favorites',
   MOODS: 'moods',
   SW_AUTH: 'sw-auth',
+  LOCAL_COPIES: 'local-copies',
 } as const;
 
 /**
  * Centralized IndexedDB upgrade function
- * Handles all store creation and migrations for v1-v11
+ * Handles all store creation and migrations for v1-v12
  *
  * Called by all services to ensure consistent database schema.
  * This fixes the tech debt where each service had duplicate upgrade logic.
@@ -249,6 +276,17 @@ export function upgradeDb(
   if (!db.objectStoreNames.contains('sw-auth')) {
     db.createObjectStore('sw-auth', { keyPath: 'id' });
     logger.debug('[dbSchema] Created sw-auth store for Background Sync (v4)');
+  }
+
+  // v12: the shared per-account local-copy store. Existence-gated like every
+  // other branch; a store that already exists gets its index checked instead.
+  if (!db.objectStoreNames.contains('local-copies')) {
+    const copies = db.createObjectStore('local-copies', { keyPath: ['userId', 'kind'] });
+    copies.createIndex('by-user', 'userId');
+    logger.debug('[dbSchema] Created local-copies store (v12)');
+  } else if (tx) {
+    const copies = tx.objectStore('local-copies');
+    if (!copies.indexNames.contains('by-user')) copies.createIndex('by-user', 'userId');
   }
 
   // v10: drop the four scripture stores if they still exist. Names are gone
