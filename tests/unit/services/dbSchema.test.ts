@@ -65,16 +65,17 @@ describe('dbSchema', () => {
       expect(db.objectStoreNames.contains('message-favorites')).toBe(true);
       expect(db.objectStoreNames.contains('moods')).toBe(true);
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
+      expect(db.objectStoreNames.contains('local-copies')).toBe(true);
       // v11: photos live in Supabase; a fresh profile never gets the store.
       expect(unwrap(db).objectStoreNames.contains('photos')).toBe(false);
     });
 
-    it('should create exactly 4 stores', async () => {
+    it('should create exactly 5 stores', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
       });
 
-      expect(db.objectStoreNames.length).toBe(4);
+      expect(db.objectStoreNames.length).toBe(5);
     });
   });
 
@@ -282,11 +283,11 @@ describe('dbSchema', () => {
       expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V7' });
       expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V7' });
 
-      // Four survivors (message-favorites is created at v9); the v7 scripture
-      // stores are dropped on the way to v10 and photos on the way to v11.
-      // The v7 moods index is untouched — v8 must not re-run the v7 swap over a
-      // store that has already had it.
-      expect(db.objectStoreNames.length).toBe(4);
+      // Five stores (message-favorites is created at v9, local-copies at v12);
+      // the v7 scripture stores are dropped on the way to v10 and photos on the
+      // way to v11. The v7 moods index is untouched — v8 must not re-run the v7
+      // swap over a store that has already had it.
+      expect(db.objectStoreNames.length).toBe(5);
       const remaining = Array.from(unwrap(db).objectStoreNames);
       expect(remaining).not.toContain('photos');
       expect(remaining).not.toContain('scripture-sessions');
@@ -472,7 +473,8 @@ describe('dbSchema', () => {
       expect(db.objectStoreNames.contains('message-favorites')).toBe(true);
       expect(db.objectStoreNames.contains('moods')).toBe(true);
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
-      expect(db.objectStoreNames.length).toBe(4);
+      expect(db.objectStoreNames.contains('local-copies')).toBe(true);
+      expect(db.objectStoreNames.length).toBe(5);
 
       const remaining = Array.from(unwrap(db).objectStoreNames);
       expect(remaining).not.toContain('photos');
@@ -557,7 +559,8 @@ describe('dbSchema', () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('photos');
-      expect(db.objectStoreNames.length).toBe(4);
+      // The four survivors plus v12's local-copies.
+      expect(db.objectStoreNames.length).toBe(5);
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
       expect((await db.getAll('message-favorites'))[0]).toEqual({
         messageId: 1,
@@ -574,8 +577,78 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(4);
+      expect(db.objectStoreNames.length).toBe(5);
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
+    });
+  });
+
+  describe('upgrade from v11 to v12', () => {
+    async function seedV11(): Promise<void> {
+      const db = await openDB(DB_NAME, 11, {
+        upgrade(database) {
+          const messages = database.createObjectStore('messages', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          messages.createIndex('by-category', 'category');
+          messages.createIndex('by-date', 'createdAt');
+          messages.createIndex('by-user', 'userId');
+          database
+            .createObjectStore('message-favorites', { keyPath: ['messageId', 'userId'] })
+            .createIndex('by-user', 'userId');
+          database
+            .createObjectStore('moods', { keyPath: 'id', autoIncrement: true })
+            .createIndex('by-user-date', ['userId', 'date'], { unique: true });
+          database.createObjectStore('sw-auth', { keyPath: 'id' });
+        },
+      });
+      await db.add('moods', {
+        userId: 'USER-A',
+        date: '2026-09-01',
+        mood: 'happy',
+        note: 'MOOD-AT-V11',
+        timestamp: new Date('2026-09-01T00:00:00.000Z'),
+        synced: false,
+      });
+      db.close();
+    }
+
+    it('adds local-copies keyed [userId, kind] with a by-user index, keeping every row', async () => {
+      await seedV11();
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(db.objectStoreNames.length).toBe(5);
+      const copies = db.transaction('local-copies', 'readonly').objectStore('local-copies');
+      expect(Array.from(copies.keyPath as string[])).toEqual(['userId', 'kind']);
+      expect(copies.indexNames.contains('by-user')).toBe(true);
+      expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V11' });
+    });
+
+    it('keeps an existing local-copies store and its rows', async () => {
+      // Existence-gated: a profile that already has the store (created by an
+      // earlier build or a partial upgrade) must not throw ConstraintError.
+      const seeded = await openDB(DB_NAME, 11, {
+        upgrade(database) {
+          database
+            .createObjectStore('local-copies', { keyPath: ['userId', 'kind'] })
+            .createIndex('by-user', 'userId');
+        },
+      });
+      await seeded.put('local-copies', {
+        userId: 'USER-A',
+        kind: 'partner',
+        value: { status: 'unlinked' },
+        savedAt: 1,
+      });
+      seeded.close();
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(db.objectStoreNames.length).toBe(5);
+      expect(await db.get('local-copies', ['USER-A', 'partner'])).toMatchObject({
+        value: { status: 'unlinked' },
+      });
     });
   });
 
@@ -817,6 +890,7 @@ describe('dbSchema', () => {
         MESSAGE_FAVORITES: 'message-favorites',
         MOODS: 'moods',
         SW_AUTH: 'sw-auth',
+        LOCAL_COPIES: 'local-copies',
       });
     });
   });
@@ -830,8 +904,9 @@ describe('dbSchema', () => {
       // v6 re-fires upgradeDb so profiles stranded at v5 by storage.ts's old
       // callback get their missing stores created; v7 swaps the moods index;
       // v8 adds by-user to messages; v9 stores favorites by account; v10 drops
-      // the four scripture stores; v11 drops the unused photos store.
-      expect(DB_VERSION).toBe(11);
+      // the four scripture stores; v11 drops the unused photos store; v12 adds
+      // the shared per-account local-copies store.
+      expect(DB_VERSION).toBe(12);
     });
   });
 });

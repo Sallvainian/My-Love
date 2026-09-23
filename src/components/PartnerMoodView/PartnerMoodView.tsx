@@ -12,7 +12,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { handleSupabaseError, isPostgrestError } from '../../api/errorHandlers';
 import { moodSyncService } from '../../api/moodSyncService';
 import { PARTNER_NAME } from '../../config/constants';
@@ -58,6 +58,7 @@ export function PartnerMoodView() {
     // Partner connection state
     partner,
     isLoadingPartner,
+    partnerLoadError,
     sentRequests,
     receivedRequests,
     searchResults,
@@ -105,13 +106,22 @@ export function PartnerMoodView() {
     }
   }, [syncStatus.isOnline, fetchPartnerMoods]);
 
-  // Load partner and pending requests on mount
+  // The partner loads online or offline: it shows the saved copy at once and
+  // refreshes it from the server only when online. Reconnect refreshes come
+  // from App's `online` handler (refreshLocalCopies), so this runs on mount.
+  // A layout effect so the loading flag loadPartner raises synchronously lands
+  // before first paint; a passive effect painted one frame of the Connect UI
+  // over a linked user while the saved copy was still being read.
+  useLayoutEffect(() => {
+    void loadPartner();
+  }, [loadPartner]);
+
+  // Pending requests have no saved copy yet; they stay online-only.
   useEffect(() => {
     if (syncStatus.isOnline) {
-      loadPartner();
       loadPendingRequests();
     }
-  }, [syncStatus.isOnline, loadPartner, loadPendingRequests]);
+  }, [syncStatus.isOnline, loadPendingRequests]);
 
   // Load partner moods only if partner is connected.
   // syncStatus.isOnline belongs in the dependency list: the suppressed version
@@ -375,8 +385,37 @@ export function PartnerMoodView() {
           </div>
         )}
 
-        {/* Show partner connection UI if no partner connected */}
-        {!partner && !isLoadingPartner && (
+        {/* The partner could not be determined (read failed or offline, and no
+            saved copy). Never the Connect UI: that is for a server-confirmed
+            "unlinked" only. */}
+        {!partner && !isLoadingPartner && partnerLoadError && (
+          <div
+            className={`${CARD} flex flex-col items-center gap-3 px-5 py-8 text-center`}
+            data-testid="partner-load-error"
+          >
+            <WifiOff className="h-8 w-8 text-muted" aria-hidden="true" />
+            <p className="text-[15px] font-semibold text-ink">Couldn't load your partner</p>
+            <p className="text-sm text-muted">
+              {syncStatus.isOnline
+                ? 'Something went wrong. Please try again.'
+                : "You're offline. Connect to load your partner."}
+            </p>
+            {syncStatus.isOnline && (
+              <button
+                type="button"
+                onClick={() => void loadPartner()}
+                className={`${PILL} bg-fill text-white focus-visible:ring-accent`}
+                data-testid="partner-load-retry"
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                <span>Try again</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Show partner connection UI only when the server says there is no partner */}
+        {!partner && !isLoadingPartner && !partnerLoadError && (
           <>
             <header className="flex items-start gap-3 px-1 pt-1">
               <div className="flex min-w-0 flex-1 flex-col gap-1">

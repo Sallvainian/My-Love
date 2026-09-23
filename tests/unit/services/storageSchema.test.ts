@@ -32,7 +32,7 @@ vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => (
   messageFavoritesApi: (await import('../helpers/fakeAccountDataApis')).fakeMessageFavoritesApi,
 }));
 
-const ALL_STORES = ['messages', 'message-favorites', 'moods', 'sw-auth'] as const;
+const ALL_STORES = ['messages', 'message-favorites', 'moods', 'sw-auth', 'local-copies'] as const;
 
 /** Every service instance built in a test, so its connection can be closed */
 const openServices: Array<{ db: IDBPDatabase<MyLoveDBSchema> | null }> = [];

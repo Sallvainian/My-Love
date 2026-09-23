@@ -26,6 +26,7 @@ import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
+import { refreshLocalCopies } from './services/localCopy';
 import { stripBasePath } from './utils/basePath';
 import { logger } from './utils/logger';
 import { logStorageQuota } from './utils/storageMonitor';
@@ -400,6 +401,14 @@ function App() {
     void loadMessageDataFromServer();
   }, [authUserId, authSessionVersion, messagesSeeded]);
 
+  // Shared per-account local copies (services/localCopy.ts): refresh every
+  // registered kind on each signed-in start, including an in-place account
+  // switch. Each kind shows its saved copy first and keeps it if the read fails.
+  useEffect(() => {
+    if (!authUserId) return;
+    void refreshLocalCopies();
+  }, [authUserId, authSessionVersion]);
+
   // Story 6.4: Task 2 - Network state detection with auto-sync on reconnect (AC #2)
   useEffect(() => {
     const handleOnline = () => {
@@ -412,6 +421,9 @@ function App() {
       syncPendingMoods().catch((error) => {
         console.error('[App] Auto-sync on reconnect failed:', error);
       });
+
+      // Refresh every local copy the offline spell left stale, without a reload.
+      if (useAppStore.getState().userId) void refreshLocalCopies();
     };
 
     const handleOffline = () => {
