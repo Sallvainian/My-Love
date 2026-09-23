@@ -52,7 +52,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, and 
 - Navigation is `navigationSlice.currentView`; do not add react-router.
 - Vite chunking lives in `rolldownOptions.output.codeSplitting.groups`, not `manualChunks`.
 - There is no formatter — match surrounding style by hand and do not re-add Prettier.
-- In IndexedDB services, reads return `null`/`[]` on failure and writes throw. The Supabase API layer is not consistent about this — `moodApi.fetchByUser` throws on a read while `photoService.getPhotos` returns `[]` — so check the function you are calling.
+- In IndexedDB services, reads return `null`/`[]` on failure and writes throw. The Supabase API layer is not consistent about this — `moodApi.fetchByUser` and `photoService.getPhotos` throw on a read while `photoService.getPhoto` returns `null` — so check the function you are calling.
 - After a mutation that changes both server and client state, wait on all three layers: the RPC response, then the Zustand store, then the UI assertion.
 - Parse a `YYYY-MM-DD` string with `parseEventDate` from `src/services/eventsService.ts`, never `new Date(string)` — the date-only form parses as UTC midnight and shows the previous day west of UTC.
 
