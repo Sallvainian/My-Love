@@ -9,10 +9,10 @@ import { logger } from '../utils/logger';
  * - T extends { id?: number | string }: Entity type with optional id field for IndexedDB keys
  * - DBTypes extends DBSchema: Database schema type for type-safe IndexedDB operations
  * - StoreName extends StoreNames<DBTypes>: Literal store name for type-safe store access
- * - Services provide concrete types: Message, Photo, MoodEntry
+ * - Services provide concrete types: Message, MoodEntry
  *
  * Abstract Methods (services must implement):
- * - getStoreName(): Returns object store name ('messages', 'photos', 'moods')
+ * - getStoreName(): Returns object store name ('messages', 'moods')
  * - _doInit(): DB-specific initialization and schema upgrade logic
  *
  * Shared Methods (inherited by all services):
@@ -88,7 +88,7 @@ export abstract class BaseIndexedDBService<
 
   /**
    * Abstract method: Get the object store name
-   * Each service returns its store name: 'messages', 'photos', 'moods'
+   * Each service returns its store name: 'messages', 'moods'
    */
   protected abstract getStoreName(): StoreName;
 
