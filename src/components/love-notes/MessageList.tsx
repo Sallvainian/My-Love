@@ -7,11 +7,11 @@
  * Features:
  * - Virtualized rendering with List component (60fps with 1000+ messages)
  * - Infinite scroll pagination (loads older messages when scrolling up)
- * - Auto-scroll to bottom on initial load and new messages
+ * - Automatic scroll to bottom on initial load and new messages
  * - Scroll position preservation during pagination
  * - "New message" indicator when scrolled up
  * - "Beginning of conversation" indicator
- * - Auto-reconnect for realtime (handled by useRealtimeMessages)
+ * - Automatic reconnect for realtime (handled by useRealtimeMessages)
  * - Loading indicators
  * - Empty state
  *
@@ -131,9 +131,12 @@ export interface MessageListProps {
  */
 function BeginningOfConversation() {
   return (
-    <div className="py-8 text-center text-gray-400" data-testid="beginning-of-conversation">
-      <div className="mb-2 text-4xl">💕</div>
-      <p className="text-sm">This is the beginning of your love story</p>
+    <div
+      className="flex flex-col items-center py-8 text-center"
+      data-testid="beginning-of-conversation"
+    >
+      <Heart className="mb-2 h-8 w-8 text-accent" aria-hidden="true" />
+      <p className="text-sm text-muted">This is the beginning of your love story</p>
     </div>
   );
 }
@@ -148,7 +151,7 @@ function LoadingSpinner({ style }: { style?: React.CSSProperties }) {
       style={style}
       data-testid="loading-spinner"
     >
-      <Loader2 className="h-6 w-6 animate-spin text-[#FF6B6B]" />
+      <Loader2 className="h-6 w-6 animate-spin text-accent" />
     </div>
   );
 }
@@ -281,7 +284,7 @@ export function MessageList({
     [notes, showBeginning]
   );
 
-  // Auto-scroll to bottom on initial load
+  // Automatic scroll to bottom on initial load
   useEffect(() => {
     if (notes.length > 0 && listRef.current && !hasScrolledToBottom.current) {
       hasScrolledToBottom.current = true;
@@ -297,13 +300,13 @@ export function MessageList({
     }
   }, [listRef, notes.length, totalRowCount]);
 
-  // Story 2.3: AC-2.3.4 - Handle new messages with conditional auto-scroll
+  // Story 2.3: AC-2.3.4 - Handle new messages with conditional automatic scroll
   useEffect(() => {
     if (notes.length > prevNotesLength.current && listRef.current) {
       const wasAtBottom = isAtBottom;
 
       if (wasAtBottom) {
-        // Auto-scroll to new message if user was at bottom
+        // Automatic scroll to new message if user was at bottom
         scrollToBottomOnNextRender.current = true;
         queueMicrotask(() => {
           setIsAtBottom(true);
@@ -345,17 +348,17 @@ export function MessageList({
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="mb-4 rounded-full bg-[#FFF5F5] p-6"
+          className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-tint text-accent"
         >
-          <Heart className="h-12 w-12 text-[#FF6B6B]" />
+          <Heart className="h-7 w-7" aria-hidden="true" />
         </motion.div>
         {/*
           Deliberately neutral: this state is also what a user sees after removing
           every message they could see, and "no love notes yet" would be a lie
           about a conversation that did happen.
         */}
-        <h3 className="mb-2 text-lg font-medium text-gray-700">No messages to show</h3>
-        <p className="max-w-xs text-gray-500">Send your partner a note whenever you like 💕</p>
+        <h3 className="mb-1 text-lg font-semibold text-ink">No messages to show</h3>
+        <p className="max-w-xs text-[15px] text-muted">Send your partner a note whenever you like</p>
       </div>
     );
   }
@@ -364,7 +367,7 @@ export function MessageList({
   if (isLoading && notes.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#FF6B6B]" />
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
       </div>
     );
   }
@@ -392,7 +395,7 @@ export function MessageList({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             onClick={scrollToBottom}
-            className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#FF6B6B] px-4 py-2 text-gray-800 shadow-lg transition-colors hover:bg-[#FF5252]"
+            className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-fill px-4 py-2 text-white shadow-float transition-opacity hover:opacity-90"
             aria-label="Scroll to new message"
             data-testid="new-message-indicator"
           >

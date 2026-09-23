@@ -93,7 +93,7 @@ describe('MessageInput', () => {
       fireEvent.change(textarea, { target: { value: longText } });
 
       const counter = screen.getByText('955/1000');
-      expect(counter).toHaveClass('text-yellow-600');
+      expect(counter).toHaveClass('text-ink', 'font-medium');
     });
 
     it('should show error message when over 1000 characters', () => {
@@ -266,6 +266,32 @@ describe('MessageInput', () => {
   });
 
   describe('Send Behavior', () => {
+    it('should show a spinner in the disabled Send button while the send is in flight', async () => {
+      let resolveSend: () => void = () => {};
+      mockSendNote.mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          resolveSend = resolve;
+        })
+      );
+      const user = userEvent.setup();
+      render(<MessageInput />);
+
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'In flight' } });
+      const sendButton = screen.getByRole('button', { name: /send message/i });
+      await user.click(sendButton);
+
+      await waitFor(() => {
+        expect(sendButton.querySelector('.animate-spin')).not.toBeNull();
+      });
+      expect(sendButton).toBeDisabled();
+
+      resolveSend();
+
+      await waitFor(() => {
+        expect(sendButton.querySelector('.animate-spin')).toBeNull();
+      });
+    });
+
     it('should call sendNote with text content', async () => {
       const user = userEvent.setup();
       render(<MessageInput />);
