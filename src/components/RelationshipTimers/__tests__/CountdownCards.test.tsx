@@ -75,9 +75,10 @@ describe('Countdown cards on the day itself', () => {
     );
 
     const card = screen.getByTestId('birthday-countdown-gracie');
-    // Whole 24h periods from noon to the birthday's midnight (unchanged math).
-    // Exact, on the value element: a substring match also passes "11 days".
-    expect(card.querySelector('h3 + div')?.textContent).toBe('1 day');
+    // Calendar days, as EventCountdown counts them: 10 March -> 12 March is 2
+    // whatever the time of day, not the 1 whole 24h period left from noon.
+    // Exact, on the value element: a substring match also passes "12 days".
+    expect(card.querySelector('h3 + div')?.textContent).toBe('2 days');
     expect(card).not.toHaveTextContent('Happy Birthday!');
     expect(tileOf(card)).toHaveClass('bg-ptint', 'text-partner');
   });
@@ -131,6 +132,32 @@ describe('Countdown cards on an ordinary day', () => {
     expect(card.querySelector('h3 + div')?.textContent).toBe('1 year 2 days');
     expect(card).toHaveTextContent('03h 05m 07s');
     expect(card.textContent ?? '').toMatch(/\d{2}h \d{2}m \d{2}s/);
+  });
+
+  it('reads the same day count as an event on the same date', () => {
+    render(
+      <>
+        <BirthdayCountdown birthday={{ name: 'Gracie', month: 3, day: 12, birthYear: 1998 }} />
+        <EventCountdown label="Meetup" icon="plane" date={new Date(2026, 2, 12)} />
+      </>
+    );
+
+    const birthday = screen.getByTestId('birthday-countdown-gracie');
+    const event = screen.getByTestId('event-countdown-meetup');
+    expect(birthday.querySelector('h3 + div')?.textContent).toBe(
+      event.querySelector('h3 + div')?.textContent
+    );
+  });
+
+  it('counts calendar days across the 23-hour DST spring-forward day', () => {
+    // TZ=America/New_York springs forward at 02:00 on 8 March 2026. From
+    // 01:00 on 8 March the birthday's midnight on 9 March is 22 real hours
+    // away: less than one 24h period, but still one calendar day.
+    vi.setSystemTime(new Date(2026, 2, 8, 1, 0, 0));
+    render(<BirthdayCountdown birthday={{ name: 'Gracie', month: 3, day: 9, birthYear: 1998 }} />);
+
+    const card = screen.getByTestId('birthday-countdown-gracie');
+    expect(card.querySelector('h3 + div')?.textContent).toBe('1 day');
   });
 
   it('shows a plain calendar tile, a day count and h/m for an upcoming anniversary', () => {
