@@ -10,7 +10,7 @@
  */
 
 import { AnimatePresence, m as motion } from 'framer-motion';
-import { Calendar, Check, Edit2, Plus, Trash2, X } from 'lucide-react';
+import { Check, Edit2, Heart, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useSubmitKey } from '../../hooks/useSubmitKey';
 import { parseEventDate } from '../../services/eventsService';
@@ -18,6 +18,31 @@ import { useAppStore } from '../../stores/useAppStore';
 import type { Anniversary } from '../../types';
 import { formatDateLong } from '../../utils/dateUtils';
 import { isValidationError } from '../../validation/errorMessages';
+import {
+  ADD_BUTTON,
+  DELETE_BUTTON,
+  DESTRUCTIVE_BUTTON,
+  DIALOG_BACKDROP,
+  DIALOG_CLOSE,
+  DIALOG_PANEL,
+  DIALOG_TITLE,
+  DIVIDER,
+  EDIT_BUTTON,
+  FAILURE_BOX,
+  FIELD_ERROR,
+  FIELD_LABEL,
+  GROUP_ROW,
+  GROUP_SUBTITLE,
+  GROUP_TILE,
+  GROUP_TITLE,
+  ITEM_LABEL,
+  ITEM_META,
+  ITEM_ROW,
+  PRIMARY_BUTTON,
+  REQUIRED_MARK,
+  SECONDARY_BUTTON,
+  fieldClass,
+} from './kitClasses';
 
 /**
  * `anniversary.date` is a bare "YYYY-MM-DD"; fed to `new Date(...)` that is the
@@ -79,37 +104,28 @@ export function AnniversarySettings() {
   const editingAnniversary = editingId ? anniversaries.find((a) => a.id === editingId) : undefined;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Anniversary Countdowns
-          </h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Manage special dates and milestones
+    <div className="flex flex-col gap-1.5">
+      {/* Group header: h3 under Settings' "Countdowns" h2. An empty list is
+          said by the subtitle alone, with no empty block below it. */}
+      <div className={GROUP_ROW}>
+        <span className={GROUP_TILE} aria-hidden="true">
+          <Heart className="h-[17px] w-[17px]" />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h3 className={GROUP_TITLE}>Anniversaries</h3>
+          <p className={GROUP_SUBTITLE} data-testid="anniversaries-subtitle">
+            {anniversaries.length === 0 ? 'Special dates · none yet' : 'Special dates'}
           </p>
         </div>
 
-        <button
-          onClick={handleAdd}
-          className="flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-700 hover:shadow-lg"
-        >
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Add Anniversary</span>
+        <button type="button" onClick={handleAdd} aria-label="Add Anniversary" className={ADD_BUTTON}>
+          <Plus className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
 
       {/* Anniversary List */}
-      <div className="space-y-3">
-        {anniversaries.length === 0 ? (
-          <div className="rounded-lg bg-gray-50 py-12 text-center dark:bg-gray-800/50">
-            <Calendar className="mx-auto mb-3 h-12 w-12 text-gray-400" />
-            <p className="text-gray-600 dark:text-gray-400">
-              No anniversaries yet. Add your first special date!
-            </p>
-          </div>
-        ) : (
+      {anniversaries.length > 0 && (
+        <div className="flex flex-col gap-1.5">
           <AnimatePresence>
             {anniversaries.map((anniversary) => (
               <motion.div
@@ -117,34 +133,31 @@ export function AnniversarySettings() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800"
+                className="flex flex-col gap-1.5"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      {anniversary.label}
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                      {formatAnniversaryDate(anniversary.date)}
-                    </p>
+                <div className={DIVIDER} aria-hidden="true" />
+                <div className={ITEM_ROW}>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <h4 className={ITEM_LABEL}>{anniversary.label}</h4>
+                    <p className={ITEM_META}>{formatAnniversaryDate(anniversary.date)}</p>
                     {anniversary.description && (
-                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
-                        {anniversary.description}
-                      </p>
+                      <p className={ITEM_META}>{anniversary.description}</p>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <button
+                      type="button"
                       onClick={() => handleEdit(anniversary)}
-                      className="rounded-lg p-2 text-purple-600 transition-colors duration-200 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900/30"
+                      className={EDIT_BUTTON}
                       aria-label="Edit anniversary"
                     >
                       <Edit2 className="h-4 w-4" />
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDelete(anniversary.id)}
-                      className="rounded-lg p-2 text-red-600 transition-colors duration-200 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30"
+                      className={DELETE_BUTTON}
                       aria-label="Delete anniversary"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -154,8 +167,8 @@ export function AnniversarySettings() {
               </motion.div>
             ))}
           </AnimatePresence>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Add/Edit Form Modal */}
       <AnimatePresence>
@@ -183,7 +196,7 @@ export function AnniversarySettings() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            className={DIALOG_BACKDROP}
             onClick={() => setDeleteConfirmId(null)}
           >
             <motion.div
@@ -191,30 +204,28 @@ export function AnniversarySettings() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
+              className={`${DIALOG_PANEL} max-w-sm`}
             >
-              <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Delete Anniversary?
-              </h3>
-              <p className="mb-6 text-gray-600 dark:text-gray-400">
+              <h3 className={`${DIALOG_TITLE} mb-2`}>Delete Anniversary?</h3>
+              <p className="mb-5 text-[15px] text-ink">
                 This action cannot be undone. The countdown will be removed.
               </p>
               {deleteError && (
-                <p role="alert" className="mb-4 text-sm text-red-700 dark:text-red-400">
+                <p role="alert" className={`${FAILURE_BOX} mb-4`}>
                   {deleteError}
                 </p>
               )}
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirmId(null)}
-                  className="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition-colors duration-200 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+                  className={SECONDARY_BUTTON}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDelete}
                   disabled={isDeleting}
-                  className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-red-700 disabled:opacity-60"
+                  className={DESTRUCTIVE_BUTTON}
                 >
                   {isDeleting ? 'Deleting…' : 'Delete'}
                 </button>
@@ -311,7 +322,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className={DIALOG_BACKDROP}
       onClick={onClose}
     >
       <motion.div
@@ -319,16 +330,16 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
+        className={`${DIALOG_PANEL} max-h-full max-w-md overflow-y-auto`}
       >
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <h3 className={DIALOG_TITLE}>
             {isEditing ? 'Edit Anniversary' : 'Add Anniversary'}
           </h3>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-600 transition-colors duration-200 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            className={DIALOG_CLOSE}
             aria-label="Close form"
           >
             <X className="h-5 w-5" />
@@ -337,8 +348,8 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
 
         {/* General Error */}
         {generalError && (
-          <div className="mb-4 rounded-lg border border-red-300 bg-red-100 p-3 dark:border-red-700 dark:bg-red-900/30">
-            <p className="text-sm text-red-700 dark:text-red-400">{generalError}</p>
+          <div className={`${FAILURE_BOX} mb-4`}>
+            <p>{generalError}</p>
           </div>
         )}
 
@@ -348,20 +359,20 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
           <div>
             <label
               htmlFor="anniversary-label"
-              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+              className={FIELD_LABEL}
             >
-              Label <span className="text-red-500">*</span>
+              Label <span className={REQUIRED_MARK}>*</span>
             </label>
             <input
               id="anniversary-label"
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className={`w-full rounded-lg border bg-white px-3 py-2 dark:bg-gray-900 ${errors.label ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} text-gray-900 placeholder-gray-500 focus:ring-2 focus:outline-none dark:text-gray-100 ${errors.label ? 'focus:ring-red-500' : 'focus:ring-pink-500'} `}
+              className={fieldClass(Boolean(errors.label))}
               placeholder="e.g., First Date Anniversary"
             />
             {errors.label && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.label}</p>
+              <p className={FIELD_ERROR}>{errors.label}</p>
             )}
           </div>
 
@@ -369,19 +380,19 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
           <div>
             <label
               htmlFor="anniversary-date"
-              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+              className={FIELD_LABEL}
             >
-              Date <span className="text-red-500">*</span>
+              Date <span className={REQUIRED_MARK}>*</span>
             </label>
             <input
               id="anniversary-date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className={`w-full rounded-lg border bg-white px-3 py-2 dark:bg-gray-900 ${errors.date ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} text-gray-900 focus:ring-2 focus:outline-none dark:text-gray-100 ${errors.date ? 'focus:ring-red-500' : 'focus:ring-pink-500'} `}
+              className={fieldClass(Boolean(errors.date))}
             />
             {errors.date && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.date}</p>
+              <p className={FIELD_ERROR}>{errors.date}</p>
             )}
           </div>
 
@@ -389,7 +400,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
           <div>
             <label
               htmlFor="anniversary-description"
-              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+              className={FIELD_LABEL}
             >
               Description (optional)
             </label>
@@ -398,17 +409,17 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-pink-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+              className={fieldClass(false, true)}
               placeholder="Add a note about this anniversary..."
             />
           </div>
 
           {/* Form Actions */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition-colors duration-200 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+              className={SECONDARY_BUTTON}
             >
               <X className="h-4 w-4" />
               Cancel
@@ -416,7 +427,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
             <button
               type="submit"
               disabled={isSaving}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-700 disabled:opacity-60"
+              className={PRIMARY_BUTTON}
             >
               <Check className="h-4 w-4" />
               {isEditing ? 'Update' : 'Add'}

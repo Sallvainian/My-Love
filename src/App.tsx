@@ -1,3 +1,4 @@
+import { Heart, Plus } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
@@ -70,7 +71,7 @@ const PhotoCarousel = lazy(() =>
 // Loading spinner component for Suspense fallback
 const LoadingSpinner = () => (
   <div className="flex min-h-screen items-center justify-center">
-    <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-pink-500"></div>
+    <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-accent"></div>
   </div>
 );
 
@@ -605,8 +606,12 @@ function App() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="mb-4 animate-pulse text-6xl">💕</div>
-          <p className="text-gray-600">Loading...</p>
+          <Heart
+            className="mx-auto mb-4 h-14 w-14 animate-pulse fill-current text-accent"
+            strokeWidth={0}
+            aria-hidden="true"
+          />
+          <p className="text-muted">Loading...</p>
         </div>
       </div>
     );
@@ -652,8 +657,12 @@ function App() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="mb-4 animate-pulse text-6xl">💕</div>
-          <p className="text-gray-600">Loading your data...</p>
+          <Heart
+            className="mx-auto mb-4 h-14 w-14 animate-pulse fill-current text-accent"
+            strokeWidth={0}
+            aria-hidden="true"
+          />
+          <p className="text-muted">Loading your data...</p>
         </div>
       </div>
     );
@@ -746,12 +755,12 @@ function App() {
         <main id="main-content" className="pb-(--dock-clearance)">
           {/* Home view - inline, not lazy-loaded, always works offline */}
           {currentView === 'home' && (
-            <div className="mx-auto max-w-4xl space-y-6 px-4 pt-4 pb-4">
+            <div className="mx-auto max-w-4xl space-y-4 px-4 pt-3 pb-4">
               {/* Time Together - replaces Day 37 Together header */}
               <TimeTogether />
 
               {/* Birthdays, side by side */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3">
                 <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.casey} />
                 <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.harper} />
               </div>
@@ -764,28 +773,47 @@ function App() {
                 placeholderText="Date TBD"
               />
 
+              {/* Upcoming: always shown, even while the slot below is still
+                  hidden. Add goes to Settings, where events are created;
+                  opening the editor directly would need new cross-view state. */}
+              <div className="flex items-center justify-between px-1">
+                <h2 className="text-xs font-semibold tracking-[.08em] text-muted uppercase">
+                  Upcoming
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setView('settings')}
+                  className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent"
+                  aria-label="Add event"
+                  data-testid="home-add-event"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Add
+                </button>
+              </div>
+
               {/* Events slot: the two placeholders below speak for the whole
                   slot, so they span the full width; real cards flow two-up like
                   the birthday pair above. */}
               {eventsSlotView === 'hidden' ? null : eventsSlotView === 'error' ? (
                 <div
-                  className="rounded-2xl border-2 border-gray-200 bg-white p-4 text-center shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                  className="rounded-[20px] border border-line bg-card p-3.5 text-center shadow-card"
                   data-testid="events-load-error"
                   role="status"
                   aria-live="polite"
                 >
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-muted">
                     Unable to load events — check your connection, then come back to Home.
                   </p>
                 </div>
               ) : eventsSlotView === 'empty' ? (
                 <div
-                  className="rounded-2xl border-2 border-gray-200 bg-white p-4 text-center shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                  className="rounded-[20px] border border-line bg-card p-3.5 text-center shadow-card"
                   data-testid="events-empty-placeholder"
                   role="status"
                   aria-live="polite"
                 >
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No upcoming events yet.</p>
+                  <p className="text-sm text-muted">No upcoming events yet.</p>
                 </div>
               ) : (
                 // Already filtered and capped by getUpcomingEventCards, which
@@ -793,7 +821,7 @@ function App() {
                 // the tail can never turn a real list into the empty
                 // placeholder. A card that retires returns null, which occupies
                 // no grid cell, so the survivors reflow with no gap.
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-2 gap-3">
                   {visibleEvents.map((event) => (
                     <EventCountdown
                       key={event.id}
@@ -827,7 +855,7 @@ function App() {
                 {currentView === 'notes' && <LoveNotes />}
 
                 {/* Story 4 (dynamic events): Settings, home of the only sign-out */}
-                {currentView === 'settings' && <Settings />}
+                {currentView === 'settings' && <Settings onShowWelcome={showWelcomeManually} />}
               </Suspense>
             </ViewErrorBoundary>
           )}

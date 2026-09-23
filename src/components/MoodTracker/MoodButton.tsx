@@ -11,13 +11,12 @@ interface MoodButtonProps {
 
 /**
  * MoodButton Component
- * Story 6.2: AC-2 - Mood button with Framer Motion animations
+ * Story 6.2: AC-2 - Mood tile on the style kit
  *
- * Features:
- * - Scale animation on selection (1.1x scale)
- * - Color feedback (pink when selected, gray when not)
- * - Icon from lucide-react
- * - Visual highlight for selected state
+ * A kit tile at least 76px tall (it grows with large text): unselected is a
+ * plain card with a hairline ring and a `muted` icon over an `ink` label;
+ * selected is the `tint` fill with a 2px `accent` ring and `accent` icon and
+ * label. Colour is by owner (always `you` here), never per mood.
  */
 export function MoodButton({ mood, icon: Icon, label, isSelected, onClick }: MoodButtonProps) {
   return (
@@ -25,21 +24,18 @@ export function MoodButton({ mood, icon: Icon, label, isSelected, onClick }: Moo
       type="button"
       onClick={onClick}
       whileTap={{ scale: 0.95 }}
-      animate={{
-        backgroundColor: isSelected ? 'rgba(236, 72, 153, 0.1)' : 'rgba(243, 244, 246, 1)',
-      }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-      className={`flex min-h-[48px] min-w-[48px] flex-col items-center justify-center gap-2 rounded-2xl border-2 p-4 transition-all ${
+      className={`flex min-h-[76px] min-w-[48px] flex-col px-1 py-2 items-center justify-center gap-1.5 rounded-2xl text-[13px] font-medium transition-colors ${
         isSelected
-          ? 'border-pink-500 text-pink-500 shadow-md shadow-pink-200'
-          : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+          ? 'bg-tint text-accent ring-2 ring-accent ring-inset'
+          : 'bg-card text-muted ring-1 ring-line ring-inset'
       }`}
       data-testid={`mood-button-${mood}`}
       aria-label={`${label} mood`}
       aria-pressed={isSelected}
     >
-      <Icon className="h-8 w-8" />
-      <span className="text-sm font-medium">{label}</span>
+      <Icon className="h-6 w-6" aria-hidden="true" />
+      <span className={isSelected ? 'text-accent' : 'text-ink'}>{label}</span>
     </motion.button>
   );
 }

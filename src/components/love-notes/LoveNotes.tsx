@@ -2,11 +2,11 @@
  * LoveNotes Component
  *
  * Main page container for the Love Notes chat feature.
- * Composes MessageList, MessageInput, and header into a full chat view.
+ * Composes the partner row, MessageList and MessageInput into a full chat view.
  *
  * Features:
  * - Full-screen chat layout
- * - Header with title
+ * - Partner row (avatar, name, feed status) under a visually hidden h1
  * - Scrollable message list
  * - Message input with send functionality
  * - Safe area handling for mobile
@@ -17,7 +17,7 @@
  */
 
 import { motion } from 'framer-motion';
-import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { authService } from '../../api/authService';
 import { getOwnDisplayName, getPartnerDisplayName } from '../../api/supabaseClient';
@@ -31,8 +31,9 @@ import { NoteRemoveConfirmation } from './NoteRemoveConfirmation';
 /**
  * LoveNotes - Full chat page component
  *
- * Assembles the Love Notes UI with header, message list,
- * and eventually a message input (Story 2.2).
+ * Assembles the Love Notes UI: partner row, message list and message input,
+ * on the style-kit tokens from index.css (no dark-mode variants; the kit
+ * variables switch with the OS theme).
  */
 export function LoveNotes(): ReactElement {
   const {
@@ -47,12 +48,13 @@ export function LoveNotes(): ReactElement {
   } = useLoveNotes();
 
   /**
-   * What to say about the live feed, if anything.
+   * What to announce about the live feed, if anything.
    *
-   * Only the two states worth interrupting the chat for get text. `connected`,
-   * `connecting` and `idle` render nothing at all: a working feed should not
-   * narrate itself, and a badge that is always on screen is the one nobody
-   * reads on the day it matters.
+   * Only the two states worth interrupting the chat for get an announced
+   * notice. `connected` shows a quiet "Connected" line in the partner row that
+   * is not a live region, and `connecting`/`idle` show nothing: a working feed
+   * should not narrate itself, and an announcement that always fires is the
+   * one nobody listens to on the day it matters.
    *
    * `disconnected` is terminal -- the subscription gave up after five failed
    * re-joins and nothing re-arms it -- so the wording says what is true of the
@@ -66,8 +68,7 @@ export function LoveNotes(): ReactElement {
         ? 'Not receiving new notes'
         : null;
 
-  // Get navigation function and userId from store
-  const navigateHome = useAppStore((state) => state.navigateHome);
+  // userId and the removal action from the store
   const currentUserId = useAppStore((state) => state.userId) ?? '';
   const removeNote = useAppStore((state) => state.removeNote);
 
@@ -122,27 +123,41 @@ export function LoveNotes(): ReactElement {
     fetchUserInfo();
   }, []);
 
-  return (
-    <div className="flex h-[calc(100dvh-4rem-env(safe-area-inset-top)-var(--dock-clearance))] flex-col bg-[#FFF5F5]">
-      {/* Header */}
-      <header className="safe-area-top flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
-        <button
-          onClick={navigateHome}
-          className="-ml-2 rounded-full p-2 transition-colors hover:bg-gray-100"
-          aria-label="Go back home"
-        >
-          <ArrowLeft className="h-5 w-5 text-gray-600" />
-        </button>
+  // The avatar's initial: the partner's name, or "P" while it is unknown
+  // (getPartnerDisplayName answered null, or has not answered yet). The first
+  // code point, not UTF-16 unit, so a name opening with an emoji is not split.
+  const partnerInitial = Array.from(partnerName.trim())[0]?.toUpperCase() || 'P';
 
-        <div className="flex flex-col items-center">
-          <h1 className="text-lg font-semibold text-gray-800">Love Notes</h1>
+  return (
+    <div className="flex h-[calc(100dvh-4rem-env(safe-area-inset-top)-var(--dock-clearance))] flex-col bg-page">
+      {/* The app top bar already names the app; the view title stays for
+          assistive tech and the heading outline, but is not drawn. */}
+      <h1 className="sr-only">Love Notes</h1>
+
+      {/* Partner row: who this conversation is with, and the feed status. */}
+      <div className="flex shrink-0 items-center gap-3 px-5 pt-3 pb-3" data-testid="notes-partner-row">
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-partner text-base font-semibold text-card"
+          aria-hidden="true"
+        >
+          {partnerInitial}
+        </div>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="truncate text-base font-semibold text-ink">{partnerName}</p>
+          {realtimeStatus === 'connected' && (
+            // The feed status, not partner presence -- there is no presence
+            // feature, so this must never read "Online". Not a live region: a
+            // healthy feed should not announce itself.
+            <p className="flex items-center gap-1.5 text-[13px] text-muted">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-good" aria-hidden="true" />
+              Connected
+            </p>
+          )}
           {realtimeNotice && (
             // `role="status"` with a polite live region, matching the error
             // banner's treatment below: this appears without the person having
             // done anything, so it has to be announced rather than only seen.
-            // amber-700 and red-600 rather than the -500 pair, which is 3.82:1
-            // on white and below the 4.5:1 AA floor at this size (DW-134).
-            <span
+            <p
               // Suffixed, not bare. `PartnerMoodView.tsx:548` already uses
               // `realtime-connection-status` for a different feed with a
               // different vocabulary; the two are never on screen together
@@ -152,32 +167,33 @@ export function LoveNotes(): ReactElement {
               data-testid="realtime-connection-status-notes"
               role="status"
               aria-live="polite"
-              className={`text-xs ${
-                realtimeStatus === 'disconnected' ? 'text-red-600' : 'text-amber-700'
+              className={`flex items-center gap-1.5 text-[13px] ${
+                realtimeStatus === 'disconnected' ? 'text-danger' : 'text-muted'
               }`}
             >
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${
+                  realtimeStatus === 'disconnected' ? 'bg-danger' : 'bg-muted'
+                }`}
+                aria-hidden="true"
+              />
               {realtimeNotice}
-            </span>
+            </p>
           )}
         </div>
-
-        {/* Spacer for symmetric header layout */}
-        <div className="w-9" />
-      </header>
+      </div>
+      <div className="h-px shrink-0 bg-line" />
 
       {/* Error banner */}
       {error && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-4 mt-4 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3"
+          className="mx-4 mt-3 flex shrink-0 items-center gap-3 rounded-[14px] bg-dtint p-3"
         >
-          <AlertCircle className="h-5 w-5 shrink-0 text-red-500" />
-          <p className="flex-1 text-sm text-red-700">{error}</p>
-          <button
-            onClick={clearError}
-            className="text-sm font-medium text-red-600 hover:text-red-800"
-          >
+          <AlertCircle className="h-5 w-5 shrink-0 text-danger" aria-hidden="true" />
+          <p className="flex-1 text-sm text-danger">{error}</p>
+          <button onClick={clearError} className="text-sm font-semibold text-danger hover:underline">
             Dismiss
           </button>
         </motion.div>

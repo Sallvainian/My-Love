@@ -85,11 +85,7 @@ test.describe('Partner Mood View', () => {
     // WHEN: View loads with connected partner
     await expect(page.getByTestId('partner-mood-view')).toBeVisible();
 
-    // THEN: Poke and kiss interaction buttons are visible
-    await expect(page.getByTestId('fab-main-button')).toBeVisible();
-
-    // Click the FAB to expand interaction options
-    await page.getByTestId('fab-main-button').click();
+    // THEN: Poke and kiss interaction tiles are visible without any click
     await expect(page.getByTestId('poke-button')).toBeVisible();
     await expect(page.getByTestId('kiss-button')).toBeVisible();
   });

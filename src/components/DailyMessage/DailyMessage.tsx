@@ -1,19 +1,42 @@
 import { AnimatePresence, m as motion, type PanInfo } from 'framer-motion';
-import { AlertCircle, Heart, RefreshCw, Share2 } from 'lucide-react';
+import {
+  AlertCircle,
+  Heart,
+  MessageCircleHeart,
+  Rainbow,
+  RefreshCw,
+  Share2,
+  Sparkles,
+  Star,
+  type LucideIcon,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { APP_CONFIG } from '../../config/constants';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import { useAppStore } from '../../stores/useAppStore';
 import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
 import { logger } from '../../utils/logger';
+import type { MessageCategory } from '../../types';
 import { CountdownTimer } from '../CountdownTimer/CountdownTimer';
-import { WelcomeButton } from '../WelcomeButton/WelcomeButton';
 
 interface DailyMessageProps {
+  /**
+   * Reserved until the welcome trigger moves to Settings (story 7): App still
+   * passes it, but Home no longer renders a welcome button, so it is unused.
+   */
   onShowWelcome?: () => void;
 }
 
-export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
+/** Category chip: a lucide icon and a plain label per message category. */
+const CATEGORY_CHIPS: Record<MessageCategory, { Icon: LucideIcon; label: string }> = {
+  reason: { Icon: Heart, label: 'Why I Love You' },
+  memory: { Icon: Sparkles, label: 'Beautiful Memory' },
+  affirmation: { Icon: Star, label: 'Daily Affirmation' },
+  future: { Icon: Rainbow, label: 'Our Future' },
+  custom: { Icon: MessageCircleHeart, label: 'Special Message' },
+};
+
+export function DailyMessage(_props: DailyMessageProps) {
   const {
     currentMessage,
     userId,
@@ -112,14 +135,14 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
     if (loadingTimeout || error) {
       return (
         <div className="flex min-h-[400px] flex-col items-center justify-center gap-6 px-4">
-          <AlertCircle className="h-16 w-16 text-red-400" />
+          <AlertCircle className="h-16 w-16 text-muted" />
 
           <div className="text-center">
-            <h2 className="mb-2 text-xl font-semibold text-red-600">
+            <h2 className="mb-2 text-xl font-semibold text-ink">
               {error || 'Failed to load message'}
             </h2>
 
-            <p className="max-w-md text-sm text-gray-600">
+            <p className="max-w-md text-sm text-muted">
               {!APP_CONFIG.isPreConfigured
                 ? 'Environment variables not configured. Please create a .env.development file with VITE_PARTNER_NAME and VITE_RELATIONSHIP_START_DATE.'
                 : 'Something went wrong during initialization. Please try refreshing the page.'}
@@ -131,13 +154,13 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
               setLoadingTimeout(false);
               initializeApp();
             }}
-            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-600 to-rose-600 px-6 py-3 font-medium text-white transition-shadow hover:shadow-lg"
+            className="flex min-h-[44px] items-center gap-2 rounded-full bg-fill px-6 py-3 font-semibold text-white"
           >
             <RefreshCw className="h-5 w-5" />
             Retry
           </button>
 
-          <div className="max-w-sm text-center text-xs text-gray-400">
+          <div className="max-w-sm text-center text-xs text-muted">
             If the problem persists, try clearing your browser data or check the browser console for
             more details.
           </div>
@@ -148,11 +171,13 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
     // Still loading (within timeout window)
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
-        <div className="animate-pulse text-6xl">💕</div>
-        <div className="text-lg text-pink-400">Loading your daily message...</div>
+        <Heart className="h-14 w-14 animate-pulse fill-current text-accent" aria-hidden="true" />
+        <div className="text-lg text-muted">Loading your daily message...</div>
       </div>
     );
   }
+
+  const categoryChip = CATEGORY_CHIPS[currentMessage.category];
 
   const handleFavorite = async () => {
     setShowHearts(true);
@@ -179,7 +204,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   };
 
   return (
-    <div className="relative mx-auto w-full max-w-2xl px-4 py-8" data-testid="daily-message">
+    <div className="relative w-full" data-testid="daily-message">
       {/* Floating hearts animation */}
       <AnimatePresence>
         {showHearts && (
@@ -187,7 +212,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
             {heartPositions.map((pos, i) => (
               <motion.div
                 key={i}
-                className="absolute text-4xl"
+                className="absolute"
                 initial={{
                   x: pos.initialX,
                   y: window.innerHeight,
@@ -205,7 +230,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
                   ease: 'easeOut',
                 }}
               >
-                💕
+                <Heart className="h-9 w-9 fill-current text-accent" aria-hidden="true" />
               </motion.div>
             ))}
           </div>
@@ -244,115 +269,79 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
           tabIndex={0}
           style={{ touchAction: 'pan-y' }}
         >
-          <div className="card card-hover relative overflow-hidden" data-testid="message-card">
-            {/* Gradient overlay */}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-pink-50/50 to-rose-50/50" />
-
-            {/* Content */}
-            <div className="relative z-10">
-              {/* Category badge */}
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: ANIMATION_TIMING.BADGE_FADE_DELAY, type: 'spring' }}
-                className="mb-4 inline-block"
+          <div
+            className="flex flex-col gap-3.5 rounded-[20px] border border-line bg-card p-5 shadow-card"
+            data-testid="message-card"
+          >
+            {/* Category chip */}
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: ANIMATION_TIMING.BADGE_FADE_DELAY, type: 'spring' }}
+              className="flex"
+            >
+              <span
+                className="flex h-7 items-center gap-2 rounded-full bg-tint px-3 text-xs font-semibold text-accent"
+                data-testid="message-category-badge"
               >
-                <span
-                  className="rounded-full bg-gradient-to-r from-pink-600 to-rose-600 px-4 py-1.5 text-xs font-medium text-white shadow-lg"
-                  data-testid="message-category-badge"
-                >
-                  {currentMessage.category === 'reason' && '💖 Why I Love You'}
-                  {currentMessage.category === 'memory' && '✨ Beautiful Memory'}
-                  {currentMessage.category === 'affirmation' && '🌟 Daily Affirmation'}
-                  {currentMessage.category === 'future' && '🌈 Our Future'}
-                  {currentMessage.category === 'custom' && '💕 Special Message'}
-                </span>
-              </motion.div>
-
-              {/* Message text */}
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: ANIMATION_TIMING.TEXT_FADE_DELAY, duration: 0.8 }}
-                className="mb-8 font-serif text-2xl leading-relaxed text-gray-800 md:text-3xl"
-                data-testid="message-text"
-              >
-                {currentMessage.text}
-              </motion.p>
-
-              {/* Action buttons */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: ANIMATION_TIMING.BUTTON_FADE_DELAY }}
-                className="flex items-center justify-between"
-              >
-                <button
-                  onClick={handleFavorite}
-                  disabled={!userId}
-                  className="btn-icon group"
-                  aria-label={!userId ? 'Sign in to save favorites' : isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-                  data-testid="message-favorite-button"
-                >
-                  <Heart
-                    className={`h-6 w-6 transition-all duration-300 ${
-                      isFavorited
-                        ? 'animate-heart fill-pink-500 text-pink-500'
-                        : 'text-pink-400 group-hover:scale-110 group-hover:text-pink-500'
-                    }`}
-                  />
-                </button>
-
-                {favoriteError && (
-                  <p
-                    role="alert"
-                    className="mx-2 flex-1 text-center text-sm text-red-600"
-                    data-testid="message-favorite-error"
-                  >
-                    {favoriteError}
-                  </p>
+                {categoryChip && (
+                  <>
+                    <categoryChip.Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                    {categoryChip.label}
+                  </>
                 )}
-
-                <button
-                  onClick={handleShare}
-                  className="btn-icon group"
-                  aria-label="Share message"
-                  data-testid="message-share-button"
-                >
-                  <Share2 className="h-6 w-6 text-pink-400 transition-colors group-hover:text-pink-500" />
-                </button>
-              </motion.div>
-            </div>
-
-            {/* Decorative elements */}
-            <motion.div
-              animate={{
-                scale: [1, 1.2, 1],
-                rotate: [0, 5, 0],
-              }}
-              transition={{
-                duration: ANIMATION_VALUES.DECORATIVE_EMOJI_FLOAT_DURATION,
-                repeat: Infinity,
-                repeatType: 'reverse',
-              }}
-              className="pointer-events-none absolute -top-4 -right-4 text-6xl opacity-20"
-            >
-              💕
+              </span>
             </motion.div>
-            <motion.div
-              animate={{
-                scale: [1, 1.1, 1],
-                rotate: [0, -5, 0],
-              }}
-              transition={{
-                duration: ANIMATION_VALUES.DECORATIVE_EMOJI_FLOAT_DURATION_ALT,
-                repeat: Infinity,
-                repeatType: 'reverse',
-                delay: 1,
-              }}
-              className="pointer-events-none absolute -bottom-4 -left-4 text-5xl opacity-20"
+
+            {/* Message text */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: ANIMATION_TIMING.TEXT_FADE_DELAY, duration: 0.8 }}
+              className="font-lora text-[21px] leading-[1.45] font-medium text-ink italic"
+              data-testid="message-text"
             >
-              💖
+              {currentMessage.text}
+            </motion.p>
+
+            {/* Action buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: ANIMATION_TIMING.BUTTON_FADE_DELAY }}
+              className="flex items-center gap-2"
+            >
+              <button
+                onClick={handleFavorite}
+                disabled={!userId}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-tint text-accent"
+                aria-label={!userId ? 'Sign in to save favorites' : isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                data-testid="message-favorite-button"
+              >
+                <Heart
+                  className={`h-5 w-5 ${isFavorited ? 'animate-heart fill-current' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+
+              <button
+                onClick={handleShare}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted"
+                aria-label="Share message"
+                data-testid="message-share-button"
+              >
+                <Share2 className="h-5 w-5" aria-hidden="true" />
+              </button>
+
+              {favoriteError && (
+                <p
+                  role="alert"
+                  className="ml-1 flex-1 text-sm text-danger"
+                  data-testid="message-favorite-error"
+                >
+                  {favoriteError}
+                </p>
+              )}
             </motion.div>
           </div>
         </motion.div>
@@ -363,7 +352,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: ANIMATION_TIMING.HINT_FADE_DELAY }}
-        className="mt-6 text-center text-sm text-gray-400"
+        className="mt-6 text-center text-sm text-muted"
       >
         Swipe left or right to see other messages
       </motion.div>
@@ -379,9 +368,6 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
           <CountdownTimer anniversaries={settings.relationship.anniversaries} maxDisplay={3} />
         </motion.div>
       )}
-
-      {/* Welcome message trigger button */}
-      {onShowWelcome && <WelcomeButton onClick={onShowWelcome} />}
     </div>
   );
 }

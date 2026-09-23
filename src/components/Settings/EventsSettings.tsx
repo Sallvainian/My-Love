@@ -54,6 +54,33 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { AppState } from '../../stores/types';
 import { useAppStore } from '../../stores/useAppStore';
 import { formatDateISO, formatDateLong } from '../../utils/dateUtils';
+import {
+  ADD_BUTTON,
+  DELETE_BUTTON,
+  DESTRUCTIVE_BUTTON,
+  DIALOG_BACKDROP,
+  DIALOG_CLOSE,
+  DIALOG_PANEL,
+  DIALOG_TITLE,
+  DIVIDER,
+  EDIT_BUTTON,
+  FAILURE_BOX,
+  FIELD_ERROR,
+  FIELD_LABEL,
+  GROUP_ROW,
+  GROUP_SUBTITLE,
+  GROUP_TILE,
+  GROUP_TITLE,
+  ITEM_LABEL,
+  ITEM_META,
+  ITEM_ROW,
+  NOTICE,
+  PRIMARY_BUTTON,
+  REQUIRED_MARK,
+  SECONDARY_BUTTON,
+  SMALL_SECONDARY,
+  fieldClass,
+} from './kitClasses';
 
 /**
  * Event shapes are read off the composed store type rather than imported from
@@ -418,13 +445,13 @@ export function EventsSettings() {
   // One notice, one testid, mounted in whichever of the two positions applies.
   const loadErrorNotice = (
     <div
-      className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/30"
+      className={NOTICE}
       data-testid="events-settings-load-error"
       role="status"
       aria-live="polite"
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-amber-800 dark:text-amber-300">
+        <p className="text-sm text-ink">
           We couldn&apos;t load your events. Check your connection and try again.
         </p>
         <button
@@ -433,7 +460,7 @@ export function EventsSettings() {
           onClick={() => void handleRetry()}
           disabled={retryIsActive}
           data-testid="events-settings-retry"
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-amber-500 px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500 dark:text-amber-200 dark:hover:bg-amber-900/50"
+          className={SMALL_SECONDARY}
         >
           {retryIsActive && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
           {retryIsActive ? 'Retrying…' : 'Retry'}
@@ -443,37 +470,35 @@ export function EventsSettings() {
   );
 
   return (
-    <div className="space-y-6" data-testid="events-settings">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          {/* Not "Events": Settings.tsx already renders that as this section's
-              title bar, and two sibling h2s with identical text is one heading
-              too many for a screen reader walking the page. AnniversarySettings
-              solves it the same way, with "Anniversary Countdowns" under
-              "Anniversary". */}
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Event Countdowns
-          </h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Countdowns you and your partner both see. Past events stay here so a wrong date can be
-            fixed.
+    <div className="flex flex-col gap-1.5" data-testid="events-settings">
+      {/* Group header. The h3 sits under Settings' "Countdowns" h2, so the
+          outline reads h1 Settings → h2 Countdowns → h3 Events → h4 rows. */}
+      <div className={GROUP_ROW}>
+        <span className={GROUP_TILE} aria-hidden="true">
+          <Calendar className="h-[17px] w-[17px]" />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h3 className={GROUP_TITLE}>Events</h3>
+          {/* Constant rather than the partner's name: the store's `partner`
+              is loaded only by the Partner view and not persisted, so a name
+              here would depend on which screen was opened first. */}
+          <p className={GROUP_SUBTITLE} data-testid="events-subtitle">
+            Shared with your partner
           </p>
         </div>
 
-        {/* aria-label rather than the visible span alone: below `sm` the span is
-            display:none, so the accessible name would be empty on the phone
-            this app is mostly used on. */}
+        {/* Icon-only, so the aria-label is the button's whole accessible
+            name. Always mounted: it is the focus fallback for every opener
+            that does not survive its own action. */}
         <button
           ref={addButtonRef}
           type="button"
           onClick={handleAdd}
           data-testid="events-settings-add"
           aria-label="Add event"
-          className="flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-700 hover:shadow-lg"
+          className={ADD_BUTTON}
         >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          <span className="hidden sm:inline">Add Event</span>
+          <Plus className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
 
@@ -484,49 +509,53 @@ export function EventsSettings() {
 
       {/* Event list */}
       <div
-        className="space-y-3"
+        className="flex flex-col gap-1.5"
         data-testid="events-settings-load-region"
         aria-busy={eventsIsLoading || eventsIsLoadingMore || isLoadingHistory}
       >
         {slot === 'error' && loadErrorNotice}
 
         {slot === 'loading' && (
-          <div
-            className="flex items-center justify-center gap-2 rounded-lg bg-gray-50 py-12 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400"
-            data-testid="events-settings-loading"
-            role="status"
-            aria-live="polite"
-          >
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Loading events…</span>
-          </div>
+          <>
+            <div className={DIVIDER} aria-hidden="true" />
+            <div
+              className="flex min-h-12 items-center justify-center gap-2 text-[13px] text-muted"
+              data-testid="events-settings-loading"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading events…</span>
+            </div>
+          </>
         )}
 
         {slot === 'empty' && (
-          <div
-            className="rounded-lg bg-gray-50 py-12 text-center dark:bg-gray-800/50"
-            data-testid="events-settings-empty"
-          >
-            <Calendar className="mx-auto mb-3 h-12 w-12 text-gray-400" />
-            <p className="text-gray-600 dark:text-gray-400">
-              {hasMoreHistory
-                ? 'No events to display in this part of your history.'
-                : 'No events yet. Add one you are both counting down to.'}
-            </p>
-            <button
-              type="button"
-              onClick={handleAddFromEmptyState}
-              data-testid="events-settings-empty-add"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-700 hover:shadow-lg"
-            >
-              <Plus className="h-4 w-4" />
-              {hasMoreHistory ? 'Add an event' : 'Add your first event'}
-            </button>
+          <div className="flex flex-col gap-1.5" data-testid="events-settings-empty">
+            <div className={DIVIDER} aria-hidden="true" />
+            {/* Wraps so the pill drops under the copy when a phone width
+                cannot hold both on one line. */}
+            <div className={`${ITEM_ROW} flex-wrap`}>
+              <p className="min-w-48 flex-1 text-[13px] text-muted">
+                {hasMoreHistory
+                  ? 'No events to display in this part of your history.'
+                  : 'No events yet. Add one you are both counting down to.'}
+              </p>
+              <button
+                type="button"
+                onClick={handleAddFromEmptyState}
+                data-testid="events-settings-empty-add"
+                className={SMALL_SECONDARY}
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {hasMoreHistory ? 'Add an event' : 'Add your first event'}
+              </button>
+            </div>
           </div>
         )}
 
         {slot === 'list' && (
-          <div data-testid="events-settings-list">
+          <div className="flex flex-col gap-1.5" data-testid="events-settings-list">
             <AnimatePresence>
               {events.map((event) => {
                 const isOwn = event.userId === userId;
@@ -538,25 +567,20 @@ export function EventsSettings() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     data-testid={`event-row-${event.id}`}
-                    className="mb-3 rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800"
+                    className="flex flex-col gap-1.5"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h3
-                          className="text-lg font-semibold text-gray-900 dark:text-gray-100"
-                          data-testid={`event-label-${event.id}`}
-                        >
+                    <div className={DIVIDER} aria-hidden="true" />
+                    <div className={ITEM_ROW}>
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <h4 className={ITEM_LABEL} data-testid={`event-label-${event.id}`}>
                           {event.label}
-                        </h3>
-                        <p
-                          className="mt-1 text-sm text-gray-600 dark:text-gray-400"
-                          data-testid={`event-date-${event.id}`}
-                        >
+                        </h4>
+                        <p className={ITEM_META} data-testid={`event-date-${event.id}`}>
                           {formatDateLong(event.date)}
                         </p>
                         {event.description && (
                           <p
-                            className="mt-2 text-sm text-gray-500 dark:text-gray-500"
+                            className={ITEM_META}
                             data-testid={`event-description-${event.id}`}
                           >
                             {event.description}
@@ -564,7 +588,7 @@ export function EventsSettings() {
                         )}
                         {!isOwn && (
                           <p
-                            className="mt-2 text-xs text-gray-400 dark:text-gray-500"
+                            className="text-[13px] text-partner"
                             data-testid={`event-partner-note-${event.id}`}
                           >
                             Added by your partner
@@ -577,12 +601,12 @@ export function EventsSettings() {
                           "not yours to edit" — a control that can only ever
                           produce that message is worse than no control. */}
                       {isOwn && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-2">
                           <button
                             type="button"
                             onClick={() => handleEdit(event)}
                             data-testid={`event-edit-${event.id}`}
-                            className="rounded-lg p-2 text-purple-600 transition-colors duration-200 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900/30"
+                            className={EDIT_BUTTON}
                             aria-label={`Edit ${event.label}`}
                           >
                             <Edit2 className="h-4 w-4" />
@@ -591,7 +615,7 @@ export function EventsSettings() {
                             type="button"
                             onClick={() => setDeletingEvent(event)}
                             data-testid={`event-delete-${event.id}`}
-                            className="rounded-lg p-2 text-red-600 transition-colors duration-200 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30"
+                            className={DELETE_BUTTON}
                             aria-label={`Delete ${event.label}`}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -607,12 +631,12 @@ export function EventsSettings() {
         )}
 
         {(hasMoreHistory || isLoadingHistory) && (
-          <div className="space-y-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+          <div className={`${NOTICE} flex flex-col items-start gap-3`}>
             {hasMoreHistory && (
               <p
                 id="events-settings-history-notice"
                 data-testid="events-settings-history-notice"
-                className="text-sm text-gray-600 dark:text-gray-400"
+                className="text-sm text-ink"
               >
                 More events are available. Load more history to find older dates or later upcoming
                 events. After a refresh or reload, saved events outside this list may need to be
@@ -625,7 +649,7 @@ export function EventsSettings() {
                 data-testid="events-settings-history-error"
                 role="status"
                 aria-live="polite"
-                className="text-sm text-amber-800 dark:text-amber-300"
+                className="text-sm text-ink"
               >
                 We couldn&apos;t load more history. Your loaded events are still here. Check your
                 connection and try again.
@@ -641,7 +665,7 @@ export function EventsSettings() {
                 hasMoreHistory ? 'events-settings-history-notice' : '',
                 eventsHistoryError ? 'events-settings-history-error' : '',
               ].filter(Boolean).join(' ') || undefined}
-              className="inline-flex items-center gap-2 rounded-lg border border-purple-500 px-4 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-purple-300 dark:hover:bg-purple-900/30"
+              className={SMALL_SECONDARY}
             >
               {historyIsActive && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               {historyIsActive
@@ -921,7 +945,7 @@ function EventForm({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className={DIALOG_BACKDROP}
       onClick={handleBackdropClick}
       data-testid="events-form"
       role="dialog"
@@ -935,10 +959,10 @@ function EventForm({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-full w-full max-w-md overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-2xl outline-none dark:border-gray-700 dark:bg-gray-800"
+        className={`${DIALOG_PANEL} max-h-full max-w-md overflow-y-auto`}
       >
-        <div className="mb-6 flex items-center justify-between">
-          <h3 id={titleId} className="text-xl font-bold text-gray-900 dark:text-gray-100">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <h3 id={titleId} className={DIALOG_TITLE}>
             {isEditing ? 'Edit Event' : 'Add Event'}
           </h3>
           <button
@@ -946,7 +970,7 @@ function EventForm({
             onClick={onClose}
             disabled={isSaving}
             data-testid="events-form-close"
-            className="rounded-lg p-2 text-gray-600 transition-colors duration-200 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700"
+            className={DIALOG_CLOSE}
             aria-label="Close form"
           >
             <X className="h-5 w-5" />
@@ -958,9 +982,9 @@ function EventForm({
           <div>
             <label
               htmlFor="events-form-label"
-              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+              className={FIELD_LABEL}
             >
-              Label <span className="text-red-500">*</span>
+              Label <span className={REQUIRED_MARK}>*</span>
             </label>
             <input
               ref={labelInputRef}
@@ -976,13 +1000,13 @@ function EventForm({
               // Paired with the id below: aria-invalid alone tells a screen
               // reader the field is wrong without ever saying why.
               aria-describedby={errors.label ? LABEL_ERROR_ID : undefined}
-              className={`w-full rounded-lg border bg-white px-3 py-2 dark:bg-gray-900 ${errors.label ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} text-gray-900 placeholder-gray-500 focus:ring-2 focus:outline-none dark:text-gray-100 ${errors.label ? 'focus:ring-red-500' : 'focus:ring-pink-500'}`}
+              className={fieldClass(Boolean(errors.label))}
               placeholder="e.g., Harper visits"
             />
             {errors.label && (
               <p
                 id={LABEL_ERROR_ID}
-                className="mt-1 text-sm text-red-600 dark:text-red-400"
+                className={FIELD_ERROR}
                 data-testid="events-form-label-error"
                 role="alert"
               >
@@ -995,9 +1019,9 @@ function EventForm({
           <div>
             <label
               htmlFor="events-form-date"
-              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+              className={FIELD_LABEL}
             >
-              Date <span className="text-red-500">*</span>
+              Date <span className={REQUIRED_MARK}>*</span>
             </label>
             <input
               id="events-form-date"
@@ -1010,12 +1034,12 @@ function EventForm({
               }}
               aria-invalid={Boolean(errors.date)}
               aria-describedby={errors.date ? DATE_ERROR_ID : undefined}
-              className={`w-full rounded-lg border bg-white px-3 py-2 dark:bg-gray-900 ${errors.date ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} text-gray-900 focus:ring-2 focus:outline-none dark:text-gray-100 ${errors.date ? 'focus:ring-red-500' : 'focus:ring-pink-500'}`}
+              className={fieldClass(Boolean(errors.date))}
             />
             {errors.date && (
               <p
                 id={DATE_ERROR_ID}
-                className="mt-1 text-sm text-red-600 dark:text-red-400"
+                className={FIELD_ERROR}
                 data-testid="events-form-date-error"
                 role="alert"
               >
@@ -1028,7 +1052,7 @@ function EventForm({
           <div>
             <label
               htmlFor="events-form-description"
-              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+              className={FIELD_LABEL}
             >
               Description (optional)
             </label>
@@ -1043,13 +1067,13 @@ function EventForm({
               rows={3}
               aria-invalid={Boolean(errors.description)}
               aria-describedby={errors.description ? DESCRIPTION_ERROR_ID : undefined}
-              className={`w-full resize-none rounded-lg border bg-white px-3 py-2 dark:bg-gray-900 ${errors.description ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-pink-500 focus:outline-none dark:text-gray-100`}
+              className={fieldClass(Boolean(errors.description), true)}
               placeholder="Add a note about this event..."
             />
             {errors.description && (
               <p
                 id={DESCRIPTION_ERROR_ID}
-                className="mt-1 text-sm text-red-600 dark:text-red-400"
+                className={FIELD_ERROR}
                 data-testid="events-form-description-error"
                 role="alert"
               >
@@ -1073,7 +1097,7 @@ function EventForm({
                 carries its own data-testid rather than leaving a test to reach
                 for a `label[for=...]` CSS selector. */}
           <fieldset>
-            <legend className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <legend className={FIELD_LABEL}>
               Icon
             </legend>
             <div className="flex gap-2">
@@ -1096,10 +1120,10 @@ function EventForm({
                   <label
                     htmlFor={`events-form-icon-${value}`}
                     data-testid={`events-form-icon-option-${value}`}
-                    className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-pink-500 peer-focus-visible:ring-offset-2 ${
+                    className={`flex h-12 cursor-pointer items-center justify-center gap-2 rounded-[14px] px-3 text-sm font-semibold transition-colors duration-200 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-accent ${
                       icon === value
-                        ? 'border-pink-500 bg-pink-50 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300'
-                        : 'border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-300'
+                        ? 'bg-tint text-accent ring-2 ring-accent'
+                        : 'text-muted ring-1 ring-line peer-focus-visible:ring-2 peer-focus-visible:ring-accent'
                     }`}
                   >
                     <Icon className="h-4 w-4" aria-hidden="true" />
@@ -1111,7 +1135,7 @@ function EventForm({
             {errors.icon && (
               <p
                 id={ICON_ERROR_ID}
-                className="mt-1 text-sm text-red-600 dark:text-red-400"
+                className={FIELD_ERROR}
                 data-testid="events-form-icon-error"
                 role="alert"
               >
@@ -1122,7 +1146,7 @@ function EventForm({
 
           {saveFailure && (
             <p
-              className="rounded-lg border border-red-300 bg-red-100 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-400"
+              className={FAILURE_BOX}
               data-testid="events-form-error"
               role="alert"
             >
@@ -1132,13 +1156,13 @@ function EventForm({
             </p>
           )}
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isSaving}
               data-testid="events-form-cancel"
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition-colors duration-200 hover:bg-gray-300 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+              className={SECONDARY_BUTTON}
             >
               <X className="h-4 w-4" />
               Cancel
@@ -1149,7 +1173,7 @@ function EventForm({
                 type="button"
                 onClick={handleRefresh}
                 data-testid="events-form-refresh"
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-700"
+                className={PRIMARY_BUTTON}
               >
                 <Calendar className="h-4 w-4" />
                 Refresh events
@@ -1160,7 +1184,7 @@ function EventForm({
                 type="submit"
                 disabled={isSaving}
                 data-testid="events-form-submit"
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-700 disabled:opacity-50"
+                className={PRIMARY_BUTTON}
               >
                 {isSaving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1294,7 +1318,7 @@ function EventDeleteConfirmation({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className={DIALOG_BACKDROP}
       onClick={handleBackdropClick}
       data-testid="events-delete-confirmation"
       role="dialog"
@@ -1308,26 +1332,26 @@ function EventDeleteConfirmation({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-2xl outline-none dark:border-gray-700 dark:bg-gray-800"
+        className={`${DIALOG_PANEL} max-w-sm`}
       >
         <div className="mb-2 flex items-center gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50">
-            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           </div>
-          <h3 id={titleId} className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h3 id={titleId} className={DIALOG_TITLE}>
             Delete this event?
           </h3>
         </div>
 
-        <p className="mb-2 text-gray-600 dark:text-gray-400">
-          <span className="font-medium text-gray-900 dark:text-gray-100">{event.label}</span> will
+        <p className="mb-2 text-[15px] break-words text-ink">
+          <span className="font-semibold">{event.label}</span> will
           be removed for both of you.
         </p>
-        <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">You cannot undo this.</p>
+        <p className="mb-5 text-sm text-muted">You cannot undo this.</p>
 
         {failure && (
           <p
-            className="mb-4 rounded-lg border border-red-300 bg-red-100 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-400"
+            className={`${FAILURE_BOX} mb-4`}
             data-testid="events-delete-error"
             role="alert"
           >
@@ -1342,7 +1366,7 @@ function EventDeleteConfirmation({
             onClick={onClose}
             disabled={isDeleting}
             data-testid="events-delete-cancel"
-            className="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition-colors duration-200 hover:bg-gray-300 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+            className={SECONDARY_BUTTON}
           >
             Cancel
           </button>
@@ -1351,7 +1375,7 @@ function EventDeleteConfirmation({
               type="button"
               onClick={handleRefresh}
               data-testid="events-delete-refresh"
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700"
+              className={PRIMARY_BUTTON}
             >
               <Calendar className="h-4 w-4" />
               Refresh events
@@ -1362,7 +1386,7 @@ function EventDeleteConfirmation({
               onClick={handleDelete}
               disabled={isDeleting}
               data-testid="events-delete-confirm"
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-red-700 disabled:opacity-50"
+              className={DESTRUCTIVE_BUTTON}
             >
               {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
               {isDeleting ? 'Deleting...' : 'Delete'}

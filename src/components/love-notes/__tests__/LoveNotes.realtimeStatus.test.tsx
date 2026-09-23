@@ -12,7 +12,7 @@
  * `useLoveNotes` is mocked rather than driven, because what is under test is
  * what `LoveNotes` does with a status, not how the status is produced.
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NoteFeedStatus } from '../../../hooks/useRealtimeMessages';
@@ -46,7 +46,6 @@ vi.mock('../../../hooks/useLoveNotes', () => ({
 }));
 
 const storeState = {
-  navigateHome: vi.fn(),
   userId: 'user-a',
   removeNote: vi.fn(),
 };
@@ -75,6 +74,7 @@ vi.mock('framer-motion', () => ({
 }));
 
 const NOTICE = 'realtime-connection-status-notes';
+const ROW = 'notes-partner-row';
 
 async function renderWith(status: NoteFeedStatus) {
   feed.status = status;
@@ -95,12 +95,63 @@ describe('LoveNotes realtime notice', () => {
   });
 
   describe('says nothing while there is nothing to say', () => {
-    // A badge that is always on screen is the one nobody reads on the day it
-    // matters, so a healthy feed must not narrate itself.
+    // An announcement that always fires is the one nobody listens to on the
+    // day it matters, so a healthy feed must not narrate itself.
     it.each(['connected', 'connecting', 'idle'] as const)('renders no notice for %s', async (status) => {
       await renderWith(status);
 
       expect(screen.queryByTestId(NOTICE)).toBeNull();
+      expect(screen.queryByRole('status')).toBeNull();
+    });
+
+    it.each(['connecting', 'idle'] as const)('shows the name alone for %s', async (status) => {
+      await renderWith(status);
+
+      const row = screen.getByTestId(ROW);
+      expect(row).toHaveTextContent(/^PPartner$/);
+      expect(row).not.toHaveTextContent(/Connected|Reconnecting|Not receiving/);
+    });
+  });
+
+  describe('the partner row', () => {
+    it('shows a quiet "Connected" line with a good dot when the feed is up', async () => {
+      await renderWith('connected');
+
+      const row = screen.getByTestId(ROW);
+      const line = within(row).getByText('Connected');
+      expect(line).toHaveClass('text-muted');
+      expect(line.querySelector('.bg-good')).not.toBeNull();
+      // The feed status, not presence: there is no presence feature.
+      expect(row).not.toHaveTextContent(/online/i);
+      // Not a live region -- only the two unhealthy states are announced.
+      expect(line).not.toHaveAttribute('role');
+      expect(line).not.toHaveAttribute('aria-live');
+    });
+
+    it('falls back to "Partner" and a "P" initial when the name is unknown', async () => {
+      await renderWith('connected');
+
+      const row = screen.getByTestId(ROW);
+      expect(within(row).getByText('Partner')).toHaveClass('text-ink');
+      const avatar = within(row).getByText('P');
+      expect(avatar).toHaveClass('bg-partner', 'text-card');
+    });
+
+    it('uses the partner name and its initial once it is known', async () => {
+      api.getPartnerDisplayName.mockResolvedValue('harper');
+      await renderWith('connected');
+
+      const row = screen.getByTestId(ROW);
+      expect(await within(row).findByText('harper')).toBeVisible();
+      expect(within(row).getByText('G')).toHaveClass('bg-partner');
+    });
+
+    it('keeps a level-1 "Love Notes" heading, visually hidden, and no back control', async () => {
+      await renderWith('connected');
+
+      const heading = screen.getByRole('heading', { level: 1, name: 'Love Notes' });
+      expect(heading).toHaveClass('sr-only');
+      expect(screen.queryByRole('button', { name: /go back home/i })).toBeNull();
     });
   });
 
@@ -113,9 +164,11 @@ describe('LoveNotes realtime notice', () => {
     // anything, which is the same treatment the error banner gets.
     expect(notice).toHaveAttribute('role', 'status');
     expect(notice).toHaveAttribute('aria-live', 'polite');
-    // amber-700, not amber-600: 5.05:1 against white versus 3.19:1, and this
-    // change is the one that raised the AA floor on the two red buttons.
-    expect(notice.className).toContain('text-amber-700');
+    // Kit `muted`, with a `muted` dot: still recovering, so not an alarm.
+    expect(notice).toHaveClass('text-muted');
+    expect(notice.querySelector('.bg-muted')).not.toBeNull();
+    // It sits in the partner row, not a header of its own.
+    expect(screen.getByTestId(ROW)).toContainElement(notice);
   });
 
   it('says the feed has stopped once it has given up', async () => {
@@ -126,7 +179,10 @@ describe('LoveNotes realtime notice', () => {
     // not coming: `disconnected` is terminal for the mount.
     expect(notice).toHaveTextContent('Not receiving new notes');
     expect(notice.textContent).not.toMatch(/reconnect/i);
-    expect(notice.className).toContain('text-red-600');
+    expect(notice).toHaveClass('text-danger');
+    expect(notice).toHaveAttribute('role', 'status');
+    expect(notice).toHaveAttribute('aria-live', 'polite');
+    expect(notice.querySelector('.bg-danger')).not.toBeNull();
   });
 
   it('gives the two visible states different text', async () => {

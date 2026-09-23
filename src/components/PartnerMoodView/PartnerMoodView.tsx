@@ -1,54 +1,27 @@
 import { normalizeMoodEntry } from '../../types/moods';
 import { AnimatePresence, m as motion } from 'framer-motion';
 import {
-  AlertCircle,
-  Angry,
-  Battery,
   Bell,
   Calendar,
   Check,
-  Frown,
   Heart,
-  Meh,
-  MessageCircle,
   RefreshCw,
   Search,
-  Smile,
-  Sparkles,
-  UserMinus,
   UserPlus,
   Users,
-  Wifi,
   WifiOff,
   X,
-  Zap,
 } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { handleSupabaseError, isPostgrestError } from '../../api/errorHandlers';
 import { moodSyncService } from '../../api/moodSyncService';
 import { PARTNER_NAME } from '../../config/constants';
+import { MOOD_DISPLAY, MOOD_TONE } from '../../constants/moodDisplay';
+import { parseEventDate } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
 import { logger } from '../../utils/logger';
 import { PokeKissInterface } from '../PokeKissInterface';
-
-// Mood icon mapping (same as MoodTracker)
-const MOOD_CONFIG = {
-  // Positive emotions
-  loved: { icon: Heart, label: 'Loved', color: 'text-red-500' },
-  happy: { icon: Smile, label: 'Happy', color: 'text-yellow-500' },
-  content: { icon: Meh, label: 'Content', color: 'text-blue-500' },
-  excited: { icon: Zap, label: 'Excited', color: 'text-amber-500' },
-  thoughtful: { icon: MessageCircle, label: 'Thoughtful', color: 'text-purple-500' },
-  grateful: { icon: Sparkles, label: 'Grateful', color: 'text-pink-500' },
-  // Negative emotions
-  sad: { icon: Frown, label: 'Sad', color: 'text-gray-500' },
-  anxious: { icon: AlertCircle, label: 'Anxious', color: 'text-orange-500' },
-  frustrated: { icon: Angry, label: 'Frustrated', color: 'text-red-600' },
-  angry: { icon: Angry, label: 'Angry', color: 'text-rose-600' },
-  lonely: { icon: UserMinus, label: 'Lonely', color: 'text-indigo-500' },
-  tired: { icon: Battery, label: 'Tired', color: 'text-slate-500' },
-} as const;
 
 /**
  * Partner Mood View Component
@@ -63,15 +36,19 @@ const MOOD_CONFIG = {
  *   - Accept/decline received requests
  *   - Display connected partner information
  * - Partner mood tracking (when connected):
- *   - Display list of partner's recent moods
- *   - Manual refresh button to fetch latest moods
+ *   - Newest mood in a "Feeling right now" card, the rest as "Recent moods" rows
+ *   - Refresh icon button to fetch latest moods
  *   - Real-time mood updates via Supabase Realtime
  *   - Empty state when no partner moods available
- *   - Mood cards with icons, dates, and notes
  *   - Loading state during fetch
- *   - Responsive grid layout
  */
 type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
+
+/** Kit card surface, section label and small pill button (design-tokens.md). */
+const CARD = 'rounded-[20px] border border-line bg-card shadow-card';
+const SECTION_LABEL = 'px-1 text-xs font-semibold tracking-[.08em] text-muted uppercase';
+const PILL =
+  'flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2';
 
 export function PartnerMoodView() {
   const {
@@ -183,7 +160,7 @@ export function PartnerMoodView() {
           logger.debug('[PartnerMoodView] Received partner mood update:', newMood);
 
           // Show notification toast
-          const moodLabel = MOOD_CONFIG[newMood.mood_type]?.label || newMood.mood_type;
+          const moodLabel = MOOD_DISPLAY[newMood.mood_type]?.label || newMood.mood_type;
           setNotification({
             show: true,
             mood: moodLabel,
@@ -244,8 +221,11 @@ export function PartnerMoodView() {
   }, [syncStatus.isOnline, fetchPartnerMoods]); // Re-subscribe if online status changes
 
   // Format date for display - memoized for performance
-  const formatDate = useCallback((date: string): string => {
-    const moodDate = new Date(date);
+  // `date` is a local YYYY-MM-DD; `new Date(date)` would read it as UTC midnight
+  // and show the previous day west of UTC.
+  const formatDate = useCallback((date: string, style: 'short' | 'long' = 'short'): string => {
+    const moodDate = parseEventDate(date);
+    if (!moodDate) return date;
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -260,12 +240,11 @@ export function PartnerMoodView() {
       return 'Yesterday';
     }
 
-    // Otherwise format as "Mon, Jan 15"
-    return moodDate.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
+    // Otherwise "Thu 19 Mar" (row) or "Friday 20 March" (current card), per the
+    // artboard. Built from parts rather than en-GB, which writes September as "Sept".
+    const weekday = moodDate.toLocaleDateString('en-US', { weekday: style });
+    const month = moodDate.toLocaleDateString('en-US', { month: style });
+    return `${weekday} ${moodDate.getDate()} ${month}`;
   }, []);
 
   // Debounced search - prevents spamming API on every keystroke
@@ -339,9 +318,20 @@ export function PartnerMoodView() {
     },
     [declinePartnerRequest]
   );
+  // Subtitle under the partner's name: one dot + one word for the realtime feed.
+  const connection = !syncStatus.isOnline
+    ? { label: 'Offline', dot: 'bg-muted', title: 'Offline' }
+    : connectionStatus === 'connected'
+      ? { label: 'Connected', dot: 'bg-good', title: 'Real-time updates active' }
+      : connectionStatus === 'reconnecting'
+        ? { label: 'Reconnecting', dot: 'bg-muted', title: 'Reconnecting...' }
+        : { label: 'Disconnected', dot: 'bg-muted', title: 'Disconnected' };
+
+  // Newest mood goes in the "Feeling right now" card; the rest are Recent moods rows.
+  const [latestMood, ...olderMoods] = partnerMoods;
 
   return (
-    <div className="min-h-screen bg-gray-50" data-testid="partner-mood-view">
+    <div className="min-h-screen bg-page" data-testid="partner-mood-view">
       {/* Real-time Notification Toast - Story 6.4: Task 6 (AC #4) */}
       <AnimatePresence>
         {notification.show && (
@@ -349,17 +339,24 @@ export function PartnerMoodView() {
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
-            className="fixed top-[calc(5rem+env(safe-area-inset-top))] left-1/2 z-50 mx-4 w-full max-w-md -translate-x-1/2 transform"
+            className="fixed inset-x-4 top-[calc(5rem+env(safe-area-inset-top))] z-50 mx-auto max-w-md"
             data-testid="partner-mood-notification"
           >
-            <div className="flex items-center gap-3 rounded-lg bg-pink-600 px-6 py-4 text-white shadow-lg">
-              <Bell className="h-5 w-5 shrink-0" />
-              <div className="flex-1">
-                <p className="font-semibold">
+            <div className="flex items-center gap-3 rounded-[20px] border border-line bg-card px-4 py-3 shadow-float">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ptint text-partner">
+                <Bell className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-semibold text-ink">
                   {PARTNER_NAME} just logged a mood: {notification.mood}
                 </p>
                 {notification.note && (
-                  <p className="mt-1 line-clamp-2 text-sm text-pink-100">{notification.note}</p>
+                  <p
+                    className="mt-0.5 line-clamp-2 text-[13px] wrap-break-word text-muted"
+                    data-testid="partner-mood-notification-note"
+                  >
+                    {notification.note}
+                  </p>
                 )}
               </div>
             </div>
@@ -367,11 +364,11 @@ export function PartnerMoodView() {
         )}
       </AnimatePresence>
 
-      <div className="mx-auto max-w-2xl px-4 py-6">
+      <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-3 pb-6">
         {/* Partner Error Display */}
         {partnerError && (
           <div
-            className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800"
+            className="rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
             data-testid="partner-connection-error"
           >
             {partnerError}
@@ -380,58 +377,68 @@ export function PartnerMoodView() {
 
         {/* Show partner connection UI if no partner connected */}
         {!partner && !isLoadingPartner && (
-          <div className="space-y-6">
-            <div className="mb-8 text-center">
-              <Users className="mx-auto mb-4 h-16 w-16 text-pink-500" />
-              <h1 className="mb-2 text-3xl font-bold text-gray-900">Connect with Your Partner</h1>
-              <p className="text-gray-600">Search for your partner to start sharing moods</p>
-            </div>
+          <>
+            <header className="flex items-start gap-3 px-1 pt-1">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <h1 className="font-serif text-[30px] leading-[1.1] font-semibold text-ink">
+                  Connect with Your Partner
+                </h1>
+                <p className="text-sm text-muted">Search for your partner to start sharing moods</p>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-tint text-accent">
+                <Users className="h-5 w-5" aria-hidden="true" />
+              </div>
+            </header>
 
             {/* Search Box */}
-            <div className="rounded-lg border border-gray-200 bg-white p-6">
+            <div className={`${CARD} p-5`} data-testid="partner-search-card">
               <label
                 htmlFor="partner-search"
-                className="mb-2 block text-sm font-medium text-gray-700"
+                className="mb-2 block text-[13px] font-semibold text-ink"
               >
                 Search by email or display name
               </label>
               <div className="relative">
-                <Search className="absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform text-gray-400" />
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-muted"
+                  aria-hidden="true"
+                />
                 <input
                   id="partner-search"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Enter email or name..."
-                  className="w-full rounded-lg border border-gray-300 py-3 pr-4 pl-10 focus:border-transparent focus:ring-2 focus:ring-pink-500 focus:outline-none"
+                  className="h-12 w-full rounded-[14px] bg-field pr-4 pl-11 text-[15px] text-ink ring-1 ring-line ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none"
                   data-testid="partner-search-input"
                 />
               </div>
 
               {/* Search Results */}
               {isSearching && (
-                <div className="mt-4 text-center text-gray-500">
-                  <div className="animate-pulse">Searching...</div>
-                </div>
+                <p className="mt-4 animate-pulse text-center text-sm text-muted">Searching...</p>
               )}
 
               {!isSearching && searchResults.length > 0 && (
-                <div className="mt-4 space-y-2" data-testid="partner-search-results">
+                <div
+                  className="mt-3 flex flex-col divide-y divide-line"
+                  data-testid="partner-search-results"
+                >
                   {searchResults.map((user) => (
-                    <div
-                      key={user.id}
-                      className="flex items-center justify-between rounded-lg bg-gray-50 p-3 transition-colors hover:bg-gray-100"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">{user.displayName}</p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
+                    <div key={user.id} className="flex items-center gap-3 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[15px] font-medium text-ink">
+                          {user.displayName}
+                        </p>
+                        <p className="truncate text-[13px] text-muted">{user.email}</p>
                       </div>
                       <button
+                        type="button"
                         onClick={() => handleSendRequest(user.id)}
-                        className="flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2 font-medium text-white transition-colors hover:bg-pink-700"
+                        className={`${PILL} bg-fill text-white focus-visible:ring-accent`}
                         data-testid={`send-request-${user.id}`}
                       >
-                        <UserPlus className="h-4 w-4" />
+                        <UserPlus className="h-4 w-4" aria-hidden="true" />
                         <span>Send Request</span>
                       </button>
                     </div>
@@ -440,157 +447,135 @@ export function PartnerMoodView() {
               )}
 
               {!isSearching && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
-                <div className="mt-4 text-center text-gray-500">
+                <p className="mt-4 text-center text-sm wrap-break-word text-muted">
                   No users found matching "{searchQuery}"
-                </div>
+                </p>
               )}
             </div>
 
             {/* Sent Requests */}
             {sentRequests.length > 0 && (
-              <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <h2 className="mb-4 text-lg font-semibold text-gray-900">Sent Requests</h2>
-                <div className="space-y-2" data-testid="sent-requests-list">
+              <section className={`${CARD} px-5 pt-4 pb-2`}>
+                <h2 className="text-[15px] font-semibold text-ink">Sent Requests</h2>
+                <div className="flex flex-col divide-y divide-line" data-testid="sent-requests-list">
                   {sentRequests.map((request) => (
-                    <div
-                      key={request.id}
-                      className="flex items-center justify-between rounded-lg border border-yellow-200 bg-yellow-50 p-3"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">
+                    <div key={request.id} className="flex items-center gap-3 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[15px] font-medium text-ink">
                           {request.to_user_display_name || request.to_user_email || 'Unknown User'}
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-[13px] text-muted">
                           Sent {new Date(request.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <div className="font-medium text-yellow-700">Pending</div>
+                      <span className="shrink-0 rounded-full bg-card2 px-3 py-1 text-xs font-semibold text-muted">
+                        Pending
+                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
             {/* Received Requests */}
             {receivedRequests.length > 0 && (
-              <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <h2 className="mb-4 text-lg font-semibold text-gray-900">Received Requests</h2>
-                <div className="space-y-2" data-testid="received-requests-list">
+              <section className={`${CARD} px-5 pt-4 pb-2`}>
+                <h2 className="text-[15px] font-semibold text-ink">Received Requests</h2>
+                <div
+                  className="flex flex-col divide-y divide-line"
+                  data-testid="received-requests-list"
+                >
                   {receivedRequests.map((request) => (
-                    <div
-                      key={request.id}
-                      className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-3"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">
+                    <div key={request.id} className="flex items-center gap-3 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[15px] font-medium text-ink">
                           {request.from_user_display_name ||
                             request.from_user_email ||
                             'Unknown User'}
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-[13px] text-muted">
                           Sent {new Date(request.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex shrink-0 gap-2">
                         <button
+                          type="button"
                           onClick={() => handleAcceptRequest(request.id)}
-                          className="flex items-center gap-1 rounded-lg bg-green-700 px-3 py-2 font-medium text-white transition-colors hover:bg-green-800"
+                          className={`${PILL} bg-fill text-white focus-visible:ring-accent`}
                           data-testid={`accept-request-${request.id}`}
                         >
-                          <Check className="h-4 w-4" />
+                          <Check className="h-4 w-4" aria-hidden="true" />
                           <span>Accept</span>
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDeclineRequest(request.id)}
-                          className="flex items-center gap-1 rounded-lg bg-gray-500 px-3 py-2 font-medium text-white transition-colors hover:bg-gray-600"
+                          className={`${PILL} bg-card2 text-muted focus-visible:ring-accent`}
                           data-testid={`decline-request-${request.id}`}
                         >
-                          <X className="h-4 w-4" />
+                          <X className="h-4 w-4" aria-hidden="true" />
                           <span>Decline</span>
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
-          </div>
+          </>
         )}
 
         {/* Show loading state while checking for partner */}
         {isLoadingPartner && (
-          <div className="py-12 text-center">
-            <div className="mb-4 animate-pulse text-6xl">💕</div>
-            <p className="text-gray-600">Loading partner information...</p>
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
+            <Heart className="h-9 w-9 animate-pulse fill-current text-accent" aria-hidden="true" />
+            <p className="text-sm text-muted">Loading partner information...</p>
           </div>
         )}
 
         {/* Show partner moods view if partner is connected */}
         {partner && !isLoadingPartner && (
           <>
-            {/* Header with Refresh Button */}
-            <div className="mb-6 flex items-center justify-between">
-              <div className="flex-1">
-                <div className="mb-2 flex items-center gap-2">
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    {partner.displayName}'s Moods
-                  </h1>
-                  {/* Story 6.4: Task 7 - Connection Status Indicator */}
-                  {syncStatus.isOnline && (
-                    <div
-                      className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${
-                        connectionStatus === 'connected'
-                          ? 'bg-green-100 text-green-700'
-                          : connectionStatus === 'reconnecting'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-gray-100 text-gray-500'
-                      }`}
-                      data-testid="realtime-connection-status"
-                      title={
-                        connectionStatus === 'connected'
-                          ? 'Real-time updates active'
-                          : connectionStatus === 'reconnecting'
-                            ? 'Reconnecting...'
-                            : 'Disconnected'
-                      }
-                    >
-                      {connectionStatus === 'connected' ? (
-                        <Wifi className="h-3 w-3" />
-                      ) : (
-                        <WifiOff className="h-3 w-3" />
-                      )}
-                      <span className="capitalize">{connectionStatus}</span>
-                    </div>
-                  )}
-                </div>
-                <p className="text-gray-600">Connected with {partner.displayName}</p>
-              </div>
-
-              {/* Action buttons: Refresh + Interaction FAB */}
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing || !syncStatus.isOnline}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-colors ${
-                    isRefreshing || !syncStatus.isOnline
-                      ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                      : 'bg-pink-600 text-white hover:bg-pink-700'
-                  }`}
-                  data-testid="partner-mood-refresh-button"
+            {/* Header: partner name, realtime status, refresh icon button */}
+            <header className="flex items-end justify-between gap-3 px-1 pt-1">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <h1 className="font-serif text-[30px] leading-[1.1] font-semibold wrap-break-word text-ink">
+                  {partner.displayName}
+                </h1>
+                {/* Story 6.4: Task 7 - Connection Status Indicator */}
+                <p
+                  className="flex items-center gap-1.5 text-sm text-muted"
+                  data-testid="realtime-connection-status"
+                  title={connection.title}
                 >
-                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-                </button>
-
-                {/* Story 6.5: Poke/Kiss Interaction FAB - next to refresh, expands down */}
-                <PokeKissInterface expandDirection="down" />
+                  <span
+                    className={`h-2 w-2 shrink-0 rounded-full ${connection.dot}`}
+                    aria-hidden="true"
+                  />
+                  {connection.label}
+                </p>
               </div>
-            </div>
+
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={isRefreshing || !syncStatus.isOnline}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Refresh"
+                aria-busy={isRefreshing}
+                data-testid="partner-mood-refresh-button"
+              >
+                <RefreshCw
+                  className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+            </header>
 
             {/* Error Display */}
             {error && (
               <div
-                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800"
+                className="rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
                 data-testid="partner-mood-error"
               >
                 {error}
@@ -600,18 +585,26 @@ export function PartnerMoodView() {
             {/* Offline Notice */}
             {!syncStatus.isOnline && (
               <div
-                className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-800"
+                className={`${CARD} flex items-center gap-3 p-4`}
                 data-testid="partner-mood-offline-notice"
               >
-                You're offline. Partner moods will load when you reconnect.
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card2 text-muted">
+                  <WifiOff className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <p className="text-sm text-muted">
+                  You're offline. Partner moods will load when you reconnect.
+                </p>
               </div>
             )}
 
             {/* Loading State */}
             {isRefreshing && partnerMoods.length === 0 && (
-              <div className="py-12 text-center" data-testid="partner-mood-loading">
-                <div className="mb-4 animate-pulse text-6xl">💕</div>
-                <p className="text-gray-600">Loading partner moods...</p>
+              <div
+                className={`${CARD} flex flex-col items-center gap-3 px-5 py-10 text-center`}
+                data-testid="partner-mood-loading"
+              >
+                <Heart className="h-8 w-8 animate-pulse fill-current text-accent" aria-hidden="true" />
+                <p className="text-sm text-muted">Loading partner moods...</p>
               </div>
             )}
 
@@ -620,31 +613,54 @@ export function PartnerMoodView() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="py-12 text-center"
+                className={`${CARD} flex flex-col items-center gap-2 px-5 py-10 text-center`}
                 data-testid="partner-mood-empty-state"
               >
-                <Calendar className="mx-auto mb-4 h-16 w-16 text-gray-300" />
-                <h3 className="mb-2 text-xl font-semibold text-gray-700">No moods yet</h3>
-                <p className="mb-6 text-gray-500">
+                <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-ptint text-partner">
+                  <Calendar className="h-6 w-6" aria-hidden="true" />
+                </div>
+                <h2 className="text-[15px] font-semibold text-ink">No moods yet</h2>
+                <p className="text-sm text-muted">
                   {partner.displayName} hasn't logged any moods yet.
                   {syncStatus.isOnline && <> Try refreshing to check for updates.</>}
                 </p>
               </motion.div>
             )}
 
-            {/* Mood List */}
-            {partnerMoods.length > 0 && (
-              <div className="space-y-4" data-testid="partner-mood-list">
-                <AnimatePresence>
-                  {partnerMoods.map((moodEntry, index) => (
-                    <MoodCard
-                      key={moodEntry.supabaseId || `${moodEntry.date}-${index}`}
-                      moodEntry={moodEntry}
-                      formatDate={formatDate}
-                    />
-                  ))}
-                </AnimatePresence>
-              </div>
+            {/* Feeling right now */}
+            {latestMood && (
+              <MoodCard
+                key={latestMood.supabaseId || latestMood.date}
+                variant="current"
+                moodEntry={latestMood}
+                formatDate={formatDate}
+              />
+            )}
+
+            {/* Story 6.5: Poke/Kiss/Fart tiles + History */}
+            <PokeKissInterface />
+
+            {/* Recent moods */}
+            {olderMoods.length > 0 && (
+              <section className="flex flex-col gap-3" aria-labelledby="partner-recent-moods-label">
+                <h2 id="partner-recent-moods-label" className={SECTION_LABEL}>
+                  Recent moods
+                </h2>
+                <div
+                  className={`${CARD} flex flex-col divide-y divide-line px-3 py-1`}
+                  data-testid="partner-mood-list"
+                >
+                  <AnimatePresence initial={false}>
+                    {olderMoods.map((moodEntry, index) => (
+                      <MoodCard
+                        key={moodEntry.supabaseId || `${moodEntry.date}-${index + 1}`}
+                        moodEntry={moodEntry}
+                        formatDate={formatDate}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </section>
             )}
           </>
         )}
@@ -656,54 +672,94 @@ export function PartnerMoodView() {
 /**
  * Individual Mood Card Component
  * Story 6.4: Task 11 - Memoized for performance optimization
+ *
+ * `current` is the "Feeling right now" card (one partner chip per mood);
+ * `row` (the default) is one line of the Recent moods list card.
  */
 interface MoodCardProps {
   moodEntry: MoodEntry;
-  formatDate: (date: string) => string;
+  formatDate: (date: string, style?: 'short' | 'long') => string;
+  variant?: 'current' | 'row';
 }
 
-export const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCardProps) {
+export const MoodCard = memo(function MoodCard({
+  moodEntry,
+  formatDate,
+  variant = 'row',
+}: MoodCardProps) {
   const normalized = normalizeMoodEntry(moodEntry);
   if (!normalized) return null;
   const { date, note, timestamp, moods: allMoods } = normalized;
-  const primaryConfig = MOOD_CONFIG[normalized.mood];
-  const PrimaryIcon = primaryConfig.icon;
+  const PrimaryIcon = MOOD_DISPLAY[normalized.mood].icon;
+  const labels = allMoods.map((m) => MOOD_DISPLAY[m].label).join(', ');
+  const when = `${formatDate(date, variant === 'current' ? 'long' : 'short')} · ${new Date(timestamp).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`;
+
+  if (variant === 'current') {
+    return (
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        className={`${CARD} flex flex-col gap-3 p-[18px]`}
+        data-testid="partner-mood-card"
+      >
+        <h2 className="text-[13px] font-semibold tracking-[.08em] text-muted uppercase">
+          Feeling right now
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {allMoods.map((m, index) => {
+            const { icon: Icon, label } = MOOD_DISPLAY[m];
+            return (
+              <span
+                key={`${m}-${index}`}
+                className={`flex h-[34px] items-center gap-1.5 rounded-full pr-3.5 pl-2.5 text-sm font-semibold ${MOOD_TONE.partner}`}
+              >
+                <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
+                {label}
+              </span>
+            );
+          })}
+        </div>
+        <p className="text-[13px] text-muted">{when}</p>
+        {note && (
+          <p
+            className="text-[15px] leading-relaxed wrap-break-word text-ink"
+            data-testid="partner-mood-entry-note"
+          >
+            {note}
+          </p>
+        )}
+      </motion.section>
+    );
+  }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
+      className="flex min-h-12 items-center gap-3 py-2"
       data-testid="partner-mood-card"
     >
-      <div className="flex items-start gap-4">
-        {/* Mood Icon */}
-        <div className={`${primaryConfig.color} mt-1`}>
-          <PrimaryIcon className="h-6 w-6" />
-        </div>
-
-        {/* Mood Content */}
-        <div className="flex-1">
-          {/* Date and Mood Label */}
-          <div className="mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900">
-                {allMoods.map((m) => MOOD_CONFIG[m].label).join(', ')}
-              </span>
-              <span className="text-sm text-gray-500">{formatDate(date)}</span>
-            </div>
-            <span className="text-xs text-gray-400">
-              {new Date(timestamp).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-            </span>
-          </div>
-
-          {/* Note (if exists) */}
-          {note && <p className="text-sm leading-relaxed text-gray-700">{note}</p>}
-        </div>
+      <div
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${MOOD_TONE.partner}`}
+      >
+        <PrimaryIcon className="h-[18px] w-[18px]" aria-hidden="true" />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <p className="text-[15px] font-medium wrap-break-word text-ink">{labels}</p>
+        <p className="text-[13px] text-muted">{when}</p>
+        {note && (
+          <p
+            className="mt-0.5 text-[13px] leading-relaxed wrap-break-word text-muted"
+            data-testid="partner-mood-entry-note"
+          >
+            {note}
+          </p>
+        )}
       </div>
     </motion.div>
   );

@@ -213,15 +213,13 @@ test.describe('An event survives the round trip through the server', () => {
     const card = page.getByTestId(ICON_CARD_TESTID);
     await expect(card).toBeVisible();
 
-    // The card holds exactly one svg — the icon from `iconComponents`
-    // (`EventCountdown.tsx:32-36,209`). `ring` selects lucide's `Gem`, which
-    // stamps `lucide-gem` on the element, and `iconColors.ring.text`
-    // (`:38-43`) adds `text-amber-500`. Both classes come from the two maps
-    // this test exists to pin, so the assertion fails for exactly the reason
-    // that matters: the wrong icon, or the wrong colour band.
+    // The card holds exactly one svg — the icon from `iconComponents` in
+    // `EventCountdown.tsx`. `ring` selects lucide's `Gem`, which stamps
+    // `lucide-gem` on the element. Colour no longer varies by icon (every
+    // event tile is the kit tint/accent pair), so the glyph is the whole of
+    // the icon's own treatment.
     const cardIcon = card.locator('svg');
     await expect(cardIcon).toHaveClass(/lucide-gem/);
-    await expect(cardIcon).toHaveClass(/text-amber-500/);
   });
 
   test('[P1] DE.5-E2E-005 rows render in server order after a reload, not in creation order', async ({

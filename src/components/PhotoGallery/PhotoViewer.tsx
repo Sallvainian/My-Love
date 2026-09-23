@@ -1,6 +1,6 @@
 import type { PanInfo } from 'framer-motion';
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Loader2, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks';
 import type { PhotoWithUrls } from '../../services/photoService';
@@ -509,10 +509,10 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
               ref={deleteButtonRef}
               onClick={() => setShowDeleteDialog(true)}
               disabled={showDeleteDialog}
-              className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent text-danger"
               aria-label="Delete photo"
             >
-              <Trash2 className="h-6 w-6 text-white" />
+              <Trash2 className="h-5 w-5" aria-hidden="true" />
             </button>
           )}
 
@@ -520,10 +520,10 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           <button
             onClick={onClose}
             disabled={showDeleteDialog}
-            className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent text-ink"
             aria-label="Close viewer"
           >
-            <X className="h-6 w-6 text-white" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -531,19 +531,19 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         <button
           onClick={() => navigatePhoto('prev')}
           disabled={showDeleteDialog || !canNavigatePrev}
-          className="absolute top-1/2 left-4 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-30"
+          className="absolute top-1/2 left-4 z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent text-ink disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Previous photo"
         >
-          <ChevronLeft className="h-8 w-8 text-white" />
+          <ChevronLeft className="h-6 w-6" aria-hidden="true" />
         </button>
 
         <button
           onClick={() => navigatePhoto('next')}
           disabled={showDeleteDialog || !canNavigateNext}
-          className="absolute top-1/2 right-4 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-30"
+          className="absolute top-1/2 right-4 z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent text-ink disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Next photo"
         >
-          <ChevronRight className="h-8 w-8 text-white" />
+          <ChevronRight className="h-6 w-6" aria-hidden="true" />
         </button>
 
         {/* AC 6.4.2, 6.4.4, 6.4.5, 6.4.7: Photo with gesture support */}
@@ -579,7 +579,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 <button
                   onClick={handleRetryLoad}
                   disabled={showDeleteDialog}
-                  className="rounded-lg bg-white/10 px-4 py-2 transition hover:bg-white/20"
+                  className="h-11 rounded-full bg-card px-5 text-[15px] font-semibold text-ink transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   Retry
                 </button>
@@ -607,12 +607,12 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
         {/* AC 6.4.8, 6.4.9: Photo caption and metadata */}
         <motion.div
-          className="absolute right-0 bottom-0 left-0 bg-black/80 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-white"
+          className="absolute right-0 bottom-0 left-0 rounded-t-[20px] border-t border-line bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-ink"
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="mb-1 text-sm text-gray-300">
+          <div className="mb-1 text-sm text-muted">
             Photo {currentIndex + 1} of {photos.length} •{' '}
             {currentPhoto.isOwn ? 'Your photo' : 'Partner photo'}
           </div>
@@ -621,7 +621,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
               {currentPhoto.caption}
             </p>
           )}
-          <div className="mt-1 text-sm text-gray-400">
+          <div className="mt-1 text-sm text-muted">
             {new Date(currentPhoto.created_at).toLocaleDateString('en-US', {
               month: 'long',
               day: 'numeric',
@@ -634,22 +634,27 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         {showDeleteDialog && (
           <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50">
             <motion.div
-              className="mx-4 max-w-sm rounded-lg bg-white p-6 dark:bg-gray-800"
+              className="mx-4 w-full max-w-md rounded-[20px] bg-card shadow-float"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
             >
-              <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Delete Photo?
-              </h3>
-              <p className="mb-4 text-gray-600 dark:text-gray-400">
-                This photo will be permanently deleted. This action cannot be undone.
-              </p>
-              {currentPhoto.caption && (
-                <p className="mb-4 line-clamp-2 text-sm text-gray-500 italic dark:text-gray-500">
-                  "{currentPhoto.caption}"
+              <div className="flex items-center gap-3 border-b border-line px-5 py-4">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
+                  <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <h3 className="text-lg font-semibold text-ink">Delete Photo?</h3>
+              </div>
+              <div className="space-y-4 px-5 py-4">
+                <p className="text-[15px] text-ink">
+                  This photo will be permanently deleted. This action cannot be undone.
                 </p>
-              )}
-              <div className="flex gap-3">
+                {currentPhoto.caption && (
+                  <p className="line-clamp-2 rounded-[14px] bg-card2 px-3 py-2 text-sm text-muted italic">
+                    "{currentPhoto.caption}"
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end gap-3 border-t border-line px-5 py-4">
                 {/* autoFocus: nothing else moves focus into this dialog, and
                     without it a keyboard user is left on the trash button
                     behind the overlay, inside a subtree the confirmation
@@ -661,15 +666,16 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 <button
                   autoFocus
                   onClick={handleCancelDialog}
-                  className="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+                  className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
                   disabled={isDeleting}
-                  className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
+                  className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
                 >
+                  {isDeleting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                   Delete
                 </button>
               </div>

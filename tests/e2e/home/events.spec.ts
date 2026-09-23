@@ -103,9 +103,10 @@ test.describe('Home dashboard reads events from the store', () => {
 
     // The stored `icon` reaches the card: the partner row is seeded 'ring' and
     // the own row takes the 'calendar' default, so the two must not render the
-    // same glyph. iconColors maps each icon to a distinct border class.
-    await expect(partnerCard).toHaveClass(/border-amber-300/);
-    await expect(futureCard).toHaveClass(/border-green-300/);
+    // same glyph. Colour no longer varies by icon (it lives only in the tile),
+    // so the lucide glyph class each icon stamps is what tells them apart.
+    await expect(partnerCard.locator('svg')).toHaveClass(/lucide-gem/);
+    await expect(futureCard.locator('svg')).toHaveClass(/lucide-calendar/);
 
     // Soonest-first, straight from the store: own event is +14d, partner's is
     // +21d. `events` is rendered in store order with no re-sort, so a
@@ -255,7 +256,7 @@ test.describe('Home dashboard reads events from the store', () => {
     const card = page.getByTestId('event-countdown-today-meetup-e2e');
     await expect(card).toBeVisible();
     await expect(card.getByText('Today Meetup E2E')).toBeVisible();
-    await expect(card.getByText('Today! 🎉')).toBeVisible();
+    await expect(card.getByText('Today!')).toBeVisible();
 
     // No description paragraph is rendered next to the label for a null value.
     expect(await card.locator('h3 ~ p').count()).toBe(0);

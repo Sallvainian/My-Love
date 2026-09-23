@@ -189,10 +189,13 @@ describe('PhotoViewer focus', () => {
 
     fireEvent.click(screen.getByLabelText('Delete photo'));
     const deleteButton = await screen.findByRole('button', { name: 'Delete' });
+    expect(deleteButton.querySelector('.animate-spin')).toBeNull();
     fireEvent.click(deleteButton);
     fireEvent.click(deleteButton);
 
     expect(deletePhotoMock).toHaveBeenCalledTimes(1);
+    // The spinner shows while the delete is held pending.
+    expect(deleteButton.querySelector('.animate-spin')).not.toBeNull();
     expect(deletePhotoMock).toHaveBeenCalledWith('photo-2');
     // And the second tap had nothing to land on anyway. Cancel stays enabled
     // as the trap's one focusable, but is inert mid-flight -- clicking it (or

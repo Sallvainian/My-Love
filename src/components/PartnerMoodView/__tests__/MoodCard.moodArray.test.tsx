@@ -1,8 +1,8 @@
 /**
  * MoodCard must survive a non-array `moods`
  *
- * `MoodCard` reads `moodEntry.moods` with a truthy-plus-length check and then
- * dereferences `MOOD_CONFIG[allMoods[0]].icon` unconditionally. A string
+ * `MoodCard` read `moodEntry.moods` with a truthy-plus-length check and then
+ * dereferenced its mood-config `[allMoods[0]].icon` unconditionally. A string
  * `moods` passes the truthy check, yields a single character, and the config
  * lookup returns undefined — so the whole 711-line Partner view threw on a
  * field that arrives, indirectly, from a partner's broadcast.

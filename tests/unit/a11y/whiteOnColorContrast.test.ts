@@ -109,15 +109,15 @@ function readBuiltInPalette(): Map<string, Rgb> {
 }
 
 /**
- * The palette THIS project adds, which is most of the brand.
+ * The palette THIS project adds on top of Tailwind's.
  *
  * `src/index.css:4` is `@config '../tailwind.config.js'`, and that file extends
- * `theme.colors` with sunset, coral, ocean and the rest, in hex. A guard that
- * read only Tailwind's built-ins would silently skip every one of them — and
- * silently is the word, because an unknown swatch is indistinguishable from a
- * class that is not a colour at all. The send button in love notes is
- * `bg-coral-500`, the worst pairing in the tree, and it was invisible here
- * until this function existed.
+ * `theme.colors` with its own `rose` scale, in hex. A guard that read only
+ * Tailwind's built-ins would silently skip any project scale — and silently is
+ * the word, because an unknown swatch is indistinguishable from a class that is
+ * not a colour at all. The love-notes send button was once `bg-coral-500`, the
+ * worst pairing in the tree, and it was invisible here until this function
+ * existed.
  *
  * Parsed by regex rather than imported: `tailwind.config.js` belongs to
  * `tsconfig.node.json` while this suite builds under `tsconfig.test.json`, so a
@@ -197,6 +197,87 @@ function componentFiles(directory: string, collected: string[] = []): string[] {
   return collected;
 }
 
+/**
+ * Every white-on-colour pairing on one source line.
+ *
+ * Split out of the file walk so the idiom canary below can run against a fixed
+ * line: the `className={…}` conditional it guards has been styled out of every
+ * component, and a canary that needs a live example in `src/` would have to go
+ * with it.
+ */
+function pairingsOnLine(
+  text: string,
+  palette: Map<string, Rgb>,
+  file: string,
+  line: number
+): Pairing[] {
+  const found: Pairing[] = [];
+  // Every string literal on the line, not just `className="…"`.
+  //
+  // This codebase writes classes both ways — roughly 1300 `className="`
+  // against 130 `className={` — and the second form is where conditional
+  // pairings live, e.g. `photo.isOwn ? 'bg-pink-600 text-white' :
+  // 'bg-blue-600 text-white'`. An attribute-shaped regex walks past all
+  // of them, which is a guard that reports clean over exactly the cases
+  // most likely to be wrong. The first version of this file did that.
+  //
+  // A literal carrying BOTH `text-white` and a `bg-` utility is the unit
+  // judged, so a conditional's two arms are judged separately, which is
+  // what you want.
+  //
+  // Two known limitations, both of which under-report rather than
+  // over-report. A pairing split across two literals (`${base} text-white`,
+  // with the background inside `base`) is not seen. And the scan is
+  // line-by-line, so a template literal left open across several lines is
+  // only judged where both utilities land on the SAME line -- the usual
+  // case, since a wrapped class list tends to keep its colour pair
+  // together, but not a guarantee.
+  for (const literal of text.matchAll(/'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g)) {
+    const classes = literal[0];
+    if (!classes.includes('text-white')) continue;
+    // Unprefixed only: the negative lookbehind rejects `hover:bg-`,
+    // `dark:bg-`, `disabled:hover:bg-` and `group-hover:bg-`.
+    //
+    // The trailing boundary allows an opacity modifier (`bg-blue-500/90`)
+    // and measures the base colour, which is the most that can be said:
+    // what shows through is a photo or a gradient, so the true ratio is not
+    // knowable from the class alone, and the opaque value is the optimistic
+    // bound. A pairing that fails even at full opacity fails.
+    for (const bg of classes.matchAll(/(?<![\w:-])bg-([a-z]+-\d{2,3})(?![\w-])/g)) {
+      const swatch = bg[1];
+      const colour = palette.get(swatch);
+      if (!colour) continue;
+      found.push({
+        file,
+        line,
+        swatch,
+        ratio: contrastAgainstWhite(colour),
+        kind: 'solid',
+      });
+    }
+
+    // A gradient carries its colours in `from-`/`via-`/`to-`, so the `bg-`
+    // matcher above sees nothing at all in `bg-gradient-to-r from-pink-500
+    // to-rose-500`. Each stop is judged as its own ground.
+    if (!classes.includes('bg-gradient')) continue;
+    for (const stop of classes.matchAll(
+      /(?<![\w:-])(?:from|via|to)-([a-z]+-\d{2,3})(?![\w-])/g
+    )) {
+      const swatch = stop[1];
+      const colour = palette.get(swatch);
+      if (!colour) continue;
+      found.push({
+        file,
+        line,
+        swatch,
+        ratio: contrastAgainstWhite(colour),
+        kind: 'gradient',
+      });
+    }
+  }
+  return found;
+}
+
 function findWhiteOnColourPairings(): Pairing[] {
   const palette = readPalette();
   const files = componentFiles(resolve(repoRoot, 'src'));
@@ -207,69 +288,7 @@ function findWhiteOnColourPairings(): Pairing[] {
 
     const lines = readFileSync(absolute, 'utf8').split('\n');
     lines.forEach((text, index) => {
-      // Every string literal on the line, not just `className="…"`.
-      //
-      // This codebase writes classes both ways — roughly 1300 `className="`
-      // against 130 `className={` — and the second form is where conditional
-      // pairings live, e.g. `photo.isOwn ? 'bg-pink-600 text-white' :
-      // 'bg-blue-600 text-white'`. An attribute-shaped regex walks past all
-      // of them, which is a guard that reports clean over exactly the cases
-      // most likely to be wrong. The first version of this file did that.
-      //
-      // A literal carrying BOTH `text-white` and a `bg-` utility is the unit
-      // judged, so a conditional's two arms are judged separately, which is
-      // what you want.
-      //
-      // Two known limitations, both of which under-report rather than
-      // over-report. A pairing split across two literals (`${base} text-white`,
-      // with the background inside `base`) is not seen. And the scan is
-      // line-by-line, so a template literal left open across several lines is
-      // only judged where both utilities land on the SAME line -- the usual
-      // case, since a wrapped class list tends to keep its colour pair
-      // together, but not a guarantee.
-      for (const literal of text.matchAll(/'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g)) {
-        const classes = literal[0];
-        if (!classes.includes('text-white')) continue;
-        // Unprefixed only: the negative lookbehind rejects `hover:bg-`,
-        // `dark:bg-`, `disabled:hover:bg-` and `group-hover:bg-`.
-        //
-        // The trailing boundary allows an opacity modifier (`bg-blue-500/90`)
-        // and measures the base colour, which is the most that can be said:
-        // what shows through is a photo or a gradient, so the true ratio is not
-        // knowable from the class alone, and the opaque value is the optimistic
-        // bound. A pairing that fails even at full opacity fails.
-        for (const bg of classes.matchAll(/(?<![\w:-])bg-([a-z]+-\d{2,3})(?![\w-])/g)) {
-          const swatch = bg[1];
-          const colour = palette.get(swatch);
-          if (!colour) continue;
-          found.push({
-            file,
-            line: index + 1,
-            swatch,
-            ratio: contrastAgainstWhite(colour),
-            kind: 'solid',
-          });
-        }
-
-        // A gradient carries its colours in `from-`/`via-`/`to-`, so the `bg-`
-        // matcher above sees nothing at all in `bg-gradient-to-r from-pink-500
-        // to-rose-500`. Each stop is judged as its own ground.
-        if (!classes.includes('bg-gradient')) continue;
-        for (const stop of classes.matchAll(
-          /(?<![\w:-])(?:from|via|to)-([a-z]+-\d{2,3})(?![\w-])/g
-        )) {
-          const swatch = stop[1];
-          const colour = palette.get(swatch);
-          if (!colour) continue;
-          found.push({
-            file,
-            line: index + 1,
-            swatch,
-            ratio: contrastAgainstWhite(colour),
-            kind: 'gradient',
-          });
-        }
-      }
+      found.push(...pairingsOnLine(text, palette, file, index + 1));
     });
   }
   return found;
@@ -288,15 +307,16 @@ describe('white text on a coloured background clears WCAG AA', () => {
   });
 
   it("reads the project's own palette too, not only Tailwind's", () => {
-    const palette = readPalette();
+    const palette = readProjectPalette();
 
-    // Most of the brand lives in `tailwind.config.js`, not in Tailwind's
-    // defaults. A guard blind to it reports clean over the whole design system
-    // while measuring only the utility colours.
-    expect(palette.get('coral-500'), 'the project palette must be loaded').toBeDefined();
-    expect(palette.get('sunset-500')).toBeDefined();
-    expect(palette.get('ocean-500')).toBeDefined();
-    expect(contrastAgainstWhite(palette.get('coral-500') as Rgb)).toBeCloseTo(1.99, 1);
+    // `tailwind.config.js` extends Tailwind's defaults with its own scale. A
+    // guard blind to it reports clean while measuring only the utility colours.
+    // Read from the config itself (#e11d48), not the built-in rose-600.
+    expect(palette.get('rose-600'), 'the project palette must be loaded').toBeDefined();
+    expect(contrastAgainstWhite(palette.get('rose-600') as Rgb)).toBeCloseTo(4.7, 1);
+    // And the merged palette the scan uses carries the project's value, so the
+    // project map cannot be dropped from readPalette() or lose the merge.
+    expect(readPalette().get('rose-600')).toEqual(palette.get('rose-600'));
   });
 
   it('finds pairings to check at all, in both class idioms', () => {
@@ -305,13 +325,24 @@ describe('white text on a coloured background clears WCAG AA', () => {
     // under the current count rather than at a token value: the first version
     // of this file matched only `className="…"`, found 36 pairings, and sailed
     // past a `> 10` canary while blind to 16 more.
+    //
+    // Re-set to just under the count as each kit story styles pairings out:
+    // 41 before the Photos restyle, 26 after it; 17 before the Sign in and
+    // remaining-surfaces restyle, 10 after it.
     const pairings = findWhiteOnColourPairings();
-    expect(pairings.length).toBeGreaterThan(35);
+    expect(pairings.length).toBeGreaterThan(8);
 
-    // And both idioms must be represented. `PhotoGridItem` writes its pairing
-    // inside `className={…}`, which is the specific blindness that shipped here
-    // once already.
-    expect(pairings.some((pairing) => pairing.file.endsWith('PhotoGridItem.tsx'))).toBe(true);
+    // And both idioms must be seen. A pairing inside `className={…}` is the
+    // specific blindness that shipped here once already. The last one in `src/`
+    // (PhotoGridItem's owner badge) moved onto kit tokens, so the idiom is
+    // checked against the line it used to be.
+    const conditional = pairingsOnLine(
+      "photo.isOwn ? 'bg-pink-600 text-white' : 'bg-blue-600 text-white'",
+      readPalette(),
+      'fixture.tsx',
+      1
+    );
+    expect(conditional.map((pairing) => pairing.swatch)).toEqual(['pink-600', 'blue-600']);
   });
 
   it('measures gradients, not only solid backgrounds', () => {
@@ -320,7 +351,9 @@ describe('white text on a coloured background clears WCAG AA', () => {
     // The most-used button style in the app is a gradient, and it was entirely
     // outside this guard until the stops were matched. A regex that stopped
     // seeing them would leave the gradient allowlist below trivially satisfied.
-    expect(gradients.length).toBeGreaterThan(15);
+    // 16 stops before the Photos restyle removed its upload FAB, 14 after;
+    // 8 after the Sign in and remaining-surfaces restyle.
+    expect(gradients.length).toBeGreaterThan(6);
     expect(gradients.some((pairing) => pairing.swatch === 'pink-600')).toBe(true);
   });
 

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { TriangleAlert, WifiOff } from 'lucide-react';
 import { Component } from 'react';
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../Settings/kitClasses';
 
 interface ViewErrorFallbackProps {
   error: Error | null;
@@ -27,40 +29,46 @@ function ViewErrorFallback({
 
   const showOfflineMessage = isOffline || isChunkError;
 
+  const Icon = showOfflineMessage ? WifiOff : TriangleAlert;
+
   return (
     <div
       className="flex min-h-[60vh] items-center justify-center px-4"
       data-testid="view-error-boundary"
     >
-      <div className="w-full max-w-md rounded-lg bg-white p-6 text-center shadow-lg dark:bg-gray-800">
-        <div className="mb-4 text-5xl">{showOfflineMessage ? '📴' : '⚠️'}</div>
-        <h2 className="mb-2 text-xl font-bold text-gray-800 dark:text-gray-100">
+      <div className="w-full max-w-md rounded-[20px] border border-line bg-card p-5 text-center shadow-card">
+        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-tint text-accent">
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <h2 className="mb-2 text-lg font-semibold text-ink">
           {showOfflineMessage ? "Can't load this page offline" : `Error loading ${viewName}`}
         </h2>
-        <p className="mb-4 text-gray-600 dark:text-gray-300">
+        <p className="mb-5 text-sm text-muted">
           {showOfflineMessage
             ? 'This page needs an internet connection to load. Please reconnect and try again.'
             : 'Something went wrong while loading this view.'}
         </p>
         {error && !showOfflineMessage && (
-          <p className="mb-4 max-h-24 overflow-auto rounded bg-gray-100 p-2 text-left font-mono text-sm text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+          <p className="mb-5 max-h-24 overflow-auto rounded-[14px] bg-card2 p-3 text-left font-mono text-sm break-words text-muted">
             {error.message}
           </p>
         )}
-        <div className="flex justify-center gap-3">
+        <div className="grid gap-3">
           <button
-            onClick={onNavigateHome}
-            data-testid="error-go-home"
-            className="rounded-lg bg-gray-200 px-4 py-2 font-medium text-gray-800 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-          >
-            Go Home
-          </button>
-          <button
+            type="button"
             onClick={onRetry}
             data-testid="error-try-again"
-            className="rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 px-4 py-2 font-medium text-white shadow-md transition-all hover:from-pink-700 hover:to-rose-700 hover:shadow-lg"
+            className={PRIMARY_BUTTON}
           >
             Try Again
+          </button>
+          <button
+            type="button"
+            onClick={onNavigateHome}
+            data-testid="error-go-home"
+            className={SECONDARY_BUTTON}
+          >
+            Go Home
           </button>
         </div>
       </div>
