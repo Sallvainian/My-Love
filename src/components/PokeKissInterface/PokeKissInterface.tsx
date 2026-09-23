@@ -371,14 +371,22 @@ export function PokeKissInterface() {
                 than inside it (a button inside a button is invalid and cannot
                 be reached by keyboard): it plays the oldest unviewed
                 interaction -- the only path that marks one viewed. The margin
-                plus History's right padding keeps the old inline gap. */}
+                plus History's right padding keeps the old inline gap.
+
+                The visible 20px badge is far under the kit's 44px icon
+                buttons, so the ::after pseudo-element widens the hit area
+                without occupying any layout. Growth on each side is capped at
+                the free space on that side, so it never covers History: 8px
+                up and down fills the 36px row History sets, 2px left is the
+                ml-0.5 gap, and 16px right stays inside the row's 4px padding
+                plus the page's 16px gutter, clear of the viewport edge. */}
             {unviewedCount > 0 && (
               <motion.button
                 ref={badgeRef}
                 type="button"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="relative isolate ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1.5 text-[11px] font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+                className="relative isolate ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1.5 text-[11px] font-bold text-white after:absolute after:-inset-y-2 after:-right-4 after:-left-0.5 after:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page"
                 onClick={handleBadgeClick}
                 data-testid="notification-badge"
                 aria-label={
