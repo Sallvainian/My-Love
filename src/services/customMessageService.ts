@@ -35,12 +35,6 @@ import { type MyLoveDBSchema, DB_VERSION, openMyLoveDB } from './dbSchema';
  * can no longer list, edit, delete, export or rotate through the other's
  * private messages on a shared browser.
  *
- * The one exception is `createUnownedIfAbsent()`, which takes no caller id
- * because it has none to take: it exists for the legacy LocalStorage migration
- * and writes a row that belongs to NOBODY. It reads the whole store to
- * deduplicate, and that is safe only because it returns no row to its caller —
- * see its own comment.
- *
  * The id is passed IN rather than read from the store, so the service stays
  * store-free and a continuation that resolves after an account switch writes
  * under the id it was raised with instead of whoever is signed in now.
@@ -66,7 +60,6 @@ import { type MyLoveDBSchema, DB_VERSION, openMyLoveDB } from './dbSchema';
  *   deleteForUser().
  * - Owner-scoped: create(), getActiveCustomMessages(), exportMessages(),
  *   importMessages()
- * - Unowned, migration-only: createUnownedIfAbsent()
  */
 class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema, 'messages'> {
   /**
@@ -281,74 +274,6 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       }
       console.error('[CustomMessageService] Failed to create custom message:', error);
       console.error('[CustomMessageService] Input:', input);
-      throw error;
-    }
-  }
-
-  /**
-   * Store a legacy LocalStorage row that belongs to nobody
-   *
-   * The Story 3.4 LocalStorage list predates accounts entirely, so there is no
-   * honest owner for it: stamping it with whoever happens to be signed in when
-   * the migration runs is exactly the inference this story forbids. The row is
-   * written without a `userId`, which keeps it on disk and hides it from every
-   * account — the same standing as a custom row written before this field
-   * existed. If those rows should ever come back, that is a product decision,
-   * not something a migration may make on the user's behalf.
-   *
-   * Deduplication lives inside this method rather than in the caller so that no
-   * unowned row is ever handed out: reading them to compare texts is precisely
-   * what the rest of this service exists to prevent. The check and the write
-   * share one readwrite transaction, so two openers cannot both insert.
-   *
-   * @returns `'created'` when the row was written, `'duplicate'` when an
-   *          unowned row with the same text already exists
-   */
-  async createUnownedIfAbsent(input: CreateMessageInput): Promise<'created' | 'duplicate'> {
-    try {
-      const validated = CreateMessageInputSchema.parse(input);
-      await this.init();
-
-      const normalizedText = validated.text.trim().toLowerCase();
-      const tx = this.getTypedDB().transaction('messages', 'readwrite');
-
-      const existing = await tx.store.getAll();
-      const alreadyStored = existing.some(
-        (row) =>
-          row.isCustom === true &&
-          row.userId === undefined &&
-          row.text.trim().toLowerCase() === normalizedText
-      );
-
-      if (alreadyStored) {
-        await tx.done;
-        return 'duplicate';
-      }
-
-      // No `userId` key at all, rather than an explicit undefined: IndexedDB
-      // keeps the property when it is present, and an own-property `userId`
-      // reads back differently from an absent one in anything that inspects
-      // the row.
-      await tx.store.add({
-        text: validated.text,
-        category: validated.category,
-        isCustom: true,
-        active: validated.active ?? true,
-        isFavorite: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        tags: validated.tags || [],
-      } as Message);
-      await tx.done;
-
-      logger.debug('[CustomMessageService] Stored legacy message without an owner');
-      return 'created';
-    } catch (error) {
-      if (isZodError(error)) {
-        console.error('[CustomMessageService] Validation failed:', error.issues);
-        throw createValidationError(error);
-      }
-      console.error('[CustomMessageService] Failed to store legacy message:', error);
       throw error;
     }
   }

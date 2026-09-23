@@ -25,7 +25,6 @@ import {
 import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
-import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { stripBasePath } from './utils/basePath';
 import { logger } from './utils/logger';
@@ -375,38 +374,15 @@ function App() {
       hasInitialized.current = true;
 
       // Performance fix: Initialize app immediately for fast first paint
-      // Migration runs in background after initial render
       initializeApp();
 
-      // Story 3.5: Migrate custom messages from LocalStorage to IndexedDB
-      // Deferred to not block initial paint - runs after first render
-      const runMigration = async () => {
-        try {
-          const migrationResult = await migrateCustomMessagesFromLocalStorage();
-          if (migrationResult.migratedCount > 0) {
-            logger.debug('[App] Migration completed:', {
-              migrated: migrationResult.migratedCount,
-              skipped: migrationResult.skippedCount,
-              success: migrationResult.success,
-            });
-          }
-          if (migrationResult.errors.length > 0) {
-            console.error('[App] Migration errors:', migrationResult.errors);
-          }
-        } catch (error) {
-          console.error('[App] Migration failed:', error);
-        }
-
-        // Monitor LocalStorage quota in development mode (Epic 2 technical debt)
-        logStorageQuota();
-      };
-
-      // Use requestIdleCallback if available, otherwise setTimeout
-      // This ensures migration doesn't block the main thread during initial render
+      // Monitor LocalStorage quota in development mode (Epic 2 technical debt).
+      // Use requestIdleCallback if available, otherwise setTimeout, so it does
+      // not block the main thread during initial render.
       if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => runMigration(), { timeout: 2000 });
+        requestIdleCallback(() => logStorageQuota(), { timeout: 2000 });
       } else {
-        setTimeout(runMigration, 100);
+        setTimeout(logStorageQuota, 100);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

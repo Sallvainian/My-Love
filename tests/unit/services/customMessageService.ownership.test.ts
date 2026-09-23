@@ -604,49 +604,4 @@ describe('customMessageService ownership', () => {
       );
     });
   });
-
-  describe('legacy LocalStorage migration', () => {
-    it('stores a migrated row with no owner at all', async () => {
-      const service = await freshService();
-
-      expect(await service.createUnownedIfAbsent({ text: 'FROM-LOCALSTORAGE', category: 'custom' }))
-        .toBe('created');
-
-      const [row] = await rowsOnDisk();
-      expect(row.isCustom).toBe(true);
-      // Not merely undefined — the key is absent, the same as a row written
-      // before the field existed.
-      expect('userId' in row).toBe(false);
-
-      // And it is hidden from everyone, exactly like any other legacy row.
-      expect(await service.getAllForUser(A, { isCustom: true })).toEqual([]);
-      expect(await service.getAllForUser(B, { isCustom: true })).toEqual([]);
-    });
-
-    it('does not re-store a text it already migrated', async () => {
-      const service = await freshService();
-
-      await service.createUnownedIfAbsent({ text: 'FROM-LOCALSTORAGE', category: 'custom' });
-      const second = await service.createUnownedIfAbsent({
-        text: '  from-localstorage  ',
-        category: 'custom',
-      });
-
-      expect(second).toBe('duplicate');
-      expect(await rowsOnDisk()).toHaveLength(1);
-    });
-
-    it('does not treat an account’s own row as a migrated duplicate', async () => {
-      await seedSharedDevice();
-      const service = await freshService();
-
-      // A wrote this sentence in their own account; the device's legacy list
-      // having it too is not a reason to drop it, and the two rows have
-      // different owners.
-      expect(await service.createUnownedIfAbsent({ text: 'A-PRIVATE-ONE', category: 'custom' })).toBe(
-        'created'
-      );
-      expect((await rowsOnDisk()).filter((m) => m.text === 'A-PRIVATE-ONE')).toHaveLength(2);
-    });
-  });
 });
