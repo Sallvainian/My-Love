@@ -199,36 +199,6 @@ export type Database = {
           },
         ]
       }
-      local_data_uploads: {
-        Row: {
-          anniversaries_count: number
-          created_at: string
-          custom_messages_count: number
-          favorites_count: number
-          id: string
-          origin: string
-          user_id: string
-        }
-        Insert: {
-          anniversaries_count: number
-          created_at?: string
-          custom_messages_count: number
-          favorites_count: number
-          id?: string
-          origin: string
-          user_id: string
-        }
-        Update: {
-          anniversaries_count?: number
-          created_at?: string
-          custom_messages_count?: number
-          favorites_count?: number
-          id?: string
-          origin?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       love_note_removals: {
         Row: {
           note_id: string

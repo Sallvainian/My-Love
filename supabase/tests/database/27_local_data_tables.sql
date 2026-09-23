@@ -1,9 +1,9 @@
 -- Account data moved off the device (LD-DB-001 .. 070)
 --
--- The property under test: anniversaries, custom_messages, message_favorites
--- and local_data_uploads are private to their author. Unlike public.events the
--- partner reads NOTHING here -- no policy calls get_my_partner_id() -- so the
--- partner and an unrelated stranger must behave identically
+-- The property under test: anniversaries, custom_messages and message_favorites
+-- are private to their author. Unlike public.events the partner reads NOTHING
+-- here -- no policy calls get_my_partner_id() -- so the partner and an
+-- unrelated stranger must behave identically
 -- (20260922000000_local_data_tables.sql).
 --
 -- Cross-user UPDATE and DELETE are asserted as ROW COUNTS: RLS filters them to
@@ -11,10 +11,13 @@
 -- UPDATE raise 42501 (same measured behaviour as 20_events.sql).
 --
 -- Helpers are declared inline: 00_helpers.sql rolls back before this file runs.
+--
+-- Gaps in the numbering are retired assertions; the remaining ids keep their
+-- numbers.
 
 begin;
 
-select plan(70);
+select plan(57);
 
 create schema if not exists tests;
 
@@ -94,9 +97,6 @@ begin
           'custom', 'c:1:k');
   insert into public.message_favorites (user_id, message_key)
   values (v_a, 'b:abc');
-  insert into public.local_data_uploads (user_id, origin, anniversaries_count,
-                                         custom_messages_count, favorites_count)
-  values (v_a, 'https://example.test', 1, 1, 1);
 
   perform set_config('tests.a', v_a::text, false);
   perform set_config('tests.b', v_b::text, false);
@@ -111,7 +111,6 @@ $$;
 select has_table('public', 'anniversaries', 'LD-DB-001: anniversaries exists');
 select has_table('public', 'custom_messages', 'LD-DB-002: custom_messages exists');
 select has_table('public', 'message_favorites', 'LD-DB-003: message_favorites exists');
-select has_table('public', 'local_data_uploads', 'LD-DB-004: local_data_uploads exists');
 
 select is((select relrowsecurity from pg_class where oid = 'public.anniversaries'::regclass),
   true, 'LD-DB-005: RLS is enabled on anniversaries');
@@ -119,8 +118,6 @@ select is((select relrowsecurity from pg_class where oid = 'public.custom_messag
   true, 'LD-DB-006: RLS is enabled on custom_messages');
 select is((select relrowsecurity from pg_class where oid = 'public.message_favorites'::regclass),
   true, 'LD-DB-007: RLS is enabled on message_favorites');
-select is((select relrowsecurity from pg_class where oid = 'public.local_data_uploads'::regclass),
-  true, 'LD-DB-008: RLS is enabled on local_data_uploads');
 
 select policies_are('public', 'anniversaries',
   array['anniversaries_select', 'anniversaries_insert', 'anniversaries_update',
@@ -133,9 +130,6 @@ select policies_are('public', 'custom_messages',
 select policies_are('public', 'message_favorites',
   array['message_favorites_select', 'message_favorites_insert', 'message_favorites_delete'],
   'LD-DB-011: message_favorites carries select, insert and delete only');
-select policies_are('public', 'local_data_uploads',
-  array['local_data_uploads_select', 'local_data_uploads_insert'],
-  'LD-DB-012: local_data_uploads carries select and insert only');
 
 select policy_roles_are('public', 'anniversaries', 'anniversaries_select', array['authenticated'],
   'LD-DB-013: anniversaries_select applies to authenticated only');
@@ -159,10 +153,6 @@ select policy_roles_are('public', 'message_favorites', 'message_favorites_insert
   'LD-DB-022: message_favorites_insert applies to authenticated only');
 select policy_roles_are('public', 'message_favorites', 'message_favorites_delete', array['authenticated'],
   'LD-DB-023: message_favorites_delete applies to authenticated only');
-select policy_roles_are('public', 'local_data_uploads', 'local_data_uploads_select', array['authenticated'],
-  'LD-DB-024: local_data_uploads_select applies to authenticated only');
-select policy_roles_are('public', 'local_data_uploads', 'local_data_uploads_insert', array['authenticated'],
-  'LD-DB-025: local_data_uploads_insert applies to authenticated only');
 
 -- anon's zero privileges undo the ALTER DEFAULT PRIVILEGES in 20260725170000.
 select ok(not (has_table_privilege('anon', 'public.anniversaries', 'SELECT')
@@ -180,18 +170,9 @@ select ok(not (has_table_privilege('anon', 'public.message_favorites', 'SELECT')
             or has_table_privilege('anon', 'public.message_favorites', 'UPDATE')
             or has_table_privilege('anon', 'public.message_favorites', 'DELETE')),
   'LD-DB-028: anon holds no privilege on message_favorites');
-select ok(not (has_table_privilege('anon', 'public.local_data_uploads', 'SELECT')
-            or has_table_privilege('anon', 'public.local_data_uploads', 'INSERT')
-            or has_table_privilege('anon', 'public.local_data_uploads', 'UPDATE')
-            or has_table_privilege('anon', 'public.local_data_uploads', 'DELETE')),
-  'LD-DB-029: anon holds no privilege on local_data_uploads');
 
 select ok(not has_table_privilege('authenticated', 'public.message_favorites', 'UPDATE'),
   'LD-DB-030: authenticated cannot UPDATE message_favorites');
-select ok(not has_table_privilege('authenticated', 'public.local_data_uploads', 'UPDATE'),
-  'LD-DB-031: authenticated cannot UPDATE a receipt');
-select ok(not has_table_privilege('authenticated', 'public.local_data_uploads', 'DELETE'),
-  'LD-DB-032: authenticated cannot DELETE a receipt');
 
 -- ---------------------------------------------------------------------------
 -- Reads: the owner sees their row; the partner and a stranger see nothing
@@ -205,8 +186,6 @@ select is((select count(*)::int from public.custom_messages), 1,
   'LD-DB-034: the owner reads their custom message');
 select is((select count(*)::int from public.message_favorites), 1,
   'LD-DB-035: the owner reads their favorite');
-select is((select count(*)::int from public.local_data_uploads), 1,
-  'LD-DB-036: the owner reads their receipt');
 
 select tests.authenticate_as(current_setting('tests.b')::uuid);
 
@@ -216,8 +195,6 @@ select is((select count(*)::int from public.custom_messages), 0,
   'LD-DB-038: the partner reads no custom messages');
 select is((select count(*)::int from public.message_favorites), 0,
   'LD-DB-039: the partner reads no favorites');
-select is((select count(*)::int from public.local_data_uploads), 0,
-  'LD-DB-040: the partner reads no receipts');
 
 select tests.authenticate_as(current_setting('tests.c')::uuid);
 
@@ -227,8 +204,6 @@ select is((select count(*)::int from public.custom_messages), 0,
   'LD-DB-042: a stranger reads no custom messages');
 select is((select count(*)::int from public.message_favorites), 0,
   'LD-DB-043: a stranger reads no favorites');
-select is((select count(*)::int from public.local_data_uploads), 0,
-  'LD-DB-044: a stranger reads no receipts');
 
 -- ---------------------------------------------------------------------------
 -- Forged inserts raise
@@ -248,11 +223,6 @@ select throws_ok(
   format($$insert into public.message_favorites (user_id, message_key)
            values (%L, 'b:forged')$$, current_setting('tests.a')),
   '42501', null, 'LD-DB-047: the partner cannot insert a favorite as the owner');
-select throws_ok(
-  format($$insert into public.local_data_uploads (user_id, origin, anniversaries_count,
-                                                  custom_messages_count, favorites_count)
-           values (%L, 'https://forged.test', 0, 0, 0)$$, current_setting('tests.a')),
-  '42501', null, 'LD-DB-048: the partner cannot write a receipt as the owner');
 
 select tests.be_postgres();
 
@@ -311,7 +281,7 @@ select lives_ok(
   format($$insert into public.custom_messages (user_id, text, category, client_key)
            values (%L, 'a private note', 'custom', 'c:1:k')
            on conflict (user_id, client_key) do nothing$$, current_setting('tests.a')),
-  'LD-DB-058: the upload''s ON CONFLICT DO NOTHING insert succeeds without UPDATE');
+  'LD-DB-058: a retried create''s ON CONFLICT DO NOTHING insert succeeds without UPDATE');
 select is((select count(*)::int from public.custom_messages), 1,
   'LD-DB-059: the ignored duplicate left exactly one row');
 
@@ -354,21 +324,15 @@ select is(tests.rows_as(current_setting('tests.a')::uuid,
   $$delete from public.message_favorites where message_key = 'b:abc'$$), 1,
   'LD-DB-066: the owner''s DELETE of their favorite affects their row');
 
--- The receipt insert gates the upload flag, and so the retirement of the old
--- origin; the favorite insert is every bundled favorite. Both run as the owner
--- through RLS here, not as postgres.
+-- The favorite insert is every bundled favorite; it runs as the owner through
+-- RLS here, not as postgres.
 select tests.authenticate_as(current_setting('tests.a')::uuid);
 
-select lives_ok(
-  format($$insert into public.local_data_uploads (user_id, origin, anniversaries_count,
-                                                  custom_messages_count, favorites_count)
-           values (%L, 'https://sallvainian.github.io', 2, 3, 4)$$, current_setting('tests.a')),
-  'LD-DB-067: the owner can write their own upload receipt');
 select lives_ok(
   format($$insert into public.message_favorites (user_id, message_key)
            values (%L, 'b:owner-insert')
            on conflict (user_id, message_key) do nothing$$, current_setting('tests.a')),
-  'LD-DB-068: the owner can insert their own favorite (as the upload does)');
+  'LD-DB-068: the owner can insert their own favorite (as addFavorite does)');
 
 select tests.be_postgres();
 
