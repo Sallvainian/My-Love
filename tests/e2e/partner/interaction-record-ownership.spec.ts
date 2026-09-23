@@ -270,8 +270,8 @@ test.describe('Interaction record ownership', () => {
             document.elementFromPoint(x, y)?.closest('[data-testid]')?.getAttribute('data-testid');
           return { right: hit(right), historyEdge: hit(historyEdge) };
         },
-        // 2px inside History's edge: the badge's pulse ring reaches 1px past the gap.
-        { right: box.x + box.width + 10, historyEdge: historyBox.x + historyBox.width - 2, y: centreY }
+        // 1px inside History's edge: the pulse ring overlaps it but takes no pointer events.
+        { right: box.x + box.width + 10, historyEdge: historyBox.x + historyBox.width - 1, y: centreY }
       );
       expect(hits).toEqual({ right: 'notification-badge', historyEdge: 'history-button' });
 

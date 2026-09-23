@@ -397,7 +397,7 @@ export function PokeKissInterface() {
               >
                 {unviewedCount}
                 <motion.span
-                  className="absolute inset-0 -z-10 rounded-full bg-fill"
+                  className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-fill"
                   animate={{ scale: [1, 1.3, 1] }}
                   transition={{ repeat: Infinity, duration: 2 }}
                   style={{ opacity: 0.4 }}
