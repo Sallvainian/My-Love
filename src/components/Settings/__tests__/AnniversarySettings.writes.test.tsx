@@ -148,4 +148,26 @@ describe('AnniversarySettings writes', () => {
     expect(screen.getByRole('heading', { name: 'Delete Anniversary?' })).toBeInTheDocument();
     expect(screen.getByText('First date')).toBeInTheDocument();
   });
+
+  it('says an empty list in the subtitle alone, with no empty block', () => {
+    const settings = useAppStore.getState().settings!;
+    useAppStore.setState({
+      settings: { ...settings, relationship: { ...settings.relationship, anniversaries: [] } },
+    } as Partial<AppState>);
+    render(<AnniversarySettings />);
+
+    expect(screen.getByRole('heading', { level: 3, name: 'Anniversaries' })).toBeInTheDocument();
+    expect(screen.getByTestId('anniversaries-subtitle').textContent).toBe(
+      'Special dates · none yet'
+    );
+    expect(screen.queryByText(/No anniversaries yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Anniversary Countdowns/)).not.toBeInTheDocument();
+  });
+
+  it('drops "none yet" from the subtitle once there is an anniversary', () => {
+    render(<AnniversarySettings />);
+
+    expect(screen.getByTestId('anniversaries-subtitle').textContent).toBe('Special dates');
+    expect(screen.getByRole('heading', { level: 4, name: 'First date' })).toBeInTheDocument();
+  });
 });
