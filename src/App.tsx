@@ -754,7 +754,7 @@ function App() {
               {/* Birthdays, side by side */}
               <div className="grid grid-cols-2 gap-3">
                 <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.frank} />
-                <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.gracie} tone="partner" />
+                <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.gracie} />
               </div>
 
               {/* Wedding - full width */}

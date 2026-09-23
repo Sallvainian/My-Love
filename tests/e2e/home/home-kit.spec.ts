@@ -21,15 +21,10 @@ const KIT_MUTED = {
   dark: 'rgb(154, 163, 178)', // #9aa3b2
 } as const;
 
-/** Kit accent (Frank's tile) and partner (Gracie's tile). */
+/** Kit accent (both birthday tiles). */
 const KIT_ACCENT = {
   light: 'rgb(200, 33, 107)', // #c8216b
   dark: 'rgb(244, 114, 182)', // #f472b6
-} as const;
-
-const KIT_PARTNER = {
-  light: 'rgb(124, 58, 237)', // #7c3aed
-  dark: 'rgb(167, 139, 250)', // #a78bfa
 } as const;
 
 const COUNTDOWN_CARDS = [
@@ -98,13 +93,15 @@ test.describe('Home on the style kit', () => {
         KIT_CARD[colorScheme]
       );
 
-      // Tile tones: Frank reads as `you` (accent), Gracie as `partner`.
+      // Tile tones: both birthdays use the default `you` (accent) tile. Birthdays are
+      // not tied to accounts, so a fixed `partner` tile would be the wrong person on
+      // one of the two devices.
       const tileColor = (testId: string) =>
         page
           .getByTestId(testId)
           .evaluate((el) => getComputedStyle(el.firstElementChild as Element).color);
       expect(await tileColor('birthday-countdown-frank')).toBe(KIT_ACCENT[colorScheme]);
-      expect(await tileColor('birthday-countdown-gracie')).toBe(KIT_PARTNER[colorScheme]);
+      expect(await tileColor('birthday-countdown-gracie')).toBe(KIT_ACCENT[colorScheme]);
 
       // Dateless wedding: "Date TBD" as the value, in the kit muted colour.
       const weddingValue = page.getByTestId('event-countdown-wedding').locator('h3 + div');
