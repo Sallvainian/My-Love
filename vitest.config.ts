@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import pkg from './package.json' with { type: 'json' };
 
 export default defineConfig({
   plugins: [react()],
@@ -10,6 +11,8 @@ export default defineConfig({
     },
   },
   define: {
+    // Mirrors vite.config.ts, which this config does not extend.
+    __APP_VERSION__: JSON.stringify(pkg.version),
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('https://xojempkrugifnaveqtqc.supabase.co'),
     'import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY': JSON.stringify(
       'test-anon-key-for-unit-tests'

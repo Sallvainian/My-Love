@@ -12,6 +12,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import pkg from '../../../../package.json';
 
 const backend = vi.hoisted(() => ({
   lookupOwnDisplayName: vi.fn(),
@@ -86,6 +87,12 @@ describe('Settings on the kit', () => {
     expect(replay).toHaveTextContent('Replay welcome message');
     fireEvent.click(replay);
     expect(onShowWelcome).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the package.json version in the About row', async () => {
+    await renderSettings();
+
+    expect(screen.getByText(`Version ${pkg.version} · made for the two of you`)).toBeInTheDocument();
   });
 
   it('renders no replay row without a handler', async () => {

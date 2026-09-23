@@ -3,12 +3,17 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
 import checker from 'vite-plugin-checker';
+import pkg from './package.json' with { type: 'json' };
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
   // Cloudflare Workers serves the app from the root of its own origin
   // (wrangler.jsonc), so production and development share one base.
   base: '/',
+  // The About row in Settings shows this; declared in src/vite-env.d.ts.
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   build: {
     sourcemap: false,
     // Vite 8 bundles with Rolldown, which dropped the object form of
@@ -66,8 +71,12 @@ export default defineConfig(() => ({
         name: 'My Love - Daily Reminders',
         short_name: 'My Love',
         description: 'Daily love notes and memories',
-        theme_color: '#FF6B9D',
-        background_color: '#FFE5EC',
+        // The kit page background (--kit-page in src/index.css). The manifest
+        // takes one value, so the launch splash stays light in dark mode; the
+        // browser and status bar follow the scheme via the theme-color metas
+        // in index.html.
+        theme_color: '#fdf4f7',
+        background_color: '#fdf4f7',
         display: 'standalone',
         orientation: 'portrait',
         start_url: './',

@@ -224,7 +224,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <p className="text-[15px] font-medium text-ink">My Love</p>
-              <p className="text-[13px] text-muted">Version 1.0.0 · made for the two of you</p>
+              <p className="text-[13px] text-muted">Version {__APP_VERSION__} · made for the two of you</p>
             </div>
           </div>
           {onShowWelcome && (
