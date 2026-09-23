@@ -143,6 +143,20 @@ vi.mock('../../../src/services/customMessageService', () => ({
   },
 }));
 
+// The partner loader reads its saved copy before the server. Controlled here
+// so a case can hold the copy read open across an account switch.
+const readLocalCopy = vi.fn();
+const writeLocalCopy = vi.fn();
+vi.mock('../../../src/services/localCopy', () => ({
+  readLocalCopy: (userId: string, kind: string) => readLocalCopy(userId, kind),
+  writeLocalCopy: (userId: string, kind: string, value: unknown) =>
+    writeLocalCopy(userId, kind, value),
+  deleteAccountCopies: async () => {},
+  registerLocalCopy: () => () => {},
+  refreshLocalCopies: async () => {},
+  refreshLocalCopy: async () => {},
+}));
+
 vi.mock('../../../src/services/moodService', () => ({
   moodService: {
     getAllForUser: (userId: string) => getAllForUser(userId),
@@ -324,6 +338,8 @@ describe('loader identity guards', () => {
     checkStorageQuota.mockResolvedValue({ used: 0, quota: 1_000, percent: 0, warning: 'none' });
     getSignedUrl.mockResolvedValue('https://signed.example/a.jpg');
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    readLocalCopy.mockResolvedValue(null);
+    writeLocalCopy.mockResolvedValue(undefined);
   });
 
   // ==========================================================================
@@ -1411,31 +1427,55 @@ describe('loader identity guards', () => {
   // ==========================================================================
 
   describe('loadPartner', () => {
+    /** Wait until the loader has reached the server read, past the copy read. */
+    async function untilServerRead(): Promise<void> {
+      await vi.waitFor(() => expect(getPartner).toHaveBeenCalled());
+    }
+
     it('discards the partner when the account changed', async () => {
-      const pending = deferred<typeof PARTNER_A>();
+      const pending = deferred<unknown>();
       getPartner.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().loadPartner();
+      await untilServerRead();
       switchToUserC({ partner: PARTNER_C });
 
-      pending.settle(PARTNER_A);
+      pending.settle({ status: 'linked', partner: PARTNER_A });
       await inFlight;
 
       expect(useAppStore.getState().partner).toEqual(PARTNER_C);
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PARTNER-NAME');
+      // Neither shown nor saved: not under C, and not under A after the switch.
+      expect(writeLocalCopy).not.toHaveBeenCalled();
+    });
+
+    it("discards A's saved copy when the account changed during the copy read", async () => {
+      const copy = deferred<unknown>();
+      readLocalCopy.mockReturnValue(copy.promise);
+
+      const inFlight = useAppStore.getState().loadPartner();
+      switchToUserC({ partner: PARTNER_C });
+
+      copy.settle({ status: 'linked', partner: PARTNER_A });
+      await inFlight;
+
+      expect(useAppStore.getState().partner).toEqual(PARTNER_C);
+      expect(useAppStore.getState().isLoadingPartner).toBe(false);
+      expect(getPartner).not.toHaveBeenCalled();
     });
 
     it('still releases the spinner when it discards', async () => {
-      const pending = deferred<typeof PARTNER_A>();
+      const pending = deferred<unknown>();
       getPartner.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().loadPartner();
       expect(useAppStore.getState().isLoadingPartner).toBe(true);
 
+      await untilServerRead();
       switchToUserC();
       expect(useAppStore.getState().isLoadingPartner).toBe(true);
 
-      pending.settle(PARTNER_A);
+      pending.settle({ status: 'linked', partner: PARTNER_A });
       await inFlight;
 
       // Stuck true renders neither branch of the partner tab.
@@ -1443,12 +1483,12 @@ describe('loader identity guards', () => {
     });
 
     it("does not blank the new account's partner when the old request fails", async () => {
-      // The catch path writes `partner: null` unconditionally without its guard,
-      // which erases a partner the new account had already loaded.
-      const pending = deferred<typeof PARTNER_A>();
+      // The error path must not write over what the new account already shows.
+      const pending = deferred<unknown>();
       getPartner.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().loadPartner();
+      await untilServerRead();
       switchToUserC({ partner: PARTNER_C });
 
       pending.fail(new Error('A-REQUEST-FAILURE'));
@@ -1456,6 +1496,7 @@ describe('loader identity guards', () => {
 
       expect(useAppStore.getState().partner).toEqual(PARTNER_C);
       expect(useAppStore.getState().isLoadingPartner).toBe(false);
+      expect(useAppStore.getState().partnerLoadError).toBe(false);
     });
   });
 
@@ -1934,12 +1975,16 @@ describe('loader identity guards', () => {
 
   describe('when the identity has not changed', () => {
     it('loadPartner writes normally', async () => {
-      getPartner.mockResolvedValue(PARTNER_A);
+      getPartner.mockResolvedValue({ status: 'linked', partner: PARTNER_A });
 
       await useAppStore.getState().loadPartner();
 
       expect(useAppStore.getState().partner).toEqual(PARTNER_A);
       expect(useAppStore.getState().isLoadingPartner).toBe(false);
+      expect(writeLocalCopy).toHaveBeenCalledWith(A, 'partner', {
+        status: 'linked',
+        partner: PARTNER_A,
+      });
     });
 
     it('fetchNotes writes normally', async () => {

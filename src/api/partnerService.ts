@@ -29,6 +29,14 @@ export interface PartnerInfo {
   connectedAt: string | null;
 }
 
+/**
+ * The partner read, with "no partner" and "the read failed" kept apart.
+ */
+export type PartnerResult =
+  | { status: 'linked'; partner: PartnerInfo }
+  | { status: 'unlinked' }
+  | { status: 'error'; reason: string };
+
 export interface PartnerRequest {
   id: string;
   from_user_id: string;
@@ -43,15 +51,21 @@ export interface PartnerRequest {
 
 class PartnerService {
   /**
-   * Get current user's partner information
+   * Get current user's partner information.
    *
-   * @returns Partner info if connected, null otherwise
+   * Three answers, never collapsed: `linked` with the partner, `unlinked` when
+   * the server says there is no `partner_id`, and `error` when the read itself
+   * failed. Mirrors `PartnerLookup` in supabaseClient.ts — a failed read is not
+   * "no partner", and treating it as one showed "Connect with Your Partner" to
+   * a linked user whenever the network hiccupped.
    */
-  async getPartner(): Promise<PartnerInfo | null> {
+  async getPartner(): Promise<PartnerResult> {
     try {
-      const { data: currentUser } = await supabase.auth.getUser();
-      if (!currentUser?.user) {
-        throw new Error('Not authenticated');
+      const { data: currentUser, error: userError } = await supabase.auth.getUser();
+      if (userError || !currentUser?.user) {
+        // Not evidence of being unlinked: getUser goes to the network and fails
+        // offline, and a signed-out answer must never be saved as "unlinked".
+        return { status: 'error', reason: userError?.message ?? 'Not authenticated' };
       }
 
       // Get user record with partner_id
@@ -62,12 +76,15 @@ class PartnerService {
         .single();
 
       if (error) {
+        // PGRST116 = no row yet: the profile exists without a partner, same as
+        // lookupPartnerId. Anything else is a failed read.
+        if (error.code === 'PGRST116') return { status: 'unlinked' };
         console.error('[PartnerService] Error fetching user record:', error);
-        return null;
+        return { status: 'error', reason: error.message };
       }
 
       if (!userRecord?.partner_id) {
-        return null;
+        return { status: 'unlinked' };
       }
 
       // Get partner's user info from users table (RLS-protected)
@@ -79,7 +96,7 @@ class PartnerService {
 
       if (partnerError || !partnerRecord) {
         console.error('[PartnerService] Error fetching partner record:', partnerError);
-        return null;
+        return { status: 'error', reason: partnerError?.message ?? 'Partner record missing' };
       }
 
       // The seed rule, not a raw `||` chain. `sync_user_profile()` seeds a new
@@ -99,14 +116,17 @@ class PartnerService {
         : (partnerRecord.display_name?.trim() ?? 'Partner');
 
       return {
-        id: partnerRecord.id,
-        email: partnerRecord.email || '',
-        displayName: partnerName,
-        connectedAt: userRecord.updated_at,
+        status: 'linked',
+        partner: {
+          id: partnerRecord.id,
+          email: partnerRecord.email || '',
+          displayName: partnerName,
+          connectedAt: userRecord.updated_at,
+        },
       };
     } catch (error) {
       console.error('[PartnerService] Error in getPartner:', error);
-      return null;
+      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
     }
   }
 
@@ -359,11 +379,15 @@ class PartnerService {
   /**
    * Check if current user has a partner
    *
-   * @returns true if user has a partner, false otherwise
+   * @returns true if linked, false if the server says unlinked
+   * @throws Error when the read failed — a failed read is not "no partner"
    */
   async hasPartner(): Promise<boolean> {
-    const partner = await this.getPartner();
-    return partner !== null;
+    const result = await this.getPartner();
+    if (result.status === 'error') {
+      throw new Error(`Could not determine partner: ${result.reason}`);
+    }
+    return result.status === 'linked';
   }
 }
 

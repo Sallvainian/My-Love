@@ -5,7 +5,7 @@
  * rows; one mood -> the current card alone; no moods -> the empty-state card;
  * offline -> "Offline" subtitle, disabled refresh, offline notice.
  */
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MoodEntry } from '../../../types';
 
@@ -62,6 +62,7 @@ function makeState(overrides: Record<string, unknown> = {}) {
     syncStatus: { isOnline: true },
     partner: { id: 'partner', email: 'partner@example.test', displayName: PARTNER_NAME },
     isLoadingPartner: false,
+    partnerLoadError: false,
     sentRequests: [],
     receivedRequests: [],
     searchResults: [],
@@ -188,5 +189,49 @@ describe('PartnerMoodView on the kit', () => {
 
     act(() => onStatus!('CHANNEL_ERROR'));
     expect(status).toHaveTextContent(/^Disconnected$/);
+  });
+
+  it('shows a load error, never the Connect UI, when the partner could not be determined', () => {
+    // A failed read with no saved copy is not "unlinked".
+    state = makeState({ partner: null, partnerLoadError: true });
+    render(<PartnerMoodView />);
+
+    expect(screen.getByTestId('partner-load-error')).toHaveTextContent("Couldn't load your partner");
+    expect(screen.queryByText('Connect with Your Partner')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('partner-search-card')).not.toBeInTheDocument();
+  });
+
+  it('shows the Connect UI when the server says there is no partner', () => {
+    state = makeState({ partner: null, partnerLoadError: false });
+    render(<PartnerMoodView />);
+
+    expect(screen.getByText('Connect with Your Partner')).toBeInTheDocument();
+    expect(screen.queryByTestId('partner-load-error')).not.toBeInTheDocument();
+  });
+
+  it('loads the partner offline too, but pending requests only online', () => {
+    state = makeState({ syncStatus: { isOnline: false } });
+    render(<PartnerMoodView />);
+
+    expect(state.loadPartner).toHaveBeenCalled();
+    expect(state.loadPendingRequests).not.toHaveBeenCalled();
+  });
+
+  it('online error card offers a retry that loads the partner again', () => {
+    state = makeState({ partner: null, partnerLoadError: true });
+    render(<PartnerMoodView />);
+    expect(state.loadPartner).toHaveBeenCalledTimes(1); // the mount load
+
+    fireEvent.click(screen.getByTestId('partner-load-retry'));
+
+    expect(state.loadPartner).toHaveBeenCalledTimes(2);
+  });
+
+  it('offline error card has no retry button', () => {
+    state = makeState({ partner: null, partnerLoadError: true, syncStatus: { isOnline: false } });
+    render(<PartnerMoodView />);
+
+    expect(screen.getByTestId('partner-load-error')).toHaveTextContent("You're offline");
+    expect(screen.queryByTestId('partner-load-retry')).not.toBeInTheDocument();
   });
 });

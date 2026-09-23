@@ -39,7 +39,7 @@ const PARTNER_EMAIL = 'Partner@Example.com';
 
 let singleResults: Array<{ data: unknown; error: unknown }> = [];
 let singleCalls = 0;
-let userResult: { data: { user: unknown } };
+let userResult: { data: { user: unknown }; error?: unknown };
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
@@ -80,7 +80,8 @@ function partnerRow(display_name: unknown, email: unknown = PARTNER_EMAIL): void
 
 async function partner() {
   const { partnerService } = await import('@/api/partnerService');
-  return partnerService.getPartner();
+  const result = await partnerService.getPartner();
+  return result.status === 'linked' ? result.partner : null;
 }
 
 describe('partnerService.getPartner display name', () => {
@@ -150,5 +151,63 @@ describe('partnerService.getPartner display name', () => {
     singleResults = [{ data: { partner_id: null, updated_at: null }, error: null }];
 
     await expect(partner()).resolves.toBeNull();
+  });
+});
+
+describe('partnerService.getPartner classification', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    singleResults = [];
+    singleCalls = 0;
+    userResult = { data: { user: { id: USER_ID, email: OWN_EMAIL } } };
+  });
+
+  async function status() {
+    const { partnerService } = await import('@/api/partnerService');
+    return (await partnerService.getPartner()).status;
+  }
+
+  it('answers linked with the partner when both reads succeed', async () => {
+    partnerRow('Alex');
+
+    await expect(status()).resolves.toBe('linked');
+  });
+
+  it('answers unlinked when the user row has no partner_id', async () => {
+    singleResults = [{ data: { partner_id: null, updated_at: null }, error: null }];
+
+    await expect(status()).resolves.toBe('unlinked');
+  });
+
+  it('answers unlinked when the user row does not exist yet (PGRST116)', async () => {
+    singleResults = [{ data: null, error: { code: 'PGRST116', message: 'no rows' } }];
+
+    await expect(status()).resolves.toBe('unlinked');
+  });
+
+  it('answers error, not unlinked, when the user-row read fails', async () => {
+    singleResults = [{ data: null, error: { code: '500', message: 'server down' } }];
+
+    await expect(status()).resolves.toBe('error');
+  });
+
+  it('answers error when getUser fails', async () => {
+    userResult = { data: { user: null }, error: { message: 'Failed to fetch' } };
+
+    await expect(status()).resolves.toBe('error');
+  });
+
+  it('answers error when there is no signed-in user', async () => {
+    userResult = { data: { user: null } };
+
+    await expect(status()).resolves.toBe('error');
+  });
+
+  it('answers error when the partner-row read fails', async () => {
+    singleResults = [linked, { data: null, error: { code: '500', message: 'server down' } }];
+
+    await expect(status()).resolves.toBe('error');
   });
 });
