@@ -12,11 +12,12 @@ import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 const ACCOUNT_TABLES = ['message_favorites', 'custom_messages', 'anniversaries'] as const;
 
-/** Wait until this page's one-time upload has finished for `userId`. */
-async function waitForAccountSync(page: Page, userId: string) {
-  await expect
-    .poll(() => page.evaluate((key) => localStorage.getItem(key), `my-love-local-upload-v1:${userId}`))
-    .not.toBeNull();
+/** The favorites read of the mirror refresh App runs on every signed-in start. */
+function favoritesRefreshed(page: Page) {
+  return page.waitForResponse(
+    (response) =>
+      response.url().includes('/rest/v1/message_favorites') && response.request().method() === 'GET'
+  );
 }
 
 async function favoritedTexts(page: Page): Promise<string[]> {
@@ -70,10 +71,11 @@ test.describe('Account data follows the account, not the browser', () => {
 
     try {
       // ---- First context: make one of each through the UI ----
+      const refreshed = favoritesRefreshed(page);
       await page.goto('/');
       const favorite = page.getByTestId('message-favorite-button');
       await expect(favorite).toHaveAccessibleName('Add to favorites');
-      await waitForAccountSync(page, userId);
+      await refreshed;
       const favoriteText = (await page.getByTestId('message-text').textContent())?.trim();
       expect(favoriteText).toBeTruthy();
 
@@ -113,9 +115,10 @@ test.describe('Account data follows the account, not the browser', () => {
       await fresh.goto('/');
       await fresh.getByLabel('Email', { exact: true }).fill(pair.user1Email);
       await fresh.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+      const freshRefreshed = favoritesRefreshed(fresh);
       await fresh.getByTestId('submit-button').click();
       await expect(fresh.getByTestId('app-container')).toBeVisible();
-      await waitForAccountSync(fresh, userId);
+      await freshRefreshed;
 
       await expect.poll(() => favoritedTexts(fresh)).toContain(favoriteText);
 

@@ -20,14 +20,13 @@
  * - Supabase is the source of truth for custom messages and favorites; the
  *   IndexedDB rows are read mirrors. The services write the server first
  *   (`customMessageService`, `storageService.toggleFavorite`), and
- *   `loadMessageDataFromServer` replaces the mirrors once this device's
- *   one-time upload has completed (`localDataUpload.ts`).
+ *   `loadMessageDataFromServer` replaces the mirrors with the server's rows on
+ *   every signed-in start (`App.tsx`).
  */
 
 import { serializeAccountDataWrite } from '../../services/accountDataQueue';
 import { customMessagesApi } from '../../services/customMessagesApi';
 import { customMessageService } from '../../services/customMessageService';
-import { hasCompletedLocalUpload } from '../../services/localDataUpload';
 import { messageFavoritesApi } from '../../services/messageFavoritesApi';
 import { storageService } from '../../services/storage';
 import type {
@@ -56,7 +55,7 @@ export interface MessagesSlice {
 
   // Actions
   loadMessages: () => Promise<void>;
-  /** Replace the custom-message and favorite mirrors with the server's, once uploaded. */
+  /** Replace the custom-message and favorite mirrors with the server's. */
   loadMessageDataFromServer: () => Promise<void>;
   addMessage: (text: string, category: Message['category']) => Promise<void>;
   toggleFavorite: (messageId: number) => Promise<void>;
@@ -126,9 +125,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     const stillCurrent = () =>
       get().userId === requestedBy && get().authSessionVersion === requestedInSession;
-    // Until the upload flag is set, the mirrors may hold rows the server does
-    // not, and replacing them would destroy those rows.
-    if (!requestedBy || !hasCompletedLocalUpload(requestedBy)) return;
+    if (!requestedBy) return;
 
     try {
       // Read and replace as one queued step, so a favorite or custom-message

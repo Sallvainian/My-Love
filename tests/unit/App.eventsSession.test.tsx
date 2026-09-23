@@ -84,14 +84,6 @@ vi.mock('../../src/components/shared', () => ({
   NetworkStatusIndicator: () => null,
   SyncToast: () => null,
 }));
-vi.mock('../../src/services/migrationService', () => ({
-  migrateCustomMessagesFromLocalStorage: vi.fn(async () => ({
-    migratedCount: 0,
-    skippedCount: 0,
-    success: true,
-    errors: [],
-  })),
-}));
 vi.mock('../../src/utils/backgroundSync', () => ({ isServiceWorkerSupported: () => false }));
 vi.mock('../../src/utils/storageMonitor', () => ({ logStorageQuota: vi.fn() }));
 vi.mock('../../src/utils/logger', () => ({

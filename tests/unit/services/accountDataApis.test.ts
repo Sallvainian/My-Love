@@ -6,8 +6,8 @@
  * - an offline write fails with an `offline` code BEFORE any request is made —
  *   there is no queue, so a request "sent later" would be a promise nobody keeps;
  * - a zero-row UPDATE is `not-found` (RLS filters a foreign row silently);
- * - the upload's inserts are ON CONFLICT DO NOTHING on the deterministic key,
- *   never a merge that could overwrite a server row;
+ * - the creates and the favorite add are ON CONFLICT DO NOTHING, never a
+ *   merge that could overwrite a server row;
  * - the bundled-favorite key is a stable hash of the exact text.
  *
  * The Supabase client is a recording fake: every chained call is logged, and
@@ -131,16 +131,10 @@ describe('request bounds', () => {
     ['updateAnniversary', () => anniversariesService.updateAnniversary('ann-1', { date: '2024-02-14', label: 'x' }),
       { data: [anniversaryRow], error: null }],
     ['deleteAnniversary', () => anniversariesService.deleteAnniversary('ann-1'), { data: null, error: null }],
-    ['insertAnniversariesOnce', () =>
-      anniversariesService.insertAnniversariesOnce([{ user_id: A, event_date: '2024-02-14', label: 'x', client_key: 'k' }]),
-      { data: null, error: null }],
     ['fetchCustomMessages', () => customMessagesApi.fetchCustomMessages(A), { data: [], error: null }],
     ['updateCustomMessage', () => customMessagesApi.updateCustomMessage('cm-1', { text: 'x' }),
       { data: [customRow], error: null }],
     ['deleteCustomMessage', () => customMessagesApi.deleteCustomMessage('cm-1'), { data: null, error: null }],
-    ['insertCustomMessagesOnce', () =>
-      customMessagesApi.insertCustomMessagesOnce([{ user_id: A, text: 'x', category: 'custom', client_key: 'k' }]),
-      { data: null, error: null }],
     ['fetchFavoriteKeys', () => messageFavoritesApi.fetchFavoriteKeys(A), { data: [], error: null }],
     ['addFavorite', () => messageFavoritesApi.addFavorite(A, 'b:1'), { data: null, error: null }],
     ['removeFavorite', () => messageFavoritesApi.removeFavorite(A, 'b:1'), { data: null, error: null }],
@@ -208,14 +202,6 @@ describe('anniversariesService', () => {
     expect(argsOf('update')?.[0]).toEqual(expect.objectContaining({ updated_at: expect.any(String) }));
   });
 
-  it('uploads with ON CONFLICT DO NOTHING on (user_id, client_key)', async () => {
-    await anniversariesService.insertAnniversariesOnce([
-      { user_id: A, event_date: '2024-02-14', label: 'x', client_key: 'a:2024-02-14:h' },
-    ]);
-
-    expect(argsOf('upsert')?.[1]).toEqual({ onConflict: 'user_id,client_key', ignoreDuplicates: true });
-  });
-
   it('keeps a PostgREST failure’s friendly message under a transport code', async () => {
     results.push({ data: null, error: { code: '42501', message: 'rls', details: '', hint: '' } });
 
@@ -270,18 +256,6 @@ describe('customMessagesApi', () => {
     expect(methods()).toEqual(['delete', 'eq', 'abortSignal']);
   });
 
-  it('uploads with ON CONFLICT DO NOTHING on (user_id, client_key)', async () => {
-    await customMessagesApi.insertCustomMessagesOnce([
-      { user_id: A, text: 'x', category: 'custom', client_key: 'c:0:h' },
-    ]);
-    expect(argsOf('upsert')?.[1]).toEqual({ onConflict: 'user_id,client_key', ignoreDuplicates: true });
-  });
-
-  it('sends nothing for an empty upload', async () => {
-    await customMessagesApi.insertCustomMessagesOnce([]);
-    expect(calls).toHaveLength(0);
-  });
-
   it('narrows categories', () => {
     expect(isMessageCategory('memory')).toBe(true);
     expect(isMessageCategory('poem')).toBe(false);
@@ -304,7 +278,7 @@ describe('messageFavoritesApi', () => {
     await messageFavoritesApi.removeFavorite(A, 'b:1');
 
     expect(argsOf('upsert', 0)).toEqual([
-      [{ user_id: A, message_key: 'b:1' }],
+      { user_id: A, message_key: 'b:1' },
       { onConflict: 'user_id,message_key', ignoreDuplicates: true },
     ]);
     expect(calls[1].chain).toEqual([

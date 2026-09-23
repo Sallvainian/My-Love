@@ -1,8 +1,7 @@
 /**
  * Anniversaries, custom messages and favorites moved to Supabase — the store
  * side: server-first writes, the identity guard around every await, the
- * refresh that may only run after this device's upload flag is set, and the
- * favorite error that sign-out must clear.
+ * mirror refresh, and the favorite error that sign-out must clear.
  *
  * The server is faked per module; the IndexedDB mirror is real
  * (fake-indexeddb), so the refresh's effect on disk is read back, not assumed.
@@ -60,7 +59,6 @@ import { AccountDataError } from '../../../src/services/accountDataError';
 import type { ServerAnniversary } from '../../../src/services/anniversariesService';
 import { OWNER_STORAGE_KEY, VAULT_STORAGE_KEY } from '../../../src/services/anniversaryVault';
 import { DB_NAME, type MyLoveDBSchema } from '../../../src/services/dbSchema';
-import { localUploadFlagKey } from '../../../src/services/localDataUpload';
 import { bundledMessageKey } from '../../../src/services/messageFavoritesApi';
 import { storageService } from '../../../src/services/storage';
 import { useAppStore } from '../../../src/stores/useAppStore';
@@ -92,10 +90,6 @@ function setAnniversaries(list: Anniversary[]) {
   useAppStore.setState({
     settings: { ...settings, relationship: { ...settings.relationship, anniversaries: list } },
   } as StoreState);
-}
-
-function markUploaded(userId: string) {
-  localStorage.setItem(localUploadFlagKey(userId), 'done');
 }
 
 const offline = () => new AccountDataError('offline', 'You are offline. Anniversaries need a connection to save.');
@@ -203,7 +197,6 @@ describe('anniversaries: server first, then the settings mirror', () => {
   });
 
   it('a queued edit or delete that starts after an account switch sends nothing', async () => {
-    markUploaded(A);
     setAnniversaries([{ id: 4, date: '2024-02-14', label: 'A row', serverId: 'ann-a' }]);
     // Hold the queue with a refresh whose read has not come back yet.
     const read = deferred<ServerAnniversary[]>();
@@ -224,8 +217,8 @@ describe('anniversaries: server first, then the settings mirror', () => {
     expect(anniversaries()).toEqual([{ id: 4, date: '2021-01-01', label: 'C row', serverId: 'ann-c' }]);
   });
 
-  it('refuses to edit or delete a row not yet uploaded', async () => {
-    setAnniversaries([{ id: 5, date: '2024-02-14', label: 'Local only' }]);
+  it('refuses to edit or delete a row with no server id', async () => {
+    setAnniversaries([{ id: 5, date: '2024-02-14', label: 'No server id' }]);
 
     await expect(
       useAppStore.getState().updateAnniversary(5, { date: '2024-02-14', label: 'x' })
@@ -238,20 +231,10 @@ describe('anniversaries: server first, then the settings mirror', () => {
 });
 
 describe('loadAnniversariesFromServer', () => {
-  it('does nothing until this device’s upload flag is set', async () => {
-    setAnniversaries([{ id: 1, date: '2024-02-14', label: 'Local only' }]);
-
-    await useAppStore.getState().loadAnniversariesFromServer();
-
-    expect(server.fetchAnniversaries).not.toHaveBeenCalled();
-    expect(anniversaries()).toEqual([{ id: 1, date: '2024-02-14', label: 'Local only' }]);
-  });
-
   it('replaces the mirror, keeping the local id of a row it already had', async () => {
-    markUploaded(A);
     setAnniversaries([
       { id: 7, date: '2024-02-14', label: 'Stale label', serverId: 'ann-1' },
-      { id: 8, date: '2024-03-01', label: 'Uploaded as a duplicate' },
+      { id: 8, date: '2024-03-01', label: 'No server id' },
     ]);
     server.fetchAnniversaries.mockResolvedValue([
       { serverId: 'ann-1', date: '2024-02-14', label: 'Fresh label' },
@@ -268,7 +251,6 @@ describe('loadAnniversariesFromServer', () => {
   });
 
   it('keeps the mirror when the read fails (offline display)', async () => {
-    markUploaded(A);
     setAnniversaries([{ id: 1, date: '2024-02-14', label: 'Kept', serverId: 'ann-1' }]);
     server.fetchAnniversaries.mockRejectedValue(offline());
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -279,7 +261,6 @@ describe('loadAnniversariesFromServer', () => {
   });
 
   it('discards a read that lands after the account changed', async () => {
-    markUploaded(A);
     const pending = deferred<ServerAnniversary[]>();
     server.fetchAnniversaries.mockReturnValue(pending.promise);
 
@@ -330,23 +311,16 @@ describe('messages: favorites and the mirror refresh', () => {
     }
   }
 
-  it('does not refresh before the upload flag is set', async () => {
-    await useAppStore.getState().loadMessageDataFromServer();
-    expect(server.fetchCustomMessages).not.toHaveBeenCalled();
-    expect(server.fetchFavoriteKeys).not.toHaveBeenCalled();
-  });
-
   it('replaces the owner’s mirror rows and bundled favorites, and nobody else’s', async () => {
     const bundledText = `DAILY-${A}`;
     const [bundledId, syncedId, , legacyId, otherId] = await seed([
       { text: bundledText, category: 'reason', isCustom: false, createdAt: at },
       { text: 'old text', category: 'custom', isCustom: true, userId: A, serverId: `srv-${A}`, createdAt: at },
-      // Uploaded from this device: the server holds the same text under a new id.
+      // Owned but with no server id: not in the account, so the refresh drops it.
       { text: 'From the other phone', category: 'custom', isCustom: true, userId: A, createdAt: at },
       { text: `legacy ${A}`, category: 'custom', isCustom: true, createdAt: at },
       { text: `other ${A}`, category: 'custom', isCustom: true, userId: `${A}-other`, createdAt: at },
     ]);
-    markUploaded(A);
     server.fetchCustomMessages.mockResolvedValue([
       {
         serverId: `srv-${A}`, text: 'new text', category: 'memory', active: true, isFavorite: true,
@@ -378,7 +352,6 @@ describe('messages: favorites and the mirror refresh', () => {
 
   it('keeps the mirror when the server read fails', async () => {
     await seed([{ text: 'keep me', category: 'custom', isCustom: true, userId: A, createdAt: at }]);
-    markUploaded(A);
     server.fetchCustomMessages.mockRejectedValue(offline());
     server.fetchFavoriteKeys.mockResolvedValue([]);
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -416,7 +389,6 @@ describe('messages: favorites and the mirror refresh', () => {
 
   it('a favorite tapped while the refresh is reading is not erased by that refresh', async () => {
     const [id] = await seed([{ text: `RACE-${A}`, category: 'reason', isCustom: false, createdAt: at }]);
-    markUploaded(A);
     await useAppStore.getState().loadMessages();
     // The refresh's snapshot predates the tap, so it holds no favorite.
     const snapshot = deferred<string[]>();
@@ -467,7 +439,6 @@ describe('messages: favorites and the mirror refresh', () => {
     ]);
     await putFavorite(bundledId);
     await putFavorite(customId);
-    markUploaded(A);
     server.fetchCustomMessages.mockResolvedValue([
       {
         serverId: `srv-drop-${A}`, text: 'custom fav', category: 'custom', active: true, isFavorite: false,
@@ -481,18 +452,16 @@ describe('messages: favorites and the mirror refresh', () => {
     expect(await diskFavorites(A)).toEqual([]);
   });
 
-  it('the refresh keeps an owned row the server never received, and drops its uploaded duplicate', async () => {
-    const tooLong = 'x'.repeat(1001);
-    const [invalidId, duplicateId, goneId] = await seed([
-      // Skipped by the upload as invalid: the server never had it.
-      { text: tooLong, category: 'custom', isCustom: true, userId: A, createdAt: at },
-      // Uploaded (the server holds the same text): the server row replaces it.
+  it('the refresh drops every owned row the server does not hold, with its favorite', async () => {
+    const [unsyncedId, duplicateId, goneId] = await seed([
+      // Owned but with no server id, and no server row of the same text.
+      { text: 'x'.repeat(1001), category: 'custom', isCustom: true, userId: A, createdAt: at },
+      // Owned with no server id; the server holds the same text under its own id.
       { text: '  Same Text  ', category: 'custom', isCustom: true, userId: A, createdAt: at },
       // A server row since deleted elsewhere.
       { text: 'gone', category: 'custom', isCustom: true, userId: A, serverId: `srv-gone-${A}`, createdAt: at },
     ]);
-    await putFavorite(invalidId);
-    markUploaded(A);
+    await putFavorite(unsyncedId);
     server.fetchCustomMessages.mockResolvedValue([
       {
         serverId: `srv-same-${A}`, text: 'same text', category: 'custom', active: true, isFavorite: false,
@@ -505,15 +474,11 @@ describe('messages: favorites and the mirror refresh', () => {
 
     const mine = (await diskRows()).filter((row) => row.userId === A);
     const ids = mine.map((row) => row.id);
-    expect(ids).toContain(invalidId);
+    expect(ids).not.toContain(unsyncedId);
     expect(ids).not.toContain(duplicateId);
     expect(ids).not.toContain(goneId);
-    // Kept and marked: the only row a local-only delete may remove.
-    expect(mine.find((row) => row.id === invalidId)).toMatchObject({ text: tooLong, localOnly: true });
-    expect(mine.filter((row) => row.localOnly).map((row) => row.id)).toEqual([invalidId]);
-    expect(mine.some((row) => row.serverId === `srv-same-${A}`)).toBe(true);
-    // Untouched means its favorite too.
-    expect((await diskFavorites(A)).map((f) => f.messageId)).toEqual([invalidId]);
+    expect(mine.map((row) => row.serverId)).toEqual([`srv-same-${A}`]);
+    expect(await diskFavorites(A)).toEqual([]);
   });
 
   it('offline: shows the reason, changes nothing, and sign-out clears the message', async () => {

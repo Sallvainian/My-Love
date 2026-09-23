@@ -1,7 +1,7 @@
 import type { IDBPDatabase } from 'idb';
 import type { Message } from '../types';
 import { logger } from '../utils/logger';
-import { AccountDataError, notSyncedMessage } from './accountDataError';
+import { AccountDataError, NOT_SYNCED_MESSAGE } from './accountDataError';
 import { serializeAccountDataWrite } from './accountDataQueue';
 import { customMessagesApi } from './customMessagesApi';
 import { type MyLoveDBSchema, openMyLoveDB } from './dbSchema';
@@ -261,7 +261,7 @@ class StorageService {
 
     if (message.isCustom) {
       if (!message.serverId) {
-        throw new AccountDataError('not-synced', notSyncedMessage(message.localOnly));
+        throw new AccountDataError('not-synced', NOT_SYNCED_MESSAGE);
       }
       await customMessagesApi.updateCustomMessage(message.serverId, { isFavorite });
     } else {
@@ -315,38 +315,6 @@ class StorageService {
       if (isFavorite) await tx.store.put({ messageId, userId });
     }
     await tx.done;
-  }
-
-  /**
-   * This account's local copy, for the one-time upload (`localDataUpload.ts`).
-   *
-   * THROWS on failure, unlike the reads above. Those degrade to `[]`, and an
-   * upload that read "nothing" would still set its flag — after which the
-   * mirror refresh deletes the very rows the failed read could not see.
-   *
-   * `customMessages` are the rows this account owns (legacy unowned rows are
-   * nobody's and are left out), each with its favorite projected on.
-   * `favoriteBundledTexts` are the texts of the bundled rows it favorited.
-   */
-  async readLocalAccountData(
-    userId: string
-  ): Promise<{ customMessages: Message[]; favoriteBundledTexts: string[] }> {
-    await this.init();
-    const tx = this.db!.transaction(['messages', 'message-favorites'], 'readonly');
-    const [messages, favorites] = await Promise.all([
-      tx.objectStore('messages').getAll(),
-      tx.objectStore('message-favorites').index('by-user').getAll(userId),
-      tx.done,
-    ]);
-    const favoriteIds = new Set(favorites.map((favorite) => favorite.messageId));
-    return {
-      customMessages: messages
-        .filter((message) => message.isCustom && message.userId === userId)
-        .map((message) => ({ ...message, isFavorite: favoriteIds.has(message.id) })),
-      favoriteBundledTexts: messages
-        .filter((message) => !message.isCustom && favoriteIds.has(message.id))
-        .map((message) => message.text),
-    };
   }
 
   // Bulk operations

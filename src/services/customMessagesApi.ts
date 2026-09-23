@@ -22,7 +22,6 @@ import { logger } from '../utils/logger';
 import { AccountDataError, requestTimeout, requireOnline, toAccountDataError } from './accountDataError';
 
 export type SupabaseCustomMessageRecord = Database['public']['Tables']['custom_messages']['Row'];
-export type CustomMessageInsert = Database['public']['Tables']['custom_messages']['Insert'];
 
 /** A server row in the app's shape. */
 export interface ServerCustomMessage {
@@ -171,24 +170,6 @@ export const customMessagesApi = {
       if (error) throw error;
     } catch (error) {
       throw toAccountDataError('CustomMessagesApi.deleteCustomMessage', error);
-    }
-  },
-
-  /**
-   * Insert-only upload of rows that each carry a deterministic `client_key`;
-   * a key already stored is ignored, so a re-run never duplicates.
-   */
-  async insertCustomMessagesOnce(rows: CustomMessageInsert[]): Promise<void> {
-    if (rows.length === 0) return;
-    requireOnline(WHAT);
-    try {
-      const { error } = await supabase
-        .from('custom_messages')
-        .upsert(rows, { onConflict: 'user_id,client_key', ignoreDuplicates: true })
-        .abortSignal(requestTimeout());
-      if (error) throw error;
-    } catch (error) {
-      throw toAccountDataError('CustomMessagesApi.insertCustomMessagesOnce', error);
     }
   },
 };
