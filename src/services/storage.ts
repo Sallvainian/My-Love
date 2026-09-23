@@ -363,35 +363,6 @@ class StorageService {
       throw error; // Re-throw to allow caller to handle
     }
   }
-
-  /**
-   * Clear every store (for reset)
-   *
-   * Named "all data" but only ever cleared photos and messages, so anything
-   * calling it to wipe the device left moods and the background-sync auth
-   * token in place. It has no callers today; a sign-out
-   * cleanup reaching for it would have looked complete and still leaked.
-   *
-   * NOTE: this deletes unsynced moods along with everything else. It is a
-   * destructive reset, not a sign-out hook — sign-out clears in-memory state
-   * (authSlice.clearAuth) and leaves IndexedDB intact so a user's offline
-   * entries survive until they sync.
-   */
-  async clearAllData(): Promise<void> {
-    try {
-      await this.init();
-      logger.debug('[StorageService] Clearing all data from IndexedDB...');
-      await Promise.all(
-        // Array.from, not spread: DOMStringList is array-like but is not
-        // specified as iterable, so the spread is not portable.
-        Array.from(this.db!.objectStoreNames).map((storeName) => this.db!.clear(storeName))
-      );
-      logger.debug('[StorageService] All data cleared successfully');
-    } catch (error) {
-      console.error('[StorageService] Failed to clear all data:', error);
-      throw error; // Re-throw to allow caller to handle
-    }
-  }
 }
 
 // Singleton instance

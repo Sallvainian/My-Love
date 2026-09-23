@@ -509,43 +509,6 @@ class PhotoService {
       return false;
     }
   }
-
-  /**
-   * Get a single photo by ID with signed URL
-   *
-   * @param photoId - Photo ID
-   * @returns Photo with signed URL or null
-   */
-  async getPhoto(photoId: string): Promise<PhotoWithUrls | null> {
-    try {
-      const { data: currentUser } = await supabase.auth.getUser();
-      if (!currentUser?.user) {
-        throw new Error('Not authenticated');
-      }
-
-      const { data: photo, error } = await supabase
-        .from('photos')
-        .select('*')
-        .eq('id', photoId)
-        .single();
-
-      if (error || !photo) {
-        console.error('[PhotoService] Photo not found:', photoId);
-        return null;
-      }
-
-      const signedUrl = await this.getSignedUrl(photo.storage_path);
-
-      return {
-        ...photo,
-        signedUrl,
-        isOwn: photo.user_id === currentUser.user.id,
-      };
-    } catch (error) {
-      console.error('[PhotoService] Error in getPhoto:', error);
-      return null;
-    }
-  }
 }
 
 // Export singleton instance
