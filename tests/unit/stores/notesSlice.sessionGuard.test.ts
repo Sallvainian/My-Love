@@ -48,6 +48,7 @@ vi.mock('../../../src/services/loveNoteImageService', () => ({
 }));
 
 import { getPartnerId } from '../../../src/api/supabaseClient';
+import { serializeAccountDataWrite } from '../../../src/services/accountDataQueue';
 import { useAppStore } from '../../../src/stores/useAppStore';
 
 const A = 'USER-A-ID';
@@ -125,8 +126,12 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
+    // Sign-out deletes the outgoing account's mirror rows through the
+    // account-data queue, fire-and-forget; drain it so its log lines land
+    // inside the test rather than after the worker closes.
+    await serializeAccountDataWrite(async () => {});
   });
 
   it('fetchNotes: a stale snapshot does not overwrite the new session', async () => {

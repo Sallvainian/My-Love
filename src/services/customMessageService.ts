@@ -47,7 +47,8 @@ import { type MyLoveDBSchema, DB_VERSION, openMyLoveDB } from './dbSchema';
  * offline write fails with a clear error and leaves nothing half-written. Each
  * mirrored row carries its server id as `serverId`; a row without one is not
  * in the account and cannot be edited or deleted. `replaceMirrorForUser()`
- * swaps the mirror for the server's rows on every signed-in start.
+ * swaps the mirror for the server's rows on every refresh (signed-in start and
+ * reconnect), and `deleteMirrorForUser()` removes it at sign-out.
  *
  * Extends: BaseIndexedDBService<Message>
  * - Inherits: init(), add()
@@ -437,6 +438,35 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       console.error(`[CustomMessageService] Failed to delete custom message ${id}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Delete every custom row `userId` owns, with those rows' favorites. Called
+   * on sign-out with the OUTGOING account, so the next account on the device
+   * never has that account's private writing on disk. Rows with no `userId`
+   * (the shared daily rows, legacy unowned rows) and every other account's rows
+   * are not touched. Local only: the server rows stay, and the next signed-in
+   * refresh mirrors them back. Throws on failure.
+   */
+  async deleteMirrorForUser(userId: string): Promise<void> {
+    const owner = this.requireOwner(userId, 'deleteMirrorForUser');
+    await this.init();
+
+    const tx = this.getTypedDB().transaction(['messages', 'message-favorites'], 'readwrite');
+    // A failed request also rejects tx.done; observe both failure channels.
+    void tx.done.catch(() => {});
+    const messages = tx.objectStore('messages');
+    const favorites = tx.objectStore('message-favorites');
+
+    const owned = (await messages.index('by-user').getAll(owner)).filter((row) =>
+      this.isOwnedBy(row, owner)
+    );
+    for (const row of owned) {
+      await messages.delete(row.id);
+      await favorites.delete([row.id, owner]);
+    }
+    await tx.done;
+    logger.debug('[CustomMessageService] Mirror deleted for sign-out, rows:', owned.length);
   }
 
   /**

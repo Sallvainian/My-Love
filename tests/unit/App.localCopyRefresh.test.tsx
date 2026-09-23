@@ -14,10 +14,13 @@ import App from '../../src/App';
 import { eventsService } from '../../src/services/eventsService';
 import { useAppStore } from '../../src/stores/useAppStore';
 
-const localCopy = vi.hoisted(() => ({ refreshLocalCopies: vi.fn(async () => {}) }));
+const localCopy = vi.hoisted(() => ({
+  refreshLocalCopies: vi.fn(async () => {}),
+  refreshLocalCopy: vi.fn(async (_kind: string) => {}),
+}));
 vi.mock('../../src/services/localCopy', () => ({
   refreshLocalCopies: localCopy.refreshLocalCopies,
-  refreshLocalCopy: vi.fn(async () => {}),
+  refreshLocalCopy: localCopy.refreshLocalCopy,
   registerLocalCopy: vi.fn(() => () => {}),
   readLocalCopy: vi.fn(async () => null),
   writeLocalCopy: vi.fn(async () => {}),
@@ -210,5 +213,32 @@ describe('App refreshes the local copies', () => {
     await act(async () => window.dispatchEvent(new Event('online')));
 
     expect(localCopy.refreshLocalCopies).not.toHaveBeenCalled();
+  });
+});
+
+describe('App triggers the message-data refresh once the bundled rows are seeded', () => {
+  const seeded = [
+    { id: 1, text: 'Shared daily', category: 'reason' as const, isCustom: false, createdAt: new Date() },
+  ];
+
+  it('when seeding lands for a signed-in user, and not before', async () => {
+    await renderApp();
+    expect(localCopy.refreshLocalCopy).not.toHaveBeenCalled();
+
+    await act(async () => useAppStore.setState({ messages: seeded }));
+
+    expect(localCopy.refreshLocalCopy).toHaveBeenCalledTimes(1);
+    expect(localCopy.refreshLocalCopy).toHaveBeenCalledWith('message-data');
+  });
+
+  it('not again on an account switch, which refreshLocalCopies already covers', async () => {
+    await renderApp();
+    await act(async () => useAppStore.setState({ messages: seeded }));
+    localCopy.refreshLocalCopy.mockClear();
+
+    await act(async () => auth.listener!(session(OTHER_USER_ID)));
+
+    expect(localCopy.refreshLocalCopy).not.toHaveBeenCalled();
+    expect(localCopy.refreshLocalCopies).toHaveBeenCalledTimes(2);
   });
 });

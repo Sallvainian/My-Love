@@ -24,6 +24,16 @@ const CURRENT_SETTINGS = {
   notifications: { enabled: false, time: '21:30' },
 };
 
+/**
+ * What survives: everything but the two theme keys — and the anniversaries,
+ * which are blanked on the way in because they live in the per-account local
+ * copy now (`persistedAnniversaries.test.ts`).
+ */
+const EXPECTED_SETTINGS = {
+  ...CURRENT_SETTINGS,
+  relationship: { ...CURRENT_SETTINGS.relationship, anniversaries: [] },
+};
+
 /** A blob saved by a build that still had the theme system. */
 function legacyBlob(): string {
   return JSON.stringify({
@@ -61,7 +71,7 @@ describe('persisted settings from the removed theme system', () => {
 
     // Exact equality: the two keys are gone and nothing else was lost or reset
     // to a default on the way.
-    expect(settings).toEqual(CURRENT_SETTINGS);
+    expect(settings).toEqual(EXPECTED_SETTINGS);
     expect(settings).not.toHaveProperty('themeName');
     expect(settings).not.toHaveProperty('customization');
 
@@ -79,7 +89,7 @@ describe('persisted settings from the removed theme system', () => {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);
 
     expect(parsed.version).toBe(0);
-    expect(parsed.state.settings).toEqual(CURRENT_SETTINGS);
+    expect(parsed.state.settings).toEqual(EXPECTED_SETTINGS);
   });
 
   it('drops only a non-object settings value, keeping the rest of the blob', async () => {

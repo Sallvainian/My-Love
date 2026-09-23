@@ -28,6 +28,20 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   getPartnerId: vi.fn(),
 }));
 
+/**
+ * When set, `readLocalCopy` answers through this instead of IndexedDB, so a
+ * case can hold the copy read open while something newer lands.
+ */
+const copyRead = vi.hoisted(() => ({ hook: null as null | (() => Promise<unknown>) }));
+vi.mock('../../../src/services/localCopy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/localCopy')>();
+  return {
+    ...actual,
+    readLocalCopy: (userId: string, kind: string) =>
+      copyRead.hook ? copyRead.hook() : actual.readLocalCopy(userId, kind),
+  };
+});
+
 vi.mock('../../../src/services/anniversariesService', () => ({
   anniversariesService: {
     createAnniversary: server.createAnniversary,
@@ -57,10 +71,13 @@ vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => (
 import { openDB } from 'idb';
 import { AccountDataError } from '../../../src/services/accountDataError';
 import type { ServerAnniversary } from '../../../src/services/anniversariesService';
-import { OWNER_STORAGE_KEY, VAULT_STORAGE_KEY } from '../../../src/services/anniversaryVault';
 import { DB_NAME, type MyLoveDBSchema } from '../../../src/services/dbSchema';
+import { readLocalCopy, refreshLocalCopies, refreshLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { bundledMessageKey } from '../../../src/services/messageFavoritesApi';
 import { storageService } from '../../../src/services/storage';
+import { ACCOUNT_OWNER_STORAGE_KEY } from '../../../src/stores/slices/authSlice';
+import { MESSAGE_DATA_COPY_KIND } from '../../../src/stores/slices/messagesSlice';
+import { ANNIVERSARIES_COPY_KIND } from '../../../src/stores/slices/settingsSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import type { AppState } from '../../../src/stores/types';
 import type { Anniversary, Message } from '../../../src/types';
@@ -96,14 +113,19 @@ const offline = () => new AccountDataError('offline', 'You are offline. Annivers
 
 beforeEach(() => {
   for (const fn of Object.values(server)) fn.mockReset();
+  copyRead.hook = null;
   A = `user-${++counter}`;
   useAppStore.setState({ messages: [], currentMessage: null } as StoreState);
   useAppStore.getState().clearAuth();
   useAppStore.getState().setAuthUser(A);
-  localStorage.removeItem(VAULT_STORAGE_KEY);
-  localStorage.removeItem(OWNER_STORAGE_KEY);
+  localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
   setAnniversaries([]);
+  setOnline(true);
 });
+
+function setOnline(value: boolean) {
+  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
+}
 
 describe('anniversaries: server first, then the settings mirror', () => {
   const created: ServerAnniversary = { serverId: 'ann-1', date: '2024-02-14', label: 'First date' };
@@ -271,6 +293,158 @@ describe('loadAnniversariesFromServer', () => {
     await inFlight;
 
     expect(anniversaries()).toEqual([{ id: 1, date: '2021-01-01', label: 'C only' }]);
+  });
+});
+
+describe('anniversaries local copy', () => {
+  const row = (serverId: string, label: string): ServerAnniversary => ({
+    serverId,
+    date: '2024-02-14',
+    label,
+  });
+
+  it('shows the saved copy offline, without asking the server', async () => {
+    await writeLocalCopy(A, ANNIVERSARIES_COPY_KIND, [
+      { id: 2, date: '2024-02-14', label: 'Saved', serverId: 'ann-s' },
+    ]);
+    setOnline(false);
+
+    await useAppStore.getState().loadAnniversariesFromServer();
+
+    expect(anniversaries()).toEqual([{ id: 2, date: '2024-02-14', label: 'Saved', serverId: 'ann-s' }]);
+    expect(server.fetchAnniversaries).not.toHaveBeenCalled();
+  });
+
+  it('saves the server rows as the copy, and a later session starts from it', async () => {
+    server.fetchAnniversaries.mockResolvedValue([row('ann-1', 'From server')]);
+
+    await useAppStore.getState().loadAnniversariesFromServer();
+
+    const saved = [{ id: 1, date: '2024-02-14', label: 'From server', serverId: 'ann-1' }];
+    expect(anniversaries()).toEqual(saved);
+    expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toEqual(saved);
+
+    // The same account in a new session, offline: the copy, not the blob.
+    useAppStore.getState().clearAuth();
+    useAppStore.getState().setAuthUser(A);
+    // clearAuth deleted A's copies as the outgoing account; save it again as
+    // the refresh above did, then start the new session from it.
+    await vi.waitFor(async () => expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toBeNull());
+    await writeLocalCopy(A, ANNIVERSARIES_COPY_KIND, saved);
+    expect(anniversaries()).toEqual([]);
+    setOnline(false);
+    await useAppStore.getState().loadAnniversariesFromServer();
+    expect(anniversaries()).toEqual(saved);
+  });
+
+  it('a failed read leaves the shown list and the copy unchanged', async () => {
+    const saved = [{ id: 1, date: '2024-02-14', label: 'Saved', serverId: 'ann-1' }];
+    await writeLocalCopy(A, ANNIVERSARIES_COPY_KIND, saved);
+    server.fetchAnniversaries.mockRejectedValue(new Error('500'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await useAppStore.getState().loadAnniversariesFromServer();
+
+    expect(anniversaries()).toEqual(saved);
+    expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toEqual(saved);
+  });
+
+  it('an empty server answer is shown and saved as []', async () => {
+    await writeLocalCopy(A, ANNIVERSARIES_COPY_KIND, [
+      { id: 1, date: '2024-02-14', label: 'Deleted elsewhere', serverId: 'ann-1' },
+    ]);
+    server.fetchAnniversaries.mockResolvedValue([]);
+
+    await useAppStore.getState().loadAnniversariesFromServer();
+
+    expect(anniversaries()).toEqual([]);
+    expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toEqual([]);
+  });
+
+  it('a copy read that lands after a confirmed write does not replace it', async () => {
+    // The copy read is held open; a confirmed add lands while it is pending;
+    // then the read resolves with an older list. The newer rows must stay.
+    const read = deferred<unknown>();
+    copyRead.hook = () => read.promise;
+    server.fetchAnniversaries.mockRejectedValue(new Error('500'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const refresh = useAppStore.getState().loadAnniversariesFromServer();
+    server.createAnniversary.mockResolvedValue(row('ann-new', 'Added'));
+    await useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'Added' });
+    read.settle([{ id: 1, date: '2024-02-14', label: 'Old copy', serverId: 'ann-old' }]);
+    await refresh;
+
+    expect(anniversaries().map((a) => a.label)).toEqual(['Added']);
+  });
+
+  it('a copy read that lands after a server answer does not replace it', async () => {
+    const read = deferred<unknown>();
+    copyRead.hook = () => read.promise;
+    const slowRefresh = useAppStore.getState().loadAnniversariesFromServer();
+    // A second refresh, reading no copy, gets the server answer first.
+    copyRead.hook = async () => null;
+    server.fetchAnniversaries.mockResolvedValueOnce([row('ann-new', 'Server')]);
+    await useAppStore.getState().loadAnniversariesFromServer();
+    server.fetchAnniversaries.mockRejectedValue(new Error('500'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    read.settle([{ id: 1, date: '2024-02-14', label: 'Old copy', serverId: 'ann-old' }]);
+    await slowRefresh;
+
+    expect(anniversaries().map((a) => a.label)).toEqual(['Server']);
+  });
+
+  it('each confirmed write updates the copy', async () => {
+    server.createAnniversary.mockResolvedValue(row('ann-1', 'Added'));
+    await useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'Added' });
+    expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toEqual([
+      { id: 1, date: '2024-02-14', label: 'Added', serverId: 'ann-1' },
+    ]);
+
+    server.updateAnniversary.mockResolvedValue(row('ann-1', 'Edited'));
+    await useAppStore.getState().updateAnniversary(1, { date: '2024-02-14', label: 'Edited' });
+    expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toEqual([
+      { id: 1, date: '2024-02-14', label: 'Edited', serverId: 'ann-1' },
+    ]);
+
+    server.deleteAnniversary.mockResolvedValue(undefined);
+    await useAppStore.getState().removeAnniversary(1);
+    expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toEqual([]);
+  });
+
+  it('a failed write leaves the copy unchanged', async () => {
+    const saved = [{ id: 1, date: '2024-02-14', label: 'Saved', serverId: 'ann-1' }];
+    await writeLocalCopy(A, ANNIVERSARIES_COPY_KIND, saved);
+    setAnniversaries(saved);
+    server.deleteAnniversary.mockRejectedValue(offline());
+
+    await expect(useAppStore.getState().removeAnniversary(1)).rejects.toThrow(/offline/i);
+
+    expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toEqual(saved);
+  });
+
+  it('a read raised for one account is neither shown nor saved under the next', async () => {
+    const pending = deferred<ServerAnniversary[]>();
+    server.fetchAnniversaries.mockReturnValue(pending.promise);
+
+    const inFlight = useAppStore.getState().loadAnniversariesFromServer();
+    await vi.waitFor(() => expect(server.fetchAnniversaries).toHaveBeenCalled());
+    useAppStore.getState().setAuthUser('USER-C');
+    pending.settle([row('ann-a', 'A private')]);
+    await inFlight;
+
+    expect(anniversaries()).toEqual([]);
+    expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toBeNull();
+    expect(await readLocalCopy('USER-C', ANNIVERSARIES_COPY_KIND)).toBeNull();
+  });
+
+  it('refreshLocalCopies reaches the anniversaries (start and reconnect)', async () => {
+    server.fetchAnniversaries.mockResolvedValue([row('ann-r', 'Added on the other phone')]);
+
+    await refreshLocalCopies();
+
+    expect(server.fetchAnniversaries).toHaveBeenCalledWith(A);
+    expect(anniversaries().map((a) => a.label)).toEqual(['Added on the other phone']);
   });
 });
 
@@ -511,5 +685,53 @@ describe('messages: favorites and the mirror refresh', () => {
     await inFlight;
 
     expect(useAppStore.getState().favoriteError).toBeNull();
+  });
+
+  it('the refresher no-ops until the bundled rows are seeded', async () => {
+    useAppStore.setState({ messages: [] } as StoreState);
+
+    await refreshLocalCopy(MESSAGE_DATA_COPY_KIND);
+
+    expect(server.fetchCustomMessages).not.toHaveBeenCalled();
+    expect(server.fetchFavoriteKeys).not.toHaveBeenCalled();
+  });
+
+  it('once seeded, refreshLocalCopies brings in a favorite added on another device', async () => {
+    const bundledText = `RECONNECT-${A}`;
+    const [id] = await seed([{ text: bundledText, category: 'reason', isCustom: false, createdAt: at }]);
+    await useAppStore.getState().loadMessages();
+    server.fetchCustomMessages.mockResolvedValue([]);
+    server.fetchFavoriteKeys.mockResolvedValue([await bundledMessageKey(bundledText)]);
+
+    await refreshLocalCopies();
+
+    expect(server.fetchFavoriteKeys).toHaveBeenCalledWith(A);
+    expect((await diskFavorites(A)).map((f) => f.messageId)).toEqual([id]);
+    expect(useAppStore.getState().messageHistory.favoriteIds).toContain(id);
+  });
+
+  it('a refresh that lands after sign-out does not put the rows back', async () => {
+    const [id] = await seed([{ text: `LATE-${A}`, category: 'reason', isCustom: false, createdAt: at }]);
+    await useAppStore.getState().loadMessages();
+    const keys = deferred<string[]>();
+    server.fetchCustomMessages.mockResolvedValue([
+      {
+        serverId: `srv-late-${A}`, text: 'late custom', category: 'custom', active: true, isFavorite: true,
+        tags: [], createdAt: at, updatedAt: at,
+      },
+    ]);
+    server.fetchFavoriteKeys.mockReturnValue(keys.promise);
+
+    const refresh = useAppStore.getState().loadMessageDataFromServer();
+    await vi.waitFor(() => expect(server.fetchFavoriteKeys).toHaveBeenCalled());
+    useAppStore.getState().clearAuth();
+    keys.settle([await bundledMessageKey(`LATE-${A}`)]);
+    await refresh;
+
+    await vi.waitFor(async () => {
+      expect((await diskRows()).filter((row) => row.userId === A)).toEqual([]);
+    });
+    expect(await diskFavorites(A)).toEqual([]);
+    expect((await diskRows()).some((row) => row.id === id)).toBe(true);
   });
 });
