@@ -1,5 +1,5 @@
 import type { IDBPDatabase } from 'idb';
-import type { Message, Photo } from '../types';
+import type { Message } from '../types';
 import { logger } from '../utils/logger';
 import { AccountDataError, notSyncedMessage } from './accountDataError';
 import { serializeAccountDataWrite } from './accountDataQueue';
@@ -75,79 +75,6 @@ class StorageService {
       // Fallback: App will continue with default state (handled in useAppStore)
       // Possible causes: permission denied, quota exceeded, corrupted database
       throw error; // Re-throw to allow caller to handle gracefully
-    }
-  }
-
-  // Photo operations
-  async addPhoto(photo: Omit<Photo, 'id'>): Promise<number> {
-    try {
-      await this.init();
-      logger.debug('[StorageService] Adding photo to IndexedDB');
-      const id = await this.db!.add('photos', photo as Photo);
-      logger.debug('[StorageService] Photo added successfully, id:', id);
-      return id;
-    } catch (error) {
-      console.error('[StorageService] Failed to add photo:', error);
-      console.error('[StorageService] Photo data:', photo);
-      throw error; // Re-throw to allow caller to handle
-    }
-  }
-
-  async getPhoto(id: number): Promise<Photo | undefined> {
-    try {
-      await this.init();
-      const photo = await this.db!.get('photos', id);
-      if (photo) {
-        logger.debug('[StorageService] Photo retrieved successfully, id:', id);
-      } else {
-        console.warn('[StorageService] Photo not found, id:', id);
-      }
-      return photo;
-    } catch (error) {
-      console.error('[StorageService] Failed to get photo:', error);
-      console.error('[StorageService] Photo id:', id);
-      return undefined; // Graceful fallback: return undefined
-    }
-  }
-
-  async getAllPhotos(): Promise<Photo[]> {
-    try {
-      await this.init();
-      const photos = await this.db!.getAll('photos');
-      logger.debug('[StorageService] Retrieved all photos, count:', photos.length);
-      return photos;
-    } catch (error) {
-      console.error('[StorageService] Failed to get all photos:', error);
-      return []; // Graceful fallback: return empty array
-    }
-  }
-
-  async deletePhoto(id: number): Promise<void> {
-    try {
-      await this.init();
-      await this.db!.delete('photos', id);
-      logger.debug('[StorageService] Photo deleted successfully, id:', id);
-    } catch (error) {
-      console.error('[StorageService] Failed to delete photo:', error);
-      console.error('[StorageService] Photo id:', id);
-      throw error; // Re-throw to allow caller to handle
-    }
-  }
-
-  async updatePhoto(id: number, updates: Partial<Photo>): Promise<void> {
-    try {
-      await this.init();
-      const photo = await this.getPhoto(id);
-      if (photo) {
-        await this.db!.put('photos', { ...photo, ...updates });
-        logger.debug('[StorageService] Photo updated successfully, id:', id);
-      } else {
-        console.warn('[StorageService] Cannot update - photo not found, id:', id);
-      }
-    } catch (error) {
-      console.error('[StorageService] Failed to update photo:', error);
-      console.error('[StorageService] Photo id:', id, 'updates:', updates);
-      throw error; // Re-throw to allow caller to handle
     }
   }
 
@@ -463,32 +390,6 @@ class StorageService {
     } catch (error) {
       console.error('[StorageService] Failed to clear all data:', error);
       throw error; // Re-throw to allow caller to handle
-    }
-  }
-
-  // Export data for backup
-  //
-  // `userId` is threaded through for the same reason getAllMessages takes it:
-  // an export is a read, and it must not hand the caller another account's
-  // custom messages. No caller today, but the argument keeps it that way.
-  async exportData(userId: string | null): Promise<{ photos: Photo[]; messages: Message[] }> {
-    try {
-      await this.init();
-      logger.debug('[StorageService] Exporting all data from IndexedDB...');
-      const [photos, messages] = await Promise.all([
-        this.getAllPhotos(),
-        this.getAllMessages(userId),
-      ]);
-      logger.debug(
-        '[StorageService] Data exported successfully, photos:',
-        photos.length,
-        'messages:',
-        messages.length
-      );
-      return { photos, messages };
-    } catch (error) {
-      console.error('[StorageService] Failed to export data:', error);
-      return { photos: [], messages: [] }; // Graceful fallback: return empty data
     }
   }
 }
