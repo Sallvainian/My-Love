@@ -1,54 +1,26 @@
 import { normalizeMoodEntry } from '../../types/moods';
 import { AnimatePresence, m as motion } from 'framer-motion';
 import {
-  AlertCircle,
-  Angry,
-  Battery,
   Bell,
   Calendar,
   Check,
-  Frown,
-  Heart,
-  Meh,
-  MessageCircle,
   RefreshCw,
   Search,
-  Smile,
-  Sparkles,
-  UserMinus,
   UserPlus,
   Users,
   Wifi,
   WifiOff,
   X,
-  Zap,
 } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { handleSupabaseError, isPostgrestError } from '../../api/errorHandlers';
 import { moodSyncService } from '../../api/moodSyncService';
 import { PARTNER_NAME } from '../../config/constants';
+import { MOOD_DISPLAY } from '../../constants/moodDisplay';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
 import { logger } from '../../utils/logger';
 import { PokeKissInterface } from '../PokeKissInterface';
-
-// Mood icon mapping (same as MoodTracker)
-const MOOD_CONFIG = {
-  // Positive emotions
-  loved: { icon: Heart, label: 'Loved', color: 'text-red-500' },
-  happy: { icon: Smile, label: 'Happy', color: 'text-yellow-500' },
-  content: { icon: Meh, label: 'Content', color: 'text-blue-500' },
-  excited: { icon: Zap, label: 'Excited', color: 'text-amber-500' },
-  thoughtful: { icon: MessageCircle, label: 'Thoughtful', color: 'text-purple-500' },
-  grateful: { icon: Sparkles, label: 'Grateful', color: 'text-pink-500' },
-  // Negative emotions
-  sad: { icon: Frown, label: 'Sad', color: 'text-gray-500' },
-  anxious: { icon: AlertCircle, label: 'Anxious', color: 'text-orange-500' },
-  frustrated: { icon: Angry, label: 'Frustrated', color: 'text-red-600' },
-  angry: { icon: Angry, label: 'Angry', color: 'text-rose-600' },
-  lonely: { icon: UserMinus, label: 'Lonely', color: 'text-indigo-500' },
-  tired: { icon: Battery, label: 'Tired', color: 'text-slate-500' },
-} as const;
 
 /**
  * Partner Mood View Component
@@ -183,7 +155,7 @@ export function PartnerMoodView() {
           logger.debug('[PartnerMoodView] Received partner mood update:', newMood);
 
           // Show notification toast
-          const moodLabel = MOOD_CONFIG[newMood.mood_type]?.label || newMood.mood_type;
+          const moodLabel = MOOD_DISPLAY[newMood.mood_type]?.label || newMood.mood_type;
           setNotification({
             show: true,
             mood: moodLabel,
@@ -666,7 +638,7 @@ export const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCa
   const normalized = normalizeMoodEntry(moodEntry);
   if (!normalized) return null;
   const { date, note, timestamp, moods: allMoods } = normalized;
-  const primaryConfig = MOOD_CONFIG[normalized.mood];
+  const primaryConfig = MOOD_DISPLAY[normalized.mood];
   const PrimaryIcon = primaryConfig.icon;
 
   return (
@@ -679,7 +651,7 @@ export const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCa
     >
       <div className="flex items-start gap-4">
         {/* Mood Icon */}
-        <div className={`${primaryConfig.color} mt-1`}>
+        <div className="mt-1 text-partner">
           <PrimaryIcon className="h-6 w-6" />
         </div>
 
@@ -689,7 +661,7 @@ export const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCa
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-gray-900">
-                {allMoods.map((m) => MOOD_CONFIG[m].label).join(', ')}
+                {allMoods.map((m) => MOOD_DISPLAY[m].label).join(', ')}
               </span>
               <span className="text-sm text-gray-500">{formatDate(date)}</span>
             </div>

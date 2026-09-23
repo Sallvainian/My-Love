@@ -68,6 +68,8 @@ const storeState = {
   syncPendingMoods: vi.fn(),
   updateSyncStatus: vi.fn(),
   moods: [] as MoodEntry[],
+  // Only `displayName` is read, by `PartnerMoodDisplay`'s heading.
+  partner: null as { displayName: string } | null,
 };
 
 vi.mock('../../../stores/useAppStore', () => ({
@@ -154,10 +156,10 @@ function moodRecord(moodTypes: unknown): SupabaseMood {
   };
 }
 
-/** 😊 — what getMoodEmoji returns for 'happy' */
-const HAPPY_EMOJI = '😊';
-/** 😴 — 'tired' */
-const TIRED_EMOJI = '😴';
+/** The lucide class MOOD_DISPLAY's icon renders for 'happy' (Smile)... */
+const HAPPY_ICON = '.lucide-smile';
+/** ...and for 'tired' (Battery). */
+const TIRED_ICON = '.lucide-battery';
 
 describe('MoodHistoryItem mood_types guard', () => {
   it.each(NON_ARRAY_ROWS)(
@@ -165,16 +167,21 @@ describe('MoodHistoryItem mood_types guard', () => {
     (_label, value) => {
       expect(() => render(<MoodHistoryItem mood={moodRecord(value)} />)).not.toThrow();
 
-      expect(screen.getByTestId('mood-emoji')).toHaveTextContent(HAPPY_EMOJI);
+      const icons = screen.getByTestId('mood-emoji');
+      expect(icons.querySelectorAll('svg')).toHaveLength(1);
+      expect(icons.querySelector(HAPPY_ICON)).not.toBeNull();
+      expect(screen.getByTestId('mood-label')).toHaveTextContent('Happy');
     }
   );
 
   it('still renders every mood of a genuine multi-mood entry', () => {
     render(<MoodHistoryItem mood={moodRecord(['happy', 'tired'])} />);
 
-    const emojis = screen.getByTestId('mood-emoji');
-    expect(emojis).toHaveTextContent(HAPPY_EMOJI);
-    expect(emojis).toHaveTextContent(TIRED_EMOJI);
+    const icons = screen.getByTestId('mood-emoji');
+    expect(icons.querySelectorAll('svg')).toHaveLength(2);
+    expect(icons.querySelector(HAPPY_ICON)).not.toBeNull();
+    expect(icons.querySelector(TIRED_ICON)).not.toBeNull();
+    expect(screen.getByTestId('mood-label')).toHaveTextContent('Happy, Tired');
   });
 });
 
@@ -194,16 +201,119 @@ describe('PartnerMoodDisplay mood_types guard', () => {
     (_label, value) => {
       expect(() => renderWith(value)).not.toThrow();
 
-      expect(screen.getByTestId('partner-mood-display')).toHaveTextContent(HAPPY_EMOJI);
+      const chips = screen.getByTestId('partner-mood-emoji');
+      expect(chips.children).toHaveLength(1);
+      expect(chips).toHaveTextContent('Happy');
+      expect(chips.querySelector(HAPPY_ICON)).not.toBeNull();
     }
   );
 
   it('still renders every mood of a genuine multi-mood entry', () => {
     renderWith(['happy', 'tired']);
 
-    const display = screen.getByTestId('partner-mood-display');
-    expect(display).toHaveTextContent(HAPPY_EMOJI);
-    expect(display).toHaveTextContent(TIRED_EMOJI);
+    const chips = screen.getByTestId('partner-mood-emoji');
+    expect(chips.children).toHaveLength(2);
+    expect(chips.children[0]).toHaveTextContent('Happy');
+    expect(chips.children[1]).toHaveTextContent('Tired');
+    expect(chips.querySelector(HAPPY_ICON)).not.toBeNull();
+    expect(chips.querySelector(TIRED_ICON)).not.toBeNull();
+    expect(screen.getByTestId('partner-mood-label')).toHaveTextContent('Happy, Tired');
+  });
+
+  it('renders no emoji in the partner card', () => {
+    renderWith(['happy', 'tired']);
+
+    expect(screen.getByTestId('partner-mood-display').textContent).not.toMatch(
+      /\p{Extended_Pictographic}/u
+    );
+  });
+
+  it('renders no emoji in the no-mood state', () => {
+    mockedUsePartnerMood.mockReturnValue({
+      partnerMood: null,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePartnerMood>);
+    render(<PartnerMoodDisplay partnerId={PARTNER_ID} />);
+
+    expect(screen.getByTestId('no-mood-logged-state').textContent).not.toMatch(
+      /\p{Extended_Pictographic}/u
+    );
+  });
+
+  it('renders no emoji in the error state', () => {
+    mockedUsePartnerMood.mockReturnValue({
+      partnerMood: null,
+      isLoading: false,
+      error: 'x',
+    } as unknown as ReturnType<typeof usePartnerMood>);
+    render(<PartnerMoodDisplay partnerId={PARTNER_ID} />);
+
+    expect(screen.getByTestId('partner-mood-error').textContent).not.toMatch(
+      /\p{Extended_Pictographic}/u
+    );
+  });
+});
+
+describe('PartnerMoodDisplay partner name', () => {
+  function renderCard() {
+    mockedUsePartnerMood.mockReturnValue({
+      partnerMood: moodRecord(['happy']),
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePartnerMood>);
+
+    return render(<PartnerMoodDisplay partnerId={PARTNER_ID} />);
+  }
+
+  /** The avatar is the first child of the card's header row. */
+  function avatar(): HTMLElement {
+    const heading = screen.getByRole('heading', { level: 2 });
+    return heading.closest('[data-testid="partner-mood-display"]')!.querySelector(
+      '[aria-hidden="true"]'
+    ) as HTMLElement;
+  }
+
+  afterEach(() => {
+    storeState.partner = null;
+  });
+
+  it('names the store partner and shows their initial', () => {
+    storeState.partner = { displayName: 'Sam' };
+    renderCard();
+
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sam is feeling');
+    expect(avatar()).toHaveTextContent('S');
+    expect(avatar().querySelector('.lucide-user')).toBeNull();
+  });
+
+  it('trims the store name', () => {
+    storeState.partner = { displayName: '  sam  ' };
+    renderCard();
+
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('sam is feeling');
+    expect(avatar()).toHaveTextContent('S');
+  });
+
+  it('takes a whole code point for the initial', () => {
+    storeState.partner = { displayName: '\u{1D4AE}am' };
+    renderCard();
+
+    expect(avatar().textContent).toBe('\u{1D4AE}');
+  });
+
+  it.each([
+    ['null', null],
+    ['blank', { displayName: '   ' }],
+  ])('falls back to "Your partner" and a User icon when the partner is %s', (_label, partner) => {
+    storeState.partner = partner;
+    renderCard();
+
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
+      'Your partner is feeling'
+    );
+    expect(avatar().querySelector('.lucide-user')).not.toBeNull();
+    expect(avatar().textContent).toBe('');
   });
 });
 
@@ -277,8 +387,9 @@ describe('CalendarDay moods guard', () => {
 
   it.each(NON_ARRAY_ROWS)('falls back to the single mood when moods is %s', (_label, value) => {
     // Pre-fix, the string row threw inside `dayClasses` before render, on
-    // `MOOD_CONFIG['h'].bgColor`; the object row cleared that lookup and threw
-    // on `allMoods.join` in the aria-label. The number row already fell back.
+    // the old local mood config's `['h'].bgColor`; the object row cleared
+    // that lookup and threw on `allMoods.join` in the aria-label. The number
+    // row already fell back.
     expect(() => renderDay(moodEntry(value))).not.toThrow();
 
     expect(ariaLabel()).toContain('- happy mood');

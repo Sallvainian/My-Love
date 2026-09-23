@@ -7,6 +7,7 @@
  * @module components/MoodTracker/MoodHistoryTimeline
  */
 
+import { AlertCircle, History } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import type { ReactElement } from 'react';
 import { List } from 'react-window';
@@ -28,10 +29,10 @@ interface MoodHistoryTimelineProps {
 function DateHeader({ date }: { date: string }) {
   return (
     <div
-      className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100 px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
+      className="sticky top-0 z-10 border-b border-line bg-card px-4 py-2.5"
       data-testid={`date-header-${date.toLowerCase().replace(/\s/g, '-')}`}
     >
-      <h3 className="text-sm font-semibold tracking-wide text-gray-700 uppercase dark:text-gray-300">
+      <h3 className="text-xs font-semibold tracking-[.08em] text-muted uppercase">
         {date}
       </h3>
     </div>
@@ -44,7 +45,7 @@ function DateHeader({ date }: { date: string }) {
 function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center" data-testid="loading-spinner">
-      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-pink-500"></div>
+      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-accent"></div>
     </div>
   );
 }
@@ -54,12 +55,15 @@ function LoadingSpinner() {
  */
 function EmptyMoodHistoryState() {
   return (
-    <div className="py-12 text-center" data-testid="empty-mood-history-state">
-      <div className="mb-4 text-6xl">📊</div>
-      <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">
-        No mood history yet
-      </h3>
-      <p className="text-gray-600 dark:text-gray-400">
+    <div
+      className="flex flex-col items-center px-4 py-12 text-center"
+      data-testid="empty-mood-history-state"
+    >
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-tint text-accent">
+        <History className="h-5 w-5" aria-hidden="true" />
+      </div>
+      <h3 className="mb-1 text-[15px] font-semibold text-ink">No mood history yet</h3>
+      <p className="text-sm text-muted">
         Start logging your moods to see your emotional journey
       </p>
     </div>
@@ -207,15 +211,13 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
   // page renders "No mood history yet" to a user who has months of moods
   if (error) {
     return (
-      <div className="py-12 text-center" data-testid="error-state">
-        <div className="mb-4 text-6xl">⚠️</div>
-        <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">
-          Failed to load mood history
-        </h3>
-        <p className="text-gray-600 dark:text-gray-400">{error}</p>
+      <div className="flex flex-col items-center px-4 py-12 text-center" data-testid="error-state">
+        <AlertCircle className="mb-3 h-8 w-8 text-muted" aria-hidden="true" />
+        <h3 className="mb-1 text-[15px] font-semibold text-ink">Failed to load mood history</h3>
+        <p className="text-sm text-muted">{error}</p>
         <button
           onClick={() => void retry()}
-          className="mt-4 rounded-lg bg-pink-600 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-700"
+          className="mt-4 h-12 rounded-full bg-fill px-6 text-[15px] font-semibold text-white"
           data-testid="mood-history-retry"
         >
           Try Again
