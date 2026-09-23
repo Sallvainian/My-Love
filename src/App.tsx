@@ -847,7 +847,7 @@ function App() {
                 {currentView === 'notes' && <LoveNotes />}
 
                 {/* Story 4 (dynamic events): Settings, home of the only sign-out */}
-                {currentView === 'settings' && <Settings />}
+                {currentView === 'settings' && <Settings onShowWelcome={showWelcomeManually} />}
               </Suspense>
             </ViewErrorBoundary>
           )}
