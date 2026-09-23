@@ -166,15 +166,8 @@ _bmad/custom/*.user.toml
 # Grok's own README claims repo-scoped skills are filtered when gitignored;
 # grok 1.0.30 does not do that -- the skill is discovered under `.grok/skills/`,
 # a bare `skills/` rule and `.grok/` alike. Worktree checkouts are served by
-# `seed_files = [".grok/skills"]` in .bmad-loop/profiles/grok.toml, which copies
-# the tree in, so nothing here needs to be tracked.
-.grok/*
-# ...except the bmad-loop hook registration. `install.py` writes this file only
-# at `bmad-loop init`, and worktree reuse means an existing run never re-seeds
-# it, so the SessionEnd removal that keeps grok dev sessions alive survives in
-# exactly one place on disk and nowhere in git. Tracking the one file makes it
-# recoverable from a clone; the 944-file `.grok/skills/` tree stays ignored,
-# per this repo's rule against re-adding vendored tool docs.
-!.grok/hooks/
-.grok/hooks/*
-!.grok/hooks/bmad-loop.json
+# `worktree_seed` in .bmad-loop/policy.toml, which copies the tree in, and
+# bmad-loop's built-in grok profile writes .grok/hooks/bmad-loop.json into each
+# worktree itself (`bmad-loop init --cli grok` regenerates it here), so nothing
+# here needs to be tracked.
+.grok/
