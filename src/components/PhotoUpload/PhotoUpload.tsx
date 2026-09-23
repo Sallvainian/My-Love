@@ -1,6 +1,7 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { AlertTriangle, Camera, Check, Loader, Upload, X } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useFocusTrap } from '../../hooks';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { useAppStore } from '../../stores/useAppStore';
 
@@ -142,6 +143,43 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
     onClose();
   };
 
+  // Escape does what the close button does, and is ignored while it is
+  // disabled mid-upload. Read through refs so the handler stays referentially
+  // stable: App passes an inline onClose, and a new onEscape would re-run the
+  // trap's arming effect on every render, throwing focus back to the close
+  // button on each keystroke.
+  const modalRef = useRef<HTMLDivElement>(null);
+  const handleCloseRef = useRef(handleClose);
+  const stepRef = useRef(step);
+  useLayoutEffect(() => {
+    handleCloseRef.current = handleClose;
+    stepRef.current = step;
+  });
+  const handleEscape = useCallback(() => {
+    if (stepRef.current === 'uploading') return;
+    handleCloseRef.current();
+  }, []);
+  useFocusTrap(modalRef, isOpen, { onEscape: handleEscape });
+
+  // Every step change unmounts the control that started it -- Select, Upload,
+  // Retry -- and a focused element that unmounts blurs to <body>. <body> is an
+  // ancestor of the modal, so the trap's keydown listener would never see
+  // Escape or Tab again. Hand focus to the step's natural target instead; the
+  // container (tabIndex -1) is the fallback for steps with nothing to act on.
+  // Declared after useFocusTrap so that on open the trap captures the opener
+  // for its focus return before anything here moves focus.
+  const captionRef = useRef<HTMLTextAreaElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!isOpen || !modal) return;
+    const active = document.activeElement;
+    if (active !== modal && modal.contains(active)) return;
+    const target =
+      step === 'preview' ? captionRef.current : step === 'error' ? retryRef.current : null;
+    (target ?? modal).focus();
+  }, [isOpen, step]);
+
   const handleRetry = () => {
     setError('');
     setStep('preview');
@@ -188,14 +226,24 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <div
+              ref={modalRef}
+              // tabIndex -1 keeps this container reachable by focus without a
+              // tab stop, so the uploading and success steps -- which render no
+              // focusable control -- still hold focus where the trap listens.
+              tabIndex={-1}
               className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[20px] bg-card shadow-float"
               data-testid="photo-upload-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="photo-upload-title"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
               <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-ink">Upload Photo</h2>
+                  <h2 id="photo-upload-title" className="text-lg font-semibold text-ink">
+                    Upload Photo
+                  </h2>
                   <p className="mt-0.5 text-sm text-muted">
                     {step === 'select' && 'Select a photo to upload'}
                     {step === 'preview' && 'Add details and upload'}
@@ -292,6 +340,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         Caption (optional)
                       </label>
                       <textarea
+                        ref={captionRef}
                         id="photo-caption"
                         value={caption}
                         onChange={(e) => setCaption(e.target.value)}
@@ -358,6 +407,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                               <p
                                 key={index}
                                 className="text-sm text-danger"
+                                role="alert"
                                 data-testid="photo-upload-tag-error"
                               >
                                 {err}
@@ -372,6 +422,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     {error && (
                       <div
                         className="rounded-[14px] bg-dtint p-4"
+                        role="alert"
                         data-testid="photo-upload-error"
                       >
                         <p className="text-sm font-medium text-danger">{error}</p>
@@ -399,6 +450,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                       </button>
                       {step === 'error' && (
                         <button
+                          ref={retryRef}
                           onClick={handleRetry}
                           className="h-12 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                           data-testid="photo-upload-retry"

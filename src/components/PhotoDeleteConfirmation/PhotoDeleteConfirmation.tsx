@@ -93,6 +93,7 @@ export function PhotoDeleteConfirmation({
           {error && (
             <div
               className="rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
+              role="alert"
               data-testid="photo-delete-confirmation-error"
             >
               {error}

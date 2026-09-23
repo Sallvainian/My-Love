@@ -284,6 +284,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
           {error && (
             <div
               className="rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
+              role="alert"
               data-testid="photo-edit-modal-error"
             >
               {error}

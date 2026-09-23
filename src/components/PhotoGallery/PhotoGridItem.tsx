@@ -20,7 +20,7 @@ interface PhotoGridItemProps {
  * Features:
  * - Square aspect ratio thumbnail (aspect-square)
  * - Lazy loading with IntersectionObserver (AC-6.3.5)
- * - Caption overlay on hover/tap (flat dark backdrop)
+ * - Caption overlay on hover or keyboard focus (flat dark backdrop)
  * - Owner badge display (AC-6.3.11): initial in a fill (own) or partner circle
  * - Click handler for photo selection
  * - Uses Supabase signed URLs
@@ -73,7 +73,7 @@ export function PhotoGridItem({
 
   return (
     <div
-      className="group relative aspect-square cursor-pointer overflow-hidden rounded-[14px] bg-card2 transition-transform duration-200 hover:scale-105"
+      className="group relative aspect-square cursor-pointer overflow-hidden rounded-[14px] bg-card2 transition-transform duration-200 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       onClick={handleClick}
       role="button"
       tabIndex={0}
@@ -122,10 +122,11 @@ export function PhotoGridItem({
         </span>
       </div>
 
-      {/* Caption overlay on hover/tap */}
+      {/* Caption overlay on hover or keyboard focus. A tap opens the viewer, so
+          touch never shows it; the viewer carries the caption instead. */}
       {photo.caption && (
         <div
-          className="absolute inset-x-0 bottom-0 bg-black/55 p-3 pl-8 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          className="absolute inset-x-0 bottom-0 bg-black/55 p-3 pl-8 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
           data-testid="photo-grid-item-caption-overlay"
         >
           <p className="line-clamp-2 text-sm font-medium text-white">{photo.caption}</p>

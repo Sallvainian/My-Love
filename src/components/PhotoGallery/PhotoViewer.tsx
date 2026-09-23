@@ -632,7 +632,12 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
         {/* AC 6.4.10: Delete confirmation dialog */}
         {showDeleteDialog && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50">
+          <div
+            className="fixed inset-0 z-60 flex items-center justify-center bg-black/50"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="photo-viewer-delete-title"
+          >
             <motion.div
               className="mx-4 w-full max-w-md rounded-[20px] bg-card shadow-float"
               initial={{ scale: 0.9, opacity: 0 }}
@@ -642,7 +647,9 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
                   <AlertTriangle className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <h3 className="text-lg font-semibold text-ink">Delete Photo?</h3>
+                <h3 id="photo-viewer-delete-title" className="text-lg font-semibold text-ink">
+                  Delete Photo?
+                </h3>
               </div>
               <div className="space-y-4 px-5 py-4">
                 <p className="text-[15px] text-ink">
