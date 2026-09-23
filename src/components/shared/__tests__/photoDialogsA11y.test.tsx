@@ -364,3 +364,29 @@ describe('DW-183: a grid tile shows its caption to keyboard focus', () => {
     );
   });
 });
+
+describe('DW-206: an outside tap closes the upload modal', () => {
+  it('closes on a tap on the overlay, not on one inside the panel', () => {
+    const onClose = vi.fn();
+    render(<PhotoUpload isOpen onClose={onClose} />);
+
+    fireEvent.click(screen.getByTestId('photo-upload-modal'));
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('photo-upload-overlay'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores an outside tap while the upload is in flight', async () => {
+    const onClose = vi.fn();
+    uploadPhotoMock.mockReturnValue(new Promise(() => {}));
+    render(<PhotoUpload isOpen onClose={onClose} />);
+    selectFile();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('photo-upload-submit-button'));
+    });
+
+    fireEvent.click(screen.getByTestId('photo-upload-overlay'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});

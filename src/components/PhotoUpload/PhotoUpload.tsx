@@ -149,6 +149,15 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
     onClose();
   };
 
+  // An outside tap lands on the full-screen overlay that centres the panel,
+  // not on the backdrop beneath it, so the overlay owns the close. Ignored mid-
+  // upload, like the disabled close button.
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && step !== 'uploading') {
+      handleClose();
+    }
+  };
+
   // Escape does what the close button does, and is ignored while it is
   // disabled mid-upload. Read through refs so the handler stays referentially
   // stable: App passes an inline onClose, and a new onEscape would re-run the
@@ -236,7 +245,6 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={handleClose}
             className="fixed inset-0 z-50 bg-black/50"
             data-testid="photo-upload-backdrop"
           />
@@ -248,6 +256,8 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ type: 'spring', duration: 0.3 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={handleBackdropClick}
+            data-testid="photo-upload-overlay"
           >
             <div
               ref={modalRef}
