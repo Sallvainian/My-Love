@@ -7,7 +7,10 @@
  * - Pagination support (hasMore)
  *
  * Cross-slice dependencies:
- * - None (self-contained)
+ * - authSlice: every async action captures `userId` + `authSessionVersion`
+ *   before its first await and re-checks the pair before every post-await
+ *   write. `userId` alone cannot tell a same-account re-sign-in from an
+ *   uninterrupted session; `clearAuth` bumps the version on every sign-out.
  *
  * Persistence:
  * - Notes loaded from Supabase (not persisted to localStorage)
@@ -189,6 +192,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
    * Pagination: LIMIT (default 50)
    */
   fetchNotes: async (limit = NOTES_PAGE_SIZE) => {
+    const { userId, authSessionVersion: requestedInSession } = get();
+    const ownsRequest = () =>
+      get().userId === userId && get().authSessionVersion === requestedInSession;
+
     try {
       // Cleanup existing preview URLs before fetching new notes
       const { notes: existingNotes } = get();
@@ -196,8 +203,6 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       set({ notesIsLoading: true, notesError: null });
 
-      // Get authenticated user ID
-      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -233,7 +238,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       // Identity guard: Sign Out sits on the same screen that fires this, and the
       // request goes out with a still-valid token — so it succeeds and its write
       // lands after clearAuth, putting the previous account's data back.
-      if (get().userId !== userId) {
+      if (!ownsRequest()) {
         set({ notesIsLoading: false });
         return;
       }
@@ -248,6 +253,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch notes';
       console.error('[NotesSlice] Error fetching notes:', error);
+      if (!ownsRequest()) {
+        set({ notesIsLoading: false });
+        return;
+      }
       set({
         notesIsLoading: false,
         notesError: errorMessage,
@@ -267,11 +276,13 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       return;
     }
 
+    const { userId, authSessionVersion: requestedInSession } = get();
+    const ownsRequest = () =>
+      get().userId === userId && get().authSessionVersion === requestedInSession;
+
     try {
       set({ notesIsLoading: true });
 
-      // Get authenticated user ID
-      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -285,6 +296,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       // Get the oldest message timestamp for pagination
       const oldestNote = notes[0];
       if (!oldestNote) {
+        if (!ownsRequest()) return;
         set({ notesIsLoading: false, notesHasMore: false });
         return;
       }
@@ -318,7 +330,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       // plain case. `notes` was destructured before both awaits, so writing it
       // back restores the messages that were on screen at sign-out as well as
       // the page just fetched: the whole conversation, not one page of it.
-      if (get().userId !== userId) {
+      if (!ownsRequest()) {
         set({ notesIsLoading: false });
         return;
       }
@@ -335,6 +347,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch older notes';
       console.error('[NotesSlice] Error fetching older notes:', error);
+      if (!ownsRequest()) {
+        set({ notesIsLoading: false });
+        return;
+      }
       set({
         notesIsLoading: false,
         notesError: errorMessage,
@@ -410,12 +426,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
    * Love Notes Images - Support optional image attachment
    */
   sendNote: async (content: string, imageFile?: File) => {
+    const { userId, authSessionVersion: requestedInSession } = get();
+    const ownsRequest = () =>
+      get().userId === userId && get().authSessionVersion === requestedInSession;
+
     try {
       // Check rate limiting
       const { recentTimestamps, now } = get().checkRateLimit();
 
-      // Get authenticated user ID and partner ID
-      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -424,6 +442,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       if (!partnerId) {
         throw new Error('Partner not configured');
       }
+
+      // The session that composed this note has ended: sending now would post
+      // a note the signed-in session never showed as sending.
+      if (!ownsRequest()) return;
 
       // Generate temporary ID for optimistic update
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -476,6 +498,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           const compressionResult = await imageCompressionService.compressImage(imageFile);
           imageBlob = compressionResult.blob;
 
+          // Stop before uploading: signedOutState() dropped the optimistic note.
+          if (!ownsRequest()) return;
+
           // Cache the compressed blob for retry flows
           set((state) => ({
             notes: state.notes.map((note) =>
@@ -490,6 +515,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           logger.debug('[NotesSlice] Image uploaded:', storagePath);
         } catch (imageError) {
           console.error('[NotesSlice] Image upload failed:', imageError);
+          if (!ownsRequest()) return;
           // Mark message as failed with image error
           set((state) => ({
             notes: state.notes.map((note) =>
@@ -515,7 +541,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         // Not unconditional: the row may have committed and only the response
         // been lost, in which case the stored note points at this very object.
         await discardUnreferencedImage(storagePath, userId, tempId);
-        if (get().userId !== userId) return;
+        if (!ownsRequest()) return;
         if (isPostgrestError(error) && error.code === '23514') {
           set({ notesError: handleSupabaseError(error).message });
         }
@@ -540,7 +566,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         URL.revokeObjectURL(imagePreviewUrl);
       }
 
-      if (get().userId !== userId) return;
+      if (!ownsRequest()) return;
       if (get().notesError === CHECK_CONSTRAINT_MESSAGE) {
         set({ notesError: null });
       }
@@ -577,6 +603,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         throw error;
       }
 
+      if (!ownsRequest()) return;
       set({ notesError: errorMessage });
     }
   },
@@ -587,7 +614,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
    * Love Notes Images - Retry uses cached imageBlob to avoid re-compression
    */
   retryFailedMessage: async (tempId: string) => {
-    const capturedUserId = get().userId;
+    const { userId: capturedUserId, authSessionVersion: requestedInSession } = get();
+    const ownsRequest = () =>
+      get().userId === capturedUserId && get().authSessionVersion === requestedInSession;
+
     try {
       // Check rate limiting before retry
       const { recentTimestamps, now } = get().checkRateLimit();
@@ -606,7 +636,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         throw new Error('Partner not configured');
       }
 
-      if (get().userId !== capturedUserId) return;
+      if (!ownsRequest()) return;
 
       // Mark as sending again
       set((state) => ({
@@ -637,6 +667,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           logger.debug('[NotesSlice] Retry image uploaded:', storagePath);
         } catch (imageError) {
           console.error('[NotesSlice] Retry image upload failed:', imageError);
+          if (!ownsRequest()) return;
           set((state) => ({
             notes: state.notes.map((note) =>
               note.tempId === tempId
@@ -663,7 +694,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         // Not unconditional: the row may have committed and only the response
         // been lost, in which case the stored note points at this very object.
         await discardUnreferencedImage(storagePath, userId, tempId);
-        if (get().userId !== userId) return;
+        if (!ownsRequest()) return;
         if (isPostgrestError(error) && error.code === '23514') {
           set({ notesError: handleSupabaseError(error).message });
         }
@@ -703,7 +734,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         URL.revokeObjectURL(failedNote.imagePreviewUrl);
       }
 
-      if (get().userId !== userId) return;
+      if (!ownsRequest()) return;
       if (get().notesError === CHECK_CONSTRAINT_MESSAGE) {
         set({ notesError: null });
       }
@@ -747,7 +778,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     // promise is the confirmation dialog's success signal -- it closes on one --
     // so returning quietly would dismiss the dialog as though the message were
     // gone when nothing had been recorded.
-    const userId = get().userId;
+    const { userId, authSessionVersion: requestedInSession } = get();
     if (!userId) {
       throw new Error('User not authenticated');
     }
@@ -807,7 +838,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     // case, so the tab renders nothing else. signedOutState() happens to clear
     // it on sign-out, but setAuthUser (authSlice.ts:145) switches accounts
     // without going through it.
-    if (get().userId !== userId) {
+    if (get().userId !== userId || get().authSessionVersion !== requestedInSession) {
       if (willEmptyWindow) set({ notesIsLoading: false });
       return;
     }
