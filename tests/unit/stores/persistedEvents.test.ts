@@ -69,14 +69,12 @@ const PERSISTED_MOOD = {
  * when it does not, which would hide whether the strip preserved it.
  */
 const PERSISTED_SETTINGS = {
-  themeName: 'ocean',
   notificationTime: '09:00',
   relationship: {
     startDate: '2020-01-01',
     partnerName: 'A',
     anniversaries: [],
   },
-  customization: { accentColor: '#ff8888', fontFamily: 'serif' },
   notifications: { enabled: true, time: '09:00' },
 };
 
@@ -184,7 +182,7 @@ describe('persisted events', () => {
     const state = useAppStore.getState();
 
     expect(state.isOnboarded).toBe(true);
-    expect(state.settings?.themeName).toBe('ocean');
+    expect(state.settings?.relationship.partnerName).toBe('A');
     expect(state.messageHistory.currentIndex).toBe(7);
     expect(state.messageHistory.shownMessages.get('2026-07-26')).toBe(3);
   });

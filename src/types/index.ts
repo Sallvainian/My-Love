@@ -2,8 +2,6 @@ import type { MoodType } from './moods';
 
 // Core types for the My Love app
 
-export type ThemeName = 'sunset' | 'ocean' | 'lavender' | 'rose';
-
 export type MessageCategory = 'reason' | 'memory' | 'affirmation' | 'future' | 'custom';
 
 export type { MoodType } from './moods';
@@ -104,16 +102,11 @@ export type {
 } from '../api/interactionService';
 
 export interface Settings {
-  themeName: ThemeName;
   notificationTime: string; // HH:MM format
   relationship: {
     startDate: string; // ISO date string
     partnerName: string;
     anniversaries: Anniversary[];
-  };
-  customization: {
-    accentColor: string;
-    fontFamily: string;
   };
   notifications: {
     enabled: boolean;
@@ -180,21 +173,4 @@ export interface CustomMessagesExport {
     createdAt: string;
     updatedAt: string;
   }>;
-}
-
-// Theme configuration
-export interface Theme {
-  name: ThemeName;
-  displayName: string;
-  colors: {
-    primary: string;
-    secondary: string;
-    background: string;
-    text: string;
-    accent: string;
-  };
-  gradients: {
-    background: string;
-    card: string;
-  };
 }

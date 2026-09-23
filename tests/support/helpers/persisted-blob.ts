@@ -50,24 +50,19 @@ export const PERSIST_VERSION = 0;
  * It has to pass: the adapter drops `settings` outright when the schema
  * rejects it (`useAppStore.ts:147-158`), which would make "the surrounding
  * keys survived the strip" unprovable — the key would be gone for an unrelated
- * reason. `themeName: 'ocean'` is deliberately NOT the app default (`'sunset'`,
- * `src/utils/themes.ts:67`), so a test can tell "the seeded settings were
- * applied" from "defaults were applied".
+ * reason. `startDate` and `partnerName` are deliberately NOT the app defaults
+ * (`APP_CONFIG` in `src/config/constants.ts`), so a test can tell "the seeded
+ * settings were applied" from "defaults were applied".
  */
 export const SEEDED_SETTINGS = {
-  themeName: 'ocean',
   notificationTime: '09:00',
   relationship: {
     startDate: '2020-01-01',
     partnerName: 'A',
     anniversaries: [],
   },
-  customization: { accentColor: '#ff8888', fontFamily: 'serif' },
   notifications: { enabled: true, time: '09:00' },
 } as const;
-
-/** `--color-primary` for `SEEDED_SETTINGS.themeName` (`src/utils/themes.ts:22`). */
-export const SEEDED_THEME_PRIMARY = '#14b8a6';
 
 /** The keys `partialize` allows onto disk (`useAppStore.ts` `partialize`). */
 export const PERSISTED_ALLOWLIST = ['isOnboarded', 'messageHistory', 'settings'] as const;

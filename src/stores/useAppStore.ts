@@ -29,7 +29,6 @@ function validateHydratedState(state: Partial<AppState> | undefined): {
 
   // Validate settings structure (only if settings exists - can be missing for fresh install)
   if (state.settings) {
-    if (!state.settings.themeName) errors.push('Missing themeName');
     if (!state.settings.relationship) errors.push('Missing relationship data');
   }
 
@@ -74,6 +73,16 @@ const STALE_PERSISTED_KEYS = [
   'moods', 'events', 'eventsIsLoading', 'eventsError',
   'eventsPagination', 'eventsIsLoadingMore', 'eventsHistoryError',
 ] as const;
+
+/**
+ * Keys inside `settings` left over from the removed pre-kit theme system.
+ *
+ * Nothing reads them any more, but `SettingsSchema` is not strict and Zustand
+ * replaces `settings` whole from the blob, so a device that saved them would
+ * carry them forward on every write. Dropping them here lets the next write
+ * leave them out.
+ */
+const STALE_PERSISTED_SETTINGS_KEYS = ['themeName', 'customization'] as const;
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -147,6 +156,15 @@ export const useAppStore = create<AppState>()(
             if (data.state?.messageHistory && 'favoriteIds' in data.state.messageHistory) {
               delete data.state.messageHistory.favoriteIds;
               mutated = true;
+            }
+
+            if (data.state?.settings) {
+              for (const key of STALE_PERSISTED_SETTINGS_KEYS) {
+                if (key in data.state.settings) {
+                  delete data.state.settings[key];
+                  mutated = true;
+                }
+              }
             }
 
             // Schema-validate persisted settings; drop just `settings` on failure
@@ -321,8 +339,7 @@ export const useAppStore = create<AppState>()(
         // Log hydration result
         if (state && state.settings) {
           logger.info(
-            '[Zustand Persist] State successfully rehydrated from LocalStorage',
-            `with settings (theme: ${state.settings.themeName})`
+            '[Zustand Persist] State successfully rehydrated from LocalStorage with settings'
           );
         } else {
           logger.info('[Zustand Persist] No persisted state found - using initial defaults');

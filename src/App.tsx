@@ -31,7 +31,6 @@ import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { stripBasePath } from './utils/basePath';
 import { logger } from './utils/logger';
 import { logStorageQuota } from './utils/storageMonitor';
-import { applyTheme } from './utils/themes';
 
 // Lazy load route components for code splitting
 const PhotoGallery = lazy(() =>
@@ -97,10 +96,9 @@ const HOME_MAX_EVENT_CARDS = 6;
 
 function App() {
   const {
-    settings, isLoading, currentView, isOnline, events, authUserId, authSessionVersion,
+    isLoading, currentView, isOnline, events, authUserId, authSessionVersion,
   } = useAppStore(
     useShallow((s) => ({
-      settings: s.settings,
       isLoading: s.isLoading,
       currentView: s.currentView,
       isOnline: s.syncStatus.isOnline,
@@ -443,13 +441,6 @@ function App() {
       console.error('[App] Account data sync failed:', error);
     });
   }, [authUserId, authSessionVersion, messagesSeeded]);
-
-  // Apply theme when settings change
-  useEffect(() => {
-    if (settings) {
-      applyTheme(settings.themeName);
-    }
-  }, [settings]);
 
   // Story 6.4: Task 2 - Network state detection with auto-sync on reconnect (AC #2)
   useEffect(() => {

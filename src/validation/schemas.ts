@@ -120,12 +120,6 @@ export const MoodEntrySchema = z.object({
 // ============================================================================
 
 /**
- * Theme name enum validation
- * Ensures only valid themes are accepted
- */
-const ThemeNameSchema = z.enum(['sunset', 'ocean', 'lavender', 'rose']);
-
-/**
  * Time format validation (HH:MM)
  * Ensures consistent time format for notifications and validates hour/minute ranges
  */
@@ -152,19 +146,14 @@ export const AnniversarySchema = z.object({
 
 /**
  * Full settings schema with nested structures
- * Validates all app settings including relationship, customization, and notifications
+ * Validates all app settings including relationship and notifications
  */
 export const SettingsSchema = z.object({
-  themeName: ThemeNameSchema,
   notificationTime: TimeFormatSchema,
   relationship: z.object({
     startDate: IsoDateStringSchema,
     partnerName: z.string().min(1, 'Partner name cannot be empty'),
     anniversaries: z.array(AnniversarySchema),
-  }),
-  customization: z.object({
-    accentColor: z.string(),
-    fontFamily: z.string(),
   }),
   notifications: z.object({
     enabled: z.boolean(),

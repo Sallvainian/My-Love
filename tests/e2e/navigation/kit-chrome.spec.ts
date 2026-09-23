@@ -2,10 +2,9 @@
  * E2E: Style kit ground and chrome wordmark
  *
  * The page ground and the top-bar wordmark read at the rendered surface, in
- * both OS themes. The ground is checked only after `applyTheme()` has run
- * (it sets `--color-primary` on <html>): it used to paint the theme gradient
- * inline on <body>, over any CSS ground, so asserting before it runs would pass
- * even with that write restored. The kit colours are `--kit-*` variables that
+ * both OS themes. The ground comes from the stylesheet alone: no script writes
+ * a colour or gradient inline on <html> or <body> any more, so the dock being
+ * on screen is readiness enough. The kit colours are `--kit-*` variables that
  * switch under `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
 import { test, expect } from '../../support/merged-fixtures';
@@ -15,7 +14,7 @@ const PAGE_GROUND = {
   dark: 'rgb(11, 14, 20)', // #0b0e14
 } as const;
 
-/** Kit accent; the sunset theme's inline `--color-accent` is #FFD700. */
+/** Kit accent. */
 const KIT_ACCENT = {
   light: 'rgb(200, 33, 107)', // #c8216b
   dark: 'rgb(244, 114, 182)', // #f472b6
@@ -37,17 +36,7 @@ test.describe('Style kit chrome', () => {
       await page.goto('/');
       await expect(page.getByTestId('nav-dock')).toBeVisible();
 
-      // Settings hydrated and applyTheme() ran.
-      await expect
-        .poll(() =>
-          page.evaluate(() =>
-            document.documentElement.style.getPropertyValue('--color-primary').trim()
-          )
-        )
-        .not.toBe('');
-
-      // `@theme inline` keeps `text-accent` on `--kit-accent`, out of reach of
-      // applyTheme()'s inline `--color-accent`.
+      // `@theme inline` compiles `text-accent` to `var(--kit-accent)` directly.
       await expect(page.getByTestId('nav-home')).toHaveCSS('color', KIT_ACCENT[colorScheme]);
 
       const ground = await page.evaluate(() => {

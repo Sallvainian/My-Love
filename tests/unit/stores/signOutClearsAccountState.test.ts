@@ -478,11 +478,11 @@ describe('clearAuth on sign-out', () => {
     }
   });
 
-  it("drops the previous couple's anniversaries but keeps the device's theme", () => {
+  it("drops the previous couple's anniversaries but keeps the device's notification time", () => {
     useAppStore.setState({
       settings: {
         ...useAppStore.getState().settings!,
-        themeName: 'ocean',
+        notificationTime: '21:30',
       },
     } as unknown as Parameters<typeof useAppStore.setState>[0]);
 
@@ -493,8 +493,8 @@ describe('clearAuth on sign-out', () => {
     // no service re-derives them — left in place they rehydrate into the next
     // account's Home countdown and Settings list.
     expect(settings.relationship.anniversaries).toEqual([]);
-    // The theme is device preference, not account state.
-    expect(settings.themeName).toBe('ocean');
+    // The notification time is device preference, not account state.
+    expect(settings.notificationTime).toBe('21:30');
   });
 
   it("restores the same user's anniversaries on their next sign-in", () => {
