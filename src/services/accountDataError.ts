@@ -42,18 +42,12 @@ export function requireOnline(what: string, action: 'save' | 'load' = 'save'): v
 }
 
 /**
- * Why a custom row without a server id refuses an edit or a favorite. A row
- * marked `localOnly` is one the mirror refresh kept because no server row
- * matches it — the upload could not send it (blank, or over the length limit),
- * or it is a stale copy of a message since edited on another device. It will
- * never sync, and deleting it from this device is all it allows. Any other
- * row without a server id is still waiting for the upload or the refresh.
+ * Why a custom row without a server id refuses an edit, a delete or a
+ * favorite: the server holds no row to change. The next mirror refresh
+ * replaces it with the server's rows.
  */
-export function notSyncedMessage(localOnly: boolean | undefined): string {
-  return localOnly
-    ? 'This message is only on this device, not in your account, so it cannot be changed. You can delete it.'
-    : 'This message has not been saved to your account yet. Try again in a moment.';
-}
+export const NOT_SYNCED_MESSAGE =
+  'This message has not been saved to your account yet. Try again in a moment.';
 
 /**
  * How long one request to these tables may take before it is abandoned.
@@ -64,10 +58,10 @@ export function notSyncedMessage(localOnly: boolean | undefined): string {
  * queue strict: an abandoned request rejects, its task ends, and the next one
  * starts with nothing still running. Applied to every request here. Each is
  * safe to repeat after a timeout that fired once the server had committed:
- * updates and deletes are absolute, the upload and both user creates are
- * ON CONFLICT DO NOTHING on a key the caller reuses across a retry (the
- * creates read the stored row back by that key), and a repeated receipt only
- * double-counts evidence.
+ * updates and deletes are absolute, adding a favorite is ON CONFLICT DO
+ * NOTHING on its own key, and both user creates are ON CONFLICT DO NOTHING on
+ * a key the caller reuses across a retry (the creates read the stored row back
+ * by that key).
  */
 export const REQUEST_TIMEOUT_MS = 30_000;
 

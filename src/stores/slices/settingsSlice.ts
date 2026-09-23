@@ -32,7 +32,6 @@ import {
   type AnniversaryInput,
   type ServerAnniversary,
 } from '../../services/anniversariesService';
-import { hasCompletedLocalUpload } from '../../services/localDataUpload';
 import { storageService } from '../../services/storage';
 import type { Anniversary, Settings } from '../../types';
 import { logger } from '../../utils/logger';
@@ -56,7 +55,7 @@ export interface SettingsSlice {
   addAnniversary: (anniversary: AnniversaryInput, clientKey?: string) => Promise<void>;
   updateAnniversary: (id: number, anniversary: AnniversaryInput) => Promise<void>;
   removeAnniversary: (id: number) => Promise<void>;
-  /** Replace the mirror with the server's rows, once this device's upload is done. */
+  /** Replace the mirror with the server's rows. */
   loadAnniversariesFromServer: () => Promise<void>;
 }
 
@@ -391,9 +390,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
 
   loadAnniversariesFromServer: async () => {
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    // Until the upload flag is set, the local list may hold items the server
-    // does not, and replacing it would destroy them.
-    if (!requestedBy || !hasCompletedLocalUpload(requestedBy)) return;
+    if (!requestedBy) return;
 
     try {
       await serializeAccountDataWrite(async () => {

@@ -30,8 +30,6 @@ on:
       - '.github/workflows/bundle-size.yml'
       - '.github/workflows/dependency-review.yml'
       - '.github/workflows/supabase-migrations.yml'
-      - '.github/workflows/pages-redirect.yml'
-      - '.github/pages-redirect/**'
   workflow_dispatch:
 
 permissions:
