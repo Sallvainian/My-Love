@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { HeartCrack, TriangleAlert } from 'lucide-react';
 import { Component } from 'react';
-import { DESTRUCTIVE_BUTTON, PRIMARY_BUTTON } from '../Settings/kitClasses';
+import { DESTRUCTIVE_BUTTON, PRIMARY_BUTTON } from '../shared/kitClasses';
 
 interface Props {
   children: ReactNode;

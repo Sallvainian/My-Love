@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { PhotoWithUrls } from '../../services/photoService';
 import type { Photo } from '../../types';
 import { isValidationError } from '../../validation/errorMessages';
+import { DIALOG_SCRIM, DIALOG_SURFACE, fieldClass } from '../shared/kitClasses';
 
 // Support both IndexedDB Photo (number id) and Supabase PhotoWithUrls (string id)
 type PhotoLike = Photo | PhotoWithUrls;
@@ -199,14 +200,14 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+      className={`${DIALOG_SCRIM} z-[60]`}
       onClick={handleBackdropClick}
       data-testid="photo-edit-modal"
       role="dialog"
       aria-modal="true"
       aria-labelledby="photo-edit-modal-title"
     >
-      <div className="mx-4 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[20px] bg-card shadow-float">
+      <div className={`${DIALOG_SURFACE} max-w-2xl`}>
         {/* Header */}
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
           <h2 id="photo-edit-modal-title" className="text-lg font-semibold text-ink">
@@ -244,9 +245,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="Add a caption..."
-              className={`w-full resize-none rounded-[14px] bg-field px-4 py-3 text-[15px] text-ink ring-inset placeholder:text-muted focus:ring-2 focus:outline-none ${
-                captionError ? 'ring-2 ring-danger focus:ring-danger' : 'ring-1 ring-line focus:ring-accent'
-              }`}
+              className={fieldClass(!!captionError, true)}
               rows={4}
               maxLength={500}
               aria-label="Photo caption"
@@ -270,9 +269,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
               placeholder="beach, sunset, memories"
-              className={`h-12 w-full rounded-[14px] bg-field px-4 text-[15px] text-ink ring-inset placeholder:text-muted focus:ring-2 focus:outline-none ${
-                tagsError ? 'ring-2 ring-danger focus:ring-danger' : 'ring-1 ring-line focus:ring-accent'
-              }`}
+              className={fieldClass(!!tagsError)}
               aria-label="Photo tags (comma-separated)"
               data-testid="photo-edit-modal-tags-input"
             />

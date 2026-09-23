@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { TriangleAlert, WifiOff } from 'lucide-react';
 import { Component } from 'react';
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../Settings/kitClasses';
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
 
 interface ViewErrorFallbackProps {
   error: Error | null;

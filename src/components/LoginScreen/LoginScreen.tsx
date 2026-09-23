@@ -22,7 +22,7 @@ import {
   NOTICE,
   PRIMARY_BUTTON,
   fieldClass,
-} from '../Settings/kitClasses';
+} from '../shared/kitClasses';
 
 /** Field label, per the Sign in artboard: 600 13px `ink`, 6px above its input. */
 const LABEL = 'text-[13px] font-semibold text-ink';

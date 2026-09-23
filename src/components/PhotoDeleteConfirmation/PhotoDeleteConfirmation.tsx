@@ -2,6 +2,7 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import type { PhotoWithUrls } from '../../services/photoService';
 import type { Photo } from '../../types';
+import { DIALOG_SCRIM, DIALOG_SURFACE } from '../shared/kitClasses';
 
 // Support both IndexedDB Photo (number id) and Supabase PhotoWithUrls (string id)
 type PhotoLike = Photo | PhotoWithUrls;
@@ -58,14 +59,14 @@ export function PhotoDeleteConfirmation({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50"
+      className={`${DIALOG_SCRIM} z-[70]`}
       onClick={handleBackdropClick}
       data-testid="photo-delete-confirmation"
       role="dialog"
       aria-modal="true"
       aria-labelledby="delete-dialog-title"
     >
-      <div className="mx-4 w-full max-w-md rounded-[20px] bg-card shadow-float">
+      <div className={`${DIALOG_SURFACE} max-w-md`}>
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">

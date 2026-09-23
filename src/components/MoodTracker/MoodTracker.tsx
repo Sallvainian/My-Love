@@ -14,6 +14,7 @@ import { logger } from '../../utils/logger';
 import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandler';
 import { isValidationError } from '../../validation/errorMessages';
 import { MoodHistoryCalendar } from '../MoodHistory';
+import { SECTION_LABEL } from '../shared/kitClasses';
 import { MoodButton } from './MoodButton';
 import { MoodHistoryTimeline } from './MoodHistoryTimeline';
 import { PartnerMoodDisplay } from './PartnerMoodDisplay';
@@ -27,9 +28,6 @@ const MOOD_TABS: readonly { key: MoodTabType; label: string }[] = [
   { key: 'timeline', label: 'Timeline' },
   { key: 'history', label: 'Calendar' },
 ];
-
-/** Kit section label: Inter 600 12px uppercase, .08em tracking, `muted`. */
-const SECTION_LABEL = 'px-1 text-xs font-semibold tracking-[.08em] text-muted uppercase';
 
 /**
  * MoodTracker Component

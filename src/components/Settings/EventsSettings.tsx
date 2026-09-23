@@ -80,7 +80,7 @@ import {
   SECONDARY_BUTTON,
   SMALL_SECONDARY,
   fieldClass,
-} from './kitClasses';
+} from '../shared/kitClasses';
 
 /**
  * Event shapes are read off the composed store type rather than imported from
@@ -959,7 +959,7 @@ function EventForm({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className={`${DIALOG_PANEL} max-h-full max-w-md overflow-y-auto`}
+        className={`${DIALOG_PANEL} max-w-md`}
       >
         <div className="mb-5 flex items-center justify-between gap-3">
           <h3 id={titleId} className={DIALOG_TITLE}>

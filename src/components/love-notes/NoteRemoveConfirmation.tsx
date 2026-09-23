@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { LoveNote } from '../../types/models';
+import { DIALOG_SCRIM, DIALOG_SURFACE } from '../shared/kitClasses';
 
 interface NoteRemoveConfirmationProps {
   note: LoveNote;
@@ -168,7 +169,7 @@ export function NoteRemoveConfirmation({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50"
+      className={`${DIALOG_SCRIM} z-[70]`}
       onClick={handleBackdropClick}
       data-testid="note-remove-confirmation"
       role="dialog"
@@ -178,7 +179,7 @@ export function NoteRemoveConfirmation({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="mx-4 w-full max-w-md rounded-[20px] bg-card shadow-float outline-none"
+        className={`${DIALOG_SURFACE} max-w-md`}
       >
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">

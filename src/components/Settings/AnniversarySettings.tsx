@@ -42,7 +42,7 @@ import {
   REQUIRED_MARK,
   SECONDARY_BUTTON,
   fieldClass,
-} from './kitClasses';
+} from '../shared/kitClasses';
 
 /**
  * `anniversary.date` is a bare "YYYY-MM-DD"; fed to `new Date(...)` that is the
@@ -330,7 +330,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className={`${DIALOG_PANEL} max-h-full max-w-md overflow-y-auto`}
+        className={`${DIALOG_PANEL} max-w-md`}
       >
         {/* Header */}
         <div className="mb-5 flex items-center justify-between gap-3">

@@ -1,7 +1,7 @@
 import { m as motion } from 'framer-motion';
 import { ArrowRight, Heart } from 'lucide-react';
 import { useMemo } from 'react';
-import { PRIMARY_BUTTON } from '../Settings/kitClasses';
+import { PRIMARY_BUTTON } from '../shared/kitClasses';
 
 interface WelcomeSplashProps {
   onContinue: () => void;

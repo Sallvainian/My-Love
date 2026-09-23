@@ -35,7 +35,7 @@ import {
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
   fieldClass,
-} from '../Settings/kitClasses';
+} from '../shared/kitClasses';
 
 interface DisplayNameSetupProps {
   /** Whether the modal is open */

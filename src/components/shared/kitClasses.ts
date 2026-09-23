@@ -1,11 +1,12 @@
 /**
  * Style-kit class strings shared by the Settings page and its countdown groups
- * (`EventsSettings`, `AnniversarySettings`), and by the surfaces with no
- * artboard of their own that borrow the same pieces: `LoginScreen`,
- * `DisplayNameSetup`, `WelcomeSplash`, `ErrorBoundary` and `ViewErrorBoundary`.
- * The dialog pieces follow the kit dialog `PhotoEditModal` /
- * `PhotoDeleteConfirmation` established; every colour is a kit token that
- * switches with the OS theme, so no per-theme variant is needed.
+ * (`EventsSettings`, `AnniversarySettings`), by the surfaces with no artboard
+ * of their own that borrow the same pieces (`LoginScreen`, `DisplayNameSetup`,
+ * `WelcomeSplash`, `ErrorBoundary` and `ViewErrorBoundary`), by the mood
+ * screens' section labels and by the centred dialogs. The dialog pieces follow
+ * the kit dialog `PhotoEditModal` / `PhotoDeleteConfirmation` established;
+ * every colour is a kit token that switches with the OS theme, so no per-theme
+ * variant is needed.
  */
 
 /** A Settings card. Its `p-3` is what `DIVIDER`'s `-mx-3` cancels. */
@@ -36,11 +37,32 @@ export const ITEM_META = 'text-[13px] break-words text-muted';
 export const SMALL_SECONDARY =
   'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60';
 
+/** The small uppercase label above a section of cards. */
+export const SECTION_LABEL = 'px-1 text-xs font-semibold tracking-[.08em] text-muted uppercase';
+
 /** Quiet in-card notice surface. */
 export const NOTICE = 'rounded-[14px] bg-card2 p-3';
 
-export const DIALOG_BACKDROP = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4';
-export const DIALOG_PANEL = 'w-full rounded-[20px] bg-card p-5 shadow-float outline-none';
+/**
+ * A centred dialog's scrim, with no stacking layer of its own. The vertical
+ * padding clears the notch and home indicator, which `viewport-fit=cover` lets
+ * the page draw under. A dialog that opens over another overlay adds its own
+ * z utility to this; the rest use `DIALOG_BACKDROP`. Appending a second z to
+ * `DIALOG_BACKDROP` would not work: Tailwind resolves two z utilities in one
+ * class list by their order in the CSS, not in the string.
+ */
+export const DIALOG_SCRIM =
+  'fixed inset-0 flex items-center justify-center bg-black/50 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]';
+export const DIALOG_BACKDROP = `${DIALOG_SCRIM} z-50`;
+
+/**
+ * A dialog panel with no padding, for one whose bordered header and footer run
+ * edge to edge. `max-h-full` caps it at the scrim's padded height (the scrim
+ * is `fixed inset-0`, so that height is definite) and it scrolls past that.
+ */
+export const DIALOG_SURFACE =
+  'max-h-full w-full overflow-y-auto rounded-[20px] bg-card shadow-float outline-none';
+export const DIALOG_PANEL = `${DIALOG_SURFACE} p-5`;
 export const DIALOG_TITLE = 'text-lg font-semibold text-ink';
 export const DIALOG_CLOSE = `${ICON_BUTTON} bg-card2 text-muted focus-visible:ring-accent`;
 
