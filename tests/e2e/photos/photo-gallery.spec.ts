@@ -92,7 +92,7 @@ test.describe('Photo Gallery', () => {
     const photoItem = page.getByTestId('photo-gallery-grid').locator('img').first();
     await photoItem.click();
 
-    // THEN: Photo viewer/carousel opens
+    // THEN: Photo viewer opens
     await expect(page.getByTestId('photo-viewer-overlay')).toBeVisible();
   });
 });

@@ -83,11 +83,8 @@ vi.mock('../../../src/api/partnerService', () => ({
 vi.mock('../../../src/services/photoService', () => ({
   photoService: {
     getPhotos: () => getPhotos(),
-    uploadPhoto: (
-      input: unknown,
-      onProgress?: (percent: number) => void,
-      onCheckError?: (message: string) => void
-    ) => uploadPhotoService(input, onProgress, onCheckError),
+    uploadPhoto: (input: unknown, onCheckError?: (message: string) => void) =>
+      uploadPhotoService(input, onCheckError),
     deletePhoto: (photoId: string) => deletePhotoService(photoId),
     getSignedUrl: (storagePath: string) => getSignedUrl(storagePath),
     checkStorageQuota: () => checkStorageQuota(),
@@ -1139,16 +1136,11 @@ describe('loader identity guards', () => {
   // ==========================================================================
   // photosSlice — upload / delete (CAP-12)
   //
-  // An upload spans four awaits and a progress callback, so the window here is
-  // seconds wide rather than one round trip. Every case seeds C's own gallery
-  // first: a guard that fails to discard is caught by C's row being replaced,
-  // and a guard that fails to release `isUploading`/`uploadProgress` is caught
-  // separately.
-  //
-  // Those two flags reach no mounted component today. They are asserted
-  // because `signedOutState()` resets them and a stale continuation would
-  // write them straight back into the next session's store, where the next
-  // component to read them would show another account's upload.
+  // An upload spans four awaits, so the window here is seconds wide rather
+  // than one round trip. Every case seeds C's own gallery first, so a guard
+  // that fails to discard is caught by C's row being replaced; the failure and
+  // quota cases also seed C's `error` / `storageWarning` as null, the keys
+  // those stale writes would fill.
   // ==========================================================================
 
   describe('uploadPhoto', () => {
@@ -1157,18 +1149,13 @@ describe('loader identity guards', () => {
       uploadPhotoService.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().uploadPhoto(uploadInput());
-      // C has started an upload of their own. That is what makes the flags
-      // discriminate: A's success path sets isUploading false and progress 0,
-      // so without the guard it blanks C's live upload UI.
-      switchToUserC({ photos: [cPhoto()], isUploading: true, uploadProgress: 40 });
+      switchToUserC({ photos: [cPhoto()] });
 
       pending.settle(aPhoto());
       await inFlight;
 
       expect(useAppStore.getState().photos).toEqual([cPhoto()]);
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-PHOTO');
-      expect(useAppStore.getState().isUploading).toBe(true);
-      expect(useAppStore.getState().uploadProgress).toBe(40);
     });
 
     it('does not insert the signed URL when the switch lands during signing', async () => {
@@ -1178,17 +1165,13 @@ describe('loader identity guards', () => {
 
       const inFlight = useAppStore.getState().uploadPhoto(uploadInput());
       await flush();
-      switchToUserC({ photos: [cPhoto()], isUploading: true, uploadProgress: 40 });
+      switchToUserC({ photos: [cPhoto()] });
 
       signing.settle('https://signed.example/A-PRIVATE-SIGNED-URL');
       await inFlight;
 
       expect(useAppStore.getState().photos).toEqual([cPhoto()]);
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-SIGNED-URL');
-      // The same write clears the flags, so C's own upload UI is the other
-      // half of what this guard protects.
-      expect(useAppStore.getState().isUploading).toBe(true);
-      expect(useAppStore.getState().uploadProgress).toBe(40);
     });
 
     it('still reports the true outcome to its own caller', async () => {
@@ -1211,12 +1194,7 @@ describe('loader identity guards', () => {
       uploadPhotoService.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().uploadPhoto(uploadInput());
-      switchToUserC({
-        photos: [cPhoto()],
-        error: null,
-        isUploading: true,
-        uploadProgress: 40,
-      });
+      switchToUserC({ photos: [cPhoto()], error: null });
 
       pending.fail(new Error('A-REQUEST-FAILURE'));
 
@@ -1225,30 +1203,6 @@ describe('loader identity guards', () => {
         error: 'A-REQUEST-FAILURE',
       });
       expect(useAppStore.getState().error).toBeNull();
-      expect(useAppStore.getState().isUploading).toBe(true);
-      expect(useAppStore.getState().uploadProgress).toBe(40);
-    });
-
-    it("does not move the new account's progress bar", async () => {
-      let reportProgress: ((percent: number) => void) | undefined;
-      const pending = deferred<unknown>();
-      uploadPhotoService.mockImplementation(
-        (_input: unknown, onProgress?: (percent: number) => void) => {
-          reportProgress = onProgress;
-          return pending.promise;
-        }
-      );
-
-      const inFlight = useAppStore.getState().uploadPhoto(uploadInput());
-      await flush();
-      switchToUserC({ photos: [cPhoto()], uploadProgress: 0 });
-
-      // Fired from inside the awaited call, which is why it is easy to miss.
-      reportProgress?.(75);
-      expect(useAppStore.getState().uploadProgress).toBe(0);
-
-      pending.settle(aPhoto());
-      await inFlight;
     });
 
     it("does not reject the new account's session over the previous one's quota", async () => {
@@ -1256,7 +1210,7 @@ describe('loader identity guards', () => {
       checkStorageQuota.mockReturnValue(quota.promise);
 
       const inFlight = useAppStore.getState().uploadPhoto(uploadInput());
-      switchToUserC({ photos: [cPhoto()], error: null, isUploading: true, uploadProgress: 40 });
+      switchToUserC({ photos: [cPhoto()], error: null });
 
       quota.settle({ used: 97, quota: 100, percent: 97, warning: 'critical' });
 
@@ -1265,35 +1219,24 @@ describe('loader identity guards', () => {
         error: 'Storage nearly full (97%) - delete photos to continue',
       });
       expect(useAppStore.getState().error).toBeNull();
-      expect(useAppStore.getState().isUploading).toBe(true);
-      expect(useAppStore.getState().uploadProgress).toBe(40);
     });
 
     it("does not raise the pre-upload storage warning against the new account", async () => {
       const quota = deferred<unknown>();
       checkStorageQuota.mockReturnValueOnce(quota.promise);
-      // Parked, so the assertions below run while THIS guard is the only one
-      // the upload has reached. Letting the upload finish first would make the
-      // flag assertions fail for the success guard too, and each guard has to
-      // be provable on its own cases.
+      // Parked, so the assertion below runs while THIS guard is the only one
+      // the upload has reached; each guard has to be provable on its own cases.
       const upload = deferred<unknown>();
       uploadPhotoService.mockReturnValue(upload.promise);
 
       const inFlight = useAppStore.getState().uploadPhoto(uploadInput());
-      switchToUserC({
-        photos: [cPhoto()],
-        storageWarning: null,
-        isUploading: true,
-        uploadProgress: 40,
-      });
+      switchToUserC({ photos: [cPhoto()], storageWarning: null });
 
       // Between 80 and 95: A's account is filling up, C's is not.
       quota.settle({ used: 850, quota: 1_000, percent: 85, warning: 'approaching' });
       await flush();
 
       expect(useAppStore.getState().storageWarning).toBeNull();
-      expect(useAppStore.getState().isUploading).toBe(true);
-      expect(useAppStore.getState().uploadProgress).toBe(40);
 
       upload.settle(aPhoto());
       await inFlight;
@@ -1334,8 +1277,6 @@ describe('loader identity guards', () => {
 
       expect(useAppStore.getState().photos).toEqual([]);
       expect(useAppStore.getState().error).toBeNull();
-      expect(useAppStore.getState().isUploading).toBe(false);
-      expect(useAppStore.getState().uploadProgress).toBe(0);
     });
 
     it('writes nothing when the SAME account signs back in mid-flight', async () => {
@@ -2113,28 +2054,9 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().photos).toEqual([
         { ...aPhoto(), signedUrl: 'https://signed.example/a.jpg', isOwn: true },
       ]);
-      expect(useAppStore.getState().isUploading).toBe(false);
-      expect(useAppStore.getState().uploadProgress).toBe(0);
     });
 
-    it('uploadPhoto still reports progress', async () => {
-      const seen: number[] = [];
-      uploadPhotoService.mockImplementation(
-        (_input: unknown, onProgress?: (percent: number) => void) => {
-          onProgress?.(25);
-          seen.push(useAppStore.getState().uploadProgress);
-          onProgress?.(100);
-          seen.push(useAppStore.getState().uploadProgress);
-          return Promise.resolve(aPhoto());
-        }
-      );
-
-      await useAppStore.getState().uploadPhoto(uploadInput());
-
-      expect(seen).toEqual([25, 100]);
-    });
-
-    it('uploadPhoto still rejects on a full quota and releases the upload flags', async () => {
+    it('uploadPhoto still rejects on a full quota', async () => {
       checkStorageQuota.mockResolvedValueOnce({
         used: 97,
         quota: 100,
@@ -2149,11 +2071,6 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().error).toBe(
         'Storage nearly full (97%) - delete photos to continue'
       );
-      // `isUploading` is raised before the quota await, so this rejection is
-      // the only thing that lowers it. Leave it set and the owner's Upload
-      // button stays disabled behind a phantom progress bar.
-      expect(useAppStore.getState().isUploading).toBe(false);
-      expect(useAppStore.getState().uploadProgress).toBe(0);
     });
 
     // The two warning writes are split across two cases with DIFFERENT
@@ -2234,6 +2151,5 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().error).toBe('Failed to delete photo');
       expect(useAppStore.getState().photos).toEqual([aGalleryRow()]);
     });
-
   });
 });

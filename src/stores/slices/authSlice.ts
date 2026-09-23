@@ -105,8 +105,6 @@ export function signedOutState() {
 
     // photosSlice
     photos: [],
-    isUploading: false,
-    uploadProgress: 0,
     storageWarning: null,
 
     // interactionsSlice — the partner snapshot names the previous couple, and

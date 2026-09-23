@@ -3,7 +3,6 @@
  *
  * Manages photo state and upload operations including:
  * - Photo list (own + partner photos)
- * - Upload progress tracking (0-100%)
  * - Storage quota warnings (80%/95% thresholds)
  * - Error handling for upload failures
  *
@@ -39,8 +38,6 @@ export type PhotoUploadResult = { success: true } | { success: false; error: str
 export interface PhotosSlice {
   // State
   photos: PhotoWithUrls[];
-  isUploading: boolean;
-  uploadProgress: number; // 0-100%
   error: string | null;
   storageWarning: string | null;
 
@@ -55,17 +52,13 @@ export interface PhotosSlice {
 export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) => ({
   // Initial state
   photos: [],
-  isUploading: false,
-  uploadProgress: 0,
   error: null,
   storageWarning: null,
 
   // Actions
 
   /**
-   * Upload a photo with progress tracking
-   * AC 6.2.2: Progress bar shows 0-100% during upload
-   * AC 6.2.3: Progress updates at least every 100ms
+   * Upload a photo
    * AC 6.2.10: Warning if storage quota > 80%
    * AC 6.2.11: Upload rejected if storage quota > 95%
    */
@@ -86,7 +79,7 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
 
     try {
       // Clear previous errors
-      set({ error: null, storageWarning: null, isUploading: true, uploadProgress: 0 });
+      set({ error: null, storageWarning: null });
 
       // Check quota BEFORE upload (AC 6.2.10, 6.2.11)
       const quota = await photoService.checkStorageQuota();
@@ -97,7 +90,7 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
         // is the shared store that is withheld from the account that did not
         // ask for the upload.
         if (ownsUpload()) {
-          set({ error: quotaError, isUploading: false, uploadProgress: 0 });
+          set({ error: quotaError });
         }
         return { success: false, error: quotaError };
       }
@@ -108,20 +101,10 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
         }
       }
 
-      // Upload with progress callback (AC 6.2.2, 6.2.3)
       let checkError: string | undefined;
-      const photo = await photoService.uploadPhoto(
-        input,
-        (percent) => {
-          // photoService calls this from inside the await above, so it is a
-          // post-await write despite no `await` preceding it here. A stranded
-          // value paints B a progress bar for a photo B never chose.
-          if (ownsUpload()) set({ uploadProgress: percent });
-        },
-        (message) => {
-          checkError = message;
-        }
-      );
+      const photo = await photoService.uploadPhoto(input, (message) => {
+        checkError = message;
+      });
 
       if (!photo) {
         throw new Error(checkError ?? 'Upload failed - no photo returned');
@@ -147,8 +130,6 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
       // Add uploaded photo to state (optimistic update)
       set((state) => ({
         photos: [photoWithUrl, ...state.photos],
-        isUploading: false,
-        uploadProgress: 0, // Reset progress after completion
       }));
 
       // Check quota after upload and warn if approaching limit (AC 6.2.10)
@@ -167,11 +148,7 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
       // `error` is the app-wide banner key (appSlice), and signedOutState()
       // does not reset it — so an unguarded write here outlives the session.
       if (ownsUpload()) {
-        set({
-          error: errorMsg,
-          isUploading: false,
-          uploadProgress: 0,
-        });
+        set({ error: errorMsg });
       }
 
       return { success: false, error: errorMsg };

@@ -288,21 +288,17 @@ class PhotoService {
    * Upload a photo to Supabase Storage and create metadata record
    *
    * @param input - Photo upload input from compression service
-   * @param onProgress - Optional callback for upload progress (0-100%)
    * @param onCheckError - Optional callback reporting friendly metadata CHECK text before rollback
    * completes; the upload still resolves to null on failure.
    * @returns Created photo record or null on error
    *
    * AC 6.0.5: Users can INSERT photos only with their own user_id
    * AC 6.0.7: Storage RLS restricts uploads to user's own folder
-   * AC 6.2.2: Progress bar shows 0-100% during upload
-   * AC 6.2.3: Progress updates at least every 100ms
    * AC 6.2.10: Warning if storage quota > 80%
    * AC 6.2.11: Upload rejected if storage quota > 95%
    */
   async uploadPhoto(
     input: PhotoUploadInput,
-    onProgress?: (percent: number) => void,
     onCheckError?: (message: string) => void
   ): Promise<SupabasePhoto | null> {
     try {
@@ -330,14 +326,7 @@ class PhotoService {
       const uniqueId = input.idempotencyKey || crypto.randomUUID();
       const storagePath = `${userId}/${uniqueId}.${fileExt}`;
 
-      // Upload to Supabase Storage (AC 6.2.2, 6.2.3)
-      // Note: Supabase storage.upload() doesn't support native progress tracking
-      // Progress simulation handled at component level if needed
-      if (onProgress) {
-        // Simulate progress for UX (upload is fast for compressed images)
-        onProgress(25);
-      }
-
+      // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(storagePath, input.file, {
@@ -354,10 +343,6 @@ class PhotoService {
           // rejects every retry, which is the one case this path exists for.
           upsert: true,
         });
-
-      if (onProgress) {
-        onProgress(75);
-      }
 
       if (uploadError) {
         console.error('[PhotoService] Storage upload error:', uploadError);
@@ -455,10 +440,6 @@ class PhotoService {
       const newQuota = await this.checkStorageQuota();
       if (newQuota.warning === 'approaching' || newQuota.warning === 'critical') {
         console.warn(`[PhotoService] Storage warning: ${newQuota.percent}% used`);
-      }
-
-      if (onProgress) {
-        onProgress(100);
       }
 
       return photo;

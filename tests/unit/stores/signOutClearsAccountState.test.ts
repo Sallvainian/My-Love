@@ -59,8 +59,6 @@ const EXPECTED_RESET: Record<string, unknown> = {
   customMessagesLoaded: false,
   favoriteError: null,
   photos: [],
-  isUploading: false,
-  uploadProgress: 0,
   storageWarning: null,
   interactions: [],
   unviewedCount: 0,
