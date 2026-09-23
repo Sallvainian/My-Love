@@ -118,11 +118,6 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
       }
 
       setStep('success');
-
-      // Auto-close after showing success (AC-4.1.8: 3 seconds)
-      setTimeout(() => {
-        handleClose();
-      }, 3000);
     } catch (err) {
       console.error('[PhotoUpload] Upload failed:', err);
       setError((err as Error).message || 'Failed to upload photo');
@@ -171,6 +166,15 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
     handleCloseRef.current();
   }, []);
   useFocusTrap(modalRef, isOpen, { onEscape: handleEscape, fallbackFocusRef });
+
+  // Auto-close after showing success (AC-4.1.8: 3 seconds). Owned by the step,
+  // so any close -- which resets the step -- cancels it, and a dialog reopened
+  // within the 3 seconds is never closed by the previous upload's timer.
+  useEffect(() => {
+    if (!isOpen || step !== 'success') return;
+    const timer = setTimeout(() => handleCloseRef.current(), 3000);
+    return () => clearTimeout(timer);
+  }, [isOpen, step]);
 
   // Every step change unmounts the control that started it -- Select, Upload,
   // Retry -- and a focused element that unmounts blurs to <body>. <body> is an
