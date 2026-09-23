@@ -444,7 +444,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       }
 
       // The session that composed this note has ended: sending now would post
-      // a note the signed-in session never showed as sending.
+      // a note the signed-in session never showed as sending. Re-checked after
+      // every await up to the insert, so a stale send never posts.
       if (!ownsRequest()) return;
 
       // Generate temporary ID for optimistic update
@@ -526,6 +527,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           }));
           return;
         }
+
+        // The session ended during the upload. No insert has run, so nothing
+        // references the object just uploaded: remove it rather than post a
+        // note the signed-in session never showed as sending.
+        if (!ownsRequest()) {
+          await discardOrphanedImage(storagePath);
+          return;
+        }
       }
 
       // Background insert to Supabase, keyed so a retry cannot post twice
@@ -566,20 +575,29 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         URL.revokeObjectURL(imagePreviewUrl);
       }
 
-      if (!ownsRequest()) return;
-      if (get().notesError === CHECK_CONSTRAINT_MESSAGE) {
-        set({ notesError: null });
+      // The note is committed whatever happened to the session meanwhile. The
+      // session check guards only the store write; the broadcast below still
+      // goes out, because the partner is owed a note the database now holds.
+      if (ownsRequest()) {
+        if (get().notesError === CHECK_CONSTRAINT_MESSAGE) {
+          set({ notesError: null });
+        }
+
+        set((state) => ({
+          notes: state.notes.map((note) =>
+            note.tempId === tempId
+              ? { ...data, sending: false, imageUploading: false, error: false }
+              : note
+          ),
+        }));
       }
 
-      set((state) => ({
-        notes: state.notes.map((note) =>
-          note.tempId === tempId
-            ? { ...data, sending: false, imageUploading: false, error: false }
-            : note
-        ),
-      }));
-
       logger.debug('[NotesSlice] Note sent successfully:', data.id);
+
+      // A different account now holds the session: the private couple topic
+      // authorizes the sender's partner link, which belongs to that account,
+      // not to the one that wrote this note. Only the same account may send it.
+      if (get().userId !== userId) return;
 
       // Story 2.3: Broadcast message to partner's channel for realtime delivery
       //
@@ -675,6 +693,13 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
                 : note
             ),
           }));
+          return;
+        }
+
+        // Same as sendNote: the session ended during the upload, so skip the
+        // insert and remove the object nothing references yet.
+        if (!ownsRequest()) {
+          await discardOrphanedImage(storagePath);
           return;
         }
       }

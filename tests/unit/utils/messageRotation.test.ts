@@ -190,6 +190,20 @@ describe('getAvailableHistoryDays', () => {
       expect(getAvailableHistoryDays(history, settings)).toBe(10);
     });
   });
+
+  // An unreadable start date cannot bound history, so only the configured cap
+  // (itself capped at 30) applies — never NaN, which Math.min would propagate.
+  it.each([
+    ['empty', ''],
+    ['non-date text', 'not-a-date'],
+    ['impossible date', '2026-02-30'],
+  ])('falls back to the configured cap for an unreadable start date (%s)', (_label, startDate) => {
+    const settings: Settings = { relationship: { startDate } } as Settings;
+
+    expect(getAvailableHistoryDays({ maxHistoryDays: 14 } as MessageHistory, settings)).toBe(14);
+    expect(getAvailableHistoryDays({ maxHistoryDays: 100 } as MessageHistory, settings)).toBe(30);
+    expect(getAvailableHistoryDays({} as MessageHistory, settings)).toBe(30);
+  });
 });
 
 describe('isNewDay', () => {

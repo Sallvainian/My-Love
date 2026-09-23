@@ -16,6 +16,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 const loveNotesQuery = vi.fn();
 const compressImage = vi.fn();
 const uploadCompressedBlob = vi.fn();
+const deleteLoveNoteImage = vi.fn();
+const sendEphemeralBroadcast = vi.fn();
 
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: {
@@ -29,7 +31,8 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 }));
 
 vi.mock('../../../src/api/ephemeralBroadcast', () => ({
-  sendEphemeralBroadcast: vi.fn().mockResolvedValue(undefined),
+  sendEphemeralBroadcast: (topic: string, event: string, payload: unknown) =>
+    sendEphemeralBroadcast(topic, event, payload),
 }));
 
 vi.mock('../../../src/services/imageCompressionService', () => ({
@@ -41,7 +44,7 @@ vi.mock('../../../src/services/imageCompressionService', () => ({
 
 vi.mock('../../../src/services/loveNoteImageService', () => ({
   uploadCompressedBlob: (blob: Blob, userId: string) => uploadCompressedBlob(blob, userId),
-  deleteLoveNoteImage: vi.fn().mockResolvedValue(undefined),
+  deleteLoveNoteImage: (storagePath: string) => deleteLoveNoteImage(storagePath),
 }));
 
 import { getPartnerId } from '../../../src/api/supabaseClient';
@@ -116,6 +119,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     useAppStore.getState().clearAuth();
     useAppStore.getState().setAuthUser(A);
     vi.mocked(getPartnerId).mockResolvedValue(PARTNER);
+    deleteLoveNoteImage.mockResolvedValue(undefined);
+    sendEphemeralBroadcast.mockResolvedValue(undefined);
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
   });
@@ -245,6 +250,83 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     writes.stop();
 
     expect(writes.count()).toBe(0);
+  });
+
+  it("sendNote's image branch: a stale upload success neither inserts nor writes, and discards the image", async () => {
+    compressImage.mockResolvedValue({ blob: new Blob(['x'], { type: 'image/jpeg' }) });
+    const upload = deferred<{ storagePath: string }>();
+    uploadCompressedBlob.mockReturnValue(upload.promise);
+
+    const inFlight = useAppStore
+      .getState()
+      .sendNote('STALE-PICTURE-NOTE', new File(['x'], 'a.jpg', { type: 'image/jpeg' }));
+    await flush();
+    expect(uploadCompressedBlob).toHaveBeenCalledTimes(1);
+    signOutAndBackInAsA();
+    await flush();
+
+    const writes = countWrites();
+    upload.settle({ storagePath: `${A}/stale-upload.jpg` });
+    await inFlight;
+    writes.stop();
+
+    expect(loveNotesQuery, 'the stale send reached the insert').not.toHaveBeenCalled();
+    expect(writes.count()).toBe(0);
+    expect(deleteLoveNoteImage).toHaveBeenCalledWith(`${A}/stale-upload.jpg`);
+  });
+
+  it('sendNote: a committed insert is still broadcast when the same account signed back in', async () => {
+    // The row is in the database, so the partner is owed it over realtime;
+    // only the store write belongs to the session that sent it.
+    const committed = { ...note('row-1', 'COMMITTED-NOTE'), image_url: null };
+    const insert = deferred<{ data: unknown; error: unknown }>();
+    loveNotesQuery.mockReturnValue(builder(insert.promise));
+
+    const inFlight = useAppStore.getState().sendNote('COMMITTED-NOTE');
+    await flush();
+    expect(loveNotesQuery).toHaveBeenCalledTimes(1);
+    signOutAndBackInAsA();
+    await flush();
+
+    const writes = countWrites();
+    insert.settle({ data: committed, error: null });
+    await inFlight;
+    writes.stop();
+
+    expect(writes.count()).toBe(0);
+    expect(sendEphemeralBroadcast).toHaveBeenCalledWith(`love-notes:${PARTNER}`, 'new_message', {
+      message: committed,
+    });
+  });
+
+  it('retryFailedMessage: a stale upload success neither inserts nor writes, and discards the image', async () => {
+    useAppStore.setState({
+      notes: [
+        {
+          ...note('temp-1', 'RETRIED'),
+          tempId: 'temp-1',
+          error: true,
+          imageBlob: new Blob(['x'], { type: 'image/jpeg' }),
+        },
+      ],
+    } as unknown as SetStateArg);
+    const upload = deferred<{ storagePath: string }>();
+    uploadCompressedBlob.mockReturnValue(upload.promise);
+
+    const inFlight = useAppStore.getState().retryFailedMessage('temp-1');
+    await flush();
+    expect(uploadCompressedBlob).toHaveBeenCalledTimes(1);
+    signOutAndBackInAsA();
+    await flush();
+
+    const writes = countWrites();
+    upload.settle({ storagePath: `${A}/stale-retry.jpg` });
+    await inFlight;
+    writes.stop();
+
+    expect(loveNotesQuery, 'the stale retry reached the insert').not.toHaveBeenCalled();
+    expect(writes.count()).toBe(0);
+    expect(deleteLoveNoteImage).toHaveBeenCalledWith(`${A}/stale-retry.jpg`);
   });
 
   it('retryFailedMessage: a stale image-upload failure does not write', async () => {
