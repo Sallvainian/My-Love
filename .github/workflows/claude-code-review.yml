@@ -58,6 +58,9 @@ jobs:
           # placeholder from the next push. Defaults to false; the action
           # describes it as "Use just one comment to deliver issue/PR comments".
           use_sticky_comment: true
+          # Run subagents in the foreground. Three reviews of PR #332 split the
+          # work into parts, ticked one, and ended with no verdict posted.
+          settings: '{"env":{"CLAUDE_CODE_DISABLE_BACKGROUND_TASKS":"1"}}'
           allowed_bots: 'claude'
           prompt: |
             REPO: ${{ github.repository }}
