@@ -78,7 +78,6 @@ vi.mock('../../src/components/DisplayNameSetup', () => ({
   DisplayNameSetup: () => null,
 }));
 vi.mock('../../src/components/PhotoUpload/PhotoUpload', () => ({ PhotoUpload: () => null }));
-vi.mock('../../src/components/PhotoCarousel/PhotoCarousel', () => ({ PhotoCarousel: () => null }));
 vi.mock('../../src/components/shared', () => ({
   NetworkStatusIndicator: () => null,
   SyncToast: () => null,
@@ -93,7 +92,6 @@ vi.mock('../../src/services/migrationService', () => ({
 }));
 vi.mock('../../src/utils/backgroundSync', () => ({ isServiceWorkerSupported: () => false }));
 vi.mock('../../src/utils/storageMonitor', () => ({ logStorageQuota: vi.fn() }));
-vi.mock('../../src/utils/themes', () => ({ applyTheme: vi.fn() }));
 vi.mock('../../src/utils/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));

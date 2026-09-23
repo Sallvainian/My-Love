@@ -8,6 +8,11 @@ interface UseFocusTrapOptions {
   onEscape?: () => void;
   /** Auto-focus a specific element on mount. Defaults to first focusable. */
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * Where focus goes on close when the opener has been removed while the trap
+   * was up. Read at close time; skipped when it is null or disconnected.
+   */
+  fallbackFocusRef?: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -16,7 +21,7 @@ interface UseFocusTrapOptions {
  *
  * @param containerRef - Ref to the container element that bounds focus
  * @param enabled - Whether the trap is active (e.g. tied to dialog visibility)
- * @param options - Optional escape handler and initial focus target
+ * @param options - Optional escape handler, initial focus target and fallback
  */
 export function useFocusTrap(
   containerRef: RefObject<HTMLElement | null>,
@@ -26,6 +31,14 @@ export function useFocusTrap(
   const onEscape = options?.onEscape;
   const initialFocusRef = options?.initialFocusRef;
   const restoreRef = useRef<HTMLElement | null>(null);
+  // Latest fallback, read by the restore cleanup below. Not a dependency of
+  // that effect: a changed ref object would run the cleanup and move focus out
+  // of a dialog that is still open.
+  const fallbackFocusRef = options?.fallbackFocusRef;
+  const fallbackRef = useRef(fallbackFocusRef);
+  useEffect(() => {
+    fallbackRef.current = fallbackFocusRef;
+  }, [fallbackFocusRef]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -90,8 +103,11 @@ export function useFocusTrap(
   //
   // Keyed on `enabled` alone so it fires on unmount or deactivation, not on
   // every re-arm. The isConnected guard matters: a dialog whose opener was
-  // removed by the very action it confirmed has nothing to restore to, and the
-  // caller is left to choose a surviving destination.
+  // removed by the very action it confirmed has nothing to restore to. A caller
+  // that knows the surviving destination passes `fallbackFocusRef`; otherwise
+  // the caller is left to choose one. isConnected is only sound when the opener
+  // went in an earlier commit than the close -- see NoteRemoveConfirmation for
+  // the same-commit case.
   useEffect(() => {
     if (!enabled) return;
     return () => {
@@ -99,6 +115,12 @@ export function useFocusTrap(
       restoreRef.current = null;
       if (target?.isConnected) {
         target.focus();
+        return;
+      }
+      if (!target) return;
+      const fallback = fallbackRef.current?.current;
+      if (fallback?.isConnected) {
+        fallback.focus();
       }
     };
   }, [enabled]);

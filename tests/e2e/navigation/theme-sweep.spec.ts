@@ -213,16 +213,6 @@ test.describe('Theme sweep, signed in', () => {
         await page.goto('/');
         await expect(page.getByTestId('nav-dock')).toBeVisible();
 
-        // Settings hydrated and applyTheme() ran, so its inline writes on
-        // <html> are in place before anything is read.
-        await expect
-          .poll(() =>
-            page.evaluate(() =>
-              document.documentElement.style.getPropertyValue('--color-primary').trim()
-            )
-          )
-          .not.toBe('');
-
         if (screen.view !== 'home') await navigateTo(page, screen.view);
         await screen.ready(page);
 

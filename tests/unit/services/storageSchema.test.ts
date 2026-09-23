@@ -628,7 +628,7 @@ describe('storageService schema', () => {
         const reopened = await freshStorageService();
         expect(await reopened.getMessage(id, A)).toMatchObject({ isFavorite: true });
         expect((await reopened.getMessagesByCategory('reason', A))[0].isFavorite).toBe(true);
-        expect((await reopened.exportData(B)).messages.every((row) => !row.isFavorite)).toBe(true);
+        expect((await reopened.getAllMessages(B)).every((row) => !row.isFavorite)).toBe(true);
         expect(await rowAt(id)).toMatchObject({ isFavorite: false });
       });
 

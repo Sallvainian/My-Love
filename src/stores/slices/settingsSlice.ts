@@ -4,7 +4,6 @@
  * Manages all settings-related state and actions including:
  * - User settings and preferences
  * - Onboarding state
- * - Theme management
  * - Anniversary management
  * - App initialization
  *
@@ -35,7 +34,7 @@ import {
 } from '../../services/anniversariesService';
 import { hasCompletedLocalUpload } from '../../services/localDataUpload';
 import { storageService } from '../../services/storage';
-import type { Anniversary, Settings, ThemeName } from '../../types';
+import type { Anniversary, Settings } from '../../types';
 import { logger } from '../../utils/logger';
 import { createValidationError, isZodError } from '../../validation/errorMessages';
 import { AnniversarySchema, SettingsSchema } from '../../validation/schemas';
@@ -59,9 +58,6 @@ export interface SettingsSlice {
   removeAnniversary: (id: number) => Promise<void>;
   /** Replace the mirror with the server's rows, once this device's upload is done. */
   loadAnniversariesFromServer: () => Promise<void>;
-
-  // Theme actions
-  setTheme: (theme: ThemeName) => void;
 }
 
 const AnniversaryInputSchema = AnniversarySchema.omit({ id: true, serverId: true });
@@ -118,16 +114,11 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
   // Initial state - use defaults that will be overridden by persist if data exists
   // Story 1.4: Pre-configured settings for single-user deployment
   settings: {
-    themeName: 'sunset' as ThemeName,
     notificationTime: '09:00',
     relationship: {
       startDate: APP_CONFIG.defaultStartDate,
       partnerName: APP_CONFIG.defaultPartnerName,
       anniversaries: [],
-    },
-    customization: {
-      accentColor: '#ff6b9d',
-      fontFamily: 'system-ui',
     },
     notifications: {
       enabled: true,
@@ -421,19 +412,6 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
     } catch (error) {
       // The mirror stays as it was, so Home keeps its countdowns offline.
       console.error('[Settings] Failed to load anniversaries from the server:', error);
-    }
-  },
-
-  // Theme actions
-  setTheme: (theme) => {
-    const { settings } = get();
-    if (settings) {
-      set({
-        settings: {
-          ...settings,
-          themeName: theme,
-        },
-      });
     }
   },
 });

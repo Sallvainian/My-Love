@@ -22,7 +22,6 @@ function persistedBlob(extra: Record<string, unknown> = {}) {
     state: {
       isOnboarded: true,
       settings: {
-        themeName: 'sunset',
         relationship: { partnerName: 'A', anniversary: '2020-01-01' },
       },
       messageHistory: { shownMessages: [], currentIndex: 0 },
@@ -102,7 +101,7 @@ describe('persisted moods', () => {
 
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);
 
-    expect(parsed.state.settings.themeName).toBe('sunset');
+    expect(parsed.state.settings.relationship.partnerName).toBe('A');
     expect(parsed.state.isOnboarded).toBe(true);
   });
 
