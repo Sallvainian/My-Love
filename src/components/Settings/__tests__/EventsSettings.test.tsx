@@ -235,8 +235,9 @@ function submitForm() {
 }
 
 function renderedLabels(): (string | null)[] {
+  // Row labels are h4: h1 Settings > h2 Countdowns > h3 Events > h4 rows.
   return within(screen.getByTestId('events-settings-list'))
-    .getAllByRole('heading', { level: 3 })
+    .getAllByRole('heading', { level: 4 })
     .map((node) => node.textContent);
 }
 
@@ -1589,11 +1590,8 @@ describe('EventsSettings delete', () => {
     );
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
     expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
-    expect(screen.getByTestId('events-delete-refresh')).toHaveClass(
-      'bg-blue-600',
-      'hover:bg-blue-700',
-      'text-white'
-    );
+    // The kit primary action: pink fill, white label.
+    expect(screen.getByTestId('events-delete-refresh')).toHaveClass('bg-fill', 'text-white');
     expect(screen.getByTestId('events-delete-refresh')).not.toHaveClass('bg-red-500');
     expect(screen.queryByTestId('events-delete-confirm')).not.toBeInTheDocument();
   });
@@ -1707,14 +1705,26 @@ describe('EventsSettings delete', () => {
 });
 
 describe('EventsSettings accessible names and modal semantics', () => {
-  it('names the header Add button, which is icon-only below the sm breakpoint', async () => {
-    // The visible "Add Event" span is `hidden sm:inline`, so on the phone
-    // viewport the aria-label is the button's entire accessible name.
+  it('names the header Add button, which is icon-only at every width', async () => {
+    // The header Add button is a round Plus icon with no visible text at any
+    // viewport, so the aria-label is the button's entire accessible name.
     await renderSection();
 
     expect(screen.getByRole('button', { name: 'Add event' })).toBe(
       screen.getByTestId('events-settings-add')
     );
+  });
+
+  it('reads "Shared with your partner" under the Events title', async () => {
+    // Constant, not the store's partner name: `partner` is loaded only by the
+    // Partner view, so a name here would depend on navigation history.
+    setStore({
+      partner: { id: 'p1', email: 'partner@example.test', displayName: 'Gracie', connectedAt: null },
+    });
+    await renderSection();
+
+    expect(screen.getByRole('heading', { level: 3, name: 'Events' })).toBeInTheDocument();
+    expect(screen.getByTestId('events-subtitle')).toHaveTextContent(/^Shared with your partner$/);
   });
 
   it('exposes the form as a modal dialog named by its heading', async () => {

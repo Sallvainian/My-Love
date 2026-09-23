@@ -1,16 +1,22 @@
 /**
  * Settings Component
  *
- * Application settings screen with logout and account management.
- *
- * Features:
- * - User account information display
- * - Logout functionality
- * - Settings sections (Anniversary, Account, etc.)
+ * Application settings screen on the style kit: account (identity and display
+ * name), the couple's countdowns (events and anniversaries), about (with the
+ * welcome-message replay) and sign out.
  *
  * @component
  */
 
+import {
+  AlertCircle,
+  ChevronRight,
+  Info,
+  Loader2,
+  LogOut,
+  Pencil,
+  RotateCcw,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { authService } from '../../api/authService';
 import { lookupOwnDisplayName, type OwnDisplayNameLookup } from '../../api/supabaseClient';
@@ -18,9 +24,17 @@ import { logger } from '../../utils/logger';
 import { DisplayNameSetup } from '../DisplayNameSetup/DisplayNameSetup';
 import { AnniversarySettings } from './AnniversarySettings';
 import { EventsSettings } from './EventsSettings';
-import './Settings.css';
+import { CARD, DIVIDER, GROUP_ROW as ROW, GROUP_TILE as TILE } from './kitClasses';
 
-export const Settings: React.FC = () => {
+const SECTION_LABEL = 'px-1 text-xs font-semibold tracking-[.08em] text-muted uppercase';
+const ROW_BUTTON = `${ROW} w-full rounded-[14px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
+
+interface SettingsProps {
+  /** Replays the welcome splash; the About row is not rendered without it. */
+  onShowWelcome?: () => void;
+}
+
+export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -85,6 +99,16 @@ export const Settings: React.FC = () => {
     }
   })();
 
+  // The avatar's letter: the chosen display name's, else the email's.
+  const avatarSource =
+    (nameLookup?.status === 'chosen' && nameLookup.displayName.trim()) || userEmail;
+  // First grapheme, not `charAt(0)` or the first code point: a flag, skin-tone
+  // or ZWJ emoji spans several code points and would otherwise render in part.
+  const [firstGrapheme] = avatarSource
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(avatarSource.trim())
+    : [];
+  const avatarInitial = firstGrapheme?.segment.toUpperCase() ?? '';
+
   const handleLogout = async () => {
     setError(null);
     setIsLoggingOut(true);
@@ -104,167 +128,154 @@ export const Settings: React.FC = () => {
   };
 
   return (
-    <div className="settings-container" data-testid="settings-view">
-      <div className="settings-header">
-        <h1 className="settings-title">Settings</h1>
-      </div>
+    <div
+      className="mx-auto flex w-full max-w-[800px] flex-col gap-4 px-4 pt-3 pb-6"
+      data-testid="settings-view"
+    >
+      <header className="px-1 pt-1">
+        <h1 className="font-serif text-[30px] leading-[1.1] font-semibold text-ink">Settings</h1>
+      </header>
 
       {error && (
-        <div className="settings-error" role="alert">
-          <svg
-            className="error-icon"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-              clipRule="evenodd"
-            />
-          </svg>
+        <div
+          className="flex items-center gap-2 rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
+          role="alert"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="settings-content">
-        {/* Account Section */}
-        <section className="settings-section">
-          <h2 className="section-title">Account</h2>
-          <div className="section-content">
-            {userEmail && (
-              <div className="user-info">
-                <svg
-                  className="user-icon"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
+      {/* Account */}
+      <section className="flex flex-col gap-2" aria-labelledby="settings-account-label">
+        <h2 id="settings-account-label" className={SECTION_LABEL}>
+          Account
+        </h2>
+        <div className={CARD}>
+          {userEmail && (
+            <>
+              <div className={ROW}>
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-fill text-base font-semibold text-white"
                   aria-hidden="true"
+                  data-testid="settings-avatar"
                 >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <div>
-                  <p className="user-email">{userEmail}</p>
-                  <p className="user-label">Signed in</p>
+                  {avatarInitial}
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <p className="text-[15px] font-medium break-words text-ink">{userEmail}</p>
+                  <p className="text-[13px] text-muted">Signed in</p>
                 </div>
               </div>
-            )}
+              <div className={DIVIDER} aria-hidden="true" />
+            </>
+          )}
 
-            <div className="display-name-row">
-              <div className="display-name-text">
-                <p className="display-name-value" data-testid="settings-display-name">
-                  {displayNameLabel}
-                </p>
-                <p className="user-label">Display name</p>
-              </div>
-              {/* Enabled on a failed read too: the user may well know the name
-                  they want, and the form's own refusals are what protect the
-                  column. Disabled only while the first read is in flight, when
-                  opening would pre-fill from an answer that has not arrived. */}
+          {/* Enabled on a failed read too: the user may well know the name
+              they want, and the form's own refusals are what protect the
+              column. Disabled only while the first read is in flight, when
+              opening would pre-fill from an answer that has not arrived. */}
+          <button
+            type="button"
+            onClick={() => setIsEditingName(true)}
+            disabled={nameLookup === null}
+            className={`${ROW_BUTTON} disabled:cursor-not-allowed disabled:opacity-60`}
+            data-testid="settings-display-name-edit"
+          >
+            <span className={TILE} aria-hidden="true">
+              <Pencil className="h-[17px] w-[17px]" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              {/* "Change " keeps the verb the old Change button carried in
+                  the row's accessible name. */}
+              <span className="text-[15px] font-medium text-ink">
+                <span className="sr-only">Change </span>Display name
+              </span>
+              <span className="text-[13px] break-words text-muted" data-testid="settings-display-name">
+                {displayNameLabel}
+              </span>
+            </span>
+            <ChevronRight className="h-[18px] w-[18px] shrink-0 text-muted" aria-hidden="true" />
+          </button>
+        </div>
+      </section>
+
+      {/* Countdowns — the couple-shared events above the anniversaries. */}
+      <section className="flex flex-col gap-2" aria-labelledby="settings-countdowns-label">
+        <h2 id="settings-countdowns-label" className={SECTION_LABEL}>
+          Countdowns
+        </h2>
+        <div className={CARD}>
+          <EventsSettings />
+          <div className={DIVIDER} aria-hidden="true" />
+          <AnniversarySettings />
+        </div>
+      </section>
+
+      {/* About */}
+      <section className="flex flex-col gap-2" aria-labelledby="settings-about-label">
+        <h2 id="settings-about-label" className={SECTION_LABEL}>
+          About
+        </h2>
+        <div className={CARD}>
+          <div className={ROW}>
+            <span className={TILE} aria-hidden="true">
+              <Info className="h-[17px] w-[17px]" />
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <p className="text-[15px] font-medium text-ink">My Love</p>
+              <p className="text-[13px] text-muted">Version 1.0.0 · made for the two of you</p>
+            </div>
+          </div>
+          {onShowWelcome && (
+            <>
+              <div className={DIVIDER} aria-hidden="true" />
               <button
                 type="button"
-                onClick={() => setIsEditingName(true)}
-                disabled={nameLookup === null}
-                className="display-name-edit-button"
-                data-testid="settings-display-name-edit"
+                onClick={onShowWelcome}
+                className={ROW_BUTTON}
+                data-testid="settings-replay-welcome"
               >
-                Change
-              </button>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="logout-button"
-              data-testid="settings-sign-out"
-            >
-              {isLoggingOut ? (
-                <span className="loading-spinner">
-                  <svg
-                    className="spinner-icon"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <circle
-                      className="spinner-track"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="spinner-head"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Signing out...
+                <span className={TILE} aria-hidden="true">
+                  <RotateCcw className="h-[17px] w-[17px]" />
                 </span>
-              ) : (
-                <>
-                  <svg
-                    className="logout-icon"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H3zm11 4.414l-4.293 4.293a1 1 0 01-1.414 0L4 7.414 5.414 6l3.293 3.293L13.586 6 15 7.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Sign Out
-                </>
-              )}
-            </button>
-          </div>
-        </section>
+                <span className="min-w-0 flex-1 text-[15px] font-medium text-ink">
+                  Replay welcome message
+                </span>
+                <ChevronRight className="h-[18px] w-[18px] shrink-0 text-muted" aria-hidden="true" />
+              </button>
+            </>
+          )}
+        </div>
+      </section>
 
-        {/* Events Section — the couple-shared countdowns, above the
-            device-local anniversaries below it. */}
-        <section className="settings-section">
-          <h2 className="section-title">Events</h2>
-          <div className="section-content">
-            <EventsSettings />
-          </div>
-        </section>
-
-        {/* Anniversary Section */}
-        <section className="settings-section">
-          <h2 className="section-title">Anniversary</h2>
-          <div className="section-content">
-            <AnniversarySettings />
-          </div>
-        </section>
-
-        {/* App Information */}
-        <section className="settings-section">
-          <h2 className="section-title">About</h2>
-          <div className="section-content">
-            <div className="app-info">
-              <p className="app-name">My Love</p>
-              <p className="app-version">Version 1.0.0</p>
-              <p className="app-description">A personal connection app for you and your partner</p>
-            </div>
-          </div>
-        </section>
+      {/* Sign out — its own quiet card, not a red block. */}
+      <div className={CARD}>
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className={`${ROW_BUTTON} text-[15px] font-medium text-danger disabled:cursor-not-allowed disabled:opacity-60`}
+          data-testid="settings-sign-out"
+        >
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-dtint"
+            aria-hidden="true"
+          >
+            {isLoggingOut ? (
+              <Loader2 className="h-[17px] w-[17px] animate-spin" />
+            ) : (
+              <LogOut className="h-[17px] w-[17px]" />
+            )}
+          </span>
+          {isLoggingOut ? 'Signing out…' : 'Sign out'}
+        </button>
       </div>
 
       {/* Mounted only while open, so `useState(initialName)` inside the form
           actually picks the current name up — kept mounted behind
           `isOpen={false}` it would hold the name it first saw forever. Outside
-          `.settings-content` because `.settings-section` sets `overflow:
-          hidden`. */}
+          every card, so no card's layout can clip or contain the overlay. */}
       {isEditingName && (
         <DisplayNameSetup
           isOpen
