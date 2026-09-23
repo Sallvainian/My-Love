@@ -27,7 +27,7 @@ test.describe('Interaction record ownership', () => {
 
       await log.step('Show an interaction from the initial authentication lifetime');
       await interactionOwnership.mount(userId, partnerId);
-      await expect(page.getByRole('button', { name: 'Open actions' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Poke' })).toBeVisible();
       await interactionOwnership.dispatch(0, existing);
       const initial = await interactionOwnership.snapshot();
       expect(initial.interactions.map(({ id }) => id)).toEqual([existing.id]);

@@ -16,8 +16,9 @@
  */
 
 import { AnimatePresence, m as motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Hand, Heart, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, Heart, X, Zap } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useFocusTrap } from '../../hooks';
 import { useAppStore } from '../../stores/useAppStore';
 import type { Interaction } from '../../types';
 import { logger } from '../../utils/logger';
@@ -31,6 +32,11 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
   const { getInteractionHistory, loadInteractionHistory } = useAppStore();
   const currentUserId = useAppStore((state) => state.userId);
   const [isLoading, setIsLoading] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Focus trap (WCAG 2.4.3) + Escape to close, focus returned on close
+  useFocusTrap(sheetRef, isOpen, { onEscape: onClose, initialFocusRef: closeButtonRef });
 
   // Load interaction history when modal opens
   useEffect(() => {
@@ -81,7 +87,7 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
         <>
           {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-black/50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -89,115 +95,121 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
             data-testid="interaction-history-backdrop"
           />
 
-          {/* Modal */}
-          <motion.div
-            className="fixed inset-x-4 top-[calc(5rem+env(safe-area-inset-top))] bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl md:inset-x-auto md:top-1/2 md:left-1/2 md:h-auto md:max-h-[80vh] md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2"
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            data-testid="interaction-history-modal"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 p-6">
-              <h2 className="text-2xl font-bold text-gray-800">Interaction History</h2>
-              <button
-                onClick={onClose}
-                className="rounded-full p-2 transition-colors hover:bg-gray-100"
-                data-testid="close-history-button"
-                aria-label="Close"
-              >
-                <X className="h-6 w-6 text-gray-600" />
-              </button>
-            </div>
+          {/* Bottom sheet (centred dialog from `sm` up) */}
+          <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+            <motion.div
+              ref={sheetRef}
+              className="pointer-events-auto flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-t-[20px] bg-card shadow-float sm:rounded-[20px]"
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="interaction-history-title"
+              data-testid="interaction-history-modal"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+                <h2 id="interaction-history-title" className="text-lg font-semibold text-ink">
+                  Interaction History
+                </h2>
+                <button
+                  ref={closeButtonRef}
+                  type="button"
+                  onClick={onClose}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  data-testid="close-history-button"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <div className="mb-4 animate-pulse text-6xl">💕</div>
-                    <p className="text-gray-600">Loading interactions...</p>
+              {/* Content */}
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                {isLoading ? (
+                  <div className="flex flex-col items-center gap-3 py-10 text-center">
+                    <Heart
+                      className="h-8 w-8 animate-pulse fill-current text-accent"
+                      aria-hidden="true"
+                    />
+                    <p className="text-sm text-muted">Loading interactions...</p>
                   </div>
-                </div>
-              ) : interactions.length === 0 ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <div className="mb-4 text-6xl">💝</div>
-                    <p className="mb-2 text-lg text-gray-600">No interactions yet</p>
-                    <p className="text-sm text-gray-400">
-                      Send your first poke or kiss to get started!
-                    </p>
+                ) : interactions.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 py-10 text-center">
+                    <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-tint text-accent">
+                      <Heart className="h-6 w-6" aria-hidden="true" />
+                    </div>
+                    <p className="text-[15px] font-semibold text-ink">No interactions yet</p>
+                    <p className="text-sm text-muted">Send your first poke or kiss to get started!</p>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {interactions.map((interaction) => {
-                    const sent = isSent(interaction);
-                    return (
-                      <motion.div
-                        key={interaction.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`flex items-center gap-4 rounded-xl border-2 p-4 transition-all ${sent ? 'border-pink-200 bg-pink-50' : 'border-purple-200 bg-purple-50'} `}
-                        data-testid={`interaction-${interaction.id}`}
-                      >
-                        {/* Direction Indicator */}
-                        <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-full ${sent ? 'bg-pink-200' : 'bg-purple-200'} `}
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {interactions.map((interaction) => {
+                      const sent = isSent(interaction);
+                      const Icon = interaction.type === 'kiss' ? Heart : Zap;
+                      const Direction = sent ? ArrowRight : ArrowLeft;
+                      return (
+                        <motion.div
+                          key={interaction.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`flex items-center gap-3 rounded-[20px] p-3 ${sent ? 'bg-tint' : 'bg-ptint'}`}
+                          data-testid={`interaction-${interaction.id}`}
                         >
-                          {sent ? (
-                            <ArrowRight className="h-5 w-5 text-pink-600" />
-                          ) : (
-                            <ArrowLeft className="h-5 w-5 text-purple-600" />
-                          )}
-                        </div>
-
-                        {/* Interaction Icon */}
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
-                          {interaction.type === 'kiss' ? (
-                            <Heart className="h-7 w-7 fill-current text-red-500" />
-                          ) : (
-                            <Hand className="h-7 w-7 text-pink-500" />
-                          )}
-                        </div>
-
-                        {/* Details */}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-800 capitalize">
-                              {interaction.type}
-                            </span>
-                            <span className="text-gray-500">•</span>
-                            <span className="text-sm text-gray-600">
-                              {sent ? 'Sent' : 'Received'}
-                            </span>
+                          {/* Interaction Icon */}
+                          <div
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card ${sent ? 'text-accent' : 'text-partner'}`}
+                          >
+                            <Icon
+                              className={`h-5 w-5 ${interaction.type === 'kiss' ? 'fill-current' : ''}`}
+                              aria-hidden="true"
+                            />
                           </div>
-                          <p className="mt-1 text-xs text-gray-500">
-                            {formatTimestamp(interaction.createdAt)}
-                          </p>
-                        </div>
 
-                        {/* Viewed Badge */}
-                        {!sent && !interaction.viewed && (
-                          <div className="rounded-full bg-purple-600 px-3 py-1 text-xs font-medium text-white">
-                            New
+                          {/* Details */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[15px] font-semibold text-ink capitalize">
+                                {interaction.type}
+                              </span>
+                              <span className="text-muted" aria-hidden="true">
+                                ·
+                              </span>
+                              <span
+                                className={`flex items-center gap-1 text-[13px] font-medium ${sent ? 'text-accent' : 'text-partner'}`}
+                              >
+                                <Direction className="h-3.5 w-3.5" aria-hidden="true" />
+                                {sent ? 'Sent' : 'Received'}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-[13px] text-muted">
+                              {formatTimestamp(interaction.createdAt)}
+                            </p>
                           </div>
-                        )}
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
 
-            {/* Footer */}
-            <div className="border-t border-gray-200 bg-gray-50 p-6">
-              <p className="text-center text-sm text-gray-500">
-                Showing interactions from the last 7 days ({interactions.length} total)
-              </p>
-            </div>
-          </motion.div>
+                          {/* Viewed Badge */}
+                          {!sent && !interaction.viewed && (
+                            <span className="shrink-0 rounded-full bg-fill px-2.5 py-0.5 text-[11px] font-bold text-white">
+                              New
+                            </span>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-line px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+                <p className="text-center text-[13px] text-muted">
+                  Showing interactions from the last 7 days ({interactions.length} total)
+                </p>
+              </div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
