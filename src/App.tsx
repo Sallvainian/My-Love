@@ -26,7 +26,8 @@ import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
-import { refreshLocalCopies } from './services/localCopy';
+import { refreshLocalCopies, refreshLocalCopy } from './services/localCopy';
+import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
 import { stripBasePath } from './utils/basePath';
 import { logger } from './utils/logger';
 import { logStorageQuota } from './utils/storageMonitor';
@@ -389,17 +390,17 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]); // Initialize when session is established
 
-  // Anniversaries, custom messages and favorites live in Supabase; refresh
-  // their local mirrors from the server on every signed-in start. Keyed on the
-  // auth lifetime, so an in-place account switch refreshes the new account
-  // too. Each loader captures the account it was raised for and logs its own
-  // failure, leaving the mirror as it was.
+  // The custom-message and favorite mirrors refresh through their local-copy
+  // refresher, which no-ops until the bundled rows are seeded (messagesSlice).
+  // A signed-in start's refreshLocalCopies() below usually runs before
+  // initializeApp has seeded, so this fires the first refresh once seeding
+  // lands. Keyed on seeding alone: `messages` is never emptied again in this
+  // page load (sign-out keeps the shared rows), so every later sign-in, switch
+  // and reconnect reaches the refresher through refreshLocalCopies() itself.
   useEffect(() => {
-    if (!authUserId || !messagesSeeded) return;
-    const { loadAnniversariesFromServer, loadMessageDataFromServer } = useAppStore.getState();
-    void loadAnniversariesFromServer();
-    void loadMessageDataFromServer();
-  }, [authUserId, authSessionVersion, messagesSeeded]);
+    if (!messagesSeeded || !useAppStore.getState().userId) return;
+    void refreshLocalCopy(MESSAGE_DATA_COPY_KIND);
+  }, [messagesSeeded]);
 
   // Shared per-account local copies (services/localCopy.ts): refresh every
   // registered kind on each signed-in start, including an in-place account

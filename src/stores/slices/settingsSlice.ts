@@ -15,11 +15,17 @@
  * - isOnboarded: Persisted to LocalStorage
  *
  * Anniversaries: `public.anniversaries` is the source of truth, and
- * `settings.relationship.anniversaries` is its read mirror — so Home still
- * renders the countdowns offline. Every write goes to the server first and to
- * the mirror only after it succeeded, with the usual `{ userId,
- * authSessionVersion }` capture-and-recheck around the await. Writes throw, so
- * the Settings form can show the reason (offline included).
+ * `settings.relationship.anniversaries` is its in-memory mirror. They are NOT
+ * persisted with `settings` (`partialize` writes `[]`): the saved copy lives in
+ * the shared per-account local copy (`services/localCopy.ts`, kind
+ * `anniversaries`), so Home still renders the countdowns offline and no other
+ * account on the device can read them. `loadAnniversariesFromServer` is the
+ * kind's refresher (signed-in start, reconnect, on demand): it shows the saved
+ * copy at once, then replaces mirror and copy with the server's rows. Every
+ * write goes to the server first and to the mirror and copy only after it
+ * succeeded, with the usual `{ userId, authSessionVersion }` capture-and-recheck
+ * around the await. Writes throw, so the Settings form can show the reason
+ * (offline included).
  */
 
 import { ZodError } from 'zod/v4';
@@ -32,6 +38,7 @@ import {
   type AnniversaryInput,
   type ServerAnniversary,
 } from '../../services/anniversariesService';
+import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
 import { storageService } from '../../services/storage';
 import type { Anniversary, Settings } from '../../types';
 import { logger } from '../../utils/logger';
@@ -55,8 +62,44 @@ export interface SettingsSlice {
   addAnniversary: (anniversary: AnniversaryInput, clientKey?: string) => Promise<void>;
   updateAnniversary: (id: number, anniversary: AnniversaryInput) => Promise<void>;
   removeAnniversary: (id: number) => Promise<void>;
-  /** Replace the mirror with the server's rows. */
+  /**
+   * The anniversaries local-copy refresher: show the saved copy, then replace
+   * the mirror and the copy with the server's rows. Never throws.
+   */
   loadAnniversariesFromServer: () => Promise<void>;
+}
+
+/** Local-copy kind for the account's anniversaries (`Anniversary[]`). */
+export const ANNIVERSARIES_COPY_KIND = 'anniversaries';
+
+/**
+ * The auth lifetime whose anniversaries already came from the server or from a
+ * confirmed write. The saved copy is applied only before that, so a copy read
+ * that lands late can never replace a newer answer in the same session.
+ * Keyed by `{ userId, authSessionVersion }`, so a new session starts unfresh.
+ */
+let anniversariesFreshFor: { userId: string; authSessionVersion: number } | null = null;
+
+function isFresh(userId: string, authSessionVersion: number): boolean {
+  return (
+    anniversariesFreshFor?.userId === userId &&
+    anniversariesFreshFor.authSessionVersion === authSessionVersion
+  );
+}
+
+function isOnline(): boolean {
+  return typeof navigator === 'undefined' || navigator.onLine;
+}
+
+/** The saved copy's valid entries; anything malformed is dropped, not shown. */
+function parseSavedAnniversaries(value: unknown): Anniversary[] | null {
+  if (!Array.isArray(value)) return null;
+  const valid: Anniversary[] = [];
+  for (const item of value) {
+    const result = AnniversarySchema.safeParse(item);
+    if (result.success) valid.push(result.data);
+  }
+  return valid;
 }
 
 const AnniversaryInputSchema = AnniversarySchema.omit({ id: true, serverId: true });
@@ -109,181 +152,181 @@ function notSynced(): AccountDataError {
 let isInitializing = false;
 let isInitialized = false;
 
-export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _api) => ({
-  // Initial state - use defaults that will be overridden by persist if data exists
-  // Story 1.4: Pre-configured settings for single-user deployment
-  settings: {
-    notificationTime: '09:00',
-    relationship: {
-      startDate: APP_CONFIG.defaultStartDate,
-      partnerName: APP_CONFIG.defaultPartnerName,
-      anniversaries: [],
-    },
-    notifications: {
-      enabled: true,
-      time: '09:00',
-    },
-  },
-  isOnboarded: true,
+export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _api) => {
+  // The anniversaries kind's refresher for signed-in start, reconnect and
+  // on-demand refreshes. Re-registering (a second store in tests) replaces it.
+  registerLocalCopy(ANNIVERSARIES_COPY_KIND, () => get().loadAnniversariesFromServer());
 
-  // Initialize app
-  initializeApp: async () => {
-    // Guard: Prevent concurrent/duplicate initialization (StrictMode protection)
-    if (isInitializing) {
-      logger.info('[App Init] Skipping - initialization already in progress');
-      return;
-    }
-    if (isInitialized) {
-      logger.info('[App Init] Skipping - app already initialized');
-      return;
-    }
-
-    isInitializing = true;
-
-    // AppSlice owns loading/error - no more "if exists" guards
-    get().setLoading(true);
-    get().setError(null);
-
-    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    const stillCurrent = () =>
-      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
-
+  /**
+   * After a confirmed server answer for `userId` in `authSessionVersion` (the
+   * caller has just re-checked both): mark the session fresh and save the
+   * mirror as the copy. A failed save is logged — the server write stands.
+   */
+  const saveAnniversariesCopy = async (userId: string, authSessionVersion: number) => {
+    anniversariesFreshFor = { userId, authSessionVersion };
+    const list = get().settings?.relationship.anniversaries;
+    if (!list) return;
     try {
-      // CRITICAL: Check Zustand persist hydration status
-      // Hydration completes synchronously during store creation (before initializeApp is called)
-      // __isHydrated is now a required boolean on AppSlice
-      const isHydrated = get().__isHydrated;
+      await writeLocalCopy(userId, ANNIVERSARIES_COPY_KIND, list);
+    } catch (error) {
+      console.error('[Settings] Failed to save the anniversaries copy:', error);
+    }
+  };
 
-      if (!isHydrated) {
-        console.error('[App Init] CRITICAL: Hydration failed or did not complete');
-        console.error('[App Init] This indicates corrupted localStorage data');
+  return {
+    // Initial state - use defaults that will be overridden by persist if data exists
+    // Story 1.4: Pre-configured settings for single-user deployment
+    settings: {
+      notificationTime: '09:00',
+      relationship: {
+        startDate: APP_CONFIG.defaultStartDate,
+        partnerName: APP_CONFIG.defaultPartnerName,
+        anniversaries: [],
+      },
+      notifications: {
+        enabled: true,
+        time: '09:00',
+      },
+    },
+    isOnboarded: true,
 
-        get().setError('Failed to load saved settings. App will reinitialize with defaults.');
-        get().setLoading(false);
-
-        // Clear corrupted state to prevent repeated failures
-        try {
-          localStorage.removeItem('my-love-storage');
-          console.warn('[App Init] Cleared corrupted localStorage - please refresh the page');
-        } catch (clearError) {
-          console.error('[App Init] Failed to clear corrupted state:', clearError);
-        }
-
-        isInitializing = false;
+    // Initialize app
+    initializeApp: async () => {
+      // Guard: Prevent concurrent/duplicate initialization (StrictMode protection)
+      if (isInitializing) {
+        logger.info('[App Init] Skipping - initialization already in progress');
+        return;
+      }
+      if (isInitialized) {
+        logger.info('[App Init] Skipping - app already initialized');
         return;
       }
 
-      logger.info('[App Init] Hydration verified - proceeding with IndexedDB initialization');
+      isInitializing = true;
 
-      // Initialize IndexedDB
-      await storageService.init();
+      // AppSlice owns loading/error - no more "if exists" guards
+      get().setLoading(true);
+      get().setError(null);
 
-      // Load messages from IndexedDB — shared daily rows plus this account's
-      // own custom rows. The seeding decision below reads the same list, and
-      // still works when nobody is signed in: the daily rows are shared, so
-      // their absence is what marks an unseeded database.
-      const storedMessages = await storageService.getAllMessages(requestedBy);
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      const stillCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
-      // If no messages exist, populate with default messages
-      if (storedMessages.length === 0) {
-        const defaultMessages = await loadDefaultMessages();
-        const messagesToAdd = defaultMessages.map((msg) => ({
-          ...msg,
-          // Remove explicit ID - let IndexedDB autoIncrement generate IDs
-          createdAt: new Date(),
-          isCustom: false,
-        }));
+      try {
+        // CRITICAL: Check Zustand persist hydration status
+        // Hydration completes synchronously during store creation (before initializeApp is called)
+        // __isHydrated is now a required boolean on AppSlice
+        const isHydrated = get().__isHydrated;
 
-        await storageService.addMessages(messagesToAdd);
+        if (!isHydrated) {
+          console.error('[App Init] CRITICAL: Hydration failed or did not complete');
+          console.error('[App Init] This indicates corrupted localStorage data');
 
-        // Reload messages from IndexedDB to get auto-generated IDs
-        const messagesWithIds = await storageService.getAllMessages(requestedBy);
+          get().setError('Failed to load saved settings. App will reinitialize with defaults.');
+          get().setLoading(false);
 
-        if (stillCurrent()) {
+          // Clear corrupted state to prevent repeated failures
+          try {
+            localStorage.removeItem('my-love-storage');
+            console.warn('[App Init] Cleared corrupted localStorage - please refresh the page');
+          } catch (clearError) {
+            console.error('[App Init] Failed to clear corrupted state:', clearError);
+          }
+
+          isInitializing = false;
+          return;
+        }
+
+        logger.info('[App Init] Hydration verified - proceeding with IndexedDB initialization');
+
+        // Initialize IndexedDB
+        await storageService.init();
+
+        // Load messages from IndexedDB — shared daily rows plus this account's
+        // own custom rows. The seeding decision below reads the same list, and
+        // still works when nobody is signed in: the daily rows are shared, so
+        // their absence is what marks an unseeded database.
+        const storedMessages = await storageService.getAllMessages(requestedBy);
+
+        // If no messages exist, populate with default messages
+        if (storedMessages.length === 0) {
+          const defaultMessages = await loadDefaultMessages();
+          const messagesToAdd = defaultMessages.map((msg) => ({
+            ...msg,
+            // Remove explicit ID - let IndexedDB autoIncrement generate IDs
+            createdAt: new Date(),
+            isCustom: false,
+          }));
+
+          await storageService.addMessages(messagesToAdd);
+
+          // Reload messages from IndexedDB to get auto-generated IDs
+          const messagesWithIds = await storageService.getAllMessages(requestedBy);
+
+          if (stillCurrent()) {
+            set((state) => ({
+              messages: messagesWithIds,
+              messageHistory: {
+                ...state.messageHistory,
+                favoriteIds: messagesWithIds
+                  .filter((message) => message.isFavorite)
+                  .map((message) => message.id),
+              },
+            }));
+          }
+        } else if (stillCurrent()) {
           set((state) => ({
-            messages: messagesWithIds,
+            messages: storedMessages,
             messageHistory: {
               ...state.messageHistory,
-              favoriteIds: messagesWithIds
+              favoriteIds: storedMessages
                 .filter((message) => message.isFavorite)
                 .map((message) => message.id),
             },
           }));
         }
-      } else if (stillCurrent()) {
-        set((state) => ({
-          messages: storedMessages,
-          messageHistory: {
-            ...state.messageHistory,
-            favoriteIds: storedMessages
-              .filter((message) => message.isFavorite)
-              .map((message) => message.id),
-          },
-        }));
+
+        if (stillCurrent()) {
+          get().updateCurrentMessage();
+        } else {
+          // `reloadRotationPool` returns early on an empty pool, which is the
+          // cold-boot state this path leaves behind, so the same two lines are
+          // inlined here rather than routed through it.
+          const { userId, authSessionVersion } = get();
+          void get()
+            .loadMessages()
+            .then(() => {
+              if (get().userId !== userId || get().authSessionVersion !== authSessionVersion) return;
+              get().updateCurrentMessage();
+            })
+            // `loadMessages` swallows its own errors, but `updateCurrentMessage` runs
+            // inside the callback above and nothing is awaiting this chain — a throw
+            // there would surface as an unhandled rejection on the init path, with no
+            // caller to report it.
+            .catch((error) => {
+              console.error('[App Init] Failed to reload the rotation pool:', error);
+            });
+        }
+
+        get().setLoading(false);
+
+        isInitialized = true;
+        logger.info('[App Init] Initialization completed successfully');
+      } catch (error) {
+        console.error('Error initializing app:', error);
+
+        get().setError('Failed to initialize app');
+        get().setLoading(false);
+      } finally {
+        isInitializing = false;
       }
+    },
 
-      if (stillCurrent()) {
-        get().updateCurrentMessage();
-      } else {
-        // `reloadRotationPool` returns early on an empty pool, which is the
-        // cold-boot state this path leaves behind, so the same two lines are
-        // inlined here rather than routed through it.
-        const { userId, authSessionVersion } = get();
-        void get()
-          .loadMessages()
-          .then(() => {
-            if (get().userId !== userId || get().authSessionVersion !== authSessionVersion) return;
-            get().updateCurrentMessage();
-          })
-          // `loadMessages` swallows its own errors, but `updateCurrentMessage` runs
-          // inside the callback above and nothing is awaiting this chain — a throw
-          // there would surface as an unhandled rejection on the init path, with no
-          // caller to report it.
-          .catch((error) => {
-            console.error('[App Init] Failed to reload the rotation pool:', error);
-          });
-      }
-
-      get().setLoading(false);
-
-      isInitialized = true;
-      logger.info('[App Init] Initialization completed successfully');
-    } catch (error) {
-      console.error('Error initializing app:', error);
-
-      get().setError('Failed to initialize app');
-      get().setLoading(false);
-    } finally {
-      isInitializing = false;
-    }
-  },
-
-  // Settings actions
-  setSettings: (settings) => {
-    try {
-      // Story 5.5: Validate settings before updating state
-      const validated = SettingsSchema.parse(settings);
-      set({ settings: validated });
-    } catch (error) {
-      // Transform Zod validation errors into user-friendly messages
-      if (isZodError(error)) {
-        console.error(
-          '[Settings] Validation failed:',
-          createValidationError(error as ZodError).message
-        );
-        throw createValidationError(error as ZodError);
-      }
-      throw error;
-    }
-  },
-
-  updateSettings: (updates) => {
-    const { settings } = get();
-    if (settings) {
+    // Settings actions
+    setSettings: (settings) => {
       try {
-        // Story 5.5: Validate merged settings before updating state
-        const merged = { ...settings, ...updates };
-        const validated = SettingsSchema.parse(merged);
+        // Story 5.5: Validate settings before updating state
+        const validated = SettingsSchema.parse(settings);
         set({ settings: validated });
       } catch (error) {
         // Transform Zod validation errors into user-friendly messages
@@ -296,122 +339,169 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         }
         throw error;
       }
-    }
-  },
+    },
 
-  setOnboarded: (onboarded) => {
-    set({ isOnboarded: onboarded });
-  },
+    updateSettings: (updates) => {
+      const { settings } = get();
+      if (settings) {
+        try {
+          // Story 5.5: Validate merged settings before updating state
+          const merged = { ...settings, ...updates };
+          const validated = SettingsSchema.parse(merged);
+          set({ settings: validated });
+        } catch (error) {
+          // Transform Zod validation errors into user-friendly messages
+          if (isZodError(error)) {
+            console.error(
+              '[Settings] Validation failed:',
+              createValidationError(error as ZodError).message
+            );
+            throw createValidationError(error as ZodError);
+          }
+          throw error;
+        }
+      }
+    },
 
-  // Anniversary actions. Each runs in the account-data queue, so the mirror
-  // refresh cannot read the server before a write and replace the list after it.
-  addAnniversary: async (anniversary, clientKey = crypto.randomUUID()) => {
-    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    if (!requestedBy) throw new Error('You must be signed in to add an anniversary');
-    const input = parseAnniversaryInput(anniversary);
+    setOnboarded: (onboarded) => {
+      set({ isOnboarded: onboarded });
+    },
 
-    await serializeAccountDataWrite(async () => {
-      const created = await anniversariesService.createAnniversary(requestedBy, input, clientKey);
+    // Anniversary actions. Each runs in the account-data queue, so the mirror
+    // refresh cannot read the server before a write and replace the list after it.
+    addAnniversary: async (anniversary, clientKey = crypto.randomUUID()) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to add an anniversary');
+      const input = parseAnniversaryInput(anniversary);
 
-      // The row is the requesting account's either way; only this session's
-      // mirror is withheld once the account changed under the request.
-      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
-      set((state) => {
-        if (!state.settings) return {};
-        const current = state.settings.relationship.anniversaries;
-        // A retried submit resolves to the row the first attempt stored, which
-        // a refresh may already have mirrored: never list it twice.
-        if (current.some((a) => a.serverId === created.serverId)) return {};
-        const newId = Math.max(0, ...current.map((a) => a.id)) + 1;
-        return {
-          settings: withAnniversaries(state.settings, [...current, toMirrored(newId, created)]),
-        };
-      });
-    });
-  },
-
-  updateAnniversary: async (id, anniversary) => {
-    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    if (!requestedBy) throw new Error('You must be signed in to edit an anniversary');
-    const input = parseAnniversaryInput(anniversary);
-
-    await serializeAccountDataWrite(async () => {
-      // The queue may have held this task across an account switch; the local
-      // id would then name the NEW account's row, under the new session.
-      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
-      const existing = get().settings?.relationship.anniversaries.find((a) => a.id === id);
-      if (!existing) throw new AccountDataError('not-found', 'Anniversary not found');
-      if (!existing.serverId) throw notSynced();
-
-      const updated = await anniversariesService.updateAnniversary(existing.serverId, input);
-
-      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
-      set((state) => {
-        if (!state.settings) return {};
-        return {
-          settings: withAnniversaries(
-            state.settings,
-            state.settings.relationship.anniversaries.map((a) =>
-              a.serverId === updated.serverId ? toMirrored(a.id, updated) : a
-            )
-          ),
-        };
-      });
-    });
-  },
-
-  removeAnniversary: async (id) => {
-    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    if (!requestedBy) throw new Error('You must be signed in to delete an anniversary');
-
-    await serializeAccountDataWrite(async () => {
-      // Same re-check as updateAnniversary: a queued delete must not reach the
-      // next account's row through a shared local id.
-      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
-      const existing = get().settings?.relationship.anniversaries.find((a) => a.id === id);
-      if (!existing) return;
-      if (!existing.serverId) throw notSynced();
-      const { serverId } = existing;
-
-      await anniversariesService.deleteAnniversary(serverId);
-
-      if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
-      set((state) => {
-        if (!state.settings) return {};
-        return {
-          settings: withAnniversaries(
-            state.settings,
-            state.settings.relationship.anniversaries.filter((a) => a.serverId !== serverId)
-          ),
-        };
-      });
-    });
-  },
-
-  loadAnniversariesFromServer: async () => {
-    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    if (!requestedBy) return;
-
-    try {
       await serializeAccountDataWrite(async () => {
-        const rows = await anniversariesService.fetchAnniversaries(requestedBy);
+        const created = await anniversariesService.createAnniversary(requestedBy, input, clientKey);
+
+        // The row is the requesting account's either way; only this session's
+        // mirror is withheld once the account changed under the request.
+        if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+        set((state) => {
+          if (!state.settings) return {};
+          const current = state.settings.relationship.anniversaries;
+          // A retried submit resolves to the row the first attempt stored, which
+          // a refresh may already have mirrored: never list it twice.
+          if (current.some((a) => a.serverId === created.serverId)) return {};
+          const newId = Math.max(0, ...current.map((a) => a.id)) + 1;
+          return {
+            settings: withAnniversaries(state.settings, [...current, toMirrored(newId, created)]),
+          };
+        });
+        await saveAnniversariesCopy(requestedBy, requestedInSession);
+      });
+    },
+
+    updateAnniversary: async (id, anniversary) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to edit an anniversary');
+      const input = parseAnniversaryInput(anniversary);
+
+      await serializeAccountDataWrite(async () => {
+        // The queue may have held this task across an account switch; the local
+        // id would then name the NEW account's row, under the new session.
+        if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+        const existing = get().settings?.relationship.anniversaries.find((a) => a.id === id);
+        if (!existing) throw new AccountDataError('not-found', 'Anniversary not found');
+        if (!existing.serverId) throw notSynced();
+
+        const updated = await anniversariesService.updateAnniversary(existing.serverId, input);
+
         if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
         set((state) => {
           if (!state.settings) return {};
           return {
             settings: withAnniversaries(
               state.settings,
-              mirrorAnniversaries(state.settings.relationship.anniversaries, rows)
+              state.settings.relationship.anniversaries.map((a) =>
+                a.serverId === updated.serverId ? toMirrored(a.id, updated) : a
+              )
             ),
           };
         });
+        await saveAnniversariesCopy(requestedBy, requestedInSession);
       });
-    } catch (error) {
-      // The mirror stays as it was, so Home keeps its countdowns offline.
-      console.error('[Settings] Failed to load anniversaries from the server:', error);
-    }
-  },
-});
+    },
+
+    removeAnniversary: async (id) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to delete an anniversary');
+
+      await serializeAccountDataWrite(async () => {
+        // Same re-check as updateAnniversary: a queued delete must not reach the
+        // next account's row through a shared local id.
+        if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+        const existing = get().settings?.relationship.anniversaries.find((a) => a.id === id);
+        if (!existing) return;
+        if (!existing.serverId) throw notSynced();
+        const { serverId } = existing;
+
+        await anniversariesService.deleteAnniversary(serverId);
+
+        if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+        set((state) => {
+          if (!state.settings) return {};
+          return {
+            settings: withAnniversaries(
+              state.settings,
+              state.settings.relationship.anniversaries.filter((a) => a.serverId !== serverId)
+            ),
+          };
+        });
+        await saveAnniversariesCopy(requestedBy, requestedInSession);
+      });
+    },
+
+    loadAnniversariesFromServer: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // 1. The saved copy, at once — online or offline. Outside the account-data
+      // queue, so a queued write cannot hold the countdowns back; skipped once
+      // this session has a server answer or a confirmed write, which is newer.
+      if (!isFresh(requestedBy, requestedInSession)) {
+        const saved = parseSavedAnniversaries(
+          await readLocalCopy<unknown>(requestedBy, ANNIVERSARIES_COPY_KIND)
+        );
+        if (!isCurrent()) return;
+        if (saved && !isFresh(requestedBy, requestedInSession)) {
+          set((state) =>
+            state.settings ? { settings: withAnniversaries(state.settings, saved) } : {}
+          );
+        }
+      }
+
+      // 2. Offline there is nothing to ask; the copy (or nothing) stays shown.
+      if (!isOnline()) return;
+
+      // 3. The server's rows replace the mirror and the copy — only on success.
+      try {
+        await serializeAccountDataWrite(async () => {
+          const rows = await anniversariesService.fetchAnniversaries(requestedBy);
+          if (!isCurrent()) return;
+          set((state) => {
+            if (!state.settings) return {};
+            return {
+              settings: withAnniversaries(
+                state.settings,
+                mirrorAnniversaries(state.settings.relationship.anniversaries, rows)
+              ),
+            };
+          });
+          await saveAnniversariesCopy(requestedBy, requestedInSession);
+        });
+      } catch (error) {
+        // The mirror and the copy stay as they were, so Home keeps its countdowns.
+        console.error('[Settings] Failed to load anniversaries from the server:', error);
+      }
+    },
+  };
+};
 
 // Export initialization guards for use in main store
 export { isInitialized, isInitializing };

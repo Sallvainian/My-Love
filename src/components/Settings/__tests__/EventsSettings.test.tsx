@@ -20,7 +20,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, Ref } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { serializeAccountDataWrite } from '../../../services/accountDataQueue';
 import { createAuthSlice } from '../../../stores/slices/authSlice';
 import type { AppState } from '../../../stores/types';
 import { EventsSettings } from '../EventsSettings';
@@ -244,6 +245,13 @@ function renderedLabels(): (string | null)[] {
 beforeEach(() => {
   vi.clearAllMocks();
   setStore();
+});
+
+// Sign-out (`reauthenticate`) deletes the outgoing account's mirror rows through
+// the account-data queue, fire-and-forget; drain it so its log lines land inside
+// the test rather than after the worker closes.
+afterEach(async () => {
+  await serializeAccountDataWrite(async () => {});
 });
 
 describe('EventsSettings list', () => {

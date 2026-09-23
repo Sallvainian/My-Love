@@ -31,12 +31,13 @@ import type {
   InteractionSubscriptionStatus,
   SupabaseInteractionRecord,
 } from '../../../src/api/interactionService';
-import {
-  OWNER_STORAGE_KEY,
-  VAULT_STORAGE_KEY,
-} from '../../../src/services/anniversaryVault';
+import { serializeAccountDataWrite } from '../../../src/services/accountDataQueue';
 import { NoPartnerError } from '../../../src/utils/interactionValidation';
-import { createAuthSlice, type AuthSlice } from '../../../src/stores/slices/authSlice';
+import {
+  ACCOUNT_OWNER_STORAGE_KEY,
+  createAuthSlice,
+  type AuthSlice,
+} from '../../../src/stores/slices/authSlice';
 import {
   createInteractionsSlice,
   type InteractionsSlice,
@@ -93,8 +94,7 @@ function interaction(
 describe('interactionsSlice subscription bridge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.removeItem(OWNER_STORAGE_KEY);
-    localStorage.removeItem(VAULT_STORAGE_KEY);
+    localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
     subscriptions.length = 0;
     resolvePartnerId.mockResolvedValue(OTHER_USER_ID);
     subscribeInteractions.mockImplementation(
@@ -115,9 +115,12 @@ describe('interactionsSlice subscription bridge', () => {
     );
   });
 
-  afterEach(() => {
-    localStorage.removeItem(OWNER_STORAGE_KEY);
-    localStorage.removeItem(VAULT_STORAGE_KEY);
+  afterEach(async () => {
+    localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
+    // Sign-out deletes the outgoing account's mirror rows through the
+    // account-data queue, fire-and-forget. Drain it so that work (and its log
+    // line) finishes inside the test rather than after the worker closes.
+    await serializeAccountDataWrite(async () => {});
   });
 
   it('forwards every service status and keeps isSubscribed aligned through recovery', async () => {

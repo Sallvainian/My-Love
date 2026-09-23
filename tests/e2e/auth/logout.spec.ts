@@ -9,8 +9,42 @@
  * function App.tsx used to import), so the logout interceptions below still fire
  * on exactly the request they always did.
  */
+import type { Page, Route } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
+
+/**
+ * How many rows one account has in the three stores sign-out must empty for
+ * it, and whether the seeded anniversary and custom message are among them.
+ */
+async function ownedRowCounts(page: Page, owner: string, seed: { label: string; custom: string }) {
+  return page.evaluate(async ({ userId, label, custom }) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('my-love-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const all = (store: string) =>
+      new Promise<Array<Record<string, unknown>>>((resolve, reject) => {
+        const request = db.transaction(store).objectStore(store).getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    try {
+      const copies = (await all('local-copies')).filter((row) => row.userId === userId);
+      const messages = (await all('messages')).filter((row) => row.userId === userId);
+      return {
+        copies: copies.length,
+        custom: messages.length,
+        favorites: (await all('message-favorites')).filter((row) => row.userId === userId).length,
+        seeded:
+          JSON.stringify(copies).includes(label) && messages.some((row) => row.text === custom),
+      };
+    } finally {
+      db.close();
+    }
+  }, { userId: owner, ...seed });
+}
 
 test.describe('Logout Flow', () => {
   // These tests need authenticated sessions (default behavior)
@@ -158,5 +192,62 @@ test.describe('Logout Flow', () => {
         events: 0,
         partner: null,
       });
+  });
+
+  test("[P1] deletes the outgoing account's saved anniversaries, custom messages and favorites from the device", async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    const signOutCall = interceptNetworkCall({
+      url: '**/auth/v1/logout**',
+      method: 'POST',
+      fulfillResponse: { status: 204, body: {} },
+    });
+    const LABEL = 'DEVICE-ANNIVERSARY-LABEL';
+    const CUSTOM = 'DEVICE-CUSTOM-MESSAGE-TEXT';
+    const seed = { label: LABEL, custom: CUSTOM };
+
+    // GIVEN: the account's saved data on the device, written by the app's own
+    // refreshes. The server reads are answered with the seed on every call, so
+    // no later refresh can replace or delete it before sign-out — the zero
+    // counts below can only come from sign-out's delete.
+    const at = new Date().toISOString();
+    const serve = (rows: unknown[]) => (route: Route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) })
+        : route.fallback();
+    await page.route('**/rest/v1/anniversaries?*', serve([
+      { id: 'srv-device', user_id: 'seed', event_date: '2024-02-14', label: LABEL, description: null,
+        client_key: 'seed', created_at: at, updated_at: at },
+    ]));
+    await page.route('**/rest/v1/custom_messages?*', serve([
+      { id: 'srv-device-custom', user_id: 'seed', text: CUSTOM, category: 'custom', active: true,
+        is_favorite: true, tags: [], client_key: 'seed', created_at: at, updated_at: at },
+    ]));
+    await page.route('**/rest/v1/message_favorites?*', serve([]));
+    await page.goto('/');
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
+    const userId = await page.evaluate(() => window.__APP_STORE__!.getState().userId!);
+
+    await expect
+      .poll(async () => {
+        const counts = await ownedRowCounts(page, userId, seed);
+        return counts.seeded && counts.favorites > 0;
+      })
+      .toBe(true);
+
+    // WHEN: the user signs out.
+    await navigateTo(page, 'settings');
+    await page.getByTestId('settings-sign-out').click();
+    await signOutCall;
+    await expect(page.getByTestId('login-screen')).toBeVisible({ timeout: 5000 });
+
+    // THEN: none of it is readable from IndexedDB or localStorage any more.
+    await expect
+      .poll(() => ownedRowCounts(page, userId, seed))
+      .toEqual({ copies: 0, custom: 0, favorites: 0, seeded: false });
+    const storage = await page.evaluate(() => JSON.stringify({ ...localStorage }));
+    expect(storage).not.toContain(LABEL);
+    expect(storage).not.toContain(CUSTOM);
   });
 });
