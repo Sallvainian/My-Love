@@ -35,7 +35,7 @@ import {
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
   fieldClass,
-} from '../Settings/kitClasses';
+} from '../shared/kitClasses';
 
 interface DisplayNameSetupProps {
   /** Whether the modal is open */
@@ -265,7 +265,7 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
             <input
               id="displayName"
               type="text"
-              className={`${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`}
+              className={`${fieldClass(Boolean(error))} disabled:cursor-not-allowed disabled:opacity-60`}
               placeholder="Enter your display name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}

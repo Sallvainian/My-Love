@@ -80,7 +80,7 @@ import {
   SECONDARY_BUTTON,
   SMALL_SECONDARY,
   fieldClass,
-} from './kitClasses';
+} from '../shared/kitClasses';
 
 /**
  * Event shapes are read off the composed store type rather than imported from
@@ -959,7 +959,7 @@ function EventForm({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className={`${DIALOG_PANEL} max-h-full max-w-md overflow-y-auto`}
+        className={`${DIALOG_PANEL} max-w-md`}
       >
         <div className="mb-5 flex items-center justify-between gap-3">
           <h3 id={titleId} className={DIALOG_TITLE}>
@@ -1123,7 +1123,7 @@ function EventForm({
                     className={`flex h-12 cursor-pointer items-center justify-center gap-2 rounded-[14px] px-3 text-sm font-semibold transition-colors duration-200 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-accent ${
                       icon === value
                         ? 'bg-tint text-accent ring-2 ring-accent'
-                        : 'text-muted ring-1 ring-line peer-focus-visible:ring-2 peer-focus-visible:ring-accent'
+                        : 'text-muted ring-1 ring-line-strong peer-focus-visible:ring-2 peer-focus-visible:ring-accent'
                     }`}
                   >
                     <Icon className="h-4 w-4" aria-hidden="true" />

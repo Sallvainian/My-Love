@@ -33,7 +33,7 @@ test.describe('Interaction record ownership', () => {
       expect(initial.interactions.map(({ id }) => id)).toEqual([existing.id]);
       expect(initial.unviewedCount).toBe(1);
       expect(initial.subscriptions).toEqual([{ userId, cleanupCalls: 0 }]);
-      await expect(badge).toHaveAttribute('aria-label', '1 unviewed interaction');
+      await expect(badge).toHaveAttribute('aria-label', 'Play 1 unviewed interaction');
 
       await log.step('Sign out through authSlice and deliver a still-callable old record');
       await interactionOwnership.clearAuth();
@@ -95,7 +95,7 @@ test.describe('Interaction record ownership', () => {
       expect(await interactionOwnership.snapshot()).toEqual(accepted);
 
       await expect(badge).toHaveText('1');
-      await expect(badge).toHaveAttribute('aria-label', '1 unviewed interaction');
+      await expect(badge).toHaveAttribute('aria-label', 'Play 1 unviewed interaction');
     }
   );
 
@@ -117,7 +117,7 @@ test.describe('Interaction record ownership', () => {
       const initial = await interactionOwnership.snapshot();
       expect(initial.interactions.map(({ id }) => id)).toEqual([beforeSwitch.id]);
       expect(initial.unviewedCount).toBe(1);
-      await expect(badge).toHaveAttribute('aria-label', '1 unviewed interaction');
+      await expect(badge).toHaveAttribute('aria-label', 'Play 1 unviewed interaction');
 
       await interactionOwnership.setAuthUser(userB);
       await interactionOwnership.setPartnerId(userA);
@@ -162,7 +162,7 @@ test.describe('Interaction record ownership', () => {
       );
       expect(await interactionOwnership.snapshot()).toEqual(accepted);
       await expect(badge).toHaveText('1');
-      await expect(badge).toHaveAttribute('aria-label', '1 unviewed interaction');
+      await expect(badge).toHaveAttribute('aria-label', 'Play 1 unviewed interaction');
     }
   );
 
@@ -192,7 +192,7 @@ test.describe('Interaction record ownership', () => {
       const initial = await interactionOwnership.snapshot();
       expect(initial.interactions.map(({ id }) => id)).toEqual([existing.id]);
       expect(initial.unviewedCount).toBe(1);
-      await expect(badge).toHaveAttribute('aria-label', '1 unviewed interaction');
+      await expect(badge).toHaveAttribute('aria-label', 'Play 1 unviewed interaction');
 
       await interactionOwnership.setAuthUser(userId, 'refreshed@example.test');
       expect(await interactionOwnership.snapshot()).toEqual(initial);
@@ -216,7 +216,7 @@ test.describe('Interaction record ownership', () => {
       await interactionOwnership.dispatch(0, fresh);
       expect(await interactionOwnership.snapshot()).toEqual(accepted);
       await expect(badge).toHaveText('2');
-      await expect(badge).toHaveAttribute('aria-label', '2 unviewed interactions');
+      await expect(badge).toHaveAttribute('aria-label', 'Play the oldest of 2 unviewed interactions');
 
       await log.step('Retain an already-viewed record without increasing the badge');
       await interactionOwnership.dispatch(0, viewed);
@@ -238,7 +238,7 @@ test.describe('Interaction record ownership', () => {
         subscriptions: [{ userId, cleanupCalls: 0 }],
       });
       await expect(badge).toHaveText('2');
-      await expect(badge).toHaveAttribute('aria-label', '2 unviewed interactions');
+      await expect(badge).toHaveAttribute('aria-label', 'Play the oldest of 2 unviewed interactions');
     }
   );
 });

@@ -22,7 +22,7 @@ import {
   NOTICE,
   PRIMARY_BUTTON,
   fieldClass,
-} from '../Settings/kitClasses';
+} from '../shared/kitClasses';
 
 /** Field label, per the Sign in artboard: 600 13px `ink`, 6px above its input. */
 const LABEL = 'text-[13px] font-semibold text-ink';
@@ -240,7 +240,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || isGoogleLoading}
                 required
                 autoComplete="email"
                 aria-required="true"
@@ -260,7 +260,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
                 placeholder="Your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || isGoogleLoading}
                 required
                 autoComplete="current-password"
                 aria-required="true"
@@ -323,7 +323,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
                 'Sign-up functionality coming soon. Please contact your administrator for account creation.'
               );
             }}
-            disabled={isLoading}
+            disabled={isLoading || isGoogleLoading}
           >
             Contact admin
           </button>

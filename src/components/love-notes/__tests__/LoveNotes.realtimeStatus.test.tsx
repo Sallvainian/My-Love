@@ -23,7 +23,10 @@ const api = vi.hoisted(() => ({
   getUser: vi.fn(),
 }));
 
-const feed = vi.hoisted(() => ({ status: 'connected' as NoteFeedStatus }));
+const feed = vi.hoisted(() => ({
+  status: 'connected' as NoteFeedStatus,
+  error: null as string | null,
+}));
 
 vi.mock('../../../api/supabaseClient', () => ({
   getOwnDisplayName: api.getOwnDisplayName,
@@ -36,7 +39,7 @@ vi.mock('../../../hooks/useLoveNotes', () => ({
   useLoveNotes: () => ({
     notes: [],
     isLoading: false,
-    error: null,
+    error: feed.error,
     hasMore: false,
     fetchOlderNotes: vi.fn(),
     clearError: vi.fn(),
@@ -85,6 +88,7 @@ async function renderWith(status: NoteFeedStatus) {
 describe('LoveNotes realtime notice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    feed.error = null;
     api.getUser.mockResolvedValue({ email: 'someone@example.com' });
     api.getOwnDisplayName.mockResolvedValue(null);
     api.getPartnerDisplayName.mockResolvedValue(null);
@@ -161,7 +165,7 @@ describe('LoveNotes realtime notice', () => {
     const notice = screen.getByTestId(NOTICE);
     expect(notice).toHaveTextContent('Reconnecting');
     // Announced, not merely shown: this appears without the person having done
-    // anything, which is the same treatment the error banner gets.
+    // anything.
     expect(notice).toHaveAttribute('role', 'status');
     expect(notice).toHaveAttribute('aria-live', 'polite');
     // Kit `muted`, with a `muted` dot: still recovering, so not an alarm.
@@ -195,6 +199,18 @@ describe('LoveNotes realtime notice', () => {
 
     expect(reconnecting).toBeTruthy();
     expect(disconnected).not.toBe(reconnecting);
+  });
+
+  it('announces the error banner as an alert', async () => {
+    // DW-172: an error can appear without the person having done anything, so
+    // the banner has to be announced rather than only seen.
+    feed.error = 'Failed to load notes';
+    await renderWith('connected');
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Failed to load notes');
+    // Only the message is announced, not the Dismiss control beside it.
+    expect(alert).not.toHaveTextContent('Dismiss');
   });
 
   it('does not collide with the partner-mood feed indicator', async () => {

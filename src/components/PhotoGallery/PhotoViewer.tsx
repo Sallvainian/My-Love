@@ -9,7 +9,14 @@ import { useAppStore } from '../../stores/useAppStore';
 interface PhotoViewerProps {
   photos: PhotoWithUrls[];
   selectedPhotoId: string;
+  /** More pages exist beyond `photos`, so its length is only a lower bound. */
+  hasMore?: boolean;
   onClose: () => void;
+  /**
+   * Called after a successful delete. The caller owns `photos` and must drop
+   * the row: the viewer keeps its index, which then holds the next photo.
+   */
+  onDeleted?: (photoId: string) => void;
 }
 
 // AC 6.4.2: Swipe gesture configuration
@@ -37,7 +44,13 @@ const DOUBLE_TAP_DELAY = 300; // ms
  * - Photo preloading
  * - Loading and error states
  */
-export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerProps) {
+export function PhotoViewer({
+  photos,
+  selectedPhotoId,
+  hasMore = false,
+  onClose,
+  onDeleted,
+}: PhotoViewerProps) {
   const { deletePhoto } = useAppStore();
 
   // Calculate current photo index from selectedPhotoId
@@ -75,9 +88,11 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   // confines the trap's Tab cycle to Cancel/Delete), and focusing a
   // still-disabled button before the re-enabling render commits is a no-op.
   const restoreAfterDialogRef = useRef(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const closeDeleteDialog = useCallback(() => {
     restoreAfterDialogRef.current = true;
     setShowDeleteDialog(false);
+    setDeleteError(null);
   }, []);
   useEffect(() => {
     if (!showDeleteDialog && restoreAfterDialogRef.current) {
@@ -104,6 +119,17 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     showDeleteDialogRef.current = showDeleteDialog;
     onCloseRef.current = onClose;
   }, [showDeleteDialog, onClose]);
+  // A failed delete keeps the confirmation open with its alert. The Delete
+  // button that held focus was disabled for the request, so hand focus to
+  // Cancel -- still inside the dialog, and the safe choice on an irreversible
+  // action -- once the re-enabling render has committed.
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (deleteError && !isDeleting) {
+      cancelButtonRef.current?.focus();
+    }
+  }, [deleteError, isDeleting]);
+
   const handleCancelDialog = useCallback(() => {
     if (isDeletingRef.current) return;
     closeDeleteDialog();
@@ -310,7 +336,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     liveRegion.setAttribute('aria-atomic', 'true');
     liveRegion.className = 'sr-only';
 
-    const announcement = `Photo ${currentIndex + 1} of ${photos.length}${
+    const announcement = `Photo ${currentIndex + 1} of ${photos.length}${hasMore ? '+' : ''}${
       currentPhoto.caption ? '. ' + currentPhoto.caption : ''
     }`;
     liveRegion.textContent = announcement;
@@ -323,7 +349,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         document.body.removeChild(liveRegion);
       }
     };
-  }, [currentIndex, photos.length, currentPhoto.caption]);
+  }, [currentIndex, photos.length, hasMore, currentPhoto.caption]);
 
   // AC 6.4.2: Swipe navigation
   const handleDragEnd = useCallback(
@@ -374,59 +400,51 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
   // AC 6.4.10: Delete photo handler.
   //
-  // Re-entry is the wrong-photo hazard again: the optimistic setCurrentIndex
-  // has already applied when the request is in flight, so a second tap on
-  // Delete would resolve photos[currentIndex] to a DIFFERENT photo and delete
-  // it too. The ref is the guard (state lags a render); the state disables the
-  // Delete button so a double-tap has nothing to land on. Cancel stays enabled
-  // as the trap's one focusable, guarded in its handler instead.
+  // Navigation waits for the outcome. deletePhoto resolves false rather than
+  // rejecting, and on false the viewer stays where it is and the confirmation
+  // stays open with an error, so Delete can be retried. On success the
+  // parent drops the row through onDeleted, so the same index then holds the
+  // next photo; only the last photo steps back, and the only photo closes.
+  //
+  // Re-entry would send a second delete while the first is in flight. The
+  // ref is the guard (state lags a render); the state disables the Delete
+  // button so a double-tap has nothing to land on. Cancel stays enabled as
+  // the trap's one focusable, guarded in its handler instead.
   const handleDeleteConfirm = useCallback(async () => {
     if (isDeletingRef.current) return;
     isDeletingRef.current = true;
     setIsDeleting(true);
+    setDeleteError(null);
     const photoToDelete = photos[currentIndex];
+    let deleted = false;
 
     try {
-      // Navigate first (optimistic update)
+      // Delete from storage + database + store
+      deleted = await deletePhoto(photoToDelete.id);
+      if (!deleted) return;
+
+      onDeleted?.(photoToDelete.id);
       if (photos.length === 1) {
         onClose();
       } else {
-        const nextIndex = canNavigateNext ? currentIndex : currentIndex - 1;
-        setCurrentIndex(nextIndex);
+        if (currentIndex === photos.length - 1) setCurrentIndex(currentIndex - 1);
         resetTransform();
       }
-
-      // Delete from storage + database + state
-      await deletePhoto(photoToDelete.id);
-    } catch (error) {
-      console.error('[PhotoViewer] Failed to delete photo:', error);
-
-      // CRITICAL 2: Better error handling for RLS policy violations
-      const errorMessage = (error as Error)?.message || '';
-      // PostgreSQL/Supabase errors may have a code property
-      const errorCode = (error as { code?: string })?.code || '';
-
-      if (
-        errorMessage.toLowerCase().includes('permission') ||
-        errorMessage.toLowerCase().includes('policy') ||
-        errorCode === '42501'
-      ) {
-        console.error(
-          '[PhotoViewer] RLS policy blocked deletion - user does not own this photo. Server-side security working correctly.'
-        );
-      }
-
-      // Note: UI already updated optimistically. In production, may want to revert navigation
-      // or show error toast to user. For now, logging is sufficient as RLS prevents unauthorized deletion.
     } finally {
       isDeletingRef.current = false;
       setIsDeleting(false);
-      // Routed through closeDeleteDialog so the post-commit effect places
-      // focus: the trash button if the next photo is the user's own, the
-      // container otherwise. By then unmounts and re-enables have committed.
-      closeDeleteDialog();
+      if (deleted) {
+        // Routed through closeDeleteDialog so the post-commit effect places
+        // focus: the trash button if the next photo is the user's own, the
+        // container otherwise. By then unmounts and re-enables have committed.
+        closeDeleteDialog();
+      } else {
+        // The photo is still here; say so, and leave the dialog open for a
+        // retry. The deleteError effect moves focus onto Cancel.
+        setDeleteError('Failed to delete photo. Please try again.');
+      }
     }
-  }, [photos, currentIndex, canNavigateNext, onClose, deletePhoto, resetTransform, closeDeleteDialog]);
+  }, [photos, currentIndex, onClose, onDeleted, deletePhoto, resetTransform, closeDeleteDialog]);
 
   // AC 6.4.15: Image loading handlers
   const handleImageLoad = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
@@ -613,7 +631,8 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           transition={{ delay: 0.2 }}
         >
           <div className="mb-1 text-sm text-muted">
-            Photo {currentIndex + 1} of {photos.length} •{' '}
+            Photo {currentIndex + 1} of {photos.length}
+            {hasMore ? '+' : ''} •{' '}
             {currentPhoto.isOwn ? 'Your photo' : 'Partner photo'}
           </div>
           {currentPhoto.caption && (
@@ -632,7 +651,12 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
         {/* AC 6.4.10: Delete confirmation dialog */}
         {showDeleteDialog && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50">
+          <div
+            className="fixed inset-0 z-60 flex items-center justify-center bg-black/50"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="photo-viewer-delete-title"
+          >
             <motion.div
               className="mx-4 w-full max-w-md rounded-[20px] bg-card shadow-float"
               initial={{ scale: 0.9, opacity: 0 }}
@@ -642,7 +666,9 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
                   <AlertTriangle className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <h3 className="text-lg font-semibold text-ink">Delete Photo?</h3>
+                <h3 id="photo-viewer-delete-title" className="text-lg font-semibold text-ink">
+                  Delete Photo?
+                </h3>
               </div>
               <div className="space-y-4 px-5 py-4">
                 <p className="text-[15px] text-ink">
@@ -652,6 +678,15 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                   <p className="line-clamp-2 rounded-[14px] bg-card2 px-3 py-2 text-sm text-muted italic">
                     "{currentPhoto.caption}"
                   </p>
+                )}
+                {deleteError && (
+                  <div
+                    className="rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
+                    role="alert"
+                    data-testid="photo-viewer-delete-error"
+                  >
+                    {deleteError}
+                  </div>
                 )}
               </div>
               <div className="flex justify-end gap-3 border-t border-line px-5 py-4">
@@ -664,6 +699,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                     out of the modal -- but its handler is guarded like Escape:
                     dismissing mid-flight would orphan the pending finally. */}
                 <button
+                  ref={cancelButtonRef}
                   autoFocus
                   onClick={handleCancelDialog}
                   className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"

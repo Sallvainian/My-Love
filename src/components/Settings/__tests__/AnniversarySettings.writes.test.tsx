@@ -68,7 +68,7 @@ describe('AnniversarySettings writes', () => {
     updateAnniversary.mockResolvedValue(undefined);
     render(<AnniversarySettings />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit anniversary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit First date' }));
     fillForm('First date, again', '2024-02-15');
     fireEvent.click(screen.getByRole('button', { name: 'Update' }));
 
@@ -127,7 +127,7 @@ describe('AnniversarySettings writes', () => {
     updateAnniversary.mockRejectedValue(new Error(OFFLINE));
     render(<AnniversarySettings />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit anniversary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit First date' }));
     fillForm('Edited', '2024-02-14');
     fireEvent.click(screen.getByRole('button', { name: 'Update' }));
 
@@ -139,7 +139,7 @@ describe('AnniversarySettings writes', () => {
     removeAnniversary.mockRejectedValue(new Error(OFFLINE));
     render(<AnniversarySettings />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete anniversary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete First date' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     const alert = await screen.findByRole('alert');

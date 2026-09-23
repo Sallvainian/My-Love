@@ -175,12 +175,11 @@ describe('PhotoViewer focus', () => {
   });
 
   it('deletes exactly one photo on a double-tap of Delete', async () => {
-    // The optimistic setCurrentIndex has already applied while the request is
-    // in flight, so a re-entered handleDeleteConfirm would resolve
-    // photos[currentIndex] to a DIFFERENT photo and delete it too.
+    // A re-entered handleDeleteConfirm would send a second delete while the
+    // first is still in flight.
     deletePhotoMock.mockClear();
-    let resolveDelete!: () => void;
-    deletePhotoMock.mockReturnValue(new Promise<void>((r) => (resolveDelete = r)));
+    let resolveDelete!: (deleted: boolean) => void;
+    deletePhotoMock.mockReturnValue(new Promise<boolean>((r) => (resolveDelete = r)));
     const two = [
       photo,
       { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
@@ -209,7 +208,7 @@ describe('PhotoViewer focus', () => {
     fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(screen.getByText('Delete Photo?')).toBeInTheDocument();
 
-    resolveDelete();
+    resolveDelete(true);
     await waitFor(() => {
       expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
     });
@@ -219,6 +218,7 @@ describe('PhotoViewer focus', () => {
   it('keeps focus inside the container after confirming a delete', async () => {
     // The focused Delete button unmounts with the dialog; without the explicit
     // refocus, focus falls to <body> and the trap's Tab cycle dies.
+    deletePhotoMock.mockResolvedValue(true);
     const two = [
       photo,
       { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
@@ -283,5 +283,88 @@ describe('PhotoViewer focus', () => {
     render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     expect(screen.getByTestId('photo-viewer-overlay')).toHaveAttribute('tabindex', '-1');
+  });
+});
+
+describe('PhotoViewer failed delete', () => {
+  // deletePhoto resolves false on failure (offline, server error) rather than
+  // rejecting. The confirmation used to close anyway, leaving the photo on
+  // screen with nothing to say the delete had not happened.
+  const two = [
+    photo,
+    { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
+  ];
+
+  it('keeps the confirmation open with an alert, and focus inside it', async () => {
+    deletePhotoMock.mockReset();
+    deletePhotoMock.mockResolvedValue(false);
+    const onDeleted = vi.fn();
+    render(
+      <PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} onDeleted={onDeleted} />
+    );
+
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    // A real click focuses the button it lands on; fireEvent does not, and
+    // would leave the auto-focused Cancel holding focus throughout.
+    const deleteButton = await screen.findByRole('button', { name: 'Delete' });
+    deleteButton.focus();
+    fireEvent.click(deleteButton);
+
+    const alert = await screen.findByTestId('photo-viewer-delete-error');
+    expect(alert).toHaveAttribute('role', 'alert');
+    expect(alert).toHaveTextContent('Failed to delete photo. Please try again.');
+    const dialog = screen.getByRole('dialog', { name: 'Delete Photo?' });
+    expect(dialog.contains(alert)).toBe(true);
+    expect(onDeleted).not.toHaveBeenCalled();
+    expect(screen.getByAltText('a photo')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }));
+    });
+    expect(screen.getByRole('button', { name: 'Delete' })).not.toBeDisabled();
+    deletePhotoMock.mockReset();
+  });
+
+  it('closes and clears the error when a retry succeeds', async () => {
+    deletePhotoMock.mockReset();
+    deletePhotoMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const onDeleted = vi.fn();
+    render(
+      <PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} onDeleted={onDeleted} />
+    );
+
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    expect(await screen.findByTestId('photo-viewer-delete-error')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('photo-viewer-delete-error')).not.toBeInTheDocument();
+    expect(onDeleted).toHaveBeenCalledWith('photo-1');
+    expect(deletePhotoMock).toHaveBeenCalledTimes(2);
+    deletePhotoMock.mockReset();
+  });
+
+  it('clears the error when the confirmation is dismissed and reopened', async () => {
+    deletePhotoMock.mockReset();
+    deletePhotoMock.mockResolvedValue(false);
+    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    expect(await screen.findByTestId('photo-viewer-delete-error')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByLabelText('Delete photo'));
+    });
+
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
+    expect(screen.queryByTestId('photo-viewer-delete-error')).not.toBeInTheDocument();
+    deletePhotoMock.mockReset();
   });
 });

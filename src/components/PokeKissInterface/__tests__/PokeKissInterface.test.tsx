@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InteractionSubscriptionStatus } from '../../../api/interactionService';
 
@@ -221,8 +222,8 @@ describe('PokeKissInterface on the kit', () => {
     expect(screen.getByTestId('interaction-history-modal')).toBeInTheDocument();
   });
 
-  it('plays the unviewed interaction from the badge without opening history', () => {
-    storeState.unviewedCount = 2;
+  function withUnviewed(count: number) {
+    storeState.unviewedCount = count;
     storeMocks.getUnviewedInteractions.mockReturnValue([
       {
         id: 'interaction-1',
@@ -233,12 +234,53 @@ describe('PokeKissInterface on the kit', () => {
         createdAt: new Date(),
       },
     ]);
+  }
+
+  it('makes the badge its own named button, beside History rather than inside it', () => {
+    withUnviewed(2);
+
+    render(<PokeKissInterface />);
+    const badge = screen.getByRole('button', { name: 'Play the oldest of 2 unviewed interactions' });
+    expect(badge).toHaveAttribute('data-testid', 'notification-badge');
+    expect(badge).toHaveTextContent('2');
+    // A button inside a button is invalid HTML and unreachable by keyboard.
+    expect(screen.getByTestId('history-button')).not.toContainElement(badge);
+    expect(screen.getByRole('button', { name: 'History' })).toBe(
+      screen.getByTestId('history-button')
+    );
+  });
+
+  it('names a single unviewed interaction in the singular', () => {
+    withUnviewed(1);
+
+    render(<PokeKissInterface />);
+
+    expect(
+      screen.getByRole('button', { name: 'Play 1 unviewed interaction' })
+    ).toHaveAttribute('data-testid', 'notification-badge');
+  });
+
+  it('plays the unviewed interaction from the badge by keyboard', async () => {
+    withUnviewed(2);
+    const user = userEvent.setup();
+
+    render(<PokeKissInterface />);
+    await user.tab();
+    expect(screen.getByTestId('history-button')).toHaveFocus();
+    await user.tab();
+    expect(screen.getByTestId('notification-badge')).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    expect(screen.getByTestId('poke-animation')).toBeInTheDocument();
+    expect(screen.queryByTestId('interaction-history-modal')).not.toBeInTheDocument();
+  });
+
+  it('plays the unviewed interaction from the badge without opening history', () => {
+    withUnviewed(2);
 
     render(<PokeKissInterface />);
     const badge = screen.getByTestId('notification-badge');
     expect(badge).toHaveTextContent('2');
-    expect(badge).toHaveAttribute('aria-label', '2 unviewed interactions');
-    expect(screen.getByTestId('history-button')).toContainElement(badge);
 
     fireEvent.click(badge);
 

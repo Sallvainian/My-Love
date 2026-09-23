@@ -147,18 +147,24 @@ describe('AppNavigation', () => {
       expect(screen.queryByTestId('nav-photos-badge')).not.toBeInTheDocument();
     });
 
-    it('renders a badge with a pluralised label on its dock item', () => {
+    it('announces a pluralised count in its dock item\'s name', () => {
       renderNavigation({ badgeCounts: { notes: 1, photos: 3 } });
 
+      // The button's aria-label replaces its content as the accessible name,
+      // so the count has to be in that label; the badge itself is hidden.
       const single = screen.getByTestId('nav-notes-badge');
       expect(single).toHaveTextContent('1');
-      expect(single).toHaveAttribute('aria-label', '1 new item');
-      expect(screen.getByTestId('nav-notes')).toContainElement(single);
+      expect(single).toHaveAttribute('aria-hidden', 'true');
+      expect(single).not.toHaveAttribute('aria-label');
+      expect(screen.getByRole('button', { name: 'Love Notes, 1 new item' })).toContainElement(single);
 
       const plural = screen.getByTestId('nav-photos-badge');
       expect(plural).toHaveTextContent('3');
-      expect(plural).toHaveAttribute('aria-label', '3 new items');
-      expect(screen.getByTestId('nav-photos')).toContainElement(plural);
+      expect(plural).toHaveAttribute('aria-hidden', 'true');
+      expect(screen.getByRole('button', { name: 'Photos, 3 new items' })).toContainElement(plural);
+
+      // A dock item with no count keeps its bare label.
+      expect(screen.getByRole('button', { name: 'Mood' })).toBeInTheDocument();
     });
 
     it('ignores a settings count', () => {

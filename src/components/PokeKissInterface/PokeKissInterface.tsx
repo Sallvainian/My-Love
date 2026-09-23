@@ -333,29 +333,34 @@ export function PokeKissInterface() {
           >
             Send a little something
           </h2>
-          <button
-            type="button"
-            onClick={() => setShowHistory(true)}
-            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-1 text-[13px] font-semibold text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            data-testid="history-button"
-          >
-            <History className="h-4 w-4" aria-hidden="true" />
-            History
-            {/* Notification Badge. Not a button of its own: it sits inside the
-                History button and stops the click there, so tapping it plays
-                the oldest unviewed interaction -- the only path that marks one
-                viewed -- instead of opening the history sheet. */}
+          <div className="flex shrink-0 items-center">
+            <button
+              type="button"
+              onClick={() => setShowHistory(true)}
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-1 text-[13px] font-semibold text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              data-testid="history-button"
+            >
+              <History className="h-4 w-4" aria-hidden="true" />
+              History
+            </button>
+            {/* Notification Badge. A button of its own, beside History rather
+                than inside it (a button inside a button is invalid and cannot
+                be reached by keyboard): it plays the oldest unviewed
+                interaction -- the only path that marks one viewed. The margin
+                plus History's right padding keeps the old inline gap. */}
             {unviewedCount > 0 && (
-              <motion.span
+              <motion.button
+                type="button"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="relative isolate inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1.5 text-[11px] font-bold text-white"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBadgeClick();
-                }}
+                className="relative isolate ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1.5 text-[11px] font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+                onClick={handleBadgeClick}
                 data-testid="notification-badge"
-                aria-label={`${unviewedCount} unviewed interaction${unviewedCount === 1 ? '' : 's'}`}
+                aria-label={
+                  unviewedCount === 1
+                    ? 'Play 1 unviewed interaction'
+                    : `Play the oldest of ${unviewedCount} unviewed interactions`
+                }
               >
                 {unviewedCount}
                 <motion.span
@@ -365,9 +370,9 @@ export function PokeKissInterface() {
                   style={{ opacity: 0.4 }}
                   aria-hidden="true"
                 />
-              </motion.span>
+              </motion.button>
             )}
-          </button>
+          </div>
         </div>
 
         {/* Action tiles */}
