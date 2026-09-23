@@ -326,9 +326,10 @@ describe('white text on a coloured background clears WCAG AA', () => {
     // past a `> 10` canary while blind to 16 more.
     //
     // Re-set to just under the count as each kit story styles pairings out:
-    // 41 before the Photos restyle, 26 after it, 17 after the Settings restyle.
+    // 41 before the Photos restyle, 26 after it; 17 before the Sign in and
+    // remaining-surfaces restyle, 10 after it.
     const pairings = findWhiteOnColourPairings();
-    expect(pairings.length).toBeGreaterThan(15);
+    expect(pairings.length).toBeGreaterThan(8);
 
     // And both idioms must be seen. A pairing inside `className={…}` is the
     // specific blindness that shipped here once already. The last one in `src/`
@@ -349,8 +350,9 @@ describe('white text on a coloured background clears WCAG AA', () => {
     // The most-used button style in the app is a gradient, and it was entirely
     // outside this guard until the stops were matched. A regex that stopped
     // seeing them would leave the gradient allowlist below trivially satisfied.
-    // 16 stops before the Photos restyle removed its upload FAB, 14 after.
-    expect(gradients.length).toBeGreaterThan(12);
+    // 16 stops before the Photos restyle removed its upload FAB, 14 after;
+    // 8 after the Sign in and remaining-surfaces restyle.
+    expect(gradients.length).toBeGreaterThan(6);
     expect(gradients.some((pairing) => pairing.swatch === 'pink-600')).toBe(true);
   });
 

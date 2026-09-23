@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { Heart, Plus } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
@@ -606,7 +606,11 @@ function App() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="mb-4 animate-pulse text-6xl">💕</div>
+          <Heart
+            className="mx-auto mb-4 h-14 w-14 animate-pulse fill-current text-accent"
+            strokeWidth={0}
+            aria-hidden="true"
+          />
           <p className="text-muted">Loading...</p>
         </div>
       </div>
@@ -653,7 +657,11 @@ function App() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="mb-4 animate-pulse text-6xl">💕</div>
+          <Heart
+            className="mx-auto mb-4 h-14 w-14 animate-pulse fill-current text-accent"
+            strokeWidth={0}
+            aria-hidden="true"
+          />
           <p className="text-muted">Loading your data...</p>
         </div>
       </div>

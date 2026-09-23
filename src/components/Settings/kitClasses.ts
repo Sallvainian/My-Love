@@ -1,8 +1,11 @@
 /**
  * Style-kit class strings shared by the Settings page and its countdown groups
- * (`EventsSettings`, `AnniversarySettings`). The dialog pieces follow the kit
- * dialog `PhotoEditModal` / `PhotoDeleteConfirmation` established; every colour
- * is a kit token that switches with the OS theme, so no per-theme variant is needed.
+ * (`EventsSettings`, `AnniversarySettings`), and by the surfaces with no
+ * artboard of their own that borrow the same pieces: `LoginScreen`,
+ * `DisplayNameSetup`, `WelcomeSplash`, `ErrorBoundary` and `ViewErrorBoundary`.
+ * The dialog pieces follow the kit dialog `PhotoEditModal` /
+ * `PhotoDeleteConfirmation` established; every colour is a kit token that
+ * switches with the OS theme, so no per-theme variant is needed.
  */
 
 /** A Settings card. Its `p-3` is what `DIVIDER`'s `-mx-3` cancels. */

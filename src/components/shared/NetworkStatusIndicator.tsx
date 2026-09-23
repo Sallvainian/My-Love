@@ -4,14 +4,16 @@
  * Visual indicator showing network connectivity state.
  *
  * States:
- * - Online: Green dot indicator
- * - Connecting: Yellow dot indicator with "Connecting..." text
- * - Offline: Red dot indicator with offline banner
+ * - Online: `good` (green) dot indicator
+ * - Connecting: `accent` dot and spinning icon with "Connecting..." text
+ * - Offline: `muted` dot and icon with offline banner
  *
- * UX Spec Colors:
- * - Success Green: #51CF66
- * - Warning Yellow: #FCC419
- * - Error Coral Red: #FF6B6B
+ * Kit colours: the style kit has no warning colour, and `danger` is reserved
+ * for destructive actions and failures, so being offline -- an expected state
+ * the app keeps working through -- is a neutral `muted`, reconnecting is the
+ * pink `accent`, and green stays "online". The banner is a `card2` strip with a
+ * `line` hairline under it; every colour is a kit token that follows the OS
+ * theme.
  *
  * Story 1.5: Task 2 - Network Status Indicator Component (AC-1.5.1)
  */
@@ -54,10 +56,8 @@ export function NetworkStatusIndicator({
     if (!isOnline && !isConnecting) {
       // Offline state
       return {
-        dotColor: 'bg-[#FF6B6B]', // Error Coral Red
-        textColor: 'text-[#FF6B6B]',
-        bgColor: 'bg-red-50',
-        borderColor: 'border-red-200',
+        dotColor: 'bg-muted',
+        textColor: 'text-muted',
         icon: WifiOff,
         label: 'Offline',
         description: "You're offline. Changes will sync when reconnected.",
@@ -69,10 +69,8 @@ export function NetworkStatusIndicator({
     if (isConnecting) {
       // Connecting/transitional state
       return {
-        dotColor: 'bg-[#FCC419]', // Warning Yellow
-        textColor: 'text-[#FCC419]',
-        bgColor: 'bg-yellow-50',
-        borderColor: 'border-yellow-200',
+        dotColor: 'bg-accent',
+        textColor: 'text-accent',
         icon: Loader2,
         label: 'Connecting...',
         description: 'Reconnecting to the network...',
@@ -84,10 +82,8 @@ export function NetworkStatusIndicator({
 
     // Online state
     return {
-      dotColor: 'bg-[#51CF66]', // Success Green
-      textColor: 'text-[#51CF66]',
-      bgColor: 'bg-green-50',
-      borderColor: 'border-green-200',
+      dotColor: 'bg-good',
+      textColor: 'text-good',
       icon: Wifi,
       label: 'Online',
       description: '',
@@ -111,7 +107,7 @@ export function NetworkStatusIndicator({
       {/* Banner for offline/connecting states */}
       {config.showBanner && (
         <div
-          className={`flex items-center justify-center gap-2 px-4 py-2 ${config.bgColor} ${config.borderColor} border-b transition-all duration-300 ease-in-out`}
+          className="flex items-center justify-center gap-2 border-b border-line bg-card2 px-4 py-2 transition-all duration-300 ease-in-out"
         >
           {/* Status dot */}
           <span
@@ -127,11 +123,11 @@ export function NetworkStatusIndicator({
           />
 
           {/* Status text */}
-          <span className={`text-sm font-medium ${config.textColor}`}>{config.label}</span>
+          <span className="text-sm font-medium text-ink">{config.label}</span>
 
           {/* Description */}
           {config.description && (
-            <span className="ml-2 text-sm text-gray-600">{config.description}</span>
+            <span className="ml-2 text-sm text-muted">{config.description}</span>
           )}
         </div>
       )}

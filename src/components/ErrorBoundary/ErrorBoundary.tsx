@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { HeartCrack, TriangleAlert } from 'lucide-react';
 import { Component } from 'react';
+import { DESTRUCTIVE_BUTTON, PRIMARY_BUTTON } from '../Settings/kitClasses';
 
 interface Props {
   children: ReactNode;
@@ -44,37 +46,39 @@ export class ErrorBoundary extends Component<Props, State> {
         this.state.error?.message.includes('Validation failed') ||
         this.state.error?.message.includes('Invalid');
 
+      const Icon = isValidationError ? TriangleAlert : HeartCrack;
+
       return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-900">
-          <div className="w-full max-w-md rounded-lg bg-white p-8 text-center shadow-lg dark:bg-gray-800">
-            <div className="mb-4 text-6xl">{isValidationError ? '⚠️' : '💔'}</div>
-            <h1 className="mb-2 text-2xl font-bold text-gray-800 dark:text-gray-100">
+        <div className="flex min-h-screen items-center justify-center bg-page px-4">
+          <div className="w-full max-w-md rounded-[20px] border border-line bg-card p-5 text-center shadow-card">
+            <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-tint text-accent">
+              <Icon className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <h1 className="mb-2 text-lg font-semibold text-ink">
               {isValidationError ? 'Invalid Data Detected' : 'Something went wrong'}
             </h1>
-            <p className="mb-6 text-gray-600 dark:text-gray-300">
+            <p className="mb-5 text-sm text-muted">
               {isValidationError
                 ? 'Your settings data appears to be corrupted. Please try refreshing the page or clearing your browser storage.'
                 : 'We encountered an unexpected error. Please try again.'}
             </p>
             {this.state.error && (
-              <p className="mb-6 rounded bg-gray-100 p-3 font-mono text-sm text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+              <p className="mb-5 rounded-[14px] bg-card2 p-3 font-mono text-sm break-words text-muted">
                 {this.state.error.message}
               </p>
             )}
-            <div className="space-y-3">
-              <button
-                onClick={this.handleRetry}
-                className="w-full rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 px-6 py-3 font-medium text-white shadow-md transition-all duration-200 hover:from-pink-700 hover:to-rose-700 hover:shadow-lg"
-              >
+            <div className="grid gap-3">
+              <button type="button" onClick={this.handleRetry} className={PRIMARY_BUTTON}>
                 Try Again
               </button>
               {isValidationError && (
                 <button
+                  type="button"
                   onClick={() => {
                     localStorage.removeItem('my-love-storage');
                     window.location.reload();
                   }}
-                  className="w-full rounded-lg bg-gray-500 px-6 py-3 font-medium text-white shadow-md transition-all duration-200 hover:bg-gray-600 hover:shadow-lg"
+                  className={DESTRUCTIVE_BUTTON}
                 >
                   Clear Storage & Reload
                 </button>

@@ -8,7 +8,7 @@
  */
 
 import { AnimatePresence, m as motion } from 'framer-motion';
-import { AlertCircle, CheckCircle, Cloud, X } from 'lucide-react';
+import { CircleAlert, CircleCheck, Cloud, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface SyncResult {
@@ -74,45 +74,35 @@ export function SyncToast({ syncResult, onDismiss, autoDismissMs = 5000 }: SyncT
   const isPartialSuccess = successCount > 0 && failCount > 0;
   const isAllFailed = successCount === 0 && failCount > 0;
 
-  // Determine toast variant
+  // Determine toast variant. The surface is the same kit card for every
+  // outcome; only the icon carries colour (green = success, pink = partial,
+  // red = all failed, muted = nothing to do), so the text stays `ink`.
   const getToastConfig = () => {
     if (isFullSuccess) {
       return {
-        icon: CheckCircle,
-        bgColor: 'bg-green-50',
-        borderColor: 'border-green-200',
-        iconColor: 'text-green-500',
-        textColor: 'text-green-800',
+        icon: CircleCheck,
+        iconColor: 'text-good',
         message: `Synced ${successCount} pending ${successCount === 1 ? 'item' : 'items'}`,
       };
     }
     if (isPartialSuccess) {
       return {
-        icon: AlertCircle,
-        bgColor: 'bg-yellow-50',
-        borderColor: 'border-yellow-200',
-        iconColor: 'text-yellow-500',
-        textColor: 'text-yellow-800',
+        icon: CircleAlert,
+        iconColor: 'text-accent',
         message: `Synced ${successCount} of ${totalCount} items (${failCount} failed)`,
       };
     }
     if (isAllFailed) {
       return {
-        icon: AlertCircle,
-        bgColor: 'bg-red-50',
-        borderColor: 'border-red-200',
-        iconColor: 'text-red-500',
-        textColor: 'text-red-800',
+        icon: CircleAlert,
+        iconColor: 'text-danger',
         message: `Failed to sync ${failCount} ${failCount === 1 ? 'item' : 'items'}`,
       };
     }
     // No items to sync case
     return {
       icon: Cloud,
-      bgColor: 'bg-gray-50',
-      borderColor: 'border-gray-200',
-      iconColor: 'text-gray-500',
-      textColor: 'text-gray-600',
+      iconColor: 'text-muted',
       message: 'No pending items to sync',
     };
   };
@@ -128,19 +118,20 @@ export function SyncToast({ syncResult, onDismiss, autoDismissMs = 5000 }: SyncT
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          className={`fixed top-[calc(5rem+env(safe-area-inset-top))] left-1/2 z-[100] flex -translate-x-1/2 items-center gap-3 rounded-lg px-4 py-3 shadow-lg ${config.bgColor} ${config.borderColor} max-w-[90vw] min-w-[280px] border`}
+          className="fixed inset-x-0 top-[calc(5rem+env(safe-area-inset-top))] z-[100] mx-auto flex w-fit max-w-[90vw] min-w-[280px] items-center gap-3 rounded-[20px] border border-line bg-card py-1.5 pr-1.5 pl-4 shadow-float"
           role="alert"
           aria-live="polite"
           data-testid="sync-toast"
         >
-          <Icon className={`h-5 w-5 flex-shrink-0 ${config.iconColor}`} />
-          <span className={`flex-1 text-sm font-medium ${config.textColor}`}>{config.message}</span>
+          <Icon className={`h-5 w-5 flex-shrink-0 ${config.iconColor}`} aria-hidden="true" />
+          <span className="flex-1 text-sm font-medium text-ink">{config.message}</span>
           <button
+            type="button"
             onClick={handleDismiss}
-            className={`rounded p-1 transition-colors hover:bg-black/5 ${config.textColor}`}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Dismiss notification"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </motion.div>
       )}
