@@ -1,6 +1,6 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { AlertTriangle, Camera, Check, Loader, Upload, X } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { useFocusTrap } from '../../hooks';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { useAppStore } from '../../stores/useAppStore';
@@ -8,11 +8,17 @@ import { useAppStore } from '../../stores/useAppStore';
 interface PhotoUploadProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * Where focus goes on close when the button that opened this is gone: the
+   * empty album's Upload unmounts once the first photo lands, and the gallery
+   * header's Upload replaces it.
+   */
+  fallbackFocusRef?: RefObject<HTMLElement | null>;
 }
 
 type UploadStep = 'select' | 'preview' | 'uploading' | 'success' | 'error';
 
-export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
+export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadProps) {
   const { uploadPhoto, storageWarning } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   /**
@@ -164,7 +170,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
     if (stepRef.current === 'uploading') return;
     handleCloseRef.current();
   }, []);
-  useFocusTrap(modalRef, isOpen, { onEscape: handleEscape });
+  useFocusTrap(modalRef, isOpen, { onEscape: handleEscape, fallbackFocusRef });
 
   // Every step change unmounts the control that started it -- Select, Upload,
   // Retry -- and a focused element that unmounts blurs to <body>. <body> is an

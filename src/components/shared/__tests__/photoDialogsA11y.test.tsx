@@ -6,9 +6,11 @@
  * ignored Escape. Their error lines rendered silently, so a screen-reader user
  * who pressed Upload or Delete heard nothing when it failed. A grid tile's
  * caption showed on hover only, never to a keyboard user tabbing the grid.
+ * The empty album's Upload button unmounts when the first photo lands, so the
+ * dialog it opened had no opener to return focus to and dropped it on <body>.
  */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
+import { useRef, type HTMLAttributes, type ImgHTMLAttributes, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
@@ -228,6 +230,72 @@ describe('DW-180: the upload modal is a dialog', () => {
     fireEvent.keyDown(screen.getByTestId('photo-upload-modal'), { key: 'Escape' });
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('DW-203: focus return when the opener is gone', () => {
+  // App renders the gallery and the upload dialog side by side. The empty
+  // state's "Upload a photo" opens the dialog; once the first upload lands the
+  // grid replaces the empty state, and its header Upload button is the one
+  // that survives.
+  function Harness({
+    open,
+    opener,
+    header,
+  }: {
+    open: boolean;
+    opener: boolean;
+    header: boolean;
+  }) {
+    const headerUploadRef = useRef<HTMLButtonElement>(null);
+    return (
+      <>
+        {opener && <button data-testid="empty-upload">Upload a photo</button>}
+        {header && (
+          <button ref={headerUploadRef} data-testid="header-upload">
+            Upload
+          </button>
+        )}
+        <PhotoUpload isOpen={open} onClose={vi.fn()} fallbackFocusRef={headerUploadRef} />
+      </>
+    );
+  }
+
+  async function openFromEmptyState() {
+    const view = render(<Harness open={false} opener header={false} />);
+    screen.getByTestId('empty-upload').focus();
+    view.rerender(<Harness open opener header={false} />);
+    await waitFor(() => {
+      expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true);
+    });
+    return view;
+  }
+
+  it('lands on the header Upload once the empty-state opener has gone', async () => {
+    const { rerender } = await openFromEmptyState();
+
+    rerender(<Harness open opener={false} header />);
+    rerender(<Harness open={false} opener={false} header />);
+
+    expect(document.activeElement).toBe(screen.getByTestId('header-upload'));
+  });
+
+  it('still returns to an opener that survived', async () => {
+    const { rerender } = await openFromEmptyState();
+
+    rerender(<Harness open opener header />);
+    rerender(<Harness open={false} opener header />);
+
+    expect(document.activeElement).toBe(screen.getByTestId('empty-upload'));
+  });
+
+  it('leaves focus alone when neither is on screen', async () => {
+    const { rerender } = await openFromEmptyState();
+
+    rerender(<Harness open opener={false} header={false} />);
+    rerender(<Harness open={false} opener={false} header={false} />);
+
+    expect(document.activeElement).toBe(document.body);
   });
 });
 

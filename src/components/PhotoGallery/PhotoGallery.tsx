@@ -1,5 +1,5 @@
 import { AlertCircle, Camera, Loader2, Plus } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { getOwnDisplayName, getPartnerDisplayName } from '../../api/supabaseClient';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { photoService } from '../../services/photoService';
@@ -10,6 +10,12 @@ import { PhotoViewer } from './PhotoViewer';
 
 interface PhotoGalleryProps {
   onUploadClick?: () => void;
+  /**
+   * Attached to the header Upload button, which replaces the empty state's
+   * Upload once the album has a photo -- so the upload dialog can return focus
+   * to it when the button that opened the dialog is gone.
+   */
+  uploadButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 // AC-4.2.4: Pagination configuration
@@ -35,7 +41,7 @@ function initialOf(name: string | null, fallback: string): string {
  * - Page header over a skeleton grid during the first fetch
  * - Lazy loading pagination with Intersection Observer
  */
-export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
+export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryProps) {
   const { photos: storePhotos, loadPhotos } = useAppStore();
 
   // AC-4.2.4: Pagination state
@@ -264,6 +270,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       </div>
       {showUpload && (
         <button
+          ref={uploadButtonRef}
           type="button"
           onClick={onUploadClick}
           className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"

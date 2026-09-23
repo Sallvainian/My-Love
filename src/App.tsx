@@ -163,6 +163,9 @@ function App() {
   // handleAdminExit, whose pushState is URL bookkeeping and never reads back into state.
   const [showAdmin, setShowAdmin] = useState(() => window.location.pathname.includes('/admin'));
   const [isPhotoUploadOpen, setIsPhotoUploadOpen] = useState(false);
+  // The gallery header's Upload: where the upload dialog returns focus when the
+  // empty album's Upload that opened it has been replaced by the grid.
+  const photoUploadButtonRef = useRef<HTMLButtonElement>(null);
 
   // Story 1.5: Sync completion feedback state (AC-1.5.4)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
@@ -833,7 +836,10 @@ function App() {
             <ViewErrorBoundary viewName={currentView} onNavigateHome={() => setView('home')}>
               <Suspense fallback={<LoadingSpinner />}>
                 {currentView === 'photos' && (
-                  <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
+                  <PhotoGallery
+                    onUploadClick={() => setIsPhotoUploadOpen(true)}
+                    uploadButtonRef={photoUploadButtonRef}
+                  />
                 )}
 
                 {currentView === 'mood' && <MoodTracker />}
@@ -851,7 +857,11 @@ function App() {
 
         {/* Photo upload modal - Story 4.1 (lazy loaded) */}
         <Suspense fallback={null}>
-          <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
+          <PhotoUpload
+            isOpen={isPhotoUploadOpen}
+            onClose={() => setIsPhotoUploadOpen(false)}
+            fallbackFocusRef={photoUploadButtonRef}
+          />
         </Suspense>
       </div>
     </ErrorBoundary>
