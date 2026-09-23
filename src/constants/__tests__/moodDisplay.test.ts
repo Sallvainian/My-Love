@@ -20,6 +20,13 @@ describe('MOOD_DISPLAY', () => {
     const labels = MOOD_TYPES.map((mood) => MOOD_DISPLAY[mood].label);
     expect(new Set(labels).size).toBe(labels.length);
   });
+
+  it('gives every mood its own icon', () => {
+    // Colour no longer tells moods apart, so icon-only surfaces (calendar
+    // cells, the timeline strip) need a distinct icon per mood.
+    const icons = MOOD_TYPES.map((mood) => MOOD_DISPLAY[mood].icon);
+    expect(new Set(icons).size).toBe(icons.length);
+  });
 });
 
 describe('POSITIVE_MOODS / CHALLENGING_MOODS', () => {

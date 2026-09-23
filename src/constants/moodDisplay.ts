@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Angry,
   Battery,
+  Flame,
   Frown,
   Heart,
   Meh,
@@ -38,7 +39,7 @@ export const MOOD_DISPLAY: Record<MoodType, MoodDisplay> = {
   sad: { icon: Frown, label: 'Sad' },
   anxious: { icon: AlertCircle, label: 'Anxious' },
   frustrated: { icon: Angry, label: 'Frustrated' },
-  angry: { icon: Angry, label: 'Angry' },
+  angry: { icon: Flame, label: 'Angry' },
   lonely: { icon: UserMinus, label: 'Lonely' },
   tired: { icon: Battery, label: 'Tired' },
 };
