@@ -124,7 +124,7 @@ function extractPriority(title) {
   return match ? match[1] : null;
 }
 
-/** Extract API path from error message or stack (e.g. /rest/v1/rpc/scripture_submit_reflection) */
+/** Extract API path from error message or stack (e.g. /rest/v1/rpc/get_my_partner_id) */
 function extractApiPath(errors) {
   for (const e of errors) {
     const text = stripAnsi((e?.message ?? '') + (e?.stack ?? ''));
