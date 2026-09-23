@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Dancing+Script:wght@400;500;600;700&family=Lora:ital,wght@1,500;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Lora:ital,wght@1,500;1,600&display=swap');
 
 @import 'tailwindcss';
 @config '../tailwind.config.js';
@@ -97,18 +97,20 @@
     @apply min-h-screen bg-page font-sans;
   }
 
-  /* Custom scrollbar styling - webkit prefix for Safari/Chrome, standard for Firefox */
+  /* Custom scrollbar styling - webkit prefix for Safari/Chrome, standard for
+     Firefox. Kit variables, so the track is the page ground and the thumb a
+     translucent kit pink in both themes. */
   *::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
 
   *::-webkit-scrollbar-track {
-    background: #fdf2f8;
+    background: var(--kit-page);
   }
 
   *::-webkit-scrollbar-thumb {
-    background: #f9a8d4;
+    background: color-mix(in srgb, var(--kit-fill) 40%, transparent);
     border-radius: 4px;
   }
 
@@ -116,101 +118,19 @@
   @supports (scrollbar-width: thin) {
     * {
       scrollbar-width: thin;
-      scrollbar-color: #f9a8d4 #fdf2f8;
+      scrollbar-color: color-mix(in srgb, var(--kit-fill) 40%, transparent) var(--kit-page);
     }
   }
 }
 
 @layer components {
-  /* Card styles */
-  .card {
-    @apply rounded-3xl bg-white/80 p-6 shadow-xl backdrop-blur-sm;
-  }
-
-  .card-hover {
-    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl active:scale-[0.98];
-  }
-
-  /* Button styles */
-  .btn-primary {
-    @apply rounded-full bg-linear-to-r from-pink-600 to-rose-600 px-6 py-3 font-medium text-white shadow-lg;
-    @apply transition-all duration-300 hover:scale-105 hover:shadow-xl active:scale-95;
-  }
-
-  .btn-secondary {
-    @apply rounded-full bg-white/80 px-6 py-3 font-medium text-pink-600 shadow-md backdrop-blur-sm;
-    @apply transition-all duration-300 hover:scale-105 hover:shadow-lg active:scale-95;
-  }
-
-  .btn-icon {
-    @apply h-12 w-12 rounded-full bg-white/80 shadow-md backdrop-blur-sm;
-    @apply flex items-center justify-center transition-all duration-300;
-    @apply hover:scale-110 hover:shadow-lg active:scale-95;
-  }
-
-  /* Input styles */
-  .input {
-    @apply w-full rounded-2xl bg-white/80 px-4 py-3 backdrop-blur-sm;
-    @apply border-2 border-pink-200 focus:border-pink-400 focus:ring-4 focus:ring-pink-100;
-    @apply transition-all duration-200 outline-none;
-  }
-
-  /* Text styles */
-  .text-gradient {
-    @apply bg-linear-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent;
-  }
-
   /* Animation utilities */
   .animate-heart {
     animation: heartBeat 1.5s ease-in-out infinite;
   }
-
-  .floating-hearts::before {
-    content: '💕';
-    position: absolute;
-    animation: float 3s ease-in-out infinite;
-  }
 }
 
 @layer utilities {
-  /* Custom scrollbar */
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  .scrollbar-thumb-pink-300::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-pink-300;
-  }
-
-  .scrollbar-track-pink-50::-webkit-scrollbar-track {
-    @apply bg-pink-50;
-  }
-
-  /* Glass morphism effect - with webkit fallback for Safari */
-  .glass {
-    @apply bg-white/70 backdrop-blur-lg backdrop-saturate-150;
-    -webkit-backdrop-filter: blur(16px) saturate(1.5);
-    backdrop-filter: blur(16px) saturate(1.5);
-  }
-
-  /* Gradient backgrounds */
-  .bg-sunset {
-    background: linear-gradient(135deg, #ffe5ec 0%, #fff4e6 50%, #ffd5c8 100%);
-  }
-
-  .bg-ocean {
-    background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 50%, #80deea 100%);
-  }
-
-  .bg-lavender {
-    background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 50%, #ce93d8 100%);
-  }
-
-  .bg-rose {
-    background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 50%, #f48fb1 100%);
-  }
-
   /* Space the fixed bottom dock (AppNavigation) takes from the viewport: its
      60px height, its 1rem inset and a gap above it. The one source for that
      space -- <main>, LoveNotes' height and the floating buttons all read it. */
@@ -239,32 +159,5 @@
   }
   50% {
     transform: scale(1);
-  }
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0px) translateX(0px);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-100px) translateX(20px);
-    opacity: 0;
-  }
-}
-
-/* Mobile touch enhancements */
-@media (hover: none) and (pointer: coarse) {
-  .btn-primary,
-  .btn-secondary,
-  .btn-icon {
-    @apply hover:scale-100;
   }
 }
