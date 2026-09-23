@@ -164,7 +164,7 @@ describe('the other centred dialogs', () => {
     expect(screen.getByTestId('photo-edit-modal-caption-input')).toHaveClass(
       'bg-field',
       'resize-none',
-      'ring-line'
+      'ring-line-strong'
     );
     expect(screen.getByTestId('photo-edit-modal-tags-input')).toHaveClass('bg-field', 'h-12');
   });

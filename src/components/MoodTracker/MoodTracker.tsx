@@ -473,7 +473,7 @@ export function MoodTracker() {
                         className={`w-full resize-none rounded-[14px] bg-field px-4 py-3 text-[15px] text-ink ring-inset placeholder:text-muted focus:ring-2 focus:outline-none ${
                           noteError
                             ? 'ring-2 ring-danger focus:ring-danger'
-                            : 'ring-1 ring-line focus:ring-accent'
+                            : 'ring-1 ring-line-strong focus:ring-accent'
                         }`}
                         data-testid="mood-note-input"
                       />

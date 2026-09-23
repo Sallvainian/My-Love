@@ -83,7 +83,7 @@ describe('LoginScreen on the kit', () => {
       screen.getByRole('textbox', { name: 'Email' }),
       screen.getByLabelText('Password'),
     ]) {
-      expect(field).toHaveClass('bg-field', 'h-12', 'rounded-[14px]', 'ring-line');
+      expect(field).toHaveClass('bg-field', 'h-12', 'rounded-[14px]', 'ring-line-strong');
       expect(field).toHaveAttribute('aria-invalid', 'false');
     }
 
@@ -110,7 +110,7 @@ describe('LoginScreen on the kit', () => {
     ]) {
       expect(field).toHaveAttribute('aria-invalid', 'true');
       expect(field).toHaveClass('ring-danger');
-      expect(field).not.toHaveClass('ring-line');
+      expect(field).not.toHaveClass('ring-line-strong');
     }
 
     expectOnKit(container.innerHTML);

@@ -1123,7 +1123,7 @@ function EventForm({
                     className={`flex h-12 cursor-pointer items-center justify-center gap-2 rounded-[14px] px-3 text-sm font-semibold transition-colors duration-200 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-accent ${
                       icon === value
                         ? 'bg-tint text-accent ring-2 ring-accent'
-                        : 'text-muted ring-1 ring-line peer-focus-visible:ring-2 peer-focus-visible:ring-accent'
+                        : 'text-muted ring-1 ring-line-strong peer-focus-visible:ring-2 peer-focus-visible:ring-accent'
                     }`}
                   >
                     <Icon className="h-4 w-4" aria-hidden="true" />

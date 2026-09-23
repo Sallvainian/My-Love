@@ -266,7 +266,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     const field = screen.getByLabelText('Display Name');
     expect(field).toHaveAttribute('aria-invalid', 'true');
     expect(field).toHaveClass('ring-danger');
-    expect(field).not.toHaveClass('ring-line');
+    expect(field).not.toHaveClass('ring-line-strong');
   });
 
   /**
