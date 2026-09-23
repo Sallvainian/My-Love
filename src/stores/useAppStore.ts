@@ -158,7 +158,9 @@ export const useAppStore = create<AppState>()(
               mutated = true;
             }
 
-            if (data.state?.settings) {
+            // A non-object `settings` would make `in` throw and the catch below
+            // would discard the whole blob; leave it for the schema check to drop.
+            if (data.state?.settings && typeof data.state.settings === 'object') {
               for (const key of STALE_PERSISTED_SETTINGS_KEYS) {
                 if (key in data.state.settings) {
                   delete data.state.settings[key];

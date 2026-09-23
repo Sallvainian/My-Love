@@ -81,4 +81,20 @@ describe('persisted settings from the removed theme system', () => {
     expect(parsed.version).toBe(0);
     expect(parsed.state.settings).toEqual(CURRENT_SETTINGS);
   });
+
+  it('drops only a non-object settings value, keeping the rest of the blob', async () => {
+    const useAppStore = await hydrateFrom(
+      JSON.stringify({
+        version: 0,
+        state: {
+          isOnboarded: true,
+          settings: 'corrupt',
+          messageHistory: { shownMessages: [['2026-07-26', 3]], currentIndex: 7 },
+        },
+      })
+    );
+
+    expect(useAppStore.getState().isOnboarded).toBe(true);
+    expect(useAppStore.getState().messageHistory.currentIndex).toBe(7);
+  });
 });
