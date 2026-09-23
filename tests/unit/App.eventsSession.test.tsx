@@ -268,6 +268,10 @@ describe('Auth bootstrap notification ownership', () => {
     const ownership = useAppStore.getState().authSessionVersion;
     render(<App />);
     expect(screen.getByText('Loading...')).toBeInTheDocument();
+    // The auth loader's heart is a kit-accent lucide icon, not an emoji.
+    const loader = screen.getByText('Loading...').parentElement!;
+    expect(loader.querySelector('svg')).toHaveClass('text-accent');
+    expect(loader.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
 
     await act(async () => lookup.resolve(session()));
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
