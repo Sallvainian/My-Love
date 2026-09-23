@@ -11,7 +11,8 @@
 
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { Check, Edit2, Heart, Plus, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useSubmitKey } from '../../hooks/useSubmitKey';
 import { parseEventDate } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
@@ -55,13 +56,23 @@ function formatAnniversaryDate(date: string): string {
   return parsed ? formatDateLong(parsed) : date;
 }
 
+/**
+ * Ids for the field-error paragraphs, so each input can point its
+ * aria-describedby at its own message. Only one form is ever mounted at a
+ * time, so fixed ids cannot collide.
+ */
+const LABEL_ERROR_ID = 'anniversary-form-label-error';
+const DATE_ERROR_ID = 'anniversary-form-date-error';
+
 export function AnniversarySettings() {
   const { settings, addAnniversary, updateAnniversary, removeAnniversary } = useAppStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+
+  // The header Add button: the one control that outlives a delete, and so
+  // where focus goes once the deleted row has taken its own Delete button away.
+  const addButtonRef = useRef<HTMLButtonElement>(null);
 
   const anniversaries = settings?.relationship.anniversaries || [];
 
@@ -76,24 +87,7 @@ export function AnniversarySettings() {
   };
 
   const handleDelete = (id: number) => {
-    setDeleteError(null);
     setDeleteConfirmId(id);
-  };
-
-  // Server first: the dialog stays open with the reason when the delete fails
-  // (offline included), rather than closing as if it had worked.
-  const confirmDelete = async () => {
-    if (deleteConfirmId === null) return;
-    setIsDeleting(true);
-    setDeleteError(null);
-    try {
-      await removeAnniversary(deleteConfirmId);
-      setDeleteConfirmId(null);
-    } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : 'Failed to delete anniversary');
-    } finally {
-      setIsDeleting(false);
-    }
   };
 
   const handleFormClose = () => {
@@ -118,7 +112,13 @@ export function AnniversarySettings() {
           </p>
         </div>
 
-        <button type="button" onClick={handleAdd} aria-label="Add Anniversary" className={ADD_BUTTON}>
+        <button
+          ref={addButtonRef}
+          type="button"
+          onClick={handleAdd}
+          aria-label="Add Anniversary"
+          className={ADD_BUTTON}
+        >
           <Plus className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
@@ -150,7 +150,7 @@ export function AnniversarySettings() {
                       type="button"
                       onClick={() => handleEdit(anniversary)}
                       className={EDIT_BUTTON}
-                      aria-label="Edit anniversary"
+                      aria-label={`Edit ${anniversary.label}`}
                     >
                       <Edit2 className="h-4 w-4" />
                     </button>
@@ -158,7 +158,7 @@ export function AnniversarySettings() {
                       type="button"
                       onClick={() => handleDelete(anniversary.id)}
                       className={DELETE_BUTTON}
-                      aria-label="Delete anniversary"
+                      aria-label={`Delete ${anniversary.label}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -192,49 +192,160 @@ export function AnniversarySettings() {
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {deleteConfirmId !== null && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={DIALOG_BACKDROP}
-            onClick={() => setDeleteConfirmId(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className={`${DIALOG_PANEL} max-w-sm`}
-            >
-              <h3 className={`${DIALOG_TITLE} mb-2`}>Delete Anniversary?</h3>
-              <p className="mb-5 text-[15px] text-ink">
-                This action cannot be undone. The countdown will be removed.
-              </p>
-              {deleteError && (
-                <p role="alert" className={`${FAILURE_BOX} mb-4`}>
-                  {deleteError}
-                </p>
-              )}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setDeleteConfirmId(null)}
-                  className={SECONDARY_BUTTON}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  disabled={isDeleting}
-                  className={DESTRUCTIVE_BUTTON}
-                >
-                  {isDeleting ? 'Deleting…' : 'Delete'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <AnniversaryDeleteConfirmation
+            onClose={() => setDeleteConfirmId(null)}
+            onConfirmDelete={() => removeAnniversary(deleteConfirmId)}
+            fallbackFocusRef={addButtonRef}
+          />
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+interface AnniversaryDeleteConfirmationProps {
+  onClose: () => void;
+  /** Throws on failure; the dialog shows the reason and stays open. */
+  onConfirmDelete: () => Promise<void>;
+  /**
+   * Where focus goes after a successful delete, which removes the row and the
+   * opener with it — useFocusTrap skips its restore when the opener is gone.
+   */
+  fallbackFocusRef: RefObject<HTMLElement | null>;
+}
+
+function AnniversaryDeleteConfirmation({
+  onClose,
+  onConfirmDelete,
+  fallbackFocusRef,
+}: AnniversaryDeleteConfirmationProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const isDeletingRef = useRef(false);
+  const deleteSucceededRef = useRef(false);
+
+  const titleId = 'anniversary-delete-title';
+
+  // useFocusTrap lists onEscape in its deps and re-focuses its initial target
+  // on every run, so the handler's identity is kept fixed with a latest-ref —
+  // the shape EventsSettings' dialogs use.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const handleEscape = useCallback(() => {
+    // Suppressed mid-write so a stray key cannot orphan a delete.
+    if (isDeletingRef.current) return;
+    onCloseRef.current();
+  }, []);
+
+  // Cancel takes initial focus because this action cannot be undone.
+  useFocusTrap(panelRef, true, {
+    onEscape: handleEscape,
+    initialFocusRef: cancelButtonRef,
+  });
+
+  // Declared after the trap call so its cleanup runs second, overwriting the
+  // hook's restore with a target known to survive the delete.
+  useEffect(() => {
+    return () => {
+      if (!deleteSucceededRef.current) return;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      const fallback = fallbackFocusRef.current;
+      if (fallback?.isConnected) {
+        fallback.focus();
+      }
+    };
+  }, [fallbackFocusRef]);
+
+  useEffect(() => {
+    if (deleteError && !isDeleting) {
+      cancelButtonRef.current?.focus();
+    }
+  }, [deleteError, isDeleting]);
+
+  // Server first: the dialog stays open with the reason when the delete fails
+  // (offline included), rather than closing as if it had worked.
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    isDeletingRef.current = true;
+    setDeleteError(null);
+    // The button about to be disabled holds focus; move it onto the panel while
+    // that can still land, or the browser parks focus on <body>, outside the
+    // element the trap's keydown listener is bound to.
+    panelRef.current?.focus();
+
+    try {
+      await onConfirmDelete();
+      deleteSucceededRef.current = true;
+      onClose();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Failed to delete anniversary');
+      setIsDeleting(false);
+      isDeletingRef.current = false;
+    }
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && !isDeleting) {
+      onClose();
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className={DIALOG_BACKDROP}
+      onClick={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
+      <motion.div
+        ref={panelRef}
+        tabIndex={-1}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className={`${DIALOG_PANEL} max-w-sm`}
+      >
+        <h3 id={titleId} className={`${DIALOG_TITLE} mb-2`}>Delete Anniversary?</h3>
+        <p className="mb-5 text-[15px] text-ink">
+          This action cannot be undone. The countdown will be removed.
+        </p>
+        {deleteError && (
+          <p role="alert" className={`${FAILURE_BOX} mb-4`}>
+            {deleteError}
+          </p>
+        )}
+        <div className="flex gap-3">
+          <button
+            ref={cancelButtonRef}
+            type="button"
+            onClick={onClose}
+            disabled={isDeleting}
+            className={SECONDARY_BUTTON}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className={DESTRUCTIVE_BUTTON}
+          >
+            {isDeleting ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -254,7 +365,53 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
   const [isSaving, setIsSaving] = useState(false);
   const { keyFor } = useSubmitKey();
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  const labelInputRef = useRef<HTMLInputElement>(null);
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
+  const isSavingRef = useRef(false);
+
   const isEditing = Boolean(anniversary);
+  const titleId = 'anniversary-form-title';
+
+  // Latest-ref plus an empty-dep useCallback keeps the Escape handler's
+  // identity fixed; useFocusTrap re-focuses the label field whenever it changes.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const handleEscape = useCallback(() => {
+    // Suppressed mid-write so a stray key cannot orphan a save.
+    if (isSavingRef.current) return;
+    onCloseRef.current();
+  }, []);
+
+  useFocusTrap(panelRef, true, {
+    onEscape: handleEscape,
+    initialFocusRef: labelInputRef,
+  });
+
+  // Hand focus to the re-enabled Save after a failure. Doing it inside the
+  // await would focus a still-disabled button, which the DOM ignores.
+  useEffect(() => {
+    if (generalError && !isSaving) {
+      submitButtonRef.current?.focus();
+    }
+  }, [generalError, isSaving]);
+
+  /**
+   * Drop one field's error the moment the user edits it; otherwise a corrected
+   * field keeps its red border, its aria-invalid and its message until the next
+   * submit, telling a screen-reader user it is still wrong while they fix it.
+   */
+  const clearFieldError = useCallback((field: string) => {
+    setErrors((previous) => {
+      if (!previous[field]) return previous;
+      const next = { ...previous };
+      delete next[field];
+      return next;
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,6 +452,10 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
 
       // Submit form — saved to the account first, so this can fail offline
       setIsSaving(true);
+      isSavingRef.current = true;
+      // Save, Cancel and Close are all about to be disabled; move focus onto
+      // the panel first, or the browser parks it on <body>, outside the trap.
+      panelRef.current?.focus();
       const data = {
         label: label.trim(),
         date,
@@ -314,6 +475,13 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
       }
     } finally {
       setIsSaving(false);
+      isSavingRef.current = false;
+    }
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && !isSaving) {
+      onClose();
     }
   };
 
@@ -323,9 +491,14 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className={DIALOG_BACKDROP}
-      onClick={onClose}
+      onClick={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
     >
       <motion.div
+        ref={panelRef}
+        tabIndex={-1}
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
@@ -334,11 +507,12 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
       >
         {/* Header */}
         <div className="mb-5 flex items-center justify-between gap-3">
-          <h3 className={DIALOG_TITLE}>
+          <h3 id={titleId} className={DIALOG_TITLE}>
             {isEditing ? 'Edit Anniversary' : 'Add Anniversary'}
           </h3>
           <button
             onClick={onClose}
+            disabled={isSaving}
             className={DIALOG_CLOSE}
             aria-label="Close form"
           >
@@ -348,7 +522,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
 
         {/* General Error */}
         {generalError && (
-          <div className={`${FAILURE_BOX} mb-4`}>
+          <div className={`${FAILURE_BOX} mb-4`} role="alert">
             <p>{generalError}</p>
           </div>
         )}
@@ -364,15 +538,25 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
               Label <span className={REQUIRED_MARK}>*</span>
             </label>
             <input
+              ref={labelInputRef}
               id="anniversary-label"
               type="text"
               value={label}
-              onChange={(e) => setLabel(e.target.value)}
+              onChange={(e) => {
+                setLabel(e.target.value);
+                clearFieldError('label');
+              }}
+              aria-invalid={Boolean(errors.label)}
+              // Paired with the id below: aria-invalid alone tells a screen
+              // reader the field is wrong without ever saying why.
+              aria-describedby={errors.label ? LABEL_ERROR_ID : undefined}
               className={fieldClass(Boolean(errors.label))}
               placeholder="e.g., First Date Anniversary"
             />
             {errors.label && (
-              <p className={FIELD_ERROR}>{errors.label}</p>
+              <p id={LABEL_ERROR_ID} className={FIELD_ERROR} role="alert">
+                {errors.label}
+              </p>
             )}
           </div>
 
@@ -388,11 +572,18 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
               id="anniversary-date"
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => {
+                setDate(e.target.value);
+                clearFieldError('date');
+              }}
+              aria-invalid={Boolean(errors.date)}
+              aria-describedby={errors.date ? DATE_ERROR_ID : undefined}
               className={fieldClass(Boolean(errors.date))}
             />
             {errors.date && (
-              <p className={FIELD_ERROR}>{errors.date}</p>
+              <p id={DATE_ERROR_ID} className={FIELD_ERROR} role="alert">
+                {errors.date}
+              </p>
             )}
           </div>
 
@@ -419,12 +610,14 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
             <button
               type="button"
               onClick={onClose}
+              disabled={isSaving}
               className={SECONDARY_BUTTON}
             >
               <X className="h-4 w-4" />
               Cancel
             </button>
             <button
+              ref={submitButtonRef}
               type="submit"
               disabled={isSaving}
               className={PRIMARY_BUTTON}

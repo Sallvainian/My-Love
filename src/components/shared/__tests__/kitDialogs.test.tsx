@@ -113,7 +113,7 @@ describe('the delete dialogs scroll on a short screen', () => {
     } as Partial<AppState>);
     render(<AnniversarySettings />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete anniversary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete First date' }));
 
     const panel = screen.getByRole('heading', { name: 'Delete Anniversary?' }).parentElement!;
     expect(panel).toHaveClass('max-h-full', 'overflow-y-auto', 'max-w-sm');
