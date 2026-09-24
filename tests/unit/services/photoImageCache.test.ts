@@ -55,6 +55,7 @@ vi.mock('../../../src/services/photoService', () => ({
 import { setPhotosOverMobileData } from '../../../src/services/photoDownloadPreference';
 import {
   cachePhotoImage,
+  deletePhotoImages,
   onPhotoImageCached,
   requestPhotoImageFill,
   type PhotoCacheSession,
@@ -68,8 +69,20 @@ function list(count: number): PhotoImageRef[] {
   return Array.from({ length: count }, (_, i) => ({ id: `p${i}`, storage_path: `owner/p${i}.jpg` }));
 }
 
-function session(photos: () => readonly PhotoImageRef[], isCurrent = () => true): PhotoCacheSession {
-  return { userId: A, isCurrent, photos };
+/**
+ * Each test is its own signed-in session: the default `isCurrent` ends with
+ * the test, so module state a test leaves (a remembered refusal) never
+ * reaches the next one.
+ */
+let testSession = 0;
+
+function session(
+  photos: () => readonly PhotoImageRef[],
+  isCurrent?: () => boolean,
+  userId = A
+): PhotoCacheSession {
+  const started = testSession;
+  return { userId, isCurrent: isCurrent ?? (() => started === testSession), photos };
 }
 
 function cached(path: string, userId = A) {
@@ -93,6 +106,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  testSession += 1;
   cache.images.clear();
   cache.capacity = Infinity;
   cache.writes = [];
@@ -358,6 +372,103 @@ describe('storage refusal', () => {
     expect(result).toBe('stale');
     expect(cache.writes).toEqual([]);
     expect(cache.deletes).toEqual([]);
+  });
+});
+
+describe('a refused photo', () => {
+  /** p0 is refused (another image fills the only slot, none older is cached). */
+  async function refuseP0(photos: () => readonly PhotoImageRef[]) {
+    cache.capacity = 1;
+    seed('owner/other.jpg');
+    await requestPhotoImageFill(session(photos));
+    expect(download.mock.calls.map(([path]) => path)).toEqual(['owner/p0.jpg']);
+    expect(cached('owner/p0.jpg')).toBe(false);
+    download.mockClear();
+  }
+
+  it('is not downloaded again by the next pass', async () => {
+    const photos = list(2);
+    await refuseP0(() => photos);
+
+    await requestPhotoImageFill(session(() => photos));
+    await requestPhotoImageFill(session(() => photos));
+
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('is downloaded again after a photo image is deleted (the prune or a photo delete)', async () => {
+    const photos = list(2);
+    await refuseP0(() => photos);
+
+    await deletePhotoImages(A, ['owner/other.jpg']);
+    await requestPhotoImageFill(session(() => photos));
+
+    // p0 takes the freed slot; p1 is then refused in its turn.
+    expect(download.mock.calls.map(([path]) => path)).toEqual(['owner/p0.jpg', 'owner/p1.jpg']);
+    expect(cached('owner/p0.jpg')).toBe(true);
+  });
+
+  it('is downloaded again after an eviction', async () => {
+    let photos = list(2);
+    await refuseP0(() => photos);
+
+    // A newer photo's write evicts p1, and that photo is deleted before the
+    // retry: nothing is cached, but room was freed.
+    seed('owner/p1.jpg');
+    photos = [{ id: 'new', storage_path: 'owner/new.jpg' }, ...photos];
+    const result = await cachePhotoImage(
+      session(() => {
+        if (cache.deletes.length > 0) photos = photos.filter((p) => p.id !== 'new');
+        return photos;
+      }),
+      'owner/new.jpg',
+      new Blob(['new'])
+    );
+    expect(result).toBe('removed');
+    expect(cache.deletes).toEqual(['owner/p1.jpg']);
+
+    await requestPhotoImageFill(session(() => photos));
+
+    expect(download.mock.calls.map(([path]) => path)).toEqual(['owner/p0.jpg']);
+  });
+
+  it('is downloaded again after another photo image is written', async () => {
+    const photos = list(2);
+    await refuseP0(() => photos);
+
+    cache.capacity = Infinity;
+    expect(await cachePhotoImage(session(() => photos), 'owner/p1.jpg', new Blob(['p1']))).toBe(
+      'cached'
+    );
+    await requestPhotoImageFill(session(() => photos));
+
+    expect(download.mock.calls.map(([path]) => path)).toEqual(['owner/p0.jpg']);
+    expect(cached('owner/p0.jpg')).toBe(true);
+  });
+
+  it('is downloaded again once the session that met the refusal has ended', async () => {
+    const photos = list(2);
+    let signedIn = true;
+    cache.capacity = 1;
+    seed('owner/other.jpg');
+    await requestPhotoImageFill(session(() => photos, () => signedIn));
+    download.mockClear();
+
+    // Sign-out, then the same account signs in again.
+    signedIn = false;
+    await requestPhotoImageFill(session(() => photos));
+
+    expect(download.mock.calls.map(([path]) => path)).toEqual(['owner/p0.jpg']);
+  });
+
+  it('does not stop another account', async () => {
+    const photos = list(2);
+    await refuseP0(() => photos);
+
+    await requestPhotoImageFill(session(() => photos, undefined, 'USER-B'));
+
+    expect(download.mock.calls.map(([path]) => path)).toEqual(['owner/p0.jpg', 'owner/p1.jpg']);
+    expect(cached('owner/p0.jpg', 'USER-B')).toBe(true);
   });
 });
 

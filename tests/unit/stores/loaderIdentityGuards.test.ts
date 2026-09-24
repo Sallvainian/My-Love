@@ -91,7 +91,10 @@ vi.mock('../../../src/services/photoService', () => ({
 }));
 
 // The background photo image fill is photoImageCache's own subject.
-vi.mock('../../../src/services/photoImageCache', () => ({
+vi.mock('../../../src/services/photoImageCache', async (importOriginal) => ({
+  deletePhotoImages: (
+    await importOriginal<typeof import('../../../src/services/photoImageCache')>()
+  ).deletePhotoImages,
   requestPhotoImageFill: vi.fn(async () => {}),
 }));
 
