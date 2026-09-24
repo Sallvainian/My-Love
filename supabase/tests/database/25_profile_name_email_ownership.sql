@@ -36,7 +36,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(34);
+select plan(35);
 
 -- ============================================
 -- Helpers (re-created per file: each test file runs in its own transaction)
@@ -117,6 +117,11 @@ select ok(has_column_privilege('authenticated', 'public.users', 'display_name', 
 
 select ok(has_column_privilege('authenticated', 'public.users', 'updated_at', 'UPDATE'),
   'PROF-DB-009: authenticated may UPDATE updated_at');
+
+-- 20260924000000_birthdays_wedding_date.sql adds the owner's birthday to the
+-- column grant, and nothing else.
+select ok(has_column_privilege('authenticated', 'public.users', 'birthday', 'UPDATE'),
+  'PROF-DB-035: authenticated may UPDATE birthday');
 
 select ok(not has_column_privilege('authenticated', 'public.users', 'email', 'UPDATE'),
   'PROF-DB-010: authenticated may not UPDATE email');

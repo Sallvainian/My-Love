@@ -220,6 +220,12 @@ export function parseEventDate(eventDate: string): Date | null {
   return parsed;
 }
 
+/** A `YYYY-MM-DD` date string as given, or `null` when absent or unreadable. */
+export function toDateOnlyOrNull(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return parseEventDate(value) ? value : null;
+}
+
 /**
  * Row → domain, or `null` when the row's date cannot be read.
  *

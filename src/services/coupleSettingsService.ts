@@ -1,6 +1,6 @@
 /**
  * Couple Settings Service — settings one linked couple shares
- * (`public.couple_settings`): today the relationship start date.
+ * (`public.couple_settings`): the relationship start date and the wedding date.
  *
  * One row per couple, keyed on the ORDERED pair (`user_a < user_b`), so both
  * partners address the same row. RLS admits the pair only (the caller on one
@@ -15,7 +15,8 @@
  *
  * `relationship_start` is a `timestamptz`: a date AND time, so Home's "Together
  * for" counter keeps its hours, minutes and seconds. It crosses this boundary
- * as an ISO string.
+ * as an ISO string. `wedding_date` is a plain `date` and crosses as
+ * `YYYY-MM-DD`; parse it with `parseEventDate`, never `new Date(string)`.
  *
  * @module services/coupleSettingsService
  */
@@ -24,6 +25,7 @@ import type { Database } from '../api/supabaseClient';
 import { supabase } from '../api/supabaseClient';
 import { logger } from '../utils/logger';
 import { AccountDataError, requestTimeout, requireOnline, toAccountDataError } from './accountDataError';
+import { parseEventDate, toDateOnlyOrNull } from './eventsService';
 
 export type SupabaseCoupleSettingsRecord = Database['public']['Tables']['couple_settings']['Row'];
 
@@ -31,6 +33,8 @@ export type SupabaseCoupleSettingsRecord = Database['public']['Tables']['couple_
 export interface ServerCoupleSettings {
   /** ISO timestamp, or `null` when neither partner has set it (or no row yet). */
   relationshipStart: string | null;
+  /** `YYYY-MM-DD`, or `null` when neither partner has set it (or it was cleared). */
+  weddingDate: string | null;
 }
 
 const WHAT = 'Couple settings';
@@ -49,10 +53,17 @@ function toIsoOrNull(value: string | null): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function toServerCoupleSettings(row: SupabaseCoupleSettingsRecord | null): ServerCoupleSettings {
+  return {
+    relationshipStart: toIsoOrNull(row?.relationship_start ?? null),
+    weddingDate: toDateOnlyOrNull(row?.wedding_date),
+  };
+}
+
 export const coupleSettingsService = {
   /**
    * The couple's settings. No row yet is an answer, not a failure: it reads as
-   * `relationshipStart: null` ("not set yet").
+   * `relationshipStart: null` and `weddingDate: null` ("not set yet").
    */
   async fetchCoupleSettings(userId: string, partnerId: string): Promise<ServerCoupleSettings> {
     requireOnline(WHAT, 'load');
@@ -66,7 +77,7 @@ export const coupleSettingsService = {
         .abortSignal(requestTimeout())
         .maybeSingle();
       if (error) throw error;
-      return { relationshipStart: toIsoOrNull(data?.relationship_start ?? null) };
+      return toServerCoupleSettings(data);
     } catch (error) {
       throw toAccountDataError('CoupleSettingsService.fetchCoupleSettings', error);
     }
@@ -104,9 +115,47 @@ export const coupleSettingsService = {
       if (error) throw error;
       if (!data) throw new AccountDataError('invalid-response', 'The start date was not saved');
       logger.debug('[CoupleSettingsService] Saved the relationship start date');
-      return { relationshipStart: toIsoOrNull(data.relationship_start) };
+      return toServerCoupleSettings(data);
     } catch (error) {
       throw toAccountDataError('CoupleSettingsService.saveStartDate', error);
+    }
+  },
+
+  /**
+   * Set (`YYYY-MM-DD`) or clear (`null`) the couple's wedding date, last write
+   * wins. An upsert on the pair that sends only `wedding_date` and
+   * `updated_at`: PostgREST updates only the columns it is sent, so it never
+   * touches the start date. Absolute, so safe to repeat.
+   */
+  async saveWeddingDate(
+    userId: string,
+    partnerId: string,
+    weddingDate: string | null
+  ): Promise<ServerCoupleSettings> {
+    requireOnline(WHAT);
+    if (weddingDate !== null && !parseEventDate(weddingDate)) {
+      throw new AccountDataError('invalid-response', `Not a valid date: ${weddingDate}`);
+    }
+    try {
+      const { data, error } = await supabase
+        .from('couple_settings')
+        .upsert(
+          {
+            ...couplePair(userId, partnerId),
+            wedding_date: weddingDate,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_a,user_b' }
+        )
+        .select()
+        .abortSignal(requestTimeout())
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new AccountDataError('invalid-response', 'The wedding date was not saved');
+      logger.debug('[CoupleSettingsService] Saved the wedding date');
+      return toServerCoupleSettings(data);
+    } catch (error) {
+      throw toAccountDataError('CoupleSettingsService.saveWeddingDate', error);
     }
   },
 };

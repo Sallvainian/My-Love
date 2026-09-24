@@ -242,3 +242,18 @@ describe('App triggers the message-data refresh once the bundled rows are seeded
     expect(localCopy.refreshLocalCopies).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('App refreshes the profile copy after the first-run name gate', () => {
+  it('completing the display-name setup refreshes the profile copy', async () => {
+    profile.lookupOwnDisplayName.mockResolvedValue({ status: 'unset' });
+    await renderApp();
+    // The gate is resolved from the auth listener, as on a real sign-in.
+    await act(async () => auth.listener!(session()));
+    const gate = await screen.findByText('Set your display name');
+    localCopy.refreshLocalCopy.mockClear();
+
+    await act(async () => gate.click());
+
+    expect(localCopy.refreshLocalCopy).toHaveBeenCalledWith('profile');
+  });
+});

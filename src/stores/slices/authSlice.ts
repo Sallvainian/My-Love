@@ -180,6 +180,8 @@ export function signedOutState() {
     // settingsSlice — the couple's shared start date names this couple's
     // relationship; the incoming account's refresher reads its own copy.
     coupleSettings: null,
+    // The outgoing account's own name and birthday.
+    ownProfile: null,
   } satisfies Partial<AppState>;
 }
 

@@ -91,18 +91,21 @@ export type Database = {
           updated_at: string
           user_a: string
           user_b: string
+          wedding_date: string | null
         }
         Insert: {
           relationship_start?: string | null
           updated_at?: string
           user_a: string
           user_b: string
+          wedding_date?: string | null
         }
         Update: {
           relationship_start?: string | null
           updated_at?: string
           user_a?: string
           user_b?: string
+          wedding_date?: string | null
         }
         Relationships: [
           {
@@ -437,6 +440,7 @@ export type Database = {
       }
       users: {
         Row: {
+          birthday: string | null
           created_at: string | null
           device_id: string | null
           display_name: string | null
@@ -447,6 +451,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          birthday?: string | null
           created_at?: string | null
           device_id?: string | null
           display_name?: string | null
@@ -457,6 +462,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          birthday?: string | null
           created_at?: string | null
           device_id?: string | null
           display_name?: string | null

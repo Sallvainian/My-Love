@@ -4,14 +4,13 @@ import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { AppNavigation } from './components/Navigation/AppNavigation';
 import {
-  BirthdayCountdown,
+  BirthdayWeddingCards,
   EventCountdown,
   getEventsSlotView,
   getUpcomingEventCards,
   TimeTogether,
 } from './components/RelationshipTimers';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
-import { RELATIONSHIP_DATES } from './config/relationshipDates';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from './stores/useAppStore';
 // PokeKissInterface moved to PartnerMoodView
@@ -28,6 +27,7 @@ import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { refreshLocalCopies, refreshLocalCopy } from './services/localCopy';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
+import { PROFILE_COPY_KIND } from './stores/slices/settingsSlice';
 import { stripBasePath } from './utils/basePath';
 import { logger } from './utils/logger';
 import { logStorageQuota } from './utils/storageMonitor';
@@ -608,6 +608,8 @@ function App() {
             // the name was saved — it would come back `unset` and re-open this.
             displayNameReadRef.current += 1;
             setNeedsDisplayName(false);
+            // Home's own birthday card is labelled with this name.
+            void refreshLocalCopy(PROFILE_COPY_KIND);
           }}
         />
       </ErrorBoundary>
@@ -721,19 +723,8 @@ function App() {
               {/* Time Together - replaces Day 37 Together header */}
               <TimeTogether />
 
-              {/* Birthdays, side by side */}
-              <div className="grid grid-cols-2 gap-3">
-                <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.frank} />
-                <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.gracie} />
-              </div>
-
-              {/* Wedding - full width */}
-              <EventCountdown
-                label="Wedding"
-                icon="ring"
-                date={RELATIONSHIP_DATES.wedding}
-                placeholderText="Date TBD"
-              />
+              {/* Birthdays and the wedding date, from the server-held values */}
+              <BirthdayWeddingCards />
 
               {/* Upcoming: always shown, even while the slot below is still
                   hidden. Add goes to Settings, where events are created;

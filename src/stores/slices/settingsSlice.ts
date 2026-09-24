@@ -34,8 +34,18 @@
  * confirmed writes, so Home's "Together for" card and the history limit work
  * offline. `loadCoupleSettings` is the kind's refresher; it resolves the
  * partner with `lookupPartnerId()` and treats a failed lookup as "keep what is
- * shown", never as unlinked. `setRelationshipStart` needs a connection and
- * throws `AccountDataError('offline')` without one. Last write wins.
+ * shown", never as unlinked. `setRelationshipStart` and `setWeddingDate` need
+ * a connection and throw `AccountDataError('offline')` without one. Last write
+ * wins. The wedding date (`YYYY-MM-DD` or `null`) rides on the same row and
+ * copy; a copy saved before it existed reads it as not set.
+ *
+ * Own profile: the account's own display name and birthday (`public.users`).
+ * `ownProfile` is its in-memory state, NOT persisted with `settings`: its saved
+ * copy is the local copy of kind `profile`, filled only from server reads and
+ * confirmed writes, so Home's own birthday card works offline.
+ * `loadOwnProfile` is the kind's refresher; `setBirthday` needs a connection.
+ * The display name is still written by `DisplayNameSetup`; Settings refreshes
+ * this kind after a name save.
  */
 
 import { ZodError } from 'zod/v4';
@@ -49,6 +59,8 @@ import {
   type ServerAnniversary,
 } from '../../services/anniversariesService';
 import { coupleSettingsService } from '../../services/coupleSettingsService';
+import { toDateOnlyOrNull } from '../../services/eventsService';
+import { type OwnProfile, profileService } from '../../services/profileService';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
 import { storageService } from '../../services/storage';
 import type { Anniversary, Settings } from '../../types';
@@ -67,6 +79,11 @@ export interface SettingsSlice {
    * show nothing for it then, rather than a placeholder that may be wrong.
    */
   coupleSettings: CoupleSettings | null;
+  /**
+   * The account's own display name and birthday, from `public.users` via its
+   * local copy. `null` until the saved copy or the server has answered.
+   */
+  ownProfile: OwnProfile | null;
 
   // Actions
   initializeApp: () => Promise<void>;
@@ -97,6 +114,22 @@ export interface SettingsSlice {
    * and an error when no partner is linked or the lookup fails.
    */
   setRelationshipStart: (relationshipStart: string) => Promise<void>;
+  /**
+   * Set (`YYYY-MM-DD`) or clear (`null`) the couple's wedding date. Server
+   * first, then state and copy. Throws like `setRelationshipStart`.
+   */
+  setWeddingDate: (weddingDate: string | null) => Promise<void>;
+
+  /**
+   * The profile local-copy refresher: show the saved copy, then — when online —
+   * replace state and copy with the server's row. Never throws.
+   */
+  loadOwnProfile: () => Promise<void>;
+  /**
+   * Set the account's own birthday (`YYYY-MM-DD`). Server first, then state
+   * and copy. Throws: `AccountDataError('offline')` without a connection.
+   */
+  setBirthday: (birthday: string) => Promise<void>;
 }
 
 /**
@@ -104,7 +137,13 @@ export interface SettingsSlice {
  * `unlinked` means the partner lookup said so — never a failed read.
  */
 export type CoupleSettings =
-  | { status: 'linked'; partnerId: string; relationshipStart: string | null }
+  | {
+      status: 'linked';
+      partnerId: string;
+      relationshipStart: string | null;
+      /** `YYYY-MM-DD`, or `null` when not set. */
+      weddingDate: string | null;
+    }
   | { status: 'unlinked' };
 
 /** Local-copy kind for the couple's shared settings (`CoupleSettings`). */
@@ -133,7 +172,38 @@ function parseSavedCoupleSettings(value: unknown): CoupleSettings | null {
   if (start !== null && (typeof start !== 'string' || Number.isNaN(new Date(start).getTime()))) {
     return null;
   }
-  return { status: 'linked', partnerId: v.partnerId, relationshipStart: start };
+  // A copy saved before the wedding date existed has no field: not set.
+  const wedding = v.weddingDate;
+  if (wedding !== undefined && wedding !== null && typeof wedding !== 'string') return null;
+  return {
+    status: 'linked',
+    partnerId: v.partnerId,
+    relationshipStart: start,
+    weddingDate: toDateOnlyOrNull(wedding),
+  };
+}
+
+/** Local-copy kind for the account's own profile (`OwnProfile`). */
+export const PROFILE_COPY_KIND = 'profile';
+
+/** Same role as `coupleSettingsFreshFor`, for the profile kind. */
+let ownProfileFreshFor: { userId: string; authSessionVersion: number } | null = null;
+
+function isOwnProfileFresh(userId: string, authSessionVersion: number): boolean {
+  return (
+    ownProfileFreshFor?.userId === userId &&
+    ownProfileFreshFor.authSessionVersion === authSessionVersion
+  );
+}
+
+/** A saved profile copy; a missing field reads as not set. */
+function parseSavedOwnProfile(value: unknown): OwnProfile | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  return {
+    displayName: typeof v.displayName === 'string' && v.displayName.trim() ? v.displayName : null,
+    birthday: typeof v.birthday === 'string' ? toDateOnlyOrNull(v.birthday) : null,
+  };
 }
 
 /** Local-copy kind for the account's anniversaries (`Anniversary[]`). */
@@ -224,6 +294,17 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
   // on-demand refreshes. Re-registering (a second store in tests) replaces it.
   registerLocalCopy(ANNIVERSARIES_COPY_KIND, () => get().loadAnniversariesFromServer());
   registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => get().loadCoupleSettings());
+  registerLocalCopy(PROFILE_COPY_KIND, () => get().loadOwnProfile());
+
+  /** Same as `saveCoupleSettingsCopy`, for the profile kind. */
+  const saveOwnProfileCopy = async (userId: string, authSessionVersion: number, value: OwnProfile) => {
+    ownProfileFreshFor = { userId, authSessionVersion };
+    try {
+      await writeLocalCopy(userId, PROFILE_COPY_KIND, value);
+    } catch (error) {
+      console.error('[Settings] Failed to save the profile copy:', error);
+    }
+  };
 
   /**
    * After a confirmed server answer for `userId` in `authSessionVersion` (the
@@ -269,6 +350,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
     },
     isOnboarded: true,
     coupleSettings: null,
+    ownProfile: null,
 
     // Initialize app
     initializeApp: async () => {
@@ -632,6 +714,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
             status: 'linked',
             partnerId: lookup.partnerId,
             relationshipStart: row.relationshipStart,
+            weddingDate: row.weddingDate,
           };
           set({ coupleSettings: next });
           await saveCoupleSettingsCopy(requestedBy, requestedInSession, next);
@@ -674,9 +757,104 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
           status: 'linked',
           partnerId: lookup.partnerId,
           relationshipStart: saved.relationshipStart,
+          weddingDate: saved.weddingDate,
         };
         set({ coupleSettings: next });
         await saveCoupleSettingsCopy(requestedBy, requestedInSession, next);
+      });
+    },
+
+    setWeddingDate: async (weddingDate) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to set your wedding date');
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // Refused before any request, so an offline edit changes nothing.
+      requireOnline('Couple settings');
+
+      const lookup = await lookupPartnerId();
+      if (lookup.status === 'error') {
+        throw new AccountDataError(
+          'transport',
+          'Could not reach your account to save the wedding date. Try again in a moment.'
+        );
+      }
+      if (lookup.status === 'unlinked') {
+        throw new Error('Link a partner first to set your wedding date');
+      }
+      if (!isCurrent()) return;
+
+      await serializeAccountDataWrite(async () => {
+        const saved = await coupleSettingsService.saveWeddingDate(
+          requestedBy,
+          lookup.partnerId,
+          weddingDate
+        );
+        if (!isCurrent()) return;
+        const next: CoupleSettings = {
+          status: 'linked',
+          partnerId: lookup.partnerId,
+          relationshipStart: saved.relationshipStart,
+          weddingDate: saved.weddingDate,
+        };
+        set({ coupleSettings: next });
+        await saveCoupleSettingsCopy(requestedBy, requestedInSession, next);
+      });
+    },
+
+    loadOwnProfile: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // 1. The saved copy, at once — online or offline. Skipped once this
+      // session has a server answer or a confirmed write, which is newer.
+      if (!isOwnProfileFresh(requestedBy, requestedInSession)) {
+        const saved = parseSavedOwnProfile(
+          await readLocalCopy<unknown>(requestedBy, PROFILE_COPY_KIND)
+        );
+        if (!isCurrent()) return;
+        if (saved && !isOwnProfileFresh(requestedBy, requestedInSession)) {
+          set({ ownProfile: saved });
+        }
+      }
+
+      // 2. Offline there is nothing to ask; the copy (or nothing) stays shown.
+      if (!isOnline()) return;
+
+      // 3. The server's row replaces state and copy — only on success. In the
+      // account-data queue, so it cannot read before a birthday write and land
+      // after it.
+      try {
+        await serializeAccountDataWrite(async () => {
+          const next = await profileService.fetchOwnProfile();
+          if (!isCurrent()) return;
+          set({ ownProfile: next });
+          await saveOwnProfileCopy(requestedBy, requestedInSession, next);
+        });
+      } catch (error) {
+        // State and copy stay as they were, so Home keeps its card.
+        console.error('[Settings] Failed to load the profile from the server:', error);
+      }
+    },
+
+    setBirthday: async (birthday) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to set your birthday');
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // Refused before any request, so an offline edit changes nothing.
+      requireOnline('Profile changes');
+
+      await serializeAccountDataWrite(async () => {
+        if (!isCurrent()) return;
+        const next = await profileService.saveBirthday(birthday);
+        if (!isCurrent()) return;
+        set({ ownProfile: next });
+        await saveOwnProfileCopy(requestedBy, requestedInSession, next);
       });
     },
   };
