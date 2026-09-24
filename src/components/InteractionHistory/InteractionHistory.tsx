@@ -128,7 +128,9 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
 
               {/* Content */}
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                {isLoading ? (
+                {/* The saved copy (or this session's list) stays on screen
+                    while the refresh runs; the spinner is for an empty list. */}
+                {isLoading && interactions.length === 0 ? (
                   <div className="flex flex-col items-center gap-3 py-10 text-center">
                     <Heart
                       className="h-8 w-8 animate-pulse fill-current text-accent"
