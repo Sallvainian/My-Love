@@ -65,6 +65,11 @@ export function PhotoViewer({
   const [isLoading, setIsLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  // The photo the open confirmation asks about, captured when it opens. The
+  // delete targets this id, never whatever photo the viewer shows at click
+  // time: a refresh can remove the named photo while the dialog is up, and the
+  // viewer then falls back to a different photo at the same index.
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   // Bumped by Retry so the image is read or downloaded again.
   const [retryKey, setRetryKey] = useState(0);
 
@@ -293,9 +298,8 @@ export function PhotoViewer({
         return;
       }
       // Navigation is suspended while the delete confirmation is up: it names a
-      // specific photo, and handleDeleteConfirm resolves photos[currentIndex] at
-      // click time, so navigating behind the dialog would delete a different
-      // photo than the one the dialog is asking about.
+      // specific photo, and moving the viewer behind it would leave the dialog
+      // asking about a photo that is no longer on screen.
       if (showDeleteDialog) return;
       switch (event.key) {
         case 'ArrowRight':
@@ -398,13 +402,21 @@ export function PhotoViewer({
   // the trap's one focusable, guarded in its handler instead.
   const handleDeleteConfirm = useCallback(async () => {
     if (isDeletingRef.current) return;
+    // The photo the dialog names, resolved by the id captured when it opened.
+    // Gone from the list means a refresh removed it (deleted elsewhere): there
+    // is nothing left to confirm, and deleting the photo now at its index
+    // would permanently delete one the user never chose.
+    const deletedIndex = photos.findIndex((p) => p.id === deleteTargetId);
+    if (deletedIndex < 0) {
+      closeDeleteDialog();
+      return;
+    }
     isDeletingRef.current = true;
     setIsDeleting(true);
     setDeleteError(null);
-    // The photo the dialog names, resolved by id; the index is where the
-    // viewer stands if the list changes before the delete returns.
-    const photoToDelete = currentPhoto;
-    const deletedIndex = currentIndex;
+    // The index is where the viewer stands if the list changes before the
+    // delete returns.
+    const photoToDelete = photos[deletedIndex];
     const next = photos[deletedIndex + 1] ?? photos[deletedIndex - 1];
     setAnchorIndex(deletedIndex);
     let deleted = false;
@@ -434,7 +446,21 @@ export function PhotoViewer({
         setDeleteError('Failed to delete photo. Please try again.');
       }
     }
-  }, [photos, currentPhoto, currentIndex, onClose, deletePhoto, resetTransform, closeDeleteDialog]);
+  }, [photos, deleteTargetId, onClose, deletePhoto, resetTransform, closeDeleteDialog]);
+
+  // The confirmation always asks about the photo on screen. When a refresh
+  // removes that photo while the dialog is up, the viewer falls back to the
+  // photo now at its index, and the dialog would name a photo the user never
+  // chose -- so it closes instead. Not mid-delete: the user's own delete drops
+  // the row before it resolves, and handleDeleteConfirm closes the dialog then.
+  // An effect, not a render-time adjustment: closeDeleteDialog flags the focus
+  // restore through a ref, which must not be written during render.
+  useEffect(() => {
+    if (showDeleteDialog && !isDeleting && currentPhoto?.id !== deleteTargetId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- dialog reset when the store's list drops the photo it names
+      closeDeleteDialog();
+    }
+  }, [showDeleteDialog, isDeleting, currentPhoto?.id, deleteTargetId, closeDeleteDialog]);
 
   // AC 6.4.15: Image loading handlers
   const handleImageLoad = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
@@ -516,7 +542,10 @@ export function PhotoViewer({
           {currentPhoto.isOwn && (
             <button
               ref={deleteButtonRef}
-              onClick={() => setShowDeleteDialog(true)}
+              onClick={() => {
+                setDeleteTargetId(currentPhoto.id);
+                setShowDeleteDialog(true);
+              }}
               disabled={showDeleteDialog}
               className="flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent text-danger"
               aria-label="Delete photo"

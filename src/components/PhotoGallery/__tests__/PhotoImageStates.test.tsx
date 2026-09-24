@@ -205,6 +205,70 @@ describe('PhotoViewer on a live list', () => {
     expect(deletePhotoMock).toHaveBeenCalledWith('photo-1');
   });
 
+  it('closes the confirmation without deleting when a refresh removes the photo it names', async () => {
+    // The same account deleted photo-1 on another device; this device's
+    // refresh drops it while its confirmation is up. The viewer falls back to
+    // the photo now at that index (photo-2), which the user never confirmed.
+    const { rerender } = render(
+      <PhotoViewer
+        photos={[photo(0), photo(1), photo(2)]}
+        selectedPhotoId="photo-1"
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    expect(screen.getByText('Delete Photo?')).toBeInTheDocument();
+
+    rerender(
+      <PhotoViewer photos={[photo(0), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
+    );
+
+    const confirm = screen.queryByRole('button', { name: 'Delete' });
+    if (confirm) {
+      await act(async () => {
+        fireEvent.click(confirm);
+      });
+    }
+
+    expect(deletePhotoMock).not.toHaveBeenCalled();
+    expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    // The viewer itself keeps its fallback: the photo now at that index.
+    expect(screen.getByAltText('cap-2')).toBeInTheDocument();
+  });
+
+  it('finishes its own delete when the store drops the row before the delete resolves', async () => {
+    // photosSlice.deletePhoto removes the row from the list and only then
+    // resolves; the confirmation must not be closed underneath that request.
+    let resolveDelete: (deleted: boolean) => void = () => {};
+    deletePhotoMock.mockImplementation(
+      () => new Promise<boolean>((resolve) => (resolveDelete = resolve))
+    );
+    const { rerender } = render(
+      <PhotoViewer
+        photos={[photo(0), photo(1), photo(2)]}
+        selectedPhotoId="photo-1"
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    });
+    rerender(
+      <PhotoViewer photos={[photo(0), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
+    );
+    expect(screen.getByText('Delete Photo?')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveDelete(true);
+    });
+
+    expect(deletePhotoMock).toHaveBeenCalledTimes(1);
+    expect(deletePhotoMock).toHaveBeenCalledWith('photo-1');
+    expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    expect(screen.getByAltText('cap-2')).toBeInTheDocument();
+  });
+
   it('moves to the next photo once its own delete removes it from the list', async () => {
     const { rerender } = render(
       <PhotoViewer

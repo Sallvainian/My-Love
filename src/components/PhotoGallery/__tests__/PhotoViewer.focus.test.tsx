@@ -101,9 +101,8 @@ describe('PhotoViewer focus', () => {
   });
 
   it('suspends arrow-key navigation while the delete confirmation is open', async () => {
-    // handleDeleteConfirm resolves its target as photos[currentIndex] at click
-    // time, so navigating behind the open dialog would permanently delete a
-    // different photo than the one the dialog named.
+    // The dialog names the photo on screen; navigating behind it would leave
+    // the dialog asking about a photo the user can no longer see.
     const two = [
       photo,
       { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
