@@ -258,7 +258,7 @@ export function MessageInput() {
           placeholder={selectedImage ? 'Add a caption...' : 'Send a love note...'}
           aria-label="Love note message input"
           disabled={isSending}
-          className="max-h-[200px] min-h-[44px] flex-1 resize-none overflow-y-auto rounded-[22px] bg-card px-4 py-[11px] text-[15px] leading-[22px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="max-h-[200px] min-h-[44px] flex-1 resize-none overflow-y-auto rounded-[22px] bg-card px-4 py-[11px] text-base leading-[22px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           rows={1}
         />
 

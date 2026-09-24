@@ -81,9 +81,13 @@ export const FAILURE_BOX = 'rounded-[14px] bg-dtint px-4 py-3 text-sm text-dange
  * A 48px kit input (or, with `multiline`, a textarea on the same surface).
  * `scheme-light-dark` lets native parts such as the date picker's icon follow
  * the OS theme instead of drawing dark on the dark field.
+ *
+ * 16px text, never smaller: iOS zooms the whole page in when a field under
+ * 16px is focused and leaves it zoomed, so the page can then be dragged
+ * about. Every text field in the app follows this.
  */
 export function fieldClass(hasError: boolean, multiline = false): string {
-  return `w-full rounded-[14px] bg-field px-4 text-[15px] text-ink ring-inset placeholder:text-muted focus:ring-2 focus:outline-none ${
+  return `w-full rounded-[14px] bg-field px-4 text-base text-ink ring-inset placeholder:text-muted focus:ring-2 focus:outline-none ${
     multiline ? 'resize-none py-3' : 'h-12 scheme-light-dark'
   } ${hasError ? 'ring-2 ring-danger focus:ring-danger' : 'ring-1 ring-line-strong focus:ring-accent'}`;
 }

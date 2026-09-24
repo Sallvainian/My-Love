@@ -384,7 +384,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                         placeholder="Add a caption to your photo..."
                         maxLength={maxCaptionLength}
                         rows={3}
-                        className="w-full resize-none rounded-[14px] bg-field px-4 text-[15px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none py-3"
+                        className="w-full resize-none rounded-[14px] bg-field px-4 text-base text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none py-3"
                         data-testid="photo-upload-caption-input"
                       />
                       <div className="mt-2 flex items-center justify-between">
@@ -411,7 +411,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                         value={tags}
                         onChange={(e) => setTags(e.target.value)}
                         placeholder="beach, sunset, memories"
-                        className="h-12 w-full rounded-[14px] bg-field px-4 text-[15px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none"
+                        className="h-12 w-full rounded-[14px] bg-field px-4 text-base text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none"
                         data-testid="photo-upload-tags-input"
                       />
                       <div className="mt-2 space-y-1">
