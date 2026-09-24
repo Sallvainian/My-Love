@@ -1,8 +1,7 @@
 /**
  * Relationship Dates Configuration
  *
- * Contains all important dates for the relationship timers:
- * - Dating start date (count-up timer)
+ * Contains the dates for Home's birthday and wedding cards:
  * - Birthday information (countdown with age calculation)
  * - Wedding date (countdown or placeholder)
  */
@@ -17,14 +16,10 @@ export interface BirthdayInfo {
 /**
  * Relationship dates configuration
  *
- * Dating since: October 18th, 2025 at 6:00pm
  * Frank's birthday: July 9th, 1997
  * Gracie's birthday: March 10th, 1998
  */
 export const RELATIONSHIP_DATES = {
-  // October 18, 2025 at 6:00pm local time
-  datingStart: new Date('2025-10-18T18:00:00'),
-
   birthdays: {
     frank: {
       name: 'Frank',

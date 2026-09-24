@@ -61,8 +61,8 @@ function LoadingState() {
 export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
   const { partnerMood, isLoading, error } = usePartnerMood(partnerId);
   // The store's partner is only loaded by the Partner view, so it is often
-  // null here. Never fall back to PARTNER_NAME: it names one fixed person and
-  // would put that name on the other partner's mood on their own device.
+  // null here. Never fall back to a hard-coded name: it names one fixed person
+  // and would put that name on the other partner's mood on their own device.
   const partnerName = useAppStore((s) => s.partner?.displayName)?.trim() || null;
   const [justUpdated, setJustUpdated] = useState(false);
   const prevMoodIdRef = useRef<string | undefined>(undefined);

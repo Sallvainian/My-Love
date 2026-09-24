@@ -6,6 +6,8 @@ import App from '../../../src/App';
 import { supabase } from '../../../src/api/supabaseClient';
 import { anniversariesService } from '../../../src/services/anniversariesService';
 import { eventsService, type CoupleEvent, type EventsPage } from '../../../src/services/eventsService';
+import { registerLocalCopy } from '../../../src/services/localCopy';
+import { COUPLE_SETTINGS_COPY_KIND } from '../../../src/stores/slices/settingsSlice';
 import { formatDateISO } from '../../../src/utils/dateUtils';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import {
@@ -98,6 +100,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
   let notificationCount = 0;
   let mounted = false;
   let disposed = false;
+  let restoreCoupleSettingsRefresher: (() => void) | null = null;
 
   const eventPage = (events: CoupleEvent[]): EventsPage => ({
     events,
@@ -147,6 +150,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       supabase.auth.onAuthStateChange = originalOnAuthStateChange;
       eventsService.getEventsPage = originalGetEventsPage;
       anniversariesService.fetchAnniversaries = originalFetchAnniversaries;
+      restoreCoupleSettingsRefresher?.();
       useAppStore.setState(originalState, true);
       if (previousWelcome === null) localStorage.removeItem('lastWelcomeView');
       else localStorage.setItem('lastWelcomeView', previousWelcome);
@@ -187,6 +191,15 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     // supabase.auth.getSession — the very call this harness counts and defers
     // — and with `initialIdentity` it runs before the bootstrap lookup.
     anniversariesService.fetchAnniversaries = async () => [];
+    // Same reason for the couple-settings refresher, one step earlier: its
+    // partner lookup (`lookupPartnerId`) calls supabase.auth.getSession
+    // directly. Replaced with a no-op for the harness's lifetime; dispose puts
+    // the store's own refresher back.
+    const unregisterNoop = registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, async () => {});
+    restoreCoupleSettingsRefresher = () => {
+      unregisterNoop();
+      registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => useAppStore.getState().loadCoupleSettings());
+    };
     localStorage.setItem('lastWelcomeView', String(Date.now()));
     useAppStore.setState({
       isLoading: false,

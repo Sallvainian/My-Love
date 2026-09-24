@@ -32,9 +32,7 @@ const STORAGE_KEY = 'my-love-storage';
 
 /** Shaped to pass `SettingsSchema` — the adapter drops `settings` when it does not. */
 const PERSISTED_SETTINGS = {
-  notificationTime: '09:00',
-  relationship: { startDate: '2020-01-01', partnerName: 'A', anniversaries: [] },
-  notifications: { enabled: true, time: '09:00' },
+  relationship: { anniversaries: [] },
 };
 
 /**

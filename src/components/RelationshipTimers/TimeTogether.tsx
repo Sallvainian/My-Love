@@ -1,39 +1,61 @@
 /**
  * TimeTogether Component
  *
- * Real-time count-up timer showing how long you've been together.
- * Updates every second for a live feel.
+ * Real-time count-up timer showing how long you've been together, from the
+ * couple's shared start (`coupleSettings.relationshipStart`, a date and time
+ * either partner sets in Settings). Updates every second for a live feel.
  *
  * Rendered as the shared CountdownCard: "Together for", the years/days as the
  * value, and the padded h/m/s remainder as the trailing figure.
+ *
+ * - Linked, start set: the live counter.
+ * - Linked, not set yet: the same card with a "Set your start date in
+ *   Settings" placeholder.
+ * - Unlinked, or nothing known yet (no saved copy, no server answer): hidden —
+ *   a placeholder there could be wrong.
  */
 
 import { Heart } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import {
-  RELATIONSHIP_DATES,
-  calculateTimeDifference,
-  type TimeDifference,
-} from '../../config/relationshipDates';
+import { useEffect, useMemo, useState } from 'react';
+import { calculateTimeDifference } from '../../config/relationshipDates';
+import { useAppStore } from '../../stores/useAppStore';
 import { CountdownCard } from './CountdownCard';
 
-function computeTimeTogetherState(): TimeDifference {
-  const now = new Date();
-  return calculateTimeDifference(RELATIONSHIP_DATES.datingStart, now);
-}
+const TEST_ID = 'time-together';
 
 export function TimeTogether() {
-  const [timeDiff, setTimeDiff] = useState<TimeDifference>(() => computeTimeTogetherState());
+  const coupleSettings = useAppStore((s) => s.coupleSettings);
 
-  const updateTime = useCallback(() => {
-    setTimeDiff(computeTimeTogetherState());
-  }, []);
+  if (!coupleSettings || coupleSettings.status !== 'linked') return null;
+
+  if (!coupleSettings.relationshipStart) {
+    return (
+      <CountdownCard
+        icon={Heart}
+        iconFilled
+        label="Together for"
+        value="Not set yet"
+        valueMuted
+        description="Set your start date in Settings"
+        testId={TEST_ID}
+      />
+    );
+  }
+
+  return <TimeTogetherCounter start={coupleSettings.relationshipStart} />;
+}
+
+function TimeTogetherCounter({ start }: { start: string }) {
+  const startDate = useMemo(() => new Date(start), [start]);
+  const [now, setNow] = useState(() => new Date());
 
   // Update every second for real-time feel
   useEffect(() => {
-    const interval = setInterval(updateTime, 1000);
+    const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
-  }, [updateTime]);
+  }, []);
+
+  const timeDiff = calculateTimeDifference(startDate, now);
 
   // Pluralize helper
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -49,7 +71,7 @@ export function TimeTogether() {
       label="Together for"
       value={value}
       trailing={`${pad(timeDiff.hours)}h ${pad(timeDiff.minutes)}m ${pad(timeDiff.seconds)}s`}
-      testId="time-together"
+      testId={TEST_ID}
     />
   );
 }

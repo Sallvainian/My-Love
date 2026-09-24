@@ -26,18 +26,29 @@
  * succeeded, with the usual `{ userId, authSessionVersion }` capture-and-recheck
  * around the await. Writes throw, so the Settings form can show the reason
  * (offline included).
+ *
+ * Couple settings: `public.couple_settings` holds one row per linked couple
+ * (today the relationship start date, a date and time). `coupleSettings` is its
+ * in-memory state and is NOT persisted with `settings`: its saved copy is the
+ * local copy of kind `couple-settings`, filled only from server reads and
+ * confirmed writes, so Home's "Together for" card and the history limit work
+ * offline. `loadCoupleSettings` is the kind's refresher; it resolves the
+ * partner with `lookupPartnerId()` and treats a failed lookup as "keep what is
+ * shown", never as unlinked. `setRelationshipStart` needs a connection and
+ * throws `AccountDataError('offline')` without one. Last write wins.
  */
 
 import { ZodError } from 'zod/v4';
-import { APP_CONFIG } from '../../config/constants';
+import { lookupPartnerId } from '../../api/supabaseClient';
 import { loadDefaultMessages } from '../../data/defaultMessagesLoader';
-import { AccountDataError } from '../../services/accountDataError';
+import { AccountDataError, requireOnline } from '../../services/accountDataError';
 import { serializeAccountDataWrite } from '../../services/accountDataQueue';
 import {
   anniversariesService,
   type AnniversaryInput,
   type ServerAnniversary,
 } from '../../services/anniversariesService';
+import { coupleSettingsService } from '../../services/coupleSettingsService';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
 import { storageService } from '../../services/storage';
 import type { Anniversary, Settings } from '../../types';
@@ -50,6 +61,12 @@ export interface SettingsSlice {
   // State
   settings: Settings | null;
   isOnboarded: boolean;
+  /**
+   * The couple's shared settings, from `public.couple_settings` via its local
+   * copy. `null` until the saved copy or the server has answered — screens
+   * show nothing for it then, rather than a placeholder that may be wrong.
+   */
+  coupleSettings: CoupleSettings | null;
 
   // Actions
   initializeApp: () => Promise<void>;
@@ -67,6 +84,56 @@ export interface SettingsSlice {
    * the mirror and the copy with the server's rows. Never throws.
    */
   loadAnniversariesFromServer: () => Promise<void>;
+
+  /**
+   * The couple-settings local-copy refresher: show the saved copy, then — when
+   * online and the partner lookup answers — replace state and copy with the
+   * server's. Never throws.
+   */
+  loadCoupleSettings: () => Promise<void>;
+  /**
+   * Set the couple's relationship start (an ISO timestamp). Server first, then
+   * state and copy. Throws: `AccountDataError('offline')` without a connection,
+   * and an error when no partner is linked or the lookup fails.
+   */
+  setRelationshipStart: (relationshipStart: string) => Promise<void>;
+}
+
+/**
+ * What the couple-settings kind holds. Only a server answer is ever stored, so
+ * `unlinked` means the partner lookup said so — never a failed read.
+ */
+export type CoupleSettings =
+  | { status: 'linked'; partnerId: string; relationshipStart: string | null }
+  | { status: 'unlinked' };
+
+/** Local-copy kind for the couple's shared settings (`CoupleSettings`). */
+export const COUPLE_SETTINGS_COPY_KIND = 'couple-settings';
+
+/**
+ * Same role as `anniversariesFreshFor`, for the couple-settings kind: once this
+ * session has a server answer or a confirmed write, a late copy read is ignored.
+ */
+let coupleSettingsFreshFor: { userId: string; authSessionVersion: number } | null = null;
+
+function isCoupleSettingsFresh(userId: string, authSessionVersion: number): boolean {
+  return (
+    coupleSettingsFreshFor?.userId === userId &&
+    coupleSettingsFreshFor.authSessionVersion === authSessionVersion
+  );
+}
+
+/** A saved copy in a shape the screens can use; anything else is ignored. */
+function parseSavedCoupleSettings(value: unknown): CoupleSettings | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  if (v.status === 'unlinked') return { status: 'unlinked' };
+  if (v.status !== 'linked' || typeof v.partnerId !== 'string') return null;
+  const start = v.relationshipStart;
+  if (start !== null && (typeof start !== 'string' || Number.isNaN(new Date(start).getTime()))) {
+    return null;
+  }
+  return { status: 'linked', partnerId: v.partnerId, relationshipStart: start };
 }
 
 /** Local-copy kind for the account's anniversaries (`Anniversary[]`). */
@@ -156,6 +223,25 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
   // The anniversaries kind's refresher for signed-in start, reconnect and
   // on-demand refreshes. Re-registering (a second store in tests) replaces it.
   registerLocalCopy(ANNIVERSARIES_COPY_KIND, () => get().loadAnniversariesFromServer());
+  registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => get().loadCoupleSettings());
+
+  /**
+   * After a confirmed server answer for `userId` in `authSessionVersion` (the
+   * caller has just re-checked both and set the state): mark the session fresh
+   * and save the answer as the copy. A failed save is logged.
+   */
+  const saveCoupleSettingsCopy = async (
+    userId: string,
+    authSessionVersion: number,
+    value: CoupleSettings
+  ) => {
+    coupleSettingsFreshFor = { userId, authSessionVersion };
+    try {
+      await writeLocalCopy(userId, COUPLE_SETTINGS_COPY_KIND, value);
+    } catch (error) {
+      console.error('[Settings] Failed to save the couple settings copy:', error);
+    }
+  };
 
   /**
    * After a confirmed server answer for `userId` in `authSessionVersion` (the
@@ -177,18 +263,12 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
     // Initial state - use defaults that will be overridden by persist if data exists
     // Story 1.4: Pre-configured settings for single-user deployment
     settings: {
-      notificationTime: '09:00',
       relationship: {
-        startDate: APP_CONFIG.defaultStartDate,
-        partnerName: APP_CONFIG.defaultPartnerName,
         anniversaries: [],
-      },
-      notifications: {
-        enabled: true,
-        time: '09:00',
       },
     },
     isOnboarded: true,
+    coupleSettings: null,
 
     // Initialize app
     initializeApp: async () => {
@@ -499,6 +579,105 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         // The mirror and the copy stay as they were, so Home keeps its countdowns.
         console.error('[Settings] Failed to load anniversaries from the server:', error);
       }
+    },
+
+    loadCoupleSettings: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // 1. The saved copy, at once — online or offline. Skipped once this
+      // session has a server answer or a confirmed write, which is newer.
+      if (!isCoupleSettingsFresh(requestedBy, requestedInSession)) {
+        const saved = parseSavedCoupleSettings(
+          await readLocalCopy<unknown>(requestedBy, COUPLE_SETTINGS_COPY_KIND)
+        );
+        if (!isCurrent()) return;
+        if (saved && !isCoupleSettingsFresh(requestedBy, requestedInSession)) {
+          set({ coupleSettings: saved });
+        }
+      }
+
+      // 2. Offline there is nothing to ask; the copy (or nothing) stays shown.
+      if (!isOnline()) return;
+
+      // 3. Who the partner is. A failed lookup is NOT "unlinked": what is shown
+      // stays, and so does the copy. Outside the account-data queue because
+      // the lookup has no request timeout and must not hold the queue.
+      const lookup = await lookupPartnerId();
+      if (!isCurrent()) return;
+      if (lookup.status === 'error') {
+        console.error('[Settings] Partner lookup failed; keeping couple settings:', lookup.reason);
+        return;
+      }
+      if (lookup.status === 'unlinked') {
+        const next: CoupleSettings = { status: 'unlinked' };
+        set({ coupleSettings: next });
+        await saveCoupleSettingsCopy(requestedBy, requestedInSession, next);
+        return;
+      }
+
+      // 4. The server's row replaces state and copy — only on success. In the
+      // account-data queue, so it cannot read before a start-date write and
+      // land after it.
+      try {
+        await serializeAccountDataWrite(async () => {
+          const row = await coupleSettingsService.fetchCoupleSettings(
+            requestedBy,
+            lookup.partnerId
+          );
+          if (!isCurrent()) return;
+          const next: CoupleSettings = {
+            status: 'linked',
+            partnerId: lookup.partnerId,
+            relationshipStart: row.relationshipStart,
+          };
+          set({ coupleSettings: next });
+          await saveCoupleSettingsCopy(requestedBy, requestedInSession, next);
+        });
+      } catch (error) {
+        // State and copy stay as they were, so Home keeps its counter.
+        console.error('[Settings] Failed to load couple settings from the server:', error);
+      }
+    },
+
+    setRelationshipStart: async (relationshipStart) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to set your start date');
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // Refused before any request, so an offline edit changes nothing.
+      requireOnline('Couple settings');
+
+      const lookup = await lookupPartnerId();
+      if (lookup.status === 'error') {
+        throw new AccountDataError(
+          'transport',
+          'Could not reach your account to save the start date. Try again in a moment.'
+        );
+      }
+      if (lookup.status === 'unlinked') {
+        throw new Error('Link a partner first to set your start date');
+      }
+      if (!isCurrent()) return;
+
+      await serializeAccountDataWrite(async () => {
+        const saved = await coupleSettingsService.saveStartDate(
+          requestedBy,
+          lookup.partnerId,
+          relationshipStart
+        );
+        if (!isCurrent()) return;
+        const next: CoupleSettings = {
+          status: 'linked',
+          partnerId: lookup.partnerId,
+          relationshipStart: saved.relationshipStart,
+        };
+        set({ coupleSettings: next });
+        await saveCoupleSettingsCopy(requestedBy, requestedInSession, next);
+      });
     },
   };
 };

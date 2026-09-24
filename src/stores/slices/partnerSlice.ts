@@ -8,7 +8,8 @@
  * - Connection/accept/decline operations
  *
  * Cross-slice dependencies:
- * - None (self-contained)
+ * - Accepting a request refreshes the `couple-settings` local copy
+ *   (settingsSlice) through the local-copy registry, not a direct import
  *
  * Persistence:
  * - NOT persisted through Zustand. The partner profile is kept in the shared
@@ -18,7 +19,12 @@
 
 import type { PartnerInfo, PartnerRequest, UserSearchResult } from '../../api/partnerService';
 import { partnerService } from '../../api/partnerService';
-import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
+import {
+  readLocalCopy,
+  refreshLocalCopy,
+  registerLocalCopy,
+  writeLocalCopy,
+} from '../../services/localCopy';
 import type { AppStateCreator } from '../types';
 
 /** Local-copy kind for the partner profile. */
@@ -252,8 +258,14 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
     acceptPartnerRequest: async (requestId: string) => {
       try {
         await partnerService.acceptPartnerRequest(requestId);
-        // Reload partner and requests after accepting
-        await Promise.all([get().loadPartner(), get().loadPendingRequests()]);
+        // Reload partner and requests after accepting, and the couple's shared
+        // settings: the new pair has its own row (or none yet), and the copy
+        // still says "unlinked".
+        await Promise.all([
+          get().loadPartner(),
+          get().loadPendingRequests(),
+          refreshLocalCopy('couple-settings'),
+        ]);
       } catch (error) {
         console.error('[PartnerSlice] Error accepting partner request:', error);
         throw error;

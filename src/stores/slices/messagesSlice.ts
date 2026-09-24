@@ -8,7 +8,8 @@
  * - Import/export functionality
  *
  * Cross-slice dependencies:
- * - Depends on Settings (uses settings.relationship.startDate for message rotation)
+ * - Depends on Settings: `coupleSettings.relationshipStart` bounds how far back
+ *   history can be browsed (`canNavigateBack`); the rotation itself ignores it
  * - authSlice: custom messages belong to one account. Every action that reaches
  *   IndexedDB captures `{ userId, authSessionVersion }` at entry, passes the
  *   captured id to the service, and rechecks the pair before every post-await
@@ -438,11 +439,11 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     },
 
     canNavigateBack: () => {
-      const { messageHistory, settings } = get();
+      const { messageHistory, coupleSettings } = get();
 
-      if (!settings) return false;
-
-      const availableDays = getAvailableHistoryDays(messageHistory, settings);
+      const relationshipStart =
+        coupleSettings?.status === 'linked' ? coupleSettings.relationshipStart : null;
+      const availableDays = getAvailableHistoryDays(messageHistory, relationshipStart);
       return messageHistory.currentIndex < availableDays;
     },
 
