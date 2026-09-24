@@ -52,14 +52,15 @@ const SYNC_PROMISING_SYMBOLS = ['handleNetworkError', 'OFFLINE_ERROR_MESSAGE'] a
  *
  *   - `interactionService.ts` — module header, lines 8-16: "interactions are
  *     Supabase-only — no offline queue, no IndexedDB mirror, no retry".
- *   - `eventsService.ts:32` — "No realtime, no IndexedDB mirror: events are
- *     Supabase-only".
+ *   - `eventsService.ts` module header — "No realtime and no offline write
+ *     queue: every write needs the server".
  *   - `photoService.ts` — imports exactly `supabase` and `logger`. There is
  *     no IndexedDB `photos` store; `dbSchema.ts` dropped it at v11.
  *   - `notesSlice.ts` — contains no IndexedDB reference at all; writes go
  *     straight to Supabase.
- *   - `eventsSlice.ts:12` — "Supabase only. NOT persisted to localStorage and
- *     NOT mirrored to IndexedDB".
+ *   - `eventsSlice.ts` header, Persistence — it keeps a read-only local copy
+ *     filled "only from a successful load or a confirmed add, edit or delete",
+ *     and "Offline writes are refused": nothing is queued to sync.
  *   - `interactionsSlice.ts:14` — "Interactions are ephemeral (not persisted
  *     to LocalStorage/IndexedDB)".
  *

@@ -31,8 +31,9 @@
  * RLS filters a non-creator's UPDATE or DELETE silently — no error, no rows —
  * so without this the UI would report success for a no-op.
  *
- * No realtime, no IndexedDB mirror: events are Supabase-only, and freshness is
- * reload-based (see `integration-points.md` §8).
+ * No realtime and no offline write queue: every write needs the server. The
+ * read-only per-account copy the screens show offline is kept by `eventsSlice`
+ * (local-copy kind `events`), not here.
  *
  * @module services/eventsService
  */

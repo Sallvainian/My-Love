@@ -479,7 +479,8 @@ function App() {
   // Story 3 (dynamic events): load the couple's countdown events on first
   // Home render and on every later return to Home while signed in — covers
   // both "first load" and "B's next load of Home" (CAP-1). No live
-  // subscription: freshness is reload-based only, by design.
+  // subscription: the load shows the saved `events` copy first, then the
+  // server's page; the local-copy refresher skips Home, so this is its load.
   //
   // Store ownership changes synchronously at sign-out/account transitions;
   // same-session token refreshes leave it stable and do not reload events.
@@ -510,8 +511,10 @@ function App() {
     };
     // isOnline is a dep for exactly one reason: coming back online re-fires
     // the load, so the offline error card clears without leaving Home. The
-    // offline-direction re-fire just fails fast into the same parked error,
-    // and a failed refresh never blanks the last-good list (eventsSlice).
+    // offline-direction re-fire keeps the list on screen (saved copy or this
+    // session's server answer) without an error, or fails into the error card
+    // when nothing was ever saved; a failed refresh never blanks the last-good
+    // list (eventsSlice).
   }, [authUserId, authSessionVersion, currentView, isOnline, loadEvents]);
 
   // Bumped when a card retires itself at local midnight, purely to re-run the
