@@ -169,7 +169,11 @@ describe('DW-184: dialog semantics and focus', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(screen.queryByRole('button', { name: 'Delete First date' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Add Anniversary' })).toHaveFocus();
+    // The fallback focus runs in a passive-phase effect cleanup, which can land
+    // after the waitFor above has seen the dialog removed — poll for it.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add Anniversary' })).toHaveFocus()
+    );
   });
 });
 
@@ -248,7 +252,8 @@ describe('DW-187: form errors are linked and announced', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('You are offline.');
     const cancel = screen.getByRole('button', { name: 'Cancel' });
     expect(cancel).toBeEnabled();
-    expect(cancel).toHaveFocus();
+    // Focus moves in a passive effect after the alert renders — same race.
+    await waitFor(() => expect(cancel).toHaveFocus());
   });
 });
 

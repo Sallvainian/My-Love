@@ -310,7 +310,10 @@ describe('EventsSettings form focus', () => {
 
     await waitFor(() => expect(screen.getByTestId('events-form-error')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByTestId('events-form-submit')).not.toBeDisabled());
-    expect(document.activeElement).toBe(screen.getByTestId('events-form-submit'));
+    // The focus effect is passive-phase, so it can run after Save re-enables.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('events-form-submit'))
+    );
   });
 
   it.each(['add', 'edit'] as const)('focuses Refresh after an uncertain %s and the header after reconciliation', async (kind) => {
@@ -502,7 +505,10 @@ describe('EventsSettings delete dialog focus', () => {
 
     await waitFor(() => expect(screen.getByTestId('events-delete-error')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByTestId('events-delete-cancel')).not.toBeDisabled());
-    expect(document.activeElement).toBe(screen.getByTestId('events-delete-cancel'));
+    // Same passive-phase race as the Save test above — poll, don't read.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('events-delete-cancel'))
+    );
   });
 
   it('moves focus to the header when refreshing a stale delete', async () => {
