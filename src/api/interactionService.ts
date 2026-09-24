@@ -8,9 +8,12 @@
  * **The error convention.** This file throws, but never through
  * `handleNetworkError`: that helper closes every message it builds with "Your
  * changes will be synced when you're back online" (`errorHandlers.ts:95`), and
- * interactions are Supabase-only — no offline queue, no IndexedDB mirror, no
- * retry — so a poke that never left the device is not waiting to sync, it is
- * gone. The reasoning is written out at length in
+ * interaction WRITES have no offline queue and no retry, so a poke that never
+ * left the device is not waiting to sync, it is gone. (Reads are different:
+ * `interactionsSlice` keeps the last-loaded history as a per-account local
+ * copy, kind `interactions`, so the list shows offline — but that copy is
+ * filled only from this service's confirmed results, never from a pending
+ * send.) The reasoning is written out at length in
  * `src/services/eventsService.ts:19-26`, and the two local builders below are
  * copied from it. The helper's promise stays TRUE for its mood callers, which
  * do have a service-worker sync queue, so `errorHandlers.ts` is left alone.
