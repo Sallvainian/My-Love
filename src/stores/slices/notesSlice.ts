@@ -604,6 +604,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
    */
   let drainInFlight: Promise<void> | null = null;
   let drainRequested = false;
+  /** True while the drain waits for another tab to let go of the queue. */
+  let waitingForLock = false;
 
   /**
    * The queue is sent in `createdAt` order, and two notes composed within one
@@ -1657,6 +1659,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     drainQueuedNotes: () => {
       if (drainInFlight) {
         drainRequested = true;
+        // Nothing sends from this tab while it waits for another, so a note
+        // just composed or retried waits too.
+        if (waitingForLock) settleWaitingNotes();
         return drainInFlight;
       }
       const run = (async () => {
@@ -1678,7 +1683,12 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
               // Another context holds the queue and may send this tab's notes.
               // Once it lets go, pass again: that sends what it left and
               // confirms what it sent.
-              await waitForSyncLock(NOTE_QUEUE_LOCK);
+              waitingForLock = true;
+              try {
+                await waitForSyncLock(NOTE_QUEUE_LOCK);
+              } finally {
+                waitingForLock = false;
+              }
               drainRequested = true;
             } else {
               await confirmNotesSentElsewhere();

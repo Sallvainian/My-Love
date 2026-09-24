@@ -501,6 +501,37 @@ describe('notesSlice offline send queue', () => {
     expect(copy).toContain('server-2');
   });
 
+  it('a note composed while this tab waits for another tab\'s drain shows waiting, not sending', async () => {
+    stubWebLocks();
+    const tab1 = createTestStore();
+    const tab2 = createTestStore();
+    // Tab 1 holds the lock mid-insert of its own note.
+    const reply = deferred();
+    server.outcomes = [{ hold: reply.promise }];
+    await tab1.getState().sendNote('from tab1');
+    await vi.waitFor(() => expect(server.upserts).toBe(1));
+
+    // Tab 2's drain loses the lock and waits for tab 1 to let go.
+    await tab2.getState().sendNote('first');
+    await vi.waitFor(() =>
+      expect(tab2.getState().notes[0]).toMatchObject({ content: 'first', queued: true, sending: false })
+    );
+
+    // A note composed during that wait joins it: nothing sends from tab 2 yet.
+    await tab2.getState().sendNote('second');
+    await flush();
+    expect(tab2.getState().notes.find((n) => n.content === 'second')).toMatchObject({
+      queued: true,
+      sending: false,
+    });
+
+    reply.resolve();
+    await tab1.getState().drainQueuedNotes();
+    await tab2.getState().drainQueuedNotes();
+    expect(server.rows.map((r) => r.content)).toEqual(['from tab1', 'first', 'second']);
+    expect(await queuedIds()).toEqual([]);
+  });
+
   it('a later drain confirms a waiting note whose row another context already sent', async () => {
     const store = createTestStore();
     setOnline(false);
