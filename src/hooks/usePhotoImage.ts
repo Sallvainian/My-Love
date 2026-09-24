@@ -24,7 +24,11 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { readCachedImage } from '../services/imageCache';
-import { cachePhotoImage, onPhotoImageCached } from '../services/photoImageCache';
+import {
+  cachePhotoImage,
+  onPhotoImageCached,
+  type PhotoImageRef,
+} from '../services/photoImageCache';
 import { photoService } from '../services/photoService';
 import { useAppStore } from '../stores/useAppStore';
 import { logger } from '../utils/logger';
@@ -52,6 +56,22 @@ const isOffline = () => navigator.onLine === false;
 /** Automatic retries of an online download failure, then it stays `error`. */
 export const ERROR_RETRY_DELAYS_MS = [2_000, 10_000, 30_000] as const;
 
+// A download outlives its component's unmount by design, and its cache write
+// must still stop if the account signed out meanwhile (sign-out has already
+// emptied that account's cache), so these read the store at each check rather
+// than through a subscription that the unmount would remove.
+function ownsCurrentSession(userId: string, authSessionVersion: number): boolean {
+  // eslint-disable-next-line no-restricted-properties
+  const state = useAppStore.getState();
+  return state.userId === userId && state.authSessionVersion === authSessionVersion;
+}
+
+/** The photo list the refusal rule picks an eviction from, read when a write is refused. */
+function currentPhotos(): readonly PhotoImageRef[] {
+  // eslint-disable-next-line no-restricted-properties
+  return useAppStore.getState().photos;
+}
+
 const IDLE: PhotoImage = { status: 'idle', url: null };
 const LOADING: PhotoImage = { status: 'loading', url: null };
 
@@ -61,13 +81,6 @@ export function usePhotoImage(
 ): PhotoImage {
   const userId = useAppStore((state) => state.userId);
   const authSessionVersion = useAppStore((state) => state.authSessionVersion);
-  // The photo list the refusal rule picks an eviction from, read when a write
-  // is refused rather than when the effect started.
-  const photos = useAppStore((state) => state.photos);
-  const photosRef = useRef(photos);
-  useEffect(() => {
-    photosRef.current = photos;
-  }, [photos]);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   // Automatic `error` retries already spent on `baseKey`.
@@ -83,15 +96,7 @@ export function usePhotoImage(
     let isMounted = true;
     let objectUrl: string | null = null;
 
-    // The subscription notices an account switch synchronously, before React
-    // re-renders and re-runs this effect.
-    let sessionChanged = false;
-    const unsubscribe = useAppStore.subscribe((state) => {
-      if (state.userId !== userId || state.authSessionVersion !== authSessionVersion) {
-        sessionChanged = true;
-      }
-    });
-    const ownsSession = () => !sessionChanged;
+    const ownsSession = () => ownsCurrentSession(userId, authSessionVersion);
     const live = () => isMounted && ownsSession();
 
     const show = (blob: Blob) => {
@@ -132,7 +137,7 @@ export function usePhotoImage(
         {
           userId,
           isCurrent: ownsSession,
-          photos: () => photosRef.current,
+          photos: currentPhotos,
         },
         storagePath,
         downloaded
@@ -143,7 +148,6 @@ export function usePhotoImage(
 
     return () => {
       isMounted = false;
-      unsubscribe();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [active, key, storagePath, userId, authSessionVersion]);

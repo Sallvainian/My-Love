@@ -249,6 +249,45 @@ describe('usePhotoImage', () => {
   });
 });
 
+describe('usePhotoImage after unmount', () => {
+  it('a sign-out after the unmount stops the cache write of a download in flight', async () => {
+    const pending = deferred<Blob>();
+    downloadPhoto.mockReturnValueOnce(pending.promise);
+    const { unmount } = renderHook(() => usePhotoImage(PATH));
+    await waitFor(() => expect(downloadPhoto).toHaveBeenCalled());
+
+    // Leave the gallery, then sign out: sign-out empties A's image cache.
+    unmount();
+    useAppStore.setState({ userId: null, authSessionVersion: 2 });
+    pending.resolve(new Blob(['A-IMAGE']));
+    await act(async () => {});
+
+    expect(cachePhotoImage).not.toHaveBeenCalled();
+  });
+
+  it('a download that lands after the unmount is cached against the live session and list', async () => {
+    const pending = deferred<Blob>();
+    downloadPhoto.mockReturnValueOnce(pending.promise);
+    const { unmount } = renderHook(() => usePhotoImage(PATH));
+    await waitFor(() => expect(downloadPhoto).toHaveBeenCalled());
+
+    unmount();
+    pending.resolve(new Blob(['A-IMAGE']));
+    await waitFor(() => expect(cachePhotoImage).toHaveBeenCalledTimes(1));
+    const session = cachePhotoImage.mock.calls[0][0] as PhotoCacheSession;
+
+    act(() => {
+      useAppStore.setState({ photos: [] });
+    });
+    expect(session.photos()).toEqual([]);
+    expect(session.isCurrent()).toBe(true);
+    act(() => {
+      useAppStore.setState({ userId: null, authSessionVersion: 2 });
+    });
+    expect(session.isCurrent()).toBe(false);
+  });
+});
+
 describe('usePhotoImage recovers without a remount', () => {
   it('an error shows the image once the fill caches it, with no second download', async () => {
     downloadPhoto.mockRejectedValueOnce(new Error('503'));
