@@ -73,9 +73,11 @@ function LoveNoteMessageComponent({
   const fullTimestamp = formatFullTimestamp(displayTime);
 
   // A note still carrying a tempId has no server row -- its `id` IS the temp
-  // string, and a failed send keeps it -- so there is nothing a removal could
-  // reference. Offering the control there would post `temp-...` into a uuid.
-  const canRemove = !!onRequestRemove && !message.tempId;
+  // string -- so there is nothing a removal could reference. A failed one is
+  // offered anyway: LoveNotes confirms it with the same dialog and deletes it
+  // from this device (removeFailedMessage), never through removeNote. A note
+  // that is sending or waiting to send is offered nothing.
+  const canRemove = !!onRequestRemove && (!message.tempId || !!message.error);
 
   // The signed-in identity: server images are cached per account.
   const userId = useAppStore((state) => state.userId);

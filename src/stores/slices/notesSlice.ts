@@ -1606,8 +1606,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
 
       // An optimistic note's id IS its tempId (see sendNote), so there is no
       // server row to point at and note_id would reject the `temp-` string. A
-      // failed send keeps that id too. The UI does not offer removal in either
-      // state; this guards the store for callers that bypass it.
+      // failed send keeps that id too. The UI offers no removal while a note
+      // sends, and deletes a failed one with removeFailedMessage instead; this
+      // guards the store for callers that bypass it.
       if (target.tempId) {
         logger.debug('[NotesSlice] Refusing to remove a note with no server row:', noteId);
         throw new Error('That message has not finished sending');

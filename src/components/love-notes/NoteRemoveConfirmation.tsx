@@ -9,6 +9,10 @@
  * There is one love_notes row per message and it is simultaneously the partner's
  * copy, so the partner's thread is untouched and they cannot tell.
  *
+ * A note that failed to send (it still carries its tempId) is confirmed here
+ * too, but it has no server row and no partner copy: LoveNotes deletes it from
+ * this device, and the wording says so.
+ *
  * Rendered by LoveNotes, outside the virtualized list, rather than from inside a
  * row: MessageList's rows live in an overflow-hidden container and framer-motion
  * puts a transform on the message wrapper, which would make a fixed-position
@@ -166,6 +170,8 @@ export function NoteRemoveConfirmation({
   };
 
   const preview = note.content?.trim() ? note.content.trim() : 'this photo';
+  // A failed send: the partner never received it, so "keeps their copy" would be false.
+  const neverSent = !!note.tempId;
 
   return (
     <div
@@ -194,10 +200,16 @@ export function NoteRemoveConfirmation({
           <p className="line-clamp-3 rounded-[14px] bg-card2 px-3 py-2 text-sm text-muted italic">
             {preview}
           </p>
-          <p className="text-[15px] text-ink">
-            This removes it from <span className="font-semibold">your</span> history only.
-            Your partner keeps their copy and will not be told.
-          </p>
+          {neverSent ? (
+            <p className="text-[15px] text-ink">
+              This message was never sent and will be deleted from this device.
+            </p>
+          ) : (
+            <p className="text-[15px] text-ink">
+              This removes it from <span className="font-semibold">your</span> history only.
+              Your partner keeps their copy and will not be told.
+            </p>
+          )}
           <p className="text-sm text-muted">You cannot undo this.</p>
 
           {error && (
