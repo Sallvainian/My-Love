@@ -104,10 +104,10 @@ jobs:
             findings that failed this gate; it carries its own additional bar, below.
 
             `AGENTS.md` deliberately names code that ALREADY violates its own rules —
-            the four modules still calling `supabase.channel()` directly, the mutators
-            still missing the userId guard. That is documentation of known debt, not a
-            work list. Report it only if THIS diff touches that code and leaves it
-            worse. Opening a review by relisting it is a failed review.
+            the two modules still calling `supabase.channel()` directly. That is
+            documentation of known debt, not a work list. Report it only if THIS
+            diff touches that code and leaves it worse. Opening a review by
+            relisting it is a failed review.
 
             ## Project-specific checks
 
@@ -116,9 +116,9 @@ jobs:
             reporting against it.
 
             1. **Cross-account leakage.** An async store action that `set()`s after an
-               `await` without first re-checking `get().userId` against the captured
-               id. A new `BaseIndexedDBService.getAll()` call not scoped by `userId`
-               in the service layer.
+               `await` without first capturing `{ userId, authSessionVersion }` and
+               re-checking both. A new `BaseIndexedDBService.getAll()` call not
+               scoped by `userId` in the service layer.
             2. **Realtime teardown.** Any new direct `supabase.channel()` call. New
                Realtime work belongs in `moodSyncService`'s refcounted registry or
                `sendEphemeralBroadcast()`.
@@ -127,9 +127,11 @@ jobs:
                `.upsert(..., { onConflict, ignoreDuplicates: true })`. Compare against
                `notesSlice.ts` or `photoService.ts`.
             4. **Wrong data model.** Data-layer code written for a model the feature
-               does not use: photos, love notes and partner interactions are
-               Supabase-only, while mood and the bundled daily messages are
-               offline-first with IndexedDB primary. Check how the feature is wired.
+               does not use: photos, partner interactions and the love-notes thread
+               are sent online but shown offline from per-account local copies,
+               love-note text is queued offline, and mood and the bundled daily
+               messages are offline-first with IndexedDB primary. Check how the
+               feature is wired.
             5. **Error contract.** Assuming IndexedDB semantics (reads return
                `null`/`[]`, writes throw) of a Supabase API function or the reverse.
                The Supabase layer is inconsistent — check the specific function called.
