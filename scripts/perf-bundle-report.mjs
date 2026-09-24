@@ -15,7 +15,7 @@ import { Writable } from 'node:stream';
 const ROOT = process.cwd();
 const DIST_ASSETS = join(ROOT, 'dist', 'assets');
 const OUTPUT_FILE = join(ROOT, 'docs', 'performance', 'bundle-report.md');
-const BUILD_LOG_FILE = join(ROOT, 'docs', 'performance', 'perf-build.log');
+const BUILD_LOG_FILE = join(ROOT, 'test-results', 'performance', 'perf-build.log');
 
 const TARGET_PREFIXES = ['index-', 'vendor-supabase-', 'vendor-animation-', 'vendor-state-'];
 
