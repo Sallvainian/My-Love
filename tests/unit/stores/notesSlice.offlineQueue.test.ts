@@ -501,6 +501,53 @@ describe('notesSlice offline send queue', () => {
     expect(copy).toContain('server-2');
   });
 
+  it('another tab sends this tab\'s waiting note and the server rejects it: this tab shows it failed, with Retry', async () => {
+    stubWebLocks();
+    const tab1 = createTestStore();
+    const tab2 = createTestStore();
+    // Tab 1 holds the lock mid-insert of its own note; tab 2's note is refused.
+    const reply = deferred();
+    server.outcomes = [{ hold: reply.promise }, { reject: '23514' }];
+    await tab1.getState().sendNote('from tab1');
+    await vi.waitFor(() => expect(server.upserts).toBe(1));
+
+    // Tab 2's drain loses the lock, so its note waits.
+    await tab2.getState().sendNote('from tab2');
+    await vi.waitFor(() =>
+      expect(tab2.getState().notes[0]).toMatchObject({ content: 'from tab2', queued: true, sending: false })
+    );
+    const key = tab2.getState().notes[0].tempId!;
+
+    // Tab 1 re-reads the shared queue, sends tab 2's note, and it is rejected.
+    reply.resolve();
+    await tab1.getState().drainQueuedNotes();
+    expect(server.rows.map((r) => r.content)).toEqual(['from tab1']);
+    expect(await listQueuedNotes(A)).toEqual([expect.objectContaining({ id: key, failed: true })]);
+
+    // No further trigger: tab 2 shows it failed once tab 1's drain lets go,
+    // exactly as its own drain marks a rejection, and raises no banner.
+    await vi.waitFor(() =>
+      expect(tab2.getState().notes[0]).toMatchObject({
+        tempId: key,
+        queued: true,
+        sending: false,
+        error: true,
+      })
+    );
+    expect(tab2.getState().notesError).toBeNull();
+    await tab2.getState().drainQueuedNotes();
+    expect(server.upserts).toBe(2);
+
+    // Retry from tab 2 resends it under the same key.
+    await tab2.getState().retryFailedMessage(key);
+    expect(server.rows.map((r) => [r.content, r.idempotency_key])).toEqual([
+      ['from tab1', expect.any(String)],
+      ['from tab2', key],
+    ]);
+    expect(tab2.getState().notes[0]).toMatchObject({ id: 'server-2', error: false });
+    expect(await queuedIds()).toEqual([]);
+  });
+
   it('a note composed while this tab waits for another tab\'s drain shows waiting, not sending', async () => {
     stubWebLocks();
     const tab1 = createTestStore();
