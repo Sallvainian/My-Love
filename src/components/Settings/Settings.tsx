@@ -4,8 +4,9 @@
  * Application settings screen on the style kit: account (identity, display
  * name, your own birthday, the couple's shared "Together since" start and
  * wedding date), the couple's
- * countdowns (events and anniversaries), about (with the welcome-message
- * replay) and sign out.
+ * countdowns (events and anniversaries), photos (this device's mobile-data
+ * choice for the offline album), about (with the welcome-message replay) and
+ * sign out.
  *
  * @component
  */
@@ -21,11 +22,18 @@ import {
   LogOut,
   Pencil,
   RotateCcw,
+  Signal,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { authService } from '../../api/authService';
 import { lookupOwnDisplayName, type OwnDisplayNameLookup } from '../../api/supabaseClient';
 import { parseEventDate } from '../../services/eventsService';
+import {
+  canTellMobileData,
+  getPhotosOverMobileData,
+  setPhotosOverMobileData,
+  subscribePhotosOverMobileData,
+} from '../../services/photoDownloadPreference';
 import { refreshLocalCopy } from '../../services/localCopy';
 import { PROFILE_COPY_KIND } from '../../stores/slices/settingsSlice';
 import { useAppStore } from '../../stores/useAppStore';
@@ -419,6 +427,65 @@ function WeddingForm({ weddingDate }: { weddingDate: string | null }) {
   );
 }
 
+/**
+ * "Download photos over mobile data": this DEVICE's choice for the background
+ * photo fill (`photoImageCache.ts`), default off. Photos opened on screen are
+ * downloaded either way. A browser that does not report the connection type
+ * cannot be held to Wi-Fi, so the row says so instead.
+ */
+function MobileDataPhotosRow() {
+  const allowed = useSyncExternalStore(
+    subscribePhotosOverMobileData,
+    getPhotosOverMobileData,
+    getPhotosOverMobileData
+  );
+  const helper = canTellMobileData()
+    ? 'Off: the photo album is saved for offline use only on Wi-Fi.'
+    : "This phone doesn't tell the app whether it's on Wi-Fi, so photos are saved on any connection.";
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={allowed}
+      aria-labelledby="settings-mobile-data-photos-label"
+      aria-describedby="settings-mobile-data-photos-helper"
+      onClick={() => setPhotosOverMobileData(!allowed)}
+      className={ROW_BUTTON}
+      data-testid="settings-mobile-data-photos"
+    >
+      <span className={TILE} aria-hidden="true">
+        <Signal className="h-[17px] w-[17px]" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span id="settings-mobile-data-photos-label" className="text-[15px] font-medium text-ink">
+          Download photos over mobile data
+        </span>
+        <span
+          id="settings-mobile-data-photos-helper"
+          className="text-[13px] break-words text-muted"
+          data-testid="settings-mobile-data-photos-helper"
+        >
+          {helper}
+        </span>
+      </span>
+      {/* The switch's track and thumb; the state itself is `aria-checked`. */}
+      <span
+        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
+          allowed ? 'bg-fill' : 'bg-line-strong'
+        }`}
+        aria-hidden="true"
+      >
+        <span
+          className={`inline-block h-5 w-5 rounded-full bg-card shadow transition-transform ${
+            allowed ? 'translate-x-6' : 'translate-x-1'
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
+
 interface SettingsProps {
   /** Replays the welcome splash; the About row is not rendered without it. */
   onShowWelcome?: () => void;
@@ -604,6 +671,16 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           <EventsSettings />
           <div className={DIVIDER} aria-hidden="true" />
           <AnniversarySettings />
+        </div>
+      </section>
+
+      {/* Photos — a device preference, not account data. */}
+      <section className="flex flex-col gap-2" aria-labelledby="settings-photos-label">
+        <h2 id="settings-photos-label" className={SECTION_LABEL}>
+          Photos
+        </h2>
+        <div className={CARD}>
+          <MobileDataPhotosRow />
         </div>
       </section>
 

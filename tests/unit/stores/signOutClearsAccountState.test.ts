@@ -57,6 +57,8 @@ const EXPECTED_RESET: Record<string, unknown> = {
   customMessagesLoaded: false,
   favoriteError: null,
   photos: [],
+  photosLoaded: false,
+  photosLoadError: null,
   storageWarning: null,
   interactions: [],
   unviewedCount: 0,
@@ -137,6 +139,8 @@ function seedSignedInSession(): void {
     notesPendingRemoval: ['note-1'],
 
     photos: [{ id: 'photo-1', caption: SECRETS.photoCaption }],
+    photosLoaded: true,
+    photosLoadError: 'A photo list read failed',
 
     // The AdminPanel list, plus the rotation pool the same rows feed into.
     // `messages` deliberately mixes the two kinds: a bundled daily row shared
