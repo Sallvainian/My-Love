@@ -45,6 +45,13 @@
  * images can never be evicted. There is no count or size cap and no eviction
  * without a refusal.
  *
+ * ## Cached notice
+ *
+ * Every successful write is announced to `onPhotoImageCached` listeners, so a
+ * display that could not show an image (`usePhotoImage`'s `unavailable` or
+ * `error`) reads the cache again as soon as the fill — or another display of
+ * the same photo — has stored it.
+ *
  * ## Identity
  *
  * Every read, write and delete runs under the session's CAPTURED `userId`, and
@@ -92,6 +99,30 @@ export type PhotoCacheWriteResult = 'cached' | 'refused' | 'failed' | 'stale' | 
 
 const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
+type CachedListener = (userId: string, path: string) => void;
+const cachedListeners = new Set<CachedListener>();
+
+/**
+ * Be told each time a photo image is written to the cache, with the account
+ * and storage path it was written under. Returns the unsubscribe.
+ */
+export function onPhotoImageCached(listener: CachedListener): () => void {
+  cachedListeners.add(listener);
+  return () => {
+    cachedListeners.delete(listener);
+  };
+}
+
+function announceCached(userId: string, path: string): void {
+  for (const listener of Array.from(cachedListeners)) {
+    try {
+      listener(userId, path);
+    } catch (error) {
+      console.error('[photoImageCache] A cached-image listener failed:', error);
+    }
+  }
+}
+
 /** On mobile data (or data saver) and the user has not allowed the fill there. */
 const heldForMobileData = () => onMeteredConnection() && !getPhotosOverMobileData();
 
@@ -135,6 +166,7 @@ export async function cachePhotoImage(
     if (!session.photos().some((photo) => photo.storage_path === path)) return 'removed';
     try {
       await writeCachedImage(session.userId, path, blob);
+      announceCached(session.userId, path);
       return 'cached';
     } catch (error) {
       if (!isQuotaError(error)) {

@@ -13,12 +13,18 @@
  *
  * There is no signed-URL fallback. Identity is captured before the first
  * await; a result raised for one account or session is never cached or shown
- * under another. An `unavailable` or `error` image tries again when the
- * connection returns.
+ * under another.
+ *
+ * An `unavailable` or `error` image loads again, without a remount, when the
+ * connection returns and when this account's image for the path is cached
+ * (the background fill, or another display of the same photo). An `error` is
+ * also retried on its own a few times (`ERROR_RETRY_DELAYS_MS`), because on an
+ * already-online device neither of those may ever happen: the fill can be held
+ * off mobile data, and a failure it met is only retried by its next run.
  */
 import { useEffect, useRef, useState } from 'react';
 import { readCachedImage } from '../services/imageCache';
-import { cachePhotoImage } from '../services/photoImageCache';
+import { cachePhotoImage, onPhotoImageCached } from '../services/photoImageCache';
 import { photoService } from '../services/photoService';
 import { useAppStore } from '../stores/useAppStore';
 import { logger } from '../utils/logger';
@@ -43,6 +49,9 @@ type Loaded = PhotoImage & { key: string };
 /** Read fresh at each call: TypeScript would otherwise keep an earlier narrowing. */
 const isOffline = () => navigator.onLine === false;
 
+/** Automatic retries of an online download failure, then it stays `error`. */
+export const ERROR_RETRY_DELAYS_MS = [2_000, 10_000, 30_000] as const;
+
 const IDLE: PhotoImage = { status: 'idle', url: null };
 const LOADING: PhotoImage = { status: 'loading', url: null };
 
@@ -60,10 +69,13 @@ export function usePhotoImage(
     photosRef.current = photos;
   }, [photos]);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [onlineTick, setOnlineTick] = useState(0);
+  const [reloadTick, setReloadTick] = useState(0);
+  // Automatic `error` retries already spent on `baseKey`.
+  const errorRetries = useRef({ baseKey: '', count: 0 });
 
   const active = !!storagePath && enabled && !!userId;
-  const key = `${userId ?? ''}|${authSessionVersion}|${storagePath ?? ''}|${retryKey}|${onlineTick}`;
+  const baseKey = `${userId ?? ''}|${authSessionVersion}|${storagePath ?? ''}|${retryKey}`;
+  const key = `${baseKey}|${reloadTick}`;
 
   useEffect(() => {
     if (!active || !storagePath || !userId) return;
@@ -142,15 +154,36 @@ export function usePhotoImage(
       ? { status: loaded.status, url: loaded.url }
       : LOADING;
 
-  // Not saved here, or the download failed: try again when the connection
-  // returns (the background fill may also have cached it by then).
-  const retryWhenOnline = active && (current.status === 'unavailable' || current.status === 'error');
+  // Not saved here, or the download failed: load again when the connection
+  // returns, or as soon as this account's image for the path is cached.
+  const waiting = active && (current.status === 'unavailable' || current.status === 'error');
   useEffect(() => {
-    if (!retryWhenOnline) return;
-    const onOnline = () => setOnlineTick((tick) => tick + 1);
-    window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
-  }, [retryWhenOnline]);
+    if (!waiting || !userId || !storagePath) return;
+    const reload = () => setReloadTick((tick) => tick + 1);
+    window.addEventListener('online', reload);
+    const unsubscribe = onPhotoImageCached((cachedUserId, cachedPath) => {
+      if (cachedUserId === userId && cachedPath === storagePath) reload();
+    });
+    return () => {
+      window.removeEventListener('online', reload);
+      unsubscribe();
+    };
+  }, [waiting, userId, storagePath]);
+
+  // An online download failure (a Storage 5xx, a rate limit, a token-refresh
+  // race) is retried a few times with a growing delay. A new photo, session or
+  // retryKey starts the count again.
+  const failed = active && current.status === 'error';
+  useEffect(() => {
+    if (!failed) return;
+    const spent = errorRetries.current.baseKey === baseKey ? errorRetries.current.count : 0;
+    if (spent >= ERROR_RETRY_DELAYS_MS.length) return;
+    const timer = setTimeout(() => {
+      errorRetries.current = { baseKey, count: spent + 1 };
+      setReloadTick((tick) => tick + 1);
+    }, ERROR_RETRY_DELAYS_MS[spent]);
+    return () => clearTimeout(timer);
+  }, [failed, baseKey]);
 
   return current;
 }

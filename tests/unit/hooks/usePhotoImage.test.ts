@@ -14,6 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const readCachedImage = vi.hoisted(() => vi.fn<(userId: string, path: string) => Promise<Blob | null>>());
 const downloadPhoto = vi.hoisted(() => vi.fn<(path: string) => Promise<Blob>>());
 const cachePhotoImage = vi.hoisted(() => vi.fn());
+/** The real module's "image cached" notice, as a registry the tests fire. */
+const cachedListeners = vi.hoisted(() => new Set<(userId: string, path: string) => void>());
 
 vi.mock('@/services/imageCache', () => ({
   readCachedImage: (userId: string, path: string) => readCachedImage(userId, path),
@@ -23,6 +25,12 @@ vi.mock('@/services/photoService', () => ({
 }));
 vi.mock('@/services/photoImageCache', () => ({
   cachePhotoImage: (...args: unknown[]) => cachePhotoImage(...args),
+  onPhotoImageCached: (listener: (userId: string, path: string) => void) => {
+    cachedListeners.add(listener);
+    return () => {
+      cachedListeners.delete(listener);
+    };
+  },
 }));
 vi.mock('@/stores/useAppStore', async () => {
   const { create } = await import('zustand');
@@ -35,7 +43,7 @@ vi.mock('@/stores/useAppStore', async () => {
   };
 });
 
-import { usePhotoImage } from '@/hooks/usePhotoImage';
+import { ERROR_RETRY_DELAYS_MS, usePhotoImage } from '@/hooks/usePhotoImage';
 import type { PhotoCacheSession } from '@/services/photoImageCache';
 import { useAppStore } from '@/stores/useAppStore';
 
@@ -76,9 +84,22 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   setOnline(true);
 });
+
+/** Announce that `path` was cached for `userId`, as `cachePhotoImage` does. */
+function announceCached(userId: string, path: string) {
+  act(() => {
+    for (const listener of Array.from(cachedListeners)) listener(userId, path);
+  });
+}
+
+/** Settle the hook's awaits while timers are fake (waitFor needs real ones). */
+async function settle() {
+  for (let i = 0; i < 5; i++) await act(async () => {});
+}
 
 describe('usePhotoImage', () => {
   it('shows the cached image without downloading', async () => {
@@ -225,5 +246,129 @@ describe('usePhotoImage', () => {
     expect(result.current.url).toBeNull();
     // The new session reads under its own account.
     await waitFor(() => expect(readCachedImage).toHaveBeenCalledWith('USER-B', PATH));
+  });
+});
+
+describe('usePhotoImage recovers without a remount', () => {
+  it('an error shows the image once the fill caches it, with no second download', async () => {
+    downloadPhoto.mockRejectedValueOnce(new Error('503'));
+    const { result } = renderHook(() => usePhotoImage(PATH));
+    await waitFor(() => expect(result.current.status).toBe('error'));
+
+    // The background fill stores this photo's image a moment later.
+    readCachedImage.mockResolvedValue(new Blob(['CACHED BY THE FILL']));
+    announceCached('USER-A', PATH);
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(downloadPhoto).toHaveBeenCalledTimes(1);
+  });
+
+  it('an unavailable image shows once it is cached', async () => {
+    setOnline(false);
+    const { result } = renderHook(() => usePhotoImage(PATH));
+    await waitFor(() => expect(result.current.status).toBe('unavailable'));
+
+    readCachedImage.mockResolvedValue(new Blob(['CACHED']));
+    announceCached('USER-A', PATH);
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+  });
+
+  it("ignores another photo's or another account's cached image", async () => {
+    setOnline(false);
+    const { result } = renderHook(() => usePhotoImage(PATH));
+    await waitFor(() => expect(result.current.status).toBe('unavailable'));
+    readCachedImage.mockClear();
+
+    announceCached('USER-A', 'owner/other.jpg');
+    announceCached('USER-B', PATH);
+    await act(async () => {});
+
+    expect(readCachedImage).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('unavailable');
+  });
+
+  it('stops listening once the image is shown or the hook unmounts', async () => {
+    readCachedImage.mockResolvedValue(new Blob(['CACHED']));
+    const shown = renderHook(() => usePhotoImage(PATH));
+    await waitFor(() => expect(shown.result.current.status).toBe('ready'));
+    expect(cachedListeners.size).toBe(0);
+
+    readCachedImage.mockResolvedValue(null);
+    setOnline(false);
+    const waiting = renderHook(() => usePhotoImage('owner/p1.jpg'));
+    await waitFor(() => expect(waiting.result.current.status).toBe('unavailable'));
+    expect(cachedListeners.size).toBe(1);
+    waiting.unmount();
+    expect(cachedListeners.size).toBe(0);
+  });
+
+  it('retries an online download failure on its own', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    downloadPhoto.mockRejectedValueOnce(new Error('503'));
+    const { result } = renderHook(() => usePhotoImage(PATH));
+    await settle();
+    expect(result.current.status).toBe('error');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ERROR_RETRY_DELAYS_MS[0]);
+    });
+    await settle();
+
+    expect(result.current.status).toBe('ready');
+    expect(downloadPhoto).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops retrying on its own after the last delay, and a retryKey starts again', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    downloadPhoto.mockRejectedValue(new Error('503'));
+    const { result, rerender } = renderHook(({ retryKey }) => usePhotoImage(PATH, { retryKey }), {
+      initialProps: { retryKey: 0 },
+    });
+    await settle();
+
+    for (const delay of ERROR_RETRY_DELAYS_MS) {
+      expect(result.current.status).toBe('error');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(delay);
+      });
+      await settle();
+    }
+    expect(result.current.status).toBe('error');
+    expect(downloadPhoto).toHaveBeenCalledTimes(1 + ERROR_RETRY_DELAYS_MS.length);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+    });
+    await settle();
+    expect(downloadPhoto).toHaveBeenCalledTimes(1 + ERROR_RETRY_DELAYS_MS.length);
+
+    // The viewer's Retry: a fresh load, and a fresh set of automatic retries.
+    downloadPhoto.mockRejectedValueOnce(new Error('503'));
+    downloadPhoto.mockResolvedValueOnce(new Blob(['OK']));
+    rerender({ retryKey: 1 });
+    await settle();
+    expect(result.current.status).toBe('error');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ERROR_RETRY_DELAYS_MS[0]);
+    });
+    await settle();
+    expect(result.current.status).toBe('ready');
+  });
+
+  it('does not retry an unavailable image on a timer', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    setOnline(false);
+    const { result } = renderHook(() => usePhotoImage(PATH));
+    await settle();
+    expect(result.current.status).toBe('unavailable');
+    readCachedImage.mockClear();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+    });
+    await settle();
+
+    expect(readCachedImage).not.toHaveBeenCalled();
   });
 });

@@ -55,6 +55,7 @@ vi.mock('../../../src/services/photoService', () => ({
 import { setPhotosOverMobileData } from '../../../src/services/photoDownloadPreference';
 import {
   cachePhotoImage,
+  onPhotoImageCached,
   requestPhotoImageFill,
   type PhotoCacheSession,
   type PhotoImageRef,
@@ -550,5 +551,60 @@ describe('mobile data', () => {
 
     await vi.waitFor(() => expect(cache.writes).toEqual(photos.map((p) => p.storage_path)));
     expect(download.mock.calls.map(([path]) => path)).toEqual(photos.map((p) => p.storage_path));
+  });
+});
+
+describe('the cached notice', () => {
+  it('announces each image the fill stores, under its account and path', async () => {
+    const heard = vi.fn();
+    const stop = onPhotoImageCached(heard);
+    const photos = list(2);
+
+    await requestPhotoImageFill(session(() => photos));
+    stop();
+
+    expect(heard.mock.calls).toEqual([
+      [A, 'owner/p0.jpg'],
+      [A, 'owner/p1.jpg'],
+    ]);
+  });
+
+  it('announces nothing that was not stored, and nothing after unsubscribing', async () => {
+    const heard = vi.fn();
+    const stop = onPhotoImageCached(heard);
+    const photos = list(2);
+
+    expect(await cachePhotoImage(session(() => photos), 'owner/gone.jpg', new Blob(['x']))).toBe(
+      'removed'
+    );
+    expect(
+      await cachePhotoImage(session(() => photos, () => false), 'owner/p0.jpg', new Blob(['x']))
+    ).toBe('stale');
+    cache.failNextWrite = new Error('disk error');
+    expect(await cachePhotoImage(session(() => photos), 'owner/p0.jpg', new Blob(['x']))).toBe(
+      'failed'
+    );
+    cache.capacity = 0;
+    expect(await cachePhotoImage(session(() => photos), 'owner/p0.jpg', new Blob(['x']))).toBe(
+      'refused'
+    );
+    expect(heard).not.toHaveBeenCalled();
+
+    cache.capacity = Infinity;
+    stop();
+    await cachePhotoImage(session(() => photos), 'owner/p0.jpg', new Blob(['x']));
+    expect(heard).not.toHaveBeenCalled();
+  });
+
+  it('a failing listener does not fail the write', async () => {
+    const stop = onPhotoImageCached(() => {
+      throw new Error('listener bug');
+    });
+
+    const result = await cachePhotoImage(session(() => list(1)), 'owner/p0.jpg', new Blob(['x']));
+    stop();
+
+    expect(result).toBe('cached');
+    expect(console.error).toHaveBeenCalled();
   });
 });
