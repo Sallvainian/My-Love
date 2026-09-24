@@ -68,7 +68,12 @@ async function expectCardCountsDownTo(card: Locator, isoDate: string): Promise<v
           const now = new Date();
           const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
           const target = new Date(year, month - 1, day);
-          const days = Math.round((target.getTime() - todayMidnight.getTime()) / 86400000);
+          const calendarDays = Math.round(
+            (target.getTime() - todayMidnight.getTime()) / 86400000
+          );
+          // Whole days left: the part of today already gone moves to the clock.
+          const intoToday = now.getTime() > todayMidnight.getTime() ? 1 : 0;
+          const days = calendarDays - intoToday;
           const expected = `${days} ${days === 1 ? 'day' : 'days'}`;
           return (element.textContent ?? '').includes(expected);
         }, isoDate),

@@ -13,8 +13,9 @@
  * InteractionHistory) keeps meaning "below the chrome" without an edit.
  *
  * The dock is `fixed`, so it is invisible to layout. The space it needs lives
- * in one place, `--dock-clearance` in index.css; <main>, LoveNotes' height and
- * the floating buttons all read it rather than hardcoding the dock's size.
+ * in one place, `--dock-clearance` (and `--dock-top`, the dock's top edge) in
+ * index.css; <main> and the floating buttons read them rather than hardcoding
+ * the dock's size. Change the dock's inset or height and update both.
  *
  * Every colour is a style-kit token from index.css (`bg-glass`, `text-ink`,
  * `text-muted`, `bg-tint`/`text-accent`, `bg-fill`, `ring-line`,

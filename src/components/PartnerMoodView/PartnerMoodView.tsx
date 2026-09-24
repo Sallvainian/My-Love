@@ -448,7 +448,7 @@ export function PartnerMoodView() {
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Enter email or name..."
-                  className="h-12 w-full rounded-[14px] bg-field pr-4 pl-11 text-[15px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none"
+                  className="h-12 w-full rounded-[14px] bg-field pr-4 pl-11 text-base text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none"
                   data-testid="partner-search-input"
                 />
               </div>

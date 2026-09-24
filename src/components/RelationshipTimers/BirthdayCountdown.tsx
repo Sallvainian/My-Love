@@ -6,8 +6,9 @@
  * person sets for themselves in Settings) and reaches this card through the
  * `profile` or `partner` local copy, so it also shows offline.
  *
- * The card shows only a day count; its 1s interval exists to flip the "today"
- * state (and the day count) when local midnight passes.
+ * An upcoming birthday shows the whole days left and a live h/m/s clock to the
+ * local midnight that starts it; the 1s interval drives that clock and flips
+ * the "today" state when local midnight passes.
  *
  * Rendered as the shared CountdownCard:
  * - set: "{name} turns {age}" over the day count ("You turn {age}" with no
@@ -23,7 +24,13 @@ import { Cake } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { parseEventDate } from '../../services/eventsService';
 import { CountdownCard, type CountdownTone } from './CountdownCard';
-import { getCalendarDaysDiff } from './eventCountdownHelpers';
+import {
+  formatCountdownClock,
+  formatDayCount,
+  getCalendarDaysDiff,
+  getCountdownToDay,
+  type CountdownParts,
+} from './eventCountdownHelpers';
 
 /** A birthday's parts, read from its `YYYY-MM-DD` string. */
 interface BirthdayInfo {
@@ -77,24 +84,25 @@ function getUpcomingAge(birthday: BirthdayInfo, now: Date = new Date()): number 
 }
 
 function computeBirthdayCountdownState(birthday: BirthdayInfo): {
-  calendarDays: number;
   upcomingAge: number;
   isBirthdayToday: boolean;
+  /** Time left until the birthday starts; `null` on the day itself. */
+  remaining: CountdownParts | null;
 } {
   // One clock sample for every figure, so a tick straddling midnight cannot
   // mix "today" from one side with the day count from the other.
   const now = new Date();
   const nextBirthday = getNextBirthday(birthday, now);
-  // Calendar days, the same count EventCountdown shows, so a birthday and an
-  // event on one date never read a day apart (whole 24h periods drop a day
-  // after midnight and across a 23-hour DST day).
+  // The same wall-clock countdown EventCountdown shows, so a birthday and an
+  // event on one date never read apart (whole 24h periods would drift by an
+  // hour across a DST day).
   const calendarDays = getCalendarDaysDiff(nextBirthday, now);
 
   return {
-    calendarDays,
     upcomingAge: getUpcomingAge(birthday, now),
     // The next occurrence is never before today, so 0 days is today itself.
     isBirthdayToday: calendarDays === 0,
+    remaining: getCountdownToDay(nextBirthday, now),
   };
 }
 
@@ -144,16 +152,14 @@ function BirthdayCountdownCounter({
     setState(computeBirthdayCountdownState(info));
   }, [info]);
 
-  // Tick every second so the "today" state and day count flip at local midnight
+  // Tick every second: the clock, and the "today" flip at local midnight
   useEffect(() => {
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
   }, [updateCountdown]);
 
-  const { calendarDays, upcomingAge, isBirthdayToday } = state;
-  const value = isBirthdayToday
-    ? 'Happy Birthday!'
-    : `${calendarDays} ${calendarDays === 1 ? 'day' : 'days'}`;
+  const { upcomingAge, isBirthdayToday, remaining } = state;
+  const value = isBirthdayToday || !remaining ? 'Happy Birthday!' : formatDayCount(remaining.days);
 
   return (
     <CountdownCard
@@ -162,6 +168,7 @@ function BirthdayCountdownCounter({
       highlight={isBirthdayToday}
       label={name === null ? `You turn ${upcomingAge}` : `${name} turns ${upcomingAge}`}
       value={value}
+      trailing={remaining && !isBirthdayToday ? formatCountdownClock(remaining) : undefined}
       testId={testId}
     />
   );

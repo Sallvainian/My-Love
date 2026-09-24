@@ -3,8 +3,9 @@
  *
  * Generic countdown for the wedding date and the couple's stored events.
  * Shows the muted placeholder text as its value when the date is not yet set.
- * The card shows only a day count; its 1s interval exists to flip the
- * today/retire state when local midnight passes.
+ * An upcoming date shows the whole days left and a live h/m/s clock to the
+ * local midnight that starts the day; the 1s interval drives that clock and
+ * flips the today/retire state when local midnight passes.
  *
  * Rendered as the shared CountdownCard in the `you` tone: colour lives only in
  * the tile, which switches to the highlight fill on the day itself.
@@ -13,7 +14,13 @@
 import { Calendar, Gem, Plane } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { CountdownCard } from './CountdownCard';
-import { getCalendarDaysDiff } from './eventCountdownHelpers';
+import {
+  formatCountdownClock,
+  formatDayCount,
+  getCalendarDaysDiff,
+  getCountdownToDay,
+  type CountdownParts,
+} from './eventCountdownHelpers';
 
 type IconType = 'ring' | 'plane' | 'calendar';
 
@@ -39,14 +46,19 @@ const iconComponents: Record<IconType, typeof Gem> = {
   calendar: Calendar,
 };
 
-function computeEventCountdownState(date: Date | null): {
+interface EventCountdownState {
   calendarDays: number;
   isEventToday: boolean;
-} {
+  /** Time left until the day starts; `null` without a date or once it has come. */
+  remaining: CountdownParts | null;
+}
+
+function computeEventCountdownState(date: Date | null): EventCountdownState {
   if (!date) {
     return {
       calendarDays: 0,
       isEventToday: false,
+      remaining: null,
     };
   }
 
@@ -61,6 +73,7 @@ function computeEventCountdownState(date: Date | null): {
   return {
     calendarDays: daysDiff,
     isEventToday: isToday,
+    remaining: getCountdownToDay(date, now),
   };
 }
 
@@ -78,18 +91,17 @@ export function EventCountdown({
   // `calendarDays` from 00:00:00.0 — `true` and `-1` together, which slips past
   // the past-date guard below and prints "Today!" a day late until the next
   // tick. Sampling once makes that combination unrepresentable.
-  const [countdownState, setCountdownState] = useState<{
-    calendarDays: number;
-    isEventToday: boolean;
-  }>(() => computeEventCountdownState(date));
+  const [countdownState, setCountdownState] = useState<EventCountdownState>(() =>
+    computeEventCountdownState(date)
+  );
 
-  const { calendarDays, isEventToday } = countdownState;
+  const { calendarDays, isEventToday, remaining } = countdownState;
 
   const updateCountdown = useCallback(() => {
     setCountdownState(computeEventCountdownState(date));
   }, [date]);
 
-  // Tick every second so the today/retire state flips at local midnight
+  // Tick every second: the clock, and the today/retire flip at local midnight
   useEffect(() => {
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
@@ -120,12 +132,13 @@ export function EventCountdown({
     return null;
   }
 
-  // Not retired, so a dated card is today or ahead: `calendarDays >= 0`.
+  // Not retired, so a dated card is today or ahead: `calendarDays >= 0`, and
+  // `remaining` is set exactly when it is ahead.
   const value = !date
     ? placeholderText
-    : isEventToday
+    : isEventToday || !remaining
       ? 'Today!'
-      : `${calendarDays} ${calendarDays === 1 ? 'day' : 'days'}`;
+      : formatDayCount(remaining.days);
 
   return (
     <CountdownCard
@@ -135,6 +148,7 @@ export function EventCountdown({
       label={label}
       value={value}
       valueMuted={!date}
+      trailing={remaining && !isEventToday ? formatCountdownClock(remaining) : undefined}
       description={description}
       testId={`event-countdown-${label.toLowerCase().replace(/\s+/g, '-')}`}
     />

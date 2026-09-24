@@ -129,7 +129,9 @@ export function LoveNotes(): ReactElement {
   const partnerInitial = Array.from(partnerName.trim())[0]?.toUpperCase() || 'P';
 
   return (
-    <div className="flex h-[calc(100dvh-4rem-env(safe-area-inset-top)-var(--dock-clearance))] flex-col bg-page">
+    // Fills <main>, which App pins between the top bar and the dock for this
+    // view, so the page itself has nothing to scroll.
+    <div className="flex min-h-0 flex-1 flex-col bg-page">
       {/* The app top bar already names the app; the view title stays for
           assistive tech and the heading outline, but is not drawn. */}
       <h1 className="sr-only">Love Notes</h1>

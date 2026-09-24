@@ -99,6 +99,15 @@
     text-size-adjust: 100%;
   }
 
+  /* The page itself never rubber-bands: dragging past an edge of a view that
+     fits the screen (Love Notes) must not pull the whole app about and show
+     page scrollbars. Views taller than the screen still scroll normally, and
+     inner scrollers such as the note list keep their own bounce. */
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+
   body {
     @apply min-h-screen bg-page font-sans;
   }
@@ -142,6 +151,10 @@
      space -- <main>, LoveNotes' height and the floating buttons all read it. */
   :root {
     --dock-clearance: calc(6rem + env(safe-area-inset-bottom));
+    /* The dock's top edge above the screen bottom: its 1rem inset plus its
+       60px height, with no gap. Love Notes ends its view here so the composer
+       sits just above the dock (the composer's own bottom pad is the gap). */
+    --dock-top: calc(1rem + 60px + env(safe-area-inset-bottom));
   }
 
   /* Safe area support for mobile */

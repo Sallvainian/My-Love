@@ -97,6 +97,34 @@ test.describe('Love Notes on the style kit', () => {
         () => document.documentElement.scrollHeight - window.innerHeight
       );
       expect(overflow).toBeLessThanOrEqual(0);
+      const sideways = await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth
+      );
+      expect(sideways).toBeLessThanOrEqual(0);
+
+      // iOS zooms the page in when a field under 16px is focused and leaves it
+      // zoomed, which lets the whole page be dragged about; and the page must
+      // not rubber-band when dragged past its edge.
+      await expect(input).toHaveCSS('font-size', '16px');
+      await expect(page.locator('html')).toHaveCSS('overscroll-behavior', 'none');
+      await expect(page.locator('body')).toHaveCSS('overscroll-behavior', 'none');
+
+      // The view is pinned to the visible screen rather than sized from 100dvh
+      // (which the installed iOS app reads about 60pt too tall), so the page
+      // has nothing to scroll: a scroll request leaves it where it is.
+      await expect(page.getByTestId('app-container')).toHaveCSS('position', 'fixed');
+      const scrolledTo = await page.evaluate(() => {
+        window.scrollTo(0, 200);
+        return window.scrollY;
+      });
+      expect(scrolledTo).toBe(0);
+
+      // The composer sits just above the dock: its 12px bottom pad is the gap.
+      const inputBox = await input.boundingBox();
+      if (!inputBox) throw new Error('[notes-kit.spec] expected an input box');
+      const gap = dockBox.y - (inputBox.y + inputBox.height);
+      expect(gap).toBeGreaterThanOrEqual(0);
+      expect(gap).toBeLessThanOrEqual(16);
     });
 
     test(`[P1] should fill a sent note's bubble with the Send button's pink in ${colorScheme}`, async ({

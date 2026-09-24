@@ -129,21 +129,22 @@ test.describe('Birthdays and wedding date from the local copy', () => {
       await expect(page.getByTestId('app-container')).toBeVisible();
       await goOffline(page, true);
 
-      // THEN: all three cards count from the saved values.
+      // THEN: all three cards count from the saved values: whole days left,
+      // one fewer than the calendar days while the clock carries today's rest.
       await expect(page.getByTestId('birthday-countdown-self').locator('h3')).toHaveText(
         /turns? 31$/
       );
       await expect(page.getByTestId('birthday-countdown-self').locator('h3 + div')).toHaveText(
-        '5 days'
+        '4 days'
       );
       await expect(page.getByTestId('birthday-countdown-partner').locator('h3')).toContainText(
         'turns 30'
       );
       await expect(page.getByTestId('birthday-countdown-partner').locator('h3 + div')).toHaveText(
-        '10 days'
+        '9 days'
       );
       await expect(page.getByTestId('event-countdown-wedding').locator('h3 + div')).toHaveText(
-        '40 days'
+        '39 days'
       );
     } finally {
       await page.context().setOffline(false);
