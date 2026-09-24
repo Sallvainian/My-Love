@@ -23,7 +23,11 @@ import { readCachedImage, writeCachedImage } from '../../services/imageCache';
 import { downloadLoveNoteImage, getSignedImageUrl } from '../../services/loveNoteImageService';
 import { useAppStore } from '../../stores/useAppStore';
 import type { LoveNote } from '../../types/models';
-import { formatFullTimestamp, formatMessageTimestamp } from '../../utils/dateUtils';
+import {
+  formatFullTimestamp,
+  formatMessageTimestamp,
+  loveNoteDisplayTime,
+} from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
 import { FullScreenImageViewer } from './FullScreenImageViewer';
 
@@ -63,8 +67,10 @@ function LoveNoteMessageComponent({
   onRetry,
   onRequestRemove,
 }: LoveNoteMessageProps): ReactElement {
-  const formattedTime = formatMessageTimestamp(message.created_at);
-  const fullTimestamp = formatFullTimestamp(message.created_at);
+  // When it was written, for a note delivered late; otherwise when it arrived.
+  const displayTime = loveNoteDisplayTime(message);
+  const formattedTime = formatMessageTimestamp(displayTime);
+  const fullTimestamp = formatFullTimestamp(displayTime);
 
   // A note still carrying a tempId has no server row -- its `id` IS the temp
   // string, and a failed send keeps it -- so there is nothing a removal could

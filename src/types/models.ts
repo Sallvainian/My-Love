@@ -22,6 +22,10 @@ export interface LoveNote {
   created_at: string;
   // Image attachment (nullable - text-only messages have no image)
   image_url?: string | null;
+  // When the sender wrote it, from their clock; null/absent when unknown. The
+  // bubble shows it in place of created_at when a queued note was delivered
+  // late. Display only: ordering and pagination use created_at.
+  written_at?: string | null;
   // Client-side only fields for optimistic updates
   sending?: boolean;
   error?: boolean;

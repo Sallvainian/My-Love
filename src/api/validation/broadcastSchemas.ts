@@ -82,6 +82,8 @@ export const LoveNoteBroadcastSchema = z.object({
   created_at: TimestampSchema,
   image_url: z.string().nullable().optional(),
   idempotency_key: z.string().nullable().optional(),
+  // Optional: a client from before the column existed sends no such key.
+  written_at: TimestampSchema.nullable().optional(),
 });
 
 /**

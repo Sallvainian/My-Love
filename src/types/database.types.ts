@@ -280,6 +280,7 @@ export type Database = {
           idempotency_key: string
           image_url: string | null
           to_user_id: string
+          written_at: string | null
         }
         Insert: {
           content: string
@@ -289,6 +290,7 @@ export type Database = {
           idempotency_key?: string
           image_url?: string | null
           to_user_id: string
+          written_at?: string | null
         }
         Update: {
           content?: string
@@ -298,6 +300,7 @@ export type Database = {
           idempotency_key?: string
           image_url?: string | null
           to_user_id?: string
+          written_at?: string | null
         }
         Relationships: []
       }
@@ -493,6 +496,7 @@ export type Database = {
           idempotency_key: string | null
           image_url: string | null
           to_user_id: string | null
+          written_at: string | null
         }
         Insert: {
           content?: string | null
@@ -502,6 +506,7 @@ export type Database = {
           idempotency_key?: string | null
           image_url?: string | null
           to_user_id?: string | null
+          written_at?: string | null
         }
         Update: {
           content?: string | null
@@ -511,6 +516,7 @@ export type Database = {
           idempotency_key?: string | null
           image_url?: string | null
           to_user_id?: string | null
+          written_at?: string | null
         }
         Relationships: []
       }

@@ -5,7 +5,8 @@
  * Every text note goes into the per-account `note-queue` (IndexedDB) before it
  * is sent. Offline, three notes show at once as "Waiting to send"; they survive
  * a reload that gets no server answer; once the connection returns, the `online`
- * drain sends them, and the partner's view holds each exactly once, in order.
+ * drain sends them, and the partner's view holds each exactly once, in order,
+ * each carrying its composition time as `written_at`.
  *
  * Dev mode has no service worker, so a reload cannot happen while the context
  * is offline. The reload runs online with every `love_notes*` REST call aborted
@@ -37,12 +38,12 @@ function noteBubble(page: Page, content: string) {
   return page.getByTestId('love-note-message').filter({ hasText: content });
 }
 
-/** The signed-in account's queued note contents, oldest first. */
-async function queuedContents(page: Page): Promise<string[]> {
+/** The signed-in account's queued notes, oldest first. */
+async function queuedRows(page: Page): Promise<{ content: string; createdAt: string }[]> {
   return page.evaluate(async () => {
     const userId = window.__APP_STORE__?.getState().userId;
     if (!userId) return [];
-    return new Promise<string[]>((resolve) => {
+    return new Promise<{ content: string; createdAt: string }[]>((resolve) => {
       const open = indexedDB.open('my-love-db');
       open.onerror = () => resolve([]);
       open.onsuccess = () => {
@@ -57,7 +58,7 @@ async function queuedContents(page: Page): Promise<string[]> {
           db.close();
           const rows = get.result as { content: string; createdAt: string }[];
           rows.sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
-          resolve(rows.map((row) => row.content));
+          resolve(rows.map(({ content, createdAt }) => ({ content, createdAt })));
         };
         get.onerror = () => {
           db.close();
@@ -68,21 +69,26 @@ async function queuedContents(page: Page): Promise<string[]> {
   });
 }
 
+/** The signed-in account's queued note contents, oldest first. */
+async function queuedContents(page: Page): Promise<string[]> {
+  return (await queuedRows(page)).map((row) => row.content);
+}
+
 /** This worker's notes to its partner carrying `stamp`, oldest first. */
 async function sentRows(
   supabaseAdmin: TypedSupabaseClient,
   stamp: string
-): Promise<{ id: string; content: string }[]> {
+): Promise<{ id: string; content: string; created_at: string; written_at: string | null }[]> {
   const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
   const { data, error } = await supabaseAdmin
     .from('love_notes')
-    .select('id, content, created_at')
+    .select('id, content, created_at, written_at')
     .eq('from_user_id', userId)
     .eq('to_user_id', partnerId)
     .like('content', `%${stamp}%`)
     .order('created_at', { ascending: true });
   expect(error).toBeNull();
-  return (data ?? []).map(({ id, content }) => ({ id, content }));
+  return data ?? [];
 }
 
 async function deleteNotes(supabaseAdmin: TypedSupabaseClient, ids: string[]) {
@@ -136,6 +142,7 @@ test.describe('Love-note text sent offline', () => {
         .allTextContents();
       expect(shownOrder.map((text) => contents.findIndex((c) => text.includes(c)))).toEqual([0, 1, 2]);
       expect(await queuedContents(page)).toEqual(contents);
+      const composedAt = (await queuedRows(page)).map((row) => row.createdAt);
 
       // WHEN: the app reloads with no love-notes server answer, then goes offline.
       let abortedCalls = 0;
@@ -169,6 +176,13 @@ test.describe('Love-note text sent offline', () => {
         .toBe(3);
       const rows = await sentRows(supabaseAdmin, stamp);
       expect(rows.map((row) => row.content)).toEqual(contents);
+      // Each carries when it was written; created_at is the later delivery.
+      expect(rows.map((row) => row.written_at && Date.parse(row.written_at))).toEqual(
+        composedAt.map((at) => Date.parse(at))
+      );
+      for (const row of rows) {
+        expect(Date.parse(row.created_at)).toBeGreaterThan(Date.parse(row.written_at!));
+      }
       await expect.poll(() => queuedContents(page)).toEqual([]);
       await expect
         .poll(() =>

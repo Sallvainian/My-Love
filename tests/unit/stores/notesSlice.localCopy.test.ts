@@ -352,6 +352,34 @@ describe('notesSlice love-notes local copy', () => {
       expect(savedIds()).toEqual(['3']);
     });
 
+    it('reads written_at back from the copy, and a copy saved before it existed still applies', async () => {
+      savedCopies.set(key(USER_A), [
+        { ...row('1'), written_at: '2026-09-20T09:00:00.000Z' },
+        { ...row('2'), written_at: null },
+        row('3'),
+      ]);
+      goOffline();
+      const store = createTestStore();
+
+      await store.getState().fetchNotes();
+
+      expect(stateIds(store)).toEqual(['1', '2', '3']);
+      expect(store.getState().notes[0].written_at).toBe('2026-09-20T09:00:00.000Z');
+      expect(store.getState().notes[1].written_at).toBeUndefined();
+      expect(store.getState().notes[2].written_at).toBeUndefined();
+    });
+
+    it('treats a copy entry with a non-string written_at as malformed', async () => {
+      savedCopies.set(key(USER_A), [{ ...row('1'), written_at: 5 }]);
+      goOffline();
+      const store = createTestStore();
+
+      await store.getState().fetchNotes();
+
+      expect(store.getState().notes).toEqual([]);
+      expect(console.error).toHaveBeenCalledWith('[NotesSlice] Ignoring a malformed love-notes copy');
+    });
+
     it('applies notesPendingRemoval to the copy', async () => {
       savedCopies.set(key(USER_A), [row('1'), row('2')]);
       goOffline();
@@ -718,7 +746,7 @@ describe('notesSlice love-notes local copy', () => {
       const saved = (savedCopies.get(key(USER_A)) as Record<string, unknown>[])[1];
       // Plain confirmed data only: no client-side fields.
       expect(Object.keys(saved).sort()).toEqual(
-        ['content', 'created_at', 'from_user_id', 'id', 'image_url', 'to_user_id'].sort()
+        ['content', 'created_at', 'from_user_id', 'id', 'image_url', 'to_user_id', 'written_at'].sort()
       );
     });
 
