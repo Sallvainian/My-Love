@@ -305,7 +305,7 @@ describe('dbSchema', () => {
     it('creates it even when a service that does not own the messages store wins the upgrade', async () => {
       // IndexedDB runs the upgrade callback of only the ONE open() that
       // performs the version-change transaction; every other concurrent open()
-      // just connects. Six modules open this database, and which one gets
+      // just connects. Seven modules open this database, and which one gets
       // there first is a race decided by app start-up order — so the store a
       // service "owns" says nothing about which callback creates its indexes.
       // moodService reaches for `moods` and never touches `messages`, which
