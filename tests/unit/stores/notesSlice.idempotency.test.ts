@@ -152,6 +152,7 @@ function fakeFrom(table: string) {
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: (table: string) => fakeFrom(table) },
   getPartnerId: vi.fn(async () => PARTNER_ID),
+  lookupPartnerId: vi.fn(async () => ({ status: 'linked', partnerId: PARTNER_ID })),
 }));
 
 vi.mock('../../../src/services/loveNoteImageService', () => ({
@@ -166,6 +167,8 @@ vi.mock('../../../src/services/imageCompressionService', () => ({
   },
 }));
 
+import 'fake-indexeddb/auto';
+import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { deleteLoveNoteImage, uploadCompressedBlob } from '../../../src/services/loveNoteImageService';
 import { createNotesSlice, type NotesSlice } from '../../../src/stores/slices/notesSlice';
 
@@ -180,10 +183,29 @@ function createTestStore() {
   return store;
 }
 
+/**
+ * Text notes go through the send queue: sendNote enqueues and starts a drain
+ * without awaiting it. This sends and waits for that drain to settle.
+ */
+async function sendText(store: ReturnType<typeof createTestStore>, content: string) {
+  await store.getState().sendNote(content);
+  await store.getState().drainQueuedNotes();
+}
+
+async function clearNoteQueue(): Promise<void> {
+  const db = await openMyLoveDB();
+  try {
+    await db.clear('note-queue');
+  } finally {
+    db.close();
+  }
+}
+
 describe('notesSlice send idempotency', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     backend.reset();
     vi.clearAllMocks();
+    await clearNoteQueue();
   });
 
   const friendly = 'Some values are not allowed - check length and format limits';
@@ -215,13 +237,18 @@ describe('notesSlice send idempotency', () => {
 
   it.each(['send', 'retry'] as const)('ignores a delayed old-account CHECK response during %s', async (action) => {
     const store = createTestStore();
-    backend.failNextWrite = true;
-    if (action === 'retry') await store.getState().sendNote('first');
+    if (action === 'retry') {
+      // A rejected note: failed, and offered for Retry.
+      backend.failNextWrite = true;
+      backend.writeError = checkError;
+      await sendText(store, 'first');
+      store.setState({ notesError: null });
+    }
     backend.failNextWrite = true;
     backend.writeError = checkError;
     let resolve!: () => void;
     backend.waitForWrite = new Promise<void>((done) => { resolve = done; });
-    const pending = action === 'send' ? store.getState().sendNote('hello') : store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
+    const pending = action === 'send' ? sendText(store, 'hello') : store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
     await vi.waitFor(() => expect(backend.failNextWrite).toBe(false));
     store.setState({ userId: PARTNER_ID, notes: [], notesError: 'new account error' });
     resolve();
@@ -234,12 +261,14 @@ describe('notesSlice send idempotency', () => {
     const store = createTestStore();
     if (action === 'retry') {
       backend.failNextWrite = true;
-      await store.getState().sendNote('first');
+      backend.writeError = checkError;
+      await sendText(store, 'first');
+      backend.writeError = null;
     }
     let resolve!: () => void;
     backend.waitForWrite = new Promise<void>((done) => { resolve = done; });
     const pending = action === 'send'
-      ? store.getState().sendNote('hello')
+      ? sendText(store, 'hello')
       : store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
     await vi.waitFor(() => expect(backend.rows).toHaveLength(1));
 
@@ -268,9 +297,9 @@ describe('notesSlice send idempotency', () => {
   it.each(['send', 'retry'] as const)('preserves unrelated errors on %s recovery', async (action) => {
     const store = createTestStore();
     backend.failNextWrite = true;
-    await store.getState().sendNote('first');
+    await sendText(store, 'first');
     store.setState({ notesError: 'unrelated error' });
-    if (action === 'send') await store.getState().sendNote('second');
+    if (action === 'send') await sendText(store, 'second');
     else await store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
     expect(store.getState().notesError).toBe('unrelated error');
   });
@@ -279,9 +308,9 @@ describe('notesSlice send idempotency', () => {
     const store = createTestStore();
     backend.failNextWrite = true;
     backend.writeError = checkError;
-    await store.getState().sendNote('first');
+    await sendText(store, 'first');
     expect(store.getState().notesError).toBe(friendly);
-    await store.getState().sendNote('second');
+    await sendText(store, 'second');
     expect(store.getState().notesError).toBeNull();
   });
 
@@ -290,7 +319,7 @@ describe('notesSlice send idempotency', () => {
     store.setState({ notesError: 'existing error' });
     backend.writeError = { ...checkError, code: '23502' };
     backend.failNextWrite = true;
-    await store.getState().sendNote('first');
+    await sendText(store, 'first');
     backend.failNextWrite = true;
     await store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
     expect(store.getState().notesError).toBe('existing error');
@@ -299,7 +328,7 @@ describe('notesSlice send idempotency', () => {
 
   it('sends a note with the composed message tempId as its idempotency key', async () => {
     const store = createTestStore();
-    await store.getState().sendNote('i love you');
+    await sendText(store, 'i love you');
 
     expect(backend.rows).toHaveLength(1);
     // The key has to be the tempId, because that is the value the retry path
@@ -308,32 +337,29 @@ describe('notesSlice send idempotency', () => {
     expect(optimisticKey).toMatch(/^temp-/);
   });
 
-  it('a retry after a lost response resolves to the committed row', async () => {
+  it('a resend after a lost response resolves to the committed row', async () => {
     const store = createTestStore();
 
-    // The row commits; the client sees a failure and offers Retry.
+    // The row commits; the client sees a network failure, so the note stays
+    // queued (pending, not failed) and the next drain pass sends it again
+    // under the same key. sendText's own drain call is that next pass.
     backend.loseNextResponse = true;
-    await store.getState().sendNote('i love you');
+    await sendText(store, 'i love you');
 
-    expect(backend.rows).toHaveLength(1);
-    const failed = store.getState().notes.find((n) => n.error);
-    expect(failed).toBeDefined();
-
-    await store.getState().retryFailedMessage(failed!.tempId as string);
-
-    // The whole point: still one row, and the optimistic note is now resolved
+    // The whole point: still one row, and the queued note is now resolved
     // against the row that was already there.
     expect(backend.rows).toHaveLength(1);
     const settled = store.getState().notes.find((n) => n.id === backend.rows[0].id);
     expect(settled).toBeDefined();
     expect(settled!.error).toBe(false);
     expect(settled!.sending).toBe(false);
+    expect(settled!.queued).toBeUndefined();
   });
 
   it('two genuinely different sends both land', async () => {
     const store = createTestStore();
-    await store.getState().sendNote('first');
-    await store.getState().sendNote('second');
+    await sendText(store, 'first');
+    await sendText(store, 'second');
 
     expect(backend.rows).toHaveLength(2);
     expect(backend.rows[0].idempotency_key).not.toBe(backend.rows[1].idempotency_key);
@@ -343,8 +369,8 @@ describe('notesSlice send idempotency', () => {
     // Uniqueness is on the client key, never on content — saying "i love you"
     // twice must produce two notes.
     const store = createTestStore();
-    await store.getState().sendNote('i love you');
-    await store.getState().sendNote('i love you');
+    await sendText(store, 'i love you');
+    await sendText(store, 'i love you');
 
     expect(backend.rows).toHaveLength(2);
   });
@@ -459,14 +485,13 @@ describe('notesSlice send idempotency', () => {
       expect(mockedDeleteLoveNoteImage).not.toHaveBeenCalled();
     });
 
-    it('deletes nothing when the retried note had no image', async () => {
+    it('deletes nothing when the resent note had no image', async () => {
       const store = createTestStore();
 
       backend.loseNextResponse = true;
-      await store.getState().sendNote('no picture');
-      const failed = store.getState().notes.find((n) => n.error);
+      await sendText(store, 'no picture');
 
-      await store.getState().retryFailedMessage(failed!.tempId as string);
+      await store.getState().drainQueuedNotes();
 
       expect(backend.rows).toHaveLength(1);
       expect(mockedDeleteLoveNoteImage).not.toHaveBeenCalled();

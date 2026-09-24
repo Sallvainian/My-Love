@@ -107,6 +107,7 @@ function App() {
   const initializeApp = useAppStore((s) => s.initializeApp);
   const setView = useAppStore((s) => s.setView);
   const syncPendingMoods = useAppStore((s) => s.syncPendingMoods);
+  const drainQueuedNotes = useAppStore((s) => s.drainQueuedNotes);
   const updateSyncStatus = useAppStore((s) => s.updateSyncStatus);
   const loadEvents = useAppStore((s) => s.loadEvents);
   // The bundled rows are seeded by initializeApp; the favorites mirror maps
@@ -423,6 +424,9 @@ function App() {
         console.error('[App] Auto-sync on reconnect failed:', error);
       });
 
+      // Send love notes queued while offline (services/noteQueue.ts).
+      if (useAppStore.getState().userId) void drainQueuedNotes();
+
       // Refresh every local copy the offline spell left stale, without a reload.
       if (useAppStore.getState().userId) void refreshLocalCopies();
     };
@@ -446,7 +450,7 @@ function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [syncPendingMoods, updateSyncStatus]);
+  }, [syncPendingMoods, drainQueuedNotes, updateSyncStatus]);
 
   // Hybrid Sync Solution: Periodic background sync + immediate sync on mount
   useEffect(() => {
@@ -456,6 +460,7 @@ function App() {
       syncPendingMoods().catch((error) => {
         console.error('[App] Initial sync on mount failed:', error);
       });
+      void drainQueuedNotes();
     }
 
     // Part 2: Periodic sync every 5 minutes while app is open
@@ -466,6 +471,7 @@ function App() {
         syncPendingMoods().catch((error) => {
           console.error('[App] Periodic sync failed:', error);
         });
+        void drainQueuedNotes();
       }
     }, SYNC_INTERVAL_MS);
 
@@ -474,7 +480,7 @@ function App() {
       clearInterval(syncInterval);
       logger.debug('[App] Periodic sync interval cleared');
     };
-  }, [syncPendingMoods, isOnline, session]);
+  }, [syncPendingMoods, drainQueuedNotes, isOnline, session]);
 
   // Story 3 (dynamic events): load the couple's countdown events on first
   // Home render and on every later return to Home while signed in — covers

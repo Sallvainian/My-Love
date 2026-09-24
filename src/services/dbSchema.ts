@@ -39,6 +39,7 @@ export type StoredMoodEntry = MoodEntry;
  * - v11: Dropped the photos store (photos live in Supabase; nothing read it)
  * - v12: Added local-copies, the one per-account store for server-derived copies
  * - v13: Added image-cache, per-account image Blobs keyed by storage path
+ * - v14: Added note-queue, per-account love-note text waiting to be sent
  */
 export interface MyLoveDBSchema extends DBSchema {
   'message-favorites': {
@@ -101,6 +102,31 @@ export interface MyLoveDBSchema extends DBSchema {
     value: StoredCachedImage;
     indexes: { 'by-user': string };
   };
+  /**
+   * The per-account love-note send queue (`src/services/noteQueue.ts`). One
+   * row per composed text note, keyed by its `tempId`, until the server has
+   * confirmed it.
+   */
+  'note-queue': {
+    key: string;
+    value: StoredQueuedNote;
+    indexes: { 'by-user': string };
+  };
+}
+
+/**
+ * One love note composed by `userId` and not yet confirmed by the server.
+ * Plain data only; `id` is the note's `tempId` and its `idempotency_key`.
+ */
+export interface StoredQueuedNote {
+  id: string;
+  userId: string;
+  toUserId: string;
+  content: string;
+  /** ISO timestamp of composition; the queue is sent oldest first. */
+  createdAt: string;
+  /** True once the server rejected it; only a Retry sends it again. */
+  failed: boolean;
 }
 
 /**
@@ -160,7 +186,11 @@ export const DB_NAME = 'my-love-db';
 // v13 adds `image-cache`, keyed [userId, path] with a `by-user` index: image
 // Blobs cached by storage path so an image shown online can be shown offline
 // (see src/services/imageCache.ts). Same existence gate as v12.
-export const DB_VERSION = 13;
+//
+// v14 adds `note-queue`, keyed by the note's tempId with a `by-user` index:
+// love-note text waiting to be sent (see src/services/noteQueue.ts). Same
+// existence gate as v12.
+export const DB_VERSION = 14;
 
 /**
  * Store name constants for consistent access across services
@@ -172,11 +202,12 @@ export const STORE_NAMES = {
   SW_AUTH: 'sw-auth',
   LOCAL_COPIES: 'local-copies',
   IMAGE_CACHE: 'image-cache',
+  NOTE_QUEUE: 'note-queue',
 } as const;
 
 /**
  * Centralized IndexedDB upgrade function
- * Handles all store creation and migrations for v1-v13
+ * Handles all store creation and migrations for v1-v14
  *
  * Called by all services to ensure consistent database schema.
  * This fixes the tech debt where each service had duplicate upgrade logic.
@@ -325,6 +356,16 @@ export function upgradeDb(
   } else if (tx) {
     const images = tx.objectStore('image-cache');
     if (!images.indexNames.contains('by-user')) images.createIndex('by-user', 'userId');
+  }
+
+  // v14: the per-account love-note send queue. Same existence gate as v12.
+  if (!db.objectStoreNames.contains('note-queue')) {
+    const queue = db.createObjectStore('note-queue', { keyPath: 'id' });
+    queue.createIndex('by-user', 'userId');
+    logger.debug('[dbSchema] Created note-queue store (v14)');
+  } else if (tx) {
+    const queue = tx.objectStore('note-queue');
+    if (!queue.indexNames.contains('by-user')) queue.createIndex('by-user', 'userId');
   }
 
   // v10: drop the four scripture stores if they still exist. Names are gone
