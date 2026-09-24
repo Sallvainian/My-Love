@@ -75,6 +75,8 @@
     "globals": "^17.12.0",
     "happy-dom": "^20.14.5",
     "postcss": "^8.5.28",
+    "prettier": "3.9.9",
+    "prettier-plugin-tailwindcss": "0.8.1",
     "rollup-plugin-visualizer": "^7.1.1",
     "tailwindcss": "^4.1.17",
     "tsx": "^4.23.13",
