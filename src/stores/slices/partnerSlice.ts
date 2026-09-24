@@ -8,7 +8,8 @@
  * - Connection/accept/decline operations
  *
  * Cross-slice dependencies:
- * - Accepting a request refreshes the `couple-settings` local copy
+ * - Accepting a request, or `loadPartner` seeing a partner the couple
+ *   settings do not name, refreshes the `couple-settings` local copy
  *   (settingsSlice) through the local-copy registry, not a direct import
  *
  * Persistence:
@@ -171,6 +172,15 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
         partnerLoadError: false,
         isLoadingPartner: false,
       });
+      // A link this device did not make (the partner accepted our request)
+      // reaches us only here, so the couple settings still describe the old
+      // pair. Before they have loaded at all, the start refresh owns them.
+      const couple = get().coupleSettings;
+      const couplePartnerId = couple?.status === 'linked' ? couple.partnerId : null;
+      const serverPartnerId = next.status === 'linked' ? next.partner.id : null;
+      if (couple && couplePartnerId !== serverPartnerId) {
+        void refreshLocalCopy('couple-settings');
+      }
       // Saved under the captured account; isCurrent() was checked synchronously
       // above, so this is never issued after a sign-out's copy deletion.
       try {
