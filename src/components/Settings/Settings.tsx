@@ -127,6 +127,11 @@ function TogetherSinceForm({ start }: { start: string | null }) {
       setSaveError('Pick a date first.');
       return;
     }
+    // A mistyped year would otherwise count "together for" toward a future day.
+    if (new Date(value).getTime() > Date.now()) {
+      setSaveError('Pick a date in the past.');
+      return;
+    }
     setSaveError(null);
     setIsSaving(true);
     try {
@@ -148,6 +153,7 @@ function TogetherSinceForm({ start }: { start: string | null }) {
           id="settings-together-since-date"
           type="date"
           value={date}
+          max={toLocalInputs(new Date().toISOString()).date}
           onChange={(e) => setDate(e.target.value)}
           className={fieldClass(false)}
           data-testid="settings-together-since-date"

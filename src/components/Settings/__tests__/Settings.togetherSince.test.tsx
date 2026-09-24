@@ -121,4 +121,24 @@ describe('Settings — Together since', () => {
     );
     expect(save).not.toHaveBeenCalled();
   });
+
+  it('refuses a start in the future and sends nothing', async () => {
+    useAppStore.setState({
+      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null },
+    });
+    const save = vi.fn(async () => {});
+    useAppStore.setState({ setRelationshipStart: save });
+    render(<Settings />);
+
+    const nextYear = new Date().getFullYear() + 1;
+    fireEvent.change(screen.getByTestId('settings-together-since-date'), {
+      target: { value: `${nextYear}-01-01` },
+    });
+    fireEvent.click(screen.getByTestId('settings-together-since-save'));
+
+    expect(await screen.findByTestId('settings-together-since-error')).toHaveTextContent(
+      /in the past/i
+    );
+    expect(save).not.toHaveBeenCalled();
+  });
 });
