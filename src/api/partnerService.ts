@@ -14,6 +14,7 @@
 
 import { logger } from '../utils/logger';
 import { handleSupabaseError, isPostgrestError, logSupabaseError } from './errorHandlers';
+import { requireOnline } from '../services/accountDataError';
 import { toDateOnlyOrNull } from '../services/eventsService';
 import { isSeedFallbackName, supabase } from './supabaseClient';
 
@@ -193,6 +194,8 @@ class PartnerService {
    * @throws Error if request fails or user already has a partner
    */
   async sendPartnerRequest(toUserId: string): Promise<void> {
+    // Refused before `auth.getUser()` or any other request goes out.
+    requireOnline('Partner requests', 'send');
     try {
       const { data: currentUser } = await supabase.auth.getUser();
       if (!currentUser?.user) {
@@ -331,6 +334,8 @@ class PartnerService {
    * @throws Error if acceptance fails
    */
   async acceptPartnerRequest(requestId: string): Promise<void> {
+    // Refused before the RPC goes out.
+    requireOnline('Partner requests', 'accept');
     try {
       // Call database function to accept request
       const { error } = await supabase.rpc('accept_partner_request', {
@@ -359,6 +364,8 @@ class PartnerService {
    * @throws Error if decline fails
    */
   async declinePartnerRequest(requestId: string): Promise<void> {
+    // Refused before the RPC goes out.
+    requireOnline('Partner requests', 'decline');
     try {
       // Call database function to decline request
       const { error } = await supabase.rpc('decline_partner_request', {

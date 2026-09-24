@@ -11,6 +11,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NoteRefusedOfflineError } from '../../../stores/slices/notesSlice';
 import { MessageInput } from '../MessageInput';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
@@ -419,6 +420,51 @@ describe('MessageInput', () => {
       await waitFor(() => {
         expect(mockVibrate).toHaveBeenCalledWith([100, 50, 100]);
       });
+    });
+  });
+
+  describe('Offline refusal (ticket 11)', () => {
+    async function sendPictureNote(user: ReturnType<typeof userEvent.setup>) {
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
+      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(fileInput, {
+        target: { files: [new File(['test'], 'photo.jpg', { type: 'image/jpeg' })] },
+      });
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Look!' } });
+      await waitFor(() => {
+        expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole('button', { name: /send message/i }));
+    }
+
+    it('keeps the text and picture and shows no "Failed to send" of its own', async () => {
+      // The slice has already put the reason in the page banner.
+      mockSendNote.mockRejectedValueOnce(
+        new NoteRefusedOfflineError('You are offline. Notes with a picture need a connection to send.')
+      );
+      const user = userEvent.setup();
+      render(<MessageInput />);
+
+      await sendPictureNote(user);
+
+      await waitFor(() => expect(mockSendNote).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(mockVibrate).toHaveBeenCalledWith([100, 50, 100]));
+      expect(screen.queryByText('Failed to send. Try again.')).not.toBeInTheDocument();
+      expect(screen.getByRole('textbox')).toHaveValue('Look!');
+      expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
+    });
+
+    it('any other failure, such as a failed save to the offline queue, still shows it', async () => {
+      mockSendNote.mockRejectedValueOnce(new Error('Failed to save the note'));
+      const user = userEvent.setup();
+      render(<MessageInput />);
+
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Hello' } });
+      await user.click(screen.getByRole('button', { name: /send message/i }));
+
+      expect(await screen.findByText('Failed to send. Try again.')).toBeInTheDocument();
+      expect(screen.getByRole('textbox')).toHaveValue('Hello');
     });
   });
 

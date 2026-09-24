@@ -31,13 +31,39 @@ export class AccountDataError extends Error {
   }
 }
 
+/** What a refused write or read would have done: "… need a connection to <action>." */
+export type NeedsConnectionAction =
+  | 'save'
+  | 'load'
+  | 'send'
+  | 'upload'
+  | 'delete'
+  | 'remove'
+  | 'accept'
+  | 'decline'
+  | 'be marked as seen';
+
 /**
- * Refuse a request before it is sent when the device reports no network.
- * `what` completes "… need a connection to save." in the user-facing message.
+ * The one wording for an up-front offline refusal:
+ * "You are offline. <what> need(s) a connection to <action>."
+ * `verb` is 'needs' for a singular subject ("A poke needs …").
  */
-export function requireOnline(what: string, action: 'save' | 'load' = 'save'): void {
+export function offlineMessage(
+  what: string,
+  action: NeedsConnectionAction = 'save',
+  verb: 'need' | 'needs' = 'need'
+): string {
+  return `You are offline. ${what} ${verb} a connection to ${action}.`;
+}
+
+/**
+ * Refuse a request before it is sent when the device reports no network,
+ * with `offlineMessage(what, action)`: "You are offline. <what> need a
+ * connection to <action>." `action` completes the sentence (default 'save').
+ */
+export function requireOnline(what: string, action: NeedsConnectionAction = 'save'): void {
   if (!isOnline()) {
-    throw new AccountDataError('offline', `You are offline. ${what} need a connection to ${action}.`);
+    throw new AccountDataError('offline', offlineMessage(what, action));
   }
 }
 

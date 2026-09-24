@@ -6,6 +6,7 @@ import { deleteDB, openDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminPanel } from '../../../src/components/AdminPanel/AdminPanel';
 import { DeleteConfirmDialog } from '../../../src/components/AdminPanel/DeleteConfirmDialog';
+import { requireOnline } from '../../../src/services/accountDataError';
 import { customMessageService } from '../../../src/services/customMessageService';
 import { DB_NAME, DB_VERSION, type MyLoveDBSchema } from '../../../src/services/dbSchema';
 import { storageService } from '../../../src/services/storage';
@@ -208,5 +209,120 @@ describe('AdminPanel with real IndexedDB and store', () => {
     act(() => { useAppStore.setState({ authSessionVersion: useAppStore.getState().authSessionVersion + 1 }); });
     await act(async () => { gate.resolve(); });
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+});
+
+describe('AdminPanel offline (ticket 11)', () => {
+  const OFFLINE = 'You are offline. Custom messages need a connection to save.';
+
+  /**
+   * The real API refuses with `requireOnline('Custom messages')` before any
+   * request; the fakes stand in for it, so each write is given that first line.
+   */
+  async function refuseOffline() {
+    const { fakeCustomMessagesApi } = await import('../helpers/fakeAccountDataApis');
+    const refuse = async (): Promise<never> => {
+      requireOnline('Custom messages');
+      throw new Error('reached the request while offline');
+    };
+    fakeCustomMessagesApi.createCustomMessage.mockImplementationOnce(refuse);
+    fakeCustomMessagesApi.updateCustomMessage.mockImplementationOnce(refuse);
+    fakeCustomMessagesApi.deleteCustomMessage.mockImplementationOnce(refuse);
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    return fakeCustomMessagesApi;
+  }
+
+  afterEach(async () => {
+    const { fakeCustomMessagesApi } = await import('../helpers/fakeAccountDataApis');
+    fakeCustomMessagesApi.createCustomMessage.mockReset();
+    fakeCustomMessagesApi.updateCustomMessage.mockReset();
+    fakeCustomMessagesApi.deleteCustomMessage.mockReset();
+  });
+
+  it('shows the offline indicator in the editor, and none online', async () => {
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const { unmount } = panel();
+    expect(screen.getByTestId('network-status-indicator')).toHaveAttribute('data-status', 'offline');
+    unmount();
+
+    onLine.mockReturnValue(true);
+    panel();
+    expect(screen.queryByTestId('network-status-indicator')).toBeNull();
+  });
+
+  it('create: the form shows the offline reason and keeps the text; nothing is added', async () => {
+    panel();
+    await refuseOffline();
+    fireEvent.click(screen.getByTestId('admin-create-button'));
+    fireEvent.change(screen.getByTestId('admin-create-form-text'), { target: { value: 'Not yet' } });
+    fireEvent.click(screen.getByTestId('admin-create-form-save'));
+
+    expect(await screen.findByTestId('admin-create-form-error')).toHaveTextContent(OFFLINE);
+    expect(screen.getByTestId('admin-create-form-text')).toHaveValue('Not yet');
+    expect(screen.queryByText('Not yet', { selector: 'td' })).toBeNull();
+    expect(useAppStore.getState().customMessages.map((message) => message.text)).toEqual([
+      'Account A message',
+    ]);
+  });
+
+  it('edit: the form shows the offline reason; the row is unchanged', async () => {
+    panel();
+    await refuseOffline();
+    fireEvent.click(within(row('Account A message')).getByTestId('message-row-edit-button'));
+    fireEvent.change(screen.getByTestId('admin-edit-form-text'), { target: { value: 'Changed' } });
+    fireEvent.click(screen.getByTestId('admin-edit-form-save'));
+
+    expect(await screen.findByTestId('admin-edit-form-error')).toHaveTextContent(OFFLINE);
+    expect((await diskRow(aId))?.text).toBe('Account A message');
+    expect(useAppStore.getState().customMessages[0].text).toBe('Account A message');
+  });
+
+  it('delete: the dialog shows the offline reason; the row stays', async () => {
+    panel();
+    await refuseOffline();
+    fireEvent.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
+    fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(OFFLINE);
+    expect(screen.getByTestId('admin-delete-dialog')).toBeInTheDocument();
+    expect(await diskRow(aId)).toBeDefined();
+    expect(useAppStore.getState().customMessages.some((message) => message.id === aId)).toBe(true);
+  });
+
+  it('import: the alert gives the offline reason and does not blame the file', async () => {
+    const alert = vi.fn();
+    vi.stubGlobal('alert', alert);
+    panel();
+    await refuseOffline();
+    const file = new File(
+      [
+        JSON.stringify({
+          version: '1.0',
+          exportDate: new Date().toISOString(),
+          messageCount: 1,
+          messages: [
+            {
+              text: 'Imported while offline',
+              category: 'custom',
+              active: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+        }),
+      ],
+      'messages.json',
+      { type: 'application/json' }
+    );
+    fireEvent.change(screen.getByTestId('import-file-input'), { target: { files: [file] } });
+
+    try {
+      await waitFor(() => expect(alert).toHaveBeenCalledWith(OFFLINE));
+      expect(useAppStore.getState().customMessages.map((message) => message.text)).toEqual([
+        'Account A message',
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

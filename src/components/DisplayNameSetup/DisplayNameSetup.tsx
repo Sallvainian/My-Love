@@ -24,7 +24,9 @@
 import { CircleAlert, Loader2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { getUser } from '../../api/auth/sessionService';
+import { isOnline } from '../../api/errorHandlers';
 import { SEED_FALLBACK_NAME, supabase } from '../../api/supabaseClient';
+import { offlineMessage } from '../../services/accountDataError';
 import { logger } from '../../utils/logger';
 import {
   DIALOG_BACKDROP,
@@ -92,6 +94,13 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
 
     if (!validateDisplayName(displayName.trim())) {
       setError('Display name must be between 3 and 30 characters');
+      return;
+    }
+
+    // Refused before `getUser()` or the update, so no request goes out and the
+    // profile row is untouched.
+    if (!isOnline()) {
+      setError(offlineMessage('Name changes', 'save'));
       return;
     }
 

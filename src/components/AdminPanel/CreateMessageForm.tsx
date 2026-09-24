@@ -2,6 +2,7 @@ import { m as motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import { useSubmitKey } from '../../hooks/useSubmitKey';
+import { AccountDataError } from '../../services/accountDataError';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MessageCategory } from '../../types';
 import { isValidationError } from '../../validation/errorMessages';
@@ -60,6 +61,10 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
         }
 
         // Set general error message
+        setError(err.message);
+      } else if (err instanceof AccountDataError && err.code === 'offline') {
+        // Refused up front: the form keeps what was typed, and "try again"
+        // would not help until the device is back online.
         setError(err.message);
       } else {
         setError('Failed to create message. Please try again.');

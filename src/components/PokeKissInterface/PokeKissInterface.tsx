@@ -23,6 +23,7 @@ import { Heart, History, Wind, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import type { InteractionSubscriptionStatus } from '../../api/interactionService';
+import { offlineMessage } from '../../services/accountDataError';
 import { useAppStore } from '../../stores/useAppStore';
 import type { Interaction } from '../../types';
 import { NoPartnerError } from '../../utils/interactionValidation';
@@ -272,6 +273,19 @@ export function PokeKissInterface() {
     if (!currentInteraction) return;
 
     try {
+      // The animation has played; only the "seen" write needs a connection.
+      // Refused before the request, so the badge stays for the next tap.
+      if (!isOnline()) {
+        setShowToast(
+          offlineMessage(
+            currentInteraction.type === 'kiss' ? 'A kiss' : 'A poke',
+            'be marked as seen',
+            'needs'
+          )
+        );
+        setTimeout(() => setShowToast(null), 3000);
+        return;
+      }
       await markInteractionViewed(currentInteraction.id);
       logger.debug('[PokeKissInterface] Interaction marked as viewed:', currentInteraction.id);
     } catch (error) {

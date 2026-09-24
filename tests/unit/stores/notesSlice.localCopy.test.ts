@@ -153,6 +153,7 @@ import { openMyLoveDB } from '../../../src/services/dbSchema';
 import {
   createNotesSlice,
   LOVE_NOTES_COPY_KIND,
+  NoteRefusedOfflineError,
   type NotesSlice,
 } from '../../../src/stores/slices/notesSlice';
 
@@ -795,18 +796,51 @@ describe('notesSlice love-notes local copy', () => {
       expect(savedIds()).toEqual(['server-1']);
     });
 
-    it('offline with no partner loaded, a send is refused with the lookup reason and the copy is unchanged', async () => {
+    it('offline with no partner loaded, a send is refused before the lookup and the copy is unchanged', async () => {
       savedCopies.set(key(USER_A), [row('1')]);
+      goOffline();
+      const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+      try {
+        const store = createTestStore();
+        await store.getState().fetchNotes();
+        writeLocalCopy.mockClear();
+        lookupPartnerId.mockClear();
+
+        // Thrown, so the composer keeps the text; the banner owns the message.
+        await expect(store.getState().sendNote('offline note')).rejects.toBeInstanceOf(
+          NoteRefusedOfflineError
+        );
+        await flush();
+
+        // The recipient cannot be fixed offline without a loaded partner: refused
+        // before the lookup goes out, with the offline wording.
+        expect(lookupPartnerId).not.toHaveBeenCalled();
+        expect(store.getState().notesError).toBe(
+          'You are offline. Love notes need a connection to send.'
+        );
+        expect(stateIds(store)).toEqual(['1']);
+        expect(writeLocalCopy).not.toHaveBeenCalled();
+        expect(savedIds()).toEqual(['1']);
+      } finally {
+        onLine.mockRestore();
+      }
+    });
+
+    it('online with no partner loaded, a failed lookup refuses the send with its reason and the copy is unchanged', async () => {
+      savedCopies.set(key(USER_A), [row('1')]);
+      // navigator.onLine stays true: the lookup itself fails, so the saved
+      // thread shows and the send reaches the lookup.
       goOffline();
       const store = createTestStore();
       await store.getState().fetchNotes();
       writeLocalCopy.mockClear();
+      lookupPartnerId.mockClear();
 
-      await store.getState().sendNote('offline note');
+      await store.getState().sendNote('lookup fails');
       await flush();
 
-      // The recipient cannot be fixed offline without a loaded partner, and a
-      // failed read is never "unlinked": refused with its reason.
+      // A failed read is never "unlinked": refused with its reason.
+      expect(lookupPartnerId).toHaveBeenCalled();
       expect(store.getState().notesError).toBe('TypeError: Failed to fetch');
       expect(stateIds(store)).toEqual(['1']);
       expect(writeLocalCopy).not.toHaveBeenCalled();
