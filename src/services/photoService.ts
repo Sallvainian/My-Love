@@ -100,6 +100,19 @@ const STORAGE_QUOTA = 1024 * 1024 * 1024; // 1GB free tier
 const WARNING_THRESHOLD = 0.8; // 80%
 const CRITICAL_THRESHOLD = 0.95; // 95%
 
+/**
+ * The PostgREST `or` filter for rows after `last` in `listAllPhotos`' order
+ * (created_at desc, id desc): an older `created_at`, or the same one with a
+ * smaller `id`. Values are double-quoted because a timestamp carries `.` and
+ * `:` (reserved in a logic tree); neither a timestamp nor a uuid can hold a
+ * `"` or `\`, so no escaping is needed inside the quotes.
+ */
+function photosAfter(last: Pick<SupabasePhoto, 'created_at' | 'id'>): string {
+  const at = `"${last.created_at}"`;
+  const id = `"${last.id}"`;
+  return `created_at.lt.${at},and(created_at.eq.${at},id.lt.${id})`;
+}
+
 class PhotoService {
   /**
    * Check storage quota usage
@@ -168,7 +181,8 @@ class PhotoService {
   /**
    * Every photo row the signed-in account can read (own + partner, filtered by
    * RLS), newest `created_at` first, ties by `id` (descending), so paging is a
-   * stable total order. Pages the server LIST_PAGE_SIZE rows at a time until a
+   * stable total order. Pages the server LIST_PAGE_SIZE rows at a time, each
+   * page keyed on the last row of the previous one (`photosAfter`), until a
    * short page. Signs nothing.
    *
    * @throws When any page fails. A partial list is never returned: the caller
@@ -185,13 +199,19 @@ class PhotoService {
     }
 
     const rows: SupabasePhoto[] = [];
-    for (let offset = 0; ; offset += LIST_PAGE_SIZE) {
-      const { data, error } = await supabase
-        .from('photos')
-        .select('*')
+    // Keyset paging: each page starts strictly after the last row of the one
+    // before, in the same (created_at desc, id desc) order. Offset paging
+    // skipped a photo when a delete landed between two page reads (and the
+    // caller then pruned it and its cached image), and repeated one when an
+    // insert did.
+    let last: SupabasePhoto | undefined;
+    for (;;) {
+      let query = supabase.from('photos').select('*');
+      if (last) query = query.or(photosAfter(last));
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
-        .range(offset, offset + LIST_PAGE_SIZE - 1);
+        .limit(LIST_PAGE_SIZE);
 
       if (error) {
         console.error('[PhotoService] Error listing photos:', error);
@@ -201,6 +221,7 @@ class PhotoService {
       const page = data ?? [];
       rows.push(...page);
       if (page.length < LIST_PAGE_SIZE) break;
+      last = page[page.length - 1];
     }
 
     logger.debug(`[PhotoService] Listed ${rows.length} photos`);
