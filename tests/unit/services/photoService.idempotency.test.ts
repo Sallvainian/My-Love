@@ -184,7 +184,6 @@ describe('photoService upload idempotency', () => {
     expect(store.getState().error).toBe(expected);
     expect(backend.objects.size).toBe(0);
     expect(backend.rows).toHaveLength(0);
-    vi.spyOn(photoService, 'getSignedUrl').mockResolvedValue('https://example.com/photo');
     await expect(store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }))).resolves.toEqual({ success: true });
     expect(backend.rows[0].storage_path).toBe(`${USER_ID}/check-key.jpeg`);
     expect(backend.rows).toHaveLength(1);

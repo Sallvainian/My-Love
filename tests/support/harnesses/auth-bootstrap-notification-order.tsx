@@ -15,6 +15,7 @@ import {
 import { MOOD_HISTORY_KIND } from '../../../src/stores/slices/moodSlice';
 import { INTERACTIONS_COPY_KIND } from '../../../src/stores/slices/interactionsSlice';
 import { LOVE_NOTES_COPY_KIND } from '../../../src/stores/slices/notesSlice';
+import { PHOTOS_COPY_KIND } from '../../../src/stores/slices/photosSlice';
 import { formatDateISO } from '../../../src/utils/dateUtils';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import {
@@ -200,8 +201,8 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     anniversariesService.fetchAnniversaries = async () => [];
     // Same reason for the couple-settings refresher, one step earlier: its
     // partner lookup (`lookupPartnerId`) calls supabase.auth.getSession
-    // directly — and for the profile, mood-history, interactions and
-    // love-notes refreshers, whose reads do too (and whose fake-token requests
+    // directly — and for the profile, mood-history, interactions, love-notes
+    // and photos refreshers, whose reads do too (and whose fake-token requests
     // PostgREST answers with 401).
     // Replaced with no-ops for the harness's lifetime; dispose puts the
     // store's own refreshers back.
@@ -210,12 +211,14 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     const unregisterMoodHistoryNoop = registerLocalCopy(MOOD_HISTORY_KIND, async () => {});
     const unregisterInteractionsNoop = registerLocalCopy(INTERACTIONS_COPY_KIND, async () => {});
     const unregisterLoveNotesNoop = registerLocalCopy(LOVE_NOTES_COPY_KIND, async () => {});
+    const unregisterPhotosNoop = registerLocalCopy(PHOTOS_COPY_KIND, async () => {});
     restoreCoupleSettingsRefresher = () => {
       unregisterNoop();
       unregisterProfileNoop();
       unregisterMoodHistoryNoop();
       unregisterInteractionsNoop();
       unregisterLoveNotesNoop();
+      unregisterPhotosNoop();
       registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => useAppStore.getState().loadCoupleSettings());
       registerLocalCopy(PROFILE_COPY_KIND, () => useAppStore.getState().loadOwnProfile());
       registerLocalCopy(MOOD_HISTORY_KIND, () => useAppStore.getState().loadMoodHistoryFromServer());
@@ -226,6 +229,10 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       registerLocalCopy(LOVE_NOTES_COPY_KIND, async () => {
         if (!useAppStore.getState().userId) return;
         await useAppStore.getState().fetchNotes(NOTES_CONFIG.PAGE_SIZE, { keepOlder: true });
+      });
+      registerLocalCopy(PHOTOS_COPY_KIND, async () => {
+        if (!useAppStore.getState().userId) return;
+        await useAppStore.getState().loadPhotos();
       });
     };
     localStorage.setItem('lastWelcomeView', String(Date.now()));
