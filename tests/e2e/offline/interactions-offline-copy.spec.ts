@@ -102,9 +102,16 @@ test.describe('Poke and kiss history from the local copy', () => {
         .toBe(true);
 
       // WHEN: the app reloads without a server answer and the device goes offline.
-      await page.route(INTERACTIONS_REST, (route) => route.abort());
+      let abortedReads = 0;
+      await page.route(INTERACTIONS_REST, (route) => {
+        abortedReads += 1;
+        return route.abort();
+      });
       await page.reload();
       await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
+      // The start read really hit the aborted route, so nothing after this
+      // point can have come from the server.
+      await expect.poll(() => abortedReads).toBeGreaterThan(0);
       await goOffline(page, true);
 
       // THEN: the badge shows the saved unviewed count…
@@ -137,15 +144,21 @@ test.describe('Poke and kiss history from the local copy', () => {
 
       // WHEN: the partner pokes while this device is offline, then it reconnects.
       pokeId = await seedPartnerPoke(supabaseAdmin);
-      const refreshRead = page.waitForRequest(
-        (request) => request.method() === 'GET' && request.url().includes('/rest/v1/interactions')
+      const id = pokeId;
+      const refreshRead = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'GET' && response.url().includes('/rest/v1/interactions')
       );
       await goOffline(page, false);
-      // The reconnect itself re-reads the server (the kind's refresher).
-      await refreshRead;
+      // The reconnect itself re-reads the server (the kind's refresher), and
+      // that read carries the poke — so the test does not rest on Realtime,
+      // whose socket setOffline may leave open.
+      const response = await refreshRead;
+      expect(response.ok()).toBe(true);
+      const rows = (await response.json()) as { id: string }[];
+      expect(rows.map((row) => row.id)).toContain(id);
 
       // THEN: the poke is in state, the copy and the sheet, with the badge showing.
-      const id = pokeId;
       await expect
         .poll(() =>
           page.evaluate(

@@ -289,12 +289,12 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         if (!currentUserId || !ownsSession(currentUserId, markedInSession)) return;
 
         // Update local state
-        set((state) => ({
-          interactions: state.interactions.map((interaction) =>
+        set((state) => {
+          const interactions = state.interactions.map((interaction) =>
             interaction.id === id ? { ...interaction, viewed: true } : interaction
-          ),
-          unviewedCount: Math.max(0, state.unviewedCount - 1),
-        }));
+          );
+          return { interactions, unviewedCount: countUnviewed(interactions, currentUserId) };
+        });
         await saveInteractionsCopy(currentUserId, markedInSession);
 
         logger.debug('[InteractionsSlice] Interaction marked as viewed:', id);

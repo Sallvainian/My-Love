@@ -512,6 +512,24 @@ describe('interactionsSlice local copy', () => {
       ]);
     });
 
+    it('recounts the badge from the list when a refresh already marked the row viewed', async () => {
+      const server = deferred<void>();
+      markAsViewed.mockReturnValue(server.promise);
+      const store = createTestStore();
+      store.setState({ interactions: [interaction('a'), interaction('b')], unviewedCount: 2 });
+
+      const inFlight = store.getState().markInteractionViewed('a');
+      // A refresh lands first and already carries `a` as viewed.
+      store.setState({
+        interactions: [interaction('a', { viewed: true }), interaction('b')],
+        unviewedCount: 1,
+      });
+      server.resolve();
+      await inFlight;
+
+      expect(store.getState().unviewedCount).toBe(1);
+    });
+
     it('offline, mark-viewed changes nothing locally', async () => {
       setOnline(false);
       const store = createTestStore();
