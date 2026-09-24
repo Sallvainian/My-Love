@@ -45,6 +45,9 @@
  *   After each pass, a queued note on screen whose row has left the queue
  *   (another tab of the account sent it) is confirmed from its stored row, and
  *   one whose row another tab marked rejected is shown failed, with Retry.
+ * - Each queued note is sent with its row's `createdAt` as `written_at`, so a
+ *   note delivered late still shows when it was written. `created_at` stays
+ *   the server's delivery time and alone orders and pages the thread.
  * - The recipient is fixed at enqueue: the loaded `partner`, else a
  *   `lookupPartnerId()` that must answer `linked`. A queued note is never sent
  *   after a fresh partner lookup.
@@ -184,6 +187,11 @@ interface SavedLoveNote {
   created_at: string;
   /** Storage path, or null for a text-only note. */
   image_url: string | null;
+  /**
+   * When the sender wrote it, or null. Absent from a copy saved before the
+   * column existed, which still parses.
+   */
+  written_at?: string | null;
 }
 
 /** A confirmed server row: not optimistic, not sending, not failed. */
@@ -199,6 +207,7 @@ function toSavedNote(note: LoveNote): SavedLoveNote {
     content: note.content,
     created_at: note.created_at,
     image_url: note.image_url ?? null,
+    written_at: note.written_at ?? null,
   };
 }
 
@@ -211,7 +220,8 @@ function parseSavedNote(value: unknown): LoveNote | null {
     typeof v.to_user_id !== 'string' ||
     typeof v.content !== 'string' ||
     typeof v.created_at !== 'string' ||
-    (v.image_url !== null && typeof v.image_url !== 'string')
+    (v.image_url !== null && typeof v.image_url !== 'string') ||
+    (v.written_at !== undefined && v.written_at !== null && typeof v.written_at !== 'string')
   ) {
     return null;
   }
@@ -222,6 +232,7 @@ function parseSavedNote(value: unknown): LoveNote | null {
     content: v.content,
     created_at: v.created_at,
     image_url: v.image_url,
+    ...(typeof v.written_at === 'string' ? { written_at: v.written_at } : null),
   };
 }
 
@@ -349,6 +360,8 @@ async function insertNoteOnce(payload: {
   content: string;
   image_url: string | null;
   idempotency_key: string;
+  /** Composition time of a queued note; the server NULLs an impossible one. */
+  written_at?: string;
 }): Promise<{ data: LoveNote | null; error: unknown }> {
   const { data, error } = await supabase
     .from('love_notes')
@@ -557,6 +570,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           content: next.content,
           image_url: null,
           idempotency_key: next.id,
+          // When it was written, so a note sent late still shows that time.
+          written_at: next.createdAt,
         });
       } catch (error) {
         result = { data: null, error };

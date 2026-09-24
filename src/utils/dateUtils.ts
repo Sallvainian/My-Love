@@ -101,6 +101,28 @@ function formatShortDate(date: Date): string {
 }
 
 /**
+ * How much earlier than delivery a love note's `written_at` must be before the
+ * bubble shows it. One minute is the bubble's own resolution ("2:45 PM"): below
+ * it, the gap is the normal send latency plus any skew between the sender's
+ * clock and the server's, and showing it would only nudge a note sent at once
+ * back by a minute.
+ */
+export const WRITTEN_AT_DISPLAY_THRESHOLD_MS = 60 * 1000;
+
+/**
+ * The time a love-note bubble shows: `written_at` when it is present and
+ * meaningfully earlier than `created_at` (a note written offline and delivered
+ * later), otherwise `created_at`. The thread is still ordered by `created_at`.
+ */
+export function loveNoteDisplayTime(note: { created_at: string; written_at?: string | null }): string {
+  if (!note.written_at) return note.created_at;
+  const written = new Date(note.written_at).getTime();
+  const created = new Date(note.created_at).getTime();
+  if (Number.isNaN(written) || Number.isNaN(created)) return note.created_at;
+  return created - written > WRITTEN_AT_DISPLAY_THRESHOLD_MS ? note.written_at : note.created_at;
+}
+
+/**
  * Format full timestamp with date and time (e.g., "November 30, 2025 at 2:45 PM")
  * Useful for accessibility / screen readers
  */

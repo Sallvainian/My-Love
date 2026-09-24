@@ -26,6 +26,7 @@ interface Row {
   image_url: string | null;
   idempotency_key: string;
   created_at: string;
+  written_at?: string | null;
 }
 
 type Outcome =
@@ -320,6 +321,34 @@ describe('notesSlice offline send queue', () => {
       [`love-notes:${PARTNER}`, 'two'],
       [`love-notes:${PARTNER}`, 'three'],
     ]);
+  });
+
+  it('a queued note is sent with its composition time as written_at, and keeps it in state and copy', async () => {
+    const store = createTestStore();
+    setOnline(false);
+    await store.getState().sendNote('written offline');
+    const composedAt = (await listQueuedNotes(A))[0].createdAt;
+    expect(store.getState().notes[0].created_at).toBe(composedAt);
+
+    setOnline(true);
+    await store.getState().drainQueuedNotes();
+
+    expect(server.rows).toEqual([expect.objectContaining({ content: 'written offline', written_at: composedAt })]);
+    // created_at stays the server's delivery time.
+    expect(store.getState().notes[0]).toMatchObject({
+      id: 'server-1',
+      created_at: server.rows[0].created_at,
+      written_at: composedAt,
+    });
+    await flush();
+    const copy = await readLocalCopy<Array<{ id: string; written_at?: string | null }>>(A, LOVE_NOTES_COPY_KIND);
+    expect(copy).toEqual([expect.objectContaining({ id: 'server-1', written_at: composedAt })]);
+
+    // A reload reads it back from the copy.
+    const reloaded = createTestStore();
+    server.lookup = { status: 'error', reason: 'TypeError: Failed to fetch' };
+    await reloaded.getState().fetchNotes();
+    expect(reloaded.getState().notes[0]).toMatchObject({ id: 'server-1', written_at: composedAt });
   });
 
   it('reconnect: a network failure stops the run and leaves the rest pending', async () => {

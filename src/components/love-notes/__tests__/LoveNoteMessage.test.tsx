@@ -11,6 +11,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoveNote } from '../../../types/models';
+import { formatFullTimestamp } from '../../../utils/dateUtils';
 import { LoveNoteMessage } from '../LoveNoteMessage';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
@@ -115,6 +116,34 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByText(/You/)).toBeInTheDocument();
+    });
+
+    it('shows when a late-delivered note was written, not when it arrived', () => {
+      const late: LoveNote = {
+        ...baseMessage,
+        created_at: '2024-01-15T14:00:00.000000+00:00',
+        written_at: '2024-01-15T09:00:00.000000+00:00',
+      };
+      render(<LoveNoteMessage message={late} isOwnMessage={true} senderName="You" />);
+
+      expect(screen.getByTestId('love-note-message')).toHaveAttribute(
+        'aria-label',
+        `Message from You at ${formatFullTimestamp('2024-01-15T09:00:00.000000+00:00')}`
+      );
+    });
+
+    it('shows the delivery time when written_at is within a minute of it', () => {
+      const prompt: LoveNote = {
+        ...baseMessage,
+        created_at: '2024-01-15T14:00:00.000000+00:00',
+        written_at: '2024-01-15T13:59:30.000000+00:00',
+      };
+      render(<LoveNoteMessage message={prompt} isOwnMessage={true} senderName="You" />);
+
+      expect(screen.getByTestId('love-note-message')).toHaveAttribute(
+        'aria-label',
+        `Message from You at ${formatFullTimestamp('2024-01-15T14:00:00.000000+00:00')}`
+      );
     });
 
     it('should apply own message styling when isOwnMessage is true', () => {
