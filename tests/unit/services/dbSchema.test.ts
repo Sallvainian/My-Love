@@ -67,16 +67,17 @@ describe('dbSchema', () => {
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
       expect(db.objectStoreNames.contains('local-copies')).toBe(true);
       expect(db.objectStoreNames.contains('image-cache')).toBe(true);
+      expect(db.objectStoreNames.contains('note-queue')).toBe(true);
       // v11: photos live in Supabase; a fresh profile never gets the store.
       expect(unwrap(db).objectStoreNames.contains('photos')).toBe(false);
     });
 
-    it('should create exactly 6 stores', async () => {
+    it('should create exactly 7 stores', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
       });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
     });
   });
 
@@ -284,12 +285,12 @@ describe('dbSchema', () => {
       expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V7' });
       expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V7' });
 
-      // Six stores (message-favorites is created at v9, local-copies at v12,
-      // image-cache at v13);
+      // Seven stores (message-favorites is created at v9, local-copies at v12,
+      // image-cache at v13, note-queue at v14);
       // the v7 scripture stores are dropped on the way to v10 and photos on the
       // way to v11. The v7 moods index is untouched — v8 must not re-run the v7
       // swap over a store that has already had it.
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       const remaining = Array.from(unwrap(db).objectStoreNames);
       expect(remaining).not.toContain('photos');
       expect(remaining).not.toContain('scripture-sessions');
@@ -477,7 +478,8 @@ describe('dbSchema', () => {
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
       expect(db.objectStoreNames.contains('local-copies')).toBe(true);
       expect(db.objectStoreNames.contains('image-cache')).toBe(true);
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.contains('note-queue')).toBe(true);
+      expect(db.objectStoreNames.length).toBe(7);
 
       const remaining = Array.from(unwrap(db).objectStoreNames);
       expect(remaining).not.toContain('photos');
@@ -562,8 +564,8 @@ describe('dbSchema', () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('photos');
-      // The four survivors plus v12's local-copies and v13's image-cache.
-      expect(db.objectStoreNames.length).toBe(6);
+      // The four survivors plus v12's local-copies, v13's image-cache and v14's note-queue.
+      expect(db.objectStoreNames.length).toBe(7);
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
       expect((await db.getAll('message-favorites'))[0]).toEqual({
         messageId: 1,
@@ -580,7 +582,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
     });
   });
@@ -621,7 +623,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       const copies = db.transaction('local-copies', 'readonly').objectStore('local-copies');
       expect(Array.from(copies.keyPath as string[])).toEqual(['userId', 'kind']);
       expect(copies.indexNames.contains('by-user')).toBe(true);
@@ -648,7 +650,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       expect(await db.get('local-copies', ['USER-A', 'partner'])).toMatchObject({
         value: { status: 'unlinked' },
       });
@@ -704,7 +706,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       const images = db.transaction('image-cache', 'readonly').objectStore('image-cache');
       expect(Array.from(images.keyPath as string[])).toEqual(['userId', 'path']);
       expect(images.indexNames.contains('by-user')).toBe(true);
@@ -720,12 +722,91 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       const images = db.transaction('image-cache', 'readonly').objectStore('image-cache');
       expect(images.indexNames.contains('by-user')).toBe(true);
       expect(
         (await db.get('image-cache', ['USER-A', 'partner/pic.jpg'])) as unknown
       ).toMatchObject({ blob: 'IMAGE-AT-V12' });
+    });
+  });
+
+  describe('upgrade from v13 to v14', () => {
+    async function seedV13(options: { withNoteQueue: boolean }): Promise<void> {
+      const db = await openDB(DB_NAME, 13, {
+        upgrade(database) {
+          const messages = database.createObjectStore('messages', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          messages.createIndex('by-category', 'category');
+          messages.createIndex('by-date', 'createdAt');
+          messages.createIndex('by-user', 'userId');
+          database
+            .createObjectStore('message-favorites', { keyPath: ['messageId', 'userId'] })
+            .createIndex('by-user', 'userId');
+          database
+            .createObjectStore('moods', { keyPath: 'id', autoIncrement: true })
+            .createIndex('by-user-date', ['userId', 'date'], { unique: true });
+          database.createObjectStore('sw-auth', { keyPath: 'id' });
+          database
+            .createObjectStore('local-copies', { keyPath: ['userId', 'kind'] })
+            .createIndex('by-user', 'userId');
+          database
+            .createObjectStore('image-cache', { keyPath: ['userId', 'path'] })
+            .createIndex('by-user', 'userId');
+          if (options.withNoteQueue) {
+            // A store that exists without its index: the upgrade adds it.
+            database.createObjectStore('note-queue', { keyPath: 'id' });
+          }
+        },
+      });
+      await db.put('image-cache', {
+        userId: 'USER-A',
+        path: 'partner/pic.jpg',
+        blob: 'IMAGE-AT-V13',
+        savedAt: 1,
+      });
+      if (options.withNoteQueue) {
+        await db.put('note-queue', {
+          id: 'temp-QUEUED-AT-V13',
+          userId: 'USER-A',
+          toUserId: 'USER-B',
+          content: 'queued before v14',
+          createdAt: '2026-09-24T10:00:00.000Z',
+          failed: false,
+        });
+      }
+      db.close();
+    }
+
+    it('adds note-queue keyed by id with a by-user index, keeping every row', async () => {
+      await seedV13({ withNoteQueue: false });
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(db.objectStoreNames.length).toBe(7);
+      const queue = db.transaction('note-queue', 'readonly').objectStore('note-queue');
+      expect(queue.keyPath).toBe('id');
+      expect(queue.indexNames.contains('by-user')).toBe(true);
+      expect(
+        (await db.get('image-cache', ['USER-A', 'partner/pic.jpg'])) as unknown
+      ).toMatchObject({ blob: 'IMAGE-AT-V13' });
+    });
+
+    it('keeps an existing note-queue store and its rows, adding a missing index', async () => {
+      // Existence-gated: a profile that already has the store must not throw
+      // ConstraintError, and its queued notes survive.
+      await seedV13({ withNoteQueue: true });
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(db.objectStoreNames.length).toBe(7);
+      const queue = db.transaction('note-queue', 'readonly').objectStore('note-queue');
+      expect(queue.indexNames.contains('by-user')).toBe(true);
+      expect(await db.getAllFromIndex('note-queue', 'by-user', 'USER-A')).toEqual([
+        expect.objectContaining({ id: 'temp-QUEUED-AT-V13', content: 'queued before v14' }),
+      ]);
     });
   });
 
@@ -969,6 +1050,7 @@ describe('dbSchema', () => {
         SW_AUTH: 'sw-auth',
         LOCAL_COPIES: 'local-copies',
         IMAGE_CACHE: 'image-cache',
+        NOTE_QUEUE: 'note-queue',
       });
     });
   });
@@ -984,8 +1066,8 @@ describe('dbSchema', () => {
       // v8 adds by-user to messages; v9 stores favorites by account; v10 drops
       // the four scripture stores; v11 drops the unused photos store; v12 adds
       // the shared per-account local-copies store; v13 adds the per-account
-      // image-cache store.
-      expect(DB_VERSION).toBe(13);
+      // image-cache store; v14 adds the per-account note-queue store.
+      expect(DB_VERSION).toBe(14);
     });
   });
 });

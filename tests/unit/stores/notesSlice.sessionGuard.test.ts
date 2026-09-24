@@ -48,8 +48,11 @@ vi.mock('../../../src/services/loveNoteImageService', () => ({
   deleteLoveNoteImage: (storagePath: string) => deleteLoveNoteImage(storagePath),
 }));
 
+import 'fake-indexeddb/auto';
 import { getPartnerId, lookupPartnerId } from '../../../src/api/supabaseClient';
 import { serializeAccountDataWrite } from '../../../src/services/accountDataQueue';
+import { openMyLoveDB } from '../../../src/services/dbSchema';
+import { listQueuedNotes } from '../../../src/services/noteQueue';
 import { useAppStore } from '../../../src/stores/useAppStore';
 
 const A = 'USER-A-ID';
@@ -113,7 +116,10 @@ function countWrites(): { count: () => number; stop: () => void } {
 }
 
 describe('notesSlice session guard — same account signs back in mid-flight', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const db = await openMyLoveDB();
+    await db.clear('note-queue');
+    db.close();
     vi.clearAllMocks();
     // An empty rotation pool keeps setAuthUser from firing a background reload
     // whose write would land inside the case under test.
@@ -191,17 +197,19 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     expect(useAppStore.getState().notes).toEqual(fresh);
   });
 
-  it('sendNote: a stale partner lookup adds no optimistic note and sends nothing', async () => {
-    const partner = deferred<string | null>();
-    vi.mocked(getPartnerId).mockReturnValue(partner.promise);
+  it('sendNote: a stale partner lookup adds no optimistic note, queues nothing and sends nothing', async () => {
+    const lookup = deferred<{ status: 'linked'; partnerId: string }>();
+    vi.mocked(lookupPartnerId).mockReturnValue(lookup.promise);
 
     const inFlight = useAppStore.getState().sendNote('STALE-DRAFT');
     signOutAndBackInAsA();
 
-    partner.settle(PARTNER);
+    lookup.settle({ status: 'linked', partnerId: PARTNER });
     await inFlight;
+    await useAppStore.getState().drainQueuedNotes();
 
     expect(JSON.stringify(useAppStore.getState().notes)).not.toContain('STALE-DRAFT');
+    expect(await listQueuedNotes(A)).toEqual([]);
     expect(loveNotesQuery).not.toHaveBeenCalled();
   });
 
@@ -209,15 +217,16 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     const pending = deferred<{ data: unknown; error: unknown }>();
     loveNotesQuery.mockReturnValue(builder(pending.promise));
 
-    const inFlight = useAppStore.getState().sendNote('hello');
-    await flush();
+    await useAppStore.getState().sendNote('hello');
+    // The queue's drain holds the insert open.
+    await vi.waitFor(() => expect(loveNotesQuery).toHaveBeenCalled());
     signOutAndBackInAsA();
 
     pending.settle({
       data: null,
       error: { code: '23514', message: 'check violation', details: '', hint: '' },
     });
-    await inFlight;
+    await useAppStore.getState().drainQueuedNotes();
 
     expect(useAppStore.getState().notesError).toBeNull();
   });
@@ -293,15 +302,15 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     const insert = deferred<{ data: unknown; error: unknown }>();
     loveNotesQuery.mockReturnValue(builder(insert.promise));
 
-    const inFlight = useAppStore.getState().sendNote('COMMITTED-NOTE');
-    await flush();
-    expect(loveNotesQuery).toHaveBeenCalledTimes(1);
+    await useAppStore.getState().sendNote('COMMITTED-NOTE');
+    // The queue's drain holds the insert open.
+    await vi.waitFor(() => expect(loveNotesQuery).toHaveBeenCalledTimes(1));
     signOutAndBackInAsA();
     await flush();
 
     const writes = countWrites();
     insert.settle({ data: committed, error: null });
-    await inFlight;
+    await useAppStore.getState().drainQueuedNotes();
     writes.stop();
 
     expect(writes.count()).toBe(0);

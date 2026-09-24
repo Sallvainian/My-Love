@@ -25,6 +25,12 @@
 export const MOOD_SYNC_LOCK = 'my-love:mood-sync';
 
 /**
+ * Held by one love-note queue drain at a time (`notesSlice.drainQueuedNotes`),
+ * so two tabs never send the same queued note concurrently.
+ */
+export const NOTE_QUEUE_LOCK = 'my-love:note-queue';
+
+/**
  * Outcome of a guarded section.
  *
  * `ran: false` means another context held the lock and the caller did nothing —

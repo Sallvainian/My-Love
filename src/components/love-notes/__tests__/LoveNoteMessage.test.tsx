@@ -512,6 +512,47 @@ describe('LoveNoteMessage', () => {
       expect(bubble).not.toHaveClass('opacity-70');
     });
 
+    it('should show "Waiting to send" for a queued note that is not sending', () => {
+      const queuedMessage: LoveNote = {
+        ...baseMessage,
+        tempId: 'temp-queued',
+        queued: true,
+        sending: false,
+      };
+
+      render(<LoveNoteMessage message={queuedMessage} isOwnMessage={true} senderName="You" />);
+
+      const waiting = screen.getByText('Waiting to send');
+      expect(waiting).toHaveAttribute('aria-live', 'polite');
+      expect(waiting).toHaveClass('text-muted');
+      expect(screen.queryByText('Sending...')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry sending message' })).not.toBeInTheDocument();
+    });
+
+    it('should show "Sending..." rather than "Waiting to send" while a queued note sends', () => {
+      const sendingQueued: LoveNote = { ...baseMessage, tempId: 'temp-q', queued: true, sending: true };
+
+      render(<LoveNoteMessage message={sendingQueued} isOwnMessage={true} senderName="You" />);
+
+      expect(screen.getByText('Sending...')).toBeInTheDocument();
+      expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
+    });
+
+    it('should show only Retry for a failed queued note', () => {
+      const failedQueued: LoveNote = {
+        ...baseMessage,
+        tempId: 'temp-q',
+        queued: true,
+        sending: false,
+        error: true,
+      };
+
+      render(<LoveNoteMessage message={failedQueued} isOwnMessage={true} senderName="You" />);
+
+      expect(screen.getByRole('button', { name: 'Retry sending message' })).toBeInTheDocument();
+      expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
+    });
+
     it('should not show sending indicator when image is uploading', () => {
       const uploadingMessage: LoveNote = {
         ...baseMessage,

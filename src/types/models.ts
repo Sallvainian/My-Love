@@ -26,6 +26,9 @@ export interface LoveNote {
   sending?: boolean;
   error?: boolean;
   tempId?: string; // For optimistic messages before server ID
+  // Client-side only: the note is in the per-account send queue
+  // (services/noteQueue.ts) and not yet confirmed by the server.
+  queued?: boolean;
   // Image upload state (client-side only)
   imageUploading?: boolean;
   // Cached image data for retry flows (avoids re-compression)

@@ -39,6 +39,7 @@ const ALL_STORES = [
   'sw-auth',
   'local-copies',
   'image-cache',
+  'note-queue',
 ] as const;
 
 /** Every service instance built in a test, so its connection can be closed */

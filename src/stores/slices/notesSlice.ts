@@ -32,11 +32,31 @@
  *   fetch replaces the thread with the newest page.
  * - Every confirmed change to the thread — an accepted Realtime note, a
  *   confirmed send or resend, a confirmed removal, an older page — rewrites the
- *   copy from the whole confirmed list. Sending still needs a connection.
+ *   copy from the whole confirmed list.
+ *
+ * Sending:
+ * - Every text-only note goes into the per-account send queue
+ *   (`services/noteQueue.ts`) before it is sent, online or offline, and shows
+ *   at once as a `queued` note. `drainQueuedNotes` sends the queue in order,
+ *   one note at a time, under `withSyncLock(NOTE_QUEUE_LOCK)`, reusing each
+ *   note's `tempId` as `idempotency_key`. It runs after each enqueue, and from
+ *   `App.tsx` on start, on the `online` event and on the 5-minute interval.
+ * - The recipient is fixed at enqueue: the loaded `partner`, else a
+ *   `lookupPartnerId()` that must answer `linked`. A queued note is never sent
+ *   after a fresh partner lookup.
+ * - A server rejection (a SQLSTATE code) marks the queued note failed and the
+ *   drain moves on; any other failure leaves it pending and ends the run.
+ *   Retry clears the mark and drains; removing a failed note deletes its row.
+ * - `fetchNotes` shows the account's queued notes before its server read, so
+ *   they survive a reload offline. They never go in the local copy.
+ * - A note with a picture keeps the direct send path and needs a connection;
+ *   offline it is refused before anything is shown or uploaded. A confirmed
+ *   send or resend of any note is broadcast to the partner.
  * - Note images are cached separately, per account and storage path, by
  *   `LoveNoteMessage` through `services/imageCache.ts`.
  * - NOT persisted to localStorage. Sign-out deletes the outgoing account's
- *   copies and cached images, and `signedOutState()` resets the state.
+ *   copies and cached images, and `signedOutState()` resets the state. Its
+ *   queued notes stay, and send when that account signs back in.
  */
 
 import { CHECK_CONSTRAINT_MESSAGE, handleSupabaseError, isPostgrestError } from '../../api/errorHandlers';
@@ -46,6 +66,14 @@ import { NOTES_CONFIG } from '../../config/images';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
 import { deleteLoveNoteImage, uploadCompressedBlob } from '../../services/loveNoteImageService';
+import {
+  enqueueNote,
+  listQueuedNotes,
+  removeQueuedNote,
+  setQueuedNoteFailed,
+  type QueuedNote,
+} from '../../services/noteQueue';
+import { NOTE_QUEUE_LOCK, withSyncLock } from '../../services/syncLock';
 import type { LoveNote } from '../../types/models';
 import { logger } from '../../utils/logger';
 import type { AppStateCreator } from '../types';
@@ -73,12 +101,59 @@ export interface NotesSlice {
   removeNote: (noteId: string) => Promise<void>;
   cleanupPreviewUrls: () => void;
   removeFailedMessage: (tempId: string) => void;
+  /** Send the signed-in account's queued notes, oldest first. Never throws. */
+  drainQueuedNotes: () => Promise<void>;
 }
 
 const { PAGE_SIZE: NOTES_PAGE_SIZE, RATE_LIMIT_MAX_MESSAGES, RATE_LIMIT_WINDOW_MS } = NOTES_CONFIG;
 
 /** The error an unlinked account sees; a conclusive answer, not a failed read. */
 const PARTNER_NOT_CONFIGURED = 'Partner not configured';
+
+/** The refusal for a note with a picture while the device is offline. */
+export const IMAGE_NOTE_NEEDS_CONNECTION = 'A note with a picture needs a connection';
+
+/**
+ * Thrown out of `sendNote` rather than shown as `notesError`: the composer
+ * catches it, keeps what was typed and shows its own error.
+ */
+class NoteNotAcceptedError extends Error {}
+
+/** `navigator.onLine` says the device is offline for certain. */
+function knownOffline(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+/**
+ * The server looked at the insert and refused it: a Postgrest error whose code
+ * is a SQLSTATE (CHECK, RLS, …). A `PGRST…` code, an empty code (a fetch that
+ * never reached the server) or anything else is not a rejection.
+ */
+function isServerRejection(error: unknown): boolean {
+  if (!isPostgrestError(error)) return false;
+  const code: unknown = error.code;
+  return typeof code === 'string' && !code.startsWith('PGRST') && /^[0-9A-Z]{5}$/.test(code);
+}
+
+/** A queued row as an unconfirmed note in the thread. */
+function queuedToNote(row: QueuedNote): LoveNote {
+  return {
+    id: row.id,
+    tempId: row.id,
+    from_user_id: row.userId,
+    to_user_id: row.toUserId,
+    content: row.content,
+    created_at: row.createdAt,
+    sending: false,
+    error: row.failed,
+    queued: true,
+  };
+}
+
+/** The key a note was composed with: its tempId, or a committed row's idempotency_key. */
+function composedKey(note: LoveNote): string | undefined {
+  return note.tempId ?? (note as LoveNote & { idempotency_key?: string }).idempotency_key;
+}
 
 /** Local-copy kind for the love-notes thread the screen last showed. */
 export const LOVE_NOTES_COPY_KIND = 'love-notes';
@@ -348,6 +423,141 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     await get().fetchNotes(NOTES_PAGE_SIZE, { keepOlder: true });
   });
 
+  /** Patch the note composed as `tempId`, if it is in the thread. */
+  const patchNote = (tempId: string, patch: Partial<LoveNote>) => {
+    set((state) => ({
+      notes: state.notes.map((note) => (note.tempId === tempId ? { ...note, ...patch } : note)),
+    }));
+  };
+
+  /**
+   * No drain is sending from this tab (offline, or another context holds the
+   * queue): every queued note on screen is waiting, not sending.
+   */
+  const settleWaitingNotes = () => {
+    if (!get().notes.some((note) => note.queued && note.sending)) return;
+    set((state) => ({
+      notes: state.notes.map((note) =>
+        note.queued && note.sending ? { ...note, sending: false } : note
+      ),
+    }));
+  };
+
+  /**
+   * One pass over the signed-in account's queue, holding NOTE_QUEUE_LOCK.
+   * Sends the oldest pending row, then re-reads the queue, so a note enqueued
+   * during the run is still sent. Each row is tried at most once per pass.
+   */
+  const drainOnce = async (): Promise<void> => {
+    const { userId, authSessionVersion } = get();
+    if (!userId) return;
+    const owns = () => ownsSession(userId, authSessionVersion);
+    const tried = new Set<string>();
+    // A CHECK banner this pass raised stays up while later notes send: it
+    // belongs to a note still showing Retry.
+    let raisedCheckBanner = false;
+
+    for (;;) {
+      const next = (await listQueuedNotes(userId)).find(
+        (row) => !row.failed && !tried.has(row.id)
+      );
+      if (!next) return;
+      // Re-checked before the insert: a stale session sends nothing.
+      if (!owns()) return;
+      tried.add(next.id);
+      patchNote(next.id, { sending: true, error: false });
+
+      let result: { data: LoveNote | null; error: unknown };
+      try {
+        result = await insertNoteOnce({
+          from_user_id: userId,
+          to_user_id: next.toUserId,
+          content: next.content,
+          image_url: null,
+          idempotency_key: next.id,
+        });
+      } catch (error) {
+        result = { data: null, error };
+      }
+      const { data, error } = result;
+
+      if (data) {
+        // The note is committed whatever happened to the session meanwhile.
+        try {
+          await removeQueuedNote(next.id);
+        } catch (removeError) {
+          // The next drain resolves the same key to the stored row.
+          console.error('[NotesSlice] Failed to remove a sent note from the queue:', removeError);
+        }
+        if (owns()) {
+          // Only a note the thread showed goes into the copy: a drain before
+          // the thread is loaded must not write [] over the saved copy.
+          const wasShown = get().notes.some((note) => note.tempId === next.id);
+          if (!raisedCheckBanner && get().notesError === CHECK_CONSTRAINT_MESSAGE) {
+            set({ notesError: null });
+          }
+          set((state) => ({ notes: confirmOptimisticNote(state.notes, next.id, data) }));
+          if (wasShown) void saveNotesCopy(userId, authSessionVersion);
+        }
+        logger.debug('[NotesSlice] Queued note sent:', data.id);
+
+        // Same rule as sendNote: only the same account may broadcast it.
+        if (get().userId === userId) {
+          try {
+            await sendEphemeralBroadcast(`love-notes:${next.toUserId}`, 'new_message', {
+              message: data,
+            });
+          } catch (broadcastError) {
+            console.warn('[NotesSlice] Broadcast failed (non-fatal):', broadcastError);
+          }
+        }
+        continue;
+      }
+
+      if (isServerRejection(error)) {
+        // Only a Retry sends it again; the rows after it still go.
+        try {
+          await setQueuedNoteFailed(next.id, true);
+        } catch (markError) {
+          console.error('[NotesSlice] Failed to mark a queued note failed:', markError);
+        }
+        if (!owns()) return;
+        if (isPostgrestError(error) && error.code === '23514') {
+          set({ notesError: handleSupabaseError(error).message });
+          raisedCheckBanner = true;
+        }
+        patchNote(next.id, { sending: false, error: true });
+        logger.debug('[NotesSlice] Queued note rejected:', error);
+        continue;
+      }
+
+      // Anything else (offline, timeout, expired token): keep the row pending
+      // and stop; order is kept, and the next trigger retries it.
+      if (owns()) patchNote(next.id, { sending: false });
+      logger.debug('[NotesSlice] Queued note not sent; retrying later:', error);
+      return;
+    }
+  };
+
+  /**
+   * The drain running in this tab, if any. A drain asked for while one runs
+   * joins it and makes it pass over the queue once more, so a note enqueued
+   * just as the run was finishing is not left for the next trigger.
+   */
+  let drainInFlight: Promise<void> | null = null;
+  let drainRequested = false;
+
+  /**
+   * The queue is sent in `createdAt` order, and two notes composed within one
+   * millisecond would tie (then sort by their random tempId). Each queued note
+   * gets a time strictly after the previous one's. Per slice instance.
+   */
+  let lastQueuedAt = 0;
+  const nextQueuedAt = () => {
+    lastQueuedAt = Math.max(Date.now(), lastQueuedAt + 1);
+    return new Date(lastQueuedAt).toISOString();
+  };
+
   return {
     // Initial state
     notes: [],
@@ -445,6 +655,21 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
               hasMoreFromServerFor = null;
               notesThreadGen += 1;
             }
+          }
+        }
+
+        // 1b. The account's queued notes, before the server answers, so they
+        // show after a reload even offline. listQueuedNotes answers [] on
+        // failure. A note already on screen, or already confirmed there (a
+        // drain may have just sent it), is not added twice.
+        const queuedRows = await listQueuedNotes(userId);
+        if (queuedRows.length > 0 && ownsRequest()) {
+          const onScreen = get().notes;
+          const shownKeys = new Set(onScreen.map(composedKey).filter(Boolean));
+          const additions = queuedRows.filter((row) => !shownKeys.has(row.id)).map(queuedToNote);
+          if (additions.length > 0) {
+            set({ notes: [...onScreen, ...additions] });
+            if (onScreen.length === 0) notesThreadGen += 1;
           }
         }
 
@@ -743,6 +968,63 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           throw new Error('User not authenticated');
         }
 
+        // Text goes through the queue, online or offline: one send path, one
+        // order. An online note sent directly would overtake queued ones.
+        if (!imageFile) {
+          // The recipient is fixed now, so the drain never needs a network
+          // lookup. The loaded partner works offline; failing that, only a
+          // conclusive `linked` answer will do.
+          let toUserId = get().partner?.id ?? null;
+          if (!toUserId) {
+            const lookup = await lookupPartnerId();
+            if (lookup.status === 'unlinked') throw new Error(PARTNER_NOT_CONFIGURED);
+            if (lookup.status === 'error') throw new Error(lookup.reason || 'Failed to send note');
+            toUserId = lookup.partnerId;
+            if (!ownsRequest()) return;
+          }
+
+          const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const createdAt = nextQueuedAt();
+          try {
+            await enqueueNote({ id: tempId, userId, toUserId, content, createdAt, failed: false });
+          } catch (queueError) {
+            console.error('[NotesSlice] Failed to queue note:', queueError);
+            throw new NoteNotAcceptedError('Failed to save the note');
+          }
+
+          // The row stays queued for its owner, who sends it on signing back in.
+          if (!ownsRequest()) return;
+
+          set((state) => ({
+            notes: [
+              ...state.notes,
+              {
+                id: tempId,
+                tempId,
+                from_user_id: userId,
+                to_user_id: toUserId,
+                content,
+                created_at: createdAt,
+                // Online it looks as it always has; offline it is waiting.
+                sending: !knownOffline(),
+                queued: true,
+              },
+            ],
+            sentMessageTimestamps: [...recentTimestamps, now],
+          }));
+          logger.debug('[NotesSlice] Note queued:', tempId);
+
+          void get().drainQueuedNotes();
+          return;
+        }
+
+        // A picture needs a connection: refused before anything is shown or
+        // uploaded, and thrown so the composer keeps the picture and text.
+        if (knownOffline()) {
+          set({ notesError: IMAGE_NOTE_NEEDS_CONNECTION });
+          throw new NoteNotAcceptedError(IMAGE_NOTE_NEEDS_CONNECTION);
+        }
+
         const partnerId = await getPartnerId();
         if (!partnerId) {
           throw new Error('Partner not configured');
@@ -923,6 +1205,11 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         if (errorMessage.includes('Rate limit')) {
           throw error;
         }
+        // Not accepted (a failed enqueue, an offline picture): the composer
+        // keeps the text and shows its own error.
+        if (error instanceof NoteNotAcceptedError) {
+          throw error;
+        }
 
         if (!ownsRequest()) return;
         set({ notesError: errorMessage });
@@ -949,6 +1236,33 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         const failedNote = notes.find((note) => note.tempId === tempId);
         if (!failedNote) {
           throw new Error('Message not found');
+        }
+
+        // A queued note goes back through the drain under the same key, to the
+        // recipient fixed when it was composed.
+        if (failedNote.queued) {
+          if (!capturedUserId) throw new Error('User not authenticated');
+          const found = await setQueuedNoteFailed(tempId, false);
+          if (!found) {
+            // Its row is gone (removed elsewhere): queue it again as composed.
+            await enqueueNote({
+              id: tempId,
+              userId: capturedUserId,
+              toUserId: failedNote.to_user_id,
+              content: failedNote.content,
+              createdAt: failedNote.created_at,
+              failed: false,
+            });
+          }
+          if (!ownsRequest()) return;
+          set((state) => ({
+            notes: state.notes.map((note) =>
+              note.tempId === tempId ? { ...note, sending: !knownOffline(), error: false } : note
+            ),
+            sentMessageTimestamps: [...recentTimestamps, now],
+          }));
+          await get().drainQueuedNotes();
+          return;
         }
 
         // Get partner ID
@@ -1062,18 +1376,31 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           URL.revokeObjectURL(failedNote.imagePreviewUrl);
         }
 
-        if (!ownsRequest()) return;
-        if (get().notesError === CHECK_CONSTRAINT_MESSAGE) {
-          set({ notesError: null });
+        // The note is committed whatever happened to the session meanwhile:
+        // the session check guards only the store write, as in sendNote.
+        if (ownsRequest()) {
+          if (get().notesError === CHECK_CONSTRAINT_MESSAGE) {
+            set({ notesError: null });
+          }
+
+          set((state) => ({
+            notes: confirmOptimisticNote(state.notes, tempId, data),
+            sentMessageTimestamps: [...recentTimestamps, now],
+          }));
+          await saveNotesCopy(userId, requestedInSession);
         }
 
-        set((state) => ({
-          notes: confirmOptimisticNote(state.notes, tempId, data),
-          sentMessageTimestamps: [...recentTimestamps, now],
-        }));
-        await saveNotesCopy(userId, requestedInSession);
-
         logger.debug('[NotesSlice] Retry successful:', data.id);
+
+        // A resend reaches the partner live too, as a first send does. Only
+        // the same account may send it (see sendNote).
+        if (get().userId !== userId) return;
+        try {
+          await sendEphemeralBroadcast(`love-notes:${partnerId}`, 'new_message', { message: data });
+          logger.debug('[NotesSlice] Resend broadcast to partner:', partnerId);
+        } catch (broadcastError) {
+          console.warn('[NotesSlice] Broadcast failed (non-fatal):', broadcastError);
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to retry message';
         console.error('[NotesSlice] Error retrying message:', error);
@@ -1253,7 +1580,49 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         notes: state.notes.filter((n) => n.tempId !== tempId),
       }));
 
+      // A queued note leaves the queue too, or a reload would bring it back.
+      if (failedNote?.queued) {
+        removeQueuedNote(tempId).catch((error: unknown) => {
+          console.error('[NotesSlice] Failed to remove a note from the queue:', error);
+        });
+      }
+
       logger.debug('[NotesSlice] Removed failed message:', tempId);
+    },
+
+    /**
+     * Send the signed-in account's queued notes, oldest first (see
+     * `drainOnce`). Called after each enqueue and by `App.tsx` on start, on
+     * the `online` event and on the 5-minute interval. Skipped while the
+     * device is known to be offline. Never throws.
+     */
+    drainQueuedNotes: () => {
+      if (drainInFlight) {
+        drainRequested = true;
+        return drainInFlight;
+      }
+      const run = (async () => {
+        // Yield first, so `drainInFlight` is set before this can finish.
+        await Promise.resolve();
+        try {
+          do {
+            drainRequested = false;
+            if (knownOffline()) {
+              settleWaitingNotes();
+              break;
+            }
+            const outcome = await withSyncLock(NOTE_QUEUE_LOCK, drainOnce);
+            // Another tab holds the queue and sends for this account.
+            if (!outcome.ran) settleWaitingNotes();
+          } while (drainRequested);
+        } catch (error) {
+          console.error('[NotesSlice] Note queue drain failed:', error);
+        } finally {
+          drainInFlight = null;
+        }
+      })();
+      drainInFlight = run;
+      return run;
     },
   };
 };

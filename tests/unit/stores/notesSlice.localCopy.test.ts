@@ -33,7 +33,7 @@ const server = {
   /** Hold the next page read until released (account-switch cases). */
   hold: null as Promise<void> | null,
   readError: null as { message: string } | null,
-  insertError: null as { message: string } | null,
+  insertError: null as { message: string; code?: string; details?: string; hint?: string } | null,
   removalError: null as { message: string } | null,
   /** Commit the next insert, then hold its reply until released. */
   insertHold: null as Promise<void> | null,
@@ -148,6 +148,8 @@ vi.mock('../../../src/services/localCopy', () => ({
     registerLocalCopy(kind, refresh),
 }));
 
+import 'fake-indexeddb/auto';
+import { openMyLoveDB } from '../../../src/services/dbSchema';
 import {
   createNotesSlice,
   LOVE_NOTES_COPY_KIND,
@@ -209,8 +211,14 @@ async function loadSixByPages(store: ReturnType<typeof createTestStore>) {
   expect(store.getState().notesHasMore).toBe(false);
 }
 
+/** A server rejection: marks a queued text note failed. */
+const REJECTED = { code: '23514', message: 'check violation', details: '', hint: '' };
+
 describe('notesSlice love-notes local copy', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const db = await openMyLoveDB();
+    await db.clear('note-queue');
+    db.close();
     vi.resetAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -702,6 +710,7 @@ describe('notesSlice love-notes local copy', () => {
       await store.getState().fetchNotes();
 
       await store.getState().sendNote('hello');
+      await store.getState().drainQueuedNotes();
       await flush();
 
       expect(stateIds(store)).toEqual(['1', 'server-1']);
@@ -733,9 +742,10 @@ describe('notesSlice love-notes local copy', () => {
       server.rows = [row('1')];
       const store = createTestStore();
       await store.getState().fetchNotes();
-      server.insertError = { message: 'insert failed' };
+      server.insertError = REJECTED;
 
       await store.getState().sendNote('will fail');
+      await store.getState().drainQueuedNotes();
       await flush();
 
       expect(store.getState().notes.at(-1)?.error).toBe(true);
@@ -744,8 +754,9 @@ describe('notesSlice love-notes local copy', () => {
 
     it('a confirmed resend saves the row in the copy', async () => {
       const store = createTestStore();
-      server.insertError = { message: 'insert failed' };
+      server.insertError = REJECTED;
       await store.getState().sendNote('retry me');
+      await store.getState().drainQueuedNotes();
       const tempId = store.getState().notes[0].tempId!;
       expect(savedIds()).toBeUndefined();
 
@@ -756,7 +767,7 @@ describe('notesSlice love-notes local copy', () => {
       expect(savedIds()).toEqual(['server-1']);
     });
 
-    it('offline, a send is refused as today and the copy is unchanged', async () => {
+    it('offline with no partner loaded, a send is refused with the lookup reason and the copy is unchanged', async () => {
       savedCopies.set(key(USER_A), [row('1')]);
       goOffline();
       const store = createTestStore();
@@ -766,7 +777,9 @@ describe('notesSlice love-notes local copy', () => {
       await store.getState().sendNote('offline note');
       await flush();
 
-      expect(store.getState().notesError).toBe('Partner not configured');
+      // The recipient cannot be fixed offline without a loaded partner, and a
+      // failed read is never "unlinked": refused with its reason.
+      expect(store.getState().notesError).toBe('TypeError: Failed to fetch');
       expect(stateIds(store)).toEqual(['1']);
       expect(writeLocalCopy).not.toHaveBeenCalled();
       expect(savedIds()).toEqual(['1']);
