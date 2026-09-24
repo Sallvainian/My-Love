@@ -195,6 +195,20 @@ function goOffline() {
   getPartnerId.mockResolvedValue(null);
 }
 
+/**
+ * Scroll back through the whole of a six-row thread two rows at a page:
+ * leaves notes 1-6 on screen and notesHasMore false.
+ */
+async function loadSixByPages(store: ReturnType<typeof createTestStore>) {
+  server.rows = ['1', '2', '3', '4', '5', '6'].map((id) => row(id));
+  await store.getState().fetchNotes(2);
+  await store.getState().fetchOlderNotes(2);
+  await store.getState().fetchOlderNotes(2);
+  await store.getState().fetchOlderNotes(2);
+  expect(stateIds(store)).toEqual(['1', '2', '3', '4', '5', '6']);
+  expect(store.getState().notesHasMore).toBe(false);
+}
+
 describe('notesSlice love-notes local copy', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -452,6 +466,104 @@ describe('notesSlice love-notes local copy', () => {
       expect(savedIds()).toEqual(['7']);
     });
 
+    it('a refresh over a scrolled-back thread keeps the older pages', async () => {
+      const store = createTestStore();
+      await loadSixByPages(store);
+
+      // The partner wrote while this device was offline; the connection returns.
+      server.rows.push(row('7'));
+      await store.getState().fetchNotes(2, { keepOlder: true });
+
+      expect(stateIds(store)).toEqual(['1', '2', '3', '4', '5', '6', '7']);
+      expect(savedIds()).toEqual(['1', '2', '3', '4', '5', '6', '7']);
+      expect(store.getState().notesHasMore).toBe(false);
+    });
+
+    it('a refresh after more than a page arrived replaces the thread', async () => {
+      const store = createTestStore();
+      await loadSixByPages(store);
+
+      server.rows.push(row('7'), row('8'));
+      await store.getState().fetchNotes(2, { keepOlder: true });
+
+      expect(stateIds(store)).toEqual(['7', '8']);
+      expect(savedIds()).toEqual(['7', '8']);
+      expect(store.getState().notesHasMore).toBe(true);
+    });
+
+    it('a short refresh page is the whole thread', async () => {
+      const store = createTestStore();
+      await loadSixByPages(store);
+
+      // Notes 1-3 were removed from this account's history on another device.
+      server.rows = ['4', '5', '6', '7'].map((id) => row(id));
+      await store.getState().fetchNotes(5, { keepOlder: true });
+
+      expect(stateIds(store)).toEqual(['4', '5', '6', '7']);
+      expect(savedIds()).toEqual(['4', '5', '6', '7']);
+      expect(store.getState().notesHasMore).toBe(false);
+    });
+
+    it('a refresh keeps a failed note last and the older pages first', async () => {
+      server.rows = ['3', '4', '5', '6'].map((id) => row(id));
+      const store = createTestStore();
+      await store.getState().fetchNotes(2);
+      await store.getState().fetchOlderNotes(2);
+      const failed: LoveNote = {
+        ...row('temp-x'),
+        id: 'temp-x',
+        tempId: 'temp-x',
+        from_user_id: USER_A,
+        to_user_id: PARTNER,
+        error: true,
+        sending: false,
+      };
+      store.setState({ notes: [...store.getState().notes, failed] });
+
+      server.rows.push(row('7'));
+      await store.getState().fetchNotes(2, { keepOlder: true });
+
+      expect(stateIds(store)).toEqual(['3', '4', '5', '6', '7', 'temp-x']);
+      expect(savedIds()).toEqual(['3', '4', '5', '6', '7']);
+    });
+
+    it('the registered refresher keeps scrolled-back pages (reconnect)', async () => {
+      // More than one default page, so the refresher's own limit is exercised.
+      const minute = (n: number) => String(Math.floor(n / 60)).padStart(2, '0');
+      const second = (n: number) => String(n % 60).padStart(2, '0');
+      const nthRow = (n: number) =>
+        row(`n${n}`, { created_at: `2026-09-20T10:${minute(n)}:${second(n)}.000000+00:00` });
+      server.rows = Array.from({ length: 60 }, (_, i) => nthRow(i + 1));
+      const store = createTestStore();
+      const refresh = registerLocalCopy.mock.calls.find(
+        ([kind]) => kind === LOVE_NOTES_COPY_KIND
+      )![1] as () => Promise<void>;
+      await store.getState().fetchNotes();
+      await store.getState().fetchOlderNotes();
+      expect(store.getState().notes).toHaveLength(60);
+      expect(store.getState().notesHasMore).toBe(false);
+
+      server.rows.push(nthRow(61));
+      await refresh();
+
+      const expected = Array.from({ length: 61 }, (_, i) => `n${i + 1}`);
+      expect(stateIds(store)).toEqual(expected);
+      expect(savedIds()).toEqual(expected);
+      expect(store.getState().notesHasMore).toBe(false);
+    });
+
+    it('a mount fetch without keepOlder still replaces the thread', async () => {
+      const store = createTestStore();
+      await loadSixByPages(store);
+
+      server.rows.push(row('7'));
+      await store.getState().fetchNotes(2);
+
+      expect(stateIds(store)).toEqual(['6', '7']);
+      expect(savedIds()).toEqual(['6', '7']);
+      expect(store.getState().notesHasMore).toBe(true);
+    });
+
     it('the refresher does nothing while signed out', async () => {
       const store = createTestStore();
       store.setState({ userId: null });
@@ -685,6 +797,106 @@ describe('notesSlice love-notes local copy', () => {
 
       expect(stateIds(store)).toEqual(['1', '2', '3']);
       expect(savedIds()).toEqual(['1', '2', '3']);
+    });
+
+    it('an in-flight older page is dropped when a replacing refresh lands', async () => {
+      server.rows = ['1', '2', '3', '4', '5', '6'].map((id) => row(id));
+      const store = createTestStore();
+      await store.getState().fetchNotes(2);
+      const gate = deferred();
+      server.hold = gate.promise;
+      const older = store.getState().fetchOlderNotes(2);
+      await flush();
+
+      // More than a page arrives: the refresh replaces the thread, so the page
+      // below note 5 no longer joins onto anything on screen.
+      server.hold = null;
+      server.rows.push(row('7'), row('8'));
+      await store.getState().fetchNotes(2, { keepOlder: true });
+      gate.resolve();
+      await older;
+
+      expect(stateIds(store)).toEqual(['7', '8']);
+      expect(savedIds()).toEqual(['7', '8']);
+      expect(store.getState().notesIsLoading).toBe(false);
+    });
+
+    it('an in-flight older page lands continuously when a merging refresh lands', async () => {
+      server.rows = ['1', '2', '3', '4', '5', '6'].map((id) => row(id));
+      const store = createTestStore();
+      await store.getState().fetchNotes(2);
+      await store.getState().fetchOlderNotes(2);
+      const gate = deferred();
+      server.hold = gate.promise;
+      const older = store.getState().fetchOlderNotes(2);
+      await flush();
+
+      server.hold = null;
+      server.rows.push(row('7'));
+      await store.getState().fetchNotes(2, { keepOlder: true });
+      gate.resolve();
+      await older;
+
+      expect(stateIds(store)).toEqual(['1', '2', '3', '4', '5', '6', '7']);
+      expect(savedIds()).toEqual(['1', '2', '3', '4', '5', '6', '7']);
+    });
+
+    it('a second older-page request with the same cursor is dropped, not doubled', async () => {
+      server.rows = ['1', '2', '3', '4', '5', '6'].map((id) => row(id));
+      const store = createTestStore();
+      await store.getState().fetchNotes(2);
+      const first = deferred();
+      server.hold = first.promise;
+      const olderA = store.getState().fetchOlderNotes(2);
+      await flush();
+
+      // A refresh lands mid-flight and clears the loading flag, so the list
+      // asks again with the same cursor.
+      server.hold = null;
+      await store.getState().fetchNotes(2, { keepOlder: true });
+      const second = deferred();
+      server.hold = second.promise;
+      const olderB = store.getState().fetchOlderNotes(2);
+      await flush();
+
+      first.resolve();
+      await olderA;
+      second.resolve();
+      await olderB;
+
+      expect(stateIds(store)).toEqual(['3', '4', '5', '6']);
+      expect(savedIds()).toEqual(['3', '4', '5', '6']);
+      expect(store.getState().notesIsLoading).toBe(false);
+    });
+
+    it('a dropped older page leaves the loading flag to a page requested after it', async () => {
+      server.rows = ['1', '2', '3', '4', '5', '6'].map((id) => row(id));
+      const store = createTestStore();
+      await store.getState().fetchNotes(2);
+      const first = deferred();
+      server.hold = first.promise;
+      const olderA = store.getState().fetchOlderNotes(2);
+      await flush();
+
+      server.hold = null;
+      server.rows.push(row('7'), row('8'));
+      await store.getState().fetchNotes(2, { keepOlder: true });
+      const second = deferred();
+      server.hold = second.promise;
+      const olderB = store.getState().fetchOlderNotes(2);
+      await flush();
+
+      // The first page no longer joins onto the thread and is dropped, but the
+      // second page is still in flight and keeps its spinner.
+      first.resolve();
+      await olderA;
+      expect(stateIds(store)).toEqual(['7', '8']);
+      expect(store.getState().notesIsLoading).toBe(true);
+
+      second.resolve();
+      await olderB;
+      expect(stateIds(store)).toEqual(['5', '6', '7', '8']);
+      expect(store.getState().notesIsLoading).toBe(false);
     });
 
     it('offline, an older page on a thread shown from the copy raises no banner and changes nothing', async () => {

@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../../../src/App';
 import { supabase } from '../../../src/api/supabaseClient';
+import { NOTES_CONFIG } from '../../../src/config/images';
 import { anniversariesService } from '../../../src/services/anniversariesService';
 import { eventsService, type CoupleEvent, type EventsPage } from '../../../src/services/eventsService';
 import { registerLocalCopy } from '../../../src/services/localCopy';
@@ -224,7 +225,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       });
       registerLocalCopy(LOVE_NOTES_COPY_KIND, async () => {
         if (!useAppStore.getState().userId) return;
-        await useAppStore.getState().fetchNotes();
+        await useAppStore.getState().fetchNotes(NOTES_CONFIG.PAGE_SIZE, { keepOlder: true });
       });
     };
     localStorage.setItem('lastWelcomeView', String(Date.now()));

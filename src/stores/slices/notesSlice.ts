@@ -28,6 +28,8 @@
  *   unlinked account or a signed-out call still shows the error.
  * - `fetchNotes` is also the kind's refresher, so the thread refreshes on
  *   signed-in start and on reconnect, not only when the Notes screen mounts.
+ *   The refresher keeps the older pages its page joins onto; the mount
+ *   fetch replaces the thread with the newest page.
  * - Every confirmed change to the thread — an accepted Realtime note, a
  *   confirmed send or resend, a confirmed removal, an older page — rewrites the
  *   copy from the whole confirmed list. Sending still needs a connection.
@@ -59,7 +61,7 @@ export interface NotesSlice {
   notesPendingRemoval: string[];
 
   // Actions
-  fetchNotes: (limit?: number) => Promise<void>;
+  fetchNotes: (limit?: number, options?: { keepOlder?: boolean }) => Promise<void>;
   fetchOlderNotes: (limit?: number) => Promise<void>;
   addNote: (note: LoveNote) => void;
   setNotes: (notes: LoveNote[]) => void;
@@ -310,11 +312,20 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     }
   };
 
+  /**
+   * Which load last raised `notesIsLoading`. A load that drops its own answer
+   * clears the flag only while it still holds it, so it never hides the
+   * spinner of a load started after it. Per slice instance.
+   */
+  let notesLoadTicket = 0;
+
   // The kind's refresher for signed-in start, reconnect and on-demand refreshes.
-  // Re-registering (a second store in tests) replaces it.
+  // It keeps the older pages the user scrolled back through; a reconnect must
+  // not cut the thread back to its newest page. Re-registering (a second store
+  // in tests) replaces it.
   registerLocalCopy(LOVE_NOTES_COPY_KIND, async () => {
     if (!get().userId) return;
-    await get().fetchNotes();
+    await get().fetchNotes(NOTES_PAGE_SIZE, { keepOlder: true });
   });
 
   return {
@@ -333,13 +344,15 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
      *
      * Copy-first: the account's saved thread is shown at once (before the
      * partner lookup), then the server's newest page replaces state and copy.
-     * Also the `love-notes` refresher (signed-in start, reconnect).
+     * Also the `love-notes` refresher (signed-in start, reconnect), which
+     * passes `keepOlder`: when the page joins onto the thread on screen, the
+     * older pages before it are kept rather than replaced.
      *
      * Query: Messages where user is sender OR recipient with partner
      * Order: By created_at DESC (newest first)
      * Pagination: LIMIT (default 50)
      */
-    fetchNotes: async (limit = NOTES_PAGE_SIZE) => {
+    fetchNotes: async (limit = NOTES_PAGE_SIZE, options) => {
       const { userId, authSessionVersion: requestedInSession } = get();
       const ownsRequest = () =>
         get().userId === userId && get().authSessionVersion === requestedInSession;
@@ -348,6 +361,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       try {
         set({ notesIsLoading: true, notesError: null });
+        notesLoadTicket += 1;
 
         if (!userId) {
           conclusiveError = true;
@@ -439,12 +453,30 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
               (row) => (row as LoveNote & { idempotency_key?: string }).idempotency_key === note.tempId
             )
         );
-        revokePreviewUrlsFromNotes(current.filter((note) => !unconfirmed.includes(note)));
+
+        // A refresh keeps the older pages on screen when its page joins onto
+        // them. Matched by id, not created_at: an optimistic note carries
+        // toISOString ('...Z') and a server row '+00:00', which do not collate.
+        // A short page is the whole thread; a full page that overlaps nothing
+        // means more than a page arrived, so the thread is replaced.
+        let olderKept: LoveNote[] = [];
+        if (options?.keepOlder && rows.length === limit) {
+          const pageIds = new Set(rows.map((note) => note.id));
+          const firstOverlap = current.findIndex((note) => pageIds.has(note.id));
+          if (firstOverlap > 0) {
+            olderKept = current
+              .slice(0, firstOverlap)
+              .filter((note) => isConfirmedNote(note) && !pendingRemoval.includes(note.id));
+          }
+        }
+        revokePreviewUrlsFromNotes(
+          current.filter((note) => !unconfirmed.includes(note) && !olderKept.includes(note))
+        );
 
         set({
-          notes: [...notesInChatOrder, ...unconfirmed],
+          notes: [...olderKept, ...notesInChatOrder, ...unconfirmed],
           notesIsLoading: false,
-          notesHasMore: rows.length === limit,
+          notesHasMore: olderKept.length > 0 ? get().notesHasMore : rows.length === limit,
         });
         await saveNotesCopy(userId, requestedInSession);
 
@@ -487,6 +519,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       try {
         set({ notesIsLoading: true });
+        const loadTicket = ++notesLoadTicket;
 
         if (!userId) {
           conclusiveError = true;
@@ -544,6 +577,16 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         // the page just fetched: the whole conversation, not one page of it.
         if (!ownsRequest()) {
           set({ notesIsLoading: false });
+          return;
+        }
+
+        // The page joins onto the note it was requested below. A refresh that
+        // replaced the thread, or an earlier page from the same cursor, has
+        // moved the oldest note since: prepending would leave a hole or a
+        // doubled page, so drop it. The flag goes down only if no load has
+        // raised it since this one; that load owns it now.
+        if (get().notes[0]?.id !== oldestNote.id) {
+          if (notesLoadTicket === loadTicket) set({ notesIsLoading: false });
           return;
         }
 
@@ -1064,6 +1107,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         notesPendingRemoval: [...get().notesPendingRemoval, noteId],
         notesIsLoading: willEmptyWindow ? true : get().notesIsLoading,
       });
+      // This removal owns the flag now: a dropped older page must not lower it.
+      if (willEmptyWindow) notesLoadTicket += 1;
 
       const forgetPending = () =>
         get().notesPendingRemoval.filter((id) => id !== noteId);
