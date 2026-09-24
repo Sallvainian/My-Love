@@ -180,6 +180,9 @@ type TestStore = NotesSlice & {
   partner: { id: string } | null;
 };
 
+/** Every store a test made; signed out after it, which cancels any retry timer. */
+const liveStores: Array<{ setState: (partial: Partial<TestStore>) => void; getState: () => TestStore }> = [];
+
 function createTestStore(options: { partnerLoaded?: boolean; userId?: string } = {}) {
   const store = create<TestStore>()(createNotesSlice as unknown as StateCreator<TestStore>);
   store.setState({
@@ -187,6 +190,7 @@ function createTestStore(options: { partnerLoaded?: boolean; userId?: string } =
     authSessionVersion: 1,
     partner: options.partnerLoaded === false ? null : { id: PARTNER },
   });
+  liveStores.push(store);
   return store;
 }
 type Store = ReturnType<typeof createTestStore>;
@@ -275,6 +279,12 @@ describe('notesSlice offline send queue', () => {
   });
 
   afterEach(() => {
+    // A transient failure leaves a retry timer; it must not drain the next
+    // test's queue.
+    for (const store of liveStores.splice(0)) {
+      store.setState({ userId: null, authSessionVersion: store.getState().authSessionVersion + 1 });
+    }
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -872,6 +882,135 @@ describe('notesSlice offline send queue', () => {
         '[NotesSlice] Broadcast failed (non-fatal):',
         expect.any(Error)
       );
+    });
+  });
+
+  describe('retry after a transient failure while online', () => {
+    /** Yields to IndexedDB (setImmediate, not faked) until `cond` holds. */
+    async function until(cond: () => boolean) {
+      for (let i = 0; i < 1000 && !cond(); i++) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      expect(cond()).toBe(true);
+    }
+
+    /** One note queued offline, then a single online pass that fails transiently. */
+    async function failOnce(store: Store, failures: number) {
+      server.outcomes = Array.from({ length: failures }, () => 'network' as const);
+      setOnline(false);
+      await store.getState().sendNote('retried');
+      setOnline(true);
+      await store.getState().drainQueuedNotes();
+      expect(server.upserts).toBe(1);
+      expect(vi.getTimerCount()).toBe(1);
+    }
+
+    /** The retry is due after exactly `delay` ms: not a millisecond before. */
+    async function expectRetryAfter(delay: number, upserts: number) {
+      await vi.advanceTimersByTimeAsync(delay - 1);
+      expect(server.upserts).toBe(upserts - 1);
+      await vi.advanceTimersByTimeAsync(1);
+      await until(() => server.upserts === upserts);
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    });
+
+    it('a transient failure is retried after 5 s without any other trigger', async () => {
+      const store = createTestStore();
+      await failOnce(store, 1);
+
+      await expectRetryAfter(5_000, 2);
+
+      await until(() => store.getState().notes[0]?.id === 'server-1');
+      expect(server.rows.map((r) => r.content)).toEqual(['retried']);
+      expect(await queuedIds()).toEqual([]);
+      // The completed pass leaves no timer behind.
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('backs off 5, 10, 20, 40, then every 60 s, and resets after a completed pass', async () => {
+      const store = createTestStore();
+      await failOnce(store, 7);
+
+      let upserts = 1;
+      for (const delay of [5_000, 10_000, 20_000, 40_000, 60_000, 60_000, 60_000]) {
+        upserts += 1;
+        await expectRetryAfter(delay, upserts);
+        if (upserts <= 7) await until(() => vi.getTimerCount() === 1);
+      }
+      await until(() => store.getState().notes[0]?.id === 'server-1');
+      await until(() => vi.getTimerCount() === 0);
+
+      // The next transient failure starts from 5 s again.
+      server.upserts = 0;
+      await failOnce(store, 1);
+      await expectRetryAfter(5_000, 2);
+    });
+
+    it('keeps one timer at a time', async () => {
+      const store = createTestStore();
+      await failOnce(store, 3);
+
+      server.outcomes = ['network'];
+      await store.getState().drainQueuedNotes();
+      expect(server.upserts).toBe(2);
+      expect(vi.getTimerCount()).toBe(1);
+    });
+
+    it('does not schedule a retry when the device is known offline as the pass ends', async () => {
+      const store = createTestStore();
+      const reply = deferred();
+      server.outcomes = [{ reject: '08006', hold: reply.promise }];
+      setOnline(false);
+      await store.getState().sendNote('dropped connection');
+      setOnline(true);
+
+      const run = store.getState().drainQueuedNotes();
+      await until(() => server.upserts === 1);
+      setOnline(false);
+      reply.resolve();
+      await run;
+
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(server.upserts).toBe(1);
+    });
+
+    it('a retry that finds the device offline stops and leaves the online event to drain', async () => {
+      const store = createTestStore();
+      await failOnce(store, 1);
+
+      setOnline(false);
+      await vi.advanceTimersByTimeAsync(5_000);
+      await until(() => vi.getTimerCount() === 0);
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(server.upserts).toBe(1);
+    });
+
+    it('sign-out cancels the retry, so nothing is drained for anyone', async () => {
+      const store = createTestStore();
+      await failOnce(store, 1);
+
+      store.setState({ userId: null, authSessionVersion: 2, notes: [] });
+
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(server.upserts).toBe(1);
+      expect(await queuedIds()).toHaveLength(1);
+    });
+
+    it("an account switch cancels the retry: B's session never drains on A's timer", async () => {
+      const store = createTestStore();
+      await failOnce(store, 1);
+
+      store.setState({ userId: B, authSessionVersion: 2, notes: [] });
+
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(server.upserts).toBe(1);
+      expect(await queuedIds(A)).toHaveLength(1);
     });
   });
 
