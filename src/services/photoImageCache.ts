@@ -50,8 +50,9 @@
  * image only to be refused again. It is forgotten whenever room may have been
  * freed: a photo image is deleted (the list prune and a photo delete, both
  * through `deletePhotoImages`, or an eviction), a photo image write succeeds,
- * or the session ends (sign-out, or a different account). Only the fill
- * consults it; a display still downloads the photo it has to show.
+ * or the session ends (sign-out, or a different account). A refusal met after
+ * room was freed during its own search for a victim is not remembered. Only
+ * the fill consults it; a display still downloads the photo it has to show.
  *
  * ## Cached notice
  *
@@ -163,9 +164,17 @@ async function oldestCachedOlderPhoto(
  */
 let refused: { userId: string; path: string; isCurrent: () => boolean } | null = null;
 
+/**
+ * Counts the times room may have been freed. A write reads it before trying;
+ * a refusal is remembered only if it has not moved since, so room freed while
+ * the write searched for a victim is never overwritten by a stale refusal.
+ */
+let roomFreed = 0;
+
 /** Room may have been freed: a later pass downloads the refused photo again. */
 function forgetRefusal(): void {
   refused = null;
+  roomFreed += 1;
 }
 
 /** Whether storage refused the image at `path` for this session's account. */
@@ -173,7 +182,7 @@ function isRefused(session: PhotoCacheSession, path: string): boolean {
   if (!refused) return false;
   // Signed out, or another account: the refusal no longer applies.
   if (refused.userId !== session.userId || !refused.isCurrent()) {
-    forgetRefusal();
+    refused = null;
     return false;
   }
   return refused.path === path;
@@ -206,6 +215,7 @@ export async function cachePhotoImage(
     // Checked immediately before every write: a delete or prune can land in
     // any await before this one.
     if (!session.photos().some((photo) => photo.storage_path === path)) return 'removed';
+    const roomFreedBefore = roomFreed;
     try {
       await writeCachedImage(session.userId, path, blob);
       forgetRefusal();
@@ -219,7 +229,11 @@ export async function cachePhotoImage(
       const victim = await oldestCachedOlderPhoto(session, path, evicted);
       if (!victim) {
         logger.debug('[photoImageCache] Storage refused and no older photo image is cached');
-        refused = { userId: session.userId, path, isCurrent: session.isCurrent };
+        // Room freed since this write was tried (a delete or prune during the
+        // search) may fit it: the next pass downloads it again.
+        if (roomFreed === roomFreedBefore) {
+          refused = { userId: session.userId, path, isCurrent: session.isCurrent };
+        }
         return 'refused';
       }
       if (!session.isCurrent()) return 'stale';

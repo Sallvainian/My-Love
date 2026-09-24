@@ -16,6 +16,8 @@ const cache = vi.hoisted(() => ({
   deletes: [] as string[],
   /** A non-quota failure for the next write, when set. */
   failNextWrite: null as Error | null,
+  /** Runs (once) before the next read of this path, when set. */
+  beforeRead: null as { path: string; run: () => Promise<void> } | null,
 }));
 const download = vi.hoisted(() => vi.fn<(path: string) => Promise<Blob>>());
 
@@ -24,8 +26,14 @@ vi.mock('../../../src/services/imageCache', async (importOriginal) => {
   const key = (userId: string, path: string) => `${userId}|${path}`;
   return {
     isQuotaError: original.isQuotaError,
-    readCachedImage: async (userId: string, path: string) =>
-      cache.images.get(key(userId, path)) ?? null,
+    readCachedImage: async (userId: string, path: string) => {
+      if (cache.beforeRead?.path === path) {
+        const { run } = cache.beforeRead;
+        cache.beforeRead = null;
+        await run();
+      }
+      return cache.images.get(key(userId, path)) ?? null;
+    },
     writeCachedImage: async (userId: string, path: string, blob: Blob) => {
       if (cache.failNextWrite) {
         const error = cache.failNextWrite;
@@ -112,6 +120,7 @@ beforeEach(() => {
   cache.writes = [];
   cache.deletes = [];
   cache.failNextWrite = null;
+  cache.beforeRead = null;
   download.mockReset();
   download.mockImplementation(async (path) => new Blob([`IMAGE ${path}`]));
   setOnline(true);
@@ -405,6 +414,30 @@ describe('a refused photo', () => {
 
     // p0 takes the freed slot; p1 is then refused in its turn.
     expect(download.mock.calls.map(([path]) => path)).toEqual(['owner/p0.jpg', 'owner/p1.jpg']);
+    expect(cached('owner/p0.jpg')).toBe(true);
+  });
+
+  it('is not remembered when an image is deleted during the search for a victim', async () => {
+    let photos = list(2);
+    cache.capacity = 1;
+    seed('owner/p1.jpg');
+    // p1 is deleted (its image with it) while the refused write of p0 looks
+    // for an older image to drop: the search then finds none.
+    cache.beforeRead = {
+      path: 'owner/p1.jpg',
+      run: async () => {
+        photos = photos.filter((p) => p.id !== 'p1');
+        await deletePhotoImages(A, ['owner/p1.jpg']);
+      },
+    };
+
+    const result = await cachePhotoImage(session(() => photos), 'owner/p0.jpg', new Blob(['p0']));
+    expect(result).toBe('refused');
+    expect(cache.deletes).toEqual(['owner/p1.jpg']);
+
+    await requestPhotoImageFill(session(() => photos));
+
+    expect(download.mock.calls.map(([path]) => path)).toEqual(['owner/p0.jpg']);
     expect(cached('owner/p0.jpg')).toBe(true);
   });
 
