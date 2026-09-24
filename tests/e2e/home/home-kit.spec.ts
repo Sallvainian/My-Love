@@ -2,8 +2,9 @@
  * E2E: Home on the style kit
  *
  * Home at 390x844 in both OS themes, read at the rendered surface: the
- * countdown cards share one kit card and one value style, the birthdays sit
- * two-up, the dateless wedding reads "Date TBD" in `muted`, the Upcoming row's
+ * countdown cards share one kit card and one value style, the two birthdays
+ * (yours, then your partner's) sit two-up, the dateless wedding reads
+ * "Date TBD" in `muted`, the Upcoming row's
  * Add button leads to Settings, and the daily message is Lora italic with no
  * emoji left in Home's own chrome. The kit colours are `--kit-*` variables that
  * switch under `prefers-color-scheme`, so `emulateMedia` alone flips them.
@@ -21,16 +22,22 @@ const KIT_MUTED = {
   dark: 'rgb(154, 163, 178)', // #9aa3b2
 } as const;
 
-/** Kit accent (both birthday tiles). */
+/** Kit accent (your own birthday tile). */
 const KIT_ACCENT = {
   light: 'rgb(200, 33, 107)', // #c8216b
   dark: 'rgb(244, 114, 182)', // #f472b6
 } as const;
 
+/** Kit partner colour (your partner's birthday tile). */
+const KIT_PARTNER = {
+  light: 'rgb(124, 58, 237)', // #7c3aed
+  dark: 'rgb(167, 139, 250)', // #a78bfa
+} as const;
+
 const COUNTDOWN_CARDS = [
   'time-together',
-  'birthday-countdown-casey',
-  'birthday-countdown-harper',
+  'birthday-countdown-self',
+  'birthday-countdown-partner',
   'event-countdown-wedding',
 ] as const;
 
@@ -93,15 +100,14 @@ test.describe('Home on the style kit', () => {
         KIT_CARD[colorScheme]
       );
 
-      // Tile tones: both birthdays use the default `you` (accent) tile. Birthdays are
-      // not tied to accounts, so a fixed `partner` tile would be the wrong person on
-      // one of the two devices.
+      // Tile tones: birthdays belong to accounts now, so your own card takes the
+      // `you` (accent) tile and your partner's the `partner` tile on each device.
       const tileColor = (testId: string) =>
         page
           .getByTestId(testId)
           .evaluate((el) => getComputedStyle(el.firstElementChild as Element).color);
-      expect(await tileColor('birthday-countdown-casey')).toBe(KIT_ACCENT[colorScheme]);
-      expect(await tileColor('birthday-countdown-harper')).toBe(KIT_ACCENT[colorScheme]);
+      expect(await tileColor('birthday-countdown-self')).toBe(KIT_ACCENT[colorScheme]);
+      expect(await tileColor('birthday-countdown-partner')).toBe(KIT_PARTNER[colorScheme]);
 
       // Dateless wedding: "Date TBD" as the value, in the kit muted colour.
       const weddingValue = page.getByTestId('event-countdown-wedding').locator('h3 + div');
@@ -110,11 +116,11 @@ test.describe('Home on the style kit', () => {
       await expect(page.getByTestId('event-countdown-wedding')).not.toContainText('XX:XX:XX');
 
       // Birthdays sit side by side at phone width.
-      const caseyBox = await page.getByTestId('birthday-countdown-casey').boundingBox();
-      const harperBox = await page.getByTestId('birthday-countdown-harper').boundingBox();
-      if (!caseyBox || !harperBox) throw new Error('[home-kit.spec] expected birthday boxes');
-      expect(Math.round(caseyBox.y)).toBe(Math.round(harperBox.y));
-      expect(Math.round(caseyBox.x)).not.toBe(Math.round(harperBox.x));
+      const selfBox = await page.getByTestId('birthday-countdown-self').boundingBox();
+      const partnerBox = await page.getByTestId('birthday-countdown-partner').boundingBox();
+      if (!selfBox || !partnerBox) throw new Error('[home-kit.spec] expected birthday boxes');
+      expect(Math.round(selfBox.y)).toBe(Math.round(partnerBox.y));
+      expect(Math.round(selfBox.x)).not.toBe(Math.round(partnerBox.x));
     });
 
     test(`[P1] should render the daily message in Lora italic with no emoji chrome in ${colorScheme}`, async ({

@@ -14,6 +14,7 @@
 
 import { logger } from '../utils/logger';
 import { handleSupabaseError, isPostgrestError, logSupabaseError } from './errorHandlers';
+import { toDateOnlyOrNull } from '../services/eventsService';
 import { isSeedFallbackName, supabase } from './supabaseClient';
 
 export interface UserSearchResult {
@@ -27,6 +28,8 @@ export interface PartnerInfo {
   email: string;
   displayName: string;
   connectedAt: string | null;
+  /** The partner's own birthday, `YYYY-MM-DD`, or `null` when not set. */
+  birthday: string | null;
 }
 
 /**
@@ -90,7 +93,7 @@ class PartnerService {
       // Get partner's user info from users table (RLS-protected)
       const { data: partnerRecord, error: partnerError } = await supabase
         .from('users')
-        .select('id, email, display_name')
+        .select('id, email, display_name, birthday')
         .eq('id', userRecord.partner_id)
         .single();
 
@@ -122,6 +125,7 @@ class PartnerService {
           email: partnerRecord.email || '',
           displayName: partnerName,
           connectedAt: userRecord.updated_at,
+          birthday: toDateOnlyOrNull(partnerRecord.birthday),
         },
       };
     } catch (error) {

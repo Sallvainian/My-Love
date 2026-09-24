@@ -17,11 +17,43 @@
 
 import { Heart } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { calculateTimeDifference } from '../../config/relationshipDates';
 import { useAppStore } from '../../stores/useAppStore';
 import { CountdownCard } from './CountdownCard';
 
 const TEST_ID = 'time-together';
+
+interface TimeDifference {
+  years: number;
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  totalMilliseconds: number;
+}
+
+/**
+ * Calculate time difference between two dates
+ */
+function calculateTimeDifference(from: Date, to: Date): TimeDifference {
+  const diff = to.getTime() - from.getTime();
+  const absDiff = Math.abs(diff);
+
+  const seconds = Math.floor(absDiff / 1000) % 60;
+  const minutes = Math.floor(absDiff / (1000 * 60)) % 60;
+  const hours = Math.floor(absDiff / (1000 * 60 * 60)) % 24;
+  const totalDays = Math.floor(absDiff / (1000 * 60 * 60 * 24));
+  const years = Math.floor(totalDays / 365);
+  const days = totalDays % 365;
+
+  return {
+    years,
+    days,
+    hours,
+    minutes,
+    seconds,
+    totalMilliseconds: absDiff,
+  };
+}
 
 export function TimeTogether() {
   const coupleSettings = useAppStore((s) => s.coupleSettings);

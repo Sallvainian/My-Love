@@ -7,7 +7,10 @@ import { supabase } from '../../../src/api/supabaseClient';
 import { anniversariesService } from '../../../src/services/anniversariesService';
 import { eventsService, type CoupleEvent, type EventsPage } from '../../../src/services/eventsService';
 import { registerLocalCopy } from '../../../src/services/localCopy';
-import { COUPLE_SETTINGS_COPY_KIND } from '../../../src/stores/slices/settingsSlice';
+import {
+  COUPLE_SETTINGS_COPY_KIND,
+  PROFILE_COPY_KIND,
+} from '../../../src/stores/slices/settingsSlice';
 import { formatDateISO } from '../../../src/utils/dateUtils';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import {
@@ -193,12 +196,16 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     anniversariesService.fetchAnniversaries = async () => [];
     // Same reason for the couple-settings refresher, one step earlier: its
     // partner lookup (`lookupPartnerId`) calls supabase.auth.getSession
-    // directly. Replaced with a no-op for the harness's lifetime; dispose puts
-    // the store's own refresher back.
+    // directly — and for the profile refresher, whose read does too. Replaced
+    // with no-ops for the harness's lifetime; dispose puts the store's own
+    // refreshers back.
     const unregisterNoop = registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, async () => {});
+    const unregisterProfileNoop = registerLocalCopy(PROFILE_COPY_KIND, async () => {});
     restoreCoupleSettingsRefresher = () => {
       unregisterNoop();
+      unregisterProfileNoop();
       registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => useAppStore.getState().loadCoupleSettings());
+      registerLocalCopy(PROFILE_COPY_KIND, () => useAppStore.getState().loadOwnProfile());
     };
     localStorage.setItem('lastWelcomeView', String(Date.now()));
     useAppStore.setState({

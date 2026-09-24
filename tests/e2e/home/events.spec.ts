@@ -120,8 +120,8 @@ test.describe('Home dashboard reads events from the store', () => {
     // CAP-4: TimeTogether, both BirthdayCountdown cards and the Wedding
     // EventCountdown render unchanged alongside the events.
     await expect(page.getByTestId('time-together')).toBeVisible();
-    await expect(page.getByTestId('birthday-countdown-casey')).toBeVisible();
-    await expect(page.getByTestId('birthday-countdown-harper')).toBeVisible();
+    await expect(page.getByTestId('birthday-countdown-self')).toBeVisible();
+    await expect(page.getByTestId('birthday-countdown-partner')).toBeVisible();
     await expect(page.getByTestId('event-countdown-wedding')).toBeVisible();
 
     // The past event renders nowhere — not as its own card, not its text.

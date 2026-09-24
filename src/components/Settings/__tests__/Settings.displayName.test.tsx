@@ -24,6 +24,7 @@ const backend = vi.hoisted(() => ({
   getUser: vi.fn(),
   signOut: vi.fn(),
   sessionUser: vi.fn(),
+  refreshLocalCopy: vi.fn(async (_kind: string) => {}),
   updatePayload: null as Record<string, unknown> | null,
   updateResult: { data: [{ id: 'user-a' }], error: null } as UpdateResult,
 }));
@@ -52,6 +53,10 @@ vi.mock('../../../api/authService', () => ({
   authService: { getUser: backend.getUser, signOut: backend.signOut },
 }));
 vi.mock('../../../api/auth/sessionService', () => ({ getUser: backend.sessionUser }));
+vi.mock('../../../services/localCopy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../services/localCopy')>()),
+  refreshLocalCopy: backend.refreshLocalCopy,
+}));
 vi.mock('../../../utils/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -180,6 +185,8 @@ describe('Settings offers a way to change the display name', () => {
       expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument();
       expect(backend.updatePayload).toMatchObject({ display_name: 'Casey' });
       expect(backend.lookupOwnDisplayName).toHaveBeenCalledTimes(2);
+      // Home's own birthday card is labelled with the name: its copy refreshes.
+      expect(backend.refreshLocalCopy).toHaveBeenCalledWith('profile');
     });
 
     it('disables Change across the re-read, so the old name cannot be saved back', async () => {

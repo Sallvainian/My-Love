@@ -33,7 +33,13 @@ import { useAppStore } from '../../../src/stores/useAppStore';
 const A = 'USER-A-ID';
 const B = 'USER-B-ID';
 
-const SAVED = { id: 'P1', email: 'p@example.test', displayName: 'SAVED-NAME', connectedAt: null };
+const SAVED = {
+  id: 'P1',
+  email: 'p@example.test',
+  displayName: 'SAVED-NAME',
+  connectedAt: null,
+  birthday: null,
+};
 const FRESH = { ...SAVED, displayName: 'FRESH-NAME' };
 
 function deferred<T>() {
@@ -235,6 +241,17 @@ describe('partner profile on the local copy', () => {
     expect(state().partner).toEqual(FRESH);
     expect(state().isLoadingPartner).toBe(false);
     expect(await readLocalCopy(A, PARTNER_COPY_KIND)).toEqual({ status: 'linked', partner: FRESH });
+  });
+
+  // Story 4 matrix: "Old copy — lacks the new field".
+  it('a copy saved before birthdays existed parses, with the birthday not set', async () => {
+    const { birthday: _birthday, ...oldPartner } = SAVED;
+    await writeLocalCopy(A, PARTNER_COPY_KIND, { status: 'linked', partner: oldPartner });
+    setOnline(false);
+
+    await state().loadPartner();
+
+    expect(state().partner).toEqual({ ...oldPartner, birthday: null });
   });
 
   it('a saved copy never replaces a partner already on screen', async () => {

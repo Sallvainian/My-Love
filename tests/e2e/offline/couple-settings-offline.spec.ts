@@ -118,7 +118,7 @@ test.describe('Couple start date from the local copy', () => {
       await expect.poll(() => storeStart(page)).toBe(startIso);
       await expect
         .poll(() => savedCoupleCopy(page))
-        .toEqual({ status: 'linked', partnerId, relationshipStart: startIso });
+        .toEqual({ status: 'linked', partnerId, relationshipStart: startIso, weddingDate: null });
       await expect(page.getByTestId('time-together')).toContainText('10 days');
 
       // WHEN: the app opens again with the table unreachable, then offline.
@@ -182,6 +182,7 @@ test.describe('Couple start date from the local copy', () => {
         status: 'linked',
         partnerId,
         relationshipStart: startIso,
+        weddingDate: null,
       });
       const { data, error } = await supabaseAdmin
         .from('couple_settings')

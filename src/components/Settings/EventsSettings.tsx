@@ -1001,7 +1001,7 @@ function EventForm({
               // reader the field is wrong without ever saying why.
               aria-describedby={errors.label ? LABEL_ERROR_ID : undefined}
               className={fieldClass(Boolean(errors.label))}
-              placeholder="e.g., Harper visits"
+              placeholder="e.g., Weekend trip"
             />
             {errors.label && (
               <p

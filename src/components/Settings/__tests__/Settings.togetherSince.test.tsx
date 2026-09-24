@@ -57,7 +57,7 @@ describe('Settings — Together since', () => {
 
   it('linked but not set yet: "Not set yet" and empty inputs', () => {
     useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null },
+      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
     });
     render(<Settings />);
 
@@ -67,7 +67,7 @@ describe('Settings — Together since', () => {
 
   it('pre-fills the saved date and time in local time', () => {
     useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: START },
+      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: START, weddingDate: null },
     });
     render(<Settings />);
 
@@ -77,7 +77,7 @@ describe('Settings — Together since', () => {
 
   it('saves the local date and time as one instant', async () => {
     useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null },
+      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
     });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setRelationshipStart: save });
@@ -97,7 +97,7 @@ describe('Settings — Together since', () => {
 
   it('shows why a save was refused, and sends nothing without a date', async () => {
     useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: START },
+      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: START, weddingDate: null },
     });
     const save = vi.fn(async () => {
       throw new AccountDataError(
@@ -124,7 +124,7 @@ describe('Settings — Together since', () => {
 
   it('refuses a start in the future and sends nothing', async () => {
     useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null },
+      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
     });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setRelationshipStart: save });

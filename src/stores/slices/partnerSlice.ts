@@ -20,6 +20,7 @@
 
 import type { PartnerInfo, PartnerRequest, UserSearchResult } from '../../api/partnerService';
 import { partnerService } from '../../api/partnerService';
+import { toDateOnlyOrNull } from '../../services/eventsService';
 import {
   readLocalCopy,
   refreshLocalCopy,
@@ -36,6 +37,23 @@ export const PARTNER_COPY_KIND = 'partner';
  * saved, so `unlinked` here means the server said so — never a failed read.
  */
 export type PartnerCopy = { status: 'linked'; partner: PartnerInfo } | { status: 'unlinked' };
+
+/**
+ * A saved copy in today's shape. A copy saved before birthdays moved to the
+ * server has no `birthday` field; it still parses, and reads it as not set
+ * until the next refresh replaces it.
+ */
+function normalizePartnerCopy(copy: PartnerCopy | null): PartnerCopy | null {
+  if (!copy || copy.status !== 'linked') return copy;
+  const birthday = (copy.partner as Partial<PartnerInfo>).birthday;
+  return {
+    status: 'linked',
+    partner: {
+      ...copy.partner,
+      birthday: typeof birthday === 'string' ? toDateOnlyOrNull(birthday) : null,
+    },
+  };
+}
 
 /**
  * Orders overlapping `loadPartner` calls (view mount, start/reconnect refresh,
@@ -129,7 +147,9 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       };
 
       // 1. The saved copy, at once — online or offline.
-      const copy = await readLocalCopy<PartnerCopy>(userId, PARTNER_COPY_KIND);
+      const copy = normalizePartnerCopy(
+        await readLocalCopy<PartnerCopy>(userId, PARTNER_COPY_KIND)
+      );
       if (stale()) return;
       // Only when nothing is shown yet: a partner already in memory is at least
       // as new as the saved copy, and swapping it for an older one flashes.

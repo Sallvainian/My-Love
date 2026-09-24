@@ -1724,10 +1724,16 @@ describe('EventsSettings accessible names and modal semantics', () => {
   });
 
   it('reads "Shared with your partner" under the Events title', async () => {
-    // Constant, not the store's partner name: `partner` is loaded only by the
-    // Partner view, so a name here would depend on navigation history.
+    // Constant, not the store's partner name: the subtitle never names the
+    // partner, even with a partner loaded.
     setStore({
-      partner: { id: 'p1', email: 'partner@example.test', displayName: 'Harper', connectedAt: null },
+      partner: {
+        id: 'p1',
+        email: 'partner@example.test',
+        displayName: 'Pat',
+        connectedAt: null,
+        birthday: null,
+      },
     });
     await renderSection();
 
