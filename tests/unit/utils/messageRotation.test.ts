@@ -5,15 +5,9 @@ import {
   getMessageForDate,
   getAvailableHistoryDays,
   isNewDay,
-  getDaysSinceStart,
-  formatRelationshipDuration,
-  getDailyMessageId,
-  getTodayMessage,
-  getNextMessage,
-  getPreviousMessage,
 } from '@/utils/messageRotation';
 import { formatDateISO } from '@/utils/dateUtils';
-import type { Message, MessageHistory, Settings } from '@/types';
+import type { Message, MessageHistory } from '@/types';
 
 /** Factory: create a minimal Message */
 function createMessage(overrides: Partial<Message> = {}): Message {
@@ -116,17 +110,25 @@ describe('getAvailableHistoryDays', () => {
     vi.useRealTimers();
   });
 
-  it('returns days since start when less than 30', () => {
-    // Fixed clock: a real "now" near midnight across a DST change can land on 9.
+  it('returns whole days since the couple start when less than 30', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 8, 22, 12, 0, 0));
 
     const history: MessageHistory = { maxHistoryDays: 30 } as MessageHistory;
-    const settings: Settings = {
-      relationship: { startDate: '2026-09-12' },
-    } as Settings;
+    const start = new Date(2026, 8, 12, 12, 0, 0).toISOString();
 
-    expect(getAvailableHistoryDays(history, settings)).toBe(10);
+    expect(getAvailableHistoryDays(history, start)).toBe(10);
+  });
+
+  it('counts from the start instant, including its time of day', () => {
+    vi.useFakeTimers();
+    // 9 days and 23 hours after an 18:00 start: nine whole days.
+    vi.setSystemTime(new Date(2026, 8, 22, 17, 0, 0));
+
+    const history: MessageHistory = { maxHistoryDays: 30 } as MessageHistory;
+    const start = new Date(2026, 8, 12, 18, 0, 0).toISOString();
+
+    expect(getAvailableHistoryDays(history, start)).toBe(9);
   });
 
   it('caps at 30 even if configured higher', () => {
@@ -134,11 +136,8 @@ describe('getAvailableHistoryDays', () => {
     twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
 
     const history: MessageHistory = { maxHistoryDays: 100 } as MessageHistory;
-    const settings: Settings = {
-      relationship: { startDate: formatDateISO(twoYearsAgo) },
-    } as Settings;
 
-    expect(getAvailableHistoryDays(history, settings)).toBe(30);
+    expect(getAvailableHistoryDays(history, twoYearsAgo.toISOString())).toBe(30);
   });
 
   it('uses configured max if less than 30 and less than days since start', () => {
@@ -146,63 +145,36 @@ describe('getAvailableHistoryDays', () => {
     twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
 
     const history: MessageHistory = { maxHistoryDays: 14 } as MessageHistory;
-    const settings: Settings = {
-      relationship: { startDate: formatDateISO(twoYearsAgo) },
-    } as Settings;
 
-    expect(getAvailableHistoryDays(history, settings)).toBe(14);
+    expect(getAvailableHistoryDays(history, twoYearsAgo.toISOString())).toBe(14);
   });
 
   it('defaults maxHistoryDays to 30 when undefined', () => {
     const twoYearsAgo = new Date();
     twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
 
-    const history: MessageHistory = {} as MessageHistory;
-    const settings: Settings = {
-      relationship: { startDate: formatDateISO(twoYearsAgo) },
-    } as Settings;
-
-    expect(getAvailableHistoryDays(history, settings)).toBe(30);
+    expect(getAvailableHistoryDays({} as MessageHistory, twoYearsAgo.toISOString())).toBe(30);
   });
 
-  // startDate is a bare YYYY-MM-DD (IsoDateStringSchema). `new Date('YYYY-MM-DD')`
-  // is UTC midnight, which under the suite's TZ=America/New_York is 20:00 the
-  // PREVIOUS local evening — so from 20:00 local every day the count ran one high.
-  describe('with a YYYY-MM-DD start date west of UTC', () => {
-    it('counts from LOCAL midnight of the start date, not UTC midnight', () => {
-      vi.useFakeTimers();
-      // 21:00 local on the start date itself: zero whole days have elapsed.
-      vi.setSystemTime(new Date(2026, 8, 12, 21, 0, 0));
+  it('never goes below zero for a start still in the future', () => {
+    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      const history: MessageHistory = { maxHistoryDays: 30 } as MessageHistory;
-      const settings: Settings = { relationship: { startDate: '2026-09-12' } } as Settings;
-
-      expect(getAvailableHistoryDays(history, settings)).toBe(0);
-    });
-
-    it('counts whole local days since the start date', () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(2026, 8, 22, 21, 0, 0));
-
-      const history: MessageHistory = { maxHistoryDays: 30 } as MessageHistory;
-      const settings: Settings = { relationship: { startDate: '2026-09-12' } } as Settings;
-
-      expect(getAvailableHistoryDays(history, settings)).toBe(10);
-    });
+    expect(
+      getAvailableHistoryDays({ maxHistoryDays: 30 } as MessageHistory, nextWeek.toISOString())
+    ).toBe(0);
   });
 
-  // An unreadable start date cannot bound history, so only the configured cap
-  // (itself capped at 30) applies — never NaN, which Math.min would propagate.
+  // No start date (unlinked, not set yet, not loaded) and an unreadable one
+  // cannot bound history, so only the configured cap (itself capped at 30)
+  // applies — never NaN, which Math.min would propagate.
   it.each([
+    ['not set', null],
     ['empty', ''],
     ['non-date text', 'not-a-date'],
-    ['impossible date', '2026-02-30'],
-  ])('falls back to the configured cap for an unreadable start date (%s)', (_label, startDate) => {
-    const settings: Settings = { relationship: { startDate } } as Settings;
-
-    expect(getAvailableHistoryDays({ maxHistoryDays: 14 } as MessageHistory, settings)).toBe(14);
-    expect(getAvailableHistoryDays({ maxHistoryDays: 100 } as MessageHistory, settings)).toBe(30);
-    expect(getAvailableHistoryDays({} as MessageHistory, settings)).toBe(30);
+  ])('falls back to the configured cap without a usable start (%s)', (_label, start) => {
+    expect(getAvailableHistoryDays({ maxHistoryDays: 14 } as MessageHistory, start)).toBe(14);
+    expect(getAvailableHistoryDays({ maxHistoryDays: 100 } as MessageHistory, start)).toBe(30);
+    expect(getAvailableHistoryDays({} as MessageHistory, start)).toBe(30);
   });
 });
 
@@ -219,100 +191,5 @@ describe('isNewDay', () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     expect(isNewDay(yesterday.toISOString())).toBe(true);
-  });
-});
-
-describe('getDaysSinceStart', () => {
-  it('returns 0 for today', () => {
-    const today = new Date();
-    expect(getDaysSinceStart(today)).toBe(0);
-  });
-
-  it('returns correct number of days', () => {
-    const start = new Date(2025, 0, 1);
-    const target = new Date(2025, 0, 11);
-    expect(getDaysSinceStart(start, target)).toBe(10);
-  });
-
-  it('accepts optional target date', () => {
-    const start = new Date(2025, 0, 1);
-    const target = new Date(2025, 0, 11);
-    expect(getDaysSinceStart(start, target)).toBe(10);
-  });
-});
-
-describe('formatRelationshipDuration', () => {
-  it('formats days when less than 30', () => {
-    const start = new Date(2025, 0, 1);
-    const target = new Date(2025, 0, 6);
-    expect(formatRelationshipDuration(start, target)).toBe('5 days');
-  });
-
-  it('uses singular for 1 day', () => {
-    const start = new Date(2025, 0, 1);
-    const target = new Date(2025, 0, 2);
-    expect(formatRelationshipDuration(start, target)).toBe('1 day');
-  });
-
-  it('formats months when 30-364 days', () => {
-    const start = new Date(2025, 0, 1);
-    const target = new Date(2025, 2, 2); // 60 days later
-    expect(formatRelationshipDuration(start, target)).toBe('2 months');
-  });
-
-  it('uses singular for 1 month', () => {
-    const start = new Date(2025, 0, 1);
-    const target = new Date(2025, 0, 31); // 30 days later
-    expect(formatRelationshipDuration(start, target)).toBe('1 month');
-  });
-
-  it('formats years with remaining months', () => {
-    const start = new Date(2025, 0, 1);
-    const target = new Date(2026, 2, 1); // 1 year, ~2 months
-    const result = formatRelationshipDuration(start, target);
-    expect(result).toMatch(/1 year/);
-  });
-
-  it('formats years without remaining months', () => {
-    const start = new Date(2025, 0, 1);
-    const target = new Date(2026, 0, 1);
-    expect(formatRelationshipDuration(start, target)).toBe('1 year');
-  });
-});
-
-describe('legacy functions', () => {
-  it('getDailyMessageId returns modulo of days since start', () => {
-    const start = new Date(2025, 0, 1);
-    const today = new Date(2025, 0, 11); // 10 days
-    expect(getDailyMessageId(start, today, 7)).toBe(3); // 10 % 7
-  });
-
-  it('getTodayMessage returns null for empty array', () => {
-    expect(getTodayMessage([], new Date())).toBeNull();
-  });
-
-  it('getTodayMessage returns a message for non-empty array', () => {
-    const messages = createMessages(5);
-    const result = getTodayMessage(messages, new Date());
-    expect(result).not.toBeNull();
-    expect(messages).toContain(result);
-  });
-
-  it('getNextMessage returns null for empty array', () => {
-    expect(getNextMessage([], new Date())).toBeNull();
-  });
-
-  it('getNextMessage returns a message', () => {
-    const messages = createMessages(5);
-    expect(getNextMessage(messages, new Date())).not.toBeNull();
-  });
-
-  it('getPreviousMessage returns null for empty array', () => {
-    expect(getPreviousMessage([], new Date())).toBeNull();
-  });
-
-  it('getPreviousMessage returns a message', () => {
-    const messages = createMessages(5);
-    expect(getPreviousMessage(messages, new Date())).not.toBeNull();
   });
 });

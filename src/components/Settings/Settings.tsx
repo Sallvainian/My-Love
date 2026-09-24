@@ -1,9 +1,10 @@
 /**
  * Settings Component
  *
- * Application settings screen on the style kit: account (identity and display
- * name), the couple's countdowns (events and anniversaries), about (with the
- * welcome-message replay) and sign out.
+ * Application settings screen on the style kit: account (identity, display
+ * name and the couple's shared "Together since" start), the couple's
+ * countdowns (events and anniversaries), about (with the welcome-message
+ * replay) and sign out.
  *
  * @component
  */
@@ -11,6 +12,7 @@
 import {
   AlertCircle,
   ChevronRight,
+  Heart,
   Info,
   Loader2,
   LogOut,
@@ -20,19 +22,173 @@ import {
 import { useEffect, useState } from 'react';
 import { authService } from '../../api/authService';
 import { lookupOwnDisplayName, type OwnDisplayNameLookup } from '../../api/supabaseClient';
+import { useAppStore } from '../../stores/useAppStore';
 import { logger } from '../../utils/logger';
 import { DisplayNameSetup } from '../DisplayNameSetup/DisplayNameSetup';
 import {
   CARD,
   DIVIDER,
+  FIELD_ERROR,
   GROUP_ROW as ROW,
   GROUP_TILE as TILE,
   SECTION_LABEL,
+  SMALL_SECONDARY,
+  fieldClass,
 } from '../shared/kitClasses';
 import { AnniversarySettings } from './AnniversarySettings';
 import { EventsSettings } from './EventsSettings';
 
 const ROW_BUTTON = `${ROW} w-full rounded-[14px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** An ISO instant as the local `YYYY-MM-DD` and `HH:MM` a date and time input take. */
+function toLocalInputs(iso: string | null): { date: string; time: string } {
+  if (!iso) return { date: '', time: '' };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: '', time: '' };
+  return {
+    date: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`,
+    time: `${pad2(d.getHours())}:${pad2(d.getMinutes())}`,
+  };
+}
+
+/**
+ * The inputs' local date and time as an ISO instant, or `null` when the date
+ * is missing or impossible. Built from components, never `new Date(string)`:
+ * a bare date string parses as UTC midnight. An empty time means midnight.
+ */
+function fromLocalInputs(date: string, time: string): string | null {
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!dm) return null;
+  const tm = /^(\d{2}):(\d{2})$/.exec(time || '00:00');
+  if (!tm) return null;
+  const [y, mo, d] = [Number(dm[1]), Number(dm[2]), Number(dm[3])];
+  const local = new Date(y, mo - 1, d, Number(tm[1]), Number(tm[2]));
+  if (local.getFullYear() !== y || local.getMonth() !== mo - 1 || local.getDate() !== d) return null;
+  return local.toISOString();
+}
+
+/**
+ * "Together since": the couple's shared start, a date and a time either
+ * partner can set. The value is server-held (`coupleSettings`); a save needs a
+ * connection, and a refused or failed one leaves the value unchanged and says
+ * why here.
+ */
+function TogetherSinceRow() {
+  const coupleSettings = useAppStore((s) => s.coupleSettings);
+
+  const subtitle = (() => {
+    if (!coupleSettings) return 'Loading...';
+    if (coupleSettings.status === 'unlinked') return 'Link a partner first to set your start date';
+    if (!coupleSettings.relationshipStart) return 'Not set yet';
+    return new Date(coupleSettings.relationshipStart).toLocaleString(undefined, {
+      dateStyle: 'long',
+      timeStyle: 'short',
+    });
+  })();
+
+  const start = coupleSettings?.status === 'linked' ? coupleSettings.relationshipStart : null;
+
+  return (
+    <div className="flex flex-col gap-2 py-1" data-testid="settings-together-since">
+      <div className={ROW}>
+        <span className={TILE} aria-hidden="true">
+          <Heart className="h-[17px] w-[17px]" />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <p className="text-[15px] font-medium text-ink">Together since</p>
+          <p
+            className="text-[13px] break-words text-muted"
+            data-testid="settings-together-since-value"
+          >
+            {subtitle}
+          </p>
+        </div>
+      </div>
+      {/* Remounted when the saved value changes, so the inputs pick it up. */}
+      {coupleSettings?.status === 'linked' && <TogetherSinceForm key={start ?? 'unset'} start={start} />}
+    </div>
+  );
+}
+
+function TogetherSinceForm({ start }: { start: string | null }) {
+  const setRelationshipStart = useAppStore((s) => s.setRelationshipStart);
+  const initial = toLocalInputs(start);
+  const [date, setDate] = useState(initial.date);
+  const [time, setTime] = useState(initial.time);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = fromLocalInputs(date, time);
+    if (!value) {
+      setSaveError('Pick a date first.');
+      return;
+    }
+    // A mistyped year would otherwise count "together for" toward a future day.
+    if (new Date(value).getTime() > Date.now()) {
+      setSaveError('Pick a date in the past.');
+      return;
+    }
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      await setRelationshipStart(value);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save the start date.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-2" onSubmit={handleSave} noValidate>
+      <div className="flex gap-2">
+        <label className="sr-only" htmlFor="settings-together-since-date">
+          Start date
+        </label>
+        <input
+          id="settings-together-since-date"
+          type="date"
+          value={date}
+          max={toLocalInputs(new Date().toISOString()).date}
+          onChange={(e) => setDate(e.target.value)}
+          className={fieldClass(false)}
+          data-testid="settings-together-since-date"
+        />
+        <label className="sr-only" htmlFor="settings-together-since-time">
+          Start time
+        </label>
+        <input
+          id="settings-together-since-time"
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className={fieldClass(false)}
+          data-testid="settings-together-since-time"
+        />
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="submit"
+          disabled={isSaving}
+          className={SMALL_SECONDARY}
+          data-testid="settings-together-since-save"
+        >
+          {isSaving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          {isSaving ? 'Saving…' : 'Save start date'}
+        </button>
+      </div>
+      {saveError && (
+        <p className={FIELD_ERROR} role="alert" data-testid="settings-together-since-error">
+          {saveError}
+        </p>
+      )}
+    </form>
+  );
+}
 
 interface SettingsProps {
   /** Replays the welcome splash; the About row is not rendered without it. */
@@ -202,6 +358,8 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             </span>
             <ChevronRight className="h-[18px] w-[18px] shrink-0 text-muted" aria-hidden="true" />
           </button>
+          <div className={DIVIDER} aria-hidden="true" />
+          <TogetherSinceRow />
         </div>
       </section>
 

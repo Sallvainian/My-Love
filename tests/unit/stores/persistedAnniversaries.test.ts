@@ -60,9 +60,9 @@ describe('anniversaries in the persisted blob', () => {
     const useAppStore = await loadStore();
     const settings = useAppStore.getState().settings!;
 
-    expect(settings.relationship.anniversaries).toEqual([]);
-    expect(settings.relationship.startDate).toBe('2020-01-01');
-    expect(settings.notificationTime).toBe('09:00');
+    // The rest of the blob survives; its removed couple and notification keys
+    // are stripped on the same load.
+    expect(settings).toEqual({ relationship: { anniversaries: [] } });
     expect(useAppStore.getState().messageHistory.currentIndex).toBe(7);
   });
 

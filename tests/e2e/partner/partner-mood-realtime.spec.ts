@@ -95,6 +95,17 @@ test.describe('Partner mood realtime delivery', () => {
       // Resolved once, up front, from `TEST_WORKER_INDEX` — the same pair the
       // two contexts below sign in as.
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+      // The sender's own display name, read before the send: the toast names
+      // the partner from it (CAP-10), never from a hard-coded name, and it
+      // auto-hides five seconds after arrival.
+      const { data: senderRow, error: senderError } = await supabaseAdmin
+        .from('users')
+        .select('display_name')
+        .eq('id', userId)
+        .single();
+      expect(senderError).toBeNull();
+      const senderName = senderRow?.display_name?.trim() ?? '';
+      expect(senderName, 'The sender needs a display name for the toast to show').not.toBe('');
       // The exact path this send must take. The sender addresses its PARTNER's
       // topic (`moodSyncService.ts:267`) while the receiver joins its OWN
       // (`:605`) — the same value seen from the two ends of the pair.
@@ -182,6 +193,9 @@ test.describe('Partner mood realtime delivery', () => {
         // seconds after arrival (`PartnerMoodView.tsx:194-196`), and it is the
         // immediate live signal rather than anything a refetch could produce.
         await expect(partnerPage.getByTestId('partner-mood-notification')).toContainText(moodNote);
+        await expect(partnerPage.getByTestId('partner-mood-notification')).toContainText(
+          `${senderName} just logged a mood`
+        );
 
         // Then the durable half. The broadcast handler also refetches
         // (`PartnerMoodView.tsx:200`), so the mood has to survive into the

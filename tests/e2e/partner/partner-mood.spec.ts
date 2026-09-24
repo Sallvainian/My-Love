@@ -8,6 +8,8 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 
+const FAKE_PARTNER_ID = '00000000-0000-4000-8000-000000000123';
+
 test.describe('Partner Mood View', () => {
   test('[P0] 4.5-E2E-001 should display partner mood view', async ({
     page,
@@ -46,12 +48,15 @@ test.describe('Partner Mood View', () => {
     // loadPartner makes 2 sequential GET /rest/v1/users calls:
     //   1. select=partner_id,updated_at → current user's record
     //   2. select=id,email,display_name → partner's record
-    // Mock both with the correct shapes.
+    // Mock both with the correct shapes. The fake partner id is uuid-shaped:
+    // the couple-settings refresher reuses the partner_id answer to address
+    // `couple_settings`, and a non-uuid id is a 400 there (RLS answers a
+    // well-formed stranger's pair with no row).
     interceptNetworkCall({
       url: '**/rest/v1/users?select=partner_id*',
       fulfillResponse: {
         status: 200,
-        body: { partner_id: 'partner-123', updated_at: '2024-01-01T00:00:00Z' },
+        body: { partner_id: FAKE_PARTNER_ID, updated_at: '2024-01-01T00:00:00Z' },
       },
     });
 
@@ -59,7 +64,7 @@ test.describe('Partner Mood View', () => {
       url: '**/rest/v1/users?select=id*',
       fulfillResponse: {
         status: 200,
-        body: { id: 'partner-123', email: 'partner@test.com', display_name: 'Test Partner' },
+        body: { id: FAKE_PARTNER_ID, email: 'partner@test.com', display_name: 'Test Partner' },
       },
     });
 

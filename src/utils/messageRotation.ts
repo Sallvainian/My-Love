@@ -1,6 +1,5 @@
-import type { Message, MessageHistory, Settings } from '../types';
+import type { Message, MessageHistory } from '../types';
 import { formatDateISO } from './dateUtils';
-import { parseEventDate } from '../services/eventsService';
 
 /**
  * Hash a date string to a deterministic number
@@ -47,27 +46,27 @@ export function getMessageForDate(allMessages: Message[], targetDate: Date): Mes
 }
 
 /**
- * Get available history days based on configuration and relationship duration
- * Returns minimum of: configured max, days since relationship start, or hard cap
+ * How many past days of daily messages can be browsed: the configured maximum
+ * (capped at 30), and never further back than the couple's relationship start.
+ *
+ * `relationshipStart` is the couple's shared start (`coupleSettings`, an ISO
+ * timestamp from `public.couple_settings.relationship_start`). `null` — no
+ * partner, not set yet, or not loaded — and an unreadable value leave only the
+ * cap. The rotation itself (`getDailyMessage`) hashes the calendar date and
+ * never reads the start date.
  */
 export function getAvailableHistoryDays(
   messageHistory: MessageHistory,
-  settings: Settings
+  relationshipStart: string | null
 ): number {
-  // startDate is a bare YYYY-MM-DD. `new Date()` on it is UTC midnight, which
-  // west of UTC is the previous local evening and counts a day too many.
-  const relationshipStartDate = parseEventDate(settings.relationship.startDate);
   const configuredMax = Math.min(messageHistory.maxHistoryDays || 30, 30);
-  // An unreadable start date cannot bound history; the configured cap still does.
-  if (!relationshipStartDate) return configuredMax;
+  if (!relationshipStart) return configuredMax;
+  const start = new Date(relationshipStart);
+  if (Number.isNaN(start.getTime())) return configuredMax;
 
-  const today = new Date();
-  const daysSinceStart = Math.floor(
-    (today.getTime() - relationshipStartDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  // Return minimum of: configured max, days since start, or 30 default
-  return Math.min(configuredMax, daysSinceStart);
+  const daysSinceStart = Math.floor((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24));
+  // A start still in the future bounds history at today.
+  return Math.max(0, Math.min(configuredMax, daysSinceStart));
 }
 
 /**
@@ -84,89 +83,4 @@ export function isNewDay(lastShownDate: string | null): boolean {
     lastDate.getMonth() !== today.getMonth() ||
     lastDate.getFullYear() !== today.getFullYear()
   );
-}
-
-// Legacy functions kept for backward compatibility (deprecated in Story 3.3)
-// These will be removed in future refactoring
-
-/**
- * @deprecated Use getDailyMessage with date parameter instead
- */
-export function getDailyMessageId(startDate: Date, today: Date, totalMessages: number): number {
-  const daysSinceStart = Math.floor(
-    (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  return daysSinceStart % totalMessages;
-}
-
-/**
- * @deprecated Use getDailyMessage instead
- */
-export function getTodayMessage(
-  messages: Message[],
-  _startDate: Date,
-  _favoriteIds: number[] = []
-): Message | null {
-  if (messages.length === 0) return null;
-
-  // Story 3.3: Remove favorite rotation logic, use pure date-hash algorithm
-  const today = new Date();
-  return getDailyMessage(messages, today);
-}
-
-/**
- * @deprecated Use getDailyMessage with tomorrow's date instead
- */
-export function getNextMessage(messages: Message[], _startDate: Date): Message | null {
-  if (messages.length === 0) return null;
-
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  return getDailyMessage(messages, tomorrow);
-}
-
-/**
- * @deprecated Use getDailyMessage with yesterday's date instead
- */
-export function getPreviousMessage(messages: Message[], _startDate: Date): Message | null {
-  if (messages.length === 0) return null;
-
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  return getDailyMessage(messages, yesterday);
-}
-
-/**
- * Calculate which day of the relationship it is
- * @param startDate - Relationship start date
- * @param targetDate - Optional target date (defaults to today)
- */
-export function getDaysSinceStart(startDate: Date, targetDate?: Date): number {
-  const endDate = targetDate || new Date();
-  return Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-/**
- * Format the relationship duration
- * @param startDate - Relationship start date
- * @param targetDate - Optional target date (defaults to today)
- */
-export function formatRelationshipDuration(startDate: Date, targetDate?: Date): string {
-  const days = getDaysSinceStart(startDate, targetDate);
-
-  if (days < 30) {
-    return `${days} ${days === 1 ? 'day' : 'days'}`;
-  } else if (days < 365) {
-    const months = Math.floor(days / 30);
-    return `${months} ${months === 1 ? 'month' : 'months'}`;
-  } else {
-    const years = Math.floor(days / 365);
-    const remainingMonths = Math.floor((days % 365) / 30);
-    if (remainingMonths > 0) {
-      return `${years} ${years === 1 ? 'year' : 'years'} and ${remainingMonths} ${remainingMonths === 1 ? 'month' : 'months'}`;
-    }
-    return `${years} ${years === 1 ? 'year' : 'years'}`;
-  }
 }

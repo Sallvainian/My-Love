@@ -14,8 +14,13 @@ describe('RELATIONSHIP_DATES', () => {
     expect('visits' in RELATIONSHIP_DATES).toBe(false);
   });
 
-  it('still carries datingStart, birthdays and wedding', () => {
-    expect(RELATIONSHIP_DATES.datingStart).toBeInstanceOf(Date);
+  // The start date is couple data on the server now (couple_settings), so the
+  // hard-coded copy must not come back.
+  it('carries no datingStart key', () => {
+    expect('datingStart' in RELATIONSHIP_DATES).toBe(false);
+  });
+
+  it('still carries birthdays and wedding', () => {
     expect(RELATIONSHIP_DATES.birthdays.frank.name).toBe('Frank');
     expect(RELATIONSHIP_DATES.birthdays.gracie.name).toBe('Gracie');
     expect(RELATIONSHIP_DATES.wedding).toBeNull();

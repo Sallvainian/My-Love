@@ -11,7 +11,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { APP_CONFIG } from '../../config/constants';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import { useAppStore } from '../../stores/useAppStore';
 import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
@@ -143,9 +142,7 @@ export function DailyMessage(_props: DailyMessageProps) {
             </h2>
 
             <p className="max-w-md text-sm text-muted">
-              {!APP_CONFIG.isPreConfigured
-                ? 'Environment variables not configured. Please create a .env.development file with VITE_PARTNER_NAME and VITE_RELATIONSHIP_START_DATE.'
-                : 'Something went wrong during initialization. Please try refreshing the page.'}
+              Something went wrong during initialization. Please try refreshing the page.
             </p>
           </div>
 
