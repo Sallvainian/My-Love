@@ -699,13 +699,24 @@ function App() {
     eventsLoadFailed
   );
 
+  // Love Notes is a screen, not a page: its list scrolls, the page never does.
+  // The shell is pinned to the visible screen (`fixed inset-0`, the same frame
+  // the dock is pinned to) and the view fills what the chrome leaves. Sizing
+  // it from `100dvh` instead left the installed iOS app about 60pt taller than
+  // the screen, so the page scrolled and the composer drifted off the dock.
+  const isScreenView = currentView === 'notes';
+
   // Story 1.4 & 4.1/4.2 & 6.2 & 6.4: Render home, photos, mood, or partner view based on navigation
   return (
     <ErrorBoundary>
-      <div className="min-h-screen" data-testid="app-container">
+      <div
+        className={isScreenView ? 'fixed inset-0 flex flex-col overflow-hidden' : 'min-h-screen'}
+        data-testid="app-container"
+      >
         {/* App chrome: a sticky top bar in normal flow above <main>, so no view
             needs a compensating top pad, and a fixed bottom dock, which layout
-            cannot see -- hence <main>'s `--dock-clearance` bottom pad. */}
+            cannot see -- hence <main>'s `--dock-clearance` bottom pad, or on
+            Love Notes `--dock-top`, which ends the view at the dock itself. */}
         <AppNavigation currentView={currentView} onViewChange={setView} />
 
         {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
@@ -716,7 +727,10 @@ function App() {
 
         {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
 
-        <main id="main-content" className="pb-(--dock-clearance)">
+        <main
+          id="main-content"
+          className={isScreenView ? 'flex min-h-0 flex-1 flex-col pb-(--dock-top)' : 'pb-(--dock-clearance)'}
+        >
           {/* Home view - inline, not lazy-loaded, always works offline */}
           {currentView === 'home' && (
             <div className="mx-auto max-w-4xl space-y-4 px-4 pt-3 pb-4">
