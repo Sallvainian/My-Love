@@ -87,12 +87,9 @@ export function PartnerMoodView() {
   // Declared before the effect that calls it: it used to live further down the
   // component, so the effect closed over it before initialization and had to
   // suppress exhaustive-deps to stay quiet.
-  const handleRefresh = useCallback(async () => {
-    if (!syncStatus.isOnline) {
-      setError('Cannot fetch moods while offline');
-      return;
-    }
-
+  // Online or offline: fetchPartnerMoods shows the saved copy first and asks
+  // the server only when online.
+  const loadPartnerMoods = useCallback(async () => {
     try {
       setIsRefreshing(true);
       setError(null);
@@ -103,7 +100,15 @@ export function PartnerMoodView() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [syncStatus.isOnline, fetchPartnerMoods]);
+  }, [fetchPartnerMoods]);
+
+  const handleRefresh = useCallback(async () => {
+    if (!syncStatus.isOnline) {
+      setError('Cannot fetch moods while offline');
+      return;
+    }
+    await loadPartnerMoods();
+  }, [syncStatus.isOnline, loadPartnerMoods]);
 
   // The partner loads online or offline: it shows the saved copy at once and
   // refreshes it from the server only when online. Reconnect refreshes come
@@ -122,21 +127,20 @@ export function PartnerMoodView() {
     }
   }, [syncStatus.isOnline, loadPendingRequests]);
 
-  // Load partner moods only if partner is connected.
-  // syncStatus.isOnline belongs in the dependency list: the suppressed version
-  // re-ran only when `partner` changed, so reconnecting with the same partner
-  // still showed the moods fetched before going offline.
+  // Load partner moods only if partner is connected — offline too, where the
+  // saved copy is all there is. syncStatus.isOnline belongs in the dependency
+  // list: reconnecting with the same partner must fetch the server's list.
   useEffect(() => {
-    if (syncStatus.isOnline && partner) {
-      // handleRefresh raises isRefreshing before it awaits, and that ordering is the point:
+    if (partner) {
+      // loadPartnerMoods raises isRefreshing before it awaits, and that ordering is the point:
       // the spinner and the "Loading partner moods..." panel are the only signal that a
       // fetch is in flight, so deferring the flag past the await would leave the view
       // looking idle for the whole Supabase round trip. There is nothing to derive it from
       // either — the fetch lifecycle lives outside React.
       // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch lifecycle
-      handleRefresh();
+      loadPartnerMoods();
     }
-  }, [syncStatus.isOnline, partner, handleRefresh]);
+  }, [syncStatus.isOnline, partner, loadPartnerMoods]);
 
   // Story 6.4: Task 6 & 7 - Real-time subscription with connection status (AC #4)
   useEffect(() => {
@@ -621,8 +625,8 @@ export function PartnerMoodView() {
               </div>
             )}
 
-            {/* Offline Notice */}
-            {!syncStatus.isOnline && (
+            {/* Offline Notice — only once the saved copy was read and had nothing */}
+            {!syncStatus.isOnline && !isRefreshing && partnerMoods.length === 0 && (
               <div
                 className={`${CARD} flex items-center gap-3 p-4`}
                 data-testid="partner-mood-offline-notice"

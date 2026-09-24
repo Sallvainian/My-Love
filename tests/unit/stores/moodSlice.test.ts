@@ -4,6 +4,8 @@ import type { MoodEntry } from '@/types';
 // Mock services before importing the store
 vi.mock('@/services/moodService', () => ({
   moodService: {
+    mergeServerMoods: vi.fn(),
+    getMergeSnapshot: vi.fn(),
     saveForDate: vi.fn(),
     create: vi.fn(),
     updateMood: vi.fn(),
@@ -24,9 +26,26 @@ vi.mock('@/api/supabaseClient', () => ({
   getPartnerId: vi.fn(),
 }));
 
+vi.mock('@/api/moodApi', () => ({
+  moodApi: {
+    getMoodHistory: vi.fn(),
+  },
+}));
+
+// The partner-moods copy lives in a Map here so a case can seed it, read what
+// was saved, and hold a read open across an account switch.
+const savedCopies = new Map<string, unknown>();
+vi.mock('@/services/localCopy', () => ({
+  readLocalCopy: vi.fn(),
+  writeLocalCopy: vi.fn(),
+  registerLocalCopy: vi.fn(() => () => {}),
+}));
+
 import { moodService } from '@/services/moodService';
 import { moodSyncService } from '@/api/moodSyncService';
 import { getPartnerId } from '@/api/supabaseClient';
+import { moodApi } from '@/api/moodApi';
+import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '@/services/localCopy';
 
 // Import Zustand store factory
 import { createMoodSlice, type MoodSlice } from '@/stores/slices/moodSlice';
@@ -34,6 +53,10 @@ import { createMoodSlice, type MoodSlice } from '@/stores/slices/moodSlice';
 const mockedMoodService = vi.mocked(moodService);
 const mockedMoodSyncService = vi.mocked(moodSyncService);
 const mockedGetPartnerId = vi.mocked(getPartnerId);
+const mockedMoodApi = vi.mocked(moodApi);
+const mockedReadLocalCopy = vi.mocked(readLocalCopy);
+const mockedWriteLocalCopy = vi.mocked(writeLocalCopy);
+const mockedRegisterLocalCopy = vi.mocked(registerLocalCopy);
 
 /** Create a standalone store-like object from the slice */
 function createTestStore(extraState: Record<string, unknown> = {}) {
@@ -78,6 +101,14 @@ describe('moodSlice', () => {
     // loadMoods runs as a side effect of several actions under test, so give
     // the scoped read a default rather than letting it resolve undefined.
     mockedMoodService.getAllForUser.mockResolvedValue([]);
+    mockedMoodService.getMergeSnapshot.mockResolvedValue(new Map());
+    savedCopies.clear();
+    mockedReadLocalCopy.mockImplementation(async (userId: string, kind: string) =>
+      savedCopies.has(`${userId}|${kind}`) ? (savedCopies.get(`${userId}|${kind}`) as never) : null
+    );
+    mockedWriteLocalCopy.mockImplementation(async (userId: string, kind: string, value: unknown) => {
+      savedCopies.set(`${userId}|${kind}`, value);
+    });
     // Default: online
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   });
@@ -642,6 +673,431 @@ describe('moodSlice', () => {
       await get().fetchPartnerMoods();
 
       expect(get().partnerMoods[0].moods).toEqual(['sad']);
+    });
+  });
+
+  describe('loadMoodHistoryFromServer (mood-history backfill)', () => {
+    const USER = 'user-123';
+
+    function serverRow(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'supa-1',
+        user_id: USER,
+        mood_type: 'happy',
+        mood_types: ['happy'],
+        note: null,
+        created_at: '2026-08-01T12:00:00.000Z',
+        updated_at: null,
+        ...overrides,
+      } as never;
+    }
+
+    function localDate(iso: string) {
+      const d = new Date(iso);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    it('registers itself as the mood-history refresher', async () => {
+      mockedMoodApi.getMoodHistory.mockResolvedValue([]);
+      mockedMoodService.mergeServerMoods.mockResolvedValue(false);
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+
+      const call = mockedRegisterLocalCopy.mock.calls.find(([kind]) => kind === 'mood-history');
+      expect(call).toBeDefined();
+      await call![1]();
+      expect(mockedMoodApi.getMoodHistory).toHaveBeenCalledWith(USER, 0, 500);
+      expect(get().moods).toEqual([]);
+    });
+
+    it('pages 500 at a time until a short page', async () => {
+      const full = Array.from({ length: 500 }, (_, i) =>
+        serverRow({ id: `p1-${i}`, created_at: new Date(Date.UTC(2025, 0, 1) + i * 86_400_000).toISOString() })
+      );
+      mockedMoodApi.getMoodHistory
+        .mockResolvedValueOnce(full)
+        .mockResolvedValueOnce([serverRow({ id: 'p2-0', created_at: '2020-01-01T12:00:00.000Z' })]);
+      mockedMoodService.mergeServerMoods.mockResolvedValue(true);
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().loadMoodHistoryFromServer();
+
+      expect(mockedMoodApi.getMoodHistory).toHaveBeenCalledTimes(2);
+      expect(mockedMoodApi.getMoodHistory).toHaveBeenNthCalledWith(1, USER, 0, 500);
+      expect(mockedMoodApi.getMoodHistory).toHaveBeenNthCalledWith(2, USER, 500, 500);
+      const [, entries] = mockedMoodService.mergeServerMoods.mock.calls[0];
+      expect(entries.length).toBeGreaterThan(400);
+    });
+
+    it('maps rows like partner moods, keeps the newest per date and skips a null created_at', async () => {
+      mockedMoodApi.getMoodHistory.mockResolvedValue([
+        serverRow({ id: 'newer', mood_type: 'sad', mood_types: ['sad'], note: 'second device', created_at: '2026-08-01T12:30:00.000Z' }),
+        serverRow({ id: 'older', created_at: '2026-08-01T12:00:00.000Z' }),
+        serverRow({ id: 'no-time', created_at: null }),
+      ]);
+      mockedMoodService.mergeServerMoods.mockResolvedValue(true);
+      const reloaded = [makeMoodEntry({ id: 7, userId: USER, synced: true })];
+      mockedMoodService.getAllForUser.mockResolvedValue(reloaded);
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().loadMoodHistoryFromServer();
+
+      expect(mockedMoodService.mergeServerMoods).toHaveBeenCalledTimes(1);
+      const [owner, entries] = mockedMoodService.mergeServerMoods.mock.calls[0];
+      expect(owner).toBe(USER);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({
+        userId: USER,
+        mood: 'sad',
+        moods: ['sad'],
+        note: 'second device',
+        date: localDate('2026-08-01T12:30:00.000Z'),
+        synced: true,
+        supabaseId: 'newer',
+      });
+      expect(entries[0].timestamp.toISOString()).toBe('2026-08-01T12:30:00.000Z');
+      // Changed, so the store reloads from IndexedDB.
+      expect(get().moods).toEqual(reloaded);
+    });
+
+    it('takes the local snapshot before the first server request and passes it to the merge', async () => {
+      const order: string[] = [];
+      const snapshot = new Map();
+      mockedMoodService.getMergeSnapshot.mockImplementation(async () => {
+        order.push('snapshot');
+        return snapshot;
+      });
+      mockedMoodApi.getMoodHistory.mockImplementation(async () => {
+        order.push('server');
+        return [serverRow()];
+      });
+      mockedMoodService.mergeServerMoods.mockResolvedValue(false);
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().loadMoodHistoryFromServer();
+
+      expect(order).toEqual(['snapshot', 'server']);
+      expect(mockedMoodService.getMergeSnapshot).toHaveBeenCalledWith(USER);
+      expect(mockedMoodService.mergeServerMoods.mock.calls[0][2]).toBe(snapshot);
+    });
+
+    it('does not reload moods when the merge changed nothing', async () => {
+      mockedMoodApi.getMoodHistory.mockResolvedValue([serverRow()]);
+      mockedMoodService.mergeServerMoods.mockResolvedValue(false);
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().loadMoodHistoryFromServer();
+
+      expect(mockedMoodService.getAllForUser).not.toHaveBeenCalled();
+    });
+
+    it('changes nothing when the read fails (offline or server error)', async () => {
+      const existing = [makeMoodEntry({ userId: USER })];
+      mockedMoodApi.getMoodHistory.mockRejectedValue(new Error('Device is offline'));
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      set({ moods: existing } as Partial<MoodSlice>);
+      await expect(get().loadMoodHistoryFromServer()).resolves.toBeUndefined();
+
+      expect(mockedMoodService.mergeServerMoods).not.toHaveBeenCalled();
+      expect(get().moods).toBe(existing);
+      expect(errorSpy).toHaveBeenCalled();
+    });
+
+    it('changes nothing when a later page fails', async () => {
+      const full = Array.from({ length: 500 }, (_, i) => serverRow({ id: `p1-${i}` }));
+      mockedMoodApi.getMoodHistory
+        .mockResolvedValueOnce(full)
+        .mockRejectedValueOnce(new Error('server error'));
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().loadMoodHistoryFromServer();
+
+      expect(mockedMoodService.mergeServerMoods).not.toHaveBeenCalled();
+    });
+
+    it('writes nothing when the account changed during the read', async () => {
+      let settle: (rows: never[]) => void = () => {};
+      mockedMoodApi.getMoodHistory.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+
+      const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      const inFlight = get().loadMoodHistoryFromServer();
+      set({ userId: 'user-B', authSessionVersion: 2 } as never);
+      settle([serverRow()]);
+      await inFlight;
+
+      expect(mockedMoodService.mergeServerMoods).not.toHaveBeenCalled();
+      expect(get().moods).toEqual([]);
+    });
+
+    it('writes nothing when the same account signed in again during the read', async () => {
+      let settle: (rows: never[]) => void = () => {};
+      mockedMoodApi.getMoodHistory.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+
+      const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      const inFlight = get().loadMoodHistoryFromServer();
+      set({ authSessionVersion: 2 } as never);
+      settle([serverRow()]);
+      await inFlight;
+
+      expect(mockedMoodService.mergeServerMoods).not.toHaveBeenCalled();
+    });
+
+    it('does not reload into state when the account changed during the merge', async () => {
+      mockedMoodApi.getMoodHistory.mockResolvedValue([serverRow()]);
+      let finishMerge: (changed: boolean) => void = () => {};
+      mockedMoodService.mergeServerMoods.mockReturnValue(
+        new Promise((resolve) => (finishMerge = resolve))
+      );
+
+      const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      const inFlight = get().loadMoodHistoryFromServer();
+      await vi.waitFor(() => expect(mockedMoodService.mergeServerMoods).toHaveBeenCalled());
+      set({ userId: 'user-B', authSessionVersion: 2 } as never);
+      finishMerge(true);
+      await inFlight;
+
+      expect(mockedMoodService.getAllForUser).not.toHaveBeenCalled();
+      expect(get().moods).toEqual([]);
+    });
+
+    it('does nothing when no one is signed in', async () => {
+      const { get } = createTestStore({ userId: null });
+      await get().loadMoodHistoryFromServer();
+      expect(mockedMoodApi.getMoodHistory).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('fetchPartnerMoods (partner-moods local copy)', () => {
+    const USER = 'user-A';
+    const PARTNER = 'partner-uuid';
+    const copyKey = `${USER}|partner-moods`;
+
+    const savedMood = {
+      userId: PARTNER,
+      mood: 'loved',
+      moods: ['loved', 'happy'],
+      note: 'SAVED-NOTE',
+      date: '2026-08-02',
+      timestamp: '2026-08-02T09:00:00.000Z',
+      supabaseId: 'saved-1',
+    };
+
+    const serverRecord = {
+      id: 'server-1',
+      user_id: PARTNER,
+      mood_type: 'tired',
+      mood_types: ['tired'],
+      note: 'SERVER-NOTE',
+      created_at: '2026-08-03T09:00:00.000Z',
+    } as never;
+
+    it('offline with a copy: lists the saved moods and does not ask the server', async () => {
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+      savedCopies.set(copyKey, [savedMood]);
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().fetchPartnerMoods(30);
+
+      expect(mockedGetPartnerId).not.toHaveBeenCalled();
+      expect(get().partnerMoods).toHaveLength(1);
+      expect(get().partnerMoods[0]).toMatchObject({
+        userId: PARTNER,
+        mood: 'loved',
+        moods: ['loved', 'happy'],
+        note: 'SAVED-NOTE',
+        date: '2026-08-02',
+        synced: true,
+        supabaseId: 'saved-1',
+      });
+      expect(get().partnerMoods[0].timestamp).toEqual(new Date('2026-08-02T09:00:00.000Z'));
+      expect(mockedWriteLocalCopy).not.toHaveBeenCalled();
+    });
+
+    it('offline with no copy: stays empty', async () => {
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().fetchPartnerMoods(30);
+
+      expect(get().partnerMoods).toEqual([]);
+      expect(mockedGetPartnerId).not.toHaveBeenCalled();
+    });
+
+    it('online: shows the copy first, then replaces it with the server list and saves that', async () => {
+      savedCopies.set(copyKey, [savedMood]);
+      mockedGetPartnerId.mockResolvedValue(PARTNER);
+      let settle: (rows: never[]) => void = () => {};
+      mockedMoodSyncService.fetchMoods.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      const inFlight = get().fetchPartnerMoods(30);
+      await vi.waitFor(() => expect(mockedMoodSyncService.fetchMoods).toHaveBeenCalled());
+      expect(get().partnerMoods.map((m) => m.supabaseId)).toEqual(['saved-1']);
+
+      settle([serverRecord]);
+      await inFlight;
+
+      expect(get().partnerMoods.map((m) => m.supabaseId)).toEqual(['server-1']);
+      expect(mockedWriteLocalCopy).toHaveBeenCalledWith(USER, 'partner-moods', [
+        {
+          userId: PARTNER,
+          mood: 'tired',
+          moods: ['tired'],
+          note: 'SERVER-NOTE',
+          date: get().partnerMoods[0].date,
+          timestamp: '2026-08-03T09:00:00.000Z',
+          supabaseId: 'server-1',
+        },
+      ]);
+    });
+
+    it('online: zero rows replaces the list and saves []', async () => {
+      savedCopies.set(copyKey, [savedMood]);
+      mockedGetPartnerId.mockResolvedValue(PARTNER);
+      mockedMoodSyncService.fetchMoods.mockResolvedValue([]);
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().fetchPartnerMoods(30);
+
+      expect(get().partnerMoods).toEqual([]);
+      expect(savedCopies.get(copyKey)).toEqual([]);
+    });
+
+    it('a failed server read keeps the copy and the state', async () => {
+      savedCopies.set(copyKey, [savedMood]);
+      mockedGetPartnerId.mockResolvedValue(PARTNER);
+      mockedMoodSyncService.fetchMoods.mockRejectedValue(new Error('network'));
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().fetchPartnerMoods(30);
+
+      expect(get().partnerMoods.map((m) => m.supabaseId)).toEqual(['saved-1']);
+      expect(mockedWriteLocalCopy).not.toHaveBeenCalled();
+      expect(savedCopies.get(copyKey)).toEqual([savedMood]);
+    });
+
+    it('a failed partner lookup keeps the copy and the state', async () => {
+      savedCopies.set(copyKey, [savedMood]);
+      mockedGetPartnerId.mockResolvedValue(null);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().fetchPartnerMoods(30);
+
+      expect(get().partnerMoods.map((m) => m.supabaseId)).toEqual(['saved-1']);
+      expect(mockedWriteLocalCopy).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['not an array', { nope: true }],
+      ['an entry with an unknown mood', [{ ...savedMood, mood: 'bogus', moods: ['bogus'] }]],
+      ['an entry with a bad timestamp', [{ ...savedMood, timestamp: 'not-a-date' }]],
+      ['an entry with a malformed date', [savedMood, { ...savedMood, date: '2026/08/02' }]],
+    ])('ignores a malformed copy (%s)', async (_label, copy) => {
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+      savedCopies.set(copyKey, copy);
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().fetchPartnerMoods(30);
+
+      expect(get().partnerMoods).toEqual([]);
+    });
+
+    it('never shows the copy again once this session has a server answer, even if saving it failed', async () => {
+      savedCopies.set(copyKey, [savedMood]);
+      mockedGetPartnerId.mockResolvedValue(PARTNER);
+      mockedMoodSyncService.fetchMoods.mockResolvedValue([]);
+      mockedWriteLocalCopy.mockRejectedValue(new Error('quota'));
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().fetchPartnerMoods(30);
+      expect(get().partnerMoods).toEqual([]);
+      // The failed save left the old copy in place.
+      expect(savedCopies.get(copyKey)).toEqual([savedMood]);
+
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+      await get().fetchPartnerMoods(30);
+
+      expect(get().partnerMoods).toEqual([]);
+    });
+
+    it('does not lay the copy over moods already shown', async () => {
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+      savedCopies.set(copyKey, [savedMood]);
+      const shown = [makeMoodEntry({ userId: PARTNER, supabaseId: 'shown' })];
+
+      const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      set({ partnerMoods: shown } as Partial<MoodSlice>);
+      await get().fetchPartnerMoods(30);
+
+      expect(get().partnerMoods).toBe(shown);
+    });
+
+    it('skips a server row with a null created_at', async () => {
+      mockedGetPartnerId.mockResolvedValue(PARTNER);
+      mockedMoodSyncService.fetchMoods.mockResolvedValue([
+        serverRecord,
+        { ...(serverRecord as object), id: 'no-time', created_at: null } as never,
+      ]);
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      await get().fetchPartnerMoods(30);
+
+      expect(get().partnerMoods.map((m) => m.supabaseId)).toEqual(['server-1']);
+    });
+
+    it('shows and saves nothing when the account changed during the copy read', async () => {
+      let settleCopy: (value: unknown) => void = () => {};
+      mockedReadLocalCopy.mockReturnValue(new Promise((resolve) => (settleCopy = resolve)) as never);
+
+      const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      const inFlight = get().fetchPartnerMoods(30);
+      set({ userId: 'user-B', authSessionVersion: 2, partnerMoods: [] } as never);
+      settleCopy([savedMood]);
+      await inFlight;
+
+      expect(get().partnerMoods).toEqual([]);
+      expect(mockedGetPartnerId).not.toHaveBeenCalled();
+      expect(mockedWriteLocalCopy).not.toHaveBeenCalled();
+    });
+
+    it('shows and saves nothing when the account changed during the server read', async () => {
+      mockedGetPartnerId.mockResolvedValue(PARTNER);
+      let settle: (rows: never[]) => void = () => {};
+      mockedMoodSyncService.fetchMoods.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+
+      const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      const inFlight = get().fetchPartnerMoods(30);
+      await vi.waitFor(() => expect(mockedMoodSyncService.fetchMoods).toHaveBeenCalled());
+      set({ userId: 'user-B', authSessionVersion: 2, partnerMoods: [] } as never);
+      settle([serverRecord]);
+      await inFlight;
+
+      expect(get().partnerMoods).toEqual([]);
+      expect(mockedWriteLocalCopy).not.toHaveBeenCalled();
+    });
+
+    it('an older call landing after a newer one writes nothing', async () => {
+      mockedGetPartnerId.mockResolvedValue(PARTNER);
+      let settleOld: (rows: never[]) => void = () => {};
+      mockedMoodSyncService.fetchMoods
+        .mockReturnValueOnce(new Promise((resolve) => (settleOld = resolve)))
+        .mockResolvedValueOnce([serverRecord]);
+
+      const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      const older = get().fetchPartnerMoods(30);
+      await vi.waitFor(() => expect(mockedMoodSyncService.fetchMoods).toHaveBeenCalledTimes(1));
+      await get().fetchPartnerMoods(30);
+      settleOld([]);
+      await older;
+
+      expect(get().partnerMoods.map((m) => m.supabaseId)).toEqual(['server-1']);
+      expect(mockedWriteLocalCopy).toHaveBeenCalledTimes(1);
     });
   });
 
