@@ -6,6 +6,9 @@ set -e
 
 # Cleanup function
 cleanup() {
+    # Keep Playwright's exit status; the echo below would overwrite $?
+    local status=$?
+
     echo -e "\n🧹 Cleaning up test processes..."
 
     # Kill all child processes
@@ -18,7 +21,7 @@ cleanup() {
     jobs -p | xargs -r kill -9 2>/dev/null || true
 
     echo "✓ Cleanup complete"
-    exit 0
+    exit "$status"
 }
 
 # Trap signals
