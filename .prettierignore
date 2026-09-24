@@ -1,0 +1,14 @@
+# Prettier formats only hand-written code. Everything is ignored first, then the
+# source folders and root config files are allowed back in; generated files are
+# ignored again at the end. See the Prettier rule under "Conventions that differ
+# from defaults" in AGENTS.md.
+/*
+!/src/
+!/tests/
+!/scripts/
+!/*.config.js
+!/*.config.ts
+
+src/types/database.types.ts
+tests/e2e-archive/
+**/*.md
