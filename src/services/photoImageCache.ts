@@ -21,6 +21,17 @@
  *   write fails. A failed download of one photo is logged and skipped; the
  *   next run retries it. A photo deleted while its image downloads is not
  *   cached (`cachePhotoImage` re-checks the list before every write).
+ * - Wi-Fi only unless the user allows mobile data. On a metered connection
+ *   (`navigator.connection.type === 'cellular'`, or the user's data-saver
+ *   `saveData`) the pass stops before its next download unless the device
+ *   preference "Download photos over mobile data" is on
+ *   (`photoDownloadPreference.ts`). The stopped session is held, and the fill
+ *   resumes through `requestPhotoImageFill` — never as a second run — when the
+ *   connection's `change` event reports an unmetered type or the preference is
+ *   turned on. A browser that reports neither (no `navigator.connection`, or
+ *   a missing or `'unknown'` type without `saveData`: Safari, Firefox, most
+ *   desktops) is not held: the fill runs on any connection. Only the fill is
+ *   held; a photo on screen is still downloaded by `usePhotoImage`.
  *
  * ## Storage refusal (eviction)
  *
@@ -47,6 +58,13 @@ import {
   readCachedImage,
   writeCachedImage,
 } from './imageCache';
+import {
+  type ConnectionInfo,
+  getConnection,
+  getPhotosOverMobileData,
+  onMeteredConnection,
+  subscribePhotosOverMobileData,
+} from './photoDownloadPreference';
 import { photoService, type SupabasePhoto } from './photoService';
 
 /** The fields of a photo row this module needs. */
@@ -73,6 +91,9 @@ export interface PhotoCacheSession {
 export type PhotoCacheWriteResult = 'cached' | 'refused' | 'failed' | 'stale' | 'removed';
 
 const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
+/** On mobile data (or data saver) and the user has not allowed the fill there. */
+const heldForMobileData = () => onMeteredConnection() && !getPhotosOverMobileData();
 
 /**
  * The storage path of the oldest photo in the list that is older than the
@@ -138,8 +159,44 @@ export async function cachePhotoImage(
   }
 }
 
+/** The session whose fill stopped for mobile data, resumed when allowed. */
+let held: PhotoCacheSession | null = null;
+let heldConnection: ConnectionInfo | null = null;
+let unsubscribePreference: (() => void) | null = null;
+
+function releaseHold(): void {
+  held = null;
+  unsubscribePreference?.();
+  unsubscribePreference = null;
+  heldConnection?.removeEventListener('change', resumeHeldFill);
+  heldConnection = null;
+}
+
+/** Keep `session` to resume, listening (once) for the conditions that allow it. */
+function holdFill(session: PhotoCacheSession): void {
+  held = session;
+  if (!unsubscribePreference) unsubscribePreference = subscribePhotosOverMobileData(resumeHeldFill);
+  const connection = getConnection();
+  if (connection && connection !== heldConnection && typeof connection.addEventListener === 'function') {
+    heldConnection?.removeEventListener('change', resumeHeldFill);
+    connection.addEventListener('change', resumeHeldFill);
+    heldConnection = connection;
+  }
+  logger.debug('[photoImageCache] On mobile data: the photo image fill waits for Wi-Fi');
+}
+
+function resumeHeldFill(): void {
+  if (!held || heldForMobileData()) return;
+  const session = held;
+  releaseHold();
+  if (!session.isCurrent()) return;
+  void requestPhotoImageFill(session);
+}
+
 /** One pass over the list as it was when the pass started. */
 async function fillPass(session: PhotoCacheSession): Promise<void> {
+  // A current pass supersedes any held one; it holds again if it has to.
+  if (session.isCurrent()) releaseHold();
   const list = session.photos().slice();
   for (const photo of list) {
     if (isOffline() || !session.isCurrent()) return;
@@ -149,6 +206,11 @@ async function fillPass(session: PhotoCacheSession): Promise<void> {
     if (!session.isCurrent()) return;
     if (cached) continue;
     if (isOffline()) return;
+    // Checked only before a download: reading what is cached costs no data.
+    if (heldForMobileData()) {
+      holdFill(session);
+      return;
+    }
 
     let blob: Blob;
     try {

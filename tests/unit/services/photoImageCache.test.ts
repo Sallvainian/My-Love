@@ -52,6 +52,7 @@ vi.mock('../../../src/services/photoService', () => ({
   photoService: { downloadPhoto: (path: string) => download(path) },
 }));
 
+import { setPhotosOverMobileData } from '../../../src/services/photoDownloadPreference';
 import {
   cachePhotoImage,
   requestPhotoImageFill,
@@ -356,5 +357,198 @@ describe('storage refusal', () => {
     expect(result).toBe('stale');
     expect(cache.writes).toEqual([]);
     expect(cache.deletes).toEqual([]);
+  });
+});
+
+/** `navigator.connection` as Chrome on Android exposes it. */
+class FakeConnection extends EventTarget {
+  constructor(
+    public type: string | undefined,
+    public saveData = false
+  ) {
+    super();
+  }
+  /** Change the reported connection and fire `change`, as the browser does. */
+  switchTo(type: string | undefined, saveData = this.saveData) {
+    this.type = type;
+    this.saveData = saveData;
+    this.dispatchEvent(new Event('change'));
+  }
+}
+
+function setConnection(connection: FakeConnection | undefined) {
+  Object.defineProperty(navigator, 'connection', { value: connection, configurable: true });
+}
+
+describe('mobile data', () => {
+  // Held sessions outlive a test in module state: each test's sessions die in
+  // afterEach, so a later preference or connection change cannot resume them.
+  let alive = true;
+  const live = (photos: () => readonly PhotoImageRef[]) => session(photos, () => alive);
+
+  beforeEach(() => {
+    alive = true;
+    setPhotosOverMobileData(false);
+  });
+
+  afterEach(() => {
+    alive = false;
+    // Releases any hold left by the test; its session is stale, so nothing runs.
+    setPhotosOverMobileData(true);
+    setPhotosOverMobileData(false);
+    setConnection(undefined);
+  });
+
+  it('downloads nothing on mobile data while the setting is off', async () => {
+    setConnection(new FakeConnection('cellular'));
+    const photos = list(3);
+    seed(photos[1].storage_path);
+
+    await requestPhotoImageFill(live(() => photos));
+
+    expect(download).not.toHaveBeenCalled();
+    expect(cache.writes).toEqual([]);
+  });
+
+  it('downloads on mobile data once the setting is on', async () => {
+    setConnection(new FakeConnection('cellular'));
+    setPhotosOverMobileData(true);
+    const photos = list(3);
+
+    await requestPhotoImageFill(live(() => photos));
+
+    expect(cache.writes).toEqual(photos.map((p) => p.storage_path));
+  });
+
+  it("treats the user's data saver like mobile data", async () => {
+    setConnection(new FakeConnection('wifi', true));
+
+    await requestPhotoImageFill(live(() => list(2)));
+
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('downloads when the browser does not report the connection', async () => {
+    setConnection(undefined);
+    const photos = list(2);
+
+    await requestPhotoImageFill(live(() => photos));
+
+    expect(cache.writes).toEqual(photos.map((p) => p.storage_path));
+  });
+
+  it("downloads when the reported type is missing or 'unknown'", async () => {
+    setConnection(new FakeConnection('unknown'));
+    await requestPhotoImageFill(live(() => list(1)));
+    setConnection(new FakeConnection(undefined));
+    await requestPhotoImageFill(live(() => [{ id: 'x', storage_path: 'owner/x.jpg' }]));
+
+    expect(cache.writes).toEqual(['owner/p0.jpg', 'owner/x.jpg']);
+  });
+
+  it('resumes when the connection changes to Wi-Fi', async () => {
+    const connection = new FakeConnection('cellular');
+    setConnection(connection);
+    const photos = list(3);
+    await requestPhotoImageFill(live(() => photos));
+    expect(download).not.toHaveBeenCalled();
+
+    // Still on mobile data: nothing yet.
+    connection.switchTo('cellular');
+    await Promise.resolve();
+    expect(download).not.toHaveBeenCalled();
+
+    connection.switchTo('wifi');
+
+    await vi.waitFor(() => expect(cache.writes).toEqual(photos.map((p) => p.storage_path)));
+  });
+
+  it('resumes when the setting is turned on', async () => {
+    setConnection(new FakeConnection('cellular'));
+    const photos = list(2);
+    await requestPhotoImageFill(live(() => photos));
+    expect(download).not.toHaveBeenCalled();
+
+    setPhotosOverMobileData(true);
+
+    await vi.waitFor(() => expect(cache.writes).toEqual(photos.map((p) => p.storage_path)));
+  });
+
+  it('stops before the next download when the device moves onto mobile data mid-pass', async () => {
+    const connection = new FakeConnection('wifi');
+    setConnection(connection);
+    const photos = list(3);
+    download.mockImplementationOnce(async (path) => {
+      connection.switchTo('cellular');
+      return new Blob([path]);
+    });
+
+    await requestPhotoImageFill(live(() => photos));
+
+    // The download in flight finishes and is kept; nothing more is fetched.
+    expect(cache.writes).toEqual([photos[0].storage_path]);
+    expect(download).toHaveBeenCalledTimes(1);
+
+    connection.switchTo('wifi');
+    await vi.waitFor(() => expect(cache.writes).toEqual(photos.map((p) => p.storage_path)));
+    expect(download).toHaveBeenCalledTimes(3);
+  });
+
+  it('never resumes a session that is no longer current', async () => {
+    const connection = new FakeConnection('cellular');
+    setConnection(connection);
+    let current = true;
+    await requestPhotoImageFill(session(() => list(2), () => current));
+
+    current = false;
+    connection.switchTo('wifi');
+    setPhotosOverMobileData(true);
+    await Promise.resolve();
+
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('keeps at most one listener, and none once the fill resumes', async () => {
+    const connection = new FakeConnection('cellular');
+    const listening = new Set<EventListenerOrEventListenerObject | null>();
+    const add = connection.addEventListener.bind(connection);
+    const remove = connection.removeEventListener.bind(connection);
+    vi.spyOn(connection, 'addEventListener').mockImplementation((type, listener) => {
+      listening.add(listener);
+      add(type, listener);
+    });
+    vi.spyOn(connection, 'removeEventListener').mockImplementation((type, listener) => {
+      listening.delete(listener);
+      remove(type, listener);
+    });
+    setConnection(connection);
+
+    // Two held fills: still one listener.
+    await requestPhotoImageFill(live(() => list(1)));
+    await requestPhotoImageFill(live(() => list(1)));
+    expect(listening.size).toBe(1);
+
+    connection.switchTo('wifi');
+    await vi.waitFor(() => expect(cache.writes).toEqual(['owner/p0.jpg']));
+    expect(listening.size).toBe(0);
+  });
+
+  it('a resume while the resumed fill runs does not start a second one', async () => {
+    const connection = new FakeConnection('cellular');
+    setConnection(connection);
+    const photos = list(2);
+    await requestPhotoImageFill(live(() => photos));
+
+    const gate = deferred<Blob>();
+    download.mockImplementationOnce(() => gate.promise);
+    setPhotosOverMobileData(true);
+    await vi.waitFor(() => expect(download).toHaveBeenCalledTimes(1));
+
+    // Wi-Fi arrives while the resumed fill's first download is in flight.
+    connection.switchTo('wifi');
+    gate.resolve(new Blob(['p0']));
+
+    await vi.waitFor(() => expect(cache.writes).toEqual(photos.map((p) => p.storage_path)));
+    expect(download.mock.calls.map(([path]) => path)).toEqual(photos.map((p) => p.storage_path));
   });
 });
