@@ -25,7 +25,6 @@ import {
 import {
   getNextAnniversaryDate,
   getUpcomingAnniversaries,
-  shouldTriggerCelebration,
 } from '../../utils/countdownService';
 import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
 
@@ -64,7 +63,10 @@ export function CountdownTimer({
       return upcomingAnniversaries.map((anniversary) => {
         const nextDate = getNextAnniversaryDate(anniversary.date);
         const remaining = getCountdownToDay(nextDate);
-        const shouldCelebrate = shouldTriggerCelebration(nextDate);
+        // The day has come exactly when the clock has nothing left to count,
+        // so the card flips and the animation starts at midnight, not in the
+        // last minute before it.
+        const shouldCelebrate = remaining === null;
 
         return {
           anniversary,
@@ -159,8 +161,8 @@ interface AnniversaryCardProps {
 }
 
 function AnniversaryCard({ countdown, isCelebrating }: AnniversaryCardProps) {
-  const { anniversary, remaining, shouldCelebrate } = countdown;
-  const celebrating = shouldCelebrate || !remaining;
+  const { anniversary, remaining } = countdown;
+  const celebrating = !remaining;
 
   return (
     <>
