@@ -22,15 +22,14 @@
  *   next run retries it. A photo deleted while its image downloads is not
  *   cached (`cachePhotoImage` re-checks the list before every write).
  * - Wi-Fi only unless the user allows mobile data. On a metered connection
- *   (`navigator.connection.type === 'cellular'`, or the user's data-saver
- *   `saveData`) the pass stops before its next download unless the device
+ *   (`navigator.connection.type === 'cellular'`) the pass stops before its next download unless the device
  *   preference "Download photos over mobile data" is on
  *   (`photoDownloadPreference.ts`). The stopped session is held, and the fill
  *   resumes through `requestPhotoImageFill` — never as a second run — when the
  *   connection's `change` event reports an unmetered type or the preference is
- *   turned on. A browser that reports neither (no `navigator.connection`, or
- *   a missing or `'unknown'` type without `saveData`: Safari, Firefox, most
- *   desktops) is not held: the fill runs on any connection. Only the fill is
+ *   turned on. A browser that does not report the type (no
+ *   `navigator.connection`, or a missing or `'unknown'` type: Safari, Firefox,
+ *   most desktops) is not held: the fill runs on any connection. Only the fill is
  *   held; a photo on screen is still downloaded by `usePhotoImage`.
  *
  * ## Storage refusal (eviction)
@@ -123,7 +122,7 @@ function announceCached(userId: string, path: string): void {
   }
 }
 
-/** On mobile data (or data saver) and the user has not allowed the fill there. */
+/** On mobile data and the user has not allowed the fill there. */
 const heldForMobileData = () => onMeteredConnection() && !getPhotosOverMobileData();
 
 /**

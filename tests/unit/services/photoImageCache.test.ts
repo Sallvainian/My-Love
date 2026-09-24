@@ -363,16 +363,12 @@ describe('storage refusal', () => {
 
 /** `navigator.connection` as Chrome on Android exposes it. */
 class FakeConnection extends EventTarget {
-  constructor(
-    public type: string | undefined,
-    public saveData = false
-  ) {
+  constructor(public type: string | undefined) {
     super();
   }
   /** Change the reported connection and fire `change`, as the browser does. */
-  switchTo(type: string | undefined, saveData = this.saveData) {
+  switchTo(type: string | undefined) {
     this.type = type;
-    this.saveData = saveData;
     this.dispatchEvent(new Event('change'));
   }
 }
@@ -421,12 +417,13 @@ describe('mobile data', () => {
     expect(cache.writes).toEqual(photos.map((p) => p.storage_path));
   });
 
-  it("treats the user's data saver like mobile data", async () => {
-    setConnection(new FakeConnection('wifi', true));
+  it('downloads on Wi-Fi', async () => {
+    setConnection(new FakeConnection('wifi'));
+    const photos = list(2);
 
-    await requestPhotoImageFill(live(() => list(2)));
+    await requestPhotoImageFill(live(() => photos));
 
-    expect(download).not.toHaveBeenCalled();
+    expect(cache.writes).toEqual(photos.map((p) => p.storage_path));
   });
 
   it('downloads when the browser does not report the connection', async () => {

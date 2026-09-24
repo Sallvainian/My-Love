@@ -127,6 +127,8 @@ describe('PhotoGridItem after an online download failure', () => {
     downloadPhoto.mockRejectedValueOnce(new Error('Failed to download photo: 503'));
     const tile = renderTile();
     await waitFor(() => expect(within(tile).getByTestId('photo-grid-item-not-saved')).toBeInTheDocument());
+    // Let the error state's effects run, so the tile is listening for the cache.
+    await act(async () => {});
 
     // The fill runs (a list refresh) and stores this photo's image.
     downloadPhoto.mockResolvedValue(new Blob(['IMAGE']));

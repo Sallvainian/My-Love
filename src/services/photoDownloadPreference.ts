@@ -54,7 +54,6 @@ export function subscribePhotosOverMobileData(listener: () => void): () => void 
 /** The Network Information API fields this app reads; absent on Safari and Firefox. */
 export interface ConnectionInfo extends EventTarget {
   type?: string;
-  saveData?: boolean;
 }
 
 /** `navigator.connection`, or null where the browser does not expose it. */
@@ -65,25 +64,19 @@ export function getConnection(): ConnectionInfo | null {
 
 /**
  * Whether this browser tells the app enough to keep the fill off mobile data:
- * it reports the connection type (Chrome on Android does), or the user's
- * data-saver request, which holds the fill on any connection. Where it is
- * false the fill runs on any connection, and Settings says so.
+ * it reports the connection type (Chrome on Android does). Where it is false
+ * the fill runs on any connection, and Settings says so.
  */
 export function canTellMobileData(): boolean {
-  const connection = getConnection();
-  if (!connection) return false;
-  const type = connection.type;
-  return (!!type && type !== 'unknown') || connection.saveData === true;
+  const type = getConnection()?.type;
+  return !!type && type !== 'unknown';
 }
 
 /**
  * Whether the connection is one the background fill must not use without the
- * user's permission: mobile data (`type === 'cellular'`), or the user's own
- * data-saver request (`saveData`). A browser that reports neither is treated as
- * unmetered, so the fill runs as before.
+ * user's permission: mobile data (`type === 'cellular'`). A browser that does
+ * not report the type is treated as unmetered, so the fill runs as before.
  */
 export function onMeteredConnection(): boolean {
-  const connection = getConnection();
-  if (!connection) return false;
-  return connection.type === 'cellular' || connection.saveData === true;
+  return getConnection()?.type === 'cellular';
 }

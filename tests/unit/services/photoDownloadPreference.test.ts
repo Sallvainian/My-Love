@@ -70,7 +70,7 @@ describe('the choice', () => {
 });
 
 describe('the connection', () => {
-  it('is metered on mobile data or with data saver, and unmetered otherwise', async () => {
+  it('is metered on mobile data only, and unmetered otherwise', async () => {
     const { onMeteredConnection, canTellMobileData } = await freshModule();
 
     setConnection(undefined);
@@ -85,8 +85,8 @@ describe('the connection', () => {
     setConnection({ type: 'cellular' });
     expect([onMeteredConnection(), canTellMobileData()]).toEqual([true, true]);
 
-    // Data saver with no type (desktop Chrome): held on every connection.
+    // Data saver is not a connection type: without one the fill runs as before.
     setConnection({ saveData: true });
-    expect([onMeteredConnection(), canTellMobileData()]).toEqual([true, true]);
+    expect([onMeteredConnection(), canTellMobileData()]).toEqual([false, false]);
   });
 });
