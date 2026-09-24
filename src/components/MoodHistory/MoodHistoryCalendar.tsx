@@ -41,6 +41,10 @@ export function MoodHistoryCalendar() {
   // The moods store is shared by every account that has signed in on this
   // device, so the range query has to be scoped to the current user.
   const userId = useAppStore((s) => s.userId);
+  // The calendar reads IndexedDB, not this array; it is watched only as the
+  // signal that the store changed (a logged mood, a sync, the server backfill),
+  // so the shown month is read again without a month change.
+  const storeMoods = useAppStore((s) => s.moods);
 
   // Current month/year state
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
@@ -57,6 +61,12 @@ export function MoodHistoryCalendar() {
   // Task 9: Navigation debounce to prevent rapid month changes
   const navDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const renderStartTimeRef = useRef<number>(0);
+  // Only the latest read may set state, so a slow read of an older month (or
+  // an older store version) cannot land over a newer one.
+  const loadSeqRef = useRef(0);
+  // The month/user last read. A re-read of the same month (a store change)
+  // keeps the grid on screen instead of flashing the loading skeleton.
+  const shownKeyRef = useRef<string | null>(null);
 
   /**
    * Load moods for visible month
@@ -66,19 +76,24 @@ export function MoodHistoryCalendar() {
    */
   const loadMoodsForMonth = useCallback(
     async (year: number, month: number) => {
+    const seq = ++loadSeqRef.current;
     if (!userId) {
+      shownKeyRef.current = null;
       setMoods([]);
       setMoodMap(new Map());
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    const key = `${userId}|${year}-${month}`;
+    if (shownKeyRef.current !== key) setIsLoading(true);
     const queryStart = performance.now();
 
     try {
       const { startOfMonth, endOfMonth } = getMonthBoundaries(year, month);
       const fetchedMoods = await moodService.getMoodsInRange(startOfMonth, endOfMonth, userId);
+      if (seq !== loadSeqRef.current) return;
+      shownKeyRef.current = key;
 
       const queryTime = performance.now() - queryStart;
 
@@ -95,16 +110,18 @@ export function MoodHistoryCalendar() {
       logger.debug(`[MoodHistoryCalendar] Query time: ${queryTime.toFixed(2)}ms (target: <100ms)`);
     } catch (error) {
       console.error('[MoodHistoryCalendar] Failed to load moods:', error);
+      if (seq !== loadSeqRef.current) return;
+      shownKeyRef.current = null;
       setMoods([]);
       setMoodMap(new Map());
     } finally {
-      setIsLoading(false);
+      if (seq === loadSeqRef.current) setIsLoading(false);
     }
     },
     [userId]
   );
 
-  // Load moods when month changes
+  // Load moods when the month, the user or the store's moods change
   useEffect(() => {
     // loadMoodsForMonth flips isLoading before its first await, and clears the mood state
     // outright when nobody is signed in. Both are the synchronous setState the rule objects
@@ -122,7 +139,7 @@ export function MoodHistoryCalendar() {
     // that would catch a regression, so it is not a change to make in a lint sweep.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- store read lifecycle, see above
     loadMoodsForMonth(currentYear, currentMonth);
-  }, [currentYear, currentMonth, loadMoodsForMonth]);
+  }, [currentYear, currentMonth, loadMoodsForMonth, storeMoods]);
 
   /**
    * Navigate to previous month

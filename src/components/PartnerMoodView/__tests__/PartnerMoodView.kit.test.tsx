@@ -3,7 +3,8 @@
  *
  * Several moods -> newest in "Feeling right now", the rest as Recent moods
  * rows; one mood -> the current card alone; no moods -> the empty-state card;
- * offline -> "Offline" subtitle, disabled refresh, offline notice.
+ * offline -> "Offline" subtitle, disabled refresh; the offline notice only when
+ * no moods are listed (a saved copy is shown without it).
  */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -144,15 +145,36 @@ describe('PartnerMoodView on the kit', () => {
     expect(screen.queryByTestId('partner-mood-list')).not.toBeInTheDocument();
   });
 
-  it('reads Offline, disables refresh and shows the offline notice when offline', () => {
-    state = makeState({ syncStatus: { isOnline: false }, partnerMoods: SEVERAL });
+  it('reads Offline, disables refresh and shows the offline notice when offline with no moods', async () => {
+    let finishRead: () => void = () => {};
+    state = makeState({
+      syncStatus: { isOnline: false },
+      fetchPartnerMoods: vi.fn(() => new Promise<void>((resolve) => (finishRead = resolve))),
+    });
     render(<PartnerMoodView />);
 
     expect(screen.getByTestId('realtime-connection-status')).toHaveTextContent(/^Offline$/);
     expect(screen.getByTestId('partner-mood-refresh-button')).toBeDisabled();
-    expect(screen.getByTestId('partner-mood-offline-notice')).toHaveTextContent(
+    // Not while the saved copy is still being read: it may fill the list.
+    expect(screen.queryByTestId('partner-mood-offline-notice')).not.toBeInTheDocument();
+    await act(async () => finishRead());
+    expect(await screen.findByTestId('partner-mood-offline-notice')).toHaveTextContent(
       "You're offline. Partner moods will load when you reconnect."
     );
+    expect(await screen.findByTestId('partner-mood-empty-state')).toBeInTheDocument();
+  });
+
+  it('offline with saved moods lists them without the offline notice or empty state', async () => {
+    state = makeState({ syncStatus: { isOnline: false }, partnerMoods: SEVERAL });
+    render(<PartnerMoodView />);
+
+    // The saved copy is read offline too.
+    await waitFor(() => expect(state.fetchPartnerMoods).toHaveBeenCalledWith(30));
+    expect(screen.getByTestId('realtime-connection-status')).toHaveTextContent(/^Offline$/);
+    expect(screen.getByTestId('partner-mood-refresh-button')).toBeDisabled();
+    expect(screen.getAllByTestId('partner-mood-card').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('partner-mood-offline-notice')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('partner-mood-empty-state')).not.toBeInTheDocument();
   });
 
   it('keeps emoji out of the view chrome', () => {

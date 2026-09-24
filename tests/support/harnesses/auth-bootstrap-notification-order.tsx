@@ -11,6 +11,7 @@ import {
   COUPLE_SETTINGS_COPY_KIND,
   PROFILE_COPY_KIND,
 } from '../../../src/stores/slices/settingsSlice';
+import { MOOD_HISTORY_KIND } from '../../../src/stores/slices/moodSlice';
 import { formatDateISO } from '../../../src/utils/dateUtils';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import {
@@ -196,16 +197,20 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     anniversariesService.fetchAnniversaries = async () => [];
     // Same reason for the couple-settings refresher, one step earlier: its
     // partner lookup (`lookupPartnerId`) calls supabase.auth.getSession
-    // directly — and for the profile refresher, whose read does too. Replaced
-    // with no-ops for the harness's lifetime; dispose puts the store's own
-    // refreshers back.
+    // directly — and for the profile and mood-history refreshers, whose reads
+    // do too (and whose fake-token requests PostgREST answers with 401).
+    // Replaced with no-ops for the harness's lifetime; dispose puts the
+    // store's own refreshers back.
     const unregisterNoop = registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, async () => {});
     const unregisterProfileNoop = registerLocalCopy(PROFILE_COPY_KIND, async () => {});
+    const unregisterMoodHistoryNoop = registerLocalCopy(MOOD_HISTORY_KIND, async () => {});
     restoreCoupleSettingsRefresher = () => {
       unregisterNoop();
       unregisterProfileNoop();
+      unregisterMoodHistoryNoop();
       registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => useAppStore.getState().loadCoupleSettings());
       registerLocalCopy(PROFILE_COPY_KIND, () => useAppStore.getState().loadOwnProfile());
+      registerLocalCopy(MOOD_HISTORY_KIND, () => useAppStore.getState().loadMoodHistoryFromServer());
     };
     localStorage.setItem('lastWelcomeView', String(Date.now()));
     useAppStore.setState({
