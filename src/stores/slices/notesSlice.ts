@@ -41,6 +41,9 @@
  *   one note at a time, under `withSyncLock(NOTE_QUEUE_LOCK)`, reusing each
  *   note's `tempId` as `idempotency_key`. It runs after each enqueue, and from
  *   `App.tsx` on start, on the `online` event and on the 5-minute interval.
+ *   A pass that stops on a transient failure while online is retried after
+ *   5 s, 10 s, 20 s, 40 s, then every 60 s, one timer at a time, until a pass
+ *   completes; a change of account or session cancels the timer.
  *   A drain that finds the lock held waits for its holder, then passes again.
  *   After each pass, a queued note on screen whose row has left the queue
  *   (another tab of the account sent it) is confirmed from its stored row, and
@@ -125,6 +128,17 @@ export const IMAGE_NOTE_NEEDS_CONNECTION = 'A note with a picture needs a connec
  * catches it, keeps what was typed and shows its own error.
  */
 class NoteNotAcceptedError extends Error {}
+
+/** What one drain pass ended on (see `drainOnce`). */
+type DrainPassOutcome = 'done' | 'transient' | 'stale';
+
+/**
+ * After a pass stops on a transient failure while online, the drain runs
+ * again after 5 s, 10 s, 20 s and 40 s, then every 60 s, until a pass
+ * completes. Offline, the `online` event triggers it instead.
+ */
+const NOTE_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 40_000];
+const NOTE_RETRY_MAX_DELAY_MS = 60_000;
 
 /** `navigator.onLine` says the device is offline for certain. */
 function knownOffline(): boolean {
@@ -385,7 +399,7 @@ async function insertNoteOnce(payload: {
   return { data: (existing.data as LoveNote) ?? null, error: existing.error };
 }
 
-export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) => {
+export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => {
   /**
    * The auth lifetime whose thread already came from the server or a confirmed
    * change. The saved copy is applied only before that, so a copy read landing
@@ -542,10 +556,13 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
    * One pass over the signed-in account's queue, holding NOTE_QUEUE_LOCK.
    * Sends the oldest pending row, then re-reads the queue, so a note enqueued
    * during the run is still sent. Each row is tried at most once per pass.
+   * Answers `done` when every pending row was tried and none failed
+   * transiently, `transient` when it stopped on a transient failure, and
+   * `stale` when there is no session or it ended during the pass.
    */
-  const drainOnce = async (): Promise<void> => {
+  const drainOnce = async (): Promise<DrainPassOutcome> => {
     const { userId, authSessionVersion } = get();
-    if (!userId) return;
+    if (!userId) return 'stale';
     const owns = () => ownsSession(userId, authSessionVersion);
     const tried = new Set<string>();
     // A CHECK banner this pass raised stays up while later notes send: it
@@ -556,9 +573,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       const next = (await listQueuedNotes(userId)).find(
         (row) => !row.failed && !tried.has(row.id)
       );
-      if (!next) return;
+      if (!next) return 'done';
       // Re-checked before the insert: a stale session sends nothing.
-      if (!owns()) return;
+      if (!owns()) return 'stale';
       tried.add(next.id);
       patchNote(next.id, { sending: true, error: false });
 
@@ -618,7 +635,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         } catch (markError) {
           console.error('[NotesSlice] Failed to mark a queued note failed:', markError);
         }
-        if (!owns()) return;
+        if (!owns()) return 'stale';
         if (isPostgrestError(error) && error.code === '23514') {
           set({ notesError: handleSupabaseError(error).message });
           raisedCheckBanner = true;
@@ -630,11 +647,55 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
 
       // Anything else (offline, timeout, expired token): keep the row pending
       // and stop; order is kept, and the next trigger retries it.
-      if (owns()) patchNote(next.id, { sending: false });
+      if (!owns()) return 'stale';
+      patchNote(next.id, { sending: false });
       logger.debug('[NotesSlice] Queued note not sent; retrying later:', error);
-      return;
+      return 'transient';
     }
   };
+
+  /**
+   * The retry after a pass stops on a transient failure while online, so a
+   * note does not wait for the `online` event or the 5-minute interval. One
+   * timer at a time; `retryAttempt` picks its delay from NOTE_RETRY_DELAYS_MS
+   * and resets on a completed pass. `retryFor` is the session it was set for:
+   * any change of account or session cancels it (the subscription below), and
+   * a timer that fires anyway re-checks the session before draining.
+   */
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let retryAttempt = 0;
+  let retryFor: { userId: string; authSessionVersion: number } | null = null;
+
+  const cancelDrainRetry = () => {
+    if (retryTimer !== null) clearTimeout(retryTimer);
+    retryTimer = null;
+    retryFor = null;
+    retryAttempt = 0;
+  };
+
+  const scheduleDrainRetry = (userId: string, authSessionVersion: number) => {
+    if (retryTimer !== null) return;
+    const delay = NOTE_RETRY_DELAYS_MS[retryAttempt] ?? NOTE_RETRY_MAX_DELAY_MS;
+    retryAttempt += 1;
+    retryFor = { userId, authSessionVersion };
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (!ownsSession(userId, authSessionVersion)) return;
+      void get().drainQueuedNotes();
+    }, delay);
+    logger.debug('[NotesSlice] Queued notes retry in', delay, 'ms');
+  };
+
+  // Sign-out (`discardAccountState`) and an account switch both change the
+  // identity in one set(); the pending retry belongs to the old one.
+  api.subscribe((state) => {
+    if (
+      retryFor &&
+      (state.userId !== retryFor.userId || state.authSessionVersion !== retryFor.authSessionVersion)
+    ) {
+      cancelDrainRetry();
+    }
+  });
 
   /**
    * The drain running in this tab, if any. A drain asked for while one runs
@@ -1692,7 +1753,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     /**
      * Send the signed-in account's queued notes, oldest first (see
      * `drainOnce`). Called after each enqueue and by `App.tsx` on start, on
-     * the `online` event and on the 5-minute interval. Skipped while the
+     * the `online` event and on the 5-minute interval, and by its own
+     * backoff timer after a transient failure while online. Skipped while the
      * device is known to be offline. Never throws.
      */
     drainQueuedNotes: () => {
@@ -1706,11 +1768,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       const run = (async () => {
         // Yield first, so `drainInFlight` is set before this can finish.
         await Promise.resolve();
+        // What the last pass that ran ended on; decides the retry below.
+        let outcome: DrainPassOutcome | 'offline' | null = null;
         try {
           do {
             drainRequested = false;
             if (knownOffline()) {
               settleWaitingNotes();
+              outcome = 'offline';
               break;
             }
             // Whatever the pass did (sent, stopped on a transient failure,
@@ -1718,6 +1783,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
             // nothing is sending from this tab once it ends.
             const pass = await withSyncLock(NOTE_QUEUE_LOCK, drainOnce);
             settleWaitingNotes();
+            if (pass.ran) outcome = pass.result;
             if (!pass.ran) {
               // Another context holds the queue and may send this tab's notes.
               // Once it lets go, pass again: that sends what it left and
@@ -1733,6 +1799,15 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
               await confirmNotesSentElsewhere();
             }
           } while (drainRequested);
+
+          // A transient stop while online retries on a backoff; a completed
+          // pass resets it. Known offline, the `online` event drains instead.
+          const { userId, authSessionVersion } = get();
+          if (outcome === 'done' || outcome === 'offline') {
+            cancelDrainRetry();
+          } else if (outcome === 'transient' && userId && !knownOffline()) {
+            scheduleDrainRetry(userId, authSessionVersion);
+          }
         } catch (error) {
           console.error('[NotesSlice] Note queue drain failed:', error);
         } finally {
