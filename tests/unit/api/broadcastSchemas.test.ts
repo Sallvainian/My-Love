@@ -69,6 +69,23 @@ describe('parseLoveNoteBroadcast', () => {
     expect(parsed).toMatchObject({ image_url: 'love-notes/abc.jpg', idempotency_key: 'key-1' });
   });
 
+  it('keeps written_at, and still accepts a note from a client that sends none', () => {
+    const written = '2026-09-12T08:00:00.000000+00:00';
+    expect(parseLoveNoteBroadcast(note({ written_at: written }), identity)).toMatchObject({
+      written_at: written,
+    });
+    expect(parseLoveNoteBroadcast(note({ written_at: null }), identity)).toMatchObject({
+      written_at: null,
+    });
+    const older = parseLoveNoteBroadcast(note(), identity);
+    expect(older).not.toBeNull();
+    expect(older).not.toHaveProperty('written_at');
+  });
+
+  it('drops a note whose written_at is not a timestamp', () => {
+    expect(parseLoveNoteBroadcast(note({ written_at: 'yesterday' }), identity)).toBeNull();
+  });
+
   it('strips a forged imagePreviewUrl', () => {
     const parsed = parseLoveNoteBroadcast(
       note({ imagePreviewUrl: 'https://attacker.example/x.png' }),

@@ -26,6 +26,7 @@ interface Row {
   image_url: string | null;
   idempotency_key: string;
   created_at: string;
+  written_at?: string | null;
 }
 
 type Outcome =
@@ -179,6 +180,9 @@ type TestStore = NotesSlice & {
   partner: { id: string } | null;
 };
 
+/** Every store a test made; signed out after it, which cancels any retry timer. */
+const liveStores: Array<{ setState: (partial: Partial<TestStore>) => void; getState: () => TestStore }> = [];
+
 function createTestStore(options: { partnerLoaded?: boolean; userId?: string } = {}) {
   const store = create<TestStore>()(createNotesSlice as unknown as StateCreator<TestStore>);
   store.setState({
@@ -186,6 +190,7 @@ function createTestStore(options: { partnerLoaded?: boolean; userId?: string } =
     authSessionVersion: 1,
     partner: options.partnerLoaded === false ? null : { id: PARTNER },
   });
+  liveStores.push(store);
   return store;
 }
 type Store = ReturnType<typeof createTestStore>;
@@ -274,6 +279,12 @@ describe('notesSlice offline send queue', () => {
   });
 
   afterEach(() => {
+    // A transient failure leaves a retry timer; it must not drain the next
+    // test's queue.
+    for (const store of liveStores.splice(0)) {
+      store.setState({ userId: null, authSessionVersion: store.getState().authSessionVersion + 1 });
+    }
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -320,6 +331,34 @@ describe('notesSlice offline send queue', () => {
       [`love-notes:${PARTNER}`, 'two'],
       [`love-notes:${PARTNER}`, 'three'],
     ]);
+  });
+
+  it('a queued note is sent with its composition time as written_at, and keeps it in state and copy', async () => {
+    const store = createTestStore();
+    setOnline(false);
+    await store.getState().sendNote('written offline');
+    const composedAt = (await listQueuedNotes(A))[0].createdAt;
+    expect(store.getState().notes[0].created_at).toBe(composedAt);
+
+    setOnline(true);
+    await store.getState().drainQueuedNotes();
+
+    expect(server.rows).toEqual([expect.objectContaining({ content: 'written offline', written_at: composedAt })]);
+    // created_at stays the server's delivery time.
+    expect(store.getState().notes[0]).toMatchObject({
+      id: 'server-1',
+      created_at: server.rows[0].created_at,
+      written_at: composedAt,
+    });
+    await flush();
+    const copy = await readLocalCopy<Array<{ id: string; written_at?: string | null }>>(A, LOVE_NOTES_COPY_KIND);
+    expect(copy).toEqual([expect.objectContaining({ id: 'server-1', written_at: composedAt })]);
+
+    // A reload reads it back from the copy.
+    const reloaded = createTestStore();
+    server.lookup = { status: 'error', reason: 'TypeError: Failed to fetch' };
+    await reloaded.getState().fetchNotes();
+    expect(reloaded.getState().notes[0]).toMatchObject({ id: 'server-1', written_at: composedAt });
   });
 
   it('reconnect: a network failure stops the run and leaves the rest pending', async () => {
@@ -499,6 +538,53 @@ describe('notesSlice offline send queue', () => {
     await flush();
     const copy = (await readLocalCopy<{ id: string }[]>(A, LOVE_NOTES_COPY_KIND))?.map((n) => n.id);
     expect(copy).toContain('server-2');
+  });
+
+  it('another tab sends this tab\'s waiting note and the server rejects it: this tab shows it failed, with Retry', async () => {
+    stubWebLocks();
+    const tab1 = createTestStore();
+    const tab2 = createTestStore();
+    // Tab 1 holds the lock mid-insert of its own note; tab 2's note is refused.
+    const reply = deferred();
+    server.outcomes = [{ hold: reply.promise }, { reject: '23514' }];
+    await tab1.getState().sendNote('from tab1');
+    await vi.waitFor(() => expect(server.upserts).toBe(1));
+
+    // Tab 2's drain loses the lock, so its note waits.
+    await tab2.getState().sendNote('from tab2');
+    await vi.waitFor(() =>
+      expect(tab2.getState().notes[0]).toMatchObject({ content: 'from tab2', queued: true, sending: false })
+    );
+    const key = tab2.getState().notes[0].tempId!;
+
+    // Tab 1 re-reads the shared queue, sends tab 2's note, and it is rejected.
+    reply.resolve();
+    await tab1.getState().drainQueuedNotes();
+    expect(server.rows.map((r) => r.content)).toEqual(['from tab1']);
+    expect(await listQueuedNotes(A)).toEqual([expect.objectContaining({ id: key, failed: true })]);
+
+    // No further trigger: tab 2 shows it failed once tab 1's drain lets go,
+    // exactly as its own drain marks a rejection, and raises no banner.
+    await vi.waitFor(() =>
+      expect(tab2.getState().notes[0]).toMatchObject({
+        tempId: key,
+        queued: true,
+        sending: false,
+        error: true,
+      })
+    );
+    expect(tab2.getState().notesError).toBeNull();
+    await tab2.getState().drainQueuedNotes();
+    expect(server.upserts).toBe(2);
+
+    // Retry from tab 2 resends it under the same key.
+    await tab2.getState().retryFailedMessage(key);
+    expect(server.rows.map((r) => [r.content, r.idempotency_key])).toEqual([
+      ['from tab1', expect.any(String)],
+      ['from tab2', key],
+    ]);
+    expect(tab2.getState().notes[0]).toMatchObject({ id: 'server-2', error: false });
+    expect(await queuedIds()).toEqual([]);
   });
 
   it('a note composed while this tab waits for another tab\'s drain shows waiting, not sending', async () => {
@@ -796,6 +882,135 @@ describe('notesSlice offline send queue', () => {
         '[NotesSlice] Broadcast failed (non-fatal):',
         expect.any(Error)
       );
+    });
+  });
+
+  describe('retry after a transient failure while online', () => {
+    /** Yields to IndexedDB (setImmediate, not faked) until `cond` holds. */
+    async function until(cond: () => boolean) {
+      for (let i = 0; i < 1000 && !cond(); i++) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      expect(cond()).toBe(true);
+    }
+
+    /** One note queued offline, then a single online pass that fails transiently. */
+    async function failOnce(store: Store, failures: number) {
+      server.outcomes = Array.from({ length: failures }, () => 'network' as const);
+      setOnline(false);
+      await store.getState().sendNote('retried');
+      setOnline(true);
+      await store.getState().drainQueuedNotes();
+      expect(server.upserts).toBe(1);
+      expect(vi.getTimerCount()).toBe(1);
+    }
+
+    /** The retry is due after exactly `delay` ms: not a millisecond before. */
+    async function expectRetryAfter(delay: number, upserts: number) {
+      await vi.advanceTimersByTimeAsync(delay - 1);
+      expect(server.upserts).toBe(upserts - 1);
+      await vi.advanceTimersByTimeAsync(1);
+      await until(() => server.upserts === upserts);
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    });
+
+    it('a transient failure is retried after 5 s without any other trigger', async () => {
+      const store = createTestStore();
+      await failOnce(store, 1);
+
+      await expectRetryAfter(5_000, 2);
+
+      await until(() => store.getState().notes[0]?.id === 'server-1');
+      expect(server.rows.map((r) => r.content)).toEqual(['retried']);
+      expect(await queuedIds()).toEqual([]);
+      // The completed pass leaves no timer behind.
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('backs off 5, 10, 20, 40, then every 60 s, and resets after a completed pass', async () => {
+      const store = createTestStore();
+      await failOnce(store, 7);
+
+      let upserts = 1;
+      for (const delay of [5_000, 10_000, 20_000, 40_000, 60_000, 60_000, 60_000]) {
+        upserts += 1;
+        await expectRetryAfter(delay, upserts);
+        if (upserts <= 7) await until(() => vi.getTimerCount() === 1);
+      }
+      await until(() => store.getState().notes[0]?.id === 'server-1');
+      await until(() => vi.getTimerCount() === 0);
+
+      // The next transient failure starts from 5 s again.
+      server.upserts = 0;
+      await failOnce(store, 1);
+      await expectRetryAfter(5_000, 2);
+    });
+
+    it('keeps one timer at a time', async () => {
+      const store = createTestStore();
+      await failOnce(store, 3);
+
+      server.outcomes = ['network'];
+      await store.getState().drainQueuedNotes();
+      expect(server.upserts).toBe(2);
+      expect(vi.getTimerCount()).toBe(1);
+    });
+
+    it('does not schedule a retry when the device is known offline as the pass ends', async () => {
+      const store = createTestStore();
+      const reply = deferred();
+      server.outcomes = [{ reject: '08006', hold: reply.promise }];
+      setOnline(false);
+      await store.getState().sendNote('dropped connection');
+      setOnline(true);
+
+      const run = store.getState().drainQueuedNotes();
+      await until(() => server.upserts === 1);
+      setOnline(false);
+      reply.resolve();
+      await run;
+
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(server.upserts).toBe(1);
+    });
+
+    it('a retry that finds the device offline stops and leaves the online event to drain', async () => {
+      const store = createTestStore();
+      await failOnce(store, 1);
+
+      setOnline(false);
+      await vi.advanceTimersByTimeAsync(5_000);
+      await until(() => vi.getTimerCount() === 0);
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(server.upserts).toBe(1);
+    });
+
+    it('sign-out cancels the retry, so nothing is drained for anyone', async () => {
+      const store = createTestStore();
+      await failOnce(store, 1);
+
+      store.setState({ userId: null, authSessionVersion: 2, notes: [] });
+
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(server.upserts).toBe(1);
+      expect(await queuedIds()).toHaveLength(1);
+    });
+
+    it("an account switch cancels the retry: B's session never drains on A's timer", async () => {
+      const store = createTestStore();
+      await failOnce(store, 1);
+
+      store.setState({ userId: B, authSessionVersion: 2, notes: [] });
+
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(server.upserts).toBe(1);
+      expect(await queuedIds(A)).toHaveLength(1);
     });
   });
 
