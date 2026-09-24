@@ -44,6 +44,16 @@
  * images can never be evicted. There is no count or size cap and no eviction
  * without a refusal.
  *
+ * The refused photo is remembered (its account and storage path, for the
+ * signed-in session that met the refusal), and a later pass that reaches it
+ * uncached stops there BEFORE downloading it, rather than fetching a full-size
+ * image only to be refused again. It is forgotten whenever room may have been
+ * freed: a photo image is deleted (the list prune and a photo delete, both
+ * through `deletePhotoImages`, or an eviction), a photo image write succeeds,
+ * or the session ends (sign-out, or a different account). A refusal met after
+ * room was freed during its own search for a victim is not remembered. Only
+ * the fill consults it; a display still downloads the photo it has to show.
+ *
  * ## Cached notice
  *
  * Every successful write is announced to `onPhotoImageCached` listeners, so a
@@ -148,6 +158,48 @@ async function oldestCachedOlderPhoto(
 }
 
 /**
+ * The photo whose image storage last refused, with the account and the
+ * session that met the refusal. One is enough: the fill stops at a refusal,
+ * so it never reaches a photo behind it.
+ */
+let refused: { userId: string; path: string; isCurrent: () => boolean } | null = null;
+
+/**
+ * Counts the times room may have been freed. A write reads it before trying;
+ * a refusal is remembered only if it has not moved since, so room freed while
+ * the write searched for a victim is never overwritten by a stale refusal.
+ */
+let roomFreed = 0;
+
+/** Room may have been freed: a later pass downloads the refused photo again. */
+function forgetRefusal(): void {
+  refused = null;
+  roomFreed += 1;
+}
+
+/** Whether storage refused the image at `path` for this session's account. */
+function isRefused(session: PhotoCacheSession, path: string): boolean {
+  if (!refused) return false;
+  // Signed out, or another account: the refusal no longer applies.
+  if (refused.userId !== session.userId || !refused.isCurrent()) {
+    refused = null;
+    return false;
+  }
+  return refused.path === path;
+}
+
+/**
+ * Delete the cached images of the photos at `paths` for `userId` — the list
+ * prune and a photo delete. Throws, as `deleteCachedImages` does. The room it
+ * frees lets the fill try a refused photo again.
+ */
+export async function deletePhotoImages(userId: string, paths: readonly string[]): Promise<void> {
+  if (paths.length === 0) return;
+  await deleteCachedImages(userId, paths);
+  forgetRefusal();
+}
+
+/**
  * Cache `blob` as the image of the photo at `path`, applying the refusal rule:
  * on a storage refusal, drop the oldest cached photo older than this one and
  * retry, until it fits or none is left.
@@ -163,8 +215,10 @@ export async function cachePhotoImage(
     // Checked immediately before every write: a delete or prune can land in
     // any await before this one.
     if (!session.photos().some((photo) => photo.storage_path === path)) return 'removed';
+    const roomFreedBefore = roomFreed;
     try {
       await writeCachedImage(session.userId, path, blob);
+      forgetRefusal();
       announceCached(session.userId, path);
       return 'cached';
     } catch (error) {
@@ -175,6 +229,11 @@ export async function cachePhotoImage(
       const victim = await oldestCachedOlderPhoto(session, path, evicted);
       if (!victim) {
         logger.debug('[photoImageCache] Storage refused and no older photo image is cached');
+        // Room freed since this write was tried (a delete or prune during the
+        // search) may fit it: the next pass downloads it again.
+        if (roomFreed === roomFreedBefore) {
+          refused = { userId: session.userId, path, isCurrent: session.isCurrent };
+        }
         return 'refused';
       }
       if (!session.isCurrent()) return 'stale';
@@ -185,6 +244,7 @@ export async function cachePhotoImage(
         return 'failed';
       }
       evicted.add(victim);
+      forgetRefusal();
       logger.debug('[photoImageCache] Storage refused; dropped an older photo image');
     }
   }
@@ -237,6 +297,12 @@ async function fillPass(session: PhotoCacheSession): Promise<void> {
     if (!session.isCurrent()) return;
     if (cached) continue;
     if (isOffline()) return;
+    // Storage refused this image and no room has been freed since: downloading
+    // it again would only be refused again, so the pass stops as it did then.
+    if (isRefused(session, path)) {
+      logger.debug('[photoImageCache] Storage refused this photo image; waiting for room');
+      return;
+    }
     // Checked only before a download: reading what is cached costs no data.
     if (heldForMobileData()) {
       holdFill(session);

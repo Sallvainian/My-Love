@@ -63,7 +63,8 @@
  *   offline it is refused before anything is shown or uploaded. A confirmed
  *   send or resend of any note is broadcast to the partner.
  * - Note images are cached separately, per account and storage path, by
- *   `LoveNoteMessage` through `services/imageCache.ts`.
+ *   `LoveNoteMessage` through `services/imageCache.ts`. A confirmed
+ *   `removeNote` deletes that note's cached image.
  * - NOT persisted to localStorage. Sign-out deletes the outgoing account's
  *   copies and cached images, and `signedOutState()` resets the state. Its
  *   queued notes stay, and send when that account signs back in.
@@ -73,6 +74,7 @@ import { CHECK_CONSTRAINT_MESSAGE, handleSupabaseError, isPostgrestError } from 
 import { sendEphemeralBroadcast } from '../../api/ephemeralBroadcast';
 import { getPartnerId, lookupPartnerId, supabase } from '../../api/supabaseClient';
 import { NOTES_CONFIG } from '../../config/images';
+import { deleteCachedImages } from '../../services/imageCache';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
 import { deleteLoveNoteImage, uploadCompressedBlob } from '../../services/loveNoteImageService';
@@ -110,6 +112,7 @@ export interface NotesSlice {
   retryFailedMessage: (tempId: string) => Promise<void>;
   removeNote: (noteId: string) => Promise<void>;
   cleanupPreviewUrls: () => void;
+  /** Throws unless the note is still failed and no Retry is in flight. */
   removeFailedMessage: (tempId: string) => void;
   /** Send the signed-in account's queued notes, oldest first. Never throws. */
   drainQueuedNotes: () => Promise<void>;
@@ -437,6 +440,15 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
    * spinner of a load started after it. Per slice instance.
    */
   let notesLoadTicket = 0;
+
+  /**
+   * Retries in flight, by tempId. A retry keeps its note marked failed until
+   * its first await returns (the queue row's reset, or the partner lookup), so
+   * the note's own flags cannot tell `removeFailedMessage` that a resend is
+   * already under way. Counted, so two taps of Retry release it only when
+   * both are done. Per slice instance.
+   */
+  const retriesInFlight = new Map<string, number>();
 
   /**
    * Bumped whenever the thread's oldest note changes by anything but a removal:
@@ -1386,6 +1398,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
       const ownsRequest = () =>
         get().userId === capturedUserId && get().authSessionVersion === requestedInSession;
 
+      retriesInFlight.set(tempId, (retriesInFlight.get(tempId) ?? 0) + 1);
       try {
         // Check rate limiting before retry
         const { recentTimestamps, now } = get().checkRateLimit();
@@ -1571,6 +1584,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         }
 
         throw error;
+      } finally {
+        const remaining = (retriesInFlight.get(tempId) ?? 1) - 1;
+        if (remaining > 0) retriesInFlight.set(tempId, remaining);
+        else retriesInFlight.delete(tempId);
       }
     },
 
@@ -1604,8 +1621,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
 
       // An optimistic note's id IS its tempId (see sendNote), so there is no
       // server row to point at and note_id would reject the `temp-` string. A
-      // failed send keeps that id too. The UI does not offer removal in either
-      // state; this guards the store for callers that bypass it.
+      // failed send keeps that id too. The UI offers no removal while a note
+      // sends, and deletes a failed one with removeFailedMessage instead; this
+      // guards the store for callers that bypass it.
       if (target.tempId) {
         logger.debug('[NotesSlice] Refusing to remove a note with no server row:', noteId);
         throw new Error('That message has not finished sending');
@@ -1636,6 +1654,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
 
       const forgetPending = () =>
         get().notesPendingRemoval.filter((id) => id !== noteId);
+
+      // Captured now: the cached image is keyed by the note's storage path.
+      const imagePath = target.image_url ?? null;
 
       const { error } = await supabase.from('love_note_removals').upsert(
         { user_id: userId, note_id: noteId },
@@ -1688,6 +1709,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         throw error instanceof Error ? error : new Error('Failed to remove message');
       }
 
+      // The removal is confirmed, so its image leaves this account's cache too.
+      // Logged, never thrown: the removal itself has already succeeded.
+      if (imagePath) {
+        deleteCachedImages(userId, [imagePath]).catch((cacheError: unknown) => {
+          console.error('[NotesSlice] Failed to drop a removed note’s cached image:', cacheError);
+        });
+      }
+
       // The removal is confirmed: the copy no longer holds the note.
       await saveNotesCopy(userId, requestedInSession);
 
@@ -1727,10 +1756,21 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
     /**
      * Remove a failed message from the notes array
      * Cleans up any associated preview URLs
+     *
+     * Throws, with a message written for a person, unless the note is loaded,
+     * still failed, and not being resent: a delete confirmed while a Retry is
+     * in flight would drop the note and its queue row as the resend lands.
      */
     removeFailedMessage: (tempId: string) => {
       const { notes } = get();
       const failedNote = notes.find((n) => n.tempId === tempId);
+
+      if (!failedNote) {
+        throw new Error('That message is no longer loaded');
+      }
+      if (!failedNote.error || failedNote.sending || retriesInFlight.has(tempId)) {
+        throw new Error('That message is sending again');
+      }
 
       if (failedNote?.imagePreviewUrl?.startsWith('blob:')) {
         URL.revokeObjectURL(failedNote.imagePreviewUrl);

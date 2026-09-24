@@ -3,9 +3,11 @@
  *
  * Two things are load-bearing here and neither is cosmetic:
  *
- * 1. The control must never appear on a note that has no server row. An
- *    optimistic note's `id` IS its tempId, and a failed send keeps that id, so
- *    offering removal there would post `temp-...` into a uuid column.
+ * 1. The control must never appear on a note that is still sending or waiting
+ *    to send. An optimistic note's `id` IS its tempId, so a removal there would
+ *    post `temp-...` into a uuid column. A failed send keeps that id too, but is
+ *    offered the control: the screen deletes it from this device instead
+ *    (`FailedNoteRemoval.test.tsx` covers that route).
  * 2. The dialog has to say who this affects. Removal is one-way and invisible to
  *    the partner, so a user who misreads it as "delete for both" cannot find out
  *    they were wrong and cannot undo it.
@@ -97,10 +99,24 @@ describe('remove control on a message bubble', () => {
     expect(screen.queryByTestId('note-remove-button')).toBeNull();
   });
 
-  it('does not offer removal on a failed send, which keeps its temp id', () => {
-    renderBubble({ ...committed, id: 'temp-1-abc', tempId: 'temp-1-abc', error: true }, vi.fn());
+  it('does not offer removal while a queued message waits to send', () => {
+    renderBubble({ ...committed, id: 'temp-1-abc', tempId: 'temp-1-abc', queued: true }, vi.fn());
 
     expect(screen.queryByTestId('note-remove-button')).toBeNull();
+  });
+
+  it('offers removal on a failed send, handing over the note with its temp id', () => {
+    const failed = { ...committed, id: 'temp-1-abc', tempId: 'temp-1-abc', error: true };
+    const onRequestRemove = vi.fn();
+    renderBubble(failed, onRequestRemove);
+
+    fireEvent.click(screen.getByTestId('note-remove-button'));
+
+    expect(onRequestRemove).toHaveBeenCalledWith(failed);
+    // Retry stays exactly as it was.
+    expect(screen.getByRole('button', { name: 'Retry sending message' })).toHaveTextContent(
+      'Failed to send · Tap to retry'
+    );
   });
 
   it('renders no control at all when the screen passes no handler', () => {
@@ -128,6 +144,24 @@ describe('remove confirmation dialog', () => {
     );
 
     expect(screen.getByText(/your partner keeps their copy/i)).toBeInTheDocument();
+    expect(screen.getByText(/cannot undo/i)).toBeInTheDocument();
+  });
+
+  it('says a failed note failed to send, not that the partner keeps a copy', () => {
+    render(
+      <NoteRemoveConfirmation
+        note={{ ...committed, id: 'temp-1-abc', tempId: 'temp-1-abc', error: true }}
+        onClose={vi.fn()}
+        onConfirmRemove={vi.fn()}
+        fallbackFocusRef={inertFallback}
+      />
+    );
+
+    // Not "never sent": a picture note whose response was lost may be stored.
+    expect(
+      screen.getByText('This message failed to send. It will be deleted from this device.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/your partner keeps their copy/i)).toBeNull();
     expect(screen.getByText(/cannot undo/i)).toBeInTheDocument();
   });
 

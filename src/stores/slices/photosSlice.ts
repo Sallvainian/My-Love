@@ -40,9 +40,8 @@
  *   resets `photos`, `photosLoaded` and `photosLoadError`.
  */
 
-import { deleteCachedImages } from '../../services/imageCache';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
-import { requestPhotoImageFill } from '../../services/photoImageCache';
+import { deletePhotoImages, requestPhotoImageFill } from '../../services/photoImageCache';
 import type { PhotoUploadInput, PhotoWithUrls, SupabasePhoto } from '../../services/photoService';
 import { photoService } from '../../services/photoService';
 import type { AppStateCreator } from '../types';
@@ -184,7 +183,7 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
   ) => {
     if (paths.length === 0 || !ownsSession(userId, authSessionVersion)) return;
     try {
-      await deleteCachedImages(userId, paths);
+      await deletePhotoImages(userId, paths);
     } catch (error) {
       console.error('[PhotosSlice] Failed to delete cached photo images:', error);
     }
