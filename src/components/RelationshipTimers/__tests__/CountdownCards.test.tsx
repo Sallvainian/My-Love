@@ -82,10 +82,10 @@ describe('Countdown cards on the day itself', () => {
     );
 
     const card = screen.getByTestId('birthday-countdown-partner');
-    // Calendar days, as EventCountdown counts them: 10 March -> 12 March is 2
-    // whatever the time of day, not the 1 whole 24h period left from noon.
-    // Exact, on the value element: a substring match also passes "12 days".
-    expect(card.querySelector('h3 + div')?.textContent).toBe('2 days');
+    // Noon on 10 March to midnight starting 12 March: 1 day 12h.
+    // Exact, on the value element: a substring match also passes "11 days".
+    expect(card.querySelector('h3 + div')?.textContent).toBe('1 day');
+    expect(card.querySelector('h3 ~ span')?.textContent).toBe('12h 00m 00s');
     expect(card).not.toHaveTextContent('Happy Birthday!');
     expect(tileOf(card)).toHaveClass('bg-ptint', 'text-partner');
   });
@@ -164,20 +164,69 @@ describe('Countdown cards on an ordinary day', () => {
     );
   });
 
-  it('counts calendar days across the 23-hour DST spring-forward day', () => {
+  it('counts wall-clock time across the 23-hour DST spring-forward day', () => {
     // TZ=America/New_York springs forward at 02:00 on 8 March 2026. From
     // 01:00 on 8 March the birthday's midnight on 9 March is 22 real hours
-    // away: less than one 24h period, but still one calendar day.
+    // away, but the card reads what a wall clock would: 23h to midnight.
     vi.setSystemTime(new Date(2026, 2, 8, 1, 0, 0));
     render(
       <BirthdayCountdown name="Pat" birthday="2000-05-19" testId="birthday-countdown-partner" />
     );
 
     const card = screen.getByTestId('birthday-countdown-partner');
-    expect(card.querySelector('h3 + div')?.textContent).toBe('1 day');
+    expect(card.querySelector('h3 + div')?.textContent).toBe('0 days');
+    expect(card.querySelector('h3 ~ span')?.textContent).toBe('23h 00m 00s');
   });
 
-  it('shows a plain calendar tile, a day count and h/m for an upcoming anniversary', () => {
+  it('ticks the clock every second and rolls into "Happy Birthday!" at midnight', () => {
+    vi.setSystemTime(new Date(2026, 2, 10, 23, 59, 58));
+    render(
+      <BirthdayCountdown name="Pat" birthday="2000-05-21" testId="birthday-countdown-partner" />
+    );
+
+    const card = screen.getByTestId('birthday-countdown-partner');
+    expect(card.querySelector('h3 + div')?.textContent).toBe('0 days');
+    expect(card.querySelector('h3 ~ span')?.textContent).toBe('00h 00m 02s');
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(card.querySelector('h3 ~ span')?.textContent).toBe('00h 00m 01s');
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(card.querySelector('h3 + div')?.textContent).toBe('Happy Birthday!');
+    expect(card.querySelector('h3 ~ span')).toBeNull();
+  });
+
+  it('shows the live clock on an upcoming event', () => {
+    // Noon on 10 March to midnight starting 13 March: 2 days 12h.
+    render(<EventCountdown label="Meetup" icon="plane" date={new Date(2026, 2, 13)} />);
+
+    const card = screen.getByTestId('event-countdown-meetup');
+    expect(card.querySelector('h3 + div')?.textContent).toBe('2 days');
+    expect(card.querySelector('h3 ~ span')?.textContent).toBe('12h 00m 00s');
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(card.querySelector('h3 ~ span')?.textContent).toBe('11h 59m 57s');
+  });
+
+  it('shows no clock on a card dated today or with no date', () => {
+    render(
+      <>
+        <EventCountdown label="Today" icon="calendar" date={new Date(2026, 2, 10)} />
+        <EventCountdown label="Wedding" icon="ring" date={null} />
+      </>
+    );
+
+    expect(screen.getByTestId('event-countdown-today').querySelector('h3 ~ span')).toBeNull();
+    expect(screen.getByTestId('event-countdown-wedding').querySelector('h3 ~ span')).toBeNull();
+  });
+
+  it('shows a plain calendar tile, a day count and a live clock for an upcoming anniversary', () => {
     // Noon on 10 March to midnight on 14 March: 3 days 12h 0m.
     render(
       <CountdownTimer
@@ -189,8 +238,7 @@ describe('Countdown cards on an ordinary day', () => {
     const card = screen.getByTestId('countdown-card-0').firstElementChild as HTMLElement;
     expect(card.querySelector('h3')?.textContent).toBe('First kiss');
     expect(card.querySelector('h3 + div')?.textContent).toBe('3 days');
-    expect(card).toHaveTextContent('12h 00m');
-    expect(card.textContent ?? '').toMatch(/\d{2}h \d{2}m/);
+    expect(card.querySelector('h3 ~ span')?.textContent).toBe('12h 00m 00s');
     expect(tileOf(card).querySelector('svg')).toHaveClass('lucide-calendar');
     expect(tileOf(card)).toHaveClass('bg-tint', 'text-accent');
     expect(tileOf(card)).not.toHaveClass('bg-fill');
@@ -260,7 +308,8 @@ describe('Birthday cards from the server-held birthdays', () => {
 
     const card = screen.getByTestId('birthday-countdown-partner');
     expect(card.querySelector('h3')?.textContent).toBe('Partner turns 26');
-    expect(card.querySelector('h3 + div')?.textContent).toBe('1 day');
+    expect(card.querySelector('h3 + div')?.textContent).toBe('0 days');
+    expect(card.querySelector('h3 ~ span')?.textContent).toBe('12h 00m 00s');
   });
 
   it('counts to next year once this year\'s birthday has passed', () => {
@@ -268,7 +317,7 @@ describe('Birthday cards from the server-held birthdays', () => {
 
     const card = screen.getByTestId('birthday-countdown-self');
     expect(card.querySelector('h3')?.textContent).toBe('Sam turns 37');
-    expect(card.querySelector('h3 + div')?.textContent).toBe('364 days');
+    expect(card.querySelector('h3 + div')?.textContent).toBe('363 days');
   });
 
   it('keeps an unset card in place with "Not set yet" and the Settings hint', () => {
@@ -342,10 +391,10 @@ describe("Home's birthday and wedding cards", () => {
     const partnerCard = screen.getByTestId('birthday-countdown-partner');
     expect(partnerCard.querySelector('h3')?.textContent).toBe('Pat turns 26');
     expect(tileOf(partnerCard)).toHaveClass('bg-ptint', 'text-partner');
-    // 10 March to 12 June 2026: 94 calendar days.
+    // Noon on 10 March to midnight starting 12 June 2026: 93 days 12h.
     expect(
       screen.getByTestId('event-countdown-wedding').querySelector('h3 + div')?.textContent
-    ).toBe('94 days');
+    ).toBe('93 days');
   });
 
   it('with no chosen names: "You turn N" and "Partner turns N"', () => {

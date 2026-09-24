@@ -25,6 +25,47 @@ export function getCalendarDaysDiff(date: Date, now: Date = new Date()): number 
   return Math.round((targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+/** Whole days plus the clock remainder, as a countdown card shows them. */
+export interface CountdownParts {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+}
+
+/**
+ * Time from `now` until the local midnight that starts `date`'s day, or `null`
+ * once that day has arrived (or passed).
+ *
+ * Counted in wall-clock time, not elapsed milliseconds, so the day figure is
+ * always `getCalendarDaysDiff` minus the part of today already gone: a 23- or
+ * 25-hour DST day never shifts the count by a day, and the clock simply reads
+ * what a wall clock would.
+ */
+export function getCountdownToDay(date: Date, now: Date = new Date()): CountdownParts | null {
+  const calendarDays = getCalendarDaysDiff(date, now);
+  if (calendarDays <= 0) return null;
+  const secondsIntoToday = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const total = calendarDays * 86400 - secondsIntoToday;
+  return {
+    days: Math.floor(total / 86400),
+    hours: Math.floor((total % 86400) / 3600),
+    minutes: Math.floor((total % 3600) / 60),
+    seconds: total % 60,
+  };
+}
+
+/** "3 days" / "1 day" / "0 days". */
+export function formatDayCount(days: number): string {
+  return `${days} ${days === 1 ? 'day' : 'days'}`;
+}
+
+/** The padded clock remainder, "05h 03m 09s", the same shape Together for shows. */
+export function formatCountdownClock({ hours, minutes, seconds }: CountdownParts): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
+}
+
 export type EventsSlotView = 'hidden' | 'empty' | 'list' | 'error';
 
 /**
