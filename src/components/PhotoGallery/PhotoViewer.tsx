@@ -254,6 +254,19 @@ export function PhotoViewer({
     setLastTap(0);
   }, [x, y]);
 
+  // A refresh can remove the photo on screen (deleted on another device). The
+  // viewer then shows the photo now at its index: adopt it and reset, as
+  // navigation does, so it does not inherit the removed photo's zoom, pan or
+  // load error. A layout effect, so the reset lands before the new <img> can
+  // report its load.
+  useLayoutEffect(() => {
+    if (foundIndex >= 0 || !currentPhoto) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- adopt the photo a refresh left on screen
+    setCurrentId(currentPhoto.id);
+    setAnchorIndex(currentIndex);
+    resetTransform();
+  }, [foundIndex, currentPhoto, currentIndex, resetTransform]);
+
   // Navigate to next/previous photo
   const navigatePhoto = useCallback(
     (direction: 'next' | 'prev') => {

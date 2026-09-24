@@ -236,6 +236,27 @@ describe('PhotoViewer on a live list', () => {
     expect(screen.getByAltText('cap-2')).toBeInTheDocument();
   });
 
+  it('resets for the photo a refresh leaves on screen, dropping the removed photo\'s load error', () => {
+    const { rerender } = render(
+      <PhotoViewer
+        photos={[photo(0), photo(1), photo(2)]}
+        selectedPhotoId="photo-1"
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.error(screen.getByAltText('cap-1'));
+    expect(screen.getByText('Failed to load photo')).toBeInTheDocument();
+
+    // Deleted on another device: the refresh drops photo-1 while it is open.
+    rerender(
+      <PhotoViewer photos={[photo(0), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
+    );
+
+    expect(screen.queryByText('Failed to load photo')).toBeNull();
+    expect(screen.getByAltText('cap-2')).toHaveAttribute('src', 'blob:me/2.jpg');
+    expect(screen.getByText(/Photo 2 of 2 •/)).toBeInTheDocument();
+  });
+
   it('finishes its own delete when the store drops the row before the delete resolves', async () => {
     // photosSlice.deletePhoto removes the row from the list and only then
     // resolves; the confirmation must not be closed underneath that request.
