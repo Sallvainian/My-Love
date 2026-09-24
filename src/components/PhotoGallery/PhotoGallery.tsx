@@ -198,6 +198,10 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
     );
   }
 
+  // A refresh that empties the album unmounts the viewer below without its
+  // onClose; drop the selection too, or the next upload would reopen it.
+  if (selectedPhotoId && photos.length === 0) setSelectedPhotoId(null);
+
   // AC-4.2.5: Empty state when no photos uploaded
   // Only once the saved copy or the server has confirmed no photos exist
   if (photos.length === 0) {

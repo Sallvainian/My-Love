@@ -166,6 +166,26 @@ describe('PhotoGallery: deleting from the viewer (DW-176)', () => {
     expect(screen.getByTestId('photo-gallery-empty-state')).toBeTruthy();
   });
 
+  it('does not reopen the viewer on the next upload after a refresh empties the album', async () => {
+    listPhotos.mockResolvedValue([photo(0)]);
+    await renderGallery();
+    fireEvent.click(within(screen.getByTestId('photo-gallery-grid')).getByLabelText('cap-0'));
+    expect(screen.getByTestId('photo-viewer-overlay')).toBeTruthy();
+
+    // Deleted on another device: a refresh empties the list while it is open.
+    await act(async () => {
+      fakePhotoStore.setState({ photos: [] });
+    });
+    expect(screen.getByTestId('photo-gallery-empty-state')).toBeTruthy();
+
+    await act(async () => {
+      fakePhotoStore.setState({ photos: [photo(1)] });
+    });
+
+    expect(screen.getAllByTestId('photo-grid-item')).toHaveLength(1);
+    expect(screen.queryByTestId('photo-viewer-overlay')).toBeNull();
+  });
+
   it('keeps the photo in the grid and the viewer when the delete fails', async () => {
     deletePhotoOnServer.mockResolvedValue(false);
     listPhotos.mockResolvedValue(page(3));
