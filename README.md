@@ -9,15 +9,17 @@ A Progressive Web App for couples to exchange daily love messages, track moods, 
 
 ## Features
 
-- **Daily Love Messages** — Rotating heartfelt messages across categories (reasons, memories, affirmations, future dreams)
-- **Love Notes Chat** — Real-time messaging with your partner
-- **Mood Tracker** — Daily mood logging with emoji moods, optional notes, and mood history timeline
+- **Daily Love Messages** — Rotating heartfelt messages across categories (reasons, memories, affirmations, future dreams), with favorites and your own custom messages (managed at `/admin`)
+- **Love Notes Chat** — Real-time messaging with your partner, including images
+- **Mood Tracker** — Daily mood logging with emoji moods, optional notes, and a mood history calendar
 - **Partner Mood View** — See your partner's current mood in real-time
 - **Partner Interactions** — Send pokes, kisses, and farts with animations and real-time delivery
 - **Photo Gallery** — Upload, view, and share photos with captions and lazy loading
-- **Anniversary Timers** — Real-time countdowns to special dates with celebration animations
-- **Themes** — Sunset, Ocean, Lavender, and Rose
-- **PWA** — Installable on mobile, works offline
+- **Home Countdowns** — How long you've been together, plus countdowns to birthdays, events and anniversaries
+- **Settings** — Display name, the couple's "Together since" date, events and anniversaries
+- **Sign-in** — Email and password, or Google
+- **Light and dark** — Follows the device's appearance setting
+- **PWA** — Installable on mobile, loads offline
 - **Privacy** — Row Level Security on all tables
 
 ## Quick Start
@@ -44,13 +46,17 @@ Open http://localhost:5173 in your browser.
 ## Development
 
 ```bash
-npm run dev              # Start dev server (cleanup wrapper)
-npm run dev:raw          # Vite dev server directly
-npm run build            # Production build (tsc + vite)
-npm run typecheck        # tsc --noEmit
-npm run lint             # ESLint
-npm run lint:fix         # ESLint --fix
+fnox exec -- npm run dev      # Start dev server (cleanup wrapper)
+fnox exec -- npm run dev:raw  # Vite dev server directly
+npm run dev:local             # Vite against local Supabase (.env.test, no secrets needed)
+fnox exec -- npm run build    # Production build (tsc + vite)
+npm run typecheck             # tsc -b --force (all three tsconfig projects)
+npm run lint                  # ESLint
+npm run lint:fix              # ESLint --fix
+npm run test:ci-local         # Run the CI checks locally
 ```
+
+`dev`, `dev:raw` and `build` need the `fnox exec --` prefix. Without it they still start or finish cleanly, but the app throws "Supabase configuration missing" in the browser.
 
 ## Testing
 
@@ -67,11 +73,11 @@ The project uses a fullstack test strategy with four tiers:
 # Unit
 npm run test:unit              # Run all
 npm run test:unit:watch        # Watch mode
-npm run test:unit:coverage     # With coverage (80% threshold)
+npm run test:unit:coverage     # With coverage (25% threshold)
 npx vitest run tests/unit/services/moodService.test.ts --silent  # Single file
 
 # E2E (requires local Supabase running)
-npm run test:e2e               # All E2E tests
+npm run test:e2e               # All Playwright projects (E2E, integration, API)
 npm run test:e2e:ui            # Playwright UI mode
 npm run test:p0                # Priority 0 only
 npm run test:p1                # Priority 0+1
@@ -83,7 +89,7 @@ npm run test:integration
 # Database
 npm run test:db
 
-# Smoke (post-build verification)
+# Smoke (checks the files in dist/; never loads the app)
 npm run test:smoke
 ```
 
@@ -115,7 +121,7 @@ fnox check                # Verify all secrets resolve
 
 ### Supabase
 
-39 migrations managing tables, RLS policies, RPC functions, and realtime subscriptions. Key tables: `users`, `moods`, `interactions`, `love_notes`, `photos`, `events`, and more.
+43 migrations managing tables, RLS policies, RPC functions, and realtime subscriptions. Key tables: `users`, `moods`, `interactions`, `love_notes`, `photos`, `events`, `anniversaries`, `couple_settings`, `custom_messages`, `message_favorites`, and more.
 
 ```bash
 supabase start                    # Start local instance
@@ -137,15 +143,20 @@ My-Love/
 │   │   ├── love-notes/           # Real-time chat
 │   │   ├── DailyMessage/         # Main message card
 │   │   ├── MoodTracker/          # Mood logging
+│   │   ├── MoodHistory/          # Mood calendar
 │   │   ├── PartnerMoodView/      # Partner mood display
 │   │   ├── PokeKissInterface/    # Playful interactions
 │   │   ├── PhotoGallery/         # Photo grid
+│   │   ├── RelationshipTimers/   # Home countdown cards
+│   │   ├── Settings/             # Settings, events, anniversaries
+│   │   ├── AdminPanel/           # Custom message editor
 │   │   └── ...
 │   ├── stores/
 │   │   ├── useAppStore.ts        # Root Zustand store
 │   │   └── slices/               # 11 state slices
-│   ├── services/                 # Supabase, IndexedDB, sync, realtime
-│   ├── config/                   # App constants
+│   ├── api/                      # Supabase client, auth, API calls
+│   ├── services/                 # IndexedDB, local copies, sync, realtime
+│   ├── config/                   # Image and performance settings
 │   ├── data/                     # Default messages
 │   ├── types/                    # TypeScript types (database.types.ts auto-generated)
 │   └── utils/                    # Themes, date helpers, message rotation
@@ -154,11 +165,12 @@ My-Love/
 │   ├── integration/              # Playwright integration specs
 │   ├── unit/                     # Vitest unit tests
 │   ├── api/                      # API contract tests
+│   ├── e2e-archive/              # Frozen old specs; not run
 │   └── support/                  # Fixtures, factories, helpers
 ├── supabase/
 │   ├── config.toml
 │   ├── functions/                # Edge Functions
-│   ├── migrations/               # 39 SQL migrations
+│   ├── migrations/               # 43 SQL migrations
 │   ├── seed.sql
 │   └── tests/                    # pgTAP database tests
 └── .github/workflows/            # CI/CD pipelines
@@ -168,16 +180,15 @@ My-Love/
 
 ### Test Pipeline (`.github/workflows/test.yml`)
 
-Runs on every PR targeting `main`:
+Runs on pull requests, pushes to `main` and a weekly schedule. On a pull request, each stage runs only when the files it covers changed; pushes to `main` and the weekly run always run everything.
 
 - Lint & Type Check (ESLint + tsc)
 - Unit Tests (Vitest with coverage)
 - Database Tests (pgTAP)
-- Integration Tests (Playwright)
-- API Tests (Playwright)
+- Backend Tests (Playwright `integration` and `api` projects)
 - E2E Tests (Playwright, sharded across 2 runners)
-- Burn-in (flaky test detection)
-- Test Summary (required status check for merge)
+- Burn-in (flaky test detection, 3 shards)
+- Test Summary (the only required status check for merge)
 
 ### Deploy Pipeline (`.github/workflows/deploy.yml`)
 
@@ -187,9 +198,12 @@ On push to `main`: apply migrations → build → smoke test → `wrangler deplo
 
 - `bundle-size.yml` — PR bundle size comparison
 - `codeql.yml` — Security analysis
-- `supabase-migrations.yml` — Migration validation
-- `claude-code-review.yml` — paused while Claude Code usage is exhausted
-- `lighthouse.yml` — Performance audits
+- `dependency-review.yml` — Flags risky dependency changes on PRs
+- `dependabot-auto-merge.yml` — Turns on auto-merge for every Dependabot PR
+- `supabase-migrations.yml` — Migration validation on PRs that touch `supabase/`
+- `claude-code-review.yml` — Claude reviews every PR
+- `claude.yml` — Answers `@claude` mentions on issues and PRs
+- `lighthouse.yml` — Performance audit after each deploy
 
 ## Deployment
 
@@ -198,14 +212,14 @@ On push to `main`: apply migrations → build → smoke test → `wrangler deplo
 | Secret                                  | Purpose                           |
 | --------------------------------------- | --------------------------------- |
 | `VITE_SUPABASE_URL`                     | Supabase project URL (build-time) |
-| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon key (build-time)    |
-| `SUPABASE_ACCESS_TOKEN`                 | CLI auth for type generation      |
-| `GROK_AUTH_JSON`                        | Grok review: contents of `~/.grok/auth.json` |
-| `XAI_API_KEY`                           | Grok review fallback (console.x.ai) |
+| `VITE_SUPABASE_ANON_KEY`                | Supabase publishable key (build-time; exposed to the app as `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`) |
+| `SUPABASE_ACCESS_TOKEN`                 | Supabase CLI auth for applying migrations |
+| `SUPABASE_DB_PASSWORD`                  | Production database password for applying migrations |
+| `CLAUDE_CODE_OAUTH_TOKEN`               | Claude review and `@claude` workflows |
 | `CLOUDFLARE_API_TOKEN`                  | `production` environment: "Edit Cloudflare Workers" token for `wrangler deploy` |
 | `CLOUDFLARE_ACCOUNT_ID`                 | `production` environment: Cloudflare account the Worker lives in |
 
-The repository variable `SITE_URL` (`https://my-love.sallvain.workers.dev/`, trailing slash required) is the address that both the post-deploy health check and the Lighthouse workflow test.
+The repository variable `SITE_URL` (`https://my-love.sallvain.workers.dev/`, trailing slash required) is the address that both the post-deploy health check and the Lighthouse workflow test. `SUPABASE_PROJECT_ID` names the production project that migrations are applied to.
 
 ### Cloudflare Workers
 
