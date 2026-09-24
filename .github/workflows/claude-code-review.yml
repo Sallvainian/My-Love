@@ -146,8 +146,9 @@ jobs:
                age-encrypted in `fnox.toml`.
             10. **Architecture drift.** react-router added instead of
                 `navigationSlice.currentView`. Vite chunking moved to `manualChunks`
-                instead of `rolldownOptions.output.codeSplitting.groups`. Prettier
-                re-added.
+                instead of `rolldownOptions.output.codeSplitting.groups`. Prettier run
+                over whole files (a `prettier --write` script, a CI format check),
+                or its version range loosened from an exact pin.
 
             ## General checks
 
