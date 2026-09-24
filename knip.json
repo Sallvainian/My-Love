@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "scripts/provision-claude-bot.mjs",
+    "tests/support/harnesses/*.{ts,tsx}"
+  ],
+  "ignore": [
+    "src/types/database.types.ts",
+    "tests/e2e-archive/**",
+    "supabase/functions/**",
+    ".claude/**",
+    ".agents/**",
+    "_bmad/**",
+    "_bmad-output/**"
+  ],
+  "ignoreBinaries": [
+    "supabase"
+  ],
+  "ignoreExportsUsedInFile": true
+}
