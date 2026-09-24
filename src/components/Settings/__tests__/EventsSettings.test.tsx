@@ -378,8 +378,8 @@ describe('EventsSettings list states', () => {
   });
 
   it('keeps a surviving list on screen and puts the failure notice above it', async () => {
-    // A failed refresh must never blank a list already on screen: events are
-    // Supabase-only with no mirror to repopulate from. Reordering the slot
+    // A failed refresh must never blank a list already on screen, whether it
+    // came from the server or the saved `events` copy. Reordering the slot
     // ternary to check loadFailed first would swap the list for the notice, and
     // this is the only test that would notice.
     setStore({

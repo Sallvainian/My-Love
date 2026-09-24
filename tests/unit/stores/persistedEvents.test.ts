@@ -1,7 +1,8 @@
 /**
  * Persisted state — events must never reach localStorage, nor come back out of it
  *
- * Events are couple-shared and Supabase-only. `partialize` in `useAppStore.ts`
+ * Events are couple-shared; the device keeps them only in the per-account
+ * `events` local copy (IndexedDB), never in localStorage. `partialize` in `useAppStore.ts`
  * is an allowlist of `settings`, `isOnboarded` and `messageHistory`, so the
  * events keys are excluded by omission — which is exactly the kind of guarantee
  * that erodes silently. Nothing errors if a later story adds `events` to that

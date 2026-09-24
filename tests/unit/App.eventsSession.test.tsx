@@ -43,7 +43,18 @@ vi.mock('../../src/api/auth/sessionService', () => ({
     };
   }),
 }));
-vi.mock('../../src/services/eventsService', () => {
+// Home's own load is what these tests control and count. The signed-in-start
+// refresher (which also runs loadEvents) and the saved events copy are covered
+// by eventsSlice.localCopy.test.ts; here there is no copy, and nothing saved in
+// one test can reach the next through fake-indexeddb.
+vi.mock('../../src/services/localCopy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/localCopy')>()),
+  readLocalCopy: vi.fn(async () => null),
+  writeLocalCopy: vi.fn(async () => {}),
+  refreshLocalCopies: vi.fn(async () => {}),
+}));
+vi.mock('../../src/services/eventsService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/services/eventsService')>();
   const eventsService = {
     getEvents: vi.fn(),
     getEventsPage: async () => ({
@@ -55,7 +66,7 @@ vi.mock('../../src/services/eventsService', () => {
       },
     }),
   };
-  return { eventsService };
+  return { ...actual, eventsService };
 });
 vi.mock('../../src/components/DailyMessage/DailyMessage', () => ({
   DailyMessage: () => null,

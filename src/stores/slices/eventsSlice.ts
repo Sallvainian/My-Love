@@ -11,10 +11,23 @@
  *   account cannot revive a request from its previous session.
  *
  * Persistence:
- * - Supabase only. NOT persisted to localStorage and NOT mirrored to IndexedDB:
- *   `partialize` in `useAppStore.ts` deliberately omits every key here, so a
- *   shared device cannot rehydrate one couple's events into the next account's
- *   session. Freshness is reload-based; there is no realtime subscription.
+ * - Supabase holds the truth. The device keeps one per-account local copy,
+ *   kind `events` (`services/localCopy.ts`): the list the screens last showed,
+ *   saved as plain strings (dates `YYYY-MM-DD`, read back with
+ *   `parseEventDate`). Pagination cursors are never saved — they only mean
+ *   something against a live server, and an online refresh resets them.
+ * - `loadEvents` applies the saved copy first (only into an empty list, and
+ *   only until this session has a server answer or a confirmed write), then
+ *   replaces state and copy with the server's first page when online. Offline
+ *   with a copy (or with this session's server data already shown) it succeeds
+ *   without an error; offline with nothing it fails as before.
+ * - The copy is filled only from a successful load or a confirmed add, edit or
+ *   delete. A failed read keeps state and copy. Offline writes are refused.
+ * - NOT persisted to localStorage: `partialize` in `useAppStore.ts` omits every
+ *   key here. Sign-out deletes the outgoing account's copies
+ *   (`deleteAccountCopies`), so a shared device never shows one couple's events
+ *   to the next account. No realtime subscription: the kind's refresher runs on
+ *   signed-in start and on reconnect.
  * - All account-scoped keys are reset by `signedOutState()` in authSlice.
  *
  * Errors: `eventsService` throws, so every action here has a real reason to
@@ -25,16 +38,98 @@
  * rows from failures that can retry the same write.
  */
 
+import { isOnline } from '../../api/errorHandlers';
 import type {
   CoupleEvent,
   EventCreateInput,
+  EventIcon,
   EventWriteErrorCode,
   EventUpdateInput,
   EventsPagination,
 } from '../../services/eventsService';
-import { eventsService } from '../../services/eventsService';
+import { eventsService, isEventIcon, parseEventDate } from '../../services/eventsService';
+import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
+import { formatDateISO } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
 import type { AppStateCreator } from '../types';
+
+/** Local-copy kind for the events list the screens last showed. */
+export const EVENTS_COPY_KIND = 'events';
+
+/** One saved event: plain, structured-cloneable strings only. */
+interface SavedEvent {
+  id: string;
+  userId: string;
+  label: string;
+  /** `YYYY-MM-DD`; read back with `parseEventDate`, never `new Date(string)`. */
+  date: string;
+  /** ISO instant. */
+  createdAt: string;
+  createdAtRaw?: string;
+  description: string | null;
+  icon: EventIcon;
+}
+
+function toSavedEvent(event: CoupleEvent): SavedEvent {
+  const saved: SavedEvent = {
+    id: event.id,
+    userId: event.userId,
+    label: event.label,
+    date: formatDateISO(event.date),
+    createdAt: event.createdAt.toISOString(),
+    description: event.description,
+    icon: event.icon,
+  };
+  if (event.createdAtRaw !== undefined) saved.createdAtRaw = event.createdAtRaw;
+  return saved;
+}
+
+function parseSavedEvent(value: unknown): CoupleEvent | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.id !== 'string' ||
+    typeof v.userId !== 'string' ||
+    typeof v.label !== 'string' ||
+    typeof v.date !== 'string' ||
+    typeof v.createdAt !== 'string' ||
+    (v.createdAtRaw !== undefined && typeof v.createdAtRaw !== 'string') ||
+    (v.description !== null && typeof v.description !== 'string') ||
+    typeof v.icon !== 'string' ||
+    !isEventIcon(v.icon)
+  ) {
+    return null;
+  }
+  const date = parseEventDate(v.date);
+  const createdAt = new Date(v.createdAt);
+  if (!date || Number.isNaN(createdAt.getTime())) return null;
+  const parsed: CoupleEvent = {
+    id: v.id,
+    userId: v.userId,
+    label: v.label,
+    date,
+    createdAt,
+    description: v.description,
+    icon: v.icon,
+  };
+  if (typeof v.createdAtRaw === 'string') parsed.createdAtRaw = v.createdAtRaw;
+  return parsed;
+}
+
+/**
+ * A saved copy in a shape the screens can use. The copy is written only by this
+ * slice, so one unreadable entry means the whole copy is suspect: ignored.
+ */
+function parseSavedEvents(value: unknown): CoupleEvent[] | null {
+  if (!Array.isArray(value)) return null;
+  const events: CoupleEvent[] = [];
+  for (const item of value) {
+    const parsed = parseSavedEvent(item);
+    if (!parsed) return null;
+    events.push(parsed);
+  }
+  return events;
+}
 
 /**
  * Outcome of a write attempt. The failure message is returned directly rather
@@ -158,6 +253,39 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
   let latestMutationSequence = 0;
   const activeLoads = new Map<number, ActiveLoad>();
   let completedMutations: CompletedMutation[] = [];
+  /**
+   * The auth lifetime whose events already came from the server or a confirmed
+   * write. The saved copy is applied only before that, so a copy read landing
+   * late never replaces a newer answer. Per slice instance, like the counters.
+   */
+  let eventsFreshFor: { userId: string; authSessionVersion: number } | null = null;
+  const isFresh = (userId: string, authSessionVersion: number) =>
+    eventsFreshFor?.userId === userId && eventsFreshFor.authSessionVersion === authSessionVersion;
+
+  /**
+   * After a server answer or confirmed write for `userId` in
+   * `authSessionVersion` has been set into state: mark the session fresh and
+   * save the shown list as the copy, under the captured `userId`. Re-checks the
+   * identity first; a failed save is logged and changes no result.
+   */
+  const saveEventsCopy = async (userId: string, authSessionVersion: number) => {
+    if (get().userId !== userId || get().authSessionVersion !== authSessionVersion) return;
+    eventsFreshFor = { userId, authSessionVersion };
+    try {
+      await writeLocalCopy(userId, EVENTS_COPY_KIND, get().events.map(toSavedEvent));
+    } catch (error) {
+      console.error('[EventsSlice] Failed to save the events copy:', error);
+    }
+  };
+
+  // The kind's refresher for signed-in start, reconnect and on-demand refreshes.
+  // Re-registering (a second store in tests) replaces it.
+  registerLocalCopy(EVENTS_COPY_KIND, async () => {
+    // Home and Settings load on their own at start and on `online`; a second load here would only be superseded.
+    const view = get().currentView;
+    if (view === 'home' || view === 'settings') return;
+    await get().loadEvents();
+  });
 
   const pruneCompletedMutations = () => {
     completedMutations = completedMutations.filter((mutation) =>
@@ -242,7 +370,40 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       loadId === latestLoadId;
 
     try {
-      const page = await eventsService.getEventsPage(append ? eventsPagination : undefined);
+      // The server request goes out at once, alongside the copy read below, so
+      // the copy adds no latency and load sequencing is unchanged. Offline the
+      // service rejects before any request.
+      const pageRequest = eventsService.getEventsPage(append ? eventsPagination : undefined);
+      // Marked handled now: it may reject while the copy read is in flight, and
+      // is awaited (or deliberately dropped) below.
+      Promise.resolve(pageRequest).catch(() => {});
+
+      if (!append && !isFresh(requestedBy, requestedInSession)) {
+        // 1. The saved copy, at once — online or offline. Skipped once this
+        // session has a server answer or a confirmed write, and never laid over
+        // a list already on screen.
+        // readLocalCopy answers null on failure; a malformed copy parses to null.
+        const saved = parseSavedEvents(await readLocalCopy<unknown>(requestedBy, EVENTS_COPY_KIND));
+        if (!ownsLoad()) return { status: 'stale' };
+        if (saved) {
+          // A write confirmed during the read is newer than the copy.
+          if (!isFresh(requestedBy, requestedInSession) && get().events.length === 0) {
+            set({ events: sortByDate(saved) });
+          }
+          // 2. Offline there is nothing to ask: the saved list stands, without
+          // an error. Offline with no copy falls through and fails as before.
+          if (!isOnline()) {
+            set({ eventsIsLoading: false, eventsIsLoadingMore: false });
+            return { status: 'success' };
+          }
+        }
+      } else if (!append && !isOnline()) {
+        // This session's server answer is already on screen: it stands.
+        set({ eventsIsLoading: false, eventsIsLoadingMore: false });
+        return { status: 'success' };
+      }
+
+      const page = await pageRequest;
       if (!ownsLoad()) return { status: 'stale' };
       const merged = append
         ? Array.from(new Map([...get().events, ...page.events].map((event) => [event.id, event])).values())
@@ -254,6 +415,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
         eventsIsLoading: false,
         eventsIsLoadingMore: false,
       });
+      await saveEventsCopy(requestedBy, requestedInSession);
       return { status: 'success' };
     } catch (error) {
       const errorMsg = messageOf(error, 'Failed to load events');
@@ -272,7 +434,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
   };
 
   return {
-  // Initial state — Supabase only, reset together by signedOutState().
+  // Initial state — reset together by signedOutState().
   events: [],
   eventsIsLoading: false,
   eventsError: null,
@@ -306,6 +468,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       }
       recordMutation({ requestedBy, requestedInSession, kind: 'upsert', event: created });
       set((state) => ({ events: sortByDate(upsertEvent(state.events, created)) }));
+      await saveEventsCopy(requestedBy, requestedInSession);
       logger.debug('[EventsSlice] Added event:', created.id);
       return { success: true };
     } catch (error) {
@@ -338,6 +501,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       set((state) => ({
         events: sortByDate(upsertEvent(state.events, updated)),
       }));
+      await saveEventsCopy(requestedBy, requestedInSession);
       logger.debug('[EventsSlice] Edited event:', eventId);
       return { success: true };
     } catch (error) {
@@ -366,6 +530,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       }
       recordMutation({ requestedBy, requestedInSession, kind: 'delete', eventId });
       set((state) => ({ events: state.events.filter((event) => event.id !== eventId) }));
+      await saveEventsCopy(requestedBy, requestedInSession);
       logger.debug('[EventsSlice] Removed event:', eventId);
       return { success: true };
     } catch (error) {
