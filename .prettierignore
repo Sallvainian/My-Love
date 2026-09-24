@@ -1,6 +1,7 @@
 # Prettier formats only hand-written code. Everything is ignored first, then the
 # source folders and root config files are allowed back in; generated files are
-# ignored again at the end. See "Formatting" in AGENTS.md.
+# ignored again at the end. See the Prettier rule under "Conventions that differ
+# from defaults" in AGENTS.md.
 /*
 !/src/
 !/tests/
