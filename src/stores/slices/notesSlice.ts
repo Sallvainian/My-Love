@@ -125,14 +125,27 @@ function knownOffline(): boolean {
 }
 
 /**
- * The server looked at the insert and refused it: a Postgrest error whose code
- * is a SQLSTATE (CHECK, RLS, …). A `PGRST…` code, an empty code (a fetch that
- * never reached the server) or anything else is not a rejection.
+ * SQLSTATEs that say "try again later", not "never": connection exceptions
+ * (08), transaction rollbacks such as serialization failure or deadlock (40),
+ * insufficient resources (53), operator intervention including statement
+ * timeout 57014 (57), and lock not available (55P03).
+ */
+const TRANSIENT_SQLSTATE_CLASSES = ['08', '40', '53', '57'];
+const TRANSIENT_SQLSTATES = ['55P03'];
+
+/**
+ * The server looked at the insert and refused it for good: a Postgrest error
+ * whose code is a SQLSTATE (CHECK, RLS, …) outside the transient classes. A
+ * `PGRST…` code, an empty code (a fetch that never reached the server), a
+ * transient SQLSTATE or anything else is not a rejection.
  */
 function isServerRejection(error: unknown): boolean {
   if (!isPostgrestError(error)) return false;
   const code: unknown = error.code;
-  return typeof code === 'string' && !code.startsWith('PGRST') && /^[0-9A-Z]{5}$/.test(code);
+  if (typeof code !== 'string' || code.startsWith('PGRST') || !/^[0-9A-Z]{5}$/.test(code)) {
+    return false;
+  }
+  return !TRANSIENT_SQLSTATE_CLASSES.includes(code.slice(0, 2)) && !TRANSIENT_SQLSTATES.includes(code);
 }
 
 /** A queued row as an unconfirmed note in the thread. */
@@ -431,8 +444,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
   };
 
   /**
-   * No drain is sending from this tab (offline, or another context holds the
-   * queue): every queued note on screen is waiting, not sending.
+   * No drain is sending from this tab (offline, a pass just ended, or another
+   * context holds the queue): every queued note on screen is waiting, not
+   * sending.
    */
   const settleWaitingNotes = () => {
     if (!get().notes.some((note) => note.queued && note.sending)) return;
@@ -1611,9 +1625,11 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
               settleWaitingNotes();
               break;
             }
-            const outcome = await withSyncLock(NOTE_QUEUE_LOCK, drainOnce);
-            // Another tab holds the queue and sends for this account.
-            if (!outcome.ran) settleWaitingNotes();
+            // Whatever the pass did (sent, stopped on a transient failure,
+            // found the queue unreadable, or lost the lock to another tab),
+            // nothing is sending from this tab once it ends.
+            await withSyncLock(NOTE_QUEUE_LOCK, drainOnce);
+            settleWaitingNotes();
           } while (drainRequested);
         } catch (error) {
           console.error('[NotesSlice] Note queue drain failed:', error);

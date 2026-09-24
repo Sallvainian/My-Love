@@ -165,7 +165,7 @@ vi.mock('../../../src/services/imageCompressionService', () => ({
 
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
-import { enqueueNote, listQueuedNotes } from '../../../src/services/noteQueue';
+import { enqueueNote, listQueuedNotes, removeQueuedNote } from '../../../src/services/noteQueue';
 import {
   createNotesSlice,
   IMAGE_NOTE_NEEDS_CONNECTION,
@@ -421,6 +421,41 @@ describe('notesSlice offline send queue', () => {
     expect(server.rows.map((r) => r.content)).toEqual(['x', 'y']);
     expect(server.upserts).toBe(2);
     expect(await queuedIds()).toEqual([]);
+
+    // Tab 1 holds the lock mid-insert; tab 2 sends online and loses the lock:
+    // its note waits rather than showing "Sending..." that nothing does.
+    const reply = deferred();
+    server.outcomes = [{ hold: reply.promise }];
+    await enqueueNote({ id: 'temp-z', userId: A, toUserId: PARTNER, content: 'z', createdAt: '2026-09-24T09:00:02.000Z', failed: false });
+    const tab1Run = tab1.getState().drainQueuedNotes();
+    await vi.waitFor(() => expect(server.upserts).toBe(3));
+
+    await tab2.getState().sendNote('from tab2');
+    await tab2.getState().drainQueuedNotes();
+
+    const waiting = tab2.getState().notes.find((n) => n.content === 'from tab2');
+    expect(waiting).toMatchObject({ queued: true, sending: false });
+
+    // Tab 1's run re-reads the shared queue and sends it, once.
+    reply.resolve();
+    await tab1Run;
+    expect(server.rows.map((r) => r.content)).toEqual(['x', 'y', 'z', 'from tab2']);
+    expect(await queuedIds()).toEqual([]);
+  });
+
+  it('online: when the head note fails transiently, a later note on screen ends waiting, not sending', async () => {
+    const store = createTestStore();
+    server.outcomes = ['network', 'network', 'network'];
+
+    await store.getState().sendNote('head');
+    await store.getState().sendNote('later');
+    await store.getState().drainQueuedNotes();
+
+    expect(server.rows).toEqual([]);
+    const [head, later] = store.getState().notes;
+    expect(head).toMatchObject({ content: 'head', queued: true, sending: false });
+    expect(later).toMatchObject({ content: 'later', queued: true, sending: false });
+    expect(later.error).toBeFalsy();
   });
 
   it('lost response: the resend under the same key resolves to the stored row, no duplicate', async () => {
@@ -480,6 +515,49 @@ describe('notesSlice offline send queue', () => {
     expect(store.getState().notes[0]).toMatchObject({ queued: true, sending: false });
     expect(store.getState().notes[0].error).toBeFalsy();
     expect(await listQueuedNotes(A)).toEqual([expect.objectContaining({ failed: false })]);
+  });
+
+  it.each([
+    ['08006', 'connection failure'],
+    ['40001', 'serialization failure'],
+    ['53300', 'too many connections'],
+    ['57014', 'statement timeout'],
+    ['55P03', 'lock not available'],
+  ])('a transient SQLSTATE %s (%s) is not a rejection: the note stays pending', async (code) => {
+    const store = createTestStore();
+    server.outcomes = [{ reject: code }];
+    setOnline(false);
+    await store.getState().sendNote('try again later');
+    setOnline(true);
+
+    await store.getState().drainQueuedNotes();
+
+    expect(store.getState().notes[0]).toMatchObject({ queued: true, sending: false });
+    expect(store.getState().notes[0].error).toBeFalsy();
+    expect(store.getState().notesError).toBeNull();
+    expect(await listQueuedNotes(A)).toEqual([expect.objectContaining({ failed: false })]);
+  });
+
+  it('retry of a rejected queued note whose row is gone queues it again under the same key', async () => {
+    const store = createTestStore();
+    server.outcomes = [{ reject: '23514' }];
+    setOnline(false);
+    await store.getState().sendNote('row removed');
+    setOnline(true);
+    await store.getState().drainQueuedNotes();
+    const key = store.getState().notes[0].tempId!;
+    expect(store.getState().notes[0]).toMatchObject({ error: true, queued: true });
+
+    await removeQueuedNote(key);
+    await store.getState().retryFailedMessage(key);
+
+    expect(server.rows.filter((r) => r.idempotency_key === key)).toHaveLength(1);
+    expect(server.rows).toHaveLength(1);
+    expect(await queuedIds()).toEqual([]);
+    expect(store.getState().notes).toEqual([
+      expect.objectContaining({ id: 'server-1', content: 'row removed', sending: false, error: false }),
+    ]);
+    expect(store.getState().notes[0].queued).toBeUndefined();
   });
 
   it('removing a failed queued note deletes its row', async () => {
