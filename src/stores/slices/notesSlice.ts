@@ -319,6 +319,26 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
    */
   let notesLoadTicket = 0;
 
+  /**
+   * Bumped whenever the thread's oldest note changes by anything but a removal:
+   * a fetch or copy that replaces the thread, or an older page prepended. An
+   * older page requested below one oldest note lands only while that is still
+   * the generation, so it never leaves a hole or doubles a page. A removal
+   * keeps it, because the page still joins onto the notes after the one
+   * removed. Per slice instance.
+   */
+  let notesThreadGen = 0;
+
+  /**
+   * The auth lifetime whose `notesHasMore` was last set by a server read, not
+   * guessed from the saved copy's length. Only a server answer is kept when a
+   * refresh keeps older pages. Per slice instance.
+   */
+  let hasMoreFromServerFor: { userId: string; authSessionVersion: number } | null = null;
+  const hasMoreFromServer = (userId: string, authSessionVersion: number) =>
+    hasMoreFromServerFor?.userId === userId &&
+    hasMoreFromServerFor.authSessionVersion === authSessionVersion;
+
   // The kind's refresher for signed-in start, reconnect and on-demand refreshes.
   // It keeps the older pages the user scrolled back through; a reconnect must
   // not cut the thread back to its newest page. Re-registering (a second store
@@ -421,6 +441,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
                 notes: saved.filter((note) => !pendingRemoval.includes(note.id)),
                 notesHasMore: saved.length >= NOTES_PAGE_SIZE,
               });
+              // A guess from the copy's length, not a server answer.
+              hasMoreFromServerFor = null;
+              notesThreadGen += 1;
             }
           }
         }
@@ -473,11 +496,18 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           current.filter((note) => !unconfirmed.includes(note) && !olderKept.includes(note))
         );
 
-        set({
-          notes: [...olderKept, ...notesInChatOrder, ...unconfirmed],
-          notesIsLoading: false,
-          notesHasMore: olderKept.length > 0 ? get().notesHasMore : rows.length === limit,
-        });
+        // With older rows kept, the page says nothing about what lies below
+        // them: a server answer from an earlier read stands, but the copy's
+        // guess does not, so the list may ask once more. One empty page ends it.
+        let hasMore = rows.length === limit;
+        if (olderKept.length > 0) {
+          hasMore = hasMoreFromServer(userId, requestedInSession) ? get().notesHasMore : true;
+        }
+        const notes = [...olderKept, ...notesInChatOrder, ...unconfirmed];
+        if (notes[0]?.id !== current[0]?.id) notesThreadGen += 1;
+
+        set({ notes, notesIsLoading: false, notesHasMore: hasMore });
+        hasMoreFromServerFor = { userId, authSessionVersion: requestedInSession };
         await saveNotesCopy(userId, requestedInSession);
 
         logger.debug('[NotesSlice] Fetched notes:', notesInChatOrder.length);
@@ -520,6 +550,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       try {
         set({ notesIsLoading: true });
         const loadTicket = ++notesLoadTicket;
+        // Taken with `notes` above, before any await: the page joins onto them.
+        const threadGen = notesThreadGen;
 
         if (!userId) {
           conclusiveError = true;
@@ -541,7 +573,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         // Get the oldest message timestamp for pagination
         const oldestNote = notes[0];
         if (!oldestNote) {
-          if (!ownsRequest()) return;
+          if (!ownsRequest()) {
+            set({ notesIsLoading: false });
+            return;
+          }
           set({ notesIsLoading: false, notesHasMore: false });
           return;
         }
@@ -583,9 +618,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         // The page joins onto the note it was requested below. A refresh that
         // replaced the thread, or an earlier page from the same cursor, has
         // moved the oldest note since: prepending would leave a hole or a
-        // doubled page, so drop it. The flag goes down only if no load has
+        // doubled page, so drop it. A removal does not count; the page still
+        // joins onto what is left. The flag goes down only if no load has
         // raised it since this one; that load owns it now.
-        if (get().notes[0]?.id !== oldestNote.id) {
+        if (notesThreadGen !== threadGen) {
           if (notesLoadTicket === loadTicket) set({ notesIsLoading: false });
           return;
         }
@@ -597,6 +633,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           notesIsLoading: false,
           notesHasMore: (data?.length || 0) === limit,
         });
+        if (olderNotes.length > 0) notesThreadGen += 1;
+        hasMoreFromServerFor = { userId, authSessionVersion: requestedInSession };
         // The copy keeps the whole confirmed thread, older pages included.
         await saveNotesCopy(userId, requestedInSession);
 
@@ -654,6 +692,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       const { notes: existingNotes } = get();
       revokePreviewUrlsFromNotes(existingNotes);
       set({ notes });
+      // A replaced thread: an older page in flight no longer joins onto it.
+      notesThreadGen += 1;
     },
 
     /**

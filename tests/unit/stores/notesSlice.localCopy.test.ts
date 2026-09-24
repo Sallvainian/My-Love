@@ -552,6 +552,36 @@ describe('notesSlice love-notes local copy', () => {
       expect(store.getState().notesHasMore).toBe(false);
     });
 
+    it("a merge over a thread shown from the copy does not keep the copy's hasMore guess", async () => {
+      const minute = (n: number) => String(Math.floor(n / 60)).padStart(2, '0');
+      const second = (n: number) => String(n % 60).padStart(2, '0');
+      const nthRow = (n: number) =>
+        row(`n${n}`, { created_at: `2026-09-20T10:${minute(n)}:${second(n)}.000000+00:00` });
+      server.rows = Array.from({ length: 100 }, (_, i) => nthRow(i + 1));
+      // One note was removed from a 50-note page, so the copy saved 49 rows.
+      savedCopies.set(key(USER_A), Array.from({ length: 49 }, (_, i) => nthRow(i + 52)));
+      goOffline();
+      const store = createTestStore();
+      const refresh = registerLocalCopy.mock.calls.find(
+        ([kind]) => kind === LOVE_NOTES_COPY_KIND
+      )![1] as () => Promise<void>;
+      await store.getState().fetchNotes();
+      // The copy's guess: 49 is under a page, so it reads as the whole thread.
+      expect(store.getState().notesHasMore).toBe(false);
+
+      // The partner sends three notes; the connection returns.
+      server.rows.push(nthRow(101), nthRow(102), nthRow(103));
+      lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: PARTNER });
+      await refresh();
+
+      expect(stateIds(store)[0]).toBe('n52');
+      expect(store.getState().notes).toHaveLength(52);
+      // The oldest kept row's history is unknown: the list may still ask.
+      expect(store.getState().notesHasMore).toBe(true);
+      await store.getState().fetchOlderNotes();
+      expect(stateIds(store)[0]).toBe('n2');
+    });
+
     it('a mount fetch without keepOlder still replaces the thread', async () => {
       const store = createTestStore();
       await loadSixByPages(store);
@@ -926,6 +956,40 @@ describe('notesSlice love-notes local copy', () => {
       await store.getState().fetchOlderNotes();
 
       expect(store.getState().notesError).toBe('Partner not configured');
+    });
+
+    it('removing the oldest note keeps an in-flight older page', async () => {
+      server.rows = ['1', '2', '3', '4', '5', '6'].map((id) => row(id));
+      const store = createTestStore();
+      await store.getState().fetchNotes(2);
+      const gate = deferred();
+      server.hold = gate.promise;
+      const older = store.getState().fetchOlderNotes(2);
+      await flush();
+
+      // The page below note 5 still joins onto note 6 once 5 is gone.
+      await store.getState().removeNote('5');
+      expect(stateIds(store)).toEqual(['6']);
+      gate.resolve();
+      await older;
+
+      expect(stateIds(store)).toEqual(['3', '4', '6']);
+      expect(savedIds()).toEqual(['3', '4', '6']);
+      expect(store.getState().notesIsLoading).toBe(false);
+    });
+
+    it('an older-page request on an empty thread lowers the flag after an account switch', async () => {
+      const store = createTestStore();
+      const lookup = deferred<{ status: 'linked'; partnerId: string }>();
+      lookupPartnerId.mockReturnValue(lookup.promise);
+
+      const inFlight = store.getState().fetchOlderNotes();
+      expect(store.getState().notesIsLoading).toBe(true);
+      store.setState({ userId: USER_B, authSessionVersion: 2, notes: [] });
+      lookup.resolve({ status: 'linked', partnerId: PARTNER });
+      await inFlight;
+
+      expect(store.getState().notesIsLoading).toBe(false);
     });
 
     it("an older page resolving after an account switch saves nothing for A", async () => {
