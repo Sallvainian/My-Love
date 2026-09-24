@@ -167,6 +167,10 @@ vi.mock('../../../src/services/loveNoteImageService', () => ({
   deleteLoveNoteImage: vi.fn(async () => undefined),
 }));
 
+vi.mock('../../../src/services/imageCache', () => ({
+  deleteCachedImages: vi.fn(async () => undefined),
+}));
+
 vi.mock('../../../src/services/imageCompressionService', () => ({
   imageCompressionService: {
     validateImageFile: vi.fn(() => ({ valid: true })),
@@ -174,12 +178,14 @@ vi.mock('../../../src/services/imageCompressionService', () => ({
   },
 }));
 
+import { deleteCachedImages } from '../../../src/services/imageCache';
 import { deleteLoveNoteImage } from '../../../src/services/loveNoteImageService';
 import { createNotesSlice, type NotesSlice } from '../../../src/stores/slices/notesSlice';
 
 const mockedDeleteLoveNoteImage = vi.mocked(deleteLoveNoteImage);
+const mockedDeleteCachedImages = vi.mocked(deleteCachedImages);
 
-type TestStore = NotesSlice & { userId: string | null };
+type TestStore = NotesSlice & { userId: string | null; authSessionVersion?: number };
 
 function createTestStore() {
   const store = create<TestStore>()(createNotesSlice as unknown as StateCreator<TestStore>);
@@ -233,6 +239,69 @@ describe('notesSlice removeNote', () => {
     await store.getState().removeNote('note-0');
 
     expect(mockedDeleteLoveNoteImage).not.toHaveBeenCalled();
+  });
+
+  it('drops the removed note’s image from this account’s image cache', async () => {
+    backend.seed(2);
+    const store = createTestStore();
+    await store.getState().fetchNotes();
+    // note-0 is the one carrying an image.
+    await store.getState().removeNote('note-0');
+
+    expect(mockedDeleteCachedImages).toHaveBeenCalledTimes(1);
+    expect(mockedDeleteCachedImages).toHaveBeenCalledWith(USER_ID, ['a0/pic.jpg']);
+  });
+
+  it('touches no cached image when the removed note has none', async () => {
+    backend.seed(2);
+    const store = createTestStore();
+    await store.getState().fetchNotes();
+    await store.getState().removeNote('note-1');
+
+    expect(mockedDeleteCachedImages).not.toHaveBeenCalled();
+  });
+
+  it('keeps the cached image when the server refuses the removal', async () => {
+    backend.seed(2);
+    const store = createTestStore();
+    await store.getState().fetchNotes();
+
+    backend.failNextRemoval = true;
+    await expect(store.getState().removeNote('note-0')).rejects.toThrow();
+
+    // The note is back in the thread, so its image must still show offline.
+    expect(mockedDeleteCachedImages).not.toHaveBeenCalled();
+  });
+
+  it('keeps the cached image when the session changed during the removal', async () => {
+    backend.seed(2);
+    const store = createTestStore();
+    store.setState({ authSessionVersion: 1 });
+    await store.getState().fetchNotes();
+
+    // Sign-out and a same-account sign-in land while the request is in flight.
+    backend.duringRemoval = () => store.setState({ authSessionVersion: 2 });
+    await store.getState().removeNote('note-0');
+
+    expect(mockedDeleteCachedImages).not.toHaveBeenCalled();
+  });
+
+  it('still reports the removal when dropping the cached image fails', async () => {
+    backend.seed(2);
+    const store = createTestStore();
+    await store.getState().fetchNotes();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockedDeleteCachedImages.mockRejectedValueOnce(new Error('idb unavailable'));
+
+    await expect(store.getState().removeNote('note-0')).resolves.toBeUndefined();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(store.getState().notes.map((n) => n.id)).toEqual(['note-1']);
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('cached image'),
+      expect.any(Error)
+    );
+    consoleError.mockRestore();
   });
 
   it('removing the same note twice converges on one removal', async () => {

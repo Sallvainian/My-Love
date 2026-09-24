@@ -63,7 +63,8 @@
  *   offline it is refused before anything is shown or uploaded. A confirmed
  *   send or resend of any note is broadcast to the partner.
  * - Note images are cached separately, per account and storage path, by
- *   `LoveNoteMessage` through `services/imageCache.ts`.
+ *   `LoveNoteMessage` through `services/imageCache.ts`. A confirmed
+ *   `removeNote` deletes that note's cached image.
  * - NOT persisted to localStorage. Sign-out deletes the outgoing account's
  *   copies and cached images, and `signedOutState()` resets the state. Its
  *   queued notes stay, and send when that account signs back in.
@@ -73,6 +74,7 @@ import { CHECK_CONSTRAINT_MESSAGE, handleSupabaseError, isPostgrestError } from 
 import { sendEphemeralBroadcast } from '../../api/ephemeralBroadcast';
 import { getPartnerId, lookupPartnerId, supabase } from '../../api/supabaseClient';
 import { NOTES_CONFIG } from '../../config/images';
+import { deleteCachedImages } from '../../services/imageCache';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
 import { deleteLoveNoteImage, uploadCompressedBlob } from '../../services/loveNoteImageService';
@@ -1637,6 +1639,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
       const forgetPending = () =>
         get().notesPendingRemoval.filter((id) => id !== noteId);
 
+      // Captured now: the cached image is keyed by the note's storage path.
+      const imagePath = target.image_url ?? null;
+
       const { error } = await supabase.from('love_note_removals').upsert(
         { user_id: userId, note_id: noteId },
         { onConflict: 'user_id,note_id', ignoreDuplicates: true }
@@ -1686,6 +1691,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         // so swallowing this would dismiss it exactly as on success and leave the
         // user watching the message reappear with no explanation.
         throw error instanceof Error ? error : new Error('Failed to remove message');
+      }
+
+      // The removal is confirmed, so its image leaves this account's cache too.
+      // Logged, never thrown: the removal itself has already succeeded.
+      if (imagePath) {
+        deleteCachedImages(userId, [imagePath]).catch((cacheError: unknown) => {
+          console.error('[NotesSlice] Failed to drop a removed note’s cached image:', cacheError);
+        });
       }
 
       // The removal is confirmed: the copy no longer holds the note.
