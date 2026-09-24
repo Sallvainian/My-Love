@@ -85,6 +85,42 @@ export type Database = {
         }
         Relationships: []
       }
+      couple_settings: {
+        Row: {
+          relationship_start: string | null
+          updated_at: string
+          user_a: string
+          user_b: string
+        }
+        Insert: {
+          relationship_start?: string | null
+          updated_at?: string
+          user_a: string
+          user_b: string
+        }
+        Update: {
+          relationship_start?: string | null
+          updated_at?: string
+          user_a?: string
+          user_b?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "couple_settings_user_a_fkey"
+            columns: ["user_a"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "couple_settings_user_b_fkey"
+            columns: ["user_b"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_messages: {
         Row: {
           active: boolean

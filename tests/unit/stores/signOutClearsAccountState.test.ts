@@ -68,6 +68,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   eventsPagination: null,
   eventsIsLoadingMore: false,
   eventsHistoryError: null,
+  coupleSettings: null,
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -466,23 +467,24 @@ describe('clearAuth on sign-out', () => {
     }
   });
 
-  it("drops the previous couple's anniversaries but keeps the device's notification time", () => {
+  it("drops the previous couple's anniversaries and shared start date", () => {
     useAppStore.setState({
-      settings: {
-        ...useAppStore.getState().settings!,
-        notificationTime: '21:30',
+      coupleSettings: {
+        status: 'linked',
+        partnerId: 'previous-partner',
+        relationshipStart: '2020-01-01T18:00:00.000Z',
       },
-    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+    });
 
     useAppStore.getState().clearAuth();
 
-    const settings = useAppStore.getState().settings!;
+    const state = useAppStore.getState();
     // Labels and dates are the couple's, `partialize` persists `settings`, and
     // no service re-derives them — left in place they rehydrate into the next
     // account's Home countdown and Settings list.
-    expect(settings.relationship.anniversaries).toEqual([]);
-    // The notification time is device preference, not account state.
-    expect(settings.notificationTime).toBe('21:30');
+    expect(state.settings!.relationship.anniversaries).toEqual([]);
+    // The start date is the couple's too; the next account reads its own copy.
+    expect(state.coupleSettings).toBeNull();
   });
 
   it('keeps no copy of the anniversaries anywhere in localStorage', () => {

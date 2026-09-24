@@ -21,7 +21,7 @@ vi.mock('../../../stores/useAppStore', () => ({ useAppStore: () => state }));
 import { moodSyncService } from '../../../api/moodSyncService';
 import { PartnerMoodView } from '../PartnerMoodView';
 
-const PARTNER_NAME = 'Harper';
+const PARTNER_DISPLAY_NAME = 'Harper';
 
 function mood(overrides: Partial<MoodEntry>): MoodEntry {
   return {
@@ -60,7 +60,7 @@ function makeState(overrides: Record<string, unknown> = {}) {
     partnerMoods: [] as MoodEntry[],
     fetchPartnerMoods: vi.fn(async () => {}),
     syncStatus: { isOnline: true },
-    partner: { id: 'partner', email: 'partner@example.test', displayName: PARTNER_NAME },
+    partner: { id: 'partner', email: 'partner@example.test', displayName: PARTNER_DISPLAY_NAME },
     isLoadingPartner: false,
     partnerLoadError: false,
     sentRequests: [],
@@ -233,5 +233,29 @@ describe('PartnerMoodView on the kit', () => {
 
     expect(screen.getByTestId('partner-load-error')).toHaveTextContent("You're offline");
     expect(screen.queryByTestId('partner-load-retry')).not.toBeInTheDocument();
+  });
+
+  // CAP-10: the pop-up names the partner from their own display name, never a
+  // hard-coded one. 'Robin' is not any name the app ever shipped with.
+  it.each([
+    ['their display name', 'Robin', 'Robin just logged a mood'],
+    ['"Your partner" without one', '', 'Your partner just logged a mood'],
+  ])('names the partner in the realtime pop-up with %s', async (_label, displayName, expected) => {
+    state = makeState({
+      partnerMoods: SEVERAL,
+      partner: { id: 'partner', email: 'partner@example.test', displayName },
+    });
+    render(<PartnerMoodView />);
+
+    const subscribe = vi.mocked(moodSyncService.subscribeMoodUpdates);
+    await waitFor(() => expect(subscribe).toHaveBeenCalled());
+    const onMood = subscribe.mock.calls[0][0];
+    act(() =>
+      onMood({ mood_type: 'happy', note: null } as unknown as Parameters<typeof onMood>[0])
+    );
+
+    const popup = screen.getByTestId('partner-mood-notification');
+    expect(popup).toHaveTextContent(expected);
+    expect(popup).not.toHaveTextContent(PARTNER_DISPLAY_NAME);
   });
 });

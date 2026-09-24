@@ -39,12 +39,7 @@ const FIELD_NAME_MAP: Record<string, string> = {
   date: 'Date',
   mood: 'Mood',
   note: 'Note',
-  notificationTime: 'Notification time',
-  'relationship.startDate': 'Relationship start date',
-  'relationship.partnerName': 'Partner name',
   'relationship.anniversaries': 'Anniversaries',
-  'notifications.enabled': 'Notifications enabled',
-  'notifications.time': 'Notification time',
 };
 
 /**

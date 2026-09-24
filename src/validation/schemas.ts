@@ -120,18 +120,6 @@ export const MoodEntrySchema = z.object({
 // ============================================================================
 
 /**
- * Time format validation (HH:MM)
- * Ensures consistent time format for notifications and validates hour/minute ranges
- */
-const TimeFormatSchema = z
-  .string()
-  .regex(/^\d{2}:\d{2}$/, 'Time must be in HH:MM format')
-  .refine((time) => {
-    const [hour, minute] = time.split(':').map(Number);
-    return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
-  }, 'Invalid time values (hour must be 00-23, minute must be 00-59)');
-
-/**
  * Anniversary schema for relationship milestones
  */
 export const AnniversarySchema = z.object({
@@ -145,19 +133,11 @@ export const AnniversarySchema = z.object({
 });
 
 /**
- * Full settings schema with nested structures
- * Validates all app settings including relationship and notifications
+ * Full settings schema: the device-persisted settings blob
  */
 export const SettingsSchema = z.object({
-  notificationTime: TimeFormatSchema,
   relationship: z.object({
-    startDate: IsoDateStringSchema,
-    partnerName: z.string().min(1, 'Partner name cannot be empty'),
     anniversaries: z.array(AnniversarySchema),
-  }),
-  notifications: z.object({
-    enabled: z.boolean(),
-    time: z.string(),
   }),
 });
 

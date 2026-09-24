@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CountdownTimer } from '../../CountdownTimer/CountdownTimer';
 import { BirthdayCountdown } from '../BirthdayCountdown';
 import { EventCountdown } from '../EventCountdown';
+import { useAppStore } from '../../../stores/useAppStore';
 import { TimeTogether } from '../TimeTogether';
 
 // Render every motion element as its plain tag, dropping animation props.
@@ -49,6 +50,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  useAppStore.setState({ coupleSettings: null });
 });
 
 describe('Countdown cards on the day itself', () => {
@@ -124,6 +126,13 @@ describe('Countdown cards on an ordinary day', () => {
     // 367 days, 3h 5m 7s after the 2025-10-04 18:00 start (both EDT): past
     // the first anniversary, so the years prefix shows.
     vi.setSystemTime(new Date(2026, 9, 6, 21, 5, 7));
+    useAppStore.setState({
+      coupleSettings: {
+        status: 'linked',
+        partnerId: 'partner',
+        relationshipStart: new Date(2025, 9, 4, 18, 0, 0).toISOString(),
+      },
+    });
 
     render(<TimeTogether />);
 
@@ -178,5 +187,40 @@ describe('Countdown cards on an ordinary day', () => {
     expect(tileOf(card)).toHaveClass('bg-tint', 'text-accent');
     expect(tileOf(card)).not.toHaveClass('bg-fill');
     expect(screen.queryByTestId('celebration-animation')).toBeNull();
+  });
+});
+
+describe('Together for, from the couple start date', () => {
+  afterEach(() => {
+    useAppStore.setState({ coupleSettings: null });
+  });
+
+  it('shows the Settings placeholder for a linked couple with no start date yet', () => {
+    useAppStore.setState({
+      coupleSettings: { status: 'linked', partnerId: 'partner', relationshipStart: null },
+    });
+
+    render(<TimeTogether />);
+
+    const card = screen.getByTestId('time-together');
+    expect(card.querySelector('h3')?.textContent).toBe('Together for');
+    expect(card).toHaveTextContent('Set your start date in Settings');
+    expect(card.textContent ?? '').not.toMatch(/\d{2}h \d{2}m \d{2}s/);
+  });
+
+  it('is hidden with no partner', () => {
+    useAppStore.setState({ coupleSettings: { status: 'unlinked' } });
+
+    render(<TimeTogether />);
+
+    expect(screen.queryByTestId('time-together')).toBeNull();
+  });
+
+  it('is hidden while nothing is known yet (no saved copy, no server answer)', () => {
+    useAppStore.setState({ coupleSettings: null });
+
+    render(<TimeTogether />);
+
+    expect(screen.queryByTestId('time-together')).toBeNull();
   });
 });

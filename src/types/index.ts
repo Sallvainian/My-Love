@@ -64,7 +64,7 @@ export interface Anniversary {
 
 export interface MoodEntry {
   id?: number; // Auto-increment (IndexedDB)
-  userId: string; // Hardcoded for single-user (from constants.ts)
+  userId: string; // The owning account's id
   mood: MoodType; // Primary mood (for backward compatibility)
   moods?: MoodType[]; // Multiple mood support
   note?: string; // Optional, max 200 chars
@@ -82,16 +82,14 @@ export type {
   SupabaseInteractionRecord,
 } from '../api/interactionService';
 
+/**
+ * Device-persisted settings. Couple data does not live here: the relationship
+ * start date is `coupleSettings` (settingsSlice, `public.couple_settings`), and
+ * the partner's name is `partner.displayName`.
+ */
 export interface Settings {
-  notificationTime: string; // HH:MM format
   relationship: {
-    startDate: string; // ISO date string
-    partnerName: string;
     anniversaries: Anniversary[];
-  };
-  notifications: {
-    enabled: boolean;
-    time: string;
   };
 }
 

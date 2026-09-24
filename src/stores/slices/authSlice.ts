@@ -48,7 +48,7 @@ function getAccountOwner(): string | null {
 
 /**
  * Delete one account's saved data from this device: its local copies
- * (anniversaries, partner, …), its custom-message rows and its favorites.
+ * (anniversaries, partner, couple settings, …), its custom-message rows and its favorites.
  * Nothing else — unsynced `moods` rows and any other queued write stay for
  * their owner to send on the next sign-in. The server keeps everything, so the
  * next signed-in refresh brings it back.
@@ -176,6 +176,10 @@ export function signedOutState() {
     eventsPagination: null,
     eventsIsLoadingMore: false,
     eventsHistoryError: null,
+
+    // settingsSlice — the couple's shared start date names this couple's
+    // relationship; the incoming account's refresher reads its own copy.
+    coupleSettings: null,
   } satisfies Partial<AppState>;
 }
 
@@ -263,8 +267,8 @@ function discardAccountState(
   // re-derivable: these are read caches of Supabase and IndexedDB, and unsynced
   // local entries stay in IndexedDB for their owner to pick up.
   //
-  // `settings` survives as a whole — it is device configuration
-  // (notifications) — except relationship.anniversaries inside it, which is
+  // `settings` survives as a whole — it is the device-persisted blob —
+  // except relationship.anniversaries inside it, which is
   // couple data rendered on Home. It is reset to `[]`: the account's saved copy
   // is its local copy (kind `anniversaries`), which the incoming account's
   // refresher reads for itself. This cannot live in signedOutState(), which has

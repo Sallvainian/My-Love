@@ -75,14 +75,27 @@ const STALE_PERSISTED_KEYS = [
 ] as const;
 
 /**
- * Keys inside `settings` left over from the removed pre-kit theme system.
+ * Keys inside `settings` that nothing reads any more: the removed pre-kit theme
+ * system (`themeName`, `customization`) and the never-used reminder settings
+ * (`notificationTime`, `notifications`).
  *
- * Nothing reads them any more, but `SettingsSchema` is not strict and Zustand
- * replaces `settings` whole from the blob, so a device that saved them would
- * carry them forward on every write. Dropping them here lets the next write
- * leave them out.
+ * `SettingsSchema` is not strict and Zustand replaces `settings` whole from the
+ * blob, so a device that saved them would carry them forward on every write.
+ * Dropping them here lets the next write leave them out.
  */
-const STALE_PERSISTED_SETTINGS_KEYS = ['themeName', 'customization'] as const;
+const STALE_PERSISTED_SETTINGS_KEYS = [
+  'themeName',
+  'customization',
+  'notificationTime',
+  'notifications',
+] as const;
+
+/**
+ * Keys inside `settings.relationship` that no longer belong on the device. The
+ * start date is couple data on the server now (`coupleSettings`), and the
+ * partner is named from `partner.displayName`; both were hard-coded defaults.
+ */
+const STALE_PERSISTED_RELATIONSHIP_KEYS = ['startDate', 'partnerName'] as const;
 
 /**
  * The retired anniversary vault's two localStorage keys. The vault stashed each
@@ -210,6 +223,15 @@ export const useAppStore = create<AppState>()(
             ) {
               relationship.anniversaries = [];
               mutated = true;
+            }
+
+            if (relationship && typeof relationship === 'object') {
+              for (const key of STALE_PERSISTED_RELATIONSHIP_KEYS) {
+                if (key in relationship) {
+                  delete relationship[key];
+                  mutated = true;
+                }
+              }
             }
 
             // Schema-validate persisted settings; drop just `settings` on failure

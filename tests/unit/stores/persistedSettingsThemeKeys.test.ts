@@ -8,6 +8,13 @@
  * would carry them forward. The storage adapter drops them from `settings` on
  * the way in (`STALE_PERSISTED_SETTINGS_KEYS` in `useAppStore.ts`), without
  * bumping the persist version the E2E auth fixtures pin.
+ *
+ * The same holds for the settings the couple-settings move retired
+ * (spec-unified-data-storage story 3): `notificationTime` and `notifications`
+ * (read by nothing), and `relationship.startDate` / `relationship.partnerName`
+ * (hard-coded defaults, replaced by the server-held `coupleSettings` and
+ * `partner.displayName`). An old device's blob carries all four; they are
+ * stripped on load and the blob still parses.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -15,11 +22,18 @@ const STORAGE_KEY = 'my-love-storage';
 
 /** Settings as the current build writes them, shaped to pass `SettingsSchema`. */
 const CURRENT_SETTINGS = {
+  relationship: {
+    anniversaries: [{ id: 1, date: '2020-02-14', label: 'First date', serverId: 'srv-1' }],
+  },
+};
+
+/** Settings as a build before the couple-settings move wrote them. */
+const PRE_COUPLE_SETTINGS = {
   notificationTime: '21:30',
   relationship: {
+    ...CURRENT_SETTINGS.relationship,
     startDate: '2020-01-01',
     partnerName: 'A',
-    anniversaries: [{ id: 1, date: '2020-02-14', label: 'First date', serverId: 'srv-1' }],
   },
   notifications: { enabled: false, time: '21:30' },
 };
@@ -35,13 +49,13 @@ const EXPECTED_SETTINGS = {
 };
 
 /** A blob saved by a build that still had the theme system. */
-function legacyBlob(): string {
+function legacyBlob(base: object = CURRENT_SETTINGS): string {
   return JSON.stringify({
     version: 0,
     state: {
       isOnboarded: true,
       settings: {
-        ...CURRENT_SETTINGS,
+        ...base,
         themeName: 'ocean',
         customization: { accentColor: '#ff8888', fontFamily: 'serif' },
       },
@@ -88,6 +102,24 @@ describe('persisted settings from the removed theme system', () => {
 
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);
 
+    expect(parsed.version).toBe(0);
+    expect(parsed.state.settings).toEqual(EXPECTED_SETTINGS);
+  });
+
+  it('rehydrates an old device without the start date, partner name or notification keys', async () => {
+    const useAppStore = await hydrateFrom(legacyBlob(PRE_COUPLE_SETTINGS));
+    const settings = useAppStore.getState().settings;
+
+    expect(settings).toEqual(EXPECTED_SETTINGS);
+    expect(settings).not.toHaveProperty('notificationTime');
+    expect(settings).not.toHaveProperty('notifications');
+    expect(settings?.relationship).not.toHaveProperty('startDate');
+    expect(settings?.relationship).not.toHaveProperty('partnerName');
+    // The blob still parsed: nothing else was reset.
+    expect(useAppStore.getState().messageHistory.currentIndex).toBe(7);
+
+    useAppStore.setState({ isOnboarded: true });
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);
     expect(parsed.version).toBe(0);
     expect(parsed.state.settings).toEqual(EXPECTED_SETTINGS);
   });

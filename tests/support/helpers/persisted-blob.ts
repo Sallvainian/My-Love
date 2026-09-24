@@ -45,14 +45,16 @@ export const STORAGE_KEY = 'my-love-storage';
 export const PERSIST_VERSION = 0;
 
 /**
- * A settings object shaped to pass `SettingsSchema`.
+ * A settings object as an installed build before couple settings moved to the
+ * server wrote it: it still carries `notificationTime`, `notifications`,
+ * `relationship.startDate` and `relationship.partnerName`, which the storage
+ * adapter now strips on load (`STALE_PERSISTED_SETTINGS_KEYS` and
+ * `STALE_PERSISTED_RELATIONSHIP_KEYS` in `useAppStore.ts`).
  *
- * It has to pass: the adapter drops `settings` outright when the schema
- * rejects it (`useAppStore.ts:147-158`), which would make "the surrounding
- * keys survived the strip" unprovable — the key would be gone for an unrelated
- * reason. `startDate` and `partnerName` are deliberately NOT the app defaults
- * (`APP_CONFIG` in `src/config/constants.ts`), so a test can tell "the seeded
- * settings were applied" from "defaults were applied".
+ * It still passes `SettingsSchema`, which is not strict. It has to: the
+ * adapter drops `settings` outright when the schema rejects it, which would
+ * make "the surrounding keys survived the strip" unprovable — the key would be
+ * gone for an unrelated reason.
  */
 export const SEEDED_SETTINGS = {
   notificationTime: '09:00',

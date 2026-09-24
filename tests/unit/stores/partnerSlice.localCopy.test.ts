@@ -6,7 +6,7 @@
  * server read (`partnerService.getPartner`) mocked, so the copy that is read
  * and written is the real `local-copies` row.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import 'fake-indexeddb/auto';
 
 const getPartner = vi.fn();
@@ -21,7 +21,12 @@ vi.mock('../../../src/api/partnerService', () => ({
 }));
 
 import { openMyLoveDB } from '../../../src/services/dbSchema';
-import { readLocalCopy, refreshLocalCopies, writeLocalCopy } from '../../../src/services/localCopy';
+import {
+  readLocalCopy,
+  refreshLocalCopies,
+  registerLocalCopy,
+  writeLocalCopy,
+} from '../../../src/services/localCopy';
 import { PARTNER_COPY_KIND } from '../../../src/stores/slices/partnerSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 
@@ -241,5 +246,54 @@ describe('partner profile on the local copy', () => {
 
     expect(state().partner).toEqual(FRESH);
     expect(state().partnerLoadError).toBe(false);
+  });
+
+  describe('a new link seen by loadPartner refreshes the couple settings', () => {
+    // The partner who SENT the request learns of the link only through
+    // loadPartner; without this their couple settings stay "unlinked".
+    let refreshCouple: Mock<() => Promise<void>>;
+    let unregister: () => void;
+
+    beforeEach(() => {
+      refreshCouple = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+      unregister = registerLocalCopy('couple-settings', refreshCouple);
+    });
+
+    afterEach(() => {
+      unregister();
+    });
+
+    it('refreshes when the server shows a partner the couple settings do not know', async () => {
+      useAppStore.setState({ coupleSettings: { status: 'unlinked' } } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+      getPartner.mockResolvedValue({ status: 'linked', partner: FRESH });
+
+      await state().loadPartner();
+
+      await vi.waitFor(() => expect(refreshCouple).toHaveBeenCalledTimes(1));
+    });
+
+    it('does not refresh when the couple settings already name this partner', async () => {
+      useAppStore.setState({
+        coupleSettings: { status: 'linked', partnerId: FRESH.id, relationshipStart: null },
+      } as unknown as Parameters<typeof useAppStore.setState>[0]);
+      getPartner.mockResolvedValue({ status: 'linked', partner: FRESH });
+
+      await state().loadPartner();
+
+      expect(refreshCouple).not.toHaveBeenCalled();
+    });
+
+    it('does not refresh on a failed partner read', async () => {
+      useAppStore.setState({ coupleSettings: { status: 'unlinked' } } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+      getPartner.mockResolvedValue({ status: 'error', reason: 'network' });
+
+      await state().loadPartner();
+
+      expect(refreshCouple).not.toHaveBeenCalled();
+    });
   });
 });

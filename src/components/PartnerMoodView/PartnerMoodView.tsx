@@ -15,7 +15,6 @@ import {
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { handleSupabaseError, isPostgrestError } from '../../api/errorHandlers';
 import { moodSyncService } from '../../api/moodSyncService';
-import { PARTNER_NAME } from '../../config/constants';
 import { MOOD_DISPLAY, MOOD_TONE } from '../../constants/moodDisplay';
 import { parseEventDate } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
@@ -358,7 +357,8 @@ export function PartnerMoodView() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-semibold text-ink">
-                  {PARTNER_NAME} just logged a mood: {notification.mood}
+                  {partner?.displayName?.trim() || 'Your partner'} just logged a mood:{' '}
+                  {notification.mood}
                 </p>
                 {notification.note && (
                   <p
