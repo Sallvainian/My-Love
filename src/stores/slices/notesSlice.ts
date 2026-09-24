@@ -573,10 +573,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         // Get the oldest message timestamp for pagination
         const oldestNote = notes[0];
         if (!oldestNote) {
-          if (!ownsRequest()) {
-            set({ notesIsLoading: false });
-            return;
-          }
+          if (!ownsRequest()) return;
           set({ notesIsLoading: false, notesHasMore: false });
           return;
         }

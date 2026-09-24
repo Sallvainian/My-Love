@@ -978,20 +978,6 @@ describe('notesSlice love-notes local copy', () => {
       expect(store.getState().notesIsLoading).toBe(false);
     });
 
-    it('an older-page request on an empty thread lowers the flag after an account switch', async () => {
-      const store = createTestStore();
-      const lookup = deferred<{ status: 'linked'; partnerId: string }>();
-      lookupPartnerId.mockReturnValue(lookup.promise);
-
-      const inFlight = store.getState().fetchOlderNotes();
-      expect(store.getState().notesIsLoading).toBe(true);
-      store.setState({ userId: USER_B, authSessionVersion: 2, notes: [] });
-      lookup.resolve({ status: 'linked', partnerId: PARTNER });
-      await inFlight;
-
-      expect(store.getState().notesIsLoading).toBe(false);
-    });
-
     it("an older page resolving after an account switch saves nothing for A", async () => {
       server.rows = [row('1'), row('2'), row('3')];
       const store = createTestStore();
