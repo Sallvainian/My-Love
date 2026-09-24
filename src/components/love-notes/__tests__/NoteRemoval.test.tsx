@@ -33,6 +33,11 @@ vi.mock('framer-motion', () => ({
 
 vi.mock('../../../services/loveNoteImageService', () => ({
   getSignedImageUrl: vi.fn(async () => ({ url: 'https://example.test/x.jpg', expiresAt: 0 })),
+  // Images are downloaded into the image cache first; failing here keeps these
+  // cases on the signed-URL path they were written against.
+  downloadLoveNoteImage: vi.fn(async () => {
+    throw new Error('download unavailable in this test');
+  }),
 }));
 
 vi.mock('../FullScreenImageViewer', () => ({

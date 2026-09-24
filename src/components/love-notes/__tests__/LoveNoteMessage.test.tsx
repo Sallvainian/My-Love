@@ -31,8 +31,40 @@ vi.mock('framer-motion', () => ({
 
 // Mock loveNoteImageService
 const mockGetSignedImageUrl = vi.fn();
+const mockDownloadLoveNoteImage = vi.fn();
 vi.mock('../../../services/loveNoteImageService', () => ({
   getSignedImageUrl: (path: string) => mockGetSignedImageUrl(path),
+  downloadLoveNoteImage: (path: string) => mockDownloadLoveNoteImage(path),
+}));
+
+// Mock the per-account image cache
+const mockReadCachedImage = vi.fn();
+const mockWriteCachedImage = vi.fn();
+vi.mock('../../../services/imageCache', () => ({
+  readCachedImage: (userId: string, path: string) => mockReadCachedImage(userId, path),
+  writeCachedImage: (userId: string, path: string, blob: Blob) =>
+    mockWriteCachedImage(userId, path, blob),
+}));
+
+// The identity the image effect captures. Signed out (null) by default, which
+// takes the signed-URL path directly; the image-cache cases sign in.
+const storeState = { userId: null as string | null, authSessionVersion: 1 };
+const storeListeners = new Set<(state: typeof storeState) => void>();
+/** An account switch as the store announces it, before any re-render. */
+function switchIdentity(next: Partial<typeof storeState>) {
+  Object.assign(storeState, next);
+  for (const listener of storeListeners) listener(storeState);
+}
+vi.mock('../../../stores/useAppStore', () => ({
+  useAppStore: Object.assign(
+    (selector: (state: typeof storeState) => unknown) => selector(storeState),
+    {
+      subscribe: (listener: (state: typeof storeState) => void) => {
+        storeListeners.add(listener);
+        return () => storeListeners.delete(listener);
+      },
+    }
+  ),
 }));
 
 // Mock FullScreenImageViewer
@@ -56,6 +88,12 @@ describe('LoveNoteMessage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    storeState.userId = null;
+    storeState.authSessionVersion = 1;
+    storeListeners.clear();
+    mockReadCachedImage.mockResolvedValue(null);
+    mockWriteCachedImage.mockResolvedValue(undefined);
+    mockDownloadLoveNoteImage.mockRejectedValue(new Error('Failed to download image'));
     mockGetSignedImageUrl.mockResolvedValue({
       url: 'https://storage.example.com/signed-image.jpg',
       expiresAt: Date.now() + 3600000,
@@ -219,6 +257,175 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={uploadingMessage} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByText('Uploading...')).toBeInTheDocument();
+    });
+  });
+
+  describe('Image cache (offline)', () => {
+    const USER = 'user-123';
+    const PATH = 'partner-456/1705315800000-uuid.jpg';
+    const imageMessage: LoveNote = { ...baseMessage, image_url: PATH };
+    let createObjectURL: ReturnType<typeof vi.fn>;
+    let revokeObjectURL: ReturnType<typeof vi.fn>;
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+
+    beforeEach(() => {
+      storeState.userId = USER;
+      createObjectURL = vi.fn(() => 'blob:http://localhost/cached-image');
+      revokeObjectURL = vi.fn();
+      URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+      URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
+    });
+
+    afterEach(() => {
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+    });
+
+    function deferred<T>() {
+      let resolve: (value: T) => void = () => {};
+      const promise = new Promise<T>((res) => {
+        resolve = res;
+      });
+      return { promise, resolve };
+    }
+
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+    it('shows a cached image from the cache, with no download or signed URL', async () => {
+      const blob = new Blob(['cached']);
+      mockReadCachedImage.mockResolvedValue(blob);
+
+      render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: /image from partner/i })).toHaveAttribute(
+          'src',
+          'blob:http://localhost/cached-image'
+        );
+      });
+      expect(mockReadCachedImage).toHaveBeenCalledWith(USER, PATH);
+      expect(createObjectURL).toHaveBeenCalledWith(blob);
+      expect(mockDownloadLoveNoteImage).not.toHaveBeenCalled();
+      expect(mockGetSignedImageUrl).not.toHaveBeenCalled();
+    });
+
+    it('on a miss, downloads by storage path, caches it and shows it', async () => {
+      const blob = new Blob(['downloaded']);
+      mockDownloadLoveNoteImage.mockResolvedValue(blob);
+
+      render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: /image from partner/i })).toHaveAttribute(
+          'src',
+          'blob:http://localhost/cached-image'
+        );
+      });
+      expect(mockDownloadLoveNoteImage).toHaveBeenCalledWith(PATH);
+      expect(mockWriteCachedImage).toHaveBeenCalledWith(USER, PATH, blob);
+      expect(mockGetSignedImageUrl).not.toHaveBeenCalled();
+    });
+
+    it('falls back to a signed URL when the download fails, caching nothing', async () => {
+      render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: /image from partner/i })).toHaveAttribute(
+          'src',
+          'https://storage.example.com/signed-image.jpg'
+        );
+      });
+      expect(mockWriteCachedImage).not.toHaveBeenCalled();
+    });
+
+    it('offline, an image never seen before shows the image-error placeholder', async () => {
+      mockGetSignedImageUrl.mockRejectedValue(new Error('Failed to fetch'));
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to load image')).toBeInTheDocument();
+      });
+      expect(mockWriteCachedImage).not.toHaveBeenCalled();
+    });
+
+    it('a failed cache write is logged and the image still shows', async () => {
+      mockDownloadLoveNoteImage.mockResolvedValue(new Blob(['downloaded']));
+      mockWriteCachedImage.mockRejectedValue(new Error('QuotaExceededError'));
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: /image from partner/i })).toHaveAttribute(
+          'src',
+          'blob:http://localhost/cached-image'
+        );
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[LoveNoteMessage] Failed to cache image:',
+        expect.any(Error)
+      );
+    });
+
+    it("drops a download that resolves after an account switch: nothing cached or shown for A", async () => {
+      const download = deferred<Blob>();
+      mockDownloadLoveNoteImage.mockReturnValue(download.promise);
+
+      render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
+      await waitFor(() => expect(mockDownloadLoveNoteImage).toHaveBeenCalled());
+
+      switchIdentity({ userId: 'user-B', authSessionVersion: 2 });
+      download.resolve(new Blob(['A-IMAGE']));
+      await settle();
+
+      expect(mockWriteCachedImage).not.toHaveBeenCalled();
+      expect(createObjectURL).not.toHaveBeenCalled();
+      expect(mockGetSignedImageUrl).not.toHaveBeenCalled();
+    });
+
+    it('drops a cache read that resolves after a sign-out and back in (new session)', async () => {
+      const read = deferred<Blob | null>();
+      mockReadCachedImage.mockReturnValue(read.promise);
+
+      render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
+      await waitFor(() => expect(mockReadCachedImage).toHaveBeenCalled());
+
+      switchIdentity({ authSessionVersion: 2 });
+      read.resolve(new Blob(['A-IMAGE']));
+      await settle();
+
+      expect(createObjectURL).not.toHaveBeenCalled();
+      expect(mockDownloadLoveNoteImage).not.toHaveBeenCalled();
+    });
+
+    it('revokes the object URL on unmount', async () => {
+      mockReadCachedImage.mockResolvedValue(new Blob(['cached']));
+
+      const { unmount } = render(
+        <LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />
+      );
+      await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+
+      unmount();
+
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/cached-image');
+    });
+
+    it('never reads or writes the cache for an optimistic preview', async () => {
+      render(
+        <LoveNoteMessage
+          message={{ ...baseMessage, imagePreviewUrl: 'blob:http://localhost/preview-1' }}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+      await settle();
+
+      expect(mockReadCachedImage).not.toHaveBeenCalled();
+      expect(mockWriteCachedImage).not.toHaveBeenCalled();
     });
   });
 

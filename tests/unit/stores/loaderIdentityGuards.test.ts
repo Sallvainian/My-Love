@@ -66,6 +66,7 @@ vi.mock('../../../src/api/supabaseClient', () => ({
     rpc: vi.fn(),
   },
   getPartnerId: vi.fn(),
+  lookupPartnerId: vi.fn(),
 }));
 
 vi.mock('../../../src/api/moodSyncService', () => ({
@@ -320,8 +321,9 @@ describe('loader identity guards', () => {
     localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
     useAppStore.setState({ error: null });
 
-    const { getPartnerId } = await import('../../../src/api/supabaseClient');
+    const { getPartnerId, lookupPartnerId } = await import('../../../src/api/supabaseClient');
     vi.mocked(getPartnerId).mockResolvedValue('USER-B-ID');
+    vi.mocked(lookupPartnerId).mockResolvedValue({ status: 'linked', partnerId: 'USER-B-ID' });
     getUnsyncedMoods.mockResolvedValue([]);
     // Quiet by default: the custom-message cases each set what they need, and
     // several actions chain into loadMessages/loadCustomMessages afterwards.

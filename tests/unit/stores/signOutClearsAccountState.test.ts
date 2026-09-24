@@ -641,8 +641,17 @@ describe('clearAuth on sign-out', () => {
     ]);
     await writeLocalCopy('OTHER-ACCOUNT', 'anniversaries', []);
     await writeLocalCopy(outgoing, 'profile', { displayName: 'OUTGOING', birthday: '1990-01-02' });
+    await writeLocalCopy(outgoing, 'love-notes', [{ id: 'note-1', content: 'OUTGOING-NOTE' }]);
     const db = await openMyLoveDB();
     try {
+      // Cached note images (story 8). The value is opaque to the delete, so a
+      // string stands in for the Blob happy-dom cannot structured-clone.
+      await db.put('image-cache', {
+        userId: outgoing, path: 'partner/pic.jpg', blob: 'OUTGOING-IMAGE' as never, savedAt: 1,
+      });
+      await db.put('image-cache', {
+        userId: 'OTHER-ACCOUNT', path: 'partner/pic.jpg', blob: 'OTHER-IMAGE' as never, savedAt: 1,
+      });
       const at = new Date('2026-08-03T06:00:00.000Z');
       const bundledId = await db.add('messages', {
         text: SHARED_DAILY_TEXT, category: 'reason', isCustom: false, createdAt: at,
@@ -680,8 +689,10 @@ describe('clearAuth on sign-out', () => {
     await vi.waitFor(async () => {
       expect(await readLocalCopy(outgoing, 'anniversaries')).toBeNull();
       expect(await readLocalCopy(outgoing, 'profile')).toBeNull();
+      expect(await readLocalCopy(outgoing, 'love-notes')).toBeNull();
       const db = await openMyLoveDB();
       try {
+        expect(await db.get('image-cache', [outgoing, 'partner/pic.jpg'])).toBeUndefined();
         expect(await db.get('messages', ids.ownId)).toBeUndefined();
         expect(await db.getAllFromIndex('message-favorites', 'by-user', outgoing)).toEqual([]);
       } finally {
@@ -692,6 +703,9 @@ describe('clearAuth on sign-out', () => {
     const db = await openMyLoveDB();
     try {
       // Unowned rows and the other account's rows are untouched…
+      expect(await db.get('image-cache', ['OTHER-ACCOUNT', 'partner/pic.jpg'])).toMatchObject({
+        blob: 'OTHER-IMAGE',
+      });
       expect(await db.get('messages', ids.bundledId)).toBeDefined();
       expect(await db.get('messages', ids.legacyId)).toBeDefined();
       expect(await db.get('messages', ids.otherId)).toBeDefined();
@@ -709,7 +723,7 @@ describe('clearAuth on sign-out', () => {
     const db = await openMyLoveDB();
     try {
       await Promise.all(
-        (['moods', 'local-copies', 'messages', 'message-favorites'] as const).map((store) =>
+        (['moods', 'local-copies', 'image-cache', 'messages', 'message-favorites'] as const).map((store) =>
           db.clear(store)
         )
       );
@@ -718,7 +732,7 @@ describe('clearAuth on sign-out', () => {
     }
   }
 
-  it("deletes the outgoing account's local copies, custom rows and favorites, and nothing else", async () => {
+  it("deletes the outgoing account's local copies, cached images, custom rows and favorites, and nothing else", async () => {
     // CAP-7: another account on the device keeps its data, and the outgoing
     // account's unsynced mood — a queued write — survives for its next sign-in.
     const ids = await seedDevice(SECRETS.userId);

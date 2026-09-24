@@ -38,6 +38,7 @@ export type StoredMoodEntry = MoodEntry;
  * - v10: Dropped the four scripture stores
  * - v11: Dropped the photos store (photos live in Supabase; nothing read it)
  * - v12: Added local-copies, the one per-account store for server-derived copies
+ * - v13: Added image-cache, per-account image Blobs keyed by storage path
  */
 export interface MyLoveDBSchema extends DBSchema {
   'message-favorites': {
@@ -90,6 +91,28 @@ export interface MyLoveDBSchema extends DBSchema {
     value: StoredLocalCopy;
     indexes: { 'by-user': string };
   };
+  /**
+   * The per-account image cache (`src/services/imageCache.ts`). One Blob per
+   * account and storage path, kept apart from `local-copies` because that
+   * store holds plain data only.
+   */
+  'image-cache': {
+    key: [string, string];
+    value: StoredCachedImage;
+    indexes: { 'by-user': string };
+  };
+}
+
+/**
+ * One cached image for one account, keyed by its storage path (never by a
+ * signed URL, which changes on every signing and expires).
+ */
+export interface StoredCachedImage {
+  userId: string;
+  path: string;
+  blob: Blob;
+  /** Epoch ms of the write that cached this image. */
+  savedAt: number;
 }
 
 /**
@@ -133,7 +156,11 @@ export const DB_NAME = 'my-love-db';
 // v12 adds `local-copies`, keyed [userId, kind] with a `by-user` index: the one
 // store every data kind's saved copy lives in (see src/services/localCopy.ts).
 // Created only if absent, so a profile that already has it is a no-op.
-export const DB_VERSION = 12;
+//
+// v13 adds `image-cache`, keyed [userId, path] with a `by-user` index: image
+// Blobs cached by storage path so an image shown online can be shown offline
+// (see src/services/imageCache.ts). Same existence gate as v12.
+export const DB_VERSION = 13;
 
 /**
  * Store name constants for consistent access across services
@@ -144,11 +171,12 @@ export const STORE_NAMES = {
   MOODS: 'moods',
   SW_AUTH: 'sw-auth',
   LOCAL_COPIES: 'local-copies',
+  IMAGE_CACHE: 'image-cache',
 } as const;
 
 /**
  * Centralized IndexedDB upgrade function
- * Handles all store creation and migrations for v1-v12
+ * Handles all store creation and migrations for v1-v13
  *
  * Called by all services to ensure consistent database schema.
  * This fixes the tech debt where each service had duplicate upgrade logic.
@@ -287,6 +315,16 @@ export function upgradeDb(
   } else if (tx) {
     const copies = tx.objectStore('local-copies');
     if (!copies.indexNames.contains('by-user')) copies.createIndex('by-user', 'userId');
+  }
+
+  // v13: the per-account image cache. Same existence gate as v12.
+  if (!db.objectStoreNames.contains('image-cache')) {
+    const images = db.createObjectStore('image-cache', { keyPath: ['userId', 'path'] });
+    images.createIndex('by-user', 'userId');
+    logger.debug('[dbSchema] Created image-cache store (v13)');
+  } else if (tx) {
+    const images = tx.objectStore('image-cache');
+    if (!images.indexNames.contains('by-user')) images.createIndex('by-user', 'userId');
   }
 
   // v10: drop the four scripture stores if they still exist. Names are gone

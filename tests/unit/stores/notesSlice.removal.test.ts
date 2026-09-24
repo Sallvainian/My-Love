@@ -159,6 +159,7 @@ function fakeFrom(table: string) {
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: (table: string) => fakeFrom(table) },
   getPartnerId: vi.fn(async () => PARTNER_ID),
+  lookupPartnerId: vi.fn(async () => ({ status: 'linked', partnerId: PARTNER_ID })),
 }));
 
 vi.mock('../../../src/services/loveNoteImageService', () => ({

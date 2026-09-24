@@ -66,16 +66,17 @@ describe('dbSchema', () => {
       expect(db.objectStoreNames.contains('moods')).toBe(true);
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
       expect(db.objectStoreNames.contains('local-copies')).toBe(true);
+      expect(db.objectStoreNames.contains('image-cache')).toBe(true);
       // v11: photos live in Supabase; a fresh profile never gets the store.
       expect(unwrap(db).objectStoreNames.contains('photos')).toBe(false);
     });
 
-    it('should create exactly 5 stores', async () => {
+    it('should create exactly 6 stores', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
       });
 
-      expect(db.objectStoreNames.length).toBe(5);
+      expect(db.objectStoreNames.length).toBe(6);
     });
   });
 
@@ -283,11 +284,12 @@ describe('dbSchema', () => {
       expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V7' });
       expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V7' });
 
-      // Five stores (message-favorites is created at v9, local-copies at v12);
+      // Six stores (message-favorites is created at v9, local-copies at v12,
+      // image-cache at v13);
       // the v7 scripture stores are dropped on the way to v10 and photos on the
       // way to v11. The v7 moods index is untouched — v8 must not re-run the v7
       // swap over a store that has already had it.
-      expect(db.objectStoreNames.length).toBe(5);
+      expect(db.objectStoreNames.length).toBe(6);
       const remaining = Array.from(unwrap(db).objectStoreNames);
       expect(remaining).not.toContain('photos');
       expect(remaining).not.toContain('scripture-sessions');
@@ -474,7 +476,8 @@ describe('dbSchema', () => {
       expect(db.objectStoreNames.contains('moods')).toBe(true);
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
       expect(db.objectStoreNames.contains('local-copies')).toBe(true);
-      expect(db.objectStoreNames.length).toBe(5);
+      expect(db.objectStoreNames.contains('image-cache')).toBe(true);
+      expect(db.objectStoreNames.length).toBe(6);
 
       const remaining = Array.from(unwrap(db).objectStoreNames);
       expect(remaining).not.toContain('photos');
@@ -559,8 +562,8 @@ describe('dbSchema', () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('photos');
-      // The four survivors plus v12's local-copies.
-      expect(db.objectStoreNames.length).toBe(5);
+      // The four survivors plus v12's local-copies and v13's image-cache.
+      expect(db.objectStoreNames.length).toBe(6);
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
       expect((await db.getAll('message-favorites'))[0]).toEqual({
         messageId: 1,
@@ -577,7 +580,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(5);
+      expect(db.objectStoreNames.length).toBe(6);
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
     });
   });
@@ -618,7 +621,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(5);
+      expect(db.objectStoreNames.length).toBe(6);
       const copies = db.transaction('local-copies', 'readonly').objectStore('local-copies');
       expect(Array.from(copies.keyPath as string[])).toEqual(['userId', 'kind']);
       expect(copies.indexNames.contains('by-user')).toBe(true);
@@ -645,10 +648,84 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(5);
+      expect(db.objectStoreNames.length).toBe(6);
       expect(await db.get('local-copies', ['USER-A', 'partner'])).toMatchObject({
         value: { status: 'unlinked' },
       });
+    });
+  });
+
+  describe('upgrade from v12 to v13', () => {
+    async function seedV12(options: { withImageCache: boolean }): Promise<void> {
+      const db = await openDB(DB_NAME, 12, {
+        upgrade(database) {
+          const messages = database.createObjectStore('messages', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          messages.createIndex('by-category', 'category');
+          messages.createIndex('by-date', 'createdAt');
+          messages.createIndex('by-user', 'userId');
+          database
+            .createObjectStore('message-favorites', { keyPath: ['messageId', 'userId'] })
+            .createIndex('by-user', 'userId');
+          database
+            .createObjectStore('moods', { keyPath: 'id', autoIncrement: true })
+            .createIndex('by-user-date', ['userId', 'date'], { unique: true });
+          database.createObjectStore('sw-auth', { keyPath: 'id' });
+          database
+            .createObjectStore('local-copies', { keyPath: ['userId', 'kind'] })
+            .createIndex('by-user', 'userId');
+          if (options.withImageCache) {
+            // A store that exists without its index: the upgrade adds it.
+            database.createObjectStore('image-cache', { keyPath: ['userId', 'path'] });
+          }
+        },
+      });
+      await db.put('local-copies', {
+        userId: 'USER-A',
+        kind: 'love-notes',
+        value: [{ id: 'COPY-AT-V12' }],
+        savedAt: 1,
+      });
+      if (options.withImageCache) {
+        await db.put('image-cache', {
+          userId: 'USER-A',
+          path: 'partner/pic.jpg',
+          blob: 'IMAGE-AT-V12',
+          savedAt: 1,
+        });
+      }
+      db.close();
+    }
+
+    it('adds image-cache keyed [userId, path] with a by-user index, keeping every row', async () => {
+      await seedV12({ withImageCache: false });
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(db.objectStoreNames.length).toBe(6);
+      const images = db.transaction('image-cache', 'readonly').objectStore('image-cache');
+      expect(Array.from(images.keyPath as string[])).toEqual(['userId', 'path']);
+      expect(images.indexNames.contains('by-user')).toBe(true);
+      expect(await db.get('local-copies', ['USER-A', 'love-notes'])).toMatchObject({
+        value: [{ id: 'COPY-AT-V12' }],
+      });
+    });
+
+    it('keeps an existing image-cache store and its rows, adding a missing index', async () => {
+      // Existence-gated: a profile that already has the store must not throw
+      // ConstraintError, and its rows survive.
+      await seedV12({ withImageCache: true });
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(db.objectStoreNames.length).toBe(6);
+      const images = db.transaction('image-cache', 'readonly').objectStore('image-cache');
+      expect(images.indexNames.contains('by-user')).toBe(true);
+      expect(
+        (await db.get('image-cache', ['USER-A', 'partner/pic.jpg'])) as unknown
+      ).toMatchObject({ blob: 'IMAGE-AT-V12' });
     });
   });
 
@@ -891,6 +968,7 @@ describe('dbSchema', () => {
         MOODS: 'moods',
         SW_AUTH: 'sw-auth',
         LOCAL_COPIES: 'local-copies',
+        IMAGE_CACHE: 'image-cache',
       });
     });
   });
@@ -905,8 +983,9 @@ describe('dbSchema', () => {
       // callback get their missing stores created; v7 swaps the moods index;
       // v8 adds by-user to messages; v9 stores favorites by account; v10 drops
       // the four scripture stores; v11 drops the unused photos store; v12 adds
-      // the shared per-account local-copies store.
-      expect(DB_VERSION).toBe(12);
+      // the shared per-account local-copies store; v13 adds the per-account
+      // image-cache store.
+      expect(DB_VERSION).toBe(13);
     });
   });
 });
