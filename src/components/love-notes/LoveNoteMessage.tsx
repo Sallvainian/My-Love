@@ -19,7 +19,9 @@ import DOMPurify from 'dompurify';
 import { motion } from 'framer-motion';
 import { Loader2, Trash2 } from 'lucide-react';
 import { memo, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getSignedImageUrl } from '../../services/loveNoteImageService';
+import { readCachedImage, writeCachedImage } from '../../services/imageCache';
+import { downloadLoveNoteImage, getSignedImageUrl } from '../../services/loveNoteImageService';
+import { useAppStore } from '../../stores/useAppStore';
 import type { LoveNote } from '../../types/models';
 import { formatFullTimestamp, formatMessageTimestamp } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
@@ -69,6 +71,10 @@ function LoveNoteMessageComponent({
   // reference. Offering the control there would post `temp-...` into a uuid.
   const canRemove = !!onRequestRemove && !message.tempId;
 
+  // The signed-in identity: server images are cached per account.
+  const userId = useAppStore((state) => state.userId);
+  const authSessionVersion = useAppStore((state) => state.authSessionVersion);
+
   // Image state
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
@@ -111,9 +117,13 @@ function LoveNoteMessageComponent({
     return `Photo shared by ${senderName}`;
   }, [sanitizedContent, senderName]);
 
-  // Fetch signed URL for server-stored images
+  // Show server-stored images cache-first. A server image is read from the
+  // per-account image cache (so an image seen online shows offline); on a miss
+  // it is downloaded by storage path, cached, and shown from a blob URL. Only
+  // if the download fails does it fall back to a signed URL, as before.
   useEffect(() => {
     let isMounted = true;
+    let objectUrl: string | null = null;
 
     const scheduleStateUpdate = (update: () => void) => {
       queueMicrotask(() => {
@@ -135,30 +145,85 @@ function LoveNoteMessageComponent({
       };
     }
 
-    // Fetch signed URL for server images
     if (message.image_url) {
+      const storagePath = message.image_url;
+      // Identity captured before the first await: an image fetched for one
+      // account is never cached or shown under another. The subscription
+      // notices a switch synchronously, before React re-renders and re-runs
+      // this effect.
+      let sessionChanged = false;
+      const unsubscribe = useAppStore.subscribe((state) => {
+        if (state.userId !== userId || state.authSessionVersion !== authSessionVersion) {
+          sessionChanged = true;
+        }
+      });
+      const ownsSession = () => !sessionChanged;
+
       scheduleStateUpdate(() => {
         setImageLoading(true);
         setImageError(false);
       });
 
-      getSignedImageUrl(message.image_url)
-        .then(({ url }) => {
-          if (isMounted) {
+      const showBlob = (blob: Blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        setImageUrl(objectUrl);
+        setImageLoading(false);
+      };
+
+      const showSignedUrl = async () => {
+        try {
+          const { url } = await getSignedImageUrl(storagePath);
+          if (isMounted && ownsSession()) {
             setImageUrl(url);
             setImageLoading(false);
           }
-        })
-        .catch((error) => {
+        } catch (error) {
           console.error('[LoveNoteMessage] Failed to get signed URL:', error);
           if (isMounted) {
             setImageError(true);
             setImageLoading(false);
           }
-        });
+        }
+      };
+
+      void (async () => {
+        if (!userId) {
+          await showSignedUrl();
+          return;
+        }
+
+        const cached = await readCachedImage(userId, storagePath);
+        if (!isMounted || !ownsSession()) return;
+        if (cached) {
+          showBlob(cached);
+          return;
+        }
+
+        let downloaded: Blob;
+        try {
+          downloaded = await downloadLoveNoteImage(storagePath);
+        } catch (error) {
+          logger.debug('[LoveNoteMessage] Image download failed; using a signed URL', error);
+          if (!isMounted || !ownsSession()) return;
+          await showSignedUrl();
+          return;
+        }
+        if (!ownsSession()) return;
+
+        // A failed cache write is logged; the image still shows.
+        try {
+          await writeCachedImage(userId, storagePath, downloaded);
+        } catch (error) {
+          console.error('[LoveNoteMessage] Failed to cache image:', error);
+        }
+        if (!isMounted || !ownsSession()) return;
+        showBlob(downloaded);
+      })();
 
       return () => {
         isMounted = false;
+        unsubscribe();
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
       };
     }
 
@@ -171,7 +236,7 @@ function LoveNoteMessageComponent({
     return () => {
       isMounted = false;
     };
-  }, [message.image_url, message.imagePreviewUrl]);
+  }, [message.image_url, message.imagePreviewUrl, userId, authSessionVersion]);
 
   // Retry fetching signed URL on 403 error (force refresh to bypass cache)
   // Includes retry limit to prevent infinite loops and mounted check for cleanup

@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   deleteLoveNoteImage,
+  downloadLoveNoteImage,
   getSignedImageUrl,
   uploadCompressedBlob,
   uploadLoveNoteImage,
@@ -38,6 +39,7 @@ function createStorageBucket(overrides: Partial<StorageBucket> = {}): StorageBuc
     upload: vi.fn(),
     createSignedUrl: vi.fn(),
     remove: vi.fn(),
+    download: vi.fn(),
     ...overrides,
   } as unknown as StorageBucket;
 }
@@ -410,6 +412,38 @@ describe('loveNoteImageService', () => {
 
       await expect(getSignedImageUrl('invalid-path')).rejects.toThrow(
         'Failed to get image URL: Object not found'
+      );
+    });
+  });
+
+  describe('downloadLoveNoteImage', () => {
+    it('downloads the Blob by storage path, with no signed URL', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const blob = new Blob(['image-bytes'], { type: 'image/jpeg' });
+      const mockDownload = vi.fn().mockResolvedValue({ data: blob, error: null });
+      const mockCreateSignedUrl = vi.fn();
+      vi.mocked(supabase.storage.from).mockReturnValue(
+        createStorageBucket({ download: mockDownload, createSignedUrl: mockCreateSignedUrl })
+      );
+
+      const storagePath = 'partner-456/1705315800000-uuid.jpg';
+      await expect(downloadLoveNoteImage(storagePath)).resolves.toBe(blob);
+
+      expect(supabase.storage.from).toHaveBeenCalledWith('love-notes-images');
+      expect(mockDownload).toHaveBeenCalledWith(storagePath);
+      expect(mockCreateSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('throws when the download fails (offline included)', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const mockDownload = vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Failed to fetch' },
+      });
+      vi.mocked(supabase.storage.from).mockReturnValue(createStorageBucket({ download: mockDownload }));
+
+      await expect(downloadLoveNoteImage('path')).rejects.toThrow(
+        'Failed to download image: Failed to fetch'
       );
     });
   });

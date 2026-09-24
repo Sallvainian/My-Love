@@ -106,9 +106,16 @@ test.describe('Login Flow', () => {
     });
 
     // Same reason, for the mirror refresh App runs after sign-in: the
-    // anniversary and message mirrors, the mood history and the poke/kiss
-    // history are read from the server.
-    for (const table of ['anniversaries', 'custom_messages', 'message_favorites', 'moods', 'interactions']) {
+    // anniversary and message mirrors, the mood history, the poke/kiss
+    // history and the love-notes thread are read from the server.
+    for (const table of [
+      'anniversaries',
+      'custom_messages',
+      'message_favorites',
+      'moods',
+      'interactions',
+      'love_notes_visible',
+    ]) {
       interceptNetworkCall({
         url: `**/rest/v1/${table}?**`,
         method: 'GET',
