@@ -112,6 +112,7 @@ export interface NotesSlice {
   retryFailedMessage: (tempId: string) => Promise<void>;
   removeNote: (noteId: string) => Promise<void>;
   cleanupPreviewUrls: () => void;
+  /** Throws unless the note is still failed and no Retry is in flight. */
   removeFailedMessage: (tempId: string) => void;
   /** Send the signed-in account's queued notes, oldest first. Never throws. */
   drainQueuedNotes: () => Promise<void>;
@@ -439,6 +440,15 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
    * spinner of a load started after it. Per slice instance.
    */
   let notesLoadTicket = 0;
+
+  /**
+   * Retries in flight, by tempId. A retry keeps its note marked failed until
+   * its first await returns (the queue row's reset, or the partner lookup), so
+   * the note's own flags cannot tell `removeFailedMessage` that a resend is
+   * already under way. Counted, so two taps of Retry release it only when
+   * both are done. Per slice instance.
+   */
+  const retriesInFlight = new Map<string, number>();
 
   /**
    * Bumped whenever the thread's oldest note changes by anything but a removal:
@@ -1388,6 +1398,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
       const ownsRequest = () =>
         get().userId === capturedUserId && get().authSessionVersion === requestedInSession;
 
+      retriesInFlight.set(tempId, (retriesInFlight.get(tempId) ?? 0) + 1);
       try {
         // Check rate limiting before retry
         const { recentTimestamps, now } = get().checkRateLimit();
@@ -1573,6 +1584,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         }
 
         throw error;
+      } finally {
+        const remaining = (retriesInFlight.get(tempId) ?? 1) - 1;
+        if (remaining > 0) retriesInFlight.set(tempId, remaining);
+        else retriesInFlight.delete(tempId);
       }
     },
 
@@ -1741,10 +1756,21 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
     /**
      * Remove a failed message from the notes array
      * Cleans up any associated preview URLs
+     *
+     * Throws, with a message written for a person, unless the note is loaded,
+     * still failed, and not being resent: a delete confirmed while a Retry is
+     * in flight would drop the note and its queue row as the resend lands.
      */
     removeFailedMessage: (tempId: string) => {
       const { notes } = get();
       const failedNote = notes.find((n) => n.tempId === tempId);
+
+      if (!failedNote) {
+        throw new Error('That message is no longer loaded');
+      }
+      if (!failedNote.error || failedNote.sending || retriesInFlight.has(tempId)) {
+        throw new Error('That message is sending again');
+      }
 
       if (failedNote?.imagePreviewUrl?.startsWith('blob:')) {
         URL.revokeObjectURL(failedNote.imagePreviewUrl);

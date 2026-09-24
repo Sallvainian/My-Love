@@ -10,8 +10,8 @@
  * copy, so the partner's thread is untouched and they cannot tell.
  *
  * A note that failed to send (it still carries its tempId) is confirmed here
- * too, but it has no server row and no partner copy: LoveNotes deletes it from
- * this device, and the wording says so.
+ * too, but it has no server row to remove: LoveNotes deletes it from this
+ * device, and the wording says only that it failed to send.
  *
  * Rendered by LoveNotes, outside the virtualized list, rather than from inside a
  * row: MessageList's rows live in an overflow-hidden container and framer-motion
@@ -170,8 +170,9 @@ export function NoteRemoveConfirmation({
   };
 
   const preview = note.content?.trim() ? note.content.trim() : 'this photo';
-  // A failed send: the partner never received it, so "keeps their copy" would be false.
-  const neverSent = !!note.tempId;
+  // A failed send. Not "never sent": a picture note whose response was lost may
+  // have been stored anyway, so this states only what the user saw.
+  const failedToSend = !!note.tempId;
 
   return (
     <div
@@ -200,9 +201,9 @@ export function NoteRemoveConfirmation({
           <p className="line-clamp-3 rounded-[14px] bg-card2 px-3 py-2 text-sm text-muted italic">
             {preview}
           </p>
-          {neverSent ? (
+          {failedToSend ? (
             <p className="text-[15px] text-ink">
-              This message was never sent and will be deleted from this device.
+              This message failed to send. It will be deleted from this device.
             </p>
           ) : (
             <p className="text-[15px] text-ink">

@@ -162,7 +162,7 @@ describe('deleting a note that failed to send', () => {
     await renderScreen();
 
     const dialog = await openRemoval('this one was refused');
-    expect(within(dialog).getByText(/never sent and will be deleted from this device/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/failed to send\. It will be deleted from this device/)).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByTestId('note-remove-confirm'));
 
@@ -185,6 +185,30 @@ describe('deleting a note that failed to send', () => {
     expect(bubbleWith('this one was refused')).toBeInTheDocument();
     expect((await listQueuedNotes(USER_ID)).map((row) => row.id)).toEqual([TEMP_ID]);
     expect(holder.removalUpserts).toEqual([]);
+  });
+
+  it('refuses the delete, keeping the note and its row, when it is sending again', async () => {
+    await renderScreen();
+
+    const dialog = await openRemoval('this one was refused');
+    // A Retry from elsewhere (another tab's drain, a tap before the dialog)
+    // puts it back on the wire while the dialog is open.
+    act(() => {
+      holder.store.setState((state) => ({
+        notes: state.notes.map((note) =>
+          note.tempId === TEMP_ID ? { ...note, sending: true, error: false } : note
+        ),
+      }));
+    });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fireEvent.click(within(dialog).getByTestId('note-remove-confirm'));
+
+    await waitFor(() =>
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('That message is sending again')
+    );
+    consoleError.mockRestore();
+    expect(holder.store.getState().notes.map((note) => note.id)).toEqual([sent.id, TEMP_ID]);
+    expect((await listQueuedNotes(USER_ID)).map((row) => row.id)).toEqual([TEMP_ID]);
   });
 
   it('a sent note still goes through removeNote, leaving the failed one alone', async () => {

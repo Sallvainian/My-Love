@@ -147,7 +147,7 @@ describe('remove confirmation dialog', () => {
     expect(screen.getByText(/cannot undo/i)).toBeInTheDocument();
   });
 
-  it('says a failed note was never sent, not that the partner keeps a copy', () => {
+  it('says a failed note failed to send, not that the partner keeps a copy', () => {
     render(
       <NoteRemoveConfirmation
         note={{ ...committed, id: 'temp-1-abc', tempId: 'temp-1-abc', error: true }}
@@ -157,7 +157,10 @@ describe('remove confirmation dialog', () => {
       />
     );
 
-    expect(screen.getByText(/never sent and will be deleted from this device/i)).toBeInTheDocument();
+    // Not "never sent": a picture note whose response was lost may be stored.
+    expect(
+      screen.getByText('This message failed to send. It will be deleted from this device.')
+    ).toBeInTheDocument();
     expect(screen.queryByText(/your partner keeps their copy/i)).toBeNull();
     expect(screen.getByText(/cannot undo/i)).toBeInTheDocument();
   });

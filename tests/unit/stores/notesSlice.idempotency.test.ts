@@ -170,8 +170,10 @@ vi.mock('../../../src/services/imageCompressionService', () => ({
 import 'fake-indexeddb/auto';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { deleteLoveNoteImage, uploadCompressedBlob } from '../../../src/services/loveNoteImageService';
+import { getPartnerId } from '../../../src/api/supabaseClient';
 import { createNotesSlice, type NotesSlice } from '../../../src/stores/slices/notesSlice';
 
+const mockedGetPartnerId = vi.mocked(getPartnerId);
 const mockedUploadCompressedBlob = vi.mocked(uploadCompressedBlob);
 const mockedDeleteLoveNoteImage = vi.mocked(deleteLoveNoteImage);
 
@@ -483,6 +485,88 @@ describe('notesSlice send idempotency', () => {
 
       expect(backend.rows).toHaveLength(0);
       expect(mockedDeleteLoveNoteImage).not.toHaveBeenCalled();
+    });
+
+    it('retry in flight, then delete: the delete is refused and the resend lands', async () => {
+      uploadsDistinctPaths();
+      const store = createTestStore();
+
+      backend.failNextWrite = true;
+      await store.getState().sendNote('look at this', imageFile());
+      const failed = store.getState().notes.find((n) => n.error);
+      expect(failed).toBeDefined();
+      const tempId = failed!.tempId as string;
+
+      // Hold the partner lookup: until it answers, the retry has not touched
+      // the note, which still reads as failed and not sending.
+      let answerLookup: (id: string) => void = () => {};
+      mockedGetPartnerId.mockImplementationOnce(
+        () => new Promise<string>((resolve) => {
+          answerLookup = resolve;
+        })
+      );
+      const retry = store.getState().retryFailedMessage(tempId);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.getState().notes.find((n) => n.tempId === tempId)).toMatchObject({
+        error: true,
+        sending: false,
+      });
+
+      // The user confirms Delete now. Dropping the note here would let the
+      // resend below store a note this device had just deleted.
+      expect(() => store.getState().removeFailedMessage(tempId)).toThrow(
+        'That message is sending again'
+      );
+      expect(store.getState().notes.some((n) => n.tempId === tempId)).toBe(true);
+
+      answerLookup(PARTNER_ID);
+      await retry;
+
+      expect(backend.rows).toHaveLength(1);
+      expect(store.getState().notes).toHaveLength(1);
+      expect(store.getState().notes[0].error).toBe(false);
+    });
+
+    it('allows the delete again once a retry has failed', async () => {
+      uploadsDistinctPaths();
+      const store = createTestStore();
+
+      backend.failNextWrite = true;
+      await store.getState().sendNote('look at this', imageFile());
+      const tempId = store.getState().notes[0].tempId as string;
+
+      backend.failNextWrite = true;
+      await store.getState().retryFailedMessage(tempId);
+      expect(store.getState().notes[0].error).toBe(true);
+
+      store.getState().removeFailedMessage(tempId);
+      expect(store.getState().notes).toEqual([]);
+    });
+
+    it('refuses to delete a note that is not failed', async () => {
+      const store = createTestStore();
+      store.setState({
+        notes: [
+          {
+            id: 'temp-9-sending',
+            tempId: 'temp-9-sending',
+            from_user_id: USER_ID,
+            to_user_id: PARTNER_ID,
+            content: 'on its way',
+            created_at: '2026-07-27T00:00:00.000Z',
+            sending: true,
+            error: false,
+          },
+        ],
+      });
+
+      expect(() => store.getState().removeFailedMessage('temp-9-sending')).toThrow(
+        'That message is sending again'
+      );
+      expect(() => store.getState().removeFailedMessage('temp-gone')).toThrow(
+        'That message is no longer loaded'
+      );
+      expect(store.getState().notes).toHaveLength(1);
     });
 
     it('deletes nothing when the resent note had no image', async () => {
