@@ -97,6 +97,17 @@ test.describe('Love Notes on the style kit', () => {
         () => document.documentElement.scrollHeight - window.innerHeight
       );
       expect(overflow).toBeLessThanOrEqual(0);
+      const sideways = await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth
+      );
+      expect(sideways).toBeLessThanOrEqual(0);
+
+      // iOS zooms the page in when a field under 16px is focused and leaves it
+      // zoomed, which lets the whole page be dragged about; and the page must
+      // not rubber-band when dragged past its edge.
+      await expect(input).toHaveCSS('font-size', '16px');
+      await expect(page.locator('html')).toHaveCSS('overscroll-behavior', 'none');
+      await expect(page.locator('body')).toHaveCSS('overscroll-behavior', 'none');
     });
 
     test(`[P1] should fill a sent note's bubble with the Send button's pink in ${colorScheme}`, async ({
