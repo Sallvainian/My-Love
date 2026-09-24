@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { formatRelativeDate, getRelativeTime, isJustNow } from '../dateUtils';
+import { formatRelativeDate, getRelativeTime, isJustNow, loveNoteDisplayTime } from '../dateUtils';
 
 describe('getRelativeTime', () => {
   afterEach(() => {
@@ -107,5 +107,36 @@ describe('formatRelativeDate', () => {
     vi.setSystemTime(now);
     const lastNight = new Date(2026, 2, 14, 23, 0, 0); // March 14, 11 PM (11h ago)
     expect(formatRelativeDate(lastNight.toISOString())).toBe('yesterday');
+  });
+});
+
+describe('loveNoteDisplayTime', () => {
+  const delivered = '2026-09-24T14:00:00.123456+00:00';
+
+  it('shows written_at for a note written well before it was delivered', () => {
+    const written = '2026-09-24T09:00:00.000Z';
+    expect(loveNoteDisplayTime({ created_at: delivered, written_at: written })).toBe(written);
+  });
+
+  it('shows created_at when written_at is absent or null (an image note, an older client)', () => {
+    expect(loveNoteDisplayTime({ created_at: delivered })).toBe(delivered);
+    expect(loveNoteDisplayTime({ created_at: delivered, written_at: null })).toBe(delivered);
+  });
+
+  it('shows created_at when the gap is within a minute (a note sent at once)', () => {
+    const justBefore = '2026-09-24T13:59:02.000Z';
+    expect(loveNoteDisplayTime({ created_at: delivered, written_at: justBefore })).toBe(delivered);
+  });
+
+  it('shows written_at once the gap passes a minute', () => {
+    const overAMinute = '2026-09-24T13:58:59.000Z';
+    expect(loveNoteDisplayTime({ created_at: delivered, written_at: overAMinute })).toBe(overAMinute);
+  });
+
+  it('shows created_at when written_at is later than delivery or unparseable', () => {
+    expect(
+      loveNoteDisplayTime({ created_at: delivered, written_at: '2026-09-24T15:00:00.000Z' })
+    ).toBe(delivered);
+    expect(loveNoteDisplayTime({ created_at: delivered, written_at: 'not a date' })).toBe(delivered);
   });
 });
