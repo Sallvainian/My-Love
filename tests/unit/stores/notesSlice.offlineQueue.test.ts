@@ -205,6 +205,40 @@ function deferred() {
   return { promise, resolve };
 }
 
+/**
+ * A same-origin Web Locks stand-in shared by every "tab" in a test:
+ * `ifAvailable` answers null while the lock is held, and a plain request waits
+ * for the holder to let go.
+ */
+function stubWebLocks() {
+  const held = new Map<string, Promise<void>>();
+  const fakeNavigator = Object.create(navigator) as Navigator;
+  Object.defineProperty(fakeNavigator, 'onLine', { value: true });
+  Object.defineProperty(fakeNavigator, 'locks', {
+    value: {
+      request: async (
+        name: string,
+        optionsOrFn: { ifAvailable?: boolean } | ((lock: object | null) => Promise<unknown>),
+        maybeFn?: (lock: object | null) => Promise<unknown>
+      ) => {
+        const options = typeof optionsOrFn === 'function' ? {} : optionsOrFn;
+        const fn = typeof optionsOrFn === 'function' ? optionsOrFn : maybeFn!;
+        if (options.ifAvailable && held.has(name)) return fn(null);
+        while (held.has(name)) await held.get(name);
+        const release = deferred();
+        held.set(name, release.promise);
+        try {
+          return await fn({ name });
+        } finally {
+          held.delete(name);
+          release.resolve();
+        }
+      },
+    },
+  });
+  vi.stubGlobal('navigator', fakeNavigator);
+}
+
 const contents = (store: Store) => store.getState().notes.map((n) => n.content);
 const queuedIds = async (userId = A) => (await listQueuedNotes(userId)).map((row) => row.id);
 
@@ -383,28 +417,7 @@ describe('notesSlice offline send queue', () => {
   });
 
   it('two tabs draining at once: the lock lets one run, and each note is inserted once', async () => {
-    // A same-origin Web Locks stand-in: `ifAvailable` answers null while held.
-    const held = new Set<string>();
-    const fakeNavigator = Object.create(navigator) as Navigator;
-    Object.defineProperty(fakeNavigator, 'onLine', { value: true });
-    Object.defineProperty(fakeNavigator, 'locks', {
-      value: {
-        request: async (
-          name: string,
-          _options: { ifAvailable: boolean },
-          fn: (lock: object | null) => Promise<unknown>
-        ) => {
-          if (held.has(name)) return fn(null);
-          held.add(name);
-          try {
-            return await fn({ name });
-          } finally {
-            held.delete(name);
-          }
-        },
-      },
-    });
-    vi.stubGlobal('navigator', fakeNavigator);
+    stubWebLocks();
     const tab1 = createTestStore();
     await tab1.getState().sendNote('one');
     await tab1.getState().drainQueuedNotes();
@@ -431,16 +444,105 @@ describe('notesSlice offline send queue', () => {
     await vi.waitFor(() => expect(server.upserts).toBe(3));
 
     await tab2.getState().sendNote('from tab2');
-    await tab2.getState().drainQueuedNotes();
+    // Tab 2's drain now waits for tab 1 to let go.
+    const tab2Run = tab2.getState().drainQueuedNotes();
 
-    const waiting = tab2.getState().notes.find((n) => n.content === 'from tab2');
-    expect(waiting).toMatchObject({ queued: true, sending: false });
+    await vi.waitFor(() =>
+      expect(tab2.getState().notes.find((n) => n.content === 'from tab2')).toMatchObject({
+        queued: true,
+        sending: false,
+      })
+    );
 
     // Tab 1's run re-reads the shared queue and sends it, once.
     reply.resolve();
     await tab1Run;
+    await tab2Run;
     expect(server.rows.map((r) => r.content)).toEqual(['x', 'y', 'z', 'from tab2']);
     expect(await queuedIds()).toEqual([]);
+  });
+
+  it('another tab sends this tab\'s waiting note: this tab confirms it once that drain ends', async () => {
+    stubWebLocks();
+    const tab1 = createTestStore();
+    const tab2 = createTestStore();
+    // Tab 1 holds the lock mid-insert of its own note.
+    const reply = deferred();
+    server.outcomes = [{ hold: reply.promise }];
+    await tab1.getState().sendNote('from tab1');
+    await vi.waitFor(() => expect(server.upserts).toBe(1));
+
+    // Tab 2's drain loses the lock, so its note waits.
+    await tab2.getState().sendNote('from tab2');
+    await vi.waitFor(() =>
+      expect(tab2.getState().notes[0]).toMatchObject({ content: 'from tab2', queued: true, sending: false })
+    );
+
+    // Tab 1 re-reads the shared queue, sends tab 2's note and deletes its row.
+    reply.resolve();
+    await tab1.getState().drainQueuedNotes();
+    expect(server.rows.map((r) => r.content)).toEqual(['from tab1', 'from tab2']);
+    expect(await queuedIds()).toEqual([]);
+    expect(server.upserts).toBe(2);
+
+    // No further trigger: tab 2 learns of it when tab 1's drain lets go.
+    await vi.waitFor(() =>
+      expect(tab2.getState().notes).toEqual([
+        expect.objectContaining({ id: 'server-2', content: 'from tab2', sending: false, error: false }),
+      ])
+    );
+    expect(tab2.getState().notes[0].queued).toBeUndefined();
+    await tab2.getState().drainQueuedNotes();
+    // Confirmed from the stored row, not sent a second time or broadcast by tab 2.
+    expect(server.upserts).toBe(2);
+    expect(sendEphemeralBroadcast).toHaveBeenCalledTimes(2);
+    await flush();
+    const copy = (await readLocalCopy<{ id: string }[]>(A, LOVE_NOTES_COPY_KIND))?.map((n) => n.id);
+    expect(copy).toContain('server-2');
+  });
+
+  it('a later drain confirms a waiting note whose row another context already sent', async () => {
+    const store = createTestStore();
+    setOnline(false);
+    await store.getState().sendNote('sent elsewhere');
+    const key = store.getState().notes[0].tempId!;
+
+    // Another tab of the same account sends it and deletes the row.
+    server.rows.push({
+      id: 'server-9',
+      from_user_id: A,
+      to_user_id: PARTNER,
+      content: 'sent elsewhere',
+      image_url: null,
+      idempotency_key: key,
+      created_at: '2026-09-24T12:00:09.000000+00:00',
+    });
+    await removeQueuedNote(key);
+
+    setOnline(true);
+    await store.getState().drainQueuedNotes();
+
+    expect(store.getState().notes).toEqual([
+      expect.objectContaining({ id: 'server-9', content: 'sent elsewhere', sending: false, error: false }),
+    ]);
+    expect(store.getState().notes[0].queued).toBeUndefined();
+    expect(server.upserts).toBe(0);
+  });
+
+  it('a waiting note whose row is gone but was never stored stays waiting, not sent', async () => {
+    const store = createTestStore();
+    setOnline(false);
+    await store.getState().sendNote('removed elsewhere');
+    const key = store.getState().notes[0].tempId!;
+    await removeQueuedNote(key);
+
+    setOnline(true);
+    await store.getState().drainQueuedNotes();
+
+    expect(store.getState().notes).toEqual([
+      expect.objectContaining({ id: key, content: 'removed elsewhere', queued: true, sending: false }),
+    ]);
+    expect(server.rows).toEqual([]);
   });
 
   it('online: when the head note fails transiently, a later note on screen ends waiting, not sending', async () => {

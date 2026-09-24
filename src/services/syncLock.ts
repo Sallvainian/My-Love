@@ -69,3 +69,15 @@ export async function withSyncLock<T>(
     return { ran: true, result: await fn() };
   });
 }
+
+/**
+ * Resolve once whoever holds `name` has let go (taking the lock and releasing
+ * it at once), so a caller whose `withSyncLock` was skipped can look at what
+ * the holder did. Resolves at once where `navigator.locks` is unavailable,
+ * where `withSyncLock` never skips.
+ */
+export async function waitForSyncLock(name: string): Promise<void> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  if (!locks) return;
+  await locks.request(name, async () => {});
+}

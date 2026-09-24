@@ -27,7 +27,9 @@
  * - SENDER. Only `notesSlice.drainQueuedNotes` sends rows, under
  *   `withSyncLock(NOTE_QUEUE_LOCK)`, one at a time, oldest first, and only the
  *   signed-in account's rows. The row's `id` is sent as `idempotency_key`, so a
- *   resend after a lost response resolves to the stored note.
+ *   resend after a lost response resolves to the stored note. Another tab of
+ *   the account may send a row this tab shows; the drain then confirms that
+ *   note from the stored row.
  * - RECIPIENT. `toUserId` is fixed at enqueue, from the loaded partner or a
  *   successful partner lookup. A queued note never needs a network lookup to
  *   be sent.

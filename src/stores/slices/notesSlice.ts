@@ -41,6 +41,9 @@
  *   one note at a time, under `withSyncLock(NOTE_QUEUE_LOCK)`, reusing each
  *   note's `tempId` as `idempotency_key`. It runs after each enqueue, and from
  *   `App.tsx` on start, on the `online` event and on the 5-minute interval.
+ *   A drain that finds the lock held waits for its holder, then passes again.
+ *   After each pass, a queued note on screen whose row has left the queue
+ *   (another tab of the account sent it) is confirmed from its stored row.
  * - The recipient is fixed at enqueue: the loaded `partner`, else a
  *   `lookupPartnerId()` that must answer `linked`. A queued note is never sent
  *   after a fresh partner lookup.
@@ -73,7 +76,7 @@ import {
   setQueuedNoteFailed,
   type QueuedNote,
 } from '../../services/noteQueue';
-import { NOTE_QUEUE_LOCK, withSyncLock } from '../../services/syncLock';
+import { NOTE_QUEUE_LOCK, waitForSyncLock, withSyncLock } from '../../services/syncLock';
 import type { LoveNote } from '../../types/models';
 import { logger } from '../../utils/logger';
 import type { AppStateCreator } from '../types';
@@ -455,6 +458,47 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         note.queued && note.sending ? { ...note, sending: false } : note
       ),
     }));
+  };
+
+  /**
+   * Another tab of the same account drains the same queue, so it may send a
+   * queued note this tab shows and delete its row; nothing tells this tab (the
+   * broadcast goes to the partner only). A queued note on screen whose row has
+   * left the queue is looked up by its key and confirmed if stored. A row that
+   * is gone but was never stored, an unreadable queue or a failed lookup
+   * leaves the note as it is. Runs after this tab's own pass, so no drain here
+   * is sending one of these notes meanwhile.
+   */
+  const confirmNotesSentElsewhere = async () => {
+    const { userId, authSessionVersion } = get();
+    if (!userId) return;
+    const onScreen = get().notes.filter(
+      (note) => note.queued && note.tempId && note.from_user_id === userId
+    );
+    if (onScreen.length === 0) return;
+    // Read after the notes: a row is enqueued before its note is shown.
+    const queuedKeys = new Set((await listQueuedNotes(userId)).map((row) => row.id));
+
+    for (const note of onScreen) {
+      const tempId = note.tempId!;
+      if (queuedKeys.has(tempId)) continue;
+      if (!ownsSession(userId, authSessionVersion)) return;
+      try {
+        const { data, error } = await supabase
+          .from('love_notes')
+          .select()
+          .eq('from_user_id', userId)
+          .eq('idempotency_key', tempId)
+          .maybeSingle();
+        if (error || !data) continue;
+        if (!ownsSession(userId, authSessionVersion)) return;
+        set((state) => ({ notes: confirmOptimisticNote(state.notes, tempId, data as LoveNote) }));
+        void saveNotesCopy(userId, authSessionVersion);
+        logger.debug('[NotesSlice] Queued note was sent by another tab:', (data as LoveNote).id);
+      } catch (error) {
+        logger.debug('[NotesSlice] Could not look up a queued note:', error);
+      }
+    }
   };
 
   /**
@@ -1628,8 +1672,17 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
             // Whatever the pass did (sent, stopped on a transient failure,
             // found the queue unreadable, or lost the lock to another tab),
             // nothing is sending from this tab once it ends.
-            await withSyncLock(NOTE_QUEUE_LOCK, drainOnce);
+            const pass = await withSyncLock(NOTE_QUEUE_LOCK, drainOnce);
             settleWaitingNotes();
+            if (!pass.ran) {
+              // Another context holds the queue and may send this tab's notes.
+              // Once it lets go, pass again: that sends what it left and
+              // confirms what it sent.
+              await waitForSyncLock(NOTE_QUEUE_LOCK);
+              drainRequested = true;
+            } else {
+              await confirmNotesSentElsewhere();
+            }
           } while (drainRequested);
         } catch (error) {
           console.error('[NotesSlice] Note queue drain failed:', error);
