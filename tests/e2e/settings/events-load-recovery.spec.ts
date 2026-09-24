@@ -114,14 +114,17 @@ test.describe('A failed Settings events load recovers on reconnect (DE.5-COMP-00
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-      await log.step('Let Home complete its own load first, against an empty list');
-      // Awaited rather than assumed: Home has its own loadEvents effect
-      // (App.tsx:428-447), and the row below must be seeded AFTER that read
-      // lands. Seed first and the client would already hold the row, making the
-      // final assertion pass without anything re-firing.
-      const homeLoad = interceptNetworkCall({ method: 'GET', url: '**/rest/v1/events*' });
+      await log.step('Fail every events read while online, so nothing is saved');
+      // Since unified-data-storage story 5, a successful read saves the list as
+      // the device's `events` copy and marks the session as holding server
+      // data; an offline load then shows that list without an error. The
+      // failure this test recovers from is offline with nothing saved, so every
+      // read before reconnect is aborted (an abort is no 4xx/5xx, so the
+      // network-error monitor stays quiet). The client therefore never learns
+      // the row seeded below until the reconnect read.
+      await page.route('**/rest/v1/events*', (route) => route.abort());
       await page.goto('/');
-      await homeLoad;
+      await expect(page.getByTestId('events-load-error')).toBeVisible();
 
       await log.step('Load the lazy Settings chunk while the browser is online');
       // Settings is lazy-loaded. If the browser goes offline before this chunk
@@ -131,12 +134,10 @@ test.describe('A failed Settings events load recovers on reconnect (DE.5-COMP-00
       // request.
       await navigateTo(page, 'settings');
       await expect(page.getByTestId('settings-view')).toBeVisible();
-      await expect(page.getByTestId('events-settings-empty')).toBeVisible();
+      await expect(page.getByTestId('events-settings-load-error')).toBeVisible();
       // Leave Settings through a view that never calls loadEvents. Returning to
-      // Home would start a two-request background refresh; if either half were
-      // still in flight when the witness was seeded, the client could learn the
-      // row before reconnect recovery and let the final assertion pass for the
-      // wrong reason.
+      // Home would start another events load, which would muddy which read the
+      // reconnect assertion below is observing.
       await navigateTo(page, 'mood');
       await expect(page.getByTestId('mood-tracker')).toBeVisible();
 
@@ -180,6 +181,7 @@ test.describe('A failed Settings events load recovers on reconnect (DE.5-COMP-00
         timeout: 15000,
       });
 
+      await page.unroute('**/rest/v1/events*');
       await page.context().setOffline(false);
       await page.evaluate(() => window.dispatchEvent(new Event('online')));
 

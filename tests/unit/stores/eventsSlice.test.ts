@@ -21,13 +21,26 @@ const createEvent = vi.fn();
 const updateEvent = vi.fn();
 const deleteEvent = vi.fn();
 
-vi.mock('../../../src/services/eventsService', () => ({
+vi.mock('../../../src/services/eventsService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/services/eventsService')>()),
   eventsService: {
     getEventsPage: (pagination: unknown) => getEventsPage(pagination),
     createEvent: (input: unknown) => createEvent(input),
     updateEvent: (eventId: string, updates: unknown) => updateEvent(eventId, updates),
     deleteEvent: (eventId: string) => deleteEvent(eventId),
   },
+}));
+
+/** In-memory local copies keyed `userId|kind`; reset per test. */
+const savedCopies = new Map<string, unknown>();
+const readLocalCopy = vi.fn();
+const writeLocalCopy = vi.fn();
+
+vi.mock('../../../src/services/localCopy', () => ({
+  readLocalCopy: (userId: string, kind: string) => readLocalCopy(userId, kind),
+  writeLocalCopy: (userId: string, kind: string, value: unknown) =>
+    writeLocalCopy(userId, kind, value),
+  registerLocalCopy: () => () => {},
 }));
 
 import type {
@@ -90,6 +103,13 @@ function deferred<T>() {
 describe('eventsSlice', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    savedCopies.clear();
+    readLocalCopy.mockImplementation(async (userId: string, kind: string) =>
+      savedCopies.has(`${userId}|${kind}`) ? savedCopies.get(`${userId}|${kind}`) : null
+    );
+    writeLocalCopy.mockImplementation(async (userId: string, kind: string, value: unknown) => {
+      savedCopies.set(`${userId}|${kind}`, value);
+    });
     getEventsPage.mockReset().mockImplementation(async () => ({
       events: await getEvents(),
       pagination: pagination(false),
@@ -296,8 +316,8 @@ describe('eventsSlice', () => {
 
       const result = await store.getState().loadEvents();
 
-      // Supabase-only means there is no mirror to repopulate from, so a failed
-      // refresh must NOT blank a list the user is already looking at.
+      // A failed refresh must NOT blank a list the user is already looking at
+      // (online here; offline with a saved copy is eventsSlice.localCopy.test).
       expect(store.getState().events).toEqual([event('stale', '2026-09-12')]);
       expect(store.getState().eventsError).toBe(message);
       expect(store.getState().eventsIsLoading).toBe(false);

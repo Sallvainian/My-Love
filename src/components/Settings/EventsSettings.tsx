@@ -6,12 +6,13 @@
  *
  * Three decisions are worth reading before changing anything here.
  *
- * 1. **It loads its own events.** `loadEvents()`'s only other call site is the
- *    Home effect in `App.tsx`, gated on `currentView === 'home'`, and `events`
- *    is not persisted — so a `/settings` deep link or a reload on Settings
- *    would otherwise render a permanently empty list. Overlapping with Home's
- *    effect is safe: `eventsSlice` carries a monotonic `latestLoadId` so a
- *    superseded load abandons its own resolution.
+ * 1. **It loads its own events.** `loadEvents()`'s other callers are the Home
+ *    effect in `App.tsx`, gated on `currentView === 'home'`, and the `events`
+ *    local-copy refresher, which skips Home and Settings — so without this
+ *    effect a `/settings` deep link or a reload on Settings would show only the
+ *    saved copy, never a fresh server read. Overlapping with Home's effect is
+ *    safe: `eventsSlice` carries a monotonic `latestLoadId` so a superseded
+ *    load abandons its own resolution.
  *
  * 2. **The list is unfiltered.** Home hides events whose date has passed; this
  *    list must not, because Settings is the only place a mistyped year can be

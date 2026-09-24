@@ -224,9 +224,10 @@ test.describe('Managing events from Settings', () => {
     page,
     supabaseAdmin,
   }) => {
-    // `events` is not persisted and App's only loadEvents() effect is gated on
-    // Home, so without the section's own mount effect this list would be
-    // permanently empty on a deep link. Seeded directly: the point is the read
+    // App's loadEvents() effect is gated on Home and the `events` local-copy
+    // refresher skips Settings, so without the section's own mount effect a
+    // deep link would never read the server (a fresh browser has no saved
+    // copy, so the list would stay empty). Seeded directly: the point is the read
     // path, not the write path.
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);

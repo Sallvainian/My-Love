@@ -167,9 +167,11 @@ export function signedOutState() {
     interactionPartnerId: null,
 
     // eventsSlice — a couple's countdown dates are theirs, and nothing else
-    // clears them: events are Supabase-only, deliberately absent from
-    // `partialize`, and the loader that would correct them is gated on being
-    // online. The loading flag goes too, on the same rule as the others.
+    // clears them from memory: events are deliberately absent from
+    // `partialize`, their `events` local copy is per-account (deleted for the
+    // outgoing account by `deleteAccountCopies`), and the server read that
+    // would correct them needs a connection. The loading flag goes too, on the
+    // same rule as the others.
     events: [],
     eventsIsLoading: false,
     eventsError: null,
