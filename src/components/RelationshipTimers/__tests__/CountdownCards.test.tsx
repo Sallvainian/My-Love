@@ -246,6 +246,30 @@ describe('Countdown cards on an ordinary day', () => {
   });
 });
 
+describe('Anniversary clock in the last minute', () => {
+  it('keeps counting seconds until midnight, then reads "Today!"', () => {
+    vi.setSystemTime(new Date(2026, 2, 13, 23, 59, 30));
+    render(
+      <CountdownTimer
+        anniversaries={[{ id: 3, date: '2024-03-14', label: 'First kiss' }]}
+        maxDisplay={3}
+      />
+    );
+
+    const card = screen.getByTestId('countdown-card-0').firstElementChild as HTMLElement;
+    expect(card.querySelector('h3 + div')?.textContent).toBe('0 days');
+    expect(card.querySelector('h3 ~ span')?.textContent).toBe('00h 00m 30s');
+    expect(screen.queryByTestId('celebration-animation')).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    const after = screen.getByTestId('countdown-card-0').firstElementChild as HTMLElement;
+    expect(after.querySelector('h3 + div')?.textContent).toBe('Today!');
+    expect(after.querySelector('h3 ~ span')).toBeNull();
+  });
+});
+
 describe('Together for, from the couple start date', () => {
   afterEach(() => {
     useAppStore.setState({ coupleSettings: null });
