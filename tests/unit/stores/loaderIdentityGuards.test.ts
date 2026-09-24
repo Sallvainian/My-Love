@@ -91,7 +91,10 @@ vi.mock('../../../src/services/photoService', () => ({
 }));
 
 // The background photo image fill is photoImageCache's own subject.
-vi.mock('../../../src/services/photoImageCache', () => ({
+vi.mock('../../../src/services/photoImageCache', async (importOriginal) => ({
+  deletePhotoImages: (
+    await importOriginal<typeof import('../../../src/services/photoImageCache')>()
+  ).deletePhotoImages,
   requestPhotoImageFill: vi.fn(async () => {}),
 }));
 
@@ -1531,6 +1534,27 @@ describe('loader identity guards', () => {
       ]);
       expect(useAppStore.getState().isLoadingRequests).toBe(false);
     });
+
+    it('discards requests when the SAME account signs back in mid-flight', async () => {
+      // `userId` is A again by the time the request lands, so only the
+      // authSessionVersion half of the guard can tell the sessions apart.
+      const pending = deferred<{ sent: unknown[]; received: unknown[] }>();
+      getPendingRequests.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().loadPendingRequests();
+      useAppStore.getState().clearAuth();
+      useAppStore.getState().setAuthUser(A);
+
+      pending.settle({
+        sent: [{ id: 'req-1', toEmail: 'DEAD-SESSION-EMAIL' }],
+        received: [],
+      });
+      await inFlight;
+
+      expect(useAppStore.getState().userId).toBe(A);
+      expect(useAppStore.getState().sentRequests).toEqual([]);
+      expect(useAppStore.getState().isLoadingRequests).toBe(false);
+    });
   });
 
   describe('searchUsers', () => {
@@ -1577,6 +1601,22 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().searchResults).toEqual([
         { id: 'USER-F-ID', displayName: 'C-OWN-SEARCH-HIT' },
       ]);
+      expect(useAppStore.getState().isSearching).toBe(false);
+    });
+
+    it('discards search hits when the SAME account signs back in mid-flight', async () => {
+      const pending = deferred<unknown[]>();
+      searchUsers.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().searchUsers('alex');
+      useAppStore.getState().clearAuth();
+      useAppStore.getState().setAuthUser(A);
+
+      pending.settle([{ id: 'USER-E-ID', displayName: 'DEAD-SESSION-HIT' }]);
+      await inFlight;
+
+      expect(useAppStore.getState().userId).toBe(A);
+      expect(useAppStore.getState().searchResults).toEqual([]);
       expect(useAppStore.getState().isSearching).toBe(false);
     });
   });

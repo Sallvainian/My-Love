@@ -40,13 +40,10 @@ vi.mock('../../../src/services/localCopy', () => ({
     registerLocalCopy(kind, refresh),
 }));
 
-const deleteCachedImages = vi.fn();
-vi.mock('../../../src/services/imageCache', () => ({
-  deleteCachedImages: (userId: string, paths: string[]) => deleteCachedImages(userId, paths),
-}));
-
+const deletePhotoImages = vi.fn();
 const requestPhotoImageFill = vi.fn();
 vi.mock('../../../src/services/photoImageCache', () => ({
+  deletePhotoImages: (userId: string, paths: string[]) => deletePhotoImages(userId, paths),
   requestPhotoImageFill: (session: unknown) => requestPhotoImageFill(session),
 }));
 
@@ -127,7 +124,7 @@ describe('photosSlice local copy', () => {
     writeLocalCopy.mockImplementation(async (userId: string, kind: string, value: unknown) => {
       savedCopies.set(`${userId}|${kind}`, value);
     });
-    deleteCachedImages.mockResolvedValue(undefined);
+    deletePhotoImages.mockResolvedValue(undefined);
     requestPhotoImageFill.mockResolvedValue(undefined);
     checkStorageQuota.mockResolvedValue({ used: 0, quota: 1, percent: 0, warning: 'none' });
     // Mirrors the real service: offline the read fails.
@@ -185,7 +182,7 @@ describe('photosSlice local copy', () => {
       expect(store.getState().photos).toEqual(saved);
       expect(store.getState().photosLoaded).toBe(true);
       expect(writeLocalCopy).not.toHaveBeenCalled();
-      expect(deleteCachedImages).not.toHaveBeenCalled();
+      expect(deletePhotoImages).not.toHaveBeenCalled();
       expect(requestPhotoImageFill).not.toHaveBeenCalled();
       expect(savedCopies.get(key(USER_A))).toEqual(saved);
     });
@@ -232,7 +229,7 @@ describe('photosSlice local copy', () => {
       expect(store.getState().photos).toEqual([shown(row(0)), shown(row(1))]);
       expect(store.getState().photosLoaded).toBe(true);
       expect(writeLocalCopy).not.toHaveBeenCalled();
-      expect(deleteCachedImages).not.toHaveBeenCalled();
+      expect(deletePhotoImages).not.toHaveBeenCalled();
       expect(requestPhotoImageFill).not.toHaveBeenCalled();
       expect(console.error).toHaveBeenCalled();
     });
@@ -258,19 +255,19 @@ describe('photosSlice local copy', () => {
 
       expect(store.getState().photos).toEqual([shown(row(0)), shown(row(2))]);
       expect(savedCopies.get(key(USER_A))).toEqual([shown(row(0)), shown(row(2))]);
-      expect(deleteCachedImages).toHaveBeenCalledWith(USER_A, [row(1, PARTNER).storage_path]);
+      expect(deletePhotoImages).toHaveBeenCalledWith(USER_A, [row(1, PARTNER).storage_path]);
     });
 
     it('also prunes rows that were only in state (a later refresh in the same session)', async () => {
       const store = createTestStore();
       listAllPhotos.mockResolvedValueOnce([row(0), row(1)]);
       await store.getState().loadPhotos();
-      deleteCachedImages.mockClear();
+      deletePhotoImages.mockClear();
 
       listAllPhotos.mockResolvedValueOnce([row(1)]);
       await store.getState().loadPhotos();
 
-      expect(deleteCachedImages).toHaveBeenCalledWith(USER_A, [row(0).storage_path]);
+      expect(deletePhotoImages).toHaveBeenCalledWith(USER_A, [row(0).storage_path]);
     });
 
     it('ignores a malformed copy whole', async () => {
@@ -309,14 +306,14 @@ describe('photosSlice local copy', () => {
 
       expect(store.getState().photos).toEqual([shown(row(0)), shown(row(1))]);
       expect(savedCopies.get(key(USER_A))).toEqual([shown(row(0)), shown(row(1))]);
-      expect(deleteCachedImages).not.toHaveBeenCalled();
+      expect(deletePhotoImages).not.toHaveBeenCalled();
     });
 
     it('keeps a delete confirmed while the read was in flight', async () => {
       const store = createTestStore();
       listAllPhotos.mockResolvedValueOnce([row(0), row(1)]);
       await store.getState().loadPhotos();
-      deleteCachedImages.mockClear();
+      deletePhotoImages.mockClear();
 
       const server = deferred<SupabasePhoto[]>();
       listAllPhotos.mockReturnValueOnce(server.promise);
@@ -349,7 +346,7 @@ describe('photosSlice local copy', () => {
 
       expect(store.getState().photos).toEqual([]);
       expect(writeLocalCopy).not.toHaveBeenCalled();
-      expect(deleteCachedImages).not.toHaveBeenCalled();
+      expect(deletePhotoImages).not.toHaveBeenCalled();
       expect(requestPhotoImageFill).not.toHaveBeenCalled();
     });
 
@@ -468,14 +465,14 @@ describe('photosSlice local copy', () => {
       const store = createTestStore();
       listAllPhotos.mockResolvedValueOnce([row(0), row(1)]);
       await store.getState().loadPhotos();
-      deleteCachedImages.mockClear();
+      deletePhotoImages.mockClear();
       deletePhotoService.mockResolvedValue(true);
 
       await expect(store.getState().deletePhoto('photo-0')).resolves.toBe(true);
 
       expect(store.getState().photos).toEqual([shown(row(1))]);
       expect(savedCopies.get(key(USER_A))).toEqual([shown(row(1))]);
-      expect(deleteCachedImages).toHaveBeenCalledWith(USER_A, [row(0).storage_path]);
+      expect(deletePhotoImages).toHaveBeenCalledWith(USER_A, [row(0).storage_path]);
     });
 
     it('a failed delete keeps the row, the copy and the cached image', async () => {
@@ -483,14 +480,14 @@ describe('photosSlice local copy', () => {
       listAllPhotos.mockResolvedValueOnce([row(0)]);
       await store.getState().loadPhotos();
       writeLocalCopy.mockClear();
-      deleteCachedImages.mockClear();
+      deletePhotoImages.mockClear();
       deletePhotoService.mockResolvedValue(false);
 
       await expect(store.getState().deletePhoto('photo-0')).resolves.toBe(false);
 
       expect(store.getState().photos).toEqual([shown(row(0))]);
       expect(writeLocalCopy).not.toHaveBeenCalled();
-      expect(deleteCachedImages).not.toHaveBeenCalled();
+      expect(deletePhotoImages).not.toHaveBeenCalled();
     });
 
     it('a delete confirmed after a session change touches no copy or cache', async () => {
@@ -498,7 +495,7 @@ describe('photosSlice local copy', () => {
       listAllPhotos.mockResolvedValueOnce([row(0)]);
       await store.getState().loadPhotos();
       writeLocalCopy.mockClear();
-      deleteCachedImages.mockClear();
+      deletePhotoImages.mockClear();
       const pending = deferred<boolean>();
       deletePhotoService.mockReturnValue(pending.promise);
 
@@ -509,7 +506,7 @@ describe('photosSlice local copy', () => {
 
       expect(store.getState().photos).toEqual([shown(row(0))]);
       expect(writeLocalCopy).not.toHaveBeenCalled();
-      expect(deleteCachedImages).not.toHaveBeenCalled();
+      expect(deletePhotoImages).not.toHaveBeenCalled();
     });
   });
 

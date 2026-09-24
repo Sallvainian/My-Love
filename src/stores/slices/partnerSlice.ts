@@ -212,12 +212,14 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
 
     loadPendingRequests: async () => {
       // Same identity guard as loadPartner: these name real third parties.
-      const requestedBy = get().userId;
+      const { userId, authSessionVersion } = get();
+      const isCurrent = () =>
+        get().userId === userId && get().authSessionVersion === authSessionVersion;
       set({ isLoadingRequests: true });
       try {
         const { sent, received } = await partnerService.getPendingRequests();
         // Same reasoning as loadPartner: release the flag, discard the data.
-        if (get().userId !== requestedBy) {
+        if (!isCurrent()) {
           set({ isLoadingRequests: false });
           return;
         }
@@ -228,7 +230,7 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
         });
       } catch (error) {
         console.error('[PartnerSlice] Error loading requests:', error);
-        if (get().userId !== requestedBy) {
+        if (!isCurrent()) {
           set({ isLoadingRequests: false });
           return;
         }
@@ -247,20 +249,23 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       }
 
       // Search hits name third parties, so they get the same guard as the loaders
-      // above: discard the result if the signed-in user changed mid-flight, but
-      // release the flag rather than stranding it.
-      const requestedBy = get().userId;
+      // above: discard the result if the signed-in session changed mid-flight
+      // (a same-account re-login included), but release the flag rather than
+      // stranding it.
+      const { userId, authSessionVersion } = get();
+      const isCurrent = () =>
+        get().userId === userId && get().authSessionVersion === authSessionVersion;
       set({ isSearching: true });
       try {
         const results = await partnerService.searchUsers(query);
-        if (get().userId !== requestedBy) {
+        if (!isCurrent()) {
           set({ isSearching: false });
           return;
         }
         set({ searchResults: results, isSearching: false });
       } catch (error) {
         console.error('[PartnerSlice] Error searching users:', error);
-        if (get().userId !== requestedBy) {
+        if (!isCurrent()) {
           set({ isSearching: false });
           return;
         }

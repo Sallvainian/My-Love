@@ -44,6 +44,7 @@ export function LoveNotes(): ReactElement {
     fetchOlderNotes,
     clearError,
     retryFailedMessage,
+    removeFailedMessage,
     realtimeStatus,
   } = useLoveNotes();
 
@@ -83,6 +84,20 @@ export function LoveNotes(): ReactElement {
   // arrow here re-armed the trap and pulled focus back to Cancel on every render
   // of this screen -- one arriving realtime note was enough.
   const closeRemovalDialog = useCallback(() => setNotePendingRemoval(null), []);
+
+  // A failed note has no server row -- removeNote refuses its tempId -- so the
+  // same confirmation deletes it from this device instead, queue row and all.
+  const pendingTempId = notePendingRemoval?.tempId;
+  const confirmRemoval = useCallback(
+    async (noteId: string) => {
+      if (pendingTempId) {
+        removeFailedMessage(pendingTempId);
+        return;
+      }
+      await removeNote(noteId);
+    },
+    [pendingTempId, removeFailedMessage, removeNote]
+  );
   const [userName, setUserName] = useState<string>('You');
   // Partner name fetched from database (not local config)
   const [partnerName, setPartnerName] = useState<string>('Partner');
@@ -238,7 +253,7 @@ export function LoveNotes(): ReactElement {
         <NoteRemoveConfirmation
           note={notePendingRemoval}
           onClose={closeRemovalDialog}
-          onConfirmRemove={removeNote}
+          onConfirmRemove={confirmRemoval}
           fallbackFocusRef={threadRef}
         />
       )}
