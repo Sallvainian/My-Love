@@ -43,7 +43,8 @@
  *   `App.tsx` on start, on the `online` event and on the 5-minute interval.
  *   A drain that finds the lock held waits for its holder, then passes again.
  *   After each pass, a queued note on screen whose row has left the queue
- *   (another tab of the account sent it) is confirmed from its stored row.
+ *   (another tab of the account sent it) is confirmed from its stored row, and
+ *   one whose row another tab marked rejected is shown failed, with Retry.
  * - The recipient is fixed at enqueue: the loaded `partner`, else a
  *   `lookupPartnerId()` that must answer `linked`. A queued note is never sent
  *   after a fresh partner lookup.
@@ -468,6 +469,12 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
    * is gone but was never stored, an unreadable queue or a failed lookup
    * leaves the note as it is. Runs after this tab's own pass, so no drain here
    * is sending one of these notes meanwhile.
+   *
+   * The other tab may instead have had the note rejected: its row is still
+   * queued, marked `failed`. The note is then marked failed here too, as
+   * `drainOnce` marks its own rejections, so it offers Retry. No banner: the
+   * row does not record why it was refused, and `drainOnce` raises one only
+   * for a CHECK violation (in the tab that saw the code).
    */
   const confirmNotesSentElsewhere = async () => {
     const { userId, authSessionVersion } = get();
@@ -477,7 +484,24 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     );
     if (onScreen.length === 0) return;
     // Read after the notes: a row is enqueued before its note is shown.
-    const queuedKeys = new Set((await listQueuedNotes(userId)).map((row) => row.id));
+    const queuedRows = await listQueuedNotes(userId);
+    const queuedKeys = new Set(queuedRows.map((row) => row.id));
+
+    // Before any lookup below awaits, so a Retry pressed meanwhile (which
+    // clears the row's mark first) is not overwritten by this older read.
+    const rejectedKeys = new Set(queuedRows.filter((row) => row.failed).map((row) => row.id));
+    const rejectedOnScreen = (note: LoveNote) =>
+      note.queued === true && !note.error && !!note.tempId && rejectedKeys.has(note.tempId);
+    if (rejectedKeys.size > 0 && ownsSession(userId, authSessionVersion)) {
+      if (get().notes.some(rejectedOnScreen)) {
+        set((state) => ({
+          notes: state.notes.map((note) =>
+            rejectedOnScreen(note) ? { ...note, sending: false, error: true } : note
+          ),
+        }));
+        logger.debug('[NotesSlice] Queued note was rejected in another tab');
+      }
+    }
 
     for (const note of onScreen) {
       const tempId = note.tempId!;
