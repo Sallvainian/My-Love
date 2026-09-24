@@ -8,7 +8,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, and 
 ## Policy
 
 - Never hand-edit `src/types/database.types.ts` or `mise.lock` — both generated. Regenerate types with `supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts`.
-- Never recreate a `docs/` tree and never re-add vendored tool docs — both were deleted deliberately so that no stale prose can hand an agent wrong context. Durable prose goes in this file.
+- Never generate repository documentation — architecture, data-model, feature or bug-backlog write-ups produced by scanning the code — and never re-add vendored tool manuals. The document-project `docs/` tree was deleted at `cc496717` after an audit found 13 of 27 claims contradicted the code, and `ba25a7af` untracked 32 BMAD and TEA manuals that never mentioned this project. Durable agent-facing prose goes in this file. `docs/performance/` is `perf:build` output and is gitignored.
 - The repo is public. Never write an email address, query output holding personal data, or a real credential into `_bmad-output/`, `.bmad-loop/` or a commit message; refer to people by role. Two real addresses already sit in history at 69a563ee.
 - One gitignore mismatch is deliberate; never reconcile it: `.gitignore` lists `CLAUDE.md` and `AGENTS.md` while both are tracked — `git rm --cached` there would delete the repo's only instructions (a plain `git check-ignore` reports tracked files as not ignored; `--no-index` shows the match).
 - Never add or repair specs in `tests/e2e-archive/` — frozen documentation, excluded from `tsconfig.test.json` and `tsconfig.tsr.json` and matched by no Playwright project; its `README.md` records the reason for most of them. New E2E goes in `tests/e2e/`.
