@@ -28,6 +28,7 @@ vi.mock('../../../src/api/supabaseClient', () => ({
     rpc: vi.fn(),
   },
   getPartnerId: vi.fn(),
+  lookupPartnerId: vi.fn(),
 }));
 
 vi.mock('../../../src/api/ephemeralBroadcast', () => ({
@@ -47,7 +48,7 @@ vi.mock('../../../src/services/loveNoteImageService', () => ({
   deleteLoveNoteImage: (storagePath: string) => deleteLoveNoteImage(storagePath),
 }));
 
-import { getPartnerId } from '../../../src/api/supabaseClient';
+import { getPartnerId, lookupPartnerId } from '../../../src/api/supabaseClient';
 import { serializeAccountDataWrite } from '../../../src/services/accountDataQueue';
 import { useAppStore } from '../../../src/stores/useAppStore';
 
@@ -120,6 +121,7 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     useAppStore.getState().clearAuth();
     useAppStore.getState().setAuthUser(A);
     vi.mocked(getPartnerId).mockResolvedValue(PARTNER);
+    vi.mocked(lookupPartnerId).mockResolvedValue({ status: 'linked', partnerId: PARTNER });
     deleteLoveNoteImage.mockResolvedValue(undefined);
     sendEphemeralBroadcast.mockResolvedValue(undefined);
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview');
@@ -140,6 +142,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
 
     const inFlight = useAppStore.getState().fetchNotes();
     await flush();
+    // The held query is really reached, so the guard below is what is measured.
+    expect(loveNotesQuery).toHaveBeenCalled();
     signOutAndBackInAsA();
     const fresh = [note('a1', 'FIRST'), note('a2', 'SENT-SINCE')];
     useAppStore.setState({ notes: fresh } as unknown as SetStateArg);
@@ -156,6 +160,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
 
     const inFlight = useAppStore.getState().fetchNotes();
     await flush();
+    // The held query is really reached, so the guard below is what is measured.
+    expect(loveNotesQuery).toHaveBeenCalled();
     signOutAndBackInAsA();
 
     pending.settle({ data: null, error: new Error('STALE-FAILURE') });

@@ -301,6 +301,22 @@ export async function getSignedImageUrl(
 }
 
 /**
+ * Download a love note image as a Blob with the authenticated Storage
+ * `download()` API — no signed URL involved, so the result can be cached by
+ * storage path (`imageCache.ts`) and shown offline later.
+ *
+ * @param storagePath - Storage path from love_notes.image_url
+ * @throws Error if the download fails (offline included)
+ */
+export async function downloadLoveNoteImage(storagePath: string): Promise<Blob> {
+  const { data, error } = await supabase.storage.from(BUCKET_NAME).download(storagePath);
+  if (error || !data) {
+    throw new Error(`Failed to download image: ${error?.message ?? 'no data'}`);
+  }
+  return data;
+}
+
+/**
  * Delete a love note image from storage
  * Used when deleting messages (future feature)
  *

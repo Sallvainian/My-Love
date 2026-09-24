@@ -83,7 +83,9 @@ test.describe('Account data from the local copy', () => {
       // WHEN: the app opens again with the server unreachable, then offline.
       await page.route('**/rest/v1/anniversaries**', (route) => route.abort());
       await page.reload();
-      await expect(page.getByTestId('app-container')).toBeVisible();
+      // Settings is a lazy view: going offline before its module has loaded
+      // fails the import and shows the offline error screen instead.
+      await expect(page.getByTestId('settings-view')).toBeVisible();
       await goOffline(page, true);
 
       // THEN: the anniversary is still listed — from the copy, since the

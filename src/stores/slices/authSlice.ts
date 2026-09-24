@@ -13,6 +13,7 @@
 
 import { serializeAccountDataWrite } from '../../services/accountDataQueue';
 import { customMessageService } from '../../services/customMessageService';
+import { deleteAccountImages } from '../../services/imageCache';
 import { deleteAccountCopies } from '../../services/localCopy';
 import { storageService } from '../../services/storage';
 import type { AppState, AppStateCreator } from '../types';
@@ -48,7 +49,8 @@ function getAccountOwner(): string | null {
 
 /**
  * Delete one account's saved data from this device: its local copies
- * (anniversaries, partner, couple settings, …), its custom-message rows and its favorites.
+ * (anniversaries, partner, couple settings, …), its cached images, its
+ * custom-message rows and its favorites.
  * Nothing else — unsynced `moods` rows and any other queued write stay for
  * their owner to send on the next sign-in. The server keeps everything, so the
  * next signed-in refresh brings it back.
@@ -62,6 +64,9 @@ function getAccountOwner(): string | null {
 function deleteAccountData(userId: string): void {
   deleteAccountCopies(userId).catch((error: unknown) => {
     console.error('[AuthSlice] Failed to delete the outgoing account\'s local copies:', error);
+  });
+  deleteAccountImages(userId).catch((error: unknown) => {
+    console.error('[AuthSlice] Failed to delete the outgoing account\'s cached images:', error);
   });
   serializeAccountDataWrite(async () => {
     await customMessageService.deleteMirrorForUser(userId);
