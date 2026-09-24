@@ -14,6 +14,8 @@ import 'fake-indexeddb/auto';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import {
   deleteAccountImages,
+  deleteCachedImages,
+  isQuotaError,
   readCachedImage,
   writeCachedImage,
 } from '../../../src/services/imageCache';
@@ -105,5 +107,50 @@ describe('imageCache', () => {
     }
 
     expect(await readCachedImage(A, PATH)).toBeNull();
+  });
+
+  it('deletes only the listed images of one account', async () => {
+    await writeCachedImage(A, PATH, new Blob(['A-1']));
+    await writeCachedImage(A, 'a/second.jpg', new Blob(['A-2']));
+    await writeCachedImage(A, 'a/third.jpg', new Blob(['A-3']));
+    await writeCachedImage(B, PATH, new Blob(['B-1']));
+
+    await deleteCachedImages(A, [PATH, 'a/third.jpg', 'a/never-cached.jpg']);
+
+    expect(await readCachedImage(A, PATH)).toBeNull();
+    expect(await readCachedImage(A, 'a/third.jpg')).toBeNull();
+    expect(await text(await readCachedImage(A, 'a/second.jpg'))).toBe('A-2');
+    expect(await text(await readCachedImage(B, PATH))).toBe('B-1');
+  });
+
+  it('deleting no paths is a no-op', async () => {
+    await writeCachedImage(A, PATH, new Blob(['A-1']));
+    await expect(deleteCachedImages(A, [])).resolves.toBeUndefined();
+    expect(await text(await readCachedImage(A, PATH))).toBe('A-1');
+  });
+});
+
+describe('isQuotaError', () => {
+  it('recognises a QuotaExceededError', () => {
+    expect(isQuotaError(new DOMException('full', 'QuotaExceededError'))).toBe(true);
+    expect(isQuotaError({ name: 'NS_ERROR_DOM_QUOTA_REACHED' })).toBe(true);
+    expect(isQuotaError({ name: 'Error', code: 22 })).toBe(true);
+  });
+
+  it('recognises a transaction aborted with one', () => {
+    const quota = new DOMException('full', 'QuotaExceededError');
+    const aborted = Object.assign(new DOMException('aborted', 'AbortError'), {
+      target: { error: quota },
+    });
+    expect(isQuotaError(aborted)).toBe(true);
+    expect(isQuotaError({ name: 'AbortError', error: quota })).toBe(true);
+    expect(isQuotaError(new Error('wrapped', { cause: quota }))).toBe(true);
+  });
+
+  it('answers false for every other failure', () => {
+    expect(isQuotaError(new DOMException('aborted', 'AbortError'))).toBe(false);
+    expect(isQuotaError(new Error('Failed to fetch'))).toBe(false);
+    expect(isQuotaError(null)).toBe(false);
+    expect(isQuotaError('QuotaExceededError')).toBe(false);
   });
 });

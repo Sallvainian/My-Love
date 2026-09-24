@@ -411,8 +411,7 @@ class EventsService {
    * @param limit - Maximum rows read from EACH side of today: up to `limit`
    *   upcoming (today included) and up to `limit` already-passed, so a call can
    *   return up to `2 × limit` rows — the per-side meaning is the intended
-   *   contract, not photoService's whole-result cap. Mirrors
-   *   `photoService.getPhotos(limit = 50, offset = 0)` in signature only.
+   *   contract, not photoService's whole-result cap.
    *   Clamped to at least 1, and to {@link DEFAULT_EVENTS_PAGE_SIZE} when not
    *   finite: `limit = 0` would otherwise build the backwards range `(0, -1)`.
    * @param offset - How far past the first page to start, applied to both

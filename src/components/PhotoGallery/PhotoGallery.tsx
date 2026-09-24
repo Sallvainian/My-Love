@@ -1,8 +1,6 @@
-import { AlertCircle, Camera, Loader2, Plus } from 'lucide-react';
+import { AlertCircle, Camera, Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { getOwnDisplayName, getPartnerDisplayName } from '../../api/supabaseClient';
-import type { PhotoWithUrls } from '../../services/photoService';
-import { photoService } from '../../services/photoService';
 import { useAppStore } from '../../stores/useAppStore';
 import { PhotoGridItem } from './PhotoGridItem';
 import { PHOTO_GRID_CLASS, PhotoGridSkeletonGrid } from './PhotoGridSkeleton';
@@ -18,9 +16,9 @@ interface PhotoGalleryProps {
   uploadButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
-// AC-4.2.4: Pagination configuration
+// AC-4.2.4: Tiles revealed per scroll step
 const PHOTOS_PER_PAGE = 20;
-const SCROLL_THRESHOLD = 200; // pixels from bottom to trigger load
+const SCROLL_THRESHOLD = 200; // pixels from bottom to trigger the next step
 
 // Subtitle while there is no count to show (loading, empty, error)
 const ALBUM_SUBTITLE = 'Your shared album';
@@ -36,26 +34,22 @@ function initialOf(name: string | null, fallback: string): string {
  *
  * Features:
  * - 3-column grid at every width, under a page header with an Upload pill
- * - Photos sorted newest first (by-date index)
+ * - Photos sorted newest first
  * - Empty state with upload CTA
- * - Page header over a skeleton grid during the first fetch
- * - Lazy loading pagination with Intersection Observer
+ * - Page header over a skeleton grid until the list is known
+ * - Renders the store's whole list (`photos`, kept offline as the `photos`
+ *   local copy, spec-unified-data-storage story 10), revealing 20 more tiles
+ *   per scroll step with an Intersection Observer. It never calls the photo
+ *   service itself: opening the gallery asks the store for a fresh read.
  */
 export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryProps) {
-  const { photos: storePhotos, loadPhotos } = useAppStore();
+  const photos = useAppStore((state) => state.photos);
+  const photosLoaded = useAppStore((state) => state.photosLoaded);
+  const photosLoadError = useAppStore((state) => state.photosLoadError);
+  const loadPhotos = useAppStore((state) => state.loadPhotos);
 
-  // AC-4.2.4: Pagination state
-  const [photos, setPhotos] = useState<PhotoWithUrls[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [currentOffset, setCurrentOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [retryTrigger, setRetryTrigger] = useState(0);
-  // A failed next page. Kept apart from `error`, which replaces the whole grid,
-  // and it pauses the scroll trigger until the user asks for a retry.
-  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
+  // AC-4.2.4: how many tiles are shown; grows one step per scroll trigger.
+  const [visibleCount, setVisibleCount] = useState(PHOTOS_PER_PAGE);
 
   // Story 6.4: Photo viewer state
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
@@ -92,150 +86,29 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
   const ownInitial = initialOf(ownName, 'Y');
   const partnerInitial = initialOf(partnerName, 'P');
 
+  // Opening the gallery refreshes the list: the saved copy shows at once, and
+  // a full server read replaces it when one answers.
+  useEffect(() => {
+    void loadPhotos();
+  }, [loadPhotos]);
+
   // Retry handler for error state
   const handleRetry = useCallback(() => {
-    setError(null);
-    setIsLoading(true);
-    setHasLoadedOnce(false);
-    setPhotos([]);
-    setCurrentOffset(0);
-    setHasMore(true);
-    setLoadMoreFailed(false);
-    setRetryTrigger((prev) => prev + 1); // Increment to trigger useEffect
-  }, []);
+    void loadPhotos();
+  }, [loadPhotos]);
 
-  // Load initial page of photos
+  const hasMore = visibleCount < photos.length;
+  const visiblePhotos = hasMore ? photos.slice(0, visibleCount) : photos;
+
+  // AC-4.2.4: Setup Intersection Observer to reveal the next step of tiles
   useEffect(() => {
-    let cancelled = false;
-
-    const loadInitialPhotos = async () => {
-      setIsLoading(true);
-
-      try {
-        const firstPage = await photoService.getPhotos(PHOTOS_PER_PAGE, 0);
-
-        if (cancelled) return;
-
-        // Batch all state updates together (React 18 automatic batching)
-        setPhotos(firstPage);
-        setCurrentOffset(firstPage.length);
-        setHasMore(firstPage.length === PHOTOS_PER_PAGE);
-        setHasLoadedOnce(true);
-        setIsLoading(false);
-
-        // Load photos into the store too: the refresh effect below watches its count
-        await loadPhotos();
-      } catch (error) {
-        if (cancelled) return;
-
-        console.error('[PhotoGallery] Failed to load initial photos:', error);
-        setPhotos([]);
-        setHasLoadedOnce(true); // Mark as loaded even on error to show empty state
-        setIsLoading(false);
-        setError(error instanceof Error ? error.message : 'Failed to load photos');
-      }
-    };
-
-    loadInitialPhotos();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadPhotos, retryTrigger]); // Re-run on mount and when retry is clicked
-
-  // BUG FIX: Refresh gallery when store photos change (after upload)
-  // This fixes the issue where uploaded photos don't appear until page refresh
-  // P1 FIX: Added cleanup to prevent memory leak on unmount
-  //
-  // An upload prepends to the store, so it shows as a newest store row this
-  // list does not hold. Counts cannot tell: the store loads up to 50 rows and
-  // this list grows 20 at a time, so comparing lengths reloaded page one after
-  // the first load and again after each scroll, snapping the album back to 20
-  // (DW-201). A delete only removes rows from both lists, so it never trips this.
-  const newestStorePhotoId = storePhotos[0]?.id;
-  const newestStorePhotoMissing =
-    newestStorePhotoId !== undefined && !photos.some((p) => p.id === newestStorePhotoId);
-  useEffect(() => {
-    // Skip if we haven't loaded once yet (initial load handles this)
-    if (!hasLoadedOnce) return;
-
-    if (newestStorePhotoMissing) {
-      let cancelled = false;
-
-      // Refresh the gallery to show new photos
-      const refreshGallery = async () => {
-        try {
-          const firstPage = await photoService.getPhotos(PHOTOS_PER_PAGE, 0);
-
-          if (cancelled) return;
-
-          setPhotos(firstPage);
-          setCurrentOffset(firstPage.length);
-          setHasMore(firstPage.length === PHOTOS_PER_PAGE);
-        } catch (error) {
-          if (cancelled) return;
-
-          console.error('[PhotoGallery] Failed to refresh gallery:', error);
-        }
-      };
-
-      refreshGallery();
-
-      return () => {
-        cancelled = true;
-      };
-    }
-  }, [newestStorePhotoId, newestStorePhotoMissing, hasLoadedOnce]);
-
-  // AC-4.2.4: Load next page of photos
-  const loadMorePhotos = useCallback(async () => {
-    if (isLoadingMore || !hasMore) return;
-
-    try {
-      setIsLoadingMore(true);
-      const nextPage = await photoService.getPhotos(PHOTOS_PER_PAGE, currentOffset);
-
-      if (nextPage.length > 0) {
-        setPhotos((prev) => [...prev, ...nextPage]);
-        setCurrentOffset((prev) => prev + nextPage.length);
-        setHasMore(nextPage.length === PHOTOS_PER_PAGE);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('[PhotoGallery] Failed to load more photos:', error);
-      setLoadMoreFailed(true);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [currentOffset, hasMore, isLoadingMore]);
-
-  const handleRetryLoadMore = useCallback(() => {
-    setLoadMoreFailed(false);
-    loadMorePhotos();
-  }, [loadMorePhotos]);
-
-  // Viewer delete (DW-176). The store filters its own list, not this page, so
-  // the row is dropped here. The server's rows shift up by one behind it, so
-  // the next page starts one earlier or its first photo would be skipped.
-  const handlePhotoDeleted = useCallback(
-    (photoId: string) => {
-      if (!photos.some((p) => p.id === photoId)) return;
-      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-      setCurrentOffset((prev) => Math.max(0, prev - 1));
-    },
-    [photos]
-  );
-
-  // AC-4.2.4: Setup Intersection Observer for infinite scroll
-  useEffect(() => {
-    if (!hasMore || isLoadingMore || loadMoreFailed || photos.length === 0) return;
+    if (!hasMore) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // Trigger load when scroll target is visible
+        // Reveal more when the scroll target is visible
         if (entries[0].isIntersecting) {
-          loadMorePhotos();
+          setVisibleCount((count) => count + PHOTOS_PER_PAGE);
         }
       },
       {
@@ -254,8 +127,9 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
       if (target) {
         observer.unobserve(target);
       }
+      observer.disconnect();
     };
-  }, [hasMore, isLoadingMore, loadMoreFailed, loadMorePhotos, photos.length]);
+  }, [hasMore, visibleCount]);
 
   // Page header, shared by every state. The Upload pill replaces the old
   // floating FAB and only exists once there is a grid to add to -- the empty
@@ -286,8 +160,8 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
 
   const pageClass = 'flex min-h-screen flex-col gap-4 px-4 pt-3 pb-6';
 
-  // Error state - show error message with retry button
-  if (error && photos.length === 0) {
+  // Error state - the list read failed and there is no saved list to show
+  if (!photosLoaded && photosLoadError && photos.length === 0) {
     return (
       <div className={pageClass} data-testid="photo-gallery-error-state">
         {renderHeader(ALBUM_SUBTITLE, false)}
@@ -297,7 +171,7 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
           </div>
           <h2 className="text-lg font-semibold text-ink">Failed to load photos</h2>
           <p className="max-w-xs rounded-[14px] bg-dtint px-3 py-2 text-sm text-danger" role="alert">
-            {error}
+            {photosLoadError}
           </p>
           <button
             type="button"
@@ -312,10 +186,10 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
     );
   }
 
-  // Story 5.2 AC-4: Skeleton loaders during initial fetch
-  // Show skeleton grid if actively loading OR haven't loaded yet
+  // Story 5.2 AC-4: Skeleton loaders until the list is known (no saved copy
+  // and no server answer yet)
   // Wrapped with photo-gallery testid so E2E tests can proceed during loading
-  if ((isLoading || !hasLoadedOnce) && photos.length === 0) {
+  if (!photosLoaded && photos.length === 0) {
     return (
       <div className={pageClass} data-testid="photo-gallery">
         {renderHeader(ALBUM_SUBTITLE, false)}
@@ -324,9 +198,13 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
     );
   }
 
-  // AC-4.2.5: Empty state when no photos uploaded (after first load attempt)
-  // Only show empty state AFTER we've loaded once and confirmed no photos exist
-  if (!isLoading && hasLoadedOnce && photos.length === 0) {
+  // A refresh that empties the album unmounts the viewer below without its
+  // onClose; drop the selection too, or the next upload would reopen it.
+  if (selectedPhotoId && photos.length === 0) setSelectedPhotoId(null);
+
+  // AC-4.2.5: Empty state when no photos uploaded
+  // Only once the saved copy or the server has confirmed no photos exist
+  if (photos.length === 0) {
     return (
       <div className={pageClass} data-testid="photo-gallery-empty-state">
         {renderHeader(ALBUM_SUBTITLE, false)}
@@ -354,11 +232,8 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
     );
   }
 
-  // "20+ photos" while more pages remain: the local list is paginated, so its
-  // length is only a lower bound until pagination ends.
-  const countLabel = hasMore
-    ? `${photos.length}+ photos`
-    : `${photos.length} ${photos.length === 1 ? 'photo' : 'photos'}`;
+  // The whole list is held, so the count is exact even before every tile shows.
+  const countLabel = `${photos.length} ${photos.length === 1 ? 'photo' : 'photos'}`;
   const subtitle = partnerName ? `${countLabel} · shared with ${partnerName}` : countLabel;
 
   // AC-4.2.1: 3 columns at every width, matching the skeleton exactly
@@ -367,7 +242,7 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
       {renderHeader(subtitle, true)}
 
       <div className={PHOTO_GRID_CLASS} data-testid="photo-gallery-grid">
-        {photos.map((photo) => (
+        {visiblePhotos.map((photo) => (
           <PhotoGridItem
             key={photo.id}
             photo={photo}
@@ -379,35 +254,13 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
         ))}
       </div>
 
-      {/* AC-4.2.4: Intersection Observer trigger element for infinite scroll */}
+      {/* AC-4.2.4: Intersection Observer trigger element for the next step */}
       {hasMore && (
         <div
           ref={observerTarget}
           className="flex w-full items-center justify-center py-8"
           data-testid="photo-gallery-load-trigger"
-        >
-          {isLoadingMore && (
-            <div className="flex flex-col items-center">
-              <Loader2 className="mb-2 h-8 w-8 animate-spin text-accent" aria-hidden="true" />
-              <p className="text-sm text-muted">Loading more photos...</p>
-            </div>
-          )}
-          {loadMoreFailed && !isLoadingMore && (
-            <div className="flex flex-col items-center gap-3">
-              <p className="rounded-[14px] bg-dtint px-3 py-2 text-sm text-danger" role="alert">
-                Couldn't load more photos
-              </p>
-              <button
-                type="button"
-                onClick={handleRetryLoadMore}
-                className="h-12 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                data-testid="photo-gallery-load-more-retry-button"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-        </div>
+        />
       )}
 
       {/* Story 5.2 AC-3, Subtask 4.3: "No more photos" indicator when pagination ends */}
@@ -425,9 +278,7 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
         <PhotoViewer
           photos={photos}
           selectedPhotoId={selectedPhotoId}
-          hasMore={hasMore}
           onClose={() => setSelectedPhotoId(null)}
-          onDeleted={handlePhotoDeleted}
         />
       )}
     </div>

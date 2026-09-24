@@ -66,13 +66,13 @@ describe('Settings on the kit', () => {
     cleanup();
   });
 
-  it('renders the three section labels and one heading per countdown group', async () => {
+  it('renders the four section labels and one heading per countdown group', async () => {
     await renderSettings();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((node) => node.textContent)
-    ).toEqual(['Account', 'Countdowns', 'About']);
+    ).toEqual(['Account', 'Countdowns', 'Photos', 'About']);
     expect(screen.getAllByRole('heading', { level: 3, name: 'Events' })).toHaveLength(1);
     expect(screen.getAllByRole('heading', { level: 3, name: 'Anniversaries' })).toHaveLength(1);
     expect(screen.queryByText(/Event Countdowns/)).not.toBeInTheDocument();
