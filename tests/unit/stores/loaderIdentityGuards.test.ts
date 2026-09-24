@@ -37,10 +37,9 @@ const searchUsers = vi.fn();
 const fetchMoods = vi.fn();
 const getAllForUser = vi.fn();
 const getUnsyncedMoods = vi.fn();
-const getPhotos = vi.fn();
+const listAllPhotos = vi.fn();
 const uploadPhotoService = vi.fn();
 const deletePhotoService = vi.fn();
-const getSignedUrl = vi.fn();
 const checkStorageQuota = vi.fn();
 const getEvents = vi.fn();
 const createEvent = vi.fn();
@@ -83,13 +82,17 @@ vi.mock('../../../src/api/partnerService', () => ({
 
 vi.mock('../../../src/services/photoService', () => ({
   photoService: {
-    getPhotos: () => getPhotos(),
+    listAllPhotos: () => listAllPhotos(),
     uploadPhoto: (input: unknown, onCheckError?: (message: string) => void) =>
       uploadPhotoService(input, onCheckError),
     deletePhoto: (photoId: string) => deletePhotoService(photoId),
-    getSignedUrl: (storagePath: string) => getSignedUrl(storagePath),
     checkStorageQuota: () => checkStorageQuota(),
   },
+}));
+
+// The background photo image fill is photoImageCache's own subject.
+vi.mock('../../../src/services/photoImageCache', () => ({
+  requestPhotoImageFill: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../src/services/eventsService', () => ({
@@ -332,7 +335,6 @@ describe('loader identity guards', () => {
     // uploadPhoto awaits the quota twice; unless a case says otherwise it is
     // quiet, so neither the reject nor the warning branch is what is measured.
     checkStorageQuota.mockResolvedValue({ used: 0, quota: 1_000, percent: 0, warning: 'none' });
-    getSignedUrl.mockResolvedValue('https://signed.example/a.jpg');
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     readLocalCopy.mockResolvedValue(null);
     writeLocalCopy.mockResolvedValue(undefined);
@@ -1095,31 +1097,53 @@ describe('loader identity guards', () => {
   describe('loadPhotos', () => {
     it('discards the gallery when the account changed', async () => {
       const pending = deferred<unknown[]>();
-      getPhotos.mockReturnValue(pending.promise);
+      listAllPhotos.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().loadPhotos();
-      switchToUserC({ photos: [{ id: 'c-photo', caption: 'C-OWN-CAPTION' }] });
+      switchToUserC({ photos: [cPhoto()] });
 
-      pending.settle([{ id: 'a-photo', caption: 'A-PHOTO-CAPTION' }]);
+      pending.settle([{ ...aPhoto(), caption: 'A-PHOTO-CAPTION' }]);
       await inFlight;
 
-      expect(useAppStore.getState().photos).toEqual([{ id: 'c-photo', caption: 'C-OWN-CAPTION' }]);
+      expect(useAppStore.getState().photos).toEqual([cPhoto()]);
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PHOTO-CAPTION');
+      // Nor is A's list saved as anyone's copy.
+      expect(writeLocalCopy).not.toHaveBeenCalled();
     });
 
     it('does not paint the previous account\'s failure onto the new one', async () => {
-      // The catch path writes `error` — an app-wide banner — and blanks `photos`.
+      // The failure path writes `photosLoadError`, which the gallery renders.
       const pending = deferred<unknown[]>();
-      getPhotos.mockReturnValue(pending.promise);
+      listAllPhotos.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().loadPhotos();
-      switchToUserC({ photos: [{ id: 'c-photo', caption: 'C-OWN-CAPTION' }], error: null });
+      switchToUserC({ photos: [cPhoto()], error: null, photosLoadError: null });
 
       pending.fail(new Error('A-REQUEST-FAILURE'));
       await inFlight;
 
       expect(useAppStore.getState().error).toBeNull();
-      expect(useAppStore.getState().photos).toEqual([{ id: 'c-photo', caption: 'C-OWN-CAPTION' }]);
+      expect(useAppStore.getState().photosLoadError).toBeNull();
+      expect(useAppStore.getState().photos).toEqual([cPhoto()]);
+    });
+
+    it('writes nothing when the SAME account signs back in mid-flight', async () => {
+      const pending = deferred<unknown[]>();
+      listAllPhotos.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().loadPhotos();
+      await flush();
+      useAppStore.getState().clearAuth();
+      useAppStore.getState().setAuthUser(A);
+      useAppStore.setState({ photos: [aGalleryRow()] } as unknown as Parameters<
+        typeof useAppStore.setState
+      >[0]);
+
+      pending.settle([{ ...aPhoto(), id: 'dead-session-row', caption: 'DEAD-SESSION-ROW' }]);
+      await inFlight;
+
+      expect(useAppStore.getState().photos).toEqual([aGalleryRow()]);
+      expect(writeLocalCopy).not.toHaveBeenCalled();
     });
   });
 
@@ -1146,22 +1170,8 @@ describe('loader identity guards', () => {
 
       expect(useAppStore.getState().photos).toEqual([cPhoto()]);
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-PHOTO');
-    });
-
-    it('does not insert the signed URL when the switch lands during signing', async () => {
-      uploadPhotoService.mockResolvedValue(aPhoto());
-      const signing = deferred<string>();
-      getSignedUrl.mockReturnValue(signing.promise);
-
-      const inFlight = useAppStore.getState().uploadPhoto(uploadInput());
-      await flush();
-      switchToUserC({ photos: [cPhoto()] });
-
-      signing.settle('https://signed.example/A-PRIVATE-SIGNED-URL');
-      await inFlight;
-
-      expect(useAppStore.getState().photos).toEqual([cPhoto()]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-SIGNED-URL');
+      // Nor is it saved into anyone's `photos` copy.
+      expect(writeLocalCopy).not.toHaveBeenCalled();
     });
 
     it('still reports the true outcome to its own caller', async () => {
@@ -2064,15 +2074,13 @@ describe('loader identity guards', () => {
 
     it('uploadPhoto writes normally', async () => {
       uploadPhotoService.mockResolvedValue(aPhoto());
-      getSignedUrl.mockResolvedValue('https://signed.example/a.jpg');
 
       await expect(useAppStore.getState().uploadPhoto(uploadInput())).resolves.toEqual({
         success: true,
       });
 
-      expect(useAppStore.getState().photos).toEqual([
-        { ...aPhoto(), signedUrl: 'https://signed.example/a.jpg', isOwn: true },
-      ]);
+      // No signed URL: the image is shown from the cache or downloaded by path.
+      expect(useAppStore.getState().photos).toEqual([{ ...aPhoto(), signedUrl: null, isOwn: true }]);
     });
 
     it('uploadPhoto still rejects on a full quota', async () => {

@@ -1,22 +1,17 @@
 import type { PanInfo } from 'framer-motion';
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
-import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, ImageOff, Loader2, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks';
+import { usePhotoImage } from '../../hooks/usePhotoImage';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { useAppStore } from '../../stores/useAppStore';
 
 interface PhotoViewerProps {
+  /** The store's live list: it can change (refresh, upload, delete) while open. */
   photos: PhotoWithUrls[];
   selectedPhotoId: string;
-  /** More pages exist beyond `photos`, so its length is only a lower bound. */
-  hasMore?: boolean;
   onClose: () => void;
-  /**
-   * Called after a successful delete. The caller owns `photos` and must drop
-   * the row: the viewer keeps its index, which then holds the next photo.
-   */
-  onDeleted?: (photoId: string) => void;
 }
 
 // AC 6.4.2: Swipe gesture configuration
@@ -41,27 +36,37 @@ const DOUBLE_TAP_DELAY = 300; // ms
  * - Swipe-down to close
  * - Photo metadata and caption display
  * - Delete functionality for own photos
- * - Photo preloading
- * - Loading and error states
+ * - Photo preloading (neighbours read from the image cache, or downloaded and cached)
+ * - Loading and error states; a placeholder when the photo is not saved on
+ *   this device (not cached, offline)
  */
 export function PhotoViewer({
   photos,
   selectedPhotoId,
-  hasMore = false,
   onClose,
-  onDeleted,
 }: PhotoViewerProps) {
   const { deletePhoto } = useAppStore();
 
-  // Calculate current photo index from selectedPhotoId
-  const initialIndex = photos.findIndex((p) => p.id === selectedPhotoId);
-  const [currentIndex, setCurrentIndex] = useState(initialIndex >= 0 ? initialIndex : 0);
+  // The shown photo is tracked by id, not index: `photos` is the store's live
+  // list, which a refresh or an upload can reorder while the viewer is open.
+  // The index is derived from the id each render. Only when that id is gone
+  // (its own delete, or removed by a refresh) does the viewer fall back to the
+  // index it last stood on, clamped to the list.
+  const [currentId, setCurrentId] = useState(selectedPhotoId);
+  const [anchorIndex, setAnchorIndex] = useState(() =>
+    Math.max(0, photos.findIndex((p) => p.id === selectedPhotoId))
+  );
+  const foundIndex = photos.findIndex((p) => p.id === currentId);
+  const currentIndex =
+    foundIndex >= 0 ? foundIndex : Math.min(anchorIndex, Math.max(photos.length - 1, 0));
 
   // AC 6.4.14: Gesture state management
   const [scale, setScale] = useState(MIN_ZOOM);
   const [isLoading, setIsLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  // Bumped by Retry so the image is read or downloaded again.
+  const [retryKey, setRetryKey] = useState(0);
 
   // AC 6.4.6: Double-tap zoom state
   const [lastTap, setLastTap] = useState(0);
@@ -208,38 +213,16 @@ export function PhotoViewer({
     };
   }, [naturalSize, scale]);
 
-  // AC 6.4.11: Photo preloading
-  useEffect(() => {
-    if (!photos || photos.length === 0) return;
+  // The shown image: cached Blob, else downloaded and cached, else a placeholder.
+  const image = usePhotoImage(currentPhoto?.storage_path, { retryKey });
 
-    const preloadedImages: HTMLImageElement[] = [];
+  // AC 6.4.11: Photo preloading. The neighbours go through the same path, so
+  // a neighbour not cached yet is downloaded and cached before it is shown.
+  usePhotoImage(canNavigateNext ? photos[currentIndex + 1]?.storage_path : null);
+  usePhotoImage(canNavigatePrev ? photos[currentIndex - 1]?.storage_path : null);
 
-    const preloadImage = (url: string | null) => {
-      if (!url) return;
-      const img = new Image();
-      img.src = url;
-      preloadedImages.push(img);
-    };
-
-    // Preload next photo
-    if (canNavigateNext) {
-      const nextPhoto = photos[currentIndex + 1];
-      preloadImage(nextPhoto.signedUrl);
-    }
-
-    // Preload previous photo
-    if (canNavigatePrev) {
-      const prevPhoto = photos[currentIndex - 1];
-      preloadImage(prevPhoto.signedUrl);
-    }
-
-    // Cleanup: Clear image sources to allow garbage collection
-    return () => {
-      preloadedImages.forEach((img) => {
-        img.src = '';
-      });
-    };
-  }, [currentIndex, photos, canNavigateNext, canNavigatePrev]);
+  const showImageError = imageError || image.status === 'error';
+  const imageNotSaved = !showImageError && image.status === 'unavailable';
 
   // Return the viewer to an untransformed state waiting on a load. Used when navigating to a
   // different photo and when retrying a failed one — both arrive at the same place.
@@ -269,15 +252,18 @@ export function PhotoViewer({
   // Navigate to next/previous photo
   const navigatePhoto = useCallback(
     (direction: 'next' | 'prev') => {
-      if (direction === 'next' && canNavigateNext) {
-        setCurrentIndex((prev) => prev + 1);
-        resetTransform();
-      } else if (direction === 'prev' && canNavigatePrev) {
-        setCurrentIndex((prev) => prev - 1);
-        resetTransform();
-      }
+      const target =
+        direction === 'next' && canNavigateNext
+          ? currentIndex + 1
+          : direction === 'prev' && canNavigatePrev
+            ? currentIndex - 1
+            : null;
+      if (target === null) return;
+      setCurrentId(photos[target].id);
+      setAnchorIndex(target);
+      resetTransform();
     },
-    [canNavigateNext, canNavigatePrev, resetTransform]
+    [canNavigateNext, canNavigatePrev, currentIndex, photos, resetTransform]
   );
 
   // AC 6.4.1: Prevent body scroll when modal is open
@@ -336,8 +322,8 @@ export function PhotoViewer({
     liveRegion.setAttribute('aria-atomic', 'true');
     liveRegion.className = 'sr-only';
 
-    const announcement = `Photo ${currentIndex + 1} of ${photos.length}${hasMore ? '+' : ''}${
-      currentPhoto.caption ? '. ' + currentPhoto.caption : ''
+    const announcement = `Photo ${currentIndex + 1} of ${photos.length}${
+      currentPhoto?.caption ? '. ' + currentPhoto.caption : ''
     }`;
     liveRegion.textContent = announcement;
 
@@ -349,7 +335,7 @@ export function PhotoViewer({
         document.body.removeChild(liveRegion);
       }
     };
-  }, [currentIndex, photos.length, hasMore, currentPhoto.caption]);
+  }, [currentIndex, photos.length, currentPhoto?.caption]);
 
   // AC 6.4.2: Swipe navigation
   const handleDragEnd = useCallback(
@@ -402,9 +388,9 @@ export function PhotoViewer({
   //
   // Navigation waits for the outcome. deletePhoto resolves false rather than
   // rejecting, and on false the viewer stays where it is and the confirmation
-  // stays open with an error, so Delete can be retried. On success the
-  // parent drops the row through onDeleted, so the same index then holds the
-  // next photo; only the last photo steps back, and the only photo closes.
+  // stays open with an error, so Delete can be retried. On success the store
+  // drops the row and the viewer moves to the next photo; only the last photo
+  // steps back, and the only photo closes.
   //
   // Re-entry would send a second delete while the first is in flight. The
   // ref is the guard (state lags a render); the state disables the Delete
@@ -415,7 +401,12 @@ export function PhotoViewer({
     isDeletingRef.current = true;
     setIsDeleting(true);
     setDeleteError(null);
-    const photoToDelete = photos[currentIndex];
+    // The photo the dialog names, resolved by id; the index is where the
+    // viewer stands if the list changes before the delete returns.
+    const photoToDelete = currentPhoto;
+    const deletedIndex = currentIndex;
+    const next = photos[deletedIndex + 1] ?? photos[deletedIndex - 1];
+    setAnchorIndex(deletedIndex);
     let deleted = false;
 
     try {
@@ -423,11 +414,10 @@ export function PhotoViewer({
       deleted = await deletePhoto(photoToDelete.id);
       if (!deleted) return;
 
-      onDeleted?.(photoToDelete.id);
-      if (photos.length === 1) {
+      if (!next) {
         onClose();
       } else {
-        if (currentIndex === photos.length - 1) setCurrentIndex(currentIndex - 1);
+        setCurrentId(next.id);
         resetTransform();
       }
     } finally {
@@ -444,7 +434,7 @@ export function PhotoViewer({
         setDeleteError('Failed to delete photo. Please try again.');
       }
     }
-  }, [photos, currentIndex, onClose, onDeleted, deletePhoto, resetTransform, closeDeleteDialog]);
+  }, [photos, currentPhoto, currentIndex, onClose, deletePhoto, resetTransform, closeDeleteDialog]);
 
   // AC 6.4.15: Image loading handlers
   const handleImageLoad = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
@@ -481,6 +471,7 @@ export function PhotoViewer({
     (event: React.MouseEvent) => {
       event.stopPropagation();
       resetTransform();
+      setRetryKey((key) => key + 1);
     },
     [resetTransform]
   );
@@ -584,14 +575,14 @@ export function PhotoViewer({
             }}
           >
             {/* AC 6.4.15: Loading spinner */}
-            {isLoading && (
+            {(isLoading || image.status === 'loading') && !showImageError && !imageNotSaved && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Loader2 className="h-12 w-12 animate-spin text-white" />
               </div>
             )}
 
             {/* AC 6.4.16: Error state */}
-            {imageError && (
+            {showImageError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
                 <p className="mb-4">Failed to load photo</p>
                 <button
@@ -604,11 +595,22 @@ export function PhotoViewer({
               </div>
             )}
 
+            {/* Listed, but its image is not on this device and cannot be fetched */}
+            {imageNotSaved && (
+              <div
+                className="flex min-h-[200px] min-w-[240px] flex-col items-center justify-center gap-2 px-6 text-center text-white"
+                data-testid="photo-viewer-not-saved"
+              >
+                <ImageOff className="h-8 w-8" aria-hidden="true" />
+                <p>This photo is not saved on this device</p>
+              </div>
+            )}
+
             {/* AC 6.4.1: Photo display */}
-            {!imageError && (
+            {!showImageError && !imageNotSaved && image.url && (
               <motion.img
                 key={currentPhoto.id} // Force remount on photo change
-                src={currentPhoto.signedUrl || ''}
+                src={image.url}
                 alt={currentPhoto.caption || 'Photo'}
                 className="max-h-[calc(100vh-8rem)] max-w-full object-contain"
                 style={{ opacity: isLoading ? 0 : 1 }}
@@ -631,8 +633,7 @@ export function PhotoViewer({
           transition={{ delay: 0.2 }}
         >
           <div className="mb-1 text-sm text-muted">
-            Photo {currentIndex + 1} of {photos.length}
-            {hasMore ? '+' : ''} •{' '}
+            Photo {currentIndex + 1} of {photos.length} •{' '}
             {currentPhoto.isOwn ? 'Your photo' : 'Partner photo'}
           </div>
           {currentPhoto.caption && (

@@ -2,9 +2,10 @@
  * PhotoGallery on the kit: the story's matrix rows.
  *
  * Grid -> title, count + partner subtitle, header Upload pill carrying the old
- * FAB's testid; "+" while more pages remain; singular; no partner name; empty
- * state without the header Upload; loading header + a skeleton in the grid's
- * exact layout; load error card with retry; owner badges.
+ * FAB's testid; the exact count while tiles are still unrevealed; singular; no
+ * partner name; empty state without the header Upload; loading header + a
+ * skeleton in the grid's exact layout; load error card with retry; owner
+ * badges. The gallery renders the store's list (`fakePhotoStore`).
  */
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { createRef } from 'react';
@@ -15,30 +16,28 @@ const names = vi.hoisted(() => ({
   own: vi.fn<() => Promise<string | null>>(),
   partner: vi.fn<() => Promise<string | null>>(),
 }));
-const getPhotos = vi.hoisted(() => vi.fn<(limit: number, offset: number) => Promise<unknown[]>>());
 
 vi.mock('../../../api/supabaseClient', () => ({
   getOwnDisplayName: names.own,
   getPartnerDisplayName: names.partner,
 }));
-vi.mock('../../../services/photoService', () => ({
-  photoService: { getPhotos },
+vi.mock('../../../stores/useAppStore', async () => ({
+  useAppStore: (await import('./fakePhotoStore')).fakePhotoStore,
 }));
-// Stable identity: the initial-load effect depends on loadPhotos, so a fresh
-// function per render would re-run it forever.
-const storeState = vi.hoisted(() => ({ photos: [], loadPhotos: async () => {} }));
-vi.mock('../../../stores/useAppStore', () => ({
-  useAppStore: () => storeState,
+vi.mock('../../../hooks/usePhotoImage', async () => ({
+  usePhotoImage: (await import('./fakePhotoStore')).fakeUsePhotoImage,
 }));
 
 import { PhotoGallery } from '../PhotoGallery';
+import { listPhotos, resetFakePhotoStore } from './fakePhotoStore';
 
 function photo(index: number, isOwn = true): PhotoWithUrls {
   return {
     id: `photo-${index}`,
     user_id: isOwn ? 'me' : 'partner',
+    storage_path: `${isOwn ? 'me' : 'partner'}/${index}.jpg`,
     caption: null,
-    signedUrl: `https://example.test/${index}.jpg`,
+    signedUrl: null,
     isOwn,
     created_at: '2026-09-01T10:00:00.000Z',
   } as unknown as PhotoWithUrls;
@@ -56,9 +55,10 @@ async function renderGallery(onUploadClick = vi.fn()) {
 }
 
 beforeEach(() => {
+  resetFakePhotoStore();
   names.own.mockResolvedValue('Frankie');
   names.partner.mockResolvedValue('Gracie');
-  getPhotos.mockResolvedValue(page(12));
+  listPhotos.mockResolvedValue(page(12));
 });
 
 afterEach(() => {
@@ -97,17 +97,19 @@ describe('PhotoGallery grid', () => {
     expect(uploadButtonRef.current).toBe(screen.getByTestId('photo-gallery-upload-fab'));
   });
 
-  it('suffixes "+" while more pages remain', async () => {
-    getPhotos.mockResolvedValue(page(20));
+  it('counts every photo while only the first 20 tiles are shown', async () => {
+    listPhotos.mockResolvedValue(page(25));
     await renderGallery();
 
+    // The whole list is held, so the count is exact, never "20+".
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe(
-      '20+ photos · shared with Gracie'
+      '25 photos · shared with Gracie'
     );
+    expect(screen.getAllByTestId('photo-grid-item')).toHaveLength(20);
   });
 
   it('says "1 photo" for a single photo', async () => {
-    getPhotos.mockResolvedValue(page(1));
+    listPhotos.mockResolvedValue(page(1));
     await renderGallery();
 
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe(
@@ -117,7 +119,7 @@ describe('PhotoGallery grid', () => {
 
   it('drops the "shared with" clause when there is no partner name', async () => {
     names.partner.mockResolvedValue(null);
-    getPhotos.mockResolvedValue(page(3));
+    listPhotos.mockResolvedValue(page(3));
     await renderGallery();
 
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe('3 photos');
@@ -127,7 +129,7 @@ describe('PhotoGallery grid', () => {
     // Both reads collapse "unset" and "failed" to null; they never reject.
     names.own.mockResolvedValue(null);
     names.partner.mockResolvedValue(null);
-    getPhotos.mockResolvedValue([photo(0, true), photo(1, false)]);
+    listPhotos.mockResolvedValue([photo(0, true), photo(1, false)]);
     await renderGallery();
 
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe('2 photos');
@@ -139,7 +141,7 @@ describe('PhotoGallery grid', () => {
 
 describe('PhotoGallery owner badge', () => {
   it('shows the own / partner initial on fill / partner, with sr-only text', async () => {
-    getPhotos.mockResolvedValue([photo(0, true), photo(1, false)]);
+    listPhotos.mockResolvedValue([photo(0, true), photo(1, false)]);
     await renderGallery();
 
     const [own, partner] = screen.getAllByTestId('photo-grid-item-owner-badge');
@@ -170,7 +172,7 @@ describe('PhotoGallery owner badge', () => {
 
   it('keeps a name that opens with an emoji whole on the badge', async () => {
     names.partner.mockResolvedValue('🌸Gracie');
-    getPhotos.mockResolvedValue([photo(0, false)]);
+    listPhotos.mockResolvedValue([photo(0, false)]);
     await renderGallery();
 
     const badge = screen.getByTestId('photo-grid-item-owner-badge');
@@ -180,7 +182,7 @@ describe('PhotoGallery owner badge', () => {
 
 describe('PhotoGallery empty', () => {
   it('shows the empty card and no header Upload', async () => {
-    getPhotos.mockResolvedValue([]);
+    listPhotos.mockResolvedValue([]);
     const onUploadClick = await renderGallery();
 
     const empty = screen.getByTestId('photo-gallery-empty-state');
@@ -201,8 +203,8 @@ describe('PhotoGallery empty', () => {
 
 describe('PhotoGallery loading', () => {
   it('shows the empty-state header and a skeleton in the grid layout', async () => {
-    let resolve: (value: unknown[]) => void = () => {};
-    getPhotos.mockImplementation(() => new Promise((r) => (resolve = r)));
+    let resolve: (value: PhotoWithUrls[]) => void = () => {};
+    listPhotos.mockImplementation(() => new Promise((r) => (resolve = r)));
     render(<PhotoGallery onUploadClick={vi.fn()} />);
 
     const wrapper = screen.getByTestId('photo-gallery');
@@ -227,7 +229,7 @@ describe('PhotoGallery loading', () => {
 
 describe('PhotoGallery load error', () => {
   it('shows the header and a kit error card with a working retry', async () => {
-    getPhotos.mockRejectedValueOnce(new Error('Network down'));
+    listPhotos.mockRejectedValueOnce(new Error('Network down'));
     await renderGallery();
 
     const errorState = screen.getByTestId('photo-gallery-error-state');

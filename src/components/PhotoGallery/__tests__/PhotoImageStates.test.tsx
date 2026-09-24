@@ -1,0 +1,227 @@
+/**
+ * The grid tile and the viewer against every image status `usePhotoImage` can
+ * report (spec-unified-data-storage story 10), and the viewer against a live
+ * list that changes while it is open.
+ */
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PhotoImage, UsePhotoImageOptions } from '../../../hooks/usePhotoImage';
+import type { PhotoWithUrls } from '../../../services/photoService';
+
+type DivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
+
+vi.mock('framer-motion', () => ({
+  motion: {
+    div: ({ children, ...props }: DivProps) => <div {...props}>{children}</div>,
+    img: (props: ImgHTMLAttributes<HTMLImageElement>) => <img {...props} alt={props.alt ?? ''} />,
+  },
+  AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  useMotionValue: () => ({ get: () => 0, set: () => {}, on: () => () => {} }),
+}));
+
+const imageFor = vi.hoisted(() =>
+  vi.fn<(path: string | null | undefined, options?: UsePhotoImageOptions) => PhotoImage>()
+);
+vi.mock('../../../hooks/usePhotoImage', () => ({
+  usePhotoImage: (path: string | null | undefined, options?: UsePhotoImageOptions) =>
+    imageFor(path, options),
+}));
+
+const deletePhotoMock = vi.hoisted(() => vi.fn<(photoId: string) => Promise<boolean>>());
+vi.mock('../../../stores/useAppStore', () => ({
+  useAppStore: () => ({ deletePhoto: deletePhotoMock }),
+}));
+
+import { PhotoGridItem } from '../PhotoGridItem';
+import { PhotoViewer } from '../PhotoViewer';
+
+function photo(index: number): PhotoWithUrls {
+  return {
+    id: `photo-${index}`,
+    user_id: 'me',
+    storage_path: `me/${index}.jpg`,
+    caption: `cap-${index}`,
+    signedUrl: null,
+    isOwn: true,
+    created_at: '2026-09-01T10:00:00.000Z',
+  } as unknown as PhotoWithUrls;
+}
+
+const ready = (path: string | null | undefined): PhotoImage =>
+  path ? { status: 'ready', url: `blob:${path}` } : { status: 'idle', url: null };
+
+/** Every tile is in view at once. */
+class VisibleObserver {
+  constructor(private callback: IntersectionObserverCallback) {}
+  observe() {
+    this.callback(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      this as unknown as IntersectionObserver
+    );
+  }
+  unobserve() {}
+  disconnect() {}
+}
+
+const originalObserver = window.IntersectionObserver;
+
+beforeEach(() => {
+  window.IntersectionObserver = VisibleObserver as unknown as typeof IntersectionObserver;
+  imageFor.mockReset();
+  imageFor.mockImplementation(ready);
+  deletePhotoMock.mockReset();
+  deletePhotoMock.mockResolvedValue(true);
+});
+
+afterEach(() => {
+  cleanup();
+  window.IntersectionObserver = originalObserver;
+});
+
+function renderTile() {
+  render(
+    <PhotoGridItem
+      photo={photo(0)}
+      ownInitial="Y"
+      partnerInitial="P"
+      partnerName={null}
+      onPhotoClick={vi.fn()}
+    />
+  );
+  return screen.getByTestId('photo-grid-item');
+}
+
+describe('PhotoGridItem image status', () => {
+  it.each(['error', 'unavailable'] as const)(
+    '%s: the "not saved on this device" placeholder, no pulse',
+    (status) => {
+      imageFor.mockReturnValue({ status, url: null });
+      const tile = renderTile();
+
+      expect(within(tile).getByTestId('photo-grid-item-not-saved')).toHaveTextContent(
+        'Not saved on this device'
+      );
+      expect(tile.querySelector('.animate-pulse')).toBeNull();
+    }
+  );
+
+  it('loading: the pulse, no placeholder', () => {
+    imageFor.mockReturnValue({ status: 'loading', url: null });
+    const tile = renderTile();
+
+    expect(tile.querySelector('.animate-pulse')).not.toBeNull();
+    expect(within(tile).queryByTestId('photo-grid-item-not-saved')).toBeNull();
+  });
+
+  it('ready: the blob image', () => {
+    const tile = renderTile();
+    expect(within(tile).getByTestId('photo-grid-item-image')).toHaveAttribute('src', 'blob:me/0.jpg');
+  });
+});
+
+describe('PhotoViewer image status', () => {
+  it('error: "Failed to load photo"; Retry loads again and shows the image', async () => {
+    // The shown photo errors until Retry raises the retry key.
+    imageFor.mockImplementation((path, options) =>
+      path === 'me/0.jpg' && (options?.retryKey ?? 0) === 0
+        ? { status: 'error', url: null }
+        : ready(path)
+    );
+    render(<PhotoViewer photos={[photo(0)]} selectedPhotoId="photo-0" onClose={vi.fn()} />);
+
+    expect(screen.getByText('Failed to load photo')).toBeInTheDocument();
+    expect(screen.queryByAltText('cap-0')).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    });
+
+    expect(imageFor).toHaveBeenCalledWith('me/0.jpg', { retryKey: 1 });
+    expect(screen.getByAltText('cap-0')).toHaveAttribute('src', 'blob:me/0.jpg');
+    expect(screen.queryByText('Failed to load photo')).toBeNull();
+  });
+
+  it('loading: a spinner while the image downloads', () => {
+    imageFor.mockImplementation((path) =>
+      path === 'me/0.jpg' ? { status: 'loading', url: null } : ready(path)
+    );
+    render(<PhotoViewer photos={[photo(0)]} selectedPhotoId="photo-0" onClose={vi.fn()} />);
+
+    const overlay = screen.getByTestId('photo-viewer-overlay');
+    expect(overlay.querySelector('.animate-spin')).not.toBeNull();
+    expect(screen.queryByAltText('cap-0')).toBeNull();
+  });
+
+  it('unavailable: the "not saved on this device" placeholder', () => {
+    imageFor.mockImplementation((path) =>
+      path === 'me/0.jpg' ? { status: 'unavailable', url: null } : ready(path)
+    );
+    render(<PhotoViewer photos={[photo(0)]} selectedPhotoId="photo-0" onClose={vi.fn()} />);
+
+    expect(screen.getByTestId('photo-viewer-not-saved')).toHaveTextContent(
+      'This photo is not saved on this device'
+    );
+  });
+});
+
+describe('PhotoViewer on a live list', () => {
+  it('keeps showing the opened photo when a newer photo is prepended', () => {
+    const { rerender } = render(
+      <PhotoViewer photos={[photo(1), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
+    );
+    expect(screen.getByAltText('cap-1')).toBeInTheDocument();
+    expect(screen.getByText(/Photo 1 of 2 •/)).toBeInTheDocument();
+
+    rerender(
+      <PhotoViewer
+        photos={[photo(0), photo(1), photo(2)]}
+        selectedPhotoId="photo-1"
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByAltText('cap-1')).toBeInTheDocument();
+    expect(screen.getByText(/Photo 2 of 3 •/)).toBeInTheDocument();
+  });
+
+  it('deletes the photo the dialog names even after the list changed', async () => {
+    const { rerender } = render(
+      <PhotoViewer photos={[photo(1), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
+    );
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    rerender(
+      <PhotoViewer
+        photos={[photo(0), photo(1), photo(2)]}
+        selectedPhotoId="photo-1"
+        onClose={vi.fn()}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    });
+
+    expect(deletePhotoMock).toHaveBeenCalledWith('photo-1');
+  });
+
+  it('moves to the next photo once its own delete removes it from the list', async () => {
+    const { rerender } = render(
+      <PhotoViewer
+        photos={[photo(0), photo(1), photo(2)]}
+        selectedPhotoId="photo-1"
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    });
+    rerender(
+      <PhotoViewer photos={[photo(0), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
+    );
+
+    expect(screen.getByAltText('cap-2')).toBeInTheDocument();
+    expect(screen.getByText(/Photo 2 of 2 •/)).toBeInTheDocument();
+  });
+});

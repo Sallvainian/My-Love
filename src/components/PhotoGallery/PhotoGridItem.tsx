@@ -1,4 +1,6 @@
+import { ImageOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { usePhotoImage } from '../../hooks/usePhotoImage';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { logger } from '../../utils/logger';
 
@@ -23,7 +25,8 @@ interface PhotoGridItemProps {
  * - Caption overlay on hover or keyboard focus (flat dark backdrop)
  * - Owner badge display (AC-6.3.11): initial in a fill (own) or partner circle
  * - Click handler for photo selection
- * - Uses Supabase signed URLs
+ * - Image from the per-account image cache, else downloaded by storage path
+ *   (usePhotoImage); a placeholder when it is not saved on this device
  */
 export function PhotoGridItem({
   photo,
@@ -32,9 +35,13 @@ export function PhotoGridItem({
   partnerName,
   onPhotoClick,
 }: PhotoGridItemProps) {
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
+  const image = usePhotoImage(photo.storage_path, { enabled: isVisible });
+  const isLoaded = image.url !== null && loadedUrl === image.url;
+  // Not cached and not downloadable (offline, or the download failed).
+  const notSaved = image.status === 'unavailable' || image.status === 'error';
 
   // AC-6.3.5: Lazy loading with IntersectionObserver
   useEffect(() => {
@@ -89,22 +96,33 @@ export function PhotoGridItem({
       }}
     >
       {/* AC-6.3.6: Blur placeholder while loading */}
-      {!isLoaded && isVisible && (
+      {!isLoaded && isVisible && !notSaved && (
         <div className="absolute inset-0 animate-pulse bg-card2" />
+      )}
+
+      {/* The photo is listed, but its image is not on this device */}
+      {notSaved && (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-card2 p-2 text-center text-muted"
+          data-testid="photo-grid-item-not-saved"
+        >
+          <ImageOff className="h-5 w-5" aria-hidden="true" />
+          <span className="text-[11px] leading-tight">Not saved on this device</span>
+        </div>
       )}
 
       {/* Photo thumbnail with lazy loading */}
       <img
         ref={imgRef}
-        src={isVisible && photo.signedUrl ? photo.signedUrl : undefined}
+        src={image.url ?? undefined}
         alt={photo.caption || 'Photo'}
         className="h-full w-full object-cover transition-opacity duration-300"
         style={{ opacity: isLoaded ? 1 : 0 }}
         loading="lazy"
-        onLoad={() => setIsLoaded(true)}
+        onLoad={() => setLoadedUrl(image.url)}
         onError={() => {
           console.error(`[PhotoGridItem] Failed to load image: ${photo.id}`);
-          setIsLoaded(true); // Show broken image rather than eternal loading
+          setLoadedUrl(image.url); // Show broken image rather than eternal loading
         }}
         data-testid="photo-grid-item-image"
       />

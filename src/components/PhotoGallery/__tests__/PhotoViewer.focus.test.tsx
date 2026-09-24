@@ -26,6 +26,12 @@ vi.mock('framer-motion', () => ({
   useMotionValue: () => ({ get: () => 0, set: () => {}, on: () => () => {} }),
 }));
 
+// Every image is cached: the image path itself is usePhotoImage's own subject.
+vi.mock('../../../hooks/usePhotoImage', () => ({
+  usePhotoImage: (path: string | null | undefined) =>
+    path ? { status: 'ready', url: `blob:${path}` } : { status: 'idle', url: null },
+}));
+
 const deletePhotoMock = vi.hoisted(() => vi.fn());
 vi.mock('../../../stores/useAppStore', () => ({
   useAppStore: () => ({ deletePhoto: deletePhotoMock }),
@@ -33,7 +39,8 @@ vi.mock('../../../stores/useAppStore', () => ({
 
 const photo = {
   id: 'photo-1',
-  signedUrl: 'https://example.test/a.jpg',
+  storage_path: 'me/photo-1.jpg',
+  signedUrl: null,
   isOwn: true,
   caption: 'a photo',
 } as unknown as PhotoWithUrls;
@@ -298,10 +305,7 @@ describe('PhotoViewer failed delete', () => {
   it('keeps the confirmation open with an alert, and focus inside it', async () => {
     deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValue(false);
-    const onDeleted = vi.fn();
-    render(
-      <PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} onDeleted={onDeleted} />
-    );
+    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     fireEvent.click(screen.getByLabelText('Delete photo'));
     // A real click focuses the button it lands on; fireEvent does not, and
@@ -315,7 +319,6 @@ describe('PhotoViewer failed delete', () => {
     expect(alert).toHaveTextContent('Failed to delete photo. Please try again.');
     const dialog = screen.getByRole('dialog', { name: 'Delete Photo?' });
     expect(dialog.contains(alert)).toBe(true);
-    expect(onDeleted).not.toHaveBeenCalled();
     expect(screen.getByAltText('a photo')).toBeInTheDocument();
     await waitFor(() => {
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }));
@@ -327,10 +330,7 @@ describe('PhotoViewer failed delete', () => {
   it('closes and clears the error when a retry succeeds', async () => {
     deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-    const onDeleted = vi.fn();
-    render(
-      <PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} onDeleted={onDeleted} />
-    );
+    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     fireEvent.click(screen.getByLabelText('Delete photo'));
     fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
@@ -342,7 +342,7 @@ describe('PhotoViewer failed delete', () => {
       expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
     });
     expect(screen.queryByTestId('photo-viewer-delete-error')).not.toBeInTheDocument();
-    expect(onDeleted).toHaveBeenCalledWith('photo-1');
+    expect(deletePhotoMock).toHaveBeenLastCalledWith('photo-1');
     expect(deletePhotoMock).toHaveBeenCalledTimes(2);
     deletePhotoMock.mockReset();
   });

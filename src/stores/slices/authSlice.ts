@@ -160,8 +160,14 @@ export function signedOutState() {
     // Names why THIS account's favorite write failed; stale for the next one.
     favoriteError: null,
 
-    // photosSlice
+    // photosSlice — the couple's album; its `photos` local copy and cached
+    // images are per-account (deleted for the outgoing account by
+    // `deleteAccountData`). The loaded flag and load error go too: a stranded
+    // `photosLoaded` would show the next account an empty album instead of its
+    // skeleton.
     photos: [],
+    photosLoaded: false,
+    photosLoadError: null,
     storageWarning: null,
 
     // interactionsSlice — the partner snapshot names the previous couple, and

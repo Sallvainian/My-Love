@@ -38,6 +38,12 @@ vi.mock('framer-motion', () => {
   };
 });
 
+// Every image is cached: the image path itself is usePhotoImage's own subject.
+vi.mock('../../../hooks/usePhotoImage', () => ({
+  usePhotoImage: (path: string | null | undefined) =>
+    path ? { status: 'ready', url: `blob:${path}` } : { status: 'idle', url: null },
+}));
+
 const uploadPhotoMock = vi.hoisted(() => vi.fn());
 vi.mock('../../../stores/useAppStore', () => ({
   useAppStore: () => ({ uploadPhoto: uploadPhotoMock, storageWarning: null, deletePhoto: vi.fn() }),
@@ -62,7 +68,8 @@ import { PhotoUpload } from '../../PhotoUpload/PhotoUpload';
 const photo = {
   id: 'photo-1',
   caption: 'Beach day',
-  signedUrl: 'https://example.test/photo.jpg',
+  storage_path: 'me/photo-1.jpg',
+  signedUrl: null,
   isOwn: true,
   created_at: '2026-08-17T10:00:00.000Z',
 } as unknown as PhotoWithUrls;

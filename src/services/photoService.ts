@@ -1,20 +1,24 @@
 /**
  * Photo Service - Supabase Storage Operations
  *
- * Manages photo storage operations using Supabase Storage.
- * Handles signed URL generation, quota monitoring, and CRUD operations.
+ * Manages photo storage operations using Supabase Storage: the full photo
+ * list, image downloads, quota monitoring, upload and delete.
  *
  * Story 6.0: Photo Storage Schema & Buckets Setup
  *
  * Features:
- * - Generate signed URLs for private photo access (1-hour expiry)
+ * - `listAllPhotos()` reads every photo row (own + partner, RLS-filtered),
+ *   newest first, in pages of 500. It signs nothing: images are shown from the
+ *   per-account image cache or downloaded by storage path (`downloadPhoto`),
+ *   never through a signed URL, so they can be kept for offline use
+ *   (`photoImageCache.ts`, spec-unified-data-storage story 10).
  * - Monitor storage quota usage with warning thresholds
- * - Foundation for upload/delete operations (future stories)
+ * - Upload and delete need a connection; nothing is queued.
  *
  * Security:
  * - All operations enforce RLS policies
  * - Photos stored in user-specific folders: {user_id}/{filename}
- * - Private bucket requires signed URLs for access
+ * - Private bucket; images are read with the authenticated `download()` API
  *
  * @module photoService
  */
@@ -41,7 +45,9 @@ export interface SupabasePhoto {
 }
 
 /**
- * Photo with computed URLs for display
+ * A photo row as the gallery holds it. `signedUrl` is always `null` since
+ * story 10 (images are shown from the image cache or downloaded by storage
+ * path); the field stays so the saved `photos` copy keeps one plain shape.
  */
 export interface PhotoWithUrls extends SupabasePhoto {
   signedUrl: string | null;
@@ -86,8 +92,8 @@ export interface PhotoUploadInput {
 // Storage bucket name
 const BUCKET_NAME = 'photos';
 
-// Signed URL expiry in seconds (1 hour)
-const SIGNED_URL_EXPIRY = 3600;
+// Rows per request in `listAllPhotos`; a shorter page ends the read.
+const LIST_PAGE_SIZE = 500;
 
 // Storage quota thresholds
 const STORAGE_QUOTA = 1024 * 1024 * 1024; // 1GB free tier
@@ -95,75 +101,6 @@ const WARNING_THRESHOLD = 0.8; // 80%
 const CRITICAL_THRESHOLD = 0.95; // 95%
 
 class PhotoService {
-  /**
-   * Generate a signed URL for private photo access
-   *
-   * @param storagePath - Path in storage bucket (e.g., "{user_id}/photo.jpg")
-   * @param expiresIn - Expiry time in seconds (default: 1 hour)
-   * @returns Signed URL or null on error
-   *
-   * AC 6.0.8: Users can read own photos
-   * AC 6.0.9: Partners can read each other's photos
-   */
-  async getSignedUrl(
-    storagePath: string,
-    expiresIn: number = SIGNED_URL_EXPIRY
-  ): Promise<string | null> {
-    try {
-      const { data, error } = await supabase.storage
-        .from(BUCKET_NAME)
-        .createSignedUrl(storagePath, expiresIn);
-
-      if (error) {
-        console.error('[PhotoService] Error creating signed URL:', error);
-        return null;
-      }
-
-      logger.debug('[PhotoService] Created signed URL for:', storagePath);
-
-      return data?.signedUrl ?? null;
-    } catch (error) {
-      console.error('[PhotoService] Error in getSignedUrl:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Generate signed URLs for multiple photos
-   *
-   * @param storagePaths - Array of storage paths
-   * @param expiresIn - Expiry time in seconds (default: 1 hour)
-   * @returns Map of storage path to signed URL
-   */
-  async getSignedUrls(
-    storagePaths: string[],
-    expiresIn: number = SIGNED_URL_EXPIRY
-  ): Promise<Map<string, string>> {
-    const urlMap = new Map<string, string>();
-
-    try {
-      // Generate URLs in parallel for better performance
-      const results = await Promise.allSettled(
-        storagePaths.map(async (path) => {
-          const url = await this.getSignedUrl(path, expiresIn);
-          return { path, url };
-        })
-      );
-
-      for (const result of results) {
-        if (result.status === 'fulfilled' && result.value.url) {
-          urlMap.set(result.value.path, result.value.url);
-        }
-      }
-
-      logger.debug(`[PhotoService] Generated ${urlMap.size}/${storagePaths.length} signed URLs`);
-    } catch (error) {
-      console.error('[PhotoService] Error in getSignedUrls:', error);
-    }
-
-    return urlMap;
-  }
-
   /**
    * Check storage quota usage
    *
@@ -229,59 +166,60 @@ class PhotoService {
   }
 
   /**
-   * Get photos for current user and their partner
-   * Photos are sorted by created_at DESC (newest first)
+   * Every photo row the signed-in account can read (own + partner, filtered by
+   * RLS), newest `created_at` first, ties by `id` (descending), so paging is a
+   * stable total order. Pages the server LIST_PAGE_SIZE rows at a time until a
+   * short page. Signs nothing.
    *
-   * @param limit - Maximum photos to fetch (default: 50)
-   * @param offset - Offset for pagination (default: 0)
-   * @returns Array of photos with signed URLs; [] only when the page really is empty
-   * @throws When the read fails. Answering [] here made a dead network look like
-   * the end of the album to the gallery's "load more" (DW-179).
-   *
-   * AC 6.0.3: Users can view own photos
-   * AC 6.0.4: Partners can view each other's photos
+   * @throws When any page fails. A partial list is never returned: the caller
+   * replaces its whole list and copy with the answer, so a short read would
+   * look like photos deleted on the server.
+   * @throws When there is no session. The request would go out as anon, RLS
+   * would answer `[]`, and the caller would save that over the copy and drop
+   * every cached image.
    */
-  async getPhotos(limit: number = 50, offset: number = 0): Promise<PhotoWithUrls[]> {
-    try {
-      const { data: currentUser } = await supabase.auth.getUser();
-      if (!currentUser?.user) {
-        throw new Error('Not authenticated');
-      }
+  async listAllPhotos(): Promise<SupabasePhoto[]> {
+    const { data: auth } = await supabase.auth.getSession();
+    if (!auth?.session) {
+      throw new Error('Not authenticated');
+    }
 
-      // Query photos - RLS policies filter to own + partner photos
+    const rows: SupabasePhoto[] = [];
+    for (let offset = 0; ; offset += LIST_PAGE_SIZE) {
       const { data, error } = await supabase
         .from('photos')
         .select('*')
         .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
+        .order('id', { ascending: false })
+        .range(offset, offset + LIST_PAGE_SIZE - 1);
 
       if (error) {
-        console.error('[PhotoService] Error fetching photos:', error);
+        console.error('[PhotoService] Error listing photos:', error);
         throw new Error(error.message);
       }
 
-      if (!data || data.length === 0) {
-        return [];
-      }
-
-      // Generate signed URLs for all photos
-      const storagePaths = data.map((photo) => photo.storage_path);
-      const urlMap = await this.getSignedUrls(storagePaths);
-
-      // Map to PhotoWithUrls
-      const photosWithUrls: PhotoWithUrls[] = data.map((photo) => ({
-        ...photo,
-        signedUrl: urlMap.get(photo.storage_path) || null,
-        isOwn: photo.user_id === currentUser.user.id,
-      }));
-
-      logger.debug(`[PhotoService] Fetched ${photosWithUrls.length} photos`);
-
-      return photosWithUrls;
-    } catch (error) {
-      console.error('[PhotoService] Error in getPhotos:', error);
-      throw error;
+      const page = data ?? [];
+      rows.push(...page);
+      if (page.length < LIST_PAGE_SIZE) break;
     }
+
+    logger.debug(`[PhotoService] Listed ${rows.length} photos`);
+    return rows;
+  }
+
+  /**
+   * Download one photo's image as a Blob with the authenticated Storage
+   * `download()` API — no signed URL, so the result can be cached by storage
+   * path (`imageCache.ts`) and shown offline later.
+   *
+   * @throws When the download fails (offline included).
+   */
+  async downloadPhoto(storagePath: string): Promise<Blob> {
+    const { data, error } = await supabase.storage.from(BUCKET_NAME).download(storagePath);
+    if (error || !data) {
+      throw new Error(`Failed to download photo: ${error?.message ?? 'no data'}`);
+    }
+    return data;
   }
 
   /**
