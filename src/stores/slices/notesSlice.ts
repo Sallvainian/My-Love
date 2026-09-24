@@ -74,6 +74,7 @@ import { CHECK_CONSTRAINT_MESSAGE, handleSupabaseError, isPostgrestError } from 
 import { sendEphemeralBroadcast } from '../../api/ephemeralBroadcast';
 import { getPartnerId, lookupPartnerId, supabase } from '../../api/supabaseClient';
 import { NOTES_CONFIG } from '../../config/images';
+import { offlineMessage } from '../../services/accountDataError';
 import { deleteCachedImages } from '../../services/imageCache';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
@@ -124,13 +125,29 @@ const { PAGE_SIZE: NOTES_PAGE_SIZE, RATE_LIMIT_MAX_MESSAGES, RATE_LIMIT_WINDOW_M
 const PARTNER_NOT_CONFIGURED = 'Partner not configured';
 
 /** The refusal for a note with a picture while the device is offline. */
-export const IMAGE_NOTE_NEEDS_CONNECTION = 'A note with a picture needs a connection';
+export const IMAGE_NOTE_NEEDS_CONNECTION = offlineMessage('Notes with a picture', 'send');
+
+/** The refusal for a thread load while the device is offline. */
+const NOTES_LOAD_NEEDS_CONNECTION = offlineMessage('Love notes', 'load');
+
+/** The refusal for a text note that has no loaded partner while offline. */
+const NOTES_SEND_NEEDS_CONNECTION = offlineMessage('Love notes', 'send');
+
+/** The refusal for removing a note while the device is offline. */
+const NOTES_REMOVE_NEEDS_CONNECTION = offlineMessage('Love notes', 'remove');
 
 /**
  * Thrown out of `sendNote` rather than shown as `notesError`: the composer
  * catches it, keeps what was typed and shows its own error.
  */
 class NoteNotAcceptedError extends Error {}
+
+/**
+ * The note was refused up front because the device is offline. The slice has
+ * already put the reason in `notesError`, so the composer keeps what was
+ * typed and shows nothing of its own — one message per failure.
+ */
+export class NoteRefusedOfflineError extends NoteNotAcceptedError {}
 
 /** What one drain pass ended on (see `drainOnce`). */
 type DrainPassOutcome = 'done' | 'transient' | 'stale';
@@ -774,6 +791,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         // the copy adds no latency. It is marked handled now: it may reject
         // while the copy read is in flight, and is awaited below.
         const serverRequest = (async () => {
+          // Known offline: no request goes out. The saved thread still shows,
+          // and the reason shows only over an empty thread (keepThreadClear).
+          if (knownOffline()) throw new Error(NOTES_LOAD_NEEDS_CONNECTION);
           // lookupPartnerId keeps "unlinked" apart from "the read failed":
           // offline the lookup fails, and that must keep the saved thread.
           const lookup = await lookupPartnerId();
@@ -937,6 +957,11 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
       if (notesIsLoading || !notesHasMore) {
         return;
       }
+
+      // Known offline: no lookup, no query and no per-scroll error — the
+      // app-wide offline indicator says why. `notesHasMore` stands, so the
+      // next scroll once back online loads the older page.
+      if (knownOffline()) return;
 
       const { userId, authSessionVersion: requestedInSession } = get();
       const ownsRequest = () =>
@@ -1148,6 +1173,12 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
           // conclusive `linked` answer will do.
           let toUserId = get().partner?.id ?? null;
           if (!toUserId) {
+            // Offline the lookup can only fail: refused before it goes out,
+            // and thrown so the composer keeps the text.
+            if (knownOffline()) {
+              set({ notesError: NOTES_SEND_NEEDS_CONNECTION });
+              throw new NoteRefusedOfflineError(NOTES_SEND_NEEDS_CONNECTION);
+            }
             const lookup = await lookupPartnerId();
             if (lookup.status === 'unlinked') throw new Error(PARTNER_NOT_CONFIGURED);
             if (lookup.status === 'error') throw new Error(lookup.reason || 'Failed to send note');
@@ -1194,7 +1225,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         // uploaded, and thrown so the composer keeps the picture and text.
         if (knownOffline()) {
           set({ notesError: IMAGE_NOTE_NEEDS_CONNECTION });
-          throw new NoteNotAcceptedError(IMAGE_NOTE_NEEDS_CONNECTION);
+          throw new NoteRefusedOfflineError(IMAGE_NOTE_NEEDS_CONNECTION);
         }
 
         const partnerId = await getPartnerId();
@@ -1438,6 +1469,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
           return;
         }
 
+        // Past the queue, only a note with a picture is left, and it needs a
+        // connection: refused before the partner lookup or any change, so it
+        // stays failed. Not thrown — the Retry button has no catch.
+        if (knownOffline()) {
+          set({ notesError: IMAGE_NOTE_NEEDS_CONNECTION });
+          return;
+        }
+
         // Get partner ID
         const partnerId = await getPartnerId();
         if (!partnerId) {
@@ -1627,6 +1666,12 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
       if (target.tempId) {
         logger.debug('[NotesSlice] Refusing to remove a note with no server row:', noteId);
         throw new Error('That message has not finished sending');
+      }
+
+      // Known offline: refused before the optimistic removal or the request, so
+      // the note never leaves the list. Thrown, so the dialog shows the reason.
+      if (knownOffline()) {
+        throw new Error(NOTES_REMOVE_NEEDS_CONNECTION);
       }
 
       // Drop it before the round trip: the message has to leave the thread as

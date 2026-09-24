@@ -50,7 +50,10 @@ const server = {
     | { status: 'unlinked' }
     | { status: 'error'; reason: string },
   readError: null as { message: string } | null,
+  /** Every table a request went to, in order. */
+  requests: [] as string[],
   reset() {
+    this.requests = [];
     this.rows = [];
     this.seq = 0;
     this.outcomes = [];
@@ -136,6 +139,7 @@ function notesBuilder() {
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: {
     from: (table: string) => {
+      server.requests.push(table);
       if (table === 'love_notes_visible') return readBuilder();
       if (table === 'love_notes') return notesBuilder();
       throw new Error(`unmodelled table ${table}`);
@@ -164,6 +168,7 @@ vi.mock('../../../src/services/imageCompressionService', () => ({
   },
 }));
 
+import { getPartnerId, lookupPartnerId } from '../../../src/api/supabaseClient';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { enqueueNote, listQueuedNotes, removeQueuedNote } from '../../../src/services/noteQueue';
@@ -171,6 +176,7 @@ import {
   createNotesSlice,
   IMAGE_NOTE_NEEDS_CONNECTION,
   LOVE_NOTES_COPY_KIND,
+  NoteRefusedOfflineError,
   type NotesSlice,
 } from '../../../src/stores/slices/notesSlice';
 
@@ -435,6 +441,8 @@ describe('notesSlice offline send queue', () => {
       created_at: '2026-09-24T09:00:00.000000+00:00',
     });
 
+    // Back online for the read: a known-offline load sends no request.
+    setOnline(true);
     await store.getState().fetchNotes();
 
     expect(contents(store)).toEqual(['committed', 'on screen']);
@@ -822,7 +830,10 @@ describe('notesSlice offline send queue', () => {
       throw new Error('IDB-DOWN');
     });
 
-    await expect(store.getState().sendNote('kept in the composer')).rejects.toThrow();
+    const refusal = store.getState().sendNote('kept in the composer');
+    await expect(refusal).rejects.toThrow();
+    // Not an offline refusal: the composer shows its own "Failed to send".
+    await expect(refusal).rejects.not.toBeInstanceOf(NoteRefusedOfflineError);
 
     expect(store.getState().notes).toEqual([]);
     expect(server.upserts).toBe(0);
@@ -833,11 +844,18 @@ describe('notesSlice offline send queue', () => {
     const createObjectURL = vi.spyOn(URL, 'createObjectURL');
     setOnline(false);
 
-    await expect(
-      store.getState().sendNote('pic', new File(['x'], 'p.jpg', { type: 'image/jpeg' }))
-    ).rejects.toThrow(IMAGE_NOTE_NEEDS_CONNECTION);
+    const refusal = store
+      .getState()
+      .sendNote('pic', new File(['x'], 'p.jpg', { type: 'image/jpeg' }));
+    await expect(refusal).rejects.toThrow(IMAGE_NOTE_NEEDS_CONNECTION);
+    // The banner owns the message; the composer keeps the text and picture.
+    await expect(refusal).rejects.toBeInstanceOf(NoteRefusedOfflineError);
 
+    expect(IMAGE_NOTE_NEEDS_CONNECTION).toBe(
+      'You are offline. Notes with a picture need a connection to send.'
+    );
     expect(store.getState().notesError).toBe(IMAGE_NOTE_NEEDS_CONNECTION);
+    expect(server.requests).toEqual([]);
     expect(store.getState().notes).toEqual([]);
     expect(createObjectURL).not.toHaveBeenCalled();
     expect(uploadCompressedBlob).not.toHaveBeenCalled();
@@ -870,6 +888,32 @@ describe('notesSlice offline send queue', () => {
       });
     });
 
+    it('offline: Retry is refused before the partner lookup, and the note stays failed', async () => {
+      const store = createTestStore();
+      const tempId = await failedImageNote(store);
+      uploadCompressedBlob.mockClear();
+      vi.mocked(getPartnerId).mockClear();
+      server.requests = [];
+      store.setState({ notesError: null });
+      setOnline(false);
+
+      // Resolves: the Retry button has no catch.
+      await expect(store.getState().retryFailedMessage(tempId)).resolves.toBeUndefined();
+
+      expect(store.getState().notesError).toBe(
+        'You are offline. Notes with a picture need a connection to send.'
+      );
+      expect(store.getState().notes[0]).toMatchObject({ tempId, error: true, sending: false });
+      expect(getPartnerId).not.toHaveBeenCalled();
+      expect(uploadCompressedBlob).not.toHaveBeenCalled();
+      expect(server.requests).toEqual([]);
+
+      // Back online, Retry sends it as before.
+      setOnline(true);
+      await store.getState().retryFailedMessage(tempId);
+      expect(store.getState().notes[0]).toMatchObject({ id: 'server-1', error: false });
+    });
+
     it('a failed broadcast is logged and the resend still stands', async () => {
       const store = createTestStore();
       const tempId = await failedImageNote(store);
@@ -882,6 +926,107 @@ describe('notesSlice offline send queue', () => {
         '[NotesSlice] Broadcast failed (non-fatal):',
         expect.any(Error)
       );
+    });
+  });
+
+  describe('known offline: refused before any request', () => {
+    const sentRow = (id: string, content: string): LoveNote => ({
+      id,
+      from_user_id: A,
+      to_user_id: PARTNER,
+      content,
+      image_url: null,
+      created_at: `2026-09-20T10:00:0${id.slice(-1)}.000000+00:00`,
+    });
+
+    it('with no partner loaded, a text send is refused before the lookup and nothing is queued', async () => {
+      const store = createTestStore({ partnerLoaded: false });
+      setOnline(false);
+
+      // Thrown, so the composer keeps the typed text.
+      await expect(store.getState().sendNote('keep me')).rejects.toBeInstanceOf(
+        NoteRefusedOfflineError
+      );
+
+      expect(store.getState().notesError).toBe(
+        'You are offline. Love notes need a connection to send.'
+      );
+      expect(lookupPartnerId).not.toHaveBeenCalled();
+      expect(store.getState().notes).toEqual([]);
+      expect(await queuedIds()).toEqual([]);
+      expect(server.requests).toEqual([]);
+    });
+
+    it('with a partner loaded, a text note is still queued offline', async () => {
+      const store = createTestStore();
+      setOnline(false);
+
+      await store.getState().sendNote('queued as before');
+
+      expect(store.getState().notesError).toBeNull();
+      expect(contents(store)).toEqual(['queued as before']);
+      expect(await queuedIds()).toHaveLength(1);
+    });
+
+    it('a thread load sends no lookup or query; the saved thread shows with no banner', async () => {
+      await writeLocalCopy(A, LOVE_NOTES_COPY_KIND, [sentRow('n1', 'saved')]);
+      const store = createTestStore();
+      setOnline(false);
+
+      await store.getState().fetchNotes();
+
+      expect(lookupPartnerId).not.toHaveBeenCalled();
+      expect(server.requests).toEqual([]);
+      expect(contents(store)).toEqual(['saved']);
+      expect(store.getState().notesError).toBeNull();
+      expect(store.getState().notesIsLoading).toBe(false);
+    });
+
+    it('a thread load with nothing saved shows the offline reason', async () => {
+      const store = createTestStore();
+      setOnline(false);
+
+      await store.getState().fetchNotes();
+
+      expect(lookupPartnerId).not.toHaveBeenCalled();
+      expect(server.requests).toEqual([]);
+      expect(store.getState().notesError).toBe(
+        'You are offline. Love notes need a connection to load.'
+      );
+    });
+
+    it('an older page sends no lookup or query and changes nothing, then loads once online', async () => {
+      const store = createTestStore();
+      store.setState({ notes: [sentRow('n2', 'on screen')], notesHasMore: true });
+      setOnline(false);
+
+      await store.getState().fetchOlderNotes();
+
+      expect(lookupPartnerId).not.toHaveBeenCalled();
+      expect(server.requests).toEqual([]);
+      expect(contents(store)).toEqual(['on screen']);
+      expect(store.getState().notesHasMore).toBe(true);
+      expect(store.getState().notesIsLoading).toBe(false);
+      expect(store.getState().notesError).toBeNull();
+
+      setOnline(true);
+      await store.getState().fetchOlderNotes();
+      expect(lookupPartnerId).toHaveBeenCalledTimes(1);
+      expect(server.requests).toEqual(['love_notes_visible']);
+    });
+
+    it('a removal is refused before the note leaves the list or any request goes out', async () => {
+      const store = createTestStore();
+      store.setState({ notes: [sentRow('n3', 'stays')] });
+      setOnline(false);
+
+      await expect(store.getState().removeNote('n3')).rejects.toThrow(
+        'You are offline. Love notes need a connection to remove.'
+      );
+
+      expect(contents(store)).toEqual(['stays']);
+      expect(store.getState().notesPendingRemoval).toEqual([]);
+      expect(server.requests).toEqual([]);
     });
   });
 

@@ -23,6 +23,7 @@ import { ArrowDown, Heart, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { List, useListRef } from 'react-window';
 import { useInfiniteLoader } from 'react-window-infinite-loader';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import type { LoveNote } from '../../types/models';
 import { LoveNoteMessage } from './LoveNoteMessage';
 
@@ -232,13 +233,18 @@ export function MessageList({
     [hasMore, notes.length, showBeginning]
   );
 
+  // Offline, an older page cannot load and nothing is asked for. The loader
+  // keeps the rows it asked about in a Set it rebuilds only when this callback
+  // changes identity, so `isOnline` is a dependency: back online, those rows
+  // are forgotten and the next scroll up asks again.
+  const { isOnline } = useNetworkStatus();
   const loadMoreRows = useCallback(
     async (_startIndex: number, _stopIndex: number) => {
-      if (!isLoading && hasMore && onLoadMore) {
+      if (isOnline && !isLoading && hasMore && onLoadMore) {
         await onLoadMore();
       }
     },
-    [isLoading, hasMore, onLoadMore]
+    [isOnline, isLoading, hasMore, onLoadMore]
   );
 
   // Setup infinite loading hook - must be called before conditional returns

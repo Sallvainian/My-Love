@@ -1,8 +1,10 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { Download, Plus, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { AccountDataError } from '../../services/accountDataError';
 import { useAppStore } from '../../stores/useAppStore';
 import type { CustomMessage } from '../../types';
+import { NetworkStatusIndicator } from '../shared';
 import { CreateMessageForm } from './CreateMessageForm';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import { EditMessageForm } from './EditMessageForm';
@@ -79,7 +81,12 @@ function AccountAdminPanel({ onExit }: AdminPanelProps) {
     } catch (error) {
       if (!stillCurrent()) return;
       console.error('[AdminPanel] Import failed:', error);
-      alert('Failed to import messages. Please check the file format and try again.');
+      // Offline, the file is fine: say what actually stopped the import.
+      alert(
+        error instanceof AccountDataError && error.code === 'offline'
+          ? error.message
+          : 'Failed to import messages. Please check the file format and try again.'
+      );
     } finally {
       // Reset file input
       if (fileInputRef.current) {
@@ -166,6 +173,10 @@ function AccountAdminPanel({ onExit }: AdminPanelProps) {
           </div>
         </div>
       </motion.div>
+
+      {/* App returns this panel before the shell that carries the app-wide
+          indicator, so the editor carries its own. */}
+      <NetworkStatusIndicator showOnlyWhenOffline />
 
       {/* Main content */}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

@@ -2,13 +2,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { PostgrestError } from '@supabase/supabase-js';
 
-const backend = vi.hoisted(() => ({ error: null as unknown }));
+const backend = vi.hoisted(() => ({ error: null as unknown, requests: [] as string[] }));
 vi.mock('@/api/supabaseClient', () => ({
   supabase: {
-    auth: { getUser: async () => ({ data: { user: { id: 'user' } } }) },
-    rpc: async () => ({ error: backend.error }),
+    auth: {
+      getUser: async () => {
+        backend.requests.push('getUser');
+        return { data: { user: { id: 'user' } } };
+      },
+    },
+    rpc: async (name: string) => {
+      backend.requests.push(name);
+      return { error: backend.error };
+    },
     from: () => ({
-      insert: async () => ({ error: backend.error }),
+      insert: async () => {
+        backend.requests.push('insert');
+        return { error: backend.error };
+      },
       select: () => ({ eq: () => ({ single: async () => ({ data: { partner_id: null } }) }) }),
     }),
   },
@@ -115,5 +126,40 @@ describe('partner request CHECK presentation', () => {
       expect.objectContaining({ message: 'You already have a pending request to this user' })
     );
     expect(backend.error).toEqual({ ...raw, code: '23505' });
+  });
+});
+
+describe('partner requests offline (ticket 11)', () => {
+  beforeEach(() => {
+    cleanup();
+    backend.error = null;
+    backend.requests = [];
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each(actions)(
+    '%s is refused before any request, with the offline reason in the rendered caller',
+    async (_method, button, verb) => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+      render(<PartnerMoodView />);
+
+      fireEvent.click(screen.getByRole('button', { name: button }));
+
+      await vi.waitFor(() =>
+        expect(screen.getByTestId('partner-connection-error')).toHaveTextContent(
+          `You are offline. Partner requests need a connection to ${verb}.`
+        )
+      );
+      expect(backend.requests).toEqual([]);
+    }
+  );
+
+  it.each(actions)('%s goes out as before once online', async (method) => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    await partnerService[method]('target');
+    expect(backend.requests.length).toBeGreaterThan(0);
   });
 });
