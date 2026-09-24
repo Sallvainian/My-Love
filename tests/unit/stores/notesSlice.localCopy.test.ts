@@ -19,6 +19,8 @@ const USER_B = 'USER-B-ID';
 
 type Row = Required<Pick<LoveNote, 'id' | 'from_user_id' | 'to_user_id' | 'content' | 'created_at'>> & {
   image_url: string | null;
+  /** The view is `select *`: rows carry the key the sender composed with. */
+  idempotency_key?: string;
 };
 
 /** What the fake server answers, and how. */
@@ -77,9 +79,9 @@ function fakeFrom(table: string) {
     };
   }
   if (table === 'love_notes') {
-    let payload: Omit<Row, 'id' | 'created_at'> | null = null;
+    let payload: (Omit<Row, 'id' | 'created_at'> & { idempotency_key: string }) | null = null;
     const api = {
-      upsert: (values: Omit<Row, 'id' | 'created_at'>) => {
+      upsert: (values: Omit<Row, 'id' | 'created_at'> & { idempotency_key: string }) => {
         payload = values;
         return api;
       },
@@ -95,11 +97,12 @@ function fakeFrom(table: string) {
           to_user_id: payload.to_user_id,
           content: payload.content,
           image_url: payload.image_url,
+          idempotency_key: payload.idempotency_key,
           created_at: `2026-09-24T12:00:0${server.seq}.000000+00:00`,
         };
         server.rows.push(row);
         if (server.insertHold) await server.insertHold;
-        return { data: { ...row, idempotency_key: 'k' }, error: null };
+        return { data: { ...row }, error: null };
       },
     };
     return api;
@@ -373,6 +376,65 @@ describe('notesSlice love-notes local copy', () => {
       expect(savedIds()).toEqual(['1']);
     });
 
+    it('a refresh that already returns a failed note\'s committed row shows it once', async () => {
+      // The insert committed but its reply was lost, so the note shows failed.
+      server.rows = [row('1'), row('2', { idempotency_key: 'temp-x', from_user_id: USER_A, to_user_id: PARTNER })];
+      const store = createTestStore();
+      const failed: LoveNote = {
+        ...row('temp-x'),
+        id: 'temp-x',
+        tempId: 'temp-x',
+        from_user_id: USER_A,
+        to_user_id: PARTNER,
+        error: true,
+        sending: false,
+      };
+      store.setState({ notes: [failed] });
+
+      await store.getState().fetchNotes();
+
+      expect(stateIds(store)).toEqual(['1', '2']);
+      expect(savedIds()).toEqual(['1', '2']);
+    });
+
+    it('a refresh revokes the previews of notes it replaces, never of notes it keeps', async () => {
+      const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+      server.rows = [row('2', { idempotency_key: 'temp-done' })];
+      const store = createTestStore();
+      const kept: LoveNote = {
+        ...row('temp-kept'),
+        id: 'temp-kept',
+        tempId: 'temp-kept',
+        error: true,
+        imagePreviewUrl: 'blob:kept-preview',
+      };
+      const replaced: LoveNote = {
+        ...row('temp-done'),
+        id: 'temp-done',
+        tempId: 'temp-done',
+        sending: true,
+        imagePreviewUrl: 'blob:replaced-preview',
+      };
+      store.setState({ notes: [replaced, kept] });
+
+      await store.getState().fetchNotes();
+
+      expect(stateIds(store)).toEqual(['2', 'temp-kept']);
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:replaced-preview');
+      expect(revokeObjectURL).not.toHaveBeenCalledWith('blob:kept-preview');
+      revokeObjectURL.mockRestore();
+    });
+
+    it('applying the copy sets notesHasMore from its length', async () => {
+      savedCopies.set(key(USER_A), [row('1'), row('2')]);
+      goOffline();
+      const store = createTestStore();
+
+      await store.getState().fetchNotes();
+
+      expect(store.getState().notesHasMore).toBe(false);
+    });
+
     it('registers itself as the love-notes refresher, which re-reads the server (reconnect)', async () => {
       const store = createTestStore();
       const call = registerLocalCopy.mock.calls.find(([kind]) => kind === LOVE_NOTES_COPY_KIND);
@@ -576,9 +638,9 @@ describe('notesSlice love-notes local copy', () => {
       const sending = store.getState().sendNote('raced');
       await vi.waitFor(() => expect(server.rows).toHaveLength(1));
       // The row has committed but its reply is still in flight when a refresh
-      // (reconnect) lists it: the optimistic note is kept beside it.
+      // (reconnect) lists it: the refresh recognises it by its idempotency key.
       await store.getState().fetchNotes();
-      expect(store.getState().notes).toHaveLength(2);
+      expect(stateIds(store)).toEqual(['server-1']);
 
       reply.resolve();
       await sending;
@@ -623,6 +685,35 @@ describe('notesSlice love-notes local copy', () => {
 
       expect(stateIds(store)).toEqual(['1', '2', '3']);
       expect(savedIds()).toEqual(['1', '2', '3']);
+    });
+
+    it('offline, an older page on a thread shown from the copy raises no banner and changes nothing', async () => {
+      savedCopies.set(key(USER_A), [row('1'), row('2')]);
+      goOffline();
+      const store = createTestStore();
+      await store.getState().fetchNotes();
+      // The infinite loader asks for more whatever the copy's length.
+      store.setState({ notesHasMore: true });
+      writeLocalCopy.mockClear();
+
+      await store.getState().fetchOlderNotes();
+
+      expect(stateIds(store)).toEqual(['1', '2']);
+      expect(store.getState().notesError).toBeNull();
+      expect(store.getState().notesIsLoading).toBe(false);
+      expect(writeLocalCopy).not.toHaveBeenCalled();
+    });
+
+    it('an older page for an unlinked account still shows "Partner not configured"', async () => {
+      server.rows = [row('1')];
+      const store = createTestStore();
+      await store.getState().fetchNotes();
+      store.setState({ notesHasMore: true });
+      lookupPartnerId.mockResolvedValue({ status: 'unlinked' });
+
+      await store.getState().fetchOlderNotes();
+
+      expect(store.getState().notesError).toBe('Partner not configured');
     });
 
     it("an older page resolving after an account switch saves nothing for A", async () => {

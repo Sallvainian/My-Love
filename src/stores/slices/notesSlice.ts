@@ -21,9 +21,11 @@
  * - `fetchNotes` applies the saved copy first — before the partner lookup, and
  *   only into an empty list, until this session has a server answer or a
  *   confirmed change — then replaces state and copy with the server's list. A
- *   failed read changes nothing; an empty answer is saved as `[]`. While the
- *   thread on screen came from the copy, a failed read leaves `notesError`
- *   null so no banner covers it.
+ *   failed read changes nothing; an empty answer is saved as `[]`. A failed
+ *   read (in `fetchNotes` or `fetchOlderNotes`) leaves `notesError` null
+ *   whenever any notes are on screen — from the copy or from an earlier
+ *   server answer — so no banner covers the thread; an empty thread, an
+ *   unlinked account or a signed-out call still shows the error.
  * - `fetchNotes` is also the kind's refresher, so the thread refreshes on
  *   signed-in start and on reconnect, not only when the Notes screen mounts.
  * - Every confirmed change to the thread — an accepted Realtime note, a
@@ -401,7 +403,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
             }
             if (saved && !isFresh(userId, requestedInSession) && get().notes.length === 0) {
               const pendingRemoval = get().notesPendingRemoval;
-              set({ notes: saved.filter((note) => !pendingRemoval.includes(note.id)) });
+              set({
+                notes: saved.filter((note) => !pendingRemoval.includes(note.id)),
+                notesHasMore: saved.length >= NOTES_PAGE_SIZE,
+              });
             }
           }
         }
@@ -424,8 +429,15 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         // A note still sending, or failed and offered for retry, has no server
         // row yet: a refresh (reconnect, signed-in start) must not drop it.
         const current = get().notes;
+        // Matched on the idempotency key: an optimistic note's id is its tempId,
+        // while its committed row has a uuid id and carries the tempId as
+        // `idempotency_key` (the view is `select *`).
         const unconfirmed = current.filter(
-          (note) => note.tempId && !notesInChatOrder.some((row) => row.id === note.id)
+          (note) =>
+            note.tempId &&
+            !notesInChatOrder.some(
+              (row) => (row as LoveNote & { idempotency_key?: string }).idempotency_key === note.tempId
+            )
         );
         revokePreviewUrlsFromNotes(current.filter((note) => !unconfirmed.includes(note)));
 
@@ -444,9 +456,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           set({ notesIsLoading: false });
           return;
         }
-        // A failed read changes nothing, and while a saved thread is on screen
-        // no banner covers it. An empty thread, an unlinked account or a
-        // signed-out call still shows the error.
+        // A failed read changes nothing, and while any notes are on screen (from
+        // the copy or an earlier server answer) no banner covers them. An empty
+        // thread, an unlinked account or a signed-out call still shows the error.
         const keepThreadClear = !conclusiveError && get().notes.length > 0;
         set({
           notesIsLoading: false,
@@ -470,19 +482,28 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       const { userId, authSessionVersion: requestedInSession } = get();
       const ownsRequest = () =>
         get().userId === userId && get().authSessionVersion === requestedInSession;
+      // Answers that are not a failed read: the error stands whatever is shown.
+      let conclusiveError = false;
 
       try {
         set({ notesIsLoading: true });
 
         if (!userId) {
+          conclusiveError = true;
           throw new Error('User not authenticated');
         }
 
-        // Get partner ID
-        const partnerId = await getPartnerId();
-        if (!partnerId) {
-          throw new Error('Partner not configured');
+        // Same split as fetchNotes: offline the lookup fails, which is a failed
+        // read, not an unlinked account.
+        const lookup = await lookupPartnerId();
+        if (lookup.status === 'unlinked') {
+          conclusiveError = true;
+          throw new Error(PARTNER_NOT_CONFIGURED);
         }
+        if (lookup.status === 'error') {
+          throw new Error(lookup.reason || 'Failed to fetch older notes');
+        }
+        const partnerId = lookup.partnerId;
 
         // Get the oldest message timestamp for pagination
         const oldestNote = notes[0];
@@ -544,9 +565,12 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           set({ notesIsLoading: false });
           return;
         }
+        // Same rule as fetchNotes: a failed read raises no banner over notes
+        // already on screen.
+        const keepThreadClear = !conclusiveError && get().notes.length > 0;
         set({
           notesIsLoading: false,
-          notesError: errorMessage,
+          notesError: keepThreadClear ? null : errorMessage,
         });
       }
     },
