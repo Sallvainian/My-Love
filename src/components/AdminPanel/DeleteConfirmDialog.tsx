@@ -1,6 +1,7 @@
 import { m as motion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { AccountDataError } from '../../services/accountDataError';
 import { useAppStore } from '../../stores/useAppStore';
 import type { CustomMessage } from '../../types';
 import { useDialogSession } from './useDialogSession';
@@ -34,8 +35,13 @@ export function DeleteConfirmDialog({
     try {
       await deleteCustomMessage(message.id);
       if (stillCurrent()) onConfirm();
-    } catch {
-      if (stillCurrent()) setError('Could not delete this message. Please try again.');
+    } catch (err) {
+      if (!stillCurrent()) return;
+      setError(
+        err instanceof AccountDataError && err.code === 'offline'
+          ? err.message
+          : 'Could not delete this message. Please try again.'
+      );
     } finally {
       pending.current = false;
       if (stillCurrent()) setIsDeleting(false);

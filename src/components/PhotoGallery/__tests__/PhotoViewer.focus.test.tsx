@@ -367,3 +367,28 @@ describe('PhotoViewer failed delete', () => {
     deletePhotoMock.mockReset();
   });
 });
+
+describe('PhotoViewer offline delete (ticket 11)', () => {
+  it('refuses before any request: the dialog stays open with the offline reason', async () => {
+    deletePhotoMock.mockReset();
+    deletePhotoMock.mockResolvedValue(true);
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByLabelText('Delete photo'));
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+      const alert = await screen.findByTestId('photo-viewer-delete-error');
+      expect(alert).toHaveTextContent('You are offline. Photos need a connection to delete.');
+      expect(screen.getAllByRole('alert')).toHaveLength(1);
+      expect(screen.getByRole('dialog', { name: 'Delete Photo?' })).toBeInTheDocument();
+      expect(screen.getByAltText('a photo')).toBeInTheDocument();
+      expect(deletePhotoMock).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Delete' })).not.toBeDisabled();
+    } finally {
+      onLine.mockRestore();
+      deletePhotoMock.mockReset();
+    }
+  });
+});

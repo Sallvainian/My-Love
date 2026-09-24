@@ -2,8 +2,10 @@ import type { PanInfo } from 'framer-motion';
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
 import { AlertTriangle, ChevronLeft, ChevronRight, ImageOff, Loader2, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { isOnline } from '../../api/errorHandlers';
 import { useFocusTrap } from '../../hooks';
 import { usePhotoImage } from '../../hooks/usePhotoImage';
+import { offlineMessage } from '../../services/accountDataError';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { useAppStore } from '../../stores/useAppStore';
 
@@ -422,6 +424,12 @@ export function PhotoViewer({
     const deletedIndex = photos.findIndex((p) => p.id === deleteTargetId);
     if (deletedIndex < 0) {
       closeDeleteDialog();
+      return;
+    }
+    // Refused before any request: the dialog stays open with the reason, and
+    // the deleteError effect moves focus onto Cancel.
+    if (!isOnline()) {
+      setDeleteError(offlineMessage('Photos', 'delete'));
       return;
     }
     isDeletingRef.current = true;

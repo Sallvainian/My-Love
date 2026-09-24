@@ -180,6 +180,23 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     expect(screen.getByTestId('display-name-setup')).toBeInTheDocument();
   });
 
+  it('offline: refused before getUser() or the write, with the offline reason inline', async () => {
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      const onComplete = submit('Jessie');
+
+      expect(await screen.findByTestId('display-name-error')).toHaveTextContent(
+        'You are offline. Name changes need a connection to save.'
+      );
+      expect(backend.getUser).not.toHaveBeenCalled();
+      expect(backend.updatePayload).toBeNull();
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(screen.getByTestId('display-name-setup')).toBeInTheDocument();
+    } finally {
+      onLine.mockRestore();
+    }
+  });
+
   it('reports a missing session without attempting a write', async () => {
     backend.getUser.mockResolvedValue(null);
     const onComplete = submit('Jessie');

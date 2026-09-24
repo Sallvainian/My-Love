@@ -236,6 +236,37 @@ describe('PokeKissInterface on the kit', () => {
     ]);
   }
 
+  it.each([
+    ['poke', 'A poke'],
+    ['kiss', 'A kiss'],
+  ] as const)(
+    'offline: a %s still plays, is not marked seen, and the badge stays',
+    async (type, subject) => {
+      storeState.unviewedCount = 1;
+      storeMocks.getUnviewedInteractions.mockReturnValue([
+        { id: 'interaction-1', type, fromUserId: 'partner', toUserId: 'me', viewed: false, createdAt: new Date() },
+      ]);
+      const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+      try {
+        render(<PokeKissInterface />);
+        fireEvent.click(screen.getByTestId('notification-badge'));
+        // The animation plays offline.
+        fireEvent.click(screen.getByTestId(`${type}-animation`));
+
+        await waitFor(() =>
+          expect(screen.getByTestId('toast-notification')).toHaveTextContent(
+            `You are offline. ${subject} needs a connection to be marked as seen.`
+          )
+        );
+        expect(storeMocks.markInteractionViewed).not.toHaveBeenCalled();
+        expect(screen.queryByTestId(`${type}-animation`)).not.toBeInTheDocument();
+        expect(screen.getByTestId('notification-badge')).toHaveTextContent('1');
+      } finally {
+        onLine.mockRestore();
+      }
+    }
+  );
+
   it('makes the badge its own named button, beside History rather than inside it', () => {
     withUnviewed(2);
 

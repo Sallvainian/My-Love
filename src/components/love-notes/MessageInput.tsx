@@ -22,6 +22,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } fro
 import { useLoveNotes } from '../../hooks/useLoveNotes';
 import { useVibration } from '../../hooks/useVibration';
 import { imageCompressionService } from '../../services/imageCompressionService';
+import { NoteRefusedOfflineError } from '../../stores/slices/notesSlice';
 import { logger } from '../../utils/logger';
 import { sanitizeMessageContent, validateMessageContent } from '../../utils/messageValidation';
 import { ImagePreview } from './ImagePreview';
@@ -145,8 +146,13 @@ export function MessageInput() {
     } catch (error) {
       console.error('Failed to send message:', error);
 
-      // Show error message to user
-      setImageError('Failed to send. Try again.');
+      // An offline refusal already shows its reason in the page banner, so the
+      // composer shows nothing of its own (and drops an earlier failure's text):
+      // one message per failure. Every other failure, including a failed save
+      // to the offline queue, shows this one.
+      setImageError(
+        error instanceof NoteRefusedOfflineError ? null : 'Failed to send. Try again.'
+      );
 
       // Error vibration (double pulse pattern)
       vibrate([100, 50, 100]);

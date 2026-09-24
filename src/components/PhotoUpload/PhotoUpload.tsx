@@ -1,7 +1,9 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { AlertTriangle, Camera, Check, Loader, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { isOnline } from '../../api/errorHandlers';
 import { useFocusTrap } from '../../hooks';
+import { offlineMessage } from '../../services/accountDataError';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { useAppStore } from '../../stores/useAppStore';
 
@@ -80,6 +82,14 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
 
   const handleUpload = async () => {
     if (!selectedFile) return;
+
+    // Refused before compressing or sending anything; Retry returns to the
+    // preview with the same file and key.
+    if (!isOnline()) {
+      setError(offlineMessage('Photos', 'upload'));
+      setStep('error');
+      return;
+    }
 
     try {
       setStep('uploading');
