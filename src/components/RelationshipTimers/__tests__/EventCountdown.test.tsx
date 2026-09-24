@@ -198,7 +198,8 @@ describe('EventCountdown — "Event passed" is never rendered', () => {
 
     expect(screen.getByText('Trip to Boston')).toBeInTheDocument();
     expect(screen.getByText('Weekend visit')).toBeInTheDocument();
-    expect(document.body.textContent).toMatch(/1 day(?!s)/);
+    // Tomorrow's midnight is under a day away: whole days 0, plus the clock.
+    expect(document.body.textContent).toMatch(/0 days\d{2}h \d{2}m \d{2}s/);
   });
 
   it('renders "Today!" for an event dated today', () => {

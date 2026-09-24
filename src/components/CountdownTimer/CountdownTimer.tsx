@@ -3,7 +3,7 @@
  *
  * Displays countdown to next upcoming anniversary with celebration animations.
  * Features:
- * - 1-minute update intervals for battery optimization
+ * - A live h/m/s clock, ticking every second like the other Home countdowns
  * - Celebration animations using Framer Motion when countdown reaches zero
  * - Support for multiple anniversaries (displays next 3)
  * - Responsive mobile-first design
@@ -17,11 +17,15 @@ import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import type { Anniversary } from '../../types';
 import { CountdownCard } from '../RelationshipTimers/CountdownCard';
 import {
-  calculateTimeRemaining,
+  formatCountdownClock,
+  formatDayCount,
+  getCountdownToDay,
+  type CountdownParts,
+} from '../RelationshipTimers/eventCountdownHelpers';
+import {
   getNextAnniversaryDate,
   getUpcomingAnniversaries,
   shouldTriggerCelebration,
-  type TimeRemaining,
 } from '../../utils/countdownService';
 import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
 
@@ -33,7 +37,8 @@ interface CountdownTimerProps {
 
 interface AnniversaryWithCountdown {
   anniversary: Anniversary;
-  timeRemaining: TimeRemaining;
+  /** Time left until the anniversary's day starts; `null` on the day itself. */
+  remaining: CountdownParts | null;
   nextDate: Date;
   shouldCelebrate: boolean;
 }
@@ -58,12 +63,12 @@ export function CountdownTimer({
     (_tick: number): AnniversaryWithCountdown[] => {
       return upcomingAnniversaries.map((anniversary) => {
         const nextDate = getNextAnniversaryDate(anniversary.date);
-        const timeRemaining = calculateTimeRemaining(nextDate);
+        const remaining = getCountdownToDay(nextDate);
         const shouldCelebrate = shouldTriggerCelebration(nextDate);
 
         return {
           anniversary,
-          timeRemaining,
+          remaining,
           nextDate,
           shouldCelebrate,
         };
@@ -96,7 +101,7 @@ export function CountdownTimer({
     activeCelebrationRef.current = null;
   }, [buildCountdowns]);
 
-  // Update countdowns every 1 minute (60000ms) - Story requirement
+  // Tick every second so the clock counts down live, as on the other cards
   useEffect(() => {
     const kickoff = setTimeout(() => {
       updateCelebration();
@@ -105,7 +110,7 @@ export function CountdownTimer({
     const interval = setInterval(() => {
       updateCelebration();
       setTick((current) => current + 1);
-    }, 60000); // 1 minute interval for battery optimization
+    }, 1000);
 
     return () => {
       clearTimeout(kickoff);
@@ -154,18 +159,17 @@ interface AnniversaryCardProps {
 }
 
 function AnniversaryCard({ countdown, isCelebrating }: AnniversaryCardProps) {
-  const { anniversary, timeRemaining, shouldCelebrate } = countdown;
-  const { days, hours, minutes } = timeRemaining;
-  const pad = (n: number) => String(n).padStart(2, '0');
+  const { anniversary, remaining, shouldCelebrate } = countdown;
+  const celebrating = shouldCelebrate || !remaining;
 
   return (
     <>
       <CountdownCard
-        icon={shouldCelebrate ? Sparkles : Calendar}
-        highlight={shouldCelebrate}
+        icon={celebrating ? Sparkles : Calendar}
+        highlight={celebrating}
         label={anniversary.label}
-        value={shouldCelebrate ? 'Today!' : `${days} ${days === 1 ? 'day' : 'days'}`}
-        trailing={shouldCelebrate ? undefined : `${pad(hours)}h ${pad(minutes)}m`}
+        value={celebrating ? 'Today!' : formatDayCount(remaining.days)}
+        trailing={celebrating ? undefined : formatCountdownClock(remaining)}
         description={anniversary.description}
       />
 
