@@ -162,6 +162,7 @@ beforeEach(() => {
       initializeApp: vi.fn(async () => {}),
       syncPendingMoods: vi.fn(async () => ({ synced: 0, failed: 0, skipped: false })),
       updateSyncStatus: vi.fn(async () => {}),
+      drainQueuedNotes: vi.fn(async () => {}),
     },
     true
   );
@@ -255,5 +256,59 @@ describe('App refreshes the profile copy after the first-run name gate', () => {
     await act(async () => gate.click());
 
     expect(localCopy.refreshLocalCopy).toHaveBeenCalledWith('profile');
+  });
+});
+
+describe('App drains the love-note send queue', () => {
+  const drain = () => vi.mocked(useAppStore.getState().drainQueuedNotes);
+
+  it('on signed-in start', async () => {
+    await renderApp();
+
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(drain()).toHaveBeenCalled();
+  });
+
+  it('on the window online event while signed in', async () => {
+    await renderApp();
+    drain().mockClear();
+
+    await act(async () => window.dispatchEvent(new Event('online')));
+
+    expect(drain()).toHaveBeenCalledTimes(1);
+  });
+
+  it('on the 5-minute interval while signed in', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      await renderApp();
+      drain().mockClear();
+
+      await act(async () => {
+        vi.advanceTimersByTime(5 * 60 * 1000);
+      });
+
+      expect(drain()).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('not at all while signed out, including on the online event and the interval', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      auth.getSession.mockResolvedValue(null);
+      await renderApp();
+      expect(screen.getByText('Sign in')).toBeInTheDocument();
+
+      await act(async () => window.dispatchEvent(new Event('online')));
+      await act(async () => {
+        vi.advanceTimersByTime(5 * 60 * 1000);
+      });
+
+      expect(drain()).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

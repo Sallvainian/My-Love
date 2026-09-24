@@ -25,6 +25,12 @@
 export const MOOD_SYNC_LOCK = 'my-love:mood-sync';
 
 /**
+ * Held by one love-note queue drain at a time (`notesSlice.drainQueuedNotes`),
+ * so two tabs never send the same queued note concurrently.
+ */
+export const NOTE_QUEUE_LOCK = 'my-love:note-queue';
+
+/**
  * Outcome of a guarded section.
  *
  * `ran: false` means another context held the lock and the caller did nothing —
@@ -62,4 +68,16 @@ export async function withSyncLock<T>(
     }
     return { ran: true, result: await fn() };
   });
+}
+
+/**
+ * Resolve once whoever holds `name` has let go (taking the lock and releasing
+ * it at once), so a caller whose `withSyncLock` was skipped can look at what
+ * the holder did. Resolves at once where `navigator.locks` is unavailable,
+ * where `withSyncLock` never skips.
+ */
+export async function waitForSyncLock(name: string): Promise<void> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  if (!locks) return;
+  await locks.request(name, async () => {});
 }

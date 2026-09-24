@@ -103,6 +103,8 @@ function LoveNoteMessageComponent({
   const isSending = message.sending ?? false;
   const hasError = message.error ?? false;
   const isImageUploading = message.imageUploading ?? false;
+  // Queued text not being sent right now: offline, or waiting for a retry.
+  const isWaiting = (message.queued ?? false) && !isSending && !hasError;
 
   // Check if message has an image (either from server or optimistic preview)
   const hasImage = !!(message.image_url || message.imagePreviewUrl);
@@ -409,6 +411,11 @@ function LoveNoteMessageComponent({
         {isSending && !isImageUploading && (
           <span className="mt-1 px-1 text-xs text-muted" aria-live="polite">
             Sending...
+          </span>
+        )}
+        {isWaiting && (
+          <span className="mt-1 px-1 text-xs text-muted" aria-live="polite">
+            Waiting to send
           </span>
         )}
         {hasError && (
