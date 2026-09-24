@@ -69,6 +69,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   eventsIsLoadingMore: false,
   eventsHistoryError: null,
   coupleSettings: null,
+  ownProfile: null,
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -467,13 +468,15 @@ describe('clearAuth on sign-out', () => {
     }
   });
 
-  it("drops the previous couple's anniversaries and shared start date", () => {
+  it("drops the previous couple's anniversaries, shared dates and own profile", () => {
     useAppStore.setState({
       coupleSettings: {
         status: 'linked',
         partnerId: 'previous-partner',
         relationshipStart: '2020-01-01T18:00:00.000Z',
+        weddingDate: '2021-06-12',
       },
+      ownProfile: { displayName: 'PREVIOUS-NAME', birthday: '1990-01-02' },
     });
 
     useAppStore.getState().clearAuth();
@@ -485,6 +488,8 @@ describe('clearAuth on sign-out', () => {
     expect(state.settings!.relationship.anniversaries).toEqual([]);
     // The start date is the couple's too; the next account reads its own copy.
     expect(state.coupleSettings).toBeNull();
+    // The previous account's own name and birthday go too.
+    expect(state.ownProfile).toBeNull();
   });
 
   it('keeps no copy of the anniversaries anywhere in localStorage', () => {
@@ -635,6 +640,7 @@ describe('clearAuth on sign-out', () => {
       { id: 1, date: '2025-11-26', label: SECRETS.anniversaryLabel },
     ]);
     await writeLocalCopy('OTHER-ACCOUNT', 'anniversaries', []);
+    await writeLocalCopy(outgoing, 'profile', { displayName: 'OUTGOING', birthday: '1990-01-02' });
     const db = await openMyLoveDB();
     try {
       const at = new Date('2026-08-03T06:00:00.000Z');
@@ -673,6 +679,7 @@ describe('clearAuth on sign-out', () => {
   ) {
     await vi.waitFor(async () => {
       expect(await readLocalCopy(outgoing, 'anniversaries')).toBeNull();
+      expect(await readLocalCopy(outgoing, 'profile')).toBeNull();
       const db = await openMyLoveDB();
       try {
         expect(await db.get('messages', ids.ownId)).toBeUndefined();

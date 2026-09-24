@@ -8,10 +8,11 @@
  * card. The clock is faked throughout; the repo pins `TZ=America/New_York`.
  */
 import type { ReactNode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CountdownTimer } from '../../CountdownTimer/CountdownTimer';
 import { BirthdayCountdown } from '../BirthdayCountdown';
+import { BirthdayWeddingCards } from '../BirthdayWeddingCards';
 import { EventCountdown } from '../EventCountdown';
 import { useAppStore } from '../../../stores/useAppStore';
 import { TimeTogether } from '../TimeTogether';
@@ -44,7 +45,7 @@ function expectHighlighted(card: HTMLElement) {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  // Noon on 10 March 2026 -- Gracie's birthday in the static config.
+  // Noon on 10 March 2026 -- the partner birthday used below.
   vi.setSystemTime(new Date(2026, 2, 10, 12, 0, 0));
 });
 
@@ -57,13 +58,15 @@ describe('Countdown cards on the day itself', () => {
   it('highlights the tile and reads "Happy Birthday!" on a birthday', () => {
     render(
       <BirthdayCountdown
-        birthday={{ name: 'Gracie', month: 3, day: 10, birthYear: 1998 }}
+        name="Pat"
+        birthday="1998-03-10"
         tone="partner"
+        testId="birthday-countdown-partner"
       />
     );
 
-    const card = screen.getByTestId('birthday-countdown-gracie');
-    expect(card).toHaveTextContent('Gracie turns 28');
+    const card = screen.getByTestId('birthday-countdown-partner');
+    expect(card).toHaveTextContent('Pat turns 28');
     expect(card).toHaveTextContent('Happy Birthday!');
     expectHighlighted(card);
   });
@@ -71,12 +74,14 @@ describe('Countdown cards on the day itself', () => {
   it('uses the partner tile pair for a partner birthday that is not today', () => {
     render(
       <BirthdayCountdown
-        birthday={{ name: 'Gracie', month: 3, day: 12, birthYear: 1998 }}
+        name="Pat"
+        birthday="1998-03-12"
         tone="partner"
+        testId="birthday-countdown-partner"
       />
     );
 
-    const card = screen.getByTestId('birthday-countdown-gracie');
+    const card = screen.getByTestId('birthday-countdown-partner');
     // Calendar days, as EventCountdown counts them: 10 March -> 12 March is 2
     // whatever the time of day, not the 1 whole 24h period left from noon.
     // Exact, on the value element: a substring match also passes "12 days".
@@ -131,6 +136,7 @@ describe('Countdown cards on an ordinary day', () => {
         status: 'linked',
         partnerId: 'partner',
         relationshipStart: new Date(2025, 9, 18, 18, 0, 0).toISOString(),
+        weddingDate: null,
       },
     });
 
@@ -146,12 +152,12 @@ describe('Countdown cards on an ordinary day', () => {
   it('reads the same day count as an event on the same date', () => {
     render(
       <>
-        <BirthdayCountdown birthday={{ name: 'Gracie', month: 3, day: 12, birthYear: 1998 }} />
+        <BirthdayCountdown name="Pat" birthday="1998-03-12" testId="birthday-countdown-partner" />
         <EventCountdown label="Meetup" icon="plane" date={new Date(2026, 2, 12)} />
       </>
     );
 
-    const birthday = screen.getByTestId('birthday-countdown-gracie');
+    const birthday = screen.getByTestId('birthday-countdown-partner');
     const event = screen.getByTestId('event-countdown-meetup');
     expect(birthday.querySelector('h3 + div')?.textContent).toBe(
       event.querySelector('h3 + div')?.textContent
@@ -163,9 +169,11 @@ describe('Countdown cards on an ordinary day', () => {
     // 01:00 on 8 March the birthday's midnight on 9 March is 22 real hours
     // away: less than one 24h period, but still one calendar day.
     vi.setSystemTime(new Date(2026, 2, 8, 1, 0, 0));
-    render(<BirthdayCountdown birthday={{ name: 'Gracie', month: 3, day: 9, birthYear: 1998 }} />);
+    render(
+      <BirthdayCountdown name="Pat" birthday="1998-03-09" testId="birthday-countdown-partner" />
+    );
 
-    const card = screen.getByTestId('birthday-countdown-gracie');
+    const card = screen.getByTestId('birthday-countdown-partner');
     expect(card.querySelector('h3 + div')?.textContent).toBe('1 day');
   });
 
@@ -197,7 +205,12 @@ describe('Together for, from the couple start date', () => {
 
   it('shows the Settings placeholder for a linked couple with no start date yet', () => {
     useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'partner', relationshipStart: null },
+      coupleSettings: {
+        status: 'linked',
+        partnerId: 'partner',
+        relationshipStart: null,
+        weddingDate: null,
+      },
     });
 
     render(<TimeTogether />);
@@ -222,5 +235,182 @@ describe('Together for, from the couple start date', () => {
     render(<TimeTogether />);
 
     expect(screen.queryByTestId('time-together')).toBeNull();
+  });
+});
+
+describe('Birthday cards from the server-held birthdays', () => {
+  it('labels your card "You turn N" when you have not chosen a name', () => {
+    render(<BirthdayCountdown name={null} birthday="1997-07-09" testId="birthday-countdown-self" />);
+
+    const card = screen.getByTestId('birthday-countdown-self');
+    // Noon on 10 March 2026: the next 9 July is in 2026, the 29th birthday.
+    expect(card.querySelector('h3')?.textContent).toBe('You turn 29');
+    expect(tileOf(card)).toHaveClass('bg-tint', 'text-accent');
+  });
+
+  it('labels a card with the display name it is given', () => {
+    render(
+      <BirthdayCountdown
+        name="Partner"
+        birthday="1998-03-11"
+        tone="partner"
+        testId="birthday-countdown-partner"
+      />
+    );
+
+    const card = screen.getByTestId('birthday-countdown-partner');
+    expect(card.querySelector('h3')?.textContent).toBe('Partner turns 28');
+    expect(card.querySelector('h3 + div')?.textContent).toBe('1 day');
+  });
+
+  it('counts to next year once this year\'s birthday has passed', () => {
+    render(<BirthdayCountdown name="Sam" birthday="1990-03-09" testId="birthday-countdown-self" />);
+
+    const card = screen.getByTestId('birthday-countdown-self');
+    expect(card.querySelector('h3')?.textContent).toBe('Sam turns 37');
+    expect(card.querySelector('h3 + div')?.textContent).toBe('364 days');
+  });
+
+  it('keeps an unset card in place with "Not set yet" and the Settings hint', () => {
+    render(
+      <BirthdayCountdown
+        name={null}
+        birthday={null}
+        unsetDescription="Set it in Settings"
+        testId="birthday-countdown-self"
+      />
+    );
+
+    const card = screen.getByTestId('birthday-countdown-self');
+    expect(card.querySelector('h3')?.textContent).toBe('Your birthday');
+    const value = card.querySelector('h3 + div');
+    expect(value?.textContent).toBe('Not set yet');
+    expect(value).toHaveClass('text-muted');
+    expect(card).toHaveTextContent('Set it in Settings');
+  });
+
+  it("shows the partner's unset card with no Settings hint", () => {
+    render(
+      <BirthdayCountdown
+        name="Pat"
+        birthday={null}
+        tone="partner"
+        testId="birthday-countdown-partner"
+      />
+    );
+
+    const card = screen.getByTestId('birthday-countdown-partner');
+    expect(card.querySelector('h3')?.textContent).toBe("Pat's birthday");
+    expect(card.querySelector('h3 + div')?.textContent).toBe('Not set yet');
+    expect(card.querySelector('p')).toBeNull();
+  });
+
+  it('treats an unreadable birthday as not set', () => {
+    render(<BirthdayCountdown name="Pat" birthday="1998-02-30" testId="birthday-countdown-partner" />);
+
+    expect(screen.getByTestId('birthday-countdown-partner')).toHaveTextContent('Not set yet');
+  });
+});
+
+describe("Home's birthday and wedding cards", () => {
+  const PARTNER = {
+    id: 'partner',
+    email: 'partner@example.test',
+    displayName: 'Pat',
+    connectedAt: null,
+    birthday: '1998-03-12',
+  };
+  const LINKED = { status: 'linked', partnerId: 'partner', relationshipStart: null } as const;
+
+  afterEach(() => {
+    useAppStore.setState({ ownProfile: null, partner: null, coupleSettings: null });
+  });
+
+  it('linked: both birthday cards side by side, labelled with display names, then the wedding', () => {
+    useAppStore.setState({
+      ownProfile: { displayName: 'Sam', birthday: '1997-07-09' },
+      partner: PARTNER,
+      coupleSettings: { ...LINKED, weddingDate: '2026-06-12' },
+    });
+
+    render(<BirthdayWeddingCards />);
+
+    expect(screen.getByTestId('birthday-cards')).toHaveClass('grid-cols-2');
+    expect(screen.getByTestId('birthday-countdown-self').querySelector('h3')?.textContent).toBe(
+      'Sam turns 29'
+    );
+    const partnerCard = screen.getByTestId('birthday-countdown-partner');
+    expect(partnerCard.querySelector('h3')?.textContent).toBe('Pat turns 28');
+    expect(tileOf(partnerCard)).toHaveClass('bg-ptint', 'text-partner');
+    // 10 March to 12 June 2026: 94 calendar days.
+    expect(
+      screen.getByTestId('event-countdown-wedding').querySelector('h3 + div')?.textContent
+    ).toBe('94 days');
+  });
+
+  it('with no chosen names: "You turn N" and "Partner turns N"', () => {
+    useAppStore.setState({
+      ownProfile: { displayName: null, birthday: '1997-07-09' },
+      partner: { ...PARTNER, displayName: 'Partner' },
+      coupleSettings: { ...LINKED, weddingDate: null },
+    });
+
+    render(<BirthdayWeddingCards />);
+
+    expect(screen.getByTestId('birthday-countdown-self')).toHaveTextContent('You turn 29');
+    expect(screen.getByTestId('birthday-countdown-partner')).toHaveTextContent('Partner turns 28');
+  });
+
+  it('linked with no wedding date: "Date TBD"; unset birthdays stay in place', () => {
+    useAppStore.setState({
+      ownProfile: { displayName: 'Sam', birthday: null },
+      partner: { ...PARTNER, birthday: null },
+      coupleSettings: { ...LINKED, weddingDate: null },
+    });
+
+    render(<BirthdayWeddingCards />);
+
+    const self = screen.getByTestId('birthday-countdown-self');
+    expect(self).toHaveTextContent('Not set yet');
+    expect(self).toHaveTextContent('Set it in Settings');
+    const partnerCard = screen.getByTestId('birthday-countdown-partner');
+    expect(partnerCard).toHaveTextContent('Not set yet');
+    expect(partnerCard).not.toHaveTextContent('Set it in Settings');
+    expect(screen.getByTestId('event-countdown-wedding')).toHaveTextContent('Date TBD');
+  });
+
+  it('unlinked: your card only, full width, and no partner or wedding card', () => {
+    useAppStore.setState({
+      ownProfile: { displayName: 'Sam', birthday: '1997-07-09' },
+      partner: null,
+      coupleSettings: { status: 'unlinked' },
+    });
+
+    render(<BirthdayWeddingCards />);
+
+    expect(screen.getByTestId('birthday-cards')).toHaveClass('grid-cols-1');
+    expect(screen.getByTestId('birthday-countdown-self')).toBeInTheDocument();
+    expect(screen.queryByTestId('birthday-countdown-partner')).toBeNull();
+    expect(screen.queryByTestId('event-countdown-wedding')).toBeNull();
+  });
+
+  it('shows nothing while nothing is known yet', () => {
+    render(<BirthdayWeddingCards />);
+
+    expect(screen.queryByTestId('birthday-cards')).toBeNull();
+    expect(screen.queryByTestId('event-countdown-wedding')).toBeNull();
+  });
+
+  // Matrix: "Display name changed" — the label follows the store, no reload.
+  it("relabels your card when your display name changes", () => {
+    useAppStore.setState({ ownProfile: { displayName: null, birthday: '1997-07-09' } });
+    render(<BirthdayWeddingCards />);
+    expect(screen.getByTestId('birthday-countdown-self')).toHaveTextContent('You turn 29');
+
+    act(() => {
+      useAppStore.setState({ ownProfile: { displayName: 'Sam', birthday: '1997-07-09' } });
+    });
+
+    expect(screen.getByTestId('birthday-countdown-self')).toHaveTextContent('Sam turns 29');
   });
 });

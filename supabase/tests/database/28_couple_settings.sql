@@ -1,4 +1,4 @@
--- Couple settings (CS-DB-001 .. 029)
+-- Couple settings (CS-DB-001 .. 036)
 --
 -- The property under test: a public.couple_settings row is readable and
 -- writable by the linked pair it names, and by nobody else -- not an outsider,
@@ -13,7 +13,7 @@
 
 begin;
 
-select plan(29);
+select plan(36);
 
 create schema if not exists tests;
 
@@ -193,6 +193,39 @@ select is((select relationship_start from public.couple_settings),
 select is((select count(*)::int from public.couple_settings), 1,
   'CS-DB-019: the upserts left exactly one row for the couple');
 
+-- ---------------------------------------------------------------------------
+-- The wedding date (20260924000000_birthdays_wedding_date.sql): either partner
+-- sets or clears it, with the app's upsert that sends only wedding_date and
+-- updated_at, so the start date is left as it was.
+-- ---------------------------------------------------------------------------
+
+select col_type_is('public', 'couple_settings', 'wedding_date', 'date',
+  'CS-DB-030: wedding_date is a plain date');
+
+select lives_ok(
+  format($$insert into public.couple_settings (user_a, user_b, wedding_date, updated_at)
+           values (%L, %L, date '2027-06-12', now())
+           on conflict (user_a, user_b) do update
+             set wedding_date = excluded.wedding_date,
+                 updated_at = excluded.updated_at$$,
+         current_setting('tests.lo'), current_setting('tests.hi')),
+  'CS-DB-031: a partner can set the wedding date with an upsert');
+
+select is((select relationship_start from public.couple_settings),
+  timestamptz '2025-10-19 09:30:00+00',
+  'CS-DB-032: the wedding-date upsert left the start date as it was');
+
+select tests.authenticate_as(current_setting('tests.a')::uuid);
+
+select is((select wedding_date from public.couple_settings), date '2027-06-12',
+  'CS-DB-033: the other partner reads the same wedding date');
+
+select tests.be_postgres();
+
+select is(tests.rows_as(current_setting('tests.a')::uuid,
+  $$update public.couple_settings set wedding_date = null, updated_at = now()$$), 1,
+  'CS-DB-034: the other partner can clear the wedding date');
+
 select tests.be_postgres();
 
 select is(tests.rows_as(current_setting('tests.a')::uuid,
@@ -218,6 +251,15 @@ select tests.be_postgres();
 select is(tests.rows_as(current_setting('tests.c')::uuid,
   $$update public.couple_settings set relationship_start = now()$$), 0,
   'CS-DB-023: an outsider''s UPDATE affects zero rows');
+
+select is(tests.rows_as(current_setting('tests.c')::uuid,
+  $$update public.couple_settings set wedding_date = date '2030-01-01'$$), 0,
+  'CS-DB-035: an outsider cannot set the couple''s wedding date');
+
+select is((select wedding_date from public.couple_settings
+            where user_a = current_setting('tests.lo')::uuid
+              and user_b = current_setting('tests.hi')::uuid), null::date,
+  'CS-DB-036: the wedding date is still cleared after the outsider''s attempt');
 
 -- ---------------------------------------------------------------------------
 -- An unlinked account reads nothing and cannot name anyone as its pair

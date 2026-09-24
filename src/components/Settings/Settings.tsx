@@ -2,7 +2,8 @@
  * Settings Component
  *
  * Application settings screen on the style kit: account (identity, display
- * name and the couple's shared "Together since" start), the couple's
+ * name, your own birthday, the couple's shared "Together since" start and
+ * wedding date), the couple's
  * countdowns (events and anniversaries), about (with the welcome-message
  * replay) and sign out.
  *
@@ -11,7 +12,9 @@
 
 import {
   AlertCircle,
+  Cake,
   ChevronRight,
+  Gem,
   Heart,
   Info,
   Loader2,
@@ -22,6 +25,9 @@ import {
 import { useEffect, useState } from 'react';
 import { authService } from '../../api/authService';
 import { lookupOwnDisplayName, type OwnDisplayNameLookup } from '../../api/supabaseClient';
+import { parseEventDate } from '../../services/eventsService';
+import { refreshLocalCopy } from '../../services/localCopy';
+import { PROFILE_COPY_KIND } from '../../stores/slices/settingsSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { logger } from '../../utils/logger';
 import { DisplayNameSetup } from '../DisplayNameSetup/DisplayNameSetup';
@@ -183,6 +189,229 @@ function TogetherSinceForm({ start }: { start: string | null }) {
       </div>
       {saveError && (
         <p className={FIELD_ERROR} role="alert" data-testid="settings-together-since-error">
+          {saveError}
+        </p>
+      )}
+    </form>
+  );
+}
+
+/** A `YYYY-MM-DD` date as a long local date ("March 10, 1998"). */
+function formatDateOnly(value: string): string {
+  const date = parseEventDate(value);
+  return date ? date.toLocaleDateString(undefined, { dateStyle: 'long' }) : value;
+}
+
+/** A local date as the `YYYY-MM-DD` a date input takes. */
+function toDateInput(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/**
+ * "Birthday": your own birthday, which only you set. Server-held
+ * (`ownProfile`, from `public.users.birthday`); it must be in the past, and
+ * there is no Clear. A save needs a connection; a refused or failed one leaves
+ * the value unchanged and says why here.
+ */
+function BirthdayRow() {
+  const ownProfile = useAppStore((s) => s.ownProfile);
+
+  const subtitle = !ownProfile
+    ? 'Loading...'
+    : ownProfile.birthday
+      ? formatDateOnly(ownProfile.birthday)
+      : 'Not set yet';
+
+  return (
+    <div className="flex flex-col gap-2 py-1" data-testid="settings-birthday">
+      <div className={ROW}>
+        <span className={TILE} aria-hidden="true">
+          <Cake className="h-[17px] w-[17px]" />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <p className="text-[15px] font-medium text-ink">Birthday</p>
+          <p className="text-[13px] break-words text-muted" data-testid="settings-birthday-value">
+            {subtitle}
+          </p>
+        </div>
+      </div>
+      {/* Remounted when the saved value changes, so the input picks it up. */}
+      {ownProfile && (
+        <BirthdayForm key={ownProfile.birthday ?? 'unset'} birthday={ownProfile.birthday} />
+      )}
+    </div>
+  );
+}
+
+/** The earliest birthday the form accepts: catches a mistyped year such as 0198. */
+const BIRTHDAY_MIN = '1900-01-01';
+
+function BirthdayForm({ birthday }: { birthday: string | null }) {
+  const setBirthday = useAppStore((s) => s.setBirthday);
+  const [date, setDate] = useState(birthday ?? '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const now = new Date();
+  const yesterday = toDateInput(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const parsed = parseEventDate(date);
+    if (!parsed) {
+      setSaveError('Pick a date first.');
+      return;
+    }
+    if (date < BIRTHDAY_MIN) {
+      setSaveError('Pick a date after 1900.');
+      return;
+    }
+    const today = new Date();
+    if (parsed >= new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+      setSaveError('Pick a date in the past.');
+      return;
+    }
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      await setBirthday(date);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save your birthday.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-2" onSubmit={handleSave} noValidate>
+      <label className="sr-only" htmlFor="settings-birthday-date">
+        Your birthday
+      </label>
+      <input
+        id="settings-birthday-date"
+        type="date"
+        value={date}
+        min={BIRTHDAY_MIN}
+        max={yesterday}
+        onChange={(e) => setDate(e.target.value)}
+        className={fieldClass(false)}
+        data-testid="settings-birthday-date"
+      />
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="submit"
+          disabled={isSaving}
+          className={SMALL_SECONDARY}
+          data-testid="settings-birthday-save"
+        >
+          {isSaving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          {isSaving ? 'Saving…' : 'Save birthday'}
+        </button>
+      </div>
+      {saveError && (
+        <p className={FIELD_ERROR} role="alert" data-testid="settings-birthday-error">
+          {saveError}
+        </p>
+      )}
+    </form>
+  );
+}
+
+/**
+ * "Wedding": the couple's shared wedding date, any date, which either partner
+ * sets, changes or clears. Shown for a linked couple only. Same save rules as
+ * "Together since".
+ */
+function WeddingRow() {
+  const coupleSettings = useAppStore((s) => s.coupleSettings);
+  if (coupleSettings?.status !== 'linked') return null;
+  const { weddingDate } = coupleSettings;
+
+  return (
+    <>
+      <div className={DIVIDER} aria-hidden="true" />
+      <div className="flex flex-col gap-2 py-1" data-testid="settings-wedding">
+        <div className={ROW}>
+          <span className={TILE} aria-hidden="true">
+            <Gem className="h-[17px] w-[17px]" />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <p className="text-[15px] font-medium text-ink">Wedding</p>
+            <p className="text-[13px] break-words text-muted" data-testid="settings-wedding-value">
+              {weddingDate ? formatDateOnly(weddingDate) : 'Not set yet'}
+            </p>
+          </div>
+        </div>
+        <WeddingForm key={weddingDate ?? 'unset'} weddingDate={weddingDate} />
+      </div>
+    </>
+  );
+}
+
+function WeddingForm({ weddingDate }: { weddingDate: string | null }) {
+  const setWeddingDate = useAppStore((s) => s.setWeddingDate);
+  const [date, setDate] = useState(weddingDate ?? '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const save = async (value: string | null) => {
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      await setWeddingDate(value);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save the wedding date.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!parseEventDate(date)) {
+      setSaveError('Pick a date first.');
+      return;
+    }
+    await save(date);
+  };
+
+  return (
+    <form className="flex flex-col gap-2" onSubmit={handleSave} noValidate>
+      <label className="sr-only" htmlFor="settings-wedding-date">
+        Wedding date
+      </label>
+      <input
+        id="settings-wedding-date"
+        type="date"
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
+        className={fieldClass(false)}
+        data-testid="settings-wedding-date"
+      />
+      <div className="flex items-center justify-end gap-2">
+        {weddingDate && (
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => void save(null)}
+            className={SMALL_SECONDARY}
+            data-testid="settings-wedding-clear"
+          >
+            Clear
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={isSaving}
+          className={SMALL_SECONDARY}
+          data-testid="settings-wedding-save"
+        >
+          {isSaving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          {isSaving ? 'Saving…' : 'Save wedding date'}
+        </button>
+      </div>
+      {saveError && (
+        <p className={FIELD_ERROR} role="alert" data-testid="settings-wedding-error">
           {saveError}
         </p>
       )}
@@ -359,7 +588,10 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             <ChevronRight className="h-[18px] w-[18px] shrink-0 text-muted" aria-hidden="true" />
           </button>
           <div className={DIVIDER} aria-hidden="true" />
+          <BirthdayRow />
+          <div className={DIVIDER} aria-hidden="true" />
           <TogetherSinceRow />
+          <WeddingRow />
         </div>
       </section>
 
@@ -461,6 +693,8 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             // the rest of the app renders from, and the read applies the seed
             // rule the write side only refuses.
             setNameReadToken((token) => token + 1);
+            // Home's own birthday card is labelled with this name.
+            void refreshLocalCopy(PROFILE_COPY_KIND);
           }}
         />
       )}
