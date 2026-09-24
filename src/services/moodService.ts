@@ -12,6 +12,30 @@ import { matchesMoodSyncFingerprint } from './moodSyncPayload';
 
 export type { MarkSyncedOutcome };
 
+/** What `mergeServerMoods` compares of a local row: its sync flag and content. */
+export interface MoodMergeSnapshot {
+  synced: boolean;
+  mood: unknown;
+  moods: string;
+  note: string;
+  time: number;
+}
+
+function toMergeSnapshot(row: MoodEntry): MoodMergeSnapshot {
+  return {
+    synced: !!row.synced,
+    mood: row.mood,
+    moods: JSON.stringify(row.moods ?? null),
+    note: row.note || '',
+    time: new Date(row.timestamp).getTime(),
+  };
+}
+
+/** Content equality; the sync flag is checked by the caller. */
+function sameMergeSnapshot(a: MoodMergeSnapshot, b: MoodMergeSnapshot): boolean {
+  return a.mood === b.mood && a.moods === b.moods && a.note === b.note && a.time === b.time;
+}
+
 /**
  * Mood Service - IndexedDB CRUD operations for mood tracking
  * Story 6.2: Mood Tracking UI & Local Storage
@@ -310,6 +334,109 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
       console.error('[MoodService] Error getting moods for user:', error);
       return []; // Graceful degradation for read operations
     }
+  }
+
+  /**
+   * The user's local rows per date, as `mergeServerMoods` compares them. Taken
+   * before the first server request, so the merge can tell a row that changed
+   * while the pages were being read (an edit that synced, a new mood) from one
+   * the server may overwrite. Read convention: an empty map on failure, which
+   * makes the merge skip every date that has a row.
+   */
+  async getMergeSnapshot(userId: string): Promise<Map<string, MoodMergeSnapshot>> {
+    const snapshot = new Map<string, MoodMergeSnapshot>();
+    try {
+      await this.init();
+      const range = IDBKeyRange.bound([userId, ''], [userId, '\uffff']);
+      const rows = await this.getTypedDB().getAllFromIndex('moods', 'by-user-date', range);
+      for (const row of rows) snapshot.set(row.date, toMergeSnapshot(row));
+    } catch (error) {
+      console.error('[MoodService] Error reading the merge snapshot:', error);
+    }
+    return snapshot;
+  }
+
+  /**
+   * Merge the server's mood history for one user into the store.
+   *
+   * `entries` are server rows already mapped to `MoodEntry` (`synced: true`,
+   * `supabaseId` set), at most one per date. `snapshot` is
+   * `getMergeSnapshot(userId)` taken before the server was read. Per date:
+   * - no local row, and none in the snapshot: inserted — unless a row with the
+   *   same `supabaseId` exists under another date (the device changed
+   *   timezone), which would show one mood on two days;
+   * - a `synced: false` row: never touched — it is queued and still sends;
+   * - a `synced: true` row: updated in place (same `id`) when it still equals
+   *   its snapshot entry and the server entry is not older than it. A row that
+   *   changed during the read (an edit that has since synced keeps its
+   *   timestamp) is newer than the pages and is kept.
+   * Nothing is ever deleted: local rows the server lacks are queued or were
+   * synced from this device.
+   *
+   * One readwrite transaction that re-reads each date's row inside it, so a
+   * row queued or marked by `markAsSynced` in between is seen as it is now.
+   * IndexedDB serialises overlapping readwrite transactions, including the
+   * service worker's.
+   *
+   * Entries for another user are ignored. Throws on failure (a write).
+   *
+   * @returns whether any row was inserted or changed
+   */
+  async mergeServerMoods(
+    userId: string,
+    entries: MoodEntry[],
+    snapshot: Map<string, MoodMergeSnapshot>
+  ): Promise<boolean> {
+    if (!userId) throw new Error('User not authenticated');
+    await this.init();
+    const tx = this.getTypedDB().transaction('moods', 'readwrite');
+    void tx.done.catch(() => {});
+    const index = tx.store.index('by-user-date');
+    const range = IDBKeyRange.bound([userId, ''], [userId, '\uffff']);
+    const knownSupabaseIds = new Set(
+      (await index.getAll(range)).flatMap((row) => (row.supabaseId ? [row.supabaseId] : []))
+    );
+    let changed = false;
+
+    for (const entry of entries) {
+      if (entry.userId !== userId) continue;
+      const serverTime = entry.timestamp.getTime();
+      if (Number.isNaN(serverTime)) continue;
+
+      const before = snapshot.get(entry.date);
+      const existing = await index.get([userId, entry.date]);
+      if (!existing) {
+        if (before) continue; // Removed or moved during the read: not ours to refill.
+        if (entry.supabaseId && knownSupabaseIds.has(entry.supabaseId)) continue;
+        const { id: _ignored, ...row } = entry;
+        await tx.store.add({ ...row, userId, synced: true });
+        changed = true;
+        continue;
+      }
+      if (!existing.synced || !before?.synced) continue;
+      if (!sameMergeSnapshot(toMergeSnapshot(existing), before)) continue;
+      if (serverTime < new Date(existing.timestamp).getTime()) continue;
+
+      const unchanged =
+        existing.supabaseId === entry.supabaseId &&
+        sameMergeSnapshot(toMergeSnapshot(existing), toMergeSnapshot(entry));
+      if (unchanged) continue;
+
+      await tx.store.put({
+        ...existing,
+        mood: entry.mood,
+        moods: entry.moods,
+        note: entry.note,
+        timestamp: entry.timestamp,
+        synced: true,
+        supabaseId: entry.supabaseId,
+      });
+      changed = true;
+    }
+
+    await tx.done;
+    logger.debug(`[MoodService] Merged ${entries.length} server moods (changed: ${changed})`);
+    return changed;
   }
 
   /**

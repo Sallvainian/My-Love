@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { moodService } from '@/services/moodService';
 import { moodSyncFingerprint } from '@/services/moodSyncPayload';
+import type { MoodEntry } from '@/types';
 
 describe('moodService', () => {
   const userId = '123e4567-e89b-42d3-a456-426614174000';
@@ -181,6 +182,201 @@ describe('moodService', () => {
       // row is on the server and nothing local references it. Throwing would
       // fail the batch into a retry that can never succeed.
       await expect(moodService.markAsSynced(99999, 'supa-123', 'any')).resolves.toBe('missing');
+    });
+  });
+
+  describe('mergeServerMoods', () => {
+    const otherUser = '223e4567-e89b-42d3-a456-426614174000';
+
+    function serverEntry(overrides: Partial<MoodEntry> = {}): MoodEntry {
+      return {
+        userId,
+        mood: 'grateful',
+        moods: ['grateful'],
+        note: 'from the server',
+        date: '2026-08-01',
+        timestamp: new Date('2026-08-01T12:00:00.000Z'),
+        synced: true,
+        supabaseId: 'server-1',
+        ...overrides,
+      };
+    }
+
+    /** Snapshot, then merge — the order the slice uses. */
+    async function merge(entries: MoodEntry[]) {
+      return moodService.mergeServerMoods(
+        userId,
+        entries,
+        await moodService.getMergeSnapshot(userId)
+      );
+    }
+
+    async function rowFor(date: string, owner = userId) {
+      const all = await moodService.getAll();
+      return all.find((row) => row.userId === owner && row.date === date);
+    }
+
+    it('inserts a server mood for a date with no local row', async () => {
+      const changed = await merge([serverEntry()]);
+
+      expect(changed).toBe(true);
+      const row = await rowFor('2026-08-01');
+      expect(row).toMatchObject({
+        userId,
+        mood: 'grateful',
+        moods: ['grateful'],
+        note: 'from the server',
+        synced: true,
+        supabaseId: 'server-1',
+      });
+      expect(row!.id).toBeDefined();
+      expect(new Date(row!.timestamp).toISOString()).toBe('2026-08-01T12:00:00.000Z');
+    });
+
+    it('never changes a queued (synced: false) row', async () => {
+      const queued = await moodService.saveForDate(userId, '2026-08-01', ['sad'], 'queued edit');
+      const before = await rowFor('2026-08-01');
+
+      const changed = await merge([
+        serverEntry({ timestamp: new Date('2030-01-01T00:00:00.000Z') }),
+      ]);
+
+      expect(changed).toBe(false);
+      const after = await rowFor('2026-08-01');
+      expect(after).toEqual(before);
+      expect(after!.id).toBe(queued.id);
+      expect(after!.synced).toBe(false);
+      expect(await moodService.getUnsyncedMoods(userId)).toHaveLength(1);
+    });
+
+    it('keeps a queued row sendable: markAsSynced still clears it afterwards', async () => {
+      const queued = await moodService.saveForDate(userId, '2026-08-01', ['sad'], 'queued edit');
+      const fingerprint = moodSyncFingerprint(queued);
+      await merge([serverEntry()]);
+
+      await expect(moodService.markAsSynced(queued.id!, 'supa-q', fingerprint)).resolves.toBe(
+        'cleared'
+      );
+    });
+
+    it('updates a synced row in place when the server entry is newer or equal', async () => {
+      const local = await moodService.saveForDate(userId, '2026-08-01', ['happy'], 'old');
+      await moodService.markAsSynced(local.id!, 'local-supa', moodSyncFingerprint(local));
+      const localTime = new Date((await rowFor('2026-08-01'))!.timestamp).getTime();
+
+      const changed = await merge([
+        serverEntry({ timestamp: new Date(localTime), note: 'edited elsewhere' }),
+      ]);
+
+      expect(changed).toBe(true);
+      const row = await rowFor('2026-08-01');
+      expect(row!.id).toBe(local.id);
+      expect(row!.note).toBe('edited elsewhere');
+      expect(row!.mood).toBe('grateful');
+      expect(row!.supabaseId).toBe('server-1');
+      expect(row!.synced).toBe(true);
+      expect((await moodService.getAll()).filter((r) => r.date === '2026-08-01')).toHaveLength(1);
+    });
+
+    it('keeps a synced local row that is newer than the server entry', async () => {
+      const local = await moodService.saveForDate(userId, '2026-08-01', ['happy'], 'mine');
+      await moodService.markAsSynced(local.id!, 'local-supa', moodSyncFingerprint(local));
+      const before = await rowFor('2026-08-01');
+
+      const changed = await merge([
+        serverEntry({ timestamp: new Date(new Date(before!.timestamp).getTime() - 60_000) }),
+      ]);
+
+      expect(changed).toBe(false);
+      expect(await rowFor('2026-08-01')).toEqual(before);
+    });
+
+    it('reports no change when the server repeats what is stored', async () => {
+      await merge([serverEntry()]);
+      await expect(merge([serverEntry()])).resolves.toBe(false);
+    });
+
+    it("ignores entries for another user and leaves that user's rows alone", async () => {
+      const changed = await merge([
+        serverEntry({ userId: otherUser }),
+      ]);
+
+      expect(changed).toBe(false);
+      expect(await moodService.getAll()).toHaveLength(0);
+    });
+
+    it('keeps a row that was edited and synced while the pages were read', async () => {
+      const local = await moodService.saveForDate(userId, '2026-08-01', ['happy'], 'before');
+      await moodService.markAsSynced(local.id!, 'server-1', moodSyncFingerprint(local));
+      const snapshot = await moodService.getMergeSnapshot(userId);
+      // The server page is read here, holding the pre-edit value...
+      const time = new Date((await rowFor('2026-08-01'))!.timestamp);
+      const stalePage = serverEntry({ timestamp: time, mood: 'happy', moods: ['happy'], note: 'before' });
+      // ...then the user edits and the edit syncs (timestamp is kept).
+      const edited = await moodService.saveForDate(userId, '2026-08-01', ['sad'], 'after', true);
+      await moodService.markAsSynced(edited.id!, 'server-1', moodSyncFingerprint(edited));
+      const before = await rowFor('2026-08-01');
+      expect(before!.synced).toBe(true);
+
+      const changed = await moodService.mergeServerMoods(userId, [stalePage], snapshot);
+
+      expect(changed).toBe(false);
+      expect(await rowFor('2026-08-01')).toEqual(before);
+    });
+
+    it('does not overwrite a row added while the pages were read', async () => {
+      const snapshot = await moodService.getMergeSnapshot(userId);
+      const added = await moodService.saveForDate(userId, '2026-08-01', ['sad'], 'new here');
+      await moodService.markAsSynced(added.id!, 'local-supa', moodSyncFingerprint(added));
+      const before = await rowFor('2026-08-01');
+
+      const changed = await moodService.mergeServerMoods(
+        userId,
+        [serverEntry({ timestamp: new Date('2030-01-01T00:00:00.000Z') })],
+        snapshot
+      );
+
+      expect(changed).toBe(false);
+      expect(await rowFor('2026-08-01')).toEqual(before);
+    });
+
+    it('does not insert a server mood already stored under another date (timezone change)', async () => {
+      await merge([serverEntry({ date: '2026-07-31' })]);
+
+      const changed = await merge([serverEntry({ date: '2026-08-01' })]);
+
+      expect(changed).toBe(false);
+      expect(await rowFor('2026-08-01')).toBeUndefined();
+      expect((await moodService.getAll()).filter((r) => r.supabaseId === 'server-1')).toHaveLength(1);
+    });
+
+    it("leaves another user's row on the same date untouched", async () => {
+      await moodService.saveForDate(otherUser, '2026-08-01', ['tired'], 'theirs');
+      const theirs = await rowFor('2026-08-01', otherUser);
+
+      const changed = await merge([serverEntry()]);
+
+      expect(changed).toBe(true);
+      expect(await rowFor('2026-08-01', otherUser)).toEqual(theirs);
+      expect((await rowFor('2026-08-01'))!.supabaseId).toBe('server-1');
+    });
+
+    it('writes a change in the moods array alone', async () => {
+      await merge([serverEntry({ moods: ['grateful'] })]);
+
+      const changed = await merge([serverEntry({ moods: ['grateful', 'happy'] })]);
+
+      expect(changed).toBe(true);
+      expect((await rowFor('2026-08-01'))!.moods).toEqual(['grateful', 'happy']);
+    });
+
+    it('never deletes a local row the server lacks', async () => {
+      await moodService.saveForDate(userId, '2026-07-01', ['happy']);
+
+      await merge([serverEntry()]);
+
+      expect(await rowFor('2026-07-01')).toBeDefined();
+      expect(await rowFor('2026-08-01')).toBeDefined();
     });
   });
 
