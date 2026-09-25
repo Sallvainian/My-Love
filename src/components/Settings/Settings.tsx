@@ -24,7 +24,7 @@ import {
   RotateCcw,
   Signal,
 } from 'lucide-react';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore, type SubmitEvent } from 'react';
 import { authService } from '../../api/authService';
 import { lookupOwnDisplayName, type OwnDisplayNameLookup } from '../../api/supabaseClient';
 import { parseEventDate } from '../../services/eventsService';
@@ -134,7 +134,7 @@ function TogetherSinceForm({ start }: { start: string | null }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const handleSave = async (event: React.FormEvent) => {
+  const handleSave = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = fromLocalInputs(date, time);
     if (!value) {
@@ -263,7 +263,7 @@ function BirthdayForm({ birthday }: { birthday: string | null }) {
   const now = new Date();
   const yesterday = toDateInput(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
 
-  const handleSave = async (event: React.FormEvent) => {
+  const handleSave = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const parsed = parseEventDate(date);
     if (!parsed) {
@@ -374,7 +374,7 @@ function WeddingForm({ weddingDate }: { weddingDate: string | null }) {
     }
   };
 
-  const handleSave = async (event: React.FormEvent) => {
+  const handleSave = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!parseEventDate(date)) {
       setSaveError('Pick a date first.');

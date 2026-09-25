@@ -11,7 +11,7 @@
 
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { Check, Edit2, Heart, Plus, Trash2, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject, type SubmitEvent } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useSubmitKey } from '../../hooks/useSubmitKey';
 import { parseEventDate } from '../../services/eventsService';
@@ -413,7 +413,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
     });
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrors({});
     setGeneralError(null);

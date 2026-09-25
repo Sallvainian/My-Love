@@ -50,7 +50,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import type { RefObject, SubmitEvent } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { AppState } from '../../stores/types';
 import { useAppStore } from '../../stores/useAppStore';
@@ -841,7 +841,7 @@ function EventForm({
     });
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     // A write with an unreadable response may have committed. Keep this form
     // refresh-only even after field edits or a submission that bypasses its button.

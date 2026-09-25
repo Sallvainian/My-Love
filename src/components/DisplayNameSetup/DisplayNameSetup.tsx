@@ -22,7 +22,7 @@
  */
 
 import { CircleAlert, Loader2 } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type SubmitEvent } from 'react';
 import { getUser } from '../../api/auth/sessionService';
 import { isOnline } from '../../api/errorHandlers';
 import { SEED_FALLBACK_NAME, supabase } from '../../api/supabaseClient';
@@ -82,7 +82,7 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
     return name.length >= 3 && name.length <= 30;
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 

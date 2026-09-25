@@ -14,7 +14,7 @@
  */
 
 import { CircleAlert, Heart, Info, Loader2 } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { signIn, signInWithGoogle } from '../../api/auth/actionService';
 import type { AuthCallbackOutcome } from '../../api/supabaseClient';
 import {
@@ -98,7 +98,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
     return password.length >= 6; // Supabase minimum password length
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setNoticeDismissed(true);

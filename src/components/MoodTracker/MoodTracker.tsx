@@ -1,6 +1,6 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { CheckCircle, Cloud, CloudOff, Plus, RefreshCw, WifiOff } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type SubmitEvent } from 'react';
 import { getPartnerId } from '../../api/supabaseClient';
 import { CHALLENGING_MOODS, MOOD_DISPLAY, POSITIVE_MOODS } from '../../constants/moodDisplay';
 import { useAuth } from '../../hooks/useAuth';
@@ -184,7 +184,7 @@ export function MoodTracker() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (selectedMoods.length === 0) {
