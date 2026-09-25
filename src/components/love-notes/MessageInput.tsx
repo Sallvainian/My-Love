@@ -240,7 +240,7 @@ export function MessageInput() {
           onClick={handleImageButtonClick}
           disabled={isSending}
           aria-label="Attach image"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted transition-colors hover:text-accent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ImageIcon size={20} aria-hidden="true" />
         </button>
@@ -264,7 +264,7 @@ export function MessageInput() {
           placeholder={selectedImage ? 'Add a caption...' : 'Send a love note...'}
           aria-label="Love note message input"
           disabled={isSending}
-          className="max-h-[200px] min-h-[44px] flex-1 resize-none overflow-y-auto rounded-[22px] bg-card px-4 py-[11px] text-base leading-[22px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="max-h-50 min-h-11 flex-1 resize-none overflow-y-auto rounded-[22px] bg-card px-4 py-2.75 text-base leading-5.5 text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
           rows={1}
         />
 
@@ -274,7 +274,7 @@ export function MessageInput() {
           onClick={handleSend}
           disabled={isDisabled}
           aria-label="Send message"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fill text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fill text-white transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSending ? (
             <Loader2 size={19} className="animate-spin" aria-hidden="true" />

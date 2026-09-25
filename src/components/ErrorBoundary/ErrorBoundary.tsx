@@ -65,7 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 : 'We encountered an unexpected error. Please try again.'}
             </p>
             {this.state.error && (
-              <p className="mb-5 max-h-24 overflow-auto rounded-[14px] bg-card2 p-3 text-left font-mono text-sm break-words text-muted">
+              <p className="mb-5 max-h-24 overflow-auto rounded-[14px] bg-card2 p-3 text-left font-mono text-sm wrap-break-word text-muted">
                 {this.state.error.message}
               </p>
             )}

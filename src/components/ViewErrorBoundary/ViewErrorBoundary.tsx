@@ -49,7 +49,7 @@ function ViewErrorFallback({
             : 'Something went wrong while loading this view.'}
         </p>
         {error && !showOfflineMessage && (
-          <p className="mb-5 max-h-24 overflow-auto rounded-[14px] bg-card2 p-3 text-left font-mono text-sm break-words text-muted">
+          <p className="mb-5 max-h-24 overflow-auto rounded-[14px] bg-card2 p-3 text-left font-mono text-sm wrap-break-word text-muted">
             {error.message}
           </p>
         )}

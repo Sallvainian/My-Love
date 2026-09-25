@@ -35,7 +35,7 @@ const FIELD_DISABLED = 'disabled:cursor-not-allowed disabled:opacity-60';
  * label, no multicolour logo (its brand hex has no kit token).
  */
 const GOOGLE_BUTTON =
-  'flex h-12 w-full items-center justify-center gap-2 rounded-full bg-card2 px-5 text-[15px] font-semibold text-ink transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50';
+  'flex h-12 w-full items-center justify-center gap-2 rounded-full bg-card2 px-5 text-[15px] font-semibold text-ink transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50';
 
 interface LoginScreenProps {
   /** Callback when login is successful */
@@ -188,9 +188,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
       className="flex min-h-screen flex-col justify-center bg-page px-5 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
       data-testid="login-screen"
     >
-      <div className="mx-auto flex w-full max-w-[400px] flex-col gap-7">
+      <div className="mx-auto flex w-full max-w-100 flex-col gap-7">
         <div className="flex flex-col items-center gap-1.5 text-center">
-          <h1 className="flex items-center justify-center gap-[11px]">
+          <h1 className="flex items-center justify-center gap-2.75">
             <Heart
               className="h-6 w-6 shrink-0 fill-current text-accent"
               strokeWidth={0}
@@ -271,7 +271,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
 
             <button
               type="submit"
-              className={`${PRIMARY_BUTTON} mt-[18px] w-full`}
+              className={`${PRIMARY_BUTTON} mt-4.5 w-full`}
               data-testid="submit-button"
               disabled={isLoading || isGoogleLoading || !email || !password}
             >
@@ -317,7 +317,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
           Need an account?{' '}
           <button
             type="button"
-            className="rounded font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => {
               setError(
                 'Sign-up functionality coming soon. Please contact your administrator for account creation.'

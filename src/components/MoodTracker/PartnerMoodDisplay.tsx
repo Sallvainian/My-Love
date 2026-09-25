@@ -45,8 +45,8 @@ function LoadingState() {
         </div>
       </div>
       <div className="mt-2.5 flex gap-2">
-        <div className="h-[34px] w-24 rounded-full bg-card2"></div>
-        <div className="h-[34px] w-20 rounded-full bg-card2"></div>
+        <div className="h-8.5 w-24 rounded-full bg-card2"></div>
+        <div className="h-8.5 w-20 rounded-full bg-card2"></div>
       </div>
     </div>
   );
@@ -179,9 +179,9 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
           return (
             <span
               key={`${m}-${index}`}
-              className={`flex h-[34px] items-center gap-1.5 rounded-full pr-3.5 pl-2.5 text-sm font-semibold ${MOOD_TONE.partner}`}
+              className={`flex h-8.5 items-center gap-1.5 rounded-full pr-3.5 pl-2.5 text-sm font-semibold ${MOOD_TONE.partner}`}
             >
-              <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
+              <Icon className="h-4.25 w-4.25" aria-hidden="true" />
               {label}
             </span>
           );

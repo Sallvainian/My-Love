@@ -438,7 +438,7 @@ function showUpgradeBlockedDialog(): void {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-labelledby', UPGRADE_BLOCKED_TITLE_ID);
-  overlay.className = 'fixed inset-0 z-[80] flex items-center justify-center bg-black/80';
+  overlay.className = 'fixed inset-0 z-80 flex items-center justify-center bg-black/80';
 
   const panel = document.createElement('div');
   panel.className = 'mx-4 w-full max-w-md rounded-lg bg-gray-800 shadow-xl';

@@ -86,7 +86,7 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
           <img
             src={previewUrl}
             alt="Selected image preview"
-            className="max-h-[150px] max-w-[200px] object-cover"
+            className="max-h-37.5 max-w-50 object-cover"
           />
         )}
 
@@ -96,7 +96,7 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
           onClick={onRemove}
           disabled={isCompressing}
           aria-label="Remove selected image"
-          className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white transition-colors hover:bg-black/80 focus:ring-2 focus:ring-white focus:outline-none disabled:opacity-50"
+          className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white transition-colors hover:bg-black/80 focus:ring-2 focus:ring-white focus:outline-hidden disabled:opacity-50"
         >
           <X size={16} aria-hidden="true" />
         </button>

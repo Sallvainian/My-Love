@@ -80,7 +80,7 @@ export function PhotoGridItem({
 
   return (
     <div
-      className="group relative aspect-square cursor-pointer overflow-hidden rounded-[14px] bg-card2 transition-transform duration-200 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className="group relative aspect-square cursor-pointer overflow-hidden rounded-[14px] bg-card2 transition-transform duration-200 hover:scale-105 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
       onClick={handleClick}
       role="button"
       tabIndex={0}

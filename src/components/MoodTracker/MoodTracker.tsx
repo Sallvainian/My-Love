@@ -470,7 +470,7 @@ export function MoodTracker() {
                         placeholder="What made you feel this way?"
                         rows={4}
                         maxLength={200}
-                        className={`w-full resize-none rounded-[14px] bg-field px-4 py-3 text-base text-ink ring-inset placeholder:text-muted focus:ring-2 focus:outline-none ${
+                        className={`w-full resize-none rounded-[14px] bg-field px-4 py-3 text-base text-ink ring-inset placeholder:text-muted focus:ring-2 focus:outline-hidden ${
                           noteError
                             ? 'ring-2 ring-danger focus:ring-danger'
                             : 'ring-1 ring-line-strong focus:ring-accent'

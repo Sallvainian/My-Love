@@ -360,7 +360,7 @@ describe('DW-183: a grid tile shows its caption to keyboard focus', () => {
     const tile = screen.getByTestId('photo-grid-item');
     expect(tile).toHaveClass(
       'group',
-      'focus:outline-none',
+      'focus:outline-hidden',
       'focus-visible:ring-2',
       'focus-visible:ring-accent'
     );

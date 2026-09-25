@@ -476,7 +476,7 @@ export function EventsSettings() {
           outline reads h1 Settings → h2 Countdowns → h3 Events → h4 rows. */}
       <div className={GROUP_ROW}>
         <span className={GROUP_TILE} aria-hidden="true">
-          <Calendar className="h-[17px] w-[17px]" />
+          <Calendar className="h-4.25 w-4.25" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h3 className={GROUP_TITLE}>Events</h3>
@@ -1336,7 +1336,7 @@ function EventDeleteConfirmation({
         className={`${DIALOG_PANEL} max-w-sm`}
       >
         <div className="mb-2 flex items-center gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
             <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           </div>
           <h3 id={titleId} className={DIALOG_TITLE}>
@@ -1344,7 +1344,7 @@ function EventDeleteConfirmation({
           </h3>
         </div>
 
-        <p className="mb-2 text-[15px] break-words text-ink">
+        <p className="mb-2 text-[15px] wrap-break-word text-ink">
           <span className="font-semibold">{event.label}</span> will
           be removed for both of you.
         </p>

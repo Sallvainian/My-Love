@@ -155,7 +155,7 @@ describe('LoveNoteMessage', () => {
       const bubble = messageContainer.querySelector('.rounded-\\[20px\\]');
       // Own bubble: kit `fill` with white text and the 6px bottom-right tail,
       // no hairline (the fill is the edge).
-      expect(bubble).toHaveClass('max-w-[78%]', 'rounded-br-[6px]', 'bg-fill', 'text-white');
+      expect(bubble).toHaveClass('max-w-[78%]', 'rounded-br-md', 'bg-fill', 'text-white');
       expect(bubble).not.toHaveClass('outline-line');
       expect(bubble).not.toHaveClass('opacity-70');
     });
@@ -170,7 +170,7 @@ describe('LoveNoteMessage', () => {
       // bottom-left tail.
       expect(bubble).toHaveClass(
         'max-w-[78%]',
-        'rounded-bl-[6px]',
+        'rounded-bl-md',
         'bg-card',
         'text-ink',
         'outline-1',

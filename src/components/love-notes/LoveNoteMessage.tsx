@@ -334,7 +334,7 @@ function LoveNoteMessageComponent({
             <button
               type="button"
               onClick={() => onRequestRemove?.(message)}
-              className="relative flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center rounded text-muted opacity-60 transition after:absolute after:-inset-x-2 after:-inset-y-1 after:content-[''] hover:text-danger hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-danger focus-visible:outline-none"
+              className="relative flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded text-muted opacity-60 transition after:absolute after:-inset-x-2 after:-inset-y-1 after:content-[''] hover:text-danger hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-danger focus-visible:outline-hidden"
               aria-label={`Remove message from ${senderName} at ${fullTimestamp} from your history`}
               data-testid="note-remove-button"
             >
@@ -352,9 +352,7 @@ function LoveNoteMessageComponent({
             page, because on the pink `fill` a danger edge is invisible. */}
         <div
           className={`max-w-[78%] overflow-hidden rounded-[20px] ${
-            isOwnMessage
-              ? 'rounded-br-[6px] bg-fill text-white'
-              : 'rounded-bl-[6px] bg-card text-ink'
+            isOwnMessage ? 'rounded-br-md bg-fill text-white' : 'rounded-bl-md bg-card text-ink'
           } ${
             hasError
               ? 'outline-2 outline-offset-2 outline-danger'
@@ -382,7 +380,7 @@ function LoveNoteMessageComponent({
                 <button
                   type="button"
                   onClick={handleImageClick}
-                  className="block w-full cursor-pointer focus:ring-2 focus:ring-accent focus:outline-none focus:ring-inset"
+                  className="block w-full cursor-pointer focus:ring-2 focus:ring-accent focus:outline-hidden focus:ring-inset"
                   aria-label={`View full size: ${imageAltText}`}
                 >
                   <img

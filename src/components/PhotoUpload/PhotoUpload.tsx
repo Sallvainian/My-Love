@@ -298,7 +298,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                 </div>
                 <button
                   onClick={handleClose}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
                   aria-label="Close"
                   data-testid="photo-upload-close"
                   disabled={step === 'uploading'}
@@ -327,7 +327,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                 {step === 'select' && (
                   <div className="flex flex-col items-center justify-center py-12">
                     <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-tint text-accent">
-                      <Camera className="h-[30px] w-[30px]" aria-hidden="true" />
+                      <Camera className="h-7.5 w-7.5" aria-hidden="true" />
                     </div>
                     <h3 className="mb-2 text-lg font-semibold text-ink">Choose a Photo</h3>
                     <p className="mb-6 max-w-md text-center text-sm text-muted">
@@ -343,7 +343,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                     />
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex h-12 items-center gap-2 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      className="flex h-12 items-center gap-2 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                       data-testid="photo-upload-select-button"
                     >
                       <Upload className="h-5 w-5" aria-hidden="true" />
@@ -364,7 +364,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                         <img
                           src={previewUrl}
                           alt="Preview"
-                          className="h-auto max-h-[300px] w-full object-contain"
+                          className="h-auto max-h-75 w-full object-contain"
                           data-testid="photo-upload-preview-image"
                         />
                       </div>
@@ -394,7 +394,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                         placeholder="Add a caption to your photo..."
                         maxLength={maxCaptionLength}
                         rows={3}
-                        className="w-full resize-none rounded-[14px] bg-field px-4 text-base text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none py-3"
+                        className="w-full resize-none rounded-[14px] bg-field px-4 text-base text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-hidden py-3"
                         data-testid="photo-upload-caption-input"
                       />
                       <div className="mt-2 flex items-center justify-between">
@@ -421,7 +421,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                         value={tags}
                         onChange={(e) => setTags(e.target.value)}
                         placeholder="beach, sunset, memories"
-                        className="h-12 w-full rounded-[14px] bg-field px-4 text-base text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none"
+                        className="h-12 w-full rounded-[14px] bg-field px-4 text-base text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-hidden"
                         data-testid="photo-upload-tags-input"
                       />
                       <div className="mt-2 space-y-1">
@@ -482,7 +482,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                     <div className="-mx-5 flex items-center justify-end gap-3 border-t border-line px-5 pt-4">
                       <button
                         onClick={handleClose}
-                        className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                         data-testid="photo-upload-cancel"
                       >
                         Cancel
@@ -491,7 +491,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                         <button
                           ref={retryRef}
                           onClick={handleRetry}
-                          className="h-12 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                          className="h-12 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                           data-testid="photo-upload-retry"
                         >
                           Retry
@@ -501,7 +501,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                         <button
                           onClick={handleUpload}
                           disabled={!isFormValid}
-                          className="flex h-12 items-center gap-2 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex h-12 items-center gap-2 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
                           data-testid="photo-upload-submit-button"
                         >
                           <Upload className="h-5 w-5" aria-hidden="true" />
@@ -527,7 +527,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                 {step === 'success' && (
                   <div className="flex flex-col items-center justify-center py-12">
                     <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-tint text-accent">
-                      <Check className="h-[30px] w-[30px]" aria-hidden="true" />
+                      <Check className="h-7.5 w-7.5" aria-hidden="true" />
                     </div>
                     <h3 className="mb-2 text-lg font-semibold text-ink">Photo uploaded!</h3>
                     <p className="text-sm text-muted">Your photo has been saved</p>

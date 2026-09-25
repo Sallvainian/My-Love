@@ -96,7 +96,7 @@ function AccountAdminPanel({ onExit }: AdminPanelProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-purple-50">
+    <div className="min-h-screen bg-linear-to-br from-pink-50 via-rose-50 to-purple-50">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -107,7 +107,7 @@ function AccountAdminPanel({ onExit }: AdminPanelProps) {
           <div className="flex items-center justify-between">
             {/* Title */}
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-linear-to-r from-pink-600 to-rose-600 text-white">
                 <span className="text-xl text-white">⚙️</span>
               </div>
               <div>
@@ -153,7 +153,7 @@ function AccountAdminPanel({ onExit }: AdminPanelProps) {
               {/* Create button */}
               <button
                 onClick={() => setIsCreateOpen(true)}
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 px-4 py-2 font-medium text-white transition-shadow hover:shadow-lg"
+                className="flex items-center gap-2 rounded-lg bg-linear-to-r from-pink-600 to-rose-600 px-4 py-2 font-medium text-white transition-shadow hover:shadow-lg"
                 data-testid="admin-create-button"
               >
                 <Plus className="h-5 w-5" />

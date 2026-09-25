@@ -568,7 +568,7 @@ export function PhotoViewer({
                 setShowDeleteDialog(true);
               }}
               disabled={showDeleteDialog}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent text-danger"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent text-danger"
               aria-label="Delete photo"
             >
               <Trash2 className="h-5 w-5" aria-hidden="true" />
@@ -579,7 +579,7 @@ export function PhotoViewer({
           <button
             onClick={onClose}
             disabled={showDeleteDialog}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent text-ink"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent text-ink"
             aria-label="Close viewer"
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -590,7 +590,7 @@ export function PhotoViewer({
         <button
           onClick={() => navigatePhoto('prev')}
           disabled={showDeleteDialog || !canNavigatePrev}
-          className="absolute top-1/2 left-4 z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent text-ink disabled:cursor-not-allowed disabled:opacity-30"
+          className="absolute top-1/2 left-4 z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent text-ink disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Previous photo"
         >
           <ChevronLeft className="h-6 w-6" aria-hidden="true" />
@@ -599,7 +599,7 @@ export function PhotoViewer({
         <button
           onClick={() => navigatePhoto('next')}
           disabled={showDeleteDialog || !canNavigateNext}
-          className="absolute top-1/2 right-4 z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent text-ink disabled:cursor-not-allowed disabled:opacity-30"
+          className="absolute top-1/2 right-4 z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent text-ink disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Next photo"
         >
           <ChevronRight className="h-6 w-6" aria-hidden="true" />
@@ -638,7 +638,7 @@ export function PhotoViewer({
                 <button
                   onClick={handleRetryLoad}
                   disabled={showDeleteDialog}
-                  className="h-11 rounded-full bg-card px-5 text-[15px] font-semibold text-ink transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="h-11 rounded-full bg-card px-5 text-[15px] font-semibold text-ink transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   Retry
                 </button>
@@ -648,7 +648,7 @@ export function PhotoViewer({
             {/* Listed, but its image is not on this device and cannot be fetched */}
             {imageNotSaved && (
               <div
-                className="flex min-h-[200px] min-w-[240px] flex-col items-center justify-center gap-2 px-6 text-center text-white"
+                className="flex min-h-50 min-w-60 flex-col items-center justify-center gap-2 px-6 text-center text-white"
                 data-testid="photo-viewer-not-saved"
               >
                 <ImageOff className="h-8 w-8" aria-hidden="true" />
@@ -714,7 +714,7 @@ export function PhotoViewer({
               animate={{ scale: 1, opacity: 1 }}
             >
               <div className="flex items-center gap-3 border-b border-line px-5 py-4">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
                   <AlertTriangle className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <h3 id="photo-viewer-delete-title" className="text-lg font-semibold text-ink">
@@ -753,14 +753,14 @@ export function PhotoViewer({
                   ref={cancelButtonRef}
                   autoFocus
                   onClick={handleCancelDialog}
-                  className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
                   disabled={isDeleting}
-                  className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
+                  className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
                 >
                   {isDeleting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                   Delete
