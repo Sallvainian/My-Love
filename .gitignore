@@ -70,8 +70,6 @@ tests/.auth/
 .claude
 !.claude/commands/
 !.claude/rules/
-_bmad/*
-!.bmad/
 .code
 
 # IDE and AI tool configs
@@ -113,7 +111,6 @@ supabase/.temp/
 _bmad/*
 .agent/
 .agents/
-skills/
 
 # OpenMemory - IDE/Assistant specific rules
 .cursor/rules/openmemory.mdc
@@ -130,8 +127,6 @@ skills/
 .worktrees/
 .security-key
 logs/security/
-CLAUDE.md
-AGENTS.md
 
 # Working directories (image generation, temp files)
 output/
@@ -142,7 +137,6 @@ gha-creds-*.json
 .bmad-loop/runs/
 .bmad-loop/cache/
 .bmad-loop/archive/
-_bmad/render/
 # BMAD specs, ledger and artifacts stay local. Loop worktrees get the specs from
 # `worktree_seed = ["_bmad-output/specs"]` in .bmad-loop/policy.toml, and the
 # loop seeds and carries back the ledger and sprint board itself.
@@ -163,11 +157,8 @@ _bmad/custom/*.user.toml
 .bmad-loop/policy.toml
 
 # Grok CLI (bmad-loop review adapter). Untracked, like .claude/ and _bmad/.
-# Grok's own README claims repo-scoped skills are filtered when gitignored;
-# grok 1.0.30 does not do that -- the skill is discovered under `.grok/skills/`,
-# a bare `skills/` rule and `.grok/` alike. Worktree checkouts are served by
-# `worktree_seed` in .bmad-loop/policy.toml, which copies the tree in, and
-# bmad-loop's built-in grok profile writes .grok/hooks/bmad-loop.json into each
-# worktree itself (`bmad-loop init --cli grok` regenerates it here), so nothing
-# here needs to be tracked.
+# `.grok/` holds only hooks/bmad-loop.json, which `bmad-loop init --cli grok`
+# writes here and the loop's grok profile writes into each worktree. Grok reads
+# skills from .agents/skills; never add a .grok/skills copy, which grok would
+# read first and so shadow the installed skills.
 .grok/
