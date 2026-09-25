@@ -1,0 +1,81 @@
+- id: "1"
+  title: Make every test able to fail
+  description: >-
+    CAP-1: fix rows C1-C7, H3 and H10 in every findings-*.md, plus the log-only
+    checks, swallowed errors, vacuous premises and false-coverage specs in corrections.md.
+  invoke_dev_with: >-
+    Read corrections.md first, then work every row for this story's rule ids across
+    all five findings-*.md files. Locate rows by content, not line number. One commit
+    per finding group. Run lint, typecheck and the affected suites before finishing.
+    For each CRITICAL, show the test fails with its behaviour broken, then restore.
+- id: "2"
+  title: Remove clock, timing and async nondeterminism
+  description: >-
+    CAP-2: fix rows H1, H2 and M6, including the suite run's normalization-removed
+    H1/H2 rows, and the timing items in corrections.md.
+  invoke_dev_with: >-
+    Read corrections.md first, then work every row for this story's rule ids across
+    all five findings-*.md files. Locate rows by content, not line number. One commit
+    per finding group. Run lint, typecheck and the affected suites before finishing.
+- id: "3"
+  title: Wait for data before interacting in e2e specs
+  description: >-
+    CAP-2: fix every M1 (network-first) row, plus the readiness-gate items in
+    corrections.md.
+  invoke_dev_with: >-
+    Read corrections.md first, then work every row for this story's rule ids across
+    all five findings-*.md files. Locate rows by content, not line number. One commit
+    per finding group. Run lint, typecheck and the affected suites before finishing.
+- id: "4"
+  title: Isolate tests and make cleanup failure-proof
+  description: >-
+    CAP-3: fix every H4 row, plus the cleanup-ordering and leaked-row items in
+    corrections.md.
+  invoke_dev_with: >-
+    Read corrections.md first, then work every row for this story's rule ids across
+    all five findings-*.md files. Locate rows by content, not line number. One commit
+    per finding group. Run lint, typecheck and the affected suites before finishing.
+- id: "5"
+  title: Drive component tests through user-event
+  description: >-
+    CAP-4: replace fireEvent with user-event at every M5 row, and make tests named
+    for a key press or gesture perform it.
+  invoke_dev_with: >-
+    Read corrections.md first, then work every row for this story's rule ids across
+    all five findings-*.md files. Locate rows by content, not line number. One commit
+    per finding group. Run lint, typecheck and the affected suites before finishing.
+- id: "6"
+  title: Adopt playwright-utils in Playwright specs
+  description: >-
+    CAP-5: fix every M9 and L9 row, using the installed helper or a recorded
+    deviation comment where a helper cannot apply.
+  invoke_dev_with: >-
+    Read corrections.md first, then work every row for this story's rule ids across
+    all five findings-*.md files. Locate rows by content, not line number. One commit
+    per finding group. Run lint, typecheck and the affected suites before finishing.
+- id: "7"
+  title: Build test data through factories and name magic values
+  description: >-
+    CAP-6: fix every M2 and L6 row.
+  invoke_dev_with: >-
+    Read corrections.md first, then work every row for this story's rule ids across
+    all five findings-*.md files. Locate rows by content, not line number. One commit
+    per finding group. Run lint, typecheck and the affected suites before finishing.
+- id: "8"
+  title: Fix names, selectors, markers and test structure
+  description: >-
+    CAP-6: fix every L1, L2, L3, L5, L7, M3, M4 and M7 row, including the four false
+    positives in corrections.md.
+  invoke_dev_with: >-
+    Read corrections.md first, then work every row for this story's rule ids across
+    all five findings-*.md files. Locate rows by content, not line number. One commit
+    per finding group. Run lint, typecheck and the affected suites before finishing.
+- id: "9"
+  title: Split oversize test files
+  description: >-
+    CAP-6: split every H5 file so none exceeds 1000 lines; runs last because
+    splitting moves the lines earlier stories cite.
+  invoke_dev_with: >-
+    Read corrections.md first, then work every row for this story's rule ids across
+    all five findings-*.md files. Locate rows by content, not line number. One commit
+    per finding group. Run lint, typecheck and the affected suites before finishing.
