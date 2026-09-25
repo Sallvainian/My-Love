@@ -110,7 +110,7 @@ function App() {
   const drainQueuedNotes = useAppStore((s) => s.drainQueuedNotes);
   const updateSyncStatus = useAppStore((s) => s.updateSyncStatus);
   const loadEvents = useAppStore((s) => s.loadEvents);
-  // The bundled rows are seeded by initializeApp; the favorites mirror maps
+  // The bundled rows are seeded by initializeApp; the message-data refresher maps
   // server keys onto them, so account-data sync waits until they exist.
   const messagesSeeded = useAppStore((s) => s.messages.length > 0);
   const hasInitialized = useRef(false);
@@ -391,8 +391,8 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]); // Initialize when session is established
 
-  // The custom-message and favorite mirrors refresh through their local-copy
-  // refresher, which no-ops until the bundled rows are seeded (messagesSlice).
+  // Custom messages and favorites refresh through their local-copy
+  // refresher (kind `message-data`), which no-ops until the bundled rows are seeded (messagesSlice).
   // A signed-in start's refreshLocalCopies() below usually runs before
   // initializeApp has seeded, so this fires the first refresh once seeding
   // lands. Keyed on seeding alone: `messages` is never emptied again in this

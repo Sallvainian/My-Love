@@ -2,10 +2,10 @@
  * Custom Messages API — the signed-in user's custom daily messages
  * (`public.custom_messages`)
  *
- * Supabase is the source of truth. The IndexedDB `messages` store keeps a read
- * mirror of these rows (`isCustom: true`, `userId`, `serverId`) so the daily
- * rotation and the Admin panel still render offline; `customMessageService`
- * writes here first and to that mirror second.
+ * Supabase is the source of truth. The account's `message-data` local copy
+ * keeps these rows (`isCustom: true`, `userId`, `serverId`) so the daily
+ * rotation and the Admin panel still render offline; `messagesSlice` writes
+ * here first and to that copy second.
  *
  * A custom message's favorite flag is a column on its own row. Favorites of the
  * bundled messages live in `message_favorites` (`messageFavoritesApi.ts`).

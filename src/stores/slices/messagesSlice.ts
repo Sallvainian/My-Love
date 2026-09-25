@@ -10,32 +10,50 @@
  * Cross-slice dependencies:
  * - Depends on Settings: `coupleSettings.relationshipStart` bounds how far back
  *   history can be browsed (`canNavigateBack`); the rotation itself ignores it
- * - authSlice: custom messages belong to one account. Every action that reaches
- *   IndexedDB captures `{ userId, authSessionVersion }` at entry, passes the
- *   captured id to the service, and rechecks the pair before every post-await
- *   `set()` — the `photosSlice`/`eventsSlice` idiom. `authSessionVersion` is
- *   paired with `userId` rather than compared alone so that A → signed out → A
- *   again is distinguishable from an uninterrupted A: `clearAuth` bumps it on
- *   every sign-out, and an id-only compare would let a request raised in the
- *   dead session write as if it were live.
- * - Supabase is the source of truth for custom messages and favorites; the
- *   IndexedDB rows are read mirrors. The services write the server first
- *   (`customMessageService`, `storageService.toggleFavorite`), and
- *   `loadMessageDataFromServer` replaces the mirrors with the server's rows. It
- *   is registered as a local-copy refresher (`services/localCopy.ts`, kind
- *   `message-data`), so it runs on signed-in start, on reconnect and on demand
- *   — but only once the bundled rows are seeded (`messages` non-empty): the
- *   seeding decision in `initializeApp` reads the same store, and owned rows
- *   written first would make it skip the bundled messages. App.tsx triggers it
- *   when seeding completes. Sign-out deletes the outgoing account's mirror rows
- *   (`authSlice.ts`).
+ * - authSlice: custom messages belong to one account. Every action captures
+ *   `{ userId, authSessionVersion }` at entry, passes the captured id to the
+ *   services, and rechecks the pair before every post-await `set()` and before
+ *   saving the local copy — the `photosSlice`/`eventsSlice` idiom.
+ *   `authSessionVersion` is paired with `userId` rather than compared alone so
+ *   that A → signed out → A again is distinguishable from an uninterrupted A:
+ *   `clearAuth` bumps it on every sign-out, and an id-only compare would let a
+ *   request raised in the dead session write as if it were live.
+ *
+ * Where the data lives:
+ * - The bundled daily messages are the `messages` IndexedDB store, shared by
+ *   every account (`storageService`).
+ * - Custom messages and favorites are Supabase data (`customMessagesApi`,
+ *   `messageFavoritesApi`). The device keeps them in the account's shared local
+ *   copy (`services/localCopy.ts`, kind `message-data`, value
+ *   `MessageDataCopy`): the custom rows with their local ids, the favorited
+ *   bundled ids, and the next free id. `loadMessages` and `loadCustomMessages`
+ *   render from that copy, so Home and the Admin panel work offline.
+ * - `loadMessageDataFromServer` is the kind's refresher (signed-in start,
+ *   reconnect, on demand): it shows the saved copy, then replaces the copy with
+ *   the server's rows. It waits until the bundled rows are seeded (`messages`
+ *   non-empty), because bundled favorites are matched to their local ids by
+ *   hashing the seeded texts; App.tsx triggers it when seeding completes.
+ * - Every write needs a connection (`customMessagesApi` and
+ *   `messageFavoritesApi` refuse offline) and goes to the server first. Only a
+ *   confirmed write updates the copy, inside the account-data queue
+ *   (`accountDataQueue.ts`) so a refresh cannot erase it mid-flight.
+ * - Sign-out deletes the outgoing account's copy with every other kind
+ *   (`deleteAccountCopies`, `authSlice.ts`).
  */
 
 import { serializeAccountDataWrite } from '../../services/accountDataQueue';
 import { customMessagesApi } from '../../services/customMessagesApi';
-import { customMessageService } from '../../services/customMessageService';
+import {
+  customMessageService,
+  emptyMessageData,
+  MESSAGE_DATA_COPY_KIND,
+  type MessageDataCopy,
+  readMessageData,
+  writeMessageData,
+} from '../../services/customMessageService';
 import { registerLocalCopy } from '../../services/localCopy';
 import { messageFavoritesApi } from '../../services/messageFavoritesApi';
+import { projectMessageFavorites } from '../../services/messageFavorites';
 import { storageService } from '../../services/storage';
 import type {
   CreateMessageInput,
@@ -62,10 +80,10 @@ export interface MessagesSlice {
   favoriteError: string | null;
 
   // Actions
+  /** Rebuild the rotation pool: the bundled rows plus the account's saved copy. */
   loadMessages: () => Promise<void>;
-  /** Replace the custom-message and favorite mirrors with the server's. */
+  /** The `message-data` refresher: replace the saved copy with the server's rows. */
   loadMessageDataFromServer: () => Promise<void>;
-  addMessage: (text: string, category: Message['category']) => Promise<void>;
   toggleFavorite: (messageId: number) => Promise<void>;
   updateCurrentMessage: () => void;
 
@@ -86,11 +104,57 @@ export interface MessagesSlice {
   importCustomMessages: (file: File) => Promise<{ imported: number; skipped: number }>;
 }
 
+/** Local-copy kind for the account's custom messages and favorites. */
+export { MESSAGE_DATA_COPY_KIND };
+
+function isOnline(): boolean {
+  return typeof navigator === 'undefined' || navigator.onLine;
+}
+
+/** The lowest id a new custom row may take: above every bundled id. */
+function minNewCustomId(bundled: Message[]): number {
+  return Math.max(0, ...bundled.map((message) => message.id)) + 1;
+}
+
+function toCustomMessage(m: Message): CustomMessage {
+  return {
+    id: m.id,
+    text: m.text,
+    category: m.category,
+    isCustom: true,
+    active: m.active ?? true,
+    createdAt: m.createdAt.toISOString(),
+    updatedAt: m.updatedAt?.toISOString(),
+    tags: m.tags,
+  };
+}
+
 /**
- * Local-copy refresher kind for the custom-message and favorite mirrors. They
- * keep their own IndexedDB stores; only the refresh goes through localCopy.
+ * A server write succeeded and the copy could not be saved. Saying "failed"
+ * would invite a retry that repeats it; the next refresh brings the copy back
+ * in line with the server.
  */
-export const MESSAGE_DATA_COPY_KIND = 'message-data';
+function copyNotSaved(cause: unknown): Error {
+  console.error('[Messages] Saved to the account, but the local copy was not:', cause);
+  return new Error(
+    'Your change was saved to your account, but this device could not store its copy. Reload to see it.',
+    { cause }
+  );
+}
+
+/**
+ * The auth lifetime whose copy already came from the server. The saved copy is
+ * shown first only before that (`loadMessageDataFromServer` step 1). Keyed by
+ * `{ userId, authSessionVersion }`, so a new session starts unfresh.
+ */
+let messageDataFreshFor: { userId: string; authSessionVersion: number } | null = null;
+
+function isFresh(userId: string, authSessionVersion: number): boolean {
+  return (
+    messageDataFreshFor?.userId === userId &&
+    messageDataFreshFor.authSessionVersion === authSessionVersion
+  );
+}
 
 export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _api) => {
   // No-op until the bundled rows are seeded (see the header); App.tsx's seeded
@@ -100,6 +164,104 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     await get().loadMessageDataFromServer();
   });
 
+  const isSession = (userId: string | null, authSessionVersion: number) =>
+    get().userId === userId && get().authSessionVersion === authSessionVersion;
+
+  /**
+   * The copy a write starts from. A copy that cannot be read (or was never
+   * saved) is rebuilt from what this session shows, which came from the same
+   * copy or the server — never an empty list that would drop the other rows.
+   * Only while that session is still on screen: what is shown then belongs to
+   * whoever signed in next.
+   */
+  const readCopyForWrite = async (
+    userId: string,
+    authSessionVersion: number,
+    bundled: Message[]
+  ): Promise<MessageDataCopy> => {
+    const saved = await readMessageData(userId);
+    if (saved) return saved;
+    if (!isSession(userId, authSessionVersion)) return emptyMessageData(minNewCustomId(bundled));
+    const shown = (get().messages ?? []) as Message[];
+    const custom = shown.filter((message) => message.isCustom);
+    return {
+      ...emptyMessageData(minNewCustomId(bundled)),
+      custom,
+      bundledFavoriteIds: shown
+        .filter((message) => !message.isCustom && message.isFavorite)
+        .map((message) => message.id),
+      nextCustomId: Math.max(
+        minNewCustomId(bundled),
+        ...custom.map((message) => message.id + 1)
+      ),
+    };
+  };
+
+  /**
+   * One queued custom-message write for `requestedBy` in `requestedInSession`:
+   * read the copy, run `send` (the server write, returning the new copy), then —
+   * only if the session is unchanged — save it. Resolves `null` when the
+   * session ended before the save; the server write stands either way, and the
+   * next sign-in's refresh brings it onto this device.
+   *
+   * `sendAfterSwitch`: a create is still sent for the account that asked when
+   * the queue held it across an account switch, as `addAnniversary` does. An
+   * edit, delete or favorite is not — its local id was chosen on a screen that
+   * has since been replaced.
+   */
+  const writeThroughCopy = <R>(
+    requestedBy: string,
+    requestedInSession: number,
+    send: (copy: MessageDataCopy, bundled: Message[]) => Promise<{ copy: MessageDataCopy; result: R }>,
+    { sendAfterSwitch = false }: { sendAfterSwitch?: boolean } = {}
+  ): Promise<R | null> =>
+    serializeAccountDataWrite(async () => {
+      if (!sendAfterSwitch && !isSession(requestedBy, requestedInSession)) return null;
+      const bundled = await storageService.getAllMessages();
+      const copy = await readCopyForWrite(requestedBy, requestedInSession, bundled);
+      if (!sendAfterSwitch && !isSession(requestedBy, requestedInSession)) return null;
+
+      const { copy: next, result } = await send(copy, bundled);
+
+      if (!isSession(requestedBy, requestedInSession)) return null;
+      if (next !== copy) {
+        try {
+          await writeMessageData(requestedBy, next);
+        } catch (error) {
+          throw copyNotSaved(error);
+        }
+      }
+      return result;
+    });
+
+  /** Create one row on the server and in the copy; see `writeThroughCopy`. */
+  const createCustomRow = (
+    requestedBy: string | null,
+    requestedInSession: number,
+    input: CreateMessageInput,
+    clientKey: string
+  ): Promise<Message | null> => {
+    // Signed out: createRemote's owner check rejects before anything is sent.
+    if (!requestedBy) {
+      return customMessageService.createRemote(null, input, clientKey).then(() => null);
+    }
+    return writeThroughCopy(
+      requestedBy,
+      requestedInSession,
+      async (copy, bundled) => {
+        const remote = await customMessageService.createRemote(requestedBy, input, clientKey);
+        const { copy: next, message } = customMessageService.withCreatedRow(
+          copy,
+          remote,
+          requestedBy,
+          minNewCustomId(bundled)
+        );
+        return { copy: next, result: message };
+      },
+      { sendAfterSwitch: true }
+    );
+  };
+
   return {
     // Initial state
     messages: [],
@@ -107,7 +269,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       currentIndex: 0, // Story 3.3: 0 = today, 1 = yesterday, etc.
       shownMessages: new Map(), // Story 3.3: Date → Message ID mapping
       maxHistoryDays: 30, // Story 3.3: History limit
-      favoriteIds: [], // Account-specific projection loaded from IndexedDB
+      favoriteIds: [], // Account-specific projection of the message-data copy
       // Deprecated fields (migration):
       lastShownDate: '',
       lastMessageId: 0,
@@ -123,12 +285,15 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     loadMessages: async () => {
       // Rotation pool: shared daily rows plus this account's own custom rows.
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      const stillCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      const stillCurrent = () => isSession(requestedBy, requestedInSession);
 
       try {
-        const messages = await storageService.getAllMessages(requestedBy);
+        const [bundled, copy] = await Promise.all([
+          storageService.getAllMessages(),
+          requestedBy ? readMessageData(requestedBy) : Promise.resolve(null),
+        ]);
         if (!stillCurrent()) return;
+        const messages = projectMessageFavorites(bundled, copy);
         set((state) => ({
           messages,
           currentMessage: messages.find((message) => message.id === state.currentMessage?.id) ?? null,
@@ -145,77 +310,88 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
 
     loadMessageDataFromServer: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      const stillCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
       if (!requestedBy) return;
+      const stillCurrent = () => isSession(requestedBy, requestedInSession);
 
+      // 1. The saved copy, at once — online or offline. Skipped once this
+      // session has a server answer, which is newer.
+      if (!isFresh(requestedBy, requestedInSession)) {
+        await get().loadMessages();
+        if (!stillCurrent()) return;
+      }
+
+      // 2. Offline there is nothing to ask; the copy (or nothing) stays shown.
+      if (!isOnline()) return;
+
+      // 3. The server's rows replace the copy — only on success. Read and save
+      // run as one queued step, so a favorite or custom-message write cannot
+      // land between them and be erased (accountDataQueue.ts).
+      let saved: boolean;
       try {
-        // Read and replace as one queued step, so a favorite or custom-message
-        // write cannot land between them and be erased (accountDataQueue.ts).
-        await serializeAccountDataWrite(async () => {
+        saved = await serializeAccountDataWrite(async () => {
           const [customRows, favoriteKeys] = await Promise.all([
             customMessagesApi.fetchCustomMessages(requestedBy),
             messageFavoritesApi.fetchFavoriteKeys(requestedBy),
           ]);
-          // Not written once the session has ended: sign-out deletes the outgoing
-          // account's mirror rows through this same queue, and a read that lands
-          // afterwards must not put them back.
-          if (!stillCurrent()) return;
-          await customMessageService.replaceMirrorForUser(requestedBy, customRows);
-          await storageService.replaceBundledFavoritesForUser(requestedBy, favoriteKeys);
+          if (!stillCurrent()) return false;
+          const bundled = await storageService.getAllMessages();
+          // Unseeded: bundled favorites could not be matched, and saving would
+          // erase the saved ones.
+          if (bundled.length === 0) return false;
+          const [copy, bundledFavoriteIds] = await Promise.all([
+            readCopyForWrite(requestedBy, requestedInSession, bundled),
+            storageService.bundledFavoriteIds(bundled, favoriteKeys),
+          ]);
+          // Not saved once the session has ended: sign-out deletes the
+          // outgoing account's copy, and a read that lands afterwards must not
+          // put it back.
+          if (!stillCurrent()) return false;
+          const next = customMessageService.withServerRows(
+            copy,
+            customRows,
+            requestedBy,
+            bundledFavoriteIds,
+            minNewCustomId(bundled)
+          );
+          await writeMessageData(requestedBy, next);
+          messageDataFreshFor = { userId: requestedBy, authSessionVersion: requestedInSession };
+          return true;
         });
       } catch (error) {
-        // The mirrors stay as they were, so Home still renders offline.
+        // The copy stays as it was, so Home still renders offline.
         console.error('[Messages] Failed to load messages data from the server:', error);
         return;
       }
 
-      if (!stillCurrent()) return;
+      if (!saved || !stillCurrent()) return;
       await get().loadMessages();
       if (stillCurrent() && get().customMessagesLoaded) await get().loadCustomMessages();
-    },
-
-    /**
-     * @deprecated Dead action: no component calls it, and it writes `isCustom:
-     * true` straight through `storageService.addMessage` with no owner — which
-     * would produce exactly the legacy unowned row this slice now hides.
-     * Deliberately left alone (removing it is not this change), but do not wire a
-     * caller to it. Use `createCustomMessage`, which stamps the owner.
-     */
-    addMessage: async (text, category) => {
-      try {
-        const newMessage: Omit<Message, 'id'> = {
-          text,
-          category,
-          isCustom: true,
-          createdAt: new Date(),
-          isFavorite: false,
-        };
-
-        const id = await storageService.addMessage(newMessage);
-        const messageWithId = { ...newMessage, id };
-
-        set((state) => ({
-          messages: [...state.messages, messageWithId],
-        }));
-      } catch (error) {
-        console.error('Error adding message:', error);
-      }
     },
 
     toggleFavorite: async (messageId) => {
       // Persist under the captured owner, then project the committed value only
       // if the same account session still owns the UI.
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      const stillCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      const stillCurrent = () => isSession(requestedBy, requestedInSession);
 
       set({ favoriteError: null });
 
       try {
-        const isFavorite = await storageService.toggleFavorite(messageId, requestedBy);
+        if (!requestedBy) throw new Error('Favorites require a signed-in user');
+        const isFavorite = await writeThroughCopy(
+          requestedBy,
+          requestedInSession,
+          async (copy) => {
+            const message =
+              copy.custom.find((row) => row.id === messageId) ??
+              (await storageService.getMessage(messageId));
+            if (!message) throw new Error('Message not found for this user');
+            const toggled = await storageService.toggleFavorite(requestedBy, message, copy);
+            return { copy: toggled.copy, result: toggled.isFavorite };
+          }
+        );
 
-        if (!stillCurrent()) return;
+        if (isFavorite === null || !stillCurrent()) return;
 
         set((state) => ({
           messages: state.messages.map((msg) =>
@@ -453,36 +629,22 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       return messageHistory.currentIndex > 0;
     },
 
-    // Custom message actions (Story 3.5: Migrated to IndexedDB)
+    // Custom message actions (Story 3.5), rendered from the message-data copy
     loadCustomMessages: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      const stillCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      const stillCurrent = () => isSession(requestedBy, requestedInSession);
 
       try {
-        // Signed out this returns [], so the AdminPanel list empties rather than
+        // Signed out this is empty, so the AdminPanel list empties rather than
         // showing whatever the last account left on disk.
-        const customMessagesFromDB = await customMessageService.getAllForUser(requestedBy, {
-          isCustom: true,
-        });
-
-        // Convert Date objects to ISO strings for CustomMessage interface
-        const customMessages: CustomMessage[] = customMessagesFromDB.map((m) => ({
-          id: m.id,
-          text: m.text,
-          category: m.category,
-          isCustom: m.isCustom,
-          active: m.active ?? true,
-          createdAt: m.createdAt.toISOString(),
-          updatedAt: m.updatedAt?.toISOString(),
-          tags: m.tags,
-        }));
+        const copy = requestedBy ? await readMessageData(requestedBy) : null;
+        const customMessages = (copy?.custom ?? []).map(toCustomMessage);
 
         if (!stillCurrent()) return;
         set({ customMessages, customMessagesLoaded: true });
-        logger.debug(`[AdminPanel] Loaded ${customMessages.length} custom messages from IndexedDB`);
+        logger.debug(`[AdminPanel] Loaded ${customMessages.length} custom messages from the local copy`);
       } catch (error) {
-        console.error('[AdminPanel] Error loading custom messages from IndexedDB:', error);
+        console.error('[AdminPanel] Error loading custom messages from the local copy:', error);
         // The `loaded` flag is half the guard: AdminPanel re-fires this effect
         // while it is false, so an early return that skipped it would spin.
         if (!stillCurrent()) return;
@@ -490,36 +652,21 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       }
     },
 
-    createCustomMessage: async (input: CreateMessageInput, clientKey?: string) => {
+    createCustomMessage: async (input: CreateMessageInput, clientKey = crypto.randomUUID()) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      const stillCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      const stillCurrent = () => isSession(requestedBy, requestedInSession);
 
       try {
-        // Story 3.5: Save to IndexedDB via customMessageService.
-        // Throws when signed out — there is no owner to stamp the row with.
-        const message = await customMessageService.create(requestedBy, input, clientKey);
+        // Server first; throws when signed out, invalid or offline.
+        const message = await createCustomRow(requestedBy, requestedInSession, input, clientKey);
 
-        // Convert to CustomMessage format for state
-        const newCustomMessage: CustomMessage = {
-          id: message.id,
-          text: message.text,
-          category: message.category,
-          isCustom: true,
-          active: message.active ?? true,
-          createdAt: message.createdAt.toISOString(),
-          updatedAt: message.updatedAt?.toISOString(),
-          tags: message.tags,
-        };
+        // The row is the requesting account's either way; only this session's
+        // copy and screen are withheld once the account changed under it.
+        if (!message || !stillCurrent()) return;
 
-        // The row is written and stamped with the id that asked for it either
-        // way; it is this session's STORE that is withheld once the account has
-        // changed under the request.
-        if (!stillCurrent()) return;
-
-        // Update state (optimistic UI update)
+        const newCustomMessage = toCustomMessage(message);
         // A retried submit can resolve to a row already listed (see
-        // customMessageService.create); never list it twice.
+        // customMessageService.withCreatedRow); never list it twice.
         set((state) =>
           state.customMessages.some((existing) => existing.id === newCustomMessage.id)
             ? {}
@@ -540,18 +687,30 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
 
     updateCustomMessage: async (input: UpdateMessageInput) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      const stillCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      const stillCurrent = () => isSession(requestedBy, requestedInSession);
 
       try {
-        // Story 3.5: Update in IndexedDB via customMessageService.
-        // Throws when the row is not this user's, so a stale id from another
-        // account's list cannot change their message.
-        await customMessageService.updateMessage(requestedBy, input);
+        if (!requestedBy) {
+          throw new Error(
+            '[CustomMessageService] updateMessage requires a signed-in user — refusing to write an unowned custom message'
+          );
+        }
+        const fields = customMessageService.validateUpdate(input);
 
-        if (!stillCurrent()) return;
+        // Throws when the row is not in this account's copy, so a stale id from
+        // another account's list cannot change their message.
+        const updated = await writeThroughCopy(requestedBy, requestedInSession, async (copy) => {
+          const row = copy.custom.find((message) => message.id === fields.id);
+          if (!row) throw new Error(`Custom message ${fields.id} not found for this user`);
+          const remote = await customMessageService.updateRemote(row, fields);
+          return {
+            copy: customMessageService.withUpdatedRow(copy, row.id, remote, requestedBy),
+            result: true,
+          };
+        });
 
-        // Update state (optimistic UI update)
+        if (!updated || !stillCurrent()) return;
+
         set((state) => ({
           customMessages: state.customMessages.map((msg) => {
             if (msg.id === input.id) {
@@ -580,17 +739,24 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
 
     deleteCustomMessage: async (id: number) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      const stillCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      const stillCurrent = () => isSession(requestedBy, requestedInSession);
 
       try {
-        // Story 3.5: Delete from IndexedDB via customMessageService.
-        // Throws for a row this user does not own.
-        await customMessageService.deleteForUser(requestedBy, id);
+        if (!requestedBy) {
+          throw new Error(
+            '[CustomMessageService] deleteForUser requires a signed-in user — refusing to write an unowned custom message'
+          );
+        }
+        // Absent rows are a no-op, so a delete that lands twice does not fail.
+        const deleted = await writeThroughCopy(requestedBy, requestedInSession, async (copy) => {
+          const row = copy.custom.find((message) => message.id === id);
+          if (!row) return { copy, result: true };
+          await customMessageService.deleteRemote(row);
+          return { copy: customMessageService.withoutRow(copy, id), result: true };
+        });
 
-        if (!stillCurrent()) return;
+        if (!deleted || !stillCurrent()) return;
 
-        // Update state (optimistic UI update)
         set((state) => ({
           customMessages: state.customMessages.filter((msg) => msg.id !== id),
         }));
@@ -643,11 +809,11 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     // Export custom messages to JSON file (Story 3.5 AC-3.5.6)
     exportCustomMessages: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      const stillCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      const stillCurrent = () => isSession(requestedBy, requestedInSession);
 
       try {
-        const exportData = await customMessageService.exportMessages(requestedBy);
+        const copy = requestedBy ? await readMessageData(requestedBy) : null;
+        const exportData = customMessageService.exportMessages(copy?.custom ?? []);
 
         // Guarded even though nothing here writes the store: the download itself
         // is the disclosure. A file A asked for must not land in B's Downloads
@@ -683,20 +849,38 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     // Import custom messages from JSON file (Story 3.5 AC-3.5.6)
     importCustomMessages: async (file: File) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      const stillCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      const stillCurrent = () => isSession(requestedBy, requestedInSession);
 
       try {
+        if (!requestedBy) {
+          throw new Error(
+            '[CustomMessageService] importMessages requires a signed-in user — refusing to write an unowned custom message'
+          );
+        }
         // Read file content
         const text = await file.text();
         const exportData = JSON.parse(text);
 
-        // Import via service. Rows are stamped with the id captured at entry, so
-        // an import that settles after a switch still belongs to the account that
-        // started it — never to whoever is signed in when it lands.
-        const result = await customMessageService.importMessages(requestedBy, exportData);
+        // Duplicates are judged against THIS account's rows only: comparing
+        // against another account's would skip a sentence they happen to share,
+        // losing the import and disclosing that their row exists.
+        const copy = await readMessageData(requestedBy);
+        const { toCreate, skipped } = customMessageService.planImport(
+          copy?.custom ?? [],
+          exportData
+        );
 
-        // The rows are A's and stay A's; B's store is simply not touched.
+        // Rows are created for the id captured at entry, so an import that
+        // settles after a switch still belongs to the account that started it.
+        // A fresh key per row, deliberately not one derived from the text: an
+        // imported message edited since would own that key, and a re-import
+        // would get the edited row back and store nothing.
+        for (const input of toCreate) {
+          await createCustomRow(requestedBy, requestedInSession, input, crypto.randomUUID());
+        }
+        const result = { imported: toCreate.length, skipped };
+
+        // The rows are A's and stay A's; B's copy is simply not touched.
         if (!stillCurrent()) return result;
 
         // Reload custom messages and main messages

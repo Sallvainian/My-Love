@@ -2,19 +2,23 @@ import 'fake-indexeddb/auto';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { domAnimation, LazyMotion } from 'framer-motion';
 import type { HTMLAttributes, ReactNode } from 'react';
-import { deleteDB, openDB } from 'idb';
+import { deleteDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminPanel } from '../../../src/components/AdminPanel/AdminPanel';
 import { DeleteConfirmDialog } from '../../../src/components/AdminPanel/DeleteConfirmDialog';
 import { requireOnline } from '../../../src/services/accountDataError';
-import { customMessageService } from '../../../src/services/customMessageService';
-import { DB_NAME, DB_VERSION, type MyLoveDBSchema } from '../../../src/services/dbSchema';
+import {
+  customMessageService,
+  readMessageData,
+  writeMessageData,
+} from '../../../src/services/customMessageService';
+import { DB_NAME } from '../../../src/services/dbSchema';
 import { storageService } from '../../../src/services/storage';
 import { useAppStore } from '../../../src/stores/useAppStore';
-import type { CustomMessage } from '../../../src/types';
+import type { CustomMessage, Message } from '../../../src/types';
 
 // The server half of custom messages and favorites; these tests drive the
-// IndexedDB mirror, which is written only after the server accepted a write.
+// message-data local copy, which is written only after the server accepted a write.
 vi.mock('../../../src/services/customMessagesApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../src/services/customMessagesApi')>()),
   customMessagesApi: (await import('../helpers/fakeAccountDataApis')).fakeCustomMessagesApi,
@@ -64,9 +68,16 @@ async function switchAccount(userId: string) {
   });
 }
 
-async function diskRow(id: number) {
-  const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
-  try { return await db.get('messages', id); } finally { db.close(); }
+/** Row `id` in `userId`'s saved copy (A's unless named), or undefined. */
+async function diskRow(id: number, userId = A) {
+  return (await readMessageData(userId))?.custom.find((message) => message.id === id);
+}
+
+function savedRow(id: number, userId: string, serverId: string, text: string): Message {
+  return {
+    id, text, category: 'custom', isCustom: true, userId, serverId,
+    active: true, isFavorite: false, createdAt: new Date(), updatedAt: new Date(), tags: [],
+  };
 }
 
 function row(text: string) {
@@ -78,25 +89,32 @@ beforeEach(async () => {
   useAppStore.setState(useAppStore.getInitialState(), true);
   await storageService.init();
   await storageService.addMessage({ text: 'Shared daily', category: 'reason', isCustom: false, createdAt: new Date() });
-  const aCreated = await customMessageService.create(A, { text: 'Account A message', category: 'custom' });
-  aId = aCreated.id;
-  aServerId = aCreated.serverId!;
-  bId = (await customMessageService.create(B, { text: 'Account B message', category: 'custom' })).id;
+  aId = 1000;
+  bId = 2000;
+  aServerId = 'srv-account-a';
+  await writeMessageData(A, {
+    custom: [savedRow(aId, A, aServerId, 'Account A message')],
+    bundledFavoriteIds: [],
+    nextCustomId: aId + 1,
+  });
+  await writeMessageData(B, {
+    custom: [savedRow(bId, B, 'srv-account-b', 'Account B message')],
+    bundledFavoriteIds: [],
+    nextCustomId: bId + 1,
+  });
   await switchAccount(A);
 });
 
 afterEach(async () => {
   cleanup();
   vi.restoreAllMocks();
-  for (const service of [storageService, customMessageService]) {
-    const holder = service as unknown as { db: { close(): void } | null };
-    holder.db?.close();
-    holder.db = null;
-  }
+  const holder = storageService as unknown as { db: { close(): void } | null };
+  holder.db?.close();
+  holder.db = null;
   await deleteDB(DB_NAME);
 });
 
-describe('AdminPanel with real IndexedDB and store', () => {
+describe('AdminPanel with the real local copy and store', () => {
   it.each(['edit', 'delete'] as const)('isolates A/B/A lists and removes the outgoing %s preview', async (dialog) => {
     panel();
     expect(screen.getAllByText('Account A message')).toHaveLength(1);
@@ -107,12 +125,12 @@ describe('AdminPanel with real IndexedDB and store', () => {
     expect(screen.queryByTestId('admin-edit-form')).toBeNull();
     expect(screen.queryByTestId('admin-delete-dialog')).toBeNull();
     expect(screen.getByText('Account B message')).toBeInTheDocument();
-    // A's mirror rows left the device with A's session (CAP-7); B's stay.
-    await waitFor(async () => expect(await diskRow(aId)).toBeUndefined());
-    expect(await diskRow(bId)).toBeDefined();
+    // A's copy left the device with A's session (CAP-7); B's stays.
+    await waitFor(async () => expect(await readMessageData(A)).toBeNull());
+    expect(await diskRow(bId, B)).toBeDefined();
     await switchAccount(A);
     expect(screen.queryByText('Account B message')).toBeNull();
-    await waitFor(async () => expect(await diskRow(bId)).toBeUndefined());
+    await waitFor(async () => expect(await readMessageData(B)).toBeNull());
     // A's own rows come back from the server on A's refresh, listed once.
     const { fakeCustomMessagesApi } = await import('../helpers/fakeAccountDataApis');
     fakeCustomMessagesApi.fetchCustomMessages.mockResolvedValueOnce([
@@ -132,8 +150,8 @@ describe('AdminPanel with real IndexedDB and store', () => {
     panel();
     act(() => { useAppStore.setState({ currentMessage: useAppStore.getState().messages.find((message) => message.id === aId)! }); });
     const gate = deferred();
-    const realDelete = customMessageService.deleteForUser.bind(customMessageService);
-    const remove = vi.spyOn(customMessageService, 'deleteForUser').mockImplementation(async (...args) => {
+    const realDelete = customMessageService.deleteRemote.bind(customMessageService);
+    const remove = vi.spyOn(customMessageService, 'deleteRemote').mockImplementation(async (...args) => {
       await gate.promise;
       return realDelete(...args);
     });
@@ -142,7 +160,8 @@ describe('AdminPanel with real IndexedDB and store', () => {
     fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
     fireEvent.click(screen.getByTestId('admin-delete-dialog-cancel'));
     fireEvent.click(screen.getByTestId('admin-delete-dialog-backdrop'));
-    expect(remove).toHaveBeenCalledTimes(1);
+    // The server call follows a read of the saved copy, so it lands a moment later.
+    await waitFor(() => expect(remove).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByTestId('admin-delete-dialog-cancel')).toBeDisabled();
     expect(await diskRow(aId)).toBeDefined();
@@ -156,7 +175,7 @@ describe('AdminPanel with real IndexedDB and store', () => {
 
   it('reports failure accessibly, permits cancel, and retries a real delete', async () => {
     panel();
-    const remove = vi.spyOn(customMessageService, 'deleteForUser').mockRejectedValueOnce(new Error('disk unavailable'));
+    const remove = vi.spyOn(customMessageService, 'deleteRemote').mockRejectedValueOnce(new Error('disk unavailable'));
     fireEvent.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
     fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
     await screen.findByRole('alert');
@@ -171,7 +190,7 @@ describe('AdminPanel with real IndexedDB and store', () => {
 
   it('allows cancellation after a failed delete without removing the row', async () => {
     panel();
-    vi.spyOn(customMessageService, 'deleteForUser').mockRejectedValueOnce(new Error('disk unavailable'));
+    vi.spyOn(customMessageService, 'deleteRemote').mockRejectedValueOnce(new Error('disk unavailable'));
     fireEvent.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
     fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
     await screen.findByRole('alert');
@@ -183,8 +202,8 @@ describe('AdminPanel with real IndexedDB and store', () => {
   it('does not let an old completion close the new account’s dialog', async () => {
     panel();
     const gate = deferred();
-    const realDelete = customMessageService.deleteForUser.bind(customMessageService);
-    vi.spyOn(customMessageService, 'deleteForUser').mockImplementationOnce(async (...args) => {
+    const realDelete = customMessageService.deleteRemote.bind(customMessageService);
+    vi.spyOn(customMessageService, 'deleteRemote').mockImplementationOnce(async (...args) => {
       await gate.promise;
       return realDelete(...args);
     });
@@ -193,15 +212,15 @@ describe('AdminPanel with real IndexedDB and store', () => {
     await switchAccount(B);
     fireEvent.click(within(row('Account B message')).getByTestId('message-row-delete-button'));
     await act(async () => { gate.resolve(); });
-    await waitFor(async () => expect(await diskRow(aId)).toBeUndefined());
+    await waitFor(async () => expect(await readMessageData(A)).toBeNull());
     expect(within(screen.getByRole('dialog')).getByText('Account B message')).toBeInTheDocument();
-    expect(await diskRow(bId)).toBeDefined();
+    expect(await diskRow(bId, B)).toBeDefined();
     expect(useAppStore.getState().customMessages.map((message) => message.id)).toEqual([bId]);
   });
 
   it('does not call success after a same-account session was replaced', async () => {
     const gate = deferred();
-    vi.spyOn(customMessageService, 'deleteForUser').mockReturnValueOnce(gate.promise);
+    vi.spyOn(customMessageService, 'deleteRemote').mockReturnValueOnce(gate.promise);
     const onConfirm = vi.fn();
     const preview: CustomMessage = { id: aId, text: 'Preview', category: 'custom', isCustom: true, active: true, createdAt: new Date().toISOString() };
     render(<LazyMotion features={domAnimation}><DeleteConfirmDialog message={preview} isOpen onConfirm={onConfirm} onCancel={() => {}} /></LazyMotion>);

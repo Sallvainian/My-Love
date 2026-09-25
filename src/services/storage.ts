@@ -2,10 +2,9 @@ import type { IDBPDatabase } from 'idb';
 import type { Message } from '../types';
 import { logger } from '../utils/logger';
 import { AccountDataError, NOT_SYNCED_MESSAGE } from './accountDataError';
-import { serializeAccountDataWrite } from './accountDataQueue';
 import { customMessagesApi } from './customMessagesApi';
-import { type MyLoveDBSchema, openMyLoveDB } from './dbSchema';
-import { projectMessageFavorites } from './messageFavorites';
+import { type MyLoveDBSchema, type StoredMessageData, openMyLoveDB } from './dbSchema';
+import { isFavoriteIn, withFavorite } from './messageFavorites';
 import { bundledMessageKey, messageFavoritesApi } from './messageFavoritesApi';
 
 class StorageService {
@@ -94,25 +93,17 @@ class StorageService {
   }
 
   /**
-   * One message by id, if this caller may see it.
-   *
-   * `userId` is REQUIRED and nullable for the same reason getAllMessages's is:
-   * the signed-out case is real (the shared daily rows still have to load), but
-   * it has to be stated at the call site rather than reached by leaving an
-   * argument off.
-   *
-   * A row this caller may not see is reported exactly as a row that is not
-   * there — same `undefined`, same warning. Message ids are small sequential
-   * integers, so a distinguishable "exists but hidden" answer would hand one
-   * account a way to enumerate the other's private rows.
+   * One bundled message by id, or `undefined`. The store holds the bundled
+   * daily rows only; custom messages live in each account's `message-data`
+   * local copy (`customMessageService`).
    */
-  async getMessage(id: number, userId: string | null): Promise<Message | undefined> {
+  async getMessage(id: number): Promise<Message | undefined> {
     try {
       await this.init();
       const message = await this.db!.get('messages', id);
-      if (message && this.isVisibleTo(message, userId)) {
+      if (message && !message.isCustom) {
         logger.debug('[StorageService] Message retrieved successfully, id:', id);
-        return (await projectMessageFavorites(this.db!, [message], userId))[0];
+        return message;
       }
       console.warn('[StorageService] Message not found, id:', id);
       return undefined;
@@ -124,65 +115,34 @@ class StorageService {
   }
 
   /**
-   * Narrow a batch of rows to the ones `userId` may see. The rule itself is
-   * {@link isVisibleTo}.
+   * Every bundled daily message, by ascending id. Their favorites are not
+   * here: `projectMessageFavorites` applies an account's copy to them.
    */
-  private visibleTo(messages: Message[], userId: string | null): Message[] {
-    return messages.filter((message) => this.isVisibleTo(message, userId));
-  }
-
-  /**
-   * May `userId` see this row? The shared daily messages are everyone's, plus
-   * that caller's own custom messages.
-   *
-   * Custom rows with no nonempty owner are legacy and belong to nobody.
-   * Signed-out readers see only shared rows, even if a legacy owner is null.
-   *
-   * This is the single expression of the rule — the batch reads reach it
-   * through {@link visibleTo}. By-id reads and favorite writes use it too;
-   * generic edits and deletions additionally require ownership.
-   */
-  private isVisibleTo(message: Message, userId: string | null): boolean {
-    return !message.isCustom || (!!userId && message.userId === userId);
-  }
-
-  /**
-   * Every message the caller may see, shared and own alike.
-   *
-   * The `messages` store holds every account that has signed in on this device,
-   * and this read feeds the daily rotation and the Home screen — so unscoped it
-   * put one partner's private custom messages into the other's rotation pool.
-   *
-   * `userId` is REQUIRED and nullable rather than optional: the signed-out case
-   * is real (the daily messages still have to load), but it has to be stated at
-   * the call site rather than reached by leaving an argument off.
-   */
-  async getAllMessages(userId: string | null): Promise<Message[]> {
+  async getAllMessages(): Promise<Message[]> {
     try {
       await this.init();
-      const messages = this.visibleTo(await this.db!.getAll('messages'), userId);
+      const messages = (await this.db!.getAll('messages')).filter((message) => !message.isCustom);
       logger.debug('[StorageService] Retrieved all messages, count:', messages.length);
-      return await projectMessageFavorites(this.db!, messages, userId);
+      return messages;
     } catch (error) {
       console.error('[StorageService] Failed to get all messages:', error);
       return []; // Graceful fallback: return empty array
     }
   }
 
-  async getMessagesByCategory(category: string, userId: string | null): Promise<Message[]> {
+  async getMessagesByCategory(category: string): Promise<Message[]> {
     try {
       await this.init();
-      const messages = this.visibleTo(
-        await this.db!.getAllFromIndex('messages', 'by-category', category),
-        userId
-      );
+      const messages = (
+        await this.db!.getAllFromIndex('messages', 'by-category', category)
+      ).filter((message) => !message.isCustom);
       logger.debug(
         '[StorageService] Retrieved messages by category:',
         category,
         'count:',
         messages.length
       );
-      return await projectMessageFavorites(this.db!, messages, userId);
+      return messages;
     } catch (error) {
       console.error('[StorageService] Failed to get messages by category:', error);
       console.error('[StorageService] Category:', category);
@@ -190,74 +150,27 @@ class StorageService {
     }
   }
 
-  /** Owner-only edits. Protected fields are rejected, not silently stripped. */
-  async updateMessage(id: number, updates: Partial<Message>, userId: string | null): Promise<void> {
-    if (!userId) throw new Error('Message writes require a signed-in user');
-    const editable = new Set(['text', 'category', 'active', 'tags']);
-    if (Object.keys(updates).some((key) => !editable.has(key))) {
-      throw new Error('Cannot update protected message fields');
-    }
-    await this.init();
-    const tx = this.db!.transaction('messages', 'readwrite');
-    // A failed request also rejects tx.done; observe both failure channels.
-    void tx.done.catch(() => {});
-    const message = await tx.store.get(id);
-    if (!message || !message.isCustom || message.userId !== userId) {
-      await tx.done;
-      throw new Error('Message not found for this user');
-    }
-    await tx.store.put({ ...message, ...updates, updatedAt: new Date() });
-    await tx.done;
-  }
-
-  async deleteMessage(id: number, userId: string | null): Promise<void> {
-    if (!userId) throw new Error('Message writes require a signed-in user');
-    await this.init();
-    const tx = this.db!.transaction(['messages', 'message-favorites'], 'readwrite');
-    // A failed request also rejects tx.done; observe both failure channels.
-    void tx.done.catch(() => {});
-    const message = await tx.objectStore('messages').get(id);
-    if (!message || !message.isCustom || message.userId !== userId) {
-      await tx.done;
-      throw new Error('Message not found for this user');
-    }
-    await tx.objectStore('messages').delete(id);
-    await tx.objectStore('message-favorites').delete([id, userId]);
-    await tx.done;
-  }
-
   /**
-   * Toggle one account's favorite, server first; return the committed value.
+   * Toggle one account's favorite on the server, then return the committed
+   * value and the copy with it applied. The caller saves that copy.
    *
    * Supabase is the source of truth: a custom message's favorite is its row's
    * `is_favorite`, a bundled message's is a `message_favorites` row keyed by a
-   * hash of its text. The `message-favorites` store is the read mirror, written
-   * only after the server accepted the change, so an offline toggle throws and
-   * changes nothing.
+   * hash of its text. The current value is read from `copy`, the account's
+   * `message-data` local copy. An offline toggle throws before anything is
+   * sent, and the caller then leaves the copy as it was.
    *
-   * The read, the request and the mirror write cannot share one IndexedDB
-   * transaction — it would commit at the network await — so toggles go
-   * through the account-data queue instead (`accountDataQueue.ts`). Two taps
-   * still resolve to on, then off, rather than both reading "off" and both
-   * writing "on", and a mirror refresh cannot erase a toggle mid-flight.
+   * Not queued itself: the caller runs the read, this and the save as one task
+   * in the account-data queue (`accountDataQueue.ts`), so two taps resolve to
+   * on, then off, and a refresh cannot erase a toggle mid-flight.
    */
-  async toggleFavorite(messageId: number, userId: string | null): Promise<boolean> {
+  async toggleFavorite(
+    userId: string | null,
+    message: Message,
+    copy: StoredMessageData
+  ): Promise<{ isFavorite: boolean; copy: StoredMessageData }> {
     if (!userId) throw new Error('Favorites require a signed-in user');
-    return serializeAccountDataWrite(() => this.toggleFavoriteNow(messageId, userId));
-  }
-
-  private async toggleFavoriteNow(messageId: number, userId: string): Promise<boolean> {
-    await this.init();
-    const key: [number, string] = [messageId, userId];
-    // Both reads in one explicit transaction whose `done` is observed: the
-    // idb shortcut reads open their own and leave an abort unobserved.
-    const read = this.db!.transaction(['messages', 'message-favorites'], 'readonly');
-    void read.done.catch(() => {});
-    const message = await read.objectStore('messages').get(messageId);
-    if (!message || !this.isVisibleTo(message, userId)) {
-      throw new Error('Message not found for this user');
-    }
-    const isFavorite = !(await read.objectStore('message-favorites').get(key));
+    const isFavorite = !isFavoriteIn(copy, message);
 
     if (message.isCustom) {
       if (!message.serverId) {
@@ -270,67 +183,24 @@ class StorageService {
       else await messageFavoritesApi.removeFavorite(userId, messageKey);
     }
 
-    const tx = this.db!.transaction('message-favorites', 'readwrite');
-    // A failed request also rejects tx.done; observe both failure channels.
-    void tx.done.catch(() => {});
-    if (isFavorite) await tx.store.put({ messageId, userId });
-    else await tx.store.delete(key);
-    await tx.done;
-    return isFavorite;
+    return { isFavorite, copy: withFavorite(copy, message, isFavorite) };
   }
 
   /**
-   * Replace `userId`'s favorites of BUNDLED messages with the server's keys.
-   *
-   * Bundled ids are device-local, so each bundled row's text is hashed to find
-   * the key the server knows it by. Favorites of custom rows are left alone —
-   * `customMessageService.replaceMirrorForUser` owns those. Hashing happens
-   * before the transaction opens, because an IndexedDB transaction commits at
-   * the first await that is not one of its own requests.
+   * The ids of the bundled rows whose server key is in `messageKeys`. Bundled
+   * ids are device-local, so each row's text is hashed to find the key the
+   * server knows it by.
    */
-  async replaceBundledFavoritesForUser(userId: string, messageKeys: string[]): Promise<void> {
-    await this.init();
+  async bundledFavoriteIds(bundled: Message[], messageKeys: string[]): Promise<number[]> {
     const wanted = new Set(messageKeys);
-    const read = this.db!.transaction('messages', 'readonly');
-    void read.done.catch(() => {});
-    const bundled = (await read.store.getAll()).filter((message) => !message.isCustom);
-    const favorite = new Map<number, boolean>(
-      await Promise.all(
-        bundled.map(
-          async (message) =>
-            [message.id, wanted.has(await bundledMessageKey(message.text))] as [number, boolean]
+    const matches = await Promise.all(
+      bundled
+        .filter((message) => !message.isCustom)
+        .map(async (message) =>
+          wanted.has(await bundledMessageKey(message.text)) ? message.id : null
         )
-      )
     );
-
-    const tx = this.db!.transaction('message-favorites', 'readwrite');
-    void tx.done.catch(() => {});
-    const current = await tx.store.index('by-user').getAll(userId);
-    for (const entry of current) {
-      if (favorite.get(entry.messageId) === false) {
-        await tx.store.delete([entry.messageId, userId]);
-      }
-    }
-    for (const [messageId, isFavorite] of favorite) {
-      if (isFavorite) await tx.store.put({ messageId, userId });
-    }
-    await tx.done;
-  }
-
-  /**
-   * Delete every favorite `userId` holds — of bundled and custom rows alike.
-   * Called on sign-out with the OUTGOING account; other accounts' favorites
-   * and every message row are untouched. Local only: the server keeps them,
-   * and the next signed-in refresh mirrors them back. Throws on failure.
-   */
-  async deleteFavoritesForUser(userId: string): Promise<void> {
-    if (!userId) throw new Error('Deleting favorites requires an owner');
-    await this.init();
-    const tx = this.db!.transaction('message-favorites', 'readwrite');
-    void tx.done.catch(() => {});
-    const keys = await tx.store.index('by-user').getAllKeys(userId);
-    for (const key of keys) await tx.store.delete(key);
-    await tx.done;
+    return matches.filter((id): id is number => id !== null);
   }
 
   // Bulk operations

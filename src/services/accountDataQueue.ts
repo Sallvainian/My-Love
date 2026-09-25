@@ -17,9 +17,9 @@
  * stalled task finish later, beside its successor, and erase that write.
  *
  * A task must not call another queued function, or it waits on itself
- * forever; queued entry points are the leaf writes
- * (`storageService.toggleFavorite`, `customMessageService` create / update /
- * delete, the anniversary actions) and the two refreshes.
+ * forever; queued entry points are the leaf writes (the `messagesSlice`
+ * favorite toggle and custom-message create / update / delete, the anniversary
+ * actions) and the two refreshes.
  *
  * @module services/accountDataQueue
  */

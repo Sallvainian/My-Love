@@ -27,7 +27,7 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { ACCOUNT_OWNER_STORAGE_KEY, signedOutState } from '../../../src/stores/slices/authSlice';
 import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
-import { openMyLoveDB } from '../../../src/services/dbSchema';
+import { MESSAGE_DATA_COPY_KIND, openMyLoveDB } from '../../../src/services/dbSchema';
 
 const EXPECTED_RESET: Record<string, unknown> = {
   moods: [],
@@ -636,8 +636,8 @@ describe('clearAuth on sign-out', () => {
 
   /**
    * Seed the device the way a shared phone looks: the outgoing account's local
-   * copy, custom row, favorites and an unsynced mood, beside another account's
-   * data and the unowned rows (bundled daily, legacy custom) nobody owns.
+   * copies (custom messages and favorites among them) and an unsynced mood,
+   * beside another account's data and the bundled daily row nobody owns.
    */
   async function seedDevice(outgoing: string) {
     await writeLocalCopy(outgoing, 'anniversaries', [
@@ -660,27 +660,38 @@ describe('clearAuth on sign-out', () => {
       const bundledId = await db.add('messages', {
         text: SHARED_DAILY_TEXT, category: 'reason', isCustom: false, createdAt: at,
       } as never);
-      const legacyId = await db.add('messages', {
-        text: 'LEGACY-UNOWNED', category: 'custom', isCustom: true, createdAt: at,
-      } as never);
-      const ownId = await db.add('messages', {
-        text: SECRETS.customMessage, category: 'custom', isCustom: true, userId: outgoing,
-        serverId: 'srv-own', createdAt: at,
-      } as never);
-      const otherId = await db.add('messages', {
-        text: 'OTHER-CUSTOM', category: 'custom', isCustom: true, userId: 'OTHER-ACCOUNT',
-        serverId: 'srv-other', createdAt: at,
-      } as never);
-      await db.put('message-favorites', { messageId: bundledId, userId: outgoing });
-      await db.put('message-favorites', { messageId: ownId, userId: outgoing });
-      await db.put('message-favorites', { messageId: bundledId, userId: 'OTHER-ACCOUNT' });
+      const ownId = 900;
+      const otherId = 901;
+      const customRow = (id: number, userId: string, text: string, serverId: string) => ({
+        id, text, category: 'custom', isCustom: true, userId, serverId, isFavorite: true, createdAt: at,
+      });
+      await db.put('local-copies', {
+        userId: outgoing,
+        kind: MESSAGE_DATA_COPY_KIND,
+        value: {
+          custom: [customRow(ownId, outgoing, SECRETS.customMessage, 'srv-own')],
+          bundledFavoriteIds: [bundledId],
+          nextCustomId: ownId + 1,
+        },
+        savedAt: 1,
+      });
+      await db.put('local-copies', {
+        userId: 'OTHER-ACCOUNT',
+        kind: MESSAGE_DATA_COPY_KIND,
+        value: {
+          custom: [customRow(otherId, 'OTHER-ACCOUNT', 'OTHER-CUSTOM', 'srv-other')],
+          bundledFavoriteIds: [bundledId],
+          nextCustomId: otherId + 1,
+        },
+        savedAt: 1,
+      });
       const { id: _seedId, ...pendingMood } = moodEntry(outgoing, SECRETS.ownNote);
       const moodId = await db.add('moods', {
         ...pendingMood,
         date: '2026-08-04',
         synced: false,
       } as never);
-      return { bundledId, legacyId, ownId, otherId, moodId };
+      return { bundledId, ownId, otherId, moodId };
     } finally {
       db.close();
     }
@@ -697,8 +708,8 @@ describe('clearAuth on sign-out', () => {
       const db = await openMyLoveDB();
       try {
         expect(await db.get('image-cache', [outgoing, 'partner/pic.jpg'])).toBeUndefined();
-        expect(await db.get('messages', ids.ownId)).toBeUndefined();
-        expect(await db.getAllFromIndex('message-favorites', 'by-user', outgoing)).toEqual([]);
+        // Custom messages and favorites go with the message-data copy.
+        expect(await db.get('local-copies', [outgoing, MESSAGE_DATA_COPY_KIND])).toBeUndefined();
       } finally {
         db.close();
       }
@@ -711,11 +722,12 @@ describe('clearAuth on sign-out', () => {
         blob: 'OTHER-IMAGE',
       });
       expect(await db.get('messages', ids.bundledId)).toBeDefined();
-      expect(await db.get('messages', ids.legacyId)).toBeDefined();
-      expect(await db.get('messages', ids.otherId)).toBeDefined();
-      expect(await db.getAllFromIndex('message-favorites', 'by-user', 'OTHER-ACCOUNT')).toEqual([
-        { messageId: ids.bundledId, userId: 'OTHER-ACCOUNT' },
-      ]);
+      expect(
+        (await db.get('local-copies', ['OTHER-ACCOUNT', MESSAGE_DATA_COPY_KIND]))?.value
+      ).toMatchObject({
+        custom: [expect.objectContaining({ id: ids.otherId, text: 'OTHER-CUSTOM' })],
+        bundledFavoriteIds: [ids.bundledId],
+      });
       // …and the outgoing account's unsynced mood, a queued write, survives.
       expect(await db.get('moods', ids.moodId)).toMatchObject({ synced: false });
     } finally {
@@ -727,7 +739,7 @@ describe('clearAuth on sign-out', () => {
     const db = await openMyLoveDB();
     try {
       await Promise.all(
-        (['moods', 'local-copies', 'image-cache', 'messages', 'message-favorites'] as const).map((store) =>
+        (['moods', 'local-copies', 'image-cache', 'messages'] as const).map((store) =>
           db.clear(store)
         )
       );
@@ -736,7 +748,7 @@ describe('clearAuth on sign-out', () => {
     }
   }
 
-  it("deletes the outgoing account's local copies, cached images, custom rows and favorites, and nothing else", async () => {
+  it("deletes the outgoing account's local copies (custom messages and favorites included) and cached images, and nothing else", async () => {
     // CAP-7: another account on the device keeps its data, and the outgoing
     // account's unsynced mood — a queued write — survives for its next sign-in.
     const ids = await seedDevice(SECRETS.userId);
@@ -821,8 +833,12 @@ describe('clearAuth on sign-out', () => {
     expect(await readLocalCopy(SECRETS.userId, 'anniversaries')).not.toBeNull();
     const db = await openMyLoveDB();
     try {
-      expect(await db.get('messages', ids.ownId)).toBeDefined();
-      expect(await db.getAllFromIndex('message-favorites', 'by-user', SECRETS.userId)).toHaveLength(2);
+      expect(
+        (await db.get('local-copies', [SECRETS.userId, MESSAGE_DATA_COPY_KIND]))?.value
+      ).toMatchObject({
+        custom: [expect.objectContaining({ id: ids.ownId })],
+        bundledFavoriteIds: [ids.bundledId],
+      });
     } finally {
       db.close();
     }

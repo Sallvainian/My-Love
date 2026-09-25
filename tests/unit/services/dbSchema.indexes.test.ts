@@ -35,7 +35,7 @@ describe('dbSchema - Index Integrity', () => {
     openDbs.length = 0;
   });
 
-  it('[P0] should have a non-unique by-user index on messages store', async () => {
+  it('[P0] should have only the bundled-row indexes on the messages store', async () => {
     // GIVEN: Fresh database install
     const db = await openTestDb();
 
@@ -43,13 +43,9 @@ describe('dbSchema - Index Integrity', () => {
     const tx = db.transaction('messages', 'readonly');
     const store = tx.objectStore('messages');
 
-    // THEN: the owner index exists and is keyed on `userId`. NOT unique — one
-    // account owns many custom rows, and the bundled daily rows carry no
-    // `userId` at all, so IndexedDB leaves them out of the index entirely.
-    expect(store.indexNames.contains('by-user')).toBe(true);
-    const index = store.index('by-user');
-    expect(index.unique).toBe(false);
-    expect(index.keyPath).toBe('userId');
+    // THEN: the store holds the bundled daily rows only (v15), so there is no
+    // owner index; custom rows live in each account's message-data local copy.
+    expect(Array.from(store.indexNames).sort()).toEqual(['by-category', 'by-date']);
   });
 
   it('[P0] should have unique by-user-date index on moods store', async () => {

@@ -59,9 +59,11 @@ import {
   type ServerAnniversary,
 } from '../../services/anniversariesService';
 import { coupleSettingsService } from '../../services/coupleSettingsService';
+import { readMessageData } from '../../services/customMessageService';
 import { toDateOnlyOrNull } from '../../services/eventsService';
 import { type OwnProfile, profileService } from '../../services/profileService';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
+import { projectMessageFavorites } from '../../services/messageFavorites';
 import { storageService } from '../../services/storage';
 import type { Anniversary, Settings } from '../../types';
 import { logger } from '../../utils/logger';
@@ -404,14 +406,13 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         // Initialize IndexedDB
         await storageService.init();
 
-        // Load messages from IndexedDB — shared daily rows plus this account's
-        // own custom rows. The seeding decision below reads the same list, and
-        // still works when nobody is signed in: the daily rows are shared, so
-        // their absence is what marks an unseeded database.
-        const storedMessages = await storageService.getAllMessages(requestedBy);
+        // The bundled daily rows are shared, so their absence is what marks an
+        // unseeded database; the store holds nothing else (custom messages and
+        // favorites live in each account's `message-data` local copy).
+        let bundled = await storageService.getAllMessages();
 
         // If no messages exist, populate with default messages
-        if (storedMessages.length === 0) {
+        if (bundled.length === 0) {
           const defaultMessages = await loadDefaultMessages();
           const messagesToAdd = defaultMessages.map((msg) => ({
             ...msg,
@@ -423,27 +424,20 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
           await storageService.addMessages(messagesToAdd);
 
           // Reload messages from IndexedDB to get auto-generated IDs
-          const messagesWithIds = await storageService.getAllMessages(requestedBy);
+          bundled = await storageService.getAllMessages();
+        }
 
-          if (stillCurrent()) {
-            set((state) => ({
-              messages: messagesWithIds,
-              messageHistory: {
-                ...state.messageHistory,
-                favoriteIds: messagesWithIds
-                  .filter((message) => message.isFavorite)
-                  .map((message) => message.id),
-              },
-            }));
-          }
-        } else if (stillCurrent()) {
+        // The rotation pool: the bundled rows plus this account's saved copy,
+        // so a signed-in start shows its custom messages and favorites offline.
+        const copy = requestedBy && stillCurrent() ? await readMessageData(requestedBy) : null;
+
+        if (stillCurrent()) {
+          const pool = projectMessageFavorites(bundled, copy);
           set((state) => ({
-            messages: storedMessages,
+            messages: pool,
             messageHistory: {
               ...state.messageHistory,
-              favoriteIds: storedMessages
-                .filter((message) => message.isFavorite)
-                .map((message) => message.id),
+              favoriteIds: pool.filter((message) => message.isFavorite).map((message) => message.id),
             },
           }));
         }
