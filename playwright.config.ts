@@ -171,8 +171,8 @@ export default defineConfig({
   ],
 
   // Run local dev server before tests.
-  // --mode test makes Vite load .env.test (plain-text local Supabase values)
-  // which overrides the encrypted production credentials in .env.local.
+  // --mode test makes Vite load .env.test (plain-text local Supabase values);
+  // the encrypted production credentials live in fnox.toml, not in any .env file.
   // In CI, set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY directly.
   webServer: {
     command: 'npx vite --mode test',
