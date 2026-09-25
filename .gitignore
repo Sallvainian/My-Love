@@ -127,6 +127,8 @@ _bmad/*
 .worktrees/
 .security-key
 logs/security/
+CLAUDE.md
+AGENTS.md
 
 # Working directories (image generation, temp files)
 output/
