@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { create } from 'zustand';
 import type { SettingsSlice } from '../../../src/stores/slices/settingsSlice';
+import { projectMessageFavorites } from '../../../src/services/messageFavorites';
 import type { Message } from '../../../src/types';
 
 const mockStorageService = {
@@ -142,11 +143,16 @@ const buildTestStore = async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       loadMessagesRequestedBy.push(requestedBy);
       try {
-        const messages = await mockStorageService.getAllMessages(requestedBy);
+        // Same reads as production: the shared bundled rows, plus the copy of
+        // the account that raised the load.
+        const [bundled, copy] = await Promise.all([
+          mockStorageService.getAllMessages(),
+          requestedBy ? mockReadMessageData(requestedBy) : Promise.resolve(null),
+        ]);
         if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) {
           return;
         }
-        set({ messages });
+        set({ messages: projectMessageFavorites(bundled, copy) });
       } catch (error) {
         console.error('[MessagesSlice] Failed to load messages:', error);
       }
@@ -286,15 +292,17 @@ describe('createSettingsSlice initializeApp', () => {
     // Handoff was issued under C, but its write has not landed yet.
     expect(loadMessagesRequestedBy).toEqual([USER_C]);
     expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(1);
-    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2, USER_C);
-    // The outgoing account's copy is never read once the session has moved on.
-    expect(mockReadMessageData).not.toHaveBeenCalled();
+    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2);
+    // The handoff reads C's copy; the outgoing account's is never read once
+    // the session has moved on.
+    expect(mockReadMessageData).toHaveBeenCalledWith(USER_C);
+    expect(mockReadMessageData).not.toHaveBeenCalledWith(SIGNED_IN_USER);
 
     const incoming = cIncomingPool();
     handoffRead.settle(incoming);
     await flush();
 
-    expect(store.getState().messages).toEqual(incoming);
+    expect(store.getState().messages).toEqual(unfavorited(incoming));
     expect(store.getState().messages).not.toEqual([]);
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
 
@@ -341,7 +349,7 @@ describe('createSettingsSlice initializeApp', () => {
     handoffRead.settle(incoming);
     await flush();
 
-    expect(store.getState().messages).toEqual(incoming);
+    expect(store.getState().messages).toEqual(unfavorited(incoming));
     expect(store.getState().messages).not.toEqual([]);
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });
@@ -370,13 +378,15 @@ describe('createSettingsSlice initializeApp', () => {
     expect(updateCurrentMessage).not.toHaveBeenCalled();
     expect(store.getState().isLoading).toBe(false);
     expect(loadMessagesRequestedBy).toEqual([null]);
-    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2, null);
+    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2);
+    // Signed out, the handoff reads no account's copy at all.
+    expect(mockReadMessageData).not.toHaveBeenCalled();
 
     const shared = sharedDailyPool();
     handoffRead.settle(shared);
     await flush();
 
-    expect(store.getState().messages).toEqual(shared);
+    expect(store.getState().messages).toEqual(unfavorited(shared));
     expect(store.getState().messages).not.toEqual([]);
     expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);

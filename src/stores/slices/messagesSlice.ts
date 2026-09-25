@@ -65,6 +65,7 @@ import type {
 } from '../../types';
 import { formatDateISO } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
+import { isOnline } from '../../utils/offlineErrorHandler';
 import { getAvailableHistoryDays, getDailyMessage } from '../../utils/messageRotation';
 import type { AppStateCreator } from '../types';
 
@@ -106,10 +107,6 @@ export interface MessagesSlice {
 
 /** Local-copy kind for the account's custom messages and favorites. */
 export { MESSAGE_DATA_COPY_KIND };
-
-function isOnline(): boolean {
-  return typeof navigator === 'undefined' || navigator.onLine;
-}
 
 /** The lowest id a new custom row may take: above every bundled id. */
 function minNewCustomId(bundled: Message[]): number {

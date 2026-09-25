@@ -731,6 +731,60 @@ describe('messages: favorites, custom messages and the message-data copy', () =>
     expect(useAppStore.getState().messageHistory.favoriteIds).not.toContain(id);
   });
 
+  it('two favorite taps in a row commit on, then off', async () => {
+    const bundledText = `TWICE-${A}`;
+    const [id] = await seedBundled([bundledText]);
+    await useAppStore.getState().loadMessages();
+    server.addFavorite.mockResolvedValue(undefined);
+    server.removeFavorite.mockResolvedValue(undefined);
+
+    const first = useAppStore.getState().toggleFavorite(id);
+    const second = useAppStore.getState().toggleFavorite(id);
+    await Promise.all([first, second]);
+
+    const key = await bundledMessageKey(bundledText);
+    expect(server.addFavorite).toHaveBeenCalledWith(A, key);
+    expect(server.removeFavorite).toHaveBeenCalledWith(A, key);
+    expect(server.addFavorite.mock.invocationCallOrder[0]).toBeLessThan(
+      server.removeFavorite.mock.invocationCallOrder[0]
+    );
+    expect((await copyOf(A))?.bundledFavoriteIds).toEqual([]);
+    expect(useAppStore.getState().messageHistory.favoriteIds).not.toContain(id);
+  });
+
+  it('an unreadable copy is rebuilt from what this session shows, never from nothing', async () => {
+    const [favoritedId, tappedId] = await seedBundled([`SHOWN-FAV-${A}`, `SHOWN-TAP-${A}`]);
+    await putCopy(A, {
+      custom: [customRow(BASE, `srv-shown-${A}`, 'shown custom')],
+      bundledFavoriteIds: [favoritedId],
+      nextCustomId: BASE + 1,
+    });
+    await useAppStore.getState().loadMessages();
+    server.addFavorite.mockResolvedValue(undefined);
+
+    // (a) A favorite saved while the copy cannot be read keeps what is shown.
+    copyRead.hook = async () => null;
+    await useAppStore.getState().toggleFavorite(tappedId);
+    copyRead.hook = null;
+
+    let copy = await copyOf(A);
+    expect(copy?.custom.map((row) => [row.id, row.serverId])).toEqual([[BASE, `srv-shown-${A}`]]);
+    expect([...(copy?.bundledFavoriteIds ?? [])].sort()).toEqual([favoritedId, tappedId].sort());
+
+    // (b) A refresh over an unreadable copy keeps the shown row's local id.
+    // One readable refresh first marks the session fresh, so the second one
+    // goes straight to the server instead of re-showing the (unreadable) copy.
+    server.fetchCustomMessages.mockResolvedValue([serverRow(`srv-shown-${A}`, 'shown custom')]);
+    server.fetchFavoriteKeys.mockResolvedValue([]);
+    await useAppStore.getState().loadMessageDataFromServer();
+    copyRead.hook = async () => null;
+    await useAppStore.getState().loadMessageDataFromServer();
+    copyRead.hook = null;
+
+    copy = await copyOf(A);
+    expect(copy?.custom.map((row) => [row.id, row.serverId])).toEqual([[BASE, `srv-shown-${A}`]]);
+  });
+
   it('the refresher no-ops until the bundled rows are seeded', async () => {
     useAppStore.setState({ messages: [] } as StoreState);
 
@@ -931,8 +985,30 @@ describe('messages: favorites, custom messages and the message-data copy', () =>
         ['Mine Already', A],
         ['Theirs', A],
       ]);
-      // A fresh key per imported row.
-      expect(server.createCustomMessage.mock.calls.map((call) => call[2])).toHaveLength(1);
+      // Only the one new row reached the server.
+      expect(server.createCustomMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives each imported row its own key, never one derived from the text', async () => {
+      // A text-derived key would belong to a message edited since its import,
+      // so a re-import would get the edited row back and store nothing.
+      await seedBundled([`IMPORT-KEYS-${A}`]);
+      const file = {
+        version: '1.0',
+        exportDate: '2026-09-12T00:00:00.000Z',
+        messageCount: 2,
+        messages: ['First import', 'Second import'].map((text) => ({
+          text, category: 'custom', active: true, tags: [],
+          createdAt: '2026-08-03T06:00:00.000Z', updatedAt: '2026-08-03T06:00:00.000Z',
+        })),
+      };
+
+      await useAppStore.getState().importCustomMessages(new File([JSON.stringify(file)], 'backup.json'));
+
+      const keys = server.createCustomMessage.mock.calls.map((call) => call[2] as string);
+      expect(keys).toHaveLength(2);
+      expect(new Set(keys).size).toBe(2);
+      expect(keys.some((key) => /^i:/.test(key))).toBe(false);
     });
   });
 });
