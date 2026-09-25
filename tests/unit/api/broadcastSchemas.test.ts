@@ -45,8 +45,14 @@ function mood(overrides: Record<string, unknown> = {}) {
 
 describe('parseLoveNoteBroadcast', () => {
   it('accepts content at both ends of the DB range', () => {
-    expect(parseLoveNoteBroadcast(note({ content: 'x' }), identity)).not.toBeNull();
-    expect(parseLoveNoteBroadcast(note({ content: 'x'.repeat(1000) }), identity)).not.toBeNull();
+    expect(parseLoveNoteBroadcast(note({ content: 'x' }), identity)).toMatchObject({
+      id: NOTE_ID,
+      content: 'x',
+    });
+    expect(parseLoveNoteBroadcast(note({ content: 'x'.repeat(1000) }), identity)).toMatchObject({
+      id: NOTE_ID,
+      content: 'x'.repeat(1000),
+    });
   });
 
   it('accepts a well-formed note from the partner', () => {

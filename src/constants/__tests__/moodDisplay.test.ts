@@ -1,15 +1,37 @@
+import {
+  Angry,
+  Battery,
+  CircleAlert,
+  FaceSlightlySmiling,
+  Flame,
+  Frown,
+  Heart,
+  Meh,
+  MessageCircle,
+  Sparkles,
+  UserMinus,
+  Zap,
+} from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { MOOD_TYPES } from '../../types/moods';
 import { CHALLENGING_MOODS, MOOD_DISPLAY, MOOD_TONE, POSITIVE_MOODS } from '../moodDisplay';
 
 describe('MOOD_DISPLAY', () => {
-  it.each(MOOD_TYPES)('gives %s an icon and a label', (mood) => {
-    const display = MOOD_DISPLAY[mood];
-
-    expect(display).toBeDefined();
-    // lucide icons are forwardRef components (objects), not plain functions.
-    expect(display.icon).toBeTruthy();
-    expect(display.label).toMatch(/^[A-Z][a-z]+$/);
+  it.each([
+    ['loved', Heart, 'Loved'],
+    ['happy', FaceSlightlySmiling, 'Happy'],
+    ['content', Meh, 'Content'],
+    ['excited', Zap, 'Excited'],
+    ['thoughtful', MessageCircle, 'Thoughtful'],
+    ['grateful', Sparkles, 'Grateful'],
+    ['sad', Frown, 'Sad'],
+    ['anxious', CircleAlert, 'Anxious'],
+    ['frustrated', Angry, 'Frustrated'],
+    ['angry', Flame, 'Angry'],
+    ['lonely', UserMinus, 'Lonely'],
+    ['tired', Battery, 'Tired'],
+  ] as const)('gives %s an icon and a label', (mood, icon, label) => {
+    expect(MOOD_DISPLAY[mood]).toEqual({ icon, label });
   });
 
   it('has no entry beyond MOOD_TYPES', () => {

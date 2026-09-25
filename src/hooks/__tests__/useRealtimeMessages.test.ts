@@ -88,6 +88,21 @@ vi.mock('../../stores/useAppStore', () => ({
   }),
 }));
 
+type SubscribeCallback = (status: string, err?: Error) => void;
+
+/**
+ * Fires a channel status through the hook's own subscribe callback. Asserts the
+ * callback was registered first: an optional-chained call would silently do
+ * nothing if the hook stopped subscribing, and the test would still pass.
+ */
+function emitStatus(
+  callback: SubscribeCallback | null | undefined,
+  ...args: [status: string, err?: Error]
+) {
+  expect(callback).toBeTypeOf('function');
+  callback!(...args);
+}
+
 /** A well-formed note from the partner to this user, as the server row looks. */
 function validNote(overrides: Record<string, unknown> = {}) {
   return {
@@ -478,7 +493,7 @@ describe('useRealtimeMessages', () => {
 
       // Simulate CHANNEL_ERROR
       await act(async () => {
-        subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+        emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
       });
 
       // Should schedule retry after 1000ms (base delay)
@@ -512,7 +527,7 @@ describe('useRealtimeMessages', () => {
 
       // Simulate TIMED_OUT
       await act(async () => {
-        subscribeCallback?.('TIMED_OUT');
+        emitStatus(subscribeCallback, 'TIMED_OUT');
       });
 
       // Should schedule retry
@@ -547,7 +562,7 @@ describe('useRealtimeMessages', () => {
       // Simulate 6 consecutive failures (initial + 5 retries)
       for (let i = 0; i < 6; i++) {
         await act(async () => {
-          subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+          emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
         });
 
         // Advance time for exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
@@ -581,7 +596,7 @@ describe('useRealtimeMessages', () => {
       // the config allows, move none of the three counters. A give-up path that
       // still released or re-created a channel fails right here.
       await act(async () => {
-        subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+        emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
       });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(30000);
@@ -615,7 +630,7 @@ describe('useRealtimeMessages', () => {
 
       // Simulate error then success
       await act(async () => {
-        subscribeCallback?.('CHANNEL_ERROR');
+        emitStatus(subscribeCallback, 'CHANNEL_ERROR');
       });
 
       await act(async () => {
@@ -624,12 +639,12 @@ describe('useRealtimeMessages', () => {
 
       // Now simulate successful subscription (2 subscribe calls now)
       await act(async () => {
-        subscribeCallback?.('SUBSCRIBED');
+        emitStatus(subscribeCallback, 'SUBSCRIBED');
       });
 
       // Simulate another error - retry count should be reset
       await act(async () => {
-        subscribeCallback?.('CHANNEL_ERROR');
+        emitStatus(subscribeCallback, 'CHANNEL_ERROR');
       });
 
       await act(async () => {
@@ -668,7 +683,7 @@ describe('useRealtimeMessages', () => {
       // during the replacement round-trip, and a note missed live is never
       // re-fetched -- nothing reloads on a realtime miss.
       await act(async () => {
-        subscribeCallback?.('SUBSCRIBED');
+        emitStatus(subscribeCallback, 'SUBSCRIBED');
         await vi.runOnlyPendingTimersAsync();
       });
 
@@ -677,7 +692,7 @@ describe('useRealtimeMessages', () => {
       // A reconnect re-joins, and RLS is re-evaluated there; the relationship
       // may have changed while the channel was down.
       await act(async () => {
-        subscribeCallback?.('SUBSCRIBED');
+        emitStatus(subscribeCallback, 'SUBSCRIBED');
         await vi.runOnlyPendingTimersAsync();
       });
 
@@ -713,7 +728,7 @@ describe('useRealtimeMessages', () => {
       expect(mocks.getPartnerId).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        subscribeCallback?.('SUBSCRIBED');
+        emitStatus(subscribeCallback, 'SUBSCRIBED');
         await vi.runOnlyPendingTimersAsync();
       });
 
@@ -752,14 +767,14 @@ describe('useRealtimeMessages', () => {
 
       // First SUBSCRIBED consumes the fresh pre-join snapshot without refetching.
       await act(async () => {
-        subscribeCallback?.('SUBSCRIBED');
+        emitStatus(subscribeCallback, 'SUBSCRIBED');
         await vi.runOnlyPendingTimersAsync();
       });
 
       // The socket drops and rejoins; every attempt of the refresh fails.
       mocks.getPartnerId.mockRejectedValueOnce(new Error('network down'));
       await act(async () => {
-        subscribeCallback?.('SUBSCRIBED');
+        emitStatus(subscribeCallback, 'SUBSCRIBED');
         await vi.runOnlyPendingTimersAsync();
       });
 
@@ -803,7 +818,7 @@ describe('useRealtimeMessages', () => {
 
       const note = validNote();
       await act(async () => {
-        subscribeCallback?.('SUBSCRIBED');
+        emitStatus(subscribeCallback, 'SUBSCRIBED');
         // No timer flush between the join and the note: it lands in the very
         // window a first-join refresh would have opened.
         broadcastHandler?.({ payload: { message: note } });
@@ -838,7 +853,7 @@ describe('useRealtimeMessages', () => {
       });
 
       await act(async () => {
-        subscribeCallbacks[0]?.('CHANNEL_ERROR');
+        emitStatus(subscribeCallbacks[0], 'CHANNEL_ERROR');
       });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1000);
@@ -864,7 +879,7 @@ describe('useRealtimeMessages', () => {
 
       const partnerLookupsBefore = mocks.getPartnerId.mock.calls.length;
       await act(async () => {
-        subscribeCallbacks[1]?.('SUBSCRIBED');
+        emitStatus(subscribeCallbacks[1], 'SUBSCRIBED');
         await vi.runOnlyPendingTimersAsync();
       });
 
@@ -875,7 +890,7 @@ describe('useRealtimeMessages', () => {
       // And the counter was reset, so the next failure starts the backoff over
       // rather than continuing toward the five-retry give-up.
       await act(async () => {
-        subscribeCallbacks[1]?.('CHANNEL_ERROR');
+        emitStatus(subscribeCallbacks[1], 'CHANNEL_ERROR');
       });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1000);
@@ -902,14 +917,14 @@ describe('useRealtimeMessages', () => {
       expect(mockChannel.subscribe).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+        emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
       });
 
       // The SDK runs its own rejoin loop on an errored channel, so the channel
       // can come back on its own INSIDE our backoff window.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(400);
-        subscribeCallback?.('SUBSCRIBED');
+        emitStatus(subscribeCallback, 'SUBSCRIBED');
         await vi.runOnlyPendingTimersAsync();
       });
 
@@ -952,7 +967,7 @@ describe('useRealtimeMessages', () => {
       expect(first.subscribe).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+        emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
       });
 
       // Park the retry inside its own setAuth. This is the window the
@@ -976,7 +991,7 @@ describe('useRealtimeMessages', () => {
       // (@supabase/phoenix assets/js/phoenix/socket.js:137).
       await act(async () => {
         first.state = 'joined';
-        subscribeCallback?.('SUBSCRIBED');
+        emitStatus(subscribeCallback, 'SUBSCRIBED');
         releaseAuth();
         await vi.runOnlyPendingTimersAsync();
       });
@@ -1021,7 +1036,7 @@ describe('useRealtimeMessages', () => {
       expect(supabase.channel).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+        emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
       });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1000);
@@ -1081,7 +1096,7 @@ describe('useRealtimeMessages', () => {
         mocks.setAuth.mockRejectedValueOnce(tokenFailure);
 
         await act(async () => {
-          subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+          emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
         });
         await act(async () => {
           await vi.advanceTimersByTimeAsync(1000);
@@ -1118,7 +1133,7 @@ describe('useRealtimeMessages', () => {
         // normally — at 2000ms, the second step of the backoff, since the
         // attempt that failed still spent one of the five.
         await act(async () => {
-          subscribeCallback?.('CHANNEL_ERROR', new Error('Connection failed'));
+          emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
         });
         await act(async () => {
           await vi.advanceTimersByTimeAsync(2000);
@@ -1165,7 +1180,7 @@ describe('useRealtimeMessages', () => {
 
       // Trigger error to schedule retry
       await act(async () => {
-        subscribeCallback?.('CHANNEL_ERROR');
+        emitStatus(subscribeCallback, 'CHANNEL_ERROR');
       });
 
       // Unmount before retry timer fires

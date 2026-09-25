@@ -37,8 +37,9 @@ describe('getRelativeTime', () => {
   });
 
   it('returns formatted date for timestamps > 1 day ago', () => {
-    const timestamp = new Date(Date.now() - 3 * 86400000).toISOString();
-    expect(getRelativeTime(timestamp)).toMatch(/^[A-Z][a-z]{2} \d{1,2}$/); // e.g., "Nov 29"
+    vi.setSystemTime(new Date(2026, 2, 15, 12, 0, 0));
+    const timestamp = new Date(2026, 2, 12, 12, 0, 0).toISOString();
+    expect(getRelativeTime(timestamp)).toBe('Mar 12');
   });
 
   it('does not say "Yesterday" for a mood two calendar days old', () => {

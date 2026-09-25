@@ -57,7 +57,11 @@ test.describe('Profile name and email ownership', () => {
     // Premise: the trigger seeded this row from the email, because
     // createOutsiderClient supplies no display_name metadata. Without this the
     // "name changed" assertion below could pass against a row that already read
-    // that way.
+    // that way. The read is checked first, so a failed read cannot pass the
+    // premise as undefined === undefined.
+    expect(seeded.error).toBeNull();
+    expect(seeded.data).not.toBeNull();
+    expect(seeded.data?.email).toEqual(expect.any(String));
     expect(seeded.data?.display_name).toBe(seeded.data?.email);
     const seededEmail = seeded.data?.email;
 

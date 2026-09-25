@@ -25,8 +25,10 @@
  * (realtime v2.124.4, supabase_realtime_My-Love, 2026-09-12). The REST endpoint
  * evaluates the same INSERT policy without requiring a join. Note also that the
  * SDK's `send()` falls back to that endpoint when the channel is not joined but
- * swallows the denial and resolves 'ok'; `httpSend` rejects. That difference is
- * asserted below, so a regression back to `send()` fails here.
+ * swallows the denial and resolves 'ok'; `httpSend` rejects. Both halves are
+ * asserted below. That pins that `send()` hides the denial from its caller —
+ * the reason the app sends with `httpSend` — but this file cannot catch the
+ * app switching back to `send()`, because it drives the SDK directly.
  *
  * Every client here is SESSION-based — signed in, then `realtime.setAuth()`
  * with no argument — because that is what the app does. Handing `setAuth` an
@@ -289,15 +291,15 @@ test.describe('Couple broadcast authorization', () => {
       ).rejects.toThrow(/Unauthorized/);
 
       // The SDK's `send()` reaches the same endpoint but reports 'ok' whatever
-      // the endpoint answered. Nothing must be delivered by that path either —
-      // this is why the app uses httpSend, and why a regression to send() would
-      // hide the denial from the caller.
+      // the endpoint answered: pinned here, so the denial it hides is measured
+      // rather than logged. Nothing must be delivered by that path either —
+      // this is why the app uses httpSend.
       const legacyResult = await forged.send({
         type: 'broadcast',
         event: 'new_message',
         payload: { message: { id: 'forged-2', content: 'forged' } },
       });
-      log.info(`Forged legacy send() reported: ${legacyResult}`);
+      expect(legacyResult, 'the SDK send() no longer reports ok on a denied forge').toBe('ok');
       await forger.removeChannel(forged);
 
       await new Promise((resolve) => setTimeout(resolve, NON_DELIVERY_GRACE_MS));
@@ -422,7 +424,7 @@ test.describe('Couple broadcast authorization', () => {
         event: 'new_message',
         payload: { message: { id: 'injected-ws', content: 'injected' } },
       });
-      log.info(`Anon public websocket send reported: ${publicSend}`);
+      expect(publicSend, 'the anon public websocket send no longer reports ok').toBe('ok');
 
       // The bulk REST route, with nothing but the publishable key. Both headers
       // are required: without `Authorization` the route answers 500 before it
@@ -445,7 +447,9 @@ test.describe('Couple broadcast authorization', () => {
           ],
         }),
       });
-      log.info(`Anon REST broadcast returned: ${restResponse.status}`);
+      // 202, not the 500 a missing header gives: the route accepted the body,
+      // so the non-delivery below is measured against a message it took.
+      expect(restResponse.status, 'the anon REST broadcast was not accepted').toBe(202);
 
       await new Promise((resolve) => setTimeout(resolve, NON_DELIVERY_GRACE_MS));
       // Both public paths report success — 'ok' and 202 — and neither is

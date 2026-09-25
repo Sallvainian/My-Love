@@ -117,14 +117,16 @@ describe('sanitizeInput', () => {
 
 describe('INTERACTION_ERRORS', () => {
   it('contains all expected error keys', () => {
-    expect(INTERACTION_ERRORS).toHaveProperty('NO_PARTNER');
-    expect(INTERACTION_ERRORS).toHaveProperty('INVALID_UUID');
-    expect(INTERACTION_ERRORS).toHaveProperty('INVALID_TYPE');
-    expect(INTERACTION_ERRORS).toHaveProperty('NETWORK_ERROR');
-    expect(INTERACTION_ERRORS).toHaveProperty('AUTH_ERROR');
-    expect(INTERACTION_ERRORS).toHaveProperty('RATE_LIMIT');
-    expect(INTERACTION_ERRORS).toHaveProperty('SERVER_ERROR');
-    expect(INTERACTION_ERRORS).toHaveProperty('UNKNOWN_ERROR');
+    expect(INTERACTION_ERRORS).toEqual({
+      NO_PARTNER: 'No partner configured. Please set up your partner in settings.',
+      INVALID_UUID: 'Invalid partner ID format.',
+      INVALID_TYPE: 'Invalid interaction type.',
+      NETWORK_ERROR: 'Network error. Please check your connection and try again.',
+      AUTH_ERROR: 'Authentication error. Please refresh the page and try again.',
+      RATE_LIMIT: 'Too many requests. Please wait a moment before trying again.',
+      SERVER_ERROR: 'Server error. Please try again later.',
+      UNKNOWN_ERROR: 'An unexpected error occurred. Please try again.',
+    });
   });
 });
 

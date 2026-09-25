@@ -419,7 +419,10 @@ describe('eventsService', () => {
       expect(backend.queries).toHaveLength(4);
     });
 
-    it.each(['2026-09-11', '2026-09-12'])('preserves microseconds and ID ties across the %s boundary', async (eventDate) => {
+    it.each([
+      ['2026-09-11', 'past', 'upcoming'],
+      ['2026-09-12', 'upcoming', 'past'],
+    ] as const)('preserves microseconds and ID ties across the %s boundary', async (eventDate, window, otherWindow) => {
       backend.rows = Array.from({ length: 103 }, (_, index) => row({
         id: `event-${String(index).padStart(3, '0')}`,
         event_date: eventDate,
@@ -427,7 +430,9 @@ describe('eventsService', () => {
         created_at: `2026-08-18T00:00:00.123${String(Math.floor(index / 2)).padStart(3, '0')}+00:00`,
       })).reverse();
       const first = await eventsService.getEventsPage();
-      const cursor = (eventDate < first.pagination.todayISO ? first.pagination.past : first.pagination.upcoming).cursor!;
+      expect(first.pagination.todayISO).toBe('2026-09-12');
+      expect(first.pagination[otherWindow]).toMatchObject({ hasMore: false, cursor: null });
+      const cursor = first.pagination[window].cursor!;
       expect(cursor.created_at).toMatch(/\.123\d{3}\+00:00/);
       const second = await eventsService.getEventsPage(first.pagination);
       const third = await eventsService.getEventsPage(second.pagination);

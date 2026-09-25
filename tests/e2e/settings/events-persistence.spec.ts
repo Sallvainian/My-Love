@@ -94,20 +94,8 @@ function longForm(isoDate: string): string {
   return formatDateLong(localDateFromIso(isoDate));
 }
 
-/**
- * Create one event through the Settings form and wait for the write itself.
- *
- * The POST is observed with `interceptNetworkCall` declared BEFORE the submit
- * click (network-first), so the create is confirmed at the wire before any DOM
- * assertion runs. `events-crud.spec.ts:185,227,258` uses `page.waitForResponse`
- * for this — a recorded pre-existing deviation; the same file does it the
- * correct way at :414-426, which is what this follows.
- */
-async function addEventThroughForm(
-  page: Page,
-  interceptNetworkCall: InterceptNetworkCallFn,
-  input: { label: string; isoDate: string; description?: string; icon?: EventIconValue }
-): Promise<void> {
+/** Open the Settings add form and fill the two required fields. */
+async function openAddEventForm(page: Page, input: { label: string; isoDate: string }): Promise<void> {
   await log.step(`Add "${input.label}" through the Settings form`);
 
   await page.getByTestId('events-settings-add').click();
@@ -115,18 +103,35 @@ async function addEventThroughForm(
 
   await page.getByTestId('events-form-label').fill(input.label);
   await page.getByTestId('events-form-date').fill(input.isoDate);
+}
 
-  if (input.description !== undefined) {
-    await page.getByTestId('events-form-description').fill(input.description);
-  }
+/** Pick an icon in the open form and confirm its radio is the checked one. */
+async function pickEventIcon(page: Page, icon: EventIconValue): Promise<void> {
+  // The radio itself is sr-only; the styled label is the control a pointer
+  // user actually hits, and it carries its own testid for exactly this.
+  await page.getByTestId(`events-form-icon-option-${icon}`).click();
+  await expect(page.getByTestId(`events-form-icon-${icon}`)).toBeChecked();
+}
 
-  if (input.icon !== undefined) {
-    // The radio itself is sr-only; the styled label is the control a pointer
-    // user actually hits, and it carries its own testid for exactly this.
-    await page.getByTestId(`events-form-icon-option-${input.icon}`).click();
-    await expect(page.getByTestId(`events-form-icon-${input.icon}`)).toBeChecked();
-  }
+/** Fill the optional description in the open form. */
+async function fillEventDescription(page: Page, description: string): Promise<void> {
+  await page.getByTestId('events-form-description').fill(description);
+}
 
+/**
+ * Submit the open add form and wait for the write itself.
+ *
+ * The POST is observed with `interceptNetworkCall` declared BEFORE the submit
+ * click (network-first), so the create is confirmed at the wire before any DOM
+ * assertion runs. `events-crud.spec.ts:185,227,258` uses `page.waitForResponse`
+ * for this — a recorded pre-existing deviation; the same file does it the
+ * correct way at :414-426, which is what this follows.
+ */
+async function submitNewEvent(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  label: string
+): Promise<void> {
   const createCall = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/events*' });
   await page.getByTestId('events-form-submit').click();
 
@@ -136,7 +141,7 @@ async function addEventThroughForm(
   // The form closes only on a successful write, so its absence is the second
   // layer under the wire confirmation above.
   await expect(page.getByTestId('events-form')).toHaveCount(0);
-  await expect(rowFor(page, input.label)).toBeVisible();
+  await expect(rowFor(page, label)).toBeVisible();
 }
 
 /** Open Settings from a cold start, with the welcome splash already dismissed. */
@@ -172,11 +177,9 @@ test.describe('An event survives the round trip through the server', () => {
 
     // GIVEN / WHEN: an event created through the Settings form with icon `ring`
     await openSettings(page);
-    await addEventThroughForm(page, interceptNetworkCall, {
-      label: ICON_LABEL,
-      isoDate,
-      icon: 'ring',
-    });
+    await openAddEventForm(page, { label: ICON_LABEL, isoDate });
+    await pickEventIcon(page, 'ring');
+    await submitNewEvent(page, interceptNetworkCall, ICON_LABEL);
 
     // WHEN: the page is reloaded, so the list can only come from the server
     await log.step('Reload /settings so the list comes back from the server');
@@ -240,18 +243,12 @@ test.describe('An event survives the round trip through the server', () => {
     // Created deliberately out of chronological order: late, then soon, then
     // mid. Creation order and `created_at` order therefore both disagree with
     // date order, so a list that echoed either would fail below.
-    await addEventThroughForm(page, interceptNetworkCall, {
-      label: ORDER_LATE_LABEL,
-      isoDate: lateDate,
-    });
-    await addEventThroughForm(page, interceptNetworkCall, {
-      label: ORDER_SOON_LABEL,
-      isoDate: soonDate,
-    });
-    await addEventThroughForm(page, interceptNetworkCall, {
-      label: ORDER_MID_LABEL,
-      isoDate: midDate,
-    });
+    await openAddEventForm(page, { label: ORDER_LATE_LABEL, isoDate: lateDate });
+    await submitNewEvent(page, interceptNetworkCall, ORDER_LATE_LABEL);
+    await openAddEventForm(page, { label: ORDER_SOON_LABEL, isoDate: soonDate });
+    await submitNewEvent(page, interceptNetworkCall, ORDER_SOON_LABEL);
+    await openAddEventForm(page, { label: ORDER_MID_LABEL, isoDate: midDate });
+    await submitNewEvent(page, interceptNetworkCall, ORDER_MID_LABEL);
 
     // WHEN: the page is reloaded
     // THEN: the rows render in event_date order, not the order they were created in
@@ -292,11 +289,9 @@ test.describe('Clearing an optional field', () => {
     const isoDate = isoDateDaysFromNow(18);
 
     await openSettings(page);
-    await addEventThroughForm(page, interceptNetworkCall, {
-      label: DESCRIPTION_LABEL,
-      isoDate,
-      description: DESCRIPTION_TEXT,
-    });
+    await openAddEventForm(page, { label: DESCRIPTION_LABEL, isoDate });
+    await fillEventDescription(page, DESCRIPTION_TEXT);
+    await submitNewEvent(page, interceptNetworkCall, DESCRIPTION_LABEL);
 
     const createdRow = rowFor(page, DESCRIPTION_LABEL);
     await expect(createdRow.locator('[data-testid^="event-description-"]')).toHaveText(

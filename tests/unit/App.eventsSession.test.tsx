@@ -398,7 +398,13 @@ describe('Auth bootstrap notification ownership', () => {
     expect(screen.getByText('Sign in')).toBeInTheDocument();
   });
 
-  it.each([true, false])('preserves same-user updates and display-name handling (has name: %s)', async (hasDisplayName) => {
+  // The session metadata is deliberately the OPPOSITE of what the profile says,
+  // so a regression that reads the gate back off the session fails both cases
+  // rather than passing one by luck.
+  async function sameUserUpdate(
+    metadata: Record<string, string>,
+    profileResult: { status: 'chosen'; displayName: string } | { status: 'unset' }
+  ) {
     const lookup = deferred<Session | null>();
     auth.getSession.mockReturnValueOnce(lookup.promise);
     const { requests, loadEvents } = controlHomeLoads();
@@ -407,13 +413,8 @@ describe('Auth bootstrap notification ownership', () => {
     const ownership = useAppStore.getState().authSessionVersion;
     const updated = session('updated-token');
     updated.user.email = 'updated@example.com';
-    // Deliberately the OPPOSITE of what the profile says, so a regression that
-    // reads the gate back off the session fails both halves of this case rather
-    // than passing one by luck.
-    updated.user.user_metadata = hasDisplayName ? {} : { display_name: 'Metadata Name' };
-    profile.lookupOwnDisplayName.mockResolvedValue(
-      hasDisplayName ? { status: 'chosen', displayName: 'Updated Name' } : { status: 'unset' }
-    );
+    updated.user.user_metadata = metadata;
+    profile.lookupOwnDisplayName.mockResolvedValue(profileResult);
 
     await act(async () => {
       // Even a notification delivered after resolution but before the awaited
@@ -428,43 +429,55 @@ describe('Auth bootstrap notification ownership', () => {
     });
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
     expect(loadEvents).toHaveBeenCalledTimes(1);
-    if (hasDisplayName) {
-      expect(screen.getByTestId('app-container')).toBeInTheDocument();
-      expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
-    } else {
-      expect(screen.getByText('Set your display name')).toBeInTheDocument();
-      expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
-    }
+    return { requests };
+  }
+
+  it('preserves same-user updates and display-name handling (has name: true)', async () => {
+    const { requests } = await sameUserUpdate({}, { status: 'chosen', displayName: 'Updated Name' });
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
     await act(async () => requests[0].resolve(success));
-    if (hasDisplayName) {
-      expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
-    }
+    expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
   });
 
-  it.each([true, false])('finishes a rejected lookup while preserving listener state (notified: %s)', async (notified) => {
+  it('preserves same-user updates and display-name handling (has name: false)', async () => {
+    const { requests } = await sameUserUpdate({ display_name: 'Metadata Name' }, { status: 'unset' });
+    expect(screen.getByText('Set your display name')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
+    await act(async () => requests[0].resolve(success));
+    expect(screen.getByText('Set your display name')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('events-empty-placeholder')).not.toBeInTheDocument();
+  });
+
+  async function rejectedLookup(beforeRejection: () => Promise<void>) {
     const lookup = deferred<Session | null>();
     const error = new Error('Initial lookup failed');
     const reportError = vi.spyOn(console, 'error').mockImplementation(() => {});
     auth.getSession.mockReturnValueOnce(lookup.promise);
     controlHomeLoads();
     render(<App />);
-    if (notified) {
-      await act(async () => auth.listener!(session('listener-token')));
-    }
+    await beforeRejection();
     const ownership = useAppStore.getState().authSessionVersion;
 
     await act(async () => lookup.reject(error));
     expect(reportError).toHaveBeenCalledWith('[App] Auth check failed:', error);
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
-    expect(useAppStore.getState()).toMatchObject({
-      userId: notified ? USER_ID : null,
-      authSessionVersion: ownership,
+    return { ownership };
+  }
+
+  it('finishes a rejected lookup while preserving listener state (notified: true)', async () => {
+    const { ownership } = await rejectedLookup(async () => {
+      await act(async () => auth.listener!(session('listener-token')));
     });
-    if (notified) {
-      expect(screen.getByTestId('app-container')).toBeInTheDocument();
-    } else {
-      expect(screen.getByText('Sign in')).toBeInTheDocument();
-    }
+    expect(useAppStore.getState()).toMatchObject({ userId: USER_ID, authSessionVersion: ownership });
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+  });
+
+  it('finishes a rejected lookup while preserving listener state (notified: false)', async () => {
+    const { ownership } = await rejectedLookup(async () => {});
+    expect(useAppStore.getState()).toMatchObject({ userId: null, authSessionVersion: ownership });
+    expect(screen.getByText('Sign in')).toBeInTheDocument();
   });
 
   it.each(['null', 'different-user', 'rejection'] as const)('ignores a cleaned-up effect when its lookup settles with %s', async (outcome) => {

@@ -277,7 +277,9 @@ describe('customMessageService and the message-data copy', () => {
 
     it('refuses an unsupported file', () => {
       const future = { ...exportFile([]), version: '2.0' } as unknown as CustomMessagesExport;
-      expect(() => service.planImport([], future)).toThrow();
+      // The schema accepts only version "1.0", so it refuses the file before
+      // planImport's own version check is reached.
+      expect(() => service.planImport([], future)).toThrow(/^Invalid version\. Please select a valid option\.$/);
     });
   });
 });

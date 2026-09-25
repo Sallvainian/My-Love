@@ -29,14 +29,17 @@ async function loadHistory(page: Page, expectedCount: number) {
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(expectedCount);
 }
 
-async function submitEvent(page: Page, method: 'POST' | 'PATCH', label: string) {
+/** The status PostgREST answers each write with: 201 for an insert, 200 for an update. */
+const SUCCESS_STATUS = { POST: 201, PATCH: 200 } as const;
+
+async function submitEvent(page: Page, method: keyof typeof SUCCESS_STATUS, label: string) {
   const response = page.waitForResponse((reply) =>
     new URL(reply.url()).pathname.endsWith('/rest/v1/events') &&
     reply.request().method() === method
   );
   await page.getByTestId('events-form-submit').click();
   const reply = await response;
-  expect(reply.status()).toBe(method === 'POST' ? 201 : 200);
+  expect(reply.status()).toBe(SUCCESS_STATUS[method]);
   const body = await reply.json() as { id: string } | { id: string }[];
   const saved = Array.isArray(body) ? body[0] : body;
   expect(saved.id).toBeTruthy();
@@ -122,15 +125,15 @@ test('[P0] adds a deep-past date and can load and edit it again after each reloa
   await expect(page.getByTestId('events-form-date')).toHaveValue(savedDate);
 });
 
-for (const size of [0, 50]) {
+for (const { size, rows, empty } of [
+  { size: 0, rows: 0, empty: 1 },
+  { size: 50, rows: 50, empty: 0 },
+]) {
   test(`[P1] ${size} past rows do not advertise another page`, async ({ page, coupleEvents }) => {
     await coupleEvents.seed(history(size));
     await openSettings(page);
-    if (size === 0) {
-      await expect(page.getByTestId('events-settings-empty')).toBeVisible();
-    } else {
-      await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(size);
-    }
+    await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(rows);
+    await expect(page.getByTestId('events-settings-empty')).toHaveCount(empty);
     await expect(page.getByTestId('events-settings-load-more')).toHaveCount(0);
     await expect(page.getByTestId('events-settings-history-notice')).toHaveCount(0);
   });
@@ -163,10 +166,12 @@ test('[P1] tied dates and microseconds stay ordered through repeated pages and H
   const actualIds = await page.locator('[data-testid^="event-row-"]')
     .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-testid')!.slice(10)));
   expect(actualIds).toEqual(expected.map((row) => row.id));
-  for (const row of seeded.slice(0, 2)) {
-    await expect(page.getByTestId(`event-edit-${row.id}`))
-      .toHaveCount(row.ownerId === coupleEvents.userId ? 1 : 0);
-  }
+  // Premises: the first seeded row is this account's own, the second its partner's.
+  const [own, partner] = seeded;
+  expect(own.ownerId).toBe(coupleEvents.userId);
+  expect(partner.ownerId).toBe(coupleEvents.partnerId);
+  await expect(page.getByTestId(`event-edit-${own.id}`)).toHaveCount(1);
+  await expect(page.getByTestId(`event-edit-${partner.id}`)).toHaveCount(0);
 
   const homeRead = page.waitForResponse((reply) => {
     const url = new URL(reply.url());

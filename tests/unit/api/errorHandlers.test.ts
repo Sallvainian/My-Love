@@ -202,9 +202,12 @@ describe('handleSupabaseError', () => {
       expect(err.code).toBe('XX000');
     });
 
-    it.each([undefined, 'EventsService.createEvent'])(
+    it.each([
+      [undefined, 'Database error:   Injected create failure \n'],
+      ['EventsService.createEvent', '[EventsService.createEvent] Database error:   Injected create failure \n'],
+    ])(
       'preserves surrounding whitespace in meaningful messages with context %s',
-      (context) => {
+      (context, expected) => {
         const err = handleSupabaseError(
           asPostgrestError({
             code: 'XX000',
@@ -215,8 +218,7 @@ describe('handleSupabaseError', () => {
           context
         );
 
-        const prefix = context ? '[EventsService.createEvent] ' : '';
-        expect(err.message).toBe(`${prefix}Database error:   Injected create failure \n`);
+        expect(err.message).toBe(expected);
       }
     );
 

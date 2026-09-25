@@ -17,8 +17,19 @@ afterEach(() => {
   vi.resetModules();
 });
 
+const BASE_REPORTERS = [
+  ['html', { outputFolder: 'playwright-report' }],
+  ['junit', { outputFile: 'test-results/junit.xml' }],
+  ['list'],
+  ['./tests/support/reporters/failure-summary-reporter.ts'],
+];
+
 describe('Playwright shard reporting', () => {
-  it.each([undefined, '0', '1'])('enables blobs only with explicit opt-in %s', async (flag) => {
+  it.each([
+    [undefined, BASE_REPORTERS],
+    ['0', BASE_REPORTERS],
+    ['1', [...BASE_REPORTERS, ['blob']]],
+  ])('enables blobs only with explicit opt-in %s', async (flag, expectedReporters) => {
     vi.stubEnv('CI', 'true');
     vi.stubEnv('E2E_BLOB_REPORT', flag);
     // The Playwright config is outside tsconfig.test's composite file list.
@@ -27,13 +38,7 @@ describe('Playwright shard reporting', () => {
       '../../../playwright.config.ts'
     );
 
-    expect(config.reporter).toEqual([
-      ['html', { outputFolder: 'playwright-report' }],
-      ['junit', { outputFile: 'test-results/junit.xml' }],
-      ['list'],
-      ['./tests/support/reporters/failure-summary-reporter.ts'],
-      ...(flag === '1' ? [['blob']] : []),
-    ]);
+    expect(config.reporter).toEqual(expectedReporters);
   });
 
   it('connects shard blob production and upload to the matching merge inputs', () => {

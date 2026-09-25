@@ -284,13 +284,25 @@ test.describe('Display Name Edit', () => {
     // GIVEN: This worker's own pool account, and whatever name it currently has.
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const originalName = await readProfileName(supabaseAdmin, userId);
-    // Unique per run so the assertion cannot pass on a name left behind by an
+    // Unique per run so the assertions cannot pass on a name left behind by an
     // earlier one, and inside the form's 3-30 character rule.
-    const newName = `E2E ${Date.now().toString().slice(-8)}`;
+    const stamp = Date.now().toString().slice(-8);
+    const seededName = `Prefill ${stamp}`;
+    const newName = `E2E ${stamp}`;
 
     // Armed BEFORE the write, so the teardown restores even if the very first
     // assertion below times out.
     renamed = { userId, originalName };
+
+    // A known chosen name, so the prefill below has one exact expected value
+    // whatever state an earlier run left this pool row in. A seed value (the
+    // email, 'Unknown', blank) would legitimately prefill an empty field.
+    const { error: seedError } = await supabaseAdmin
+      .from('users')
+      .update({ display_name: seededName, updated_at: new Date().toISOString() })
+      .eq('id', userId);
+    if (seedError) throw new Error(`Failed to seed the display name: ${seedError.message}`);
+    expect(await readProfileName(supabaseAdmin, userId)).toBe(seededName);
 
     await page.goto('/');
 
@@ -308,18 +320,8 @@ test.describe('Display Name Edit', () => {
 
     // The field carries the current name, not an empty box — the whole point of
     // an edit route rather than a second setup screen.
-    //
-    // Guarded on the FIELD, not on the stored column: `readProfileName` returns
-    // `display_name` verbatim, while the form is prefilled only when the row
-    // classifies as `chosen`. A pool row holding a seed value (its own email,
-    // 'Unknown', blank) is legitimately an empty field, and guarding on
-    // `originalName !== null` would fail there pointing at the prefill instead
-    // of at the row's state.
     const field = page.getByLabel('Display Name');
-    const prefilled = await field.inputValue();
-    if (prefilled !== '') {
-      expect(prefilled).toBe((originalName ?? '').trim());
-    }
+    await expect(field).toHaveValue(seededName);
 
     await field.fill(newName);
     await page.getByTestId('display-name-submit').click();

@@ -117,11 +117,16 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   it('sets updated_at itself, because no trigger does', async () => {
     // `public.users` has no BEFORE UPDATE trigger, and the column grant covers
     // exactly (display_name, updated_at) so this is the client's job.
-    const onComplete = submit('Jessie');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-12T15:30:00.000Z'));
+    try {
+      const onComplete = submit('Jessie');
 
-    await waitFor(() => expect(onComplete).toHaveBeenCalled());
-    expect(typeof backend.updatePayload?.updated_at).toBe('string');
-    expect(Number.isNaN(Date.parse(String(backend.updatePayload?.updated_at)))).toBe(false);
+      await waitFor(() => expect(onComplete).toHaveBeenCalled());
+      expect(backend.updatePayload?.updated_at).toBe('2026-09-12T15:30:00.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('never writes auth metadata', async () => {

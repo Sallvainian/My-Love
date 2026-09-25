@@ -116,11 +116,14 @@ afterEach(async () => {
 });
 
 describe('AdminPanel with the real local copy and store', () => {
-  it.each(['edit', 'delete'] as const)('isolates A/B/A lists and removes the outgoing %s preview', async (dialog) => {
+  it.each([
+    ['edit', 'admin-edit-form'],
+    ['delete', 'admin-delete-dialog'],
+  ] as const)('isolates A/B/A lists and removes the outgoing %s preview', async (dialog, previewTestId) => {
     panel();
     expect(screen.getAllByText('Account A message')).toHaveLength(1);
     fireEvent.click(within(row('Account A message')).getByTestId(`message-row-${dialog}-button`));
-    expect(screen.getByTestId(dialog === 'edit' ? 'admin-edit-form' : 'admin-delete-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId(previewTestId)).toBeInTheDocument();
     await switchAccount(B);
     expect(screen.queryByText('Account A message')).toBeNull();
     expect(screen.queryByTestId('admin-edit-form')).toBeNull();
@@ -197,7 +200,9 @@ describe('AdminPanel with the real local copy and store', () => {
     await screen.findByRole('alert');
     fireEvent.click(screen.getByTestId('admin-delete-dialog-cancel'));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(await diskRow(aId)).toBeDefined();
+    expect(await diskRow(aId)).toMatchObject({
+      id: 1000, text: 'Account A message', serverId: 'srv-account-a', userId: A, category: 'custom',
+    });
   });
 
   it('does not let an old completion close the new account’s dialog', async () => {

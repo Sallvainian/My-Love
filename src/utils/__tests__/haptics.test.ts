@@ -142,17 +142,19 @@ describe('haptics utility', () => {
 
   describe('haptic feedback patterns', () => {
     it('save haptic (50ms) is longer than selection haptic (15ms)', () => {
-      const saveDuration = 50;
-      const selectionDuration = 15;
-
       triggerMoodSaveHaptic();
-      expect(vibrateMock).toHaveBeenCalledWith(saveDuration);
+      expect(vibrateMock).toHaveBeenCalledTimes(1);
+      const saveDuration = vibrateMock.mock.calls[0][0];
 
       vibrateMock.mockClear();
 
       triggerSelectionHaptic();
-      expect(vibrateMock).toHaveBeenCalledWith(selectionDuration);
+      expect(vibrateMock).toHaveBeenCalledTimes(1);
+      const selectionDuration = vibrateMock.mock.calls[0][0];
 
+      // Compare what each trigger actually sent, not test-local literals
+      expect(saveDuration).toBe(50);
+      expect(selectionDuration).toBe(15);
       expect(saveDuration).toBeGreaterThan(selectionDuration);
     });
 
@@ -165,9 +167,10 @@ describe('haptics utility', () => {
       triggerErrorHaptic();
       const errorCall = vibrateMock.mock.calls[0][0];
 
-      // Save is a single number, error is an array pattern
-      expect(typeof saveCall).toBe('number');
-      expect(Array.isArray(errorCall)).toBe(true);
+      // Save is a single 50ms pulse, error is a buzz-pause-buzz pattern
+      expect(saveCall).toBe(50);
+      expect(errorCall).toEqual([100, 50, 100]);
+      expect(errorCall).not.toEqual(saveCall);
     });
   });
 });

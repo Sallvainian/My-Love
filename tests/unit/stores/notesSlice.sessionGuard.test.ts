@@ -392,7 +392,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     useAppStore.setState({ notes: fresh } as unknown as SetStateArg);
 
     pending.settle({ data: null, error: new Error('STALE-FAILURE') });
-    await inFlight.catch(() => {});
+    // The stale path returns before it looks at the error, so nothing throws.
+    await expect(inFlight).resolves.toBeUndefined();
 
     expect(useAppStore.getState().notes).toEqual(fresh);
   });

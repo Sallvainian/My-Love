@@ -41,7 +41,7 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: (table: string) => builder(table) },
 }));
 
-import { AccountDataError } from '../../../src/services/accountDataError';
+import { AccountDataError, REQUEST_TIMEOUT_MS } from '../../../src/services/accountDataError';
 import { anniversariesService } from '../../../src/services/anniversariesService';
 import { customMessagesApi, isMessageCategory } from '../../../src/services/customMessagesApi';
 import {
@@ -139,9 +139,11 @@ describe('request bounds', () => {
     ['addFavorite', () => messageFavoritesApi.addFavorite(A, 'b:1'), { data: null, error: null }],
     ['removeFavorite', () => messageFavoritesApi.removeFavorite(A, 'b:1'), { data: null, error: null }],
   ])('%s carries a timeout signal', async (_name, request, result) => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
     results.push(result as Result);
     await request();
-    expect(signalOf()).toBeInstanceOf(AbortSignal);
+    expect(timeout).toHaveBeenCalledExactlyOnceWith(REQUEST_TIMEOUT_MS);
+    expect(signalOf()).toBe(timeout.mock.results[0].value);
   });
 
   it.each([
@@ -151,9 +153,11 @@ describe('request bounds', () => {
       customMessagesApi.createCustomMessage(A, { text: 'x', category: 'custom', active: true, tags: [] }, 'k-1'),
       { data: customRow, error: null }],
   ])('%s carries a timeout signal too — it is retry-safe', async (_name, request, result) => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
     results.push(result as Result);
     await request();
-    expect(signalOf()).toBeInstanceOf(AbortSignal);
+    expect(timeout).toHaveBeenCalledExactlyOnceWith(REQUEST_TIMEOUT_MS);
+    expect(signalOf()).toBe(timeout.mock.results[0].value);
   });
 });
 

@@ -160,23 +160,23 @@ beforeEach(() => {
 });
 
 describe('EventsSettings explicit history', () => {
+  const HISTORY_NOTICE =
+    'More events are available. Load more history to find older dates or later upcoming ' +
+    'events. After a refresh or reload, saved events outside this list may need to be ' +
+    'loaded again.';
+
   it.each([
-    { upcoming: false, past: false, more: false },
-    { upcoming: true, past: false, more: true },
-    { upcoming: false, past: true, more: true },
-    { upcoming: true, past: true, more: true },
-  ])('uses raw continuation flags: upcoming=$upcoming, past=$past', async ({ upcoming, past, more }) => {
+    { upcoming: false, past: false, more: false, notice: null },
+    { upcoming: true, past: false, more: true, notice: HISTORY_NOTICE },
+    { upcoming: false, past: true, more: true, notice: HISTORY_NOTICE },
+    { upcoming: true, past: true, more: true, notice: HISTORY_NOTICE },
+  ])('uses raw continuation flags: upcoming=$upcoming, past=$past', async ({ upcoming, past, more, notice }) => {
     const loadMoreEvents = vi.fn(async () => loadOk);
     setStore({ eventsPagination: pagination(upcoming, past), loadMoreEvents });
     await renderSection();
 
     expect(Boolean(screen.queryByRole('button', { name: 'Load more history' }))).toBe(more);
-    expect(Boolean(screen.queryByTestId('events-settings-history-notice'))).toBe(more);
-    if (more) {
-      expect(screen.getByTestId('events-settings-history-notice')).toHaveTextContent(
-        /After a refresh or reload, saved events outside this list may need to be loaded again/
-      );
-    }
+    expect(screen.queryByTestId('events-settings-history-notice')?.textContent ?? null).toBe(notice);
     expect(loadMoreEvents).not.toHaveBeenCalled();
   });
 

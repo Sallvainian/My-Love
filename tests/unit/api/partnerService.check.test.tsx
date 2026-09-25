@@ -157,9 +157,13 @@ describe('partner requests offline (ticket 11)', () => {
     }
   );
 
-  it.each(actions)('%s goes out as before once online', async (method) => {
+  it.each([
+    ['sendPartnerRequest', ['getUser', 'insert']],
+    ['acceptPartnerRequest', ['accept_partner_request']],
+    ['declinePartnerRequest', ['decline_partner_request']],
+  ] as const)('%s goes out as before once online', async (method, expectedRequests) => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     await partnerService[method]('target');
-    expect(backend.requests.length).toBeGreaterThan(0);
+    expect(backend.requests).toEqual(expectedRequests);
   });
 });

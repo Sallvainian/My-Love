@@ -116,9 +116,11 @@ describe('fetchCoupleSettings', () => {
   it('throws a transport error on a failed read', async () => {
     results.push({ data: null, error: { message: 'boom', code: '500', details: '', hint: '' } });
 
-    await expect(coupleSettingsService.fetchCoupleSettings(LOW, HIGH)).rejects.toBeInstanceOf(
-      AccountDataError
-    );
+    await expect(coupleSettingsService.fetchCoupleSettings(LOW, HIGH)).rejects.toMatchObject({
+      name: 'AccountDataError',
+      code: 'transport',
+      message: '[CoupleSettingsService.fetchCoupleSettings] Database error: boom',
+    });
   });
 
   it('refuses offline before any request', async () => {

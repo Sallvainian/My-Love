@@ -177,7 +177,11 @@ test.describe('PKCE code exchange', () => {
       const stranger = pkceClient();
       const strangerResult = await stranger.client.auth.exchangeCodeForSession(code!);
       expect(strangerResult.data.session).toBeNull();
-      expect(strangerResult.error).not.toBeNull();
+      expect(strangerResult.error).toMatchObject({
+        name: 'AuthPKCECodeVerifierMissingError',
+        code: 'pkce_code_verifier_not_found',
+        status: 400,
+      });
       expect(stranger.pkceGrantCalls(), 'refused locally, so the code is untouched').toBe(0);
 
       // And a client holding the wrong verifier is refused by the server itself.
@@ -195,7 +199,11 @@ test.describe('PKCE code exchange', () => {
       }
       const impostorResult = await impostor.client.auth.exchangeCodeForSession(code!);
       expect(impostorResult.data.session).toBeNull();
-      expect(impostorResult.error).not.toBeNull();
+      expect(impostorResult.error).toMatchObject({
+        name: 'AuthApiError',
+        status: 400,
+        code: 'bad_code_verifier',
+      });
       expect(impostor.pkceGrantCalls(), 'the server evaluated and rejected it').toBeGreaterThan(0);
 
       // While the initiating client completes the exchange for its own account.

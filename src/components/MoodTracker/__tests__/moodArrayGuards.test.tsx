@@ -1,5 +1,6 @@
 /** Shared mood normalization at all display boundaries; data hooks are mocked. */
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseMood } from '../../../api/validation/supabaseSchemas';
@@ -568,24 +569,43 @@ describe('malformed element recovery at mood displays', () => {
     return render(<MoodTracker />);
   }
 
-  it.each(displays)('%s preserves recognized values in order, including duplicates', (kind) => {
-    const { container } = display(kind);
-    if (kind === 'calendar') {
-      expect(screen.getByTestId(`calendar-day-${DATE_KEY}`)).toHaveAttribute('aria-label', expect.stringContaining('sad, tired, sad mood'));
-    } else {
-      expect(container.textContent?.toLowerCase()).toContain('sad, tired, sad');
-    }
+  it.each([
+    ['history', () => screen.getByTestId('mood-label').textContent, 'Sad, Tired, Sad'],
+    ['partner', () => screen.getByTestId('partner-mood-label').textContent, 'Sad, Tired, Sad'],
+    ['modal', () => screen.getByTestId('modal-mood-type').textContent, 'Sad, Tired, Sad'],
+    [
+      'calendar',
+      () => screen.getByTestId(`calendar-day-${DATE_KEY}`).getAttribute('aria-label'),
+      'September 12, 2026 - sad, tired, sad mood. Press enter to view details.',
+    ],
+    ['tracker', () => screen.getByText(/^Selected:/).textContent, 'Selected: Sad, Tired, Sad'],
+  ] as const)('%s preserves recognized values in order, including duplicates', (kind, read, expected) => {
+    display(kind);
+    expect(read()).toBe(expected);
   });
 
-  it.each(displays)('%s excludes wholly invalid moods instead of inventing a display value', (kind) => {
-    const { container } = display(kind, true);
-    if (kind === 'calendar') expect(screen.getByTestId(`calendar-day-${DATE_KEY}`)).toHaveAttribute('data-has-mood', 'false');
-    else if (kind === 'tracker') {
-      expect(container.textContent).not.toContain('Selected:');
-      expect(container.querySelector('textarea')?.value ?? '').toBe('');
-    } else {
-      expect(screen.queryByTestId(kind === 'history' ? 'mood-history-item' : kind === 'partner' ? 'partner-mood-display' : 'mood-detail-modal')).toBeNull();
-    }
+  it.each([
+    ['history', 'mood-history-item'],
+    ['partner', 'partner-mood-display'],
+    ['modal', 'mood-detail-modal'],
+  ] as const)('%s excludes wholly invalid moods instead of inventing a display value', (kind, testId) => {
+    display(kind, true);
+    expect(screen.queryByTestId(testId)).toBeNull();
+  });
+
+  it('calendar excludes wholly invalid moods instead of inventing a display value', () => {
+    display('calendar', true);
+    expect(screen.getByTestId(`calendar-day-${DATE_KEY}`)).toHaveAttribute('data-has-mood', 'false');
+  });
+
+  it('tracker excludes wholly invalid moods instead of inventing a display value', async () => {
+    const { container } = display('tracker', true);
+    expect(container.textContent).not.toContain('Selected:');
+    // A seeded entry with a note auto-expands the note field, so the collapsed
+    // toggle is itself evidence the entry was not seeded; opening it must then
+    // show an empty note rather than 'hidden note'.
+    await userEvent.click(screen.getByTestId('mood-add-note-toggle'));
+    expect(screen.getByRole('textbox')).toHaveValue('');
   });
 
   it('normalizes partner records independently and omits invalid siblings', async () => {

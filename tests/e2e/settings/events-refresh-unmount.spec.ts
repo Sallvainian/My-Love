@@ -167,8 +167,24 @@ test.describe('DW-57 events refresh and retry across Settings unmount', () => {
     await expect(page.getByRole('button', { name: 'Add event', exact: true })).toBeEnabled();
   });
 
-  for (const outcome of ['success', 'failure'] as const) {
-    const id = outcome === 'success' ? 'DW-57-E2E-003' : 'DW-57-E2E-004';
+  const retryOutcomes = [
+    {
+      id: 'DW-57-E2E-003',
+      outcome: 'success',
+      statuses: [200, 200],
+      ids: (witness: { id: string }) => [witness.id],
+      error: null,
+    },
+    {
+      id: 'DW-57-E2E-004',
+      outcome: 'failure',
+      statuses: [400, 400],
+      ids: (_witness: { id: string }): string[] => [],
+      error: injectedLoadError,
+    },
+  ] as const;
+
+  for (const { id, outcome, statuses, ids, error } of retryOutcomes) {
     test(`[P1] ${id} pending Retry settles with ${outcome} after navigating to Mood`, expectedLoadFailure, async ({
       page, coupleEvents, eventsRefreshControl,
     }) => {
@@ -186,14 +202,9 @@ test.describe('DW-57 events refresh and retry across Settings unmount', () => {
       await expect(page.getByTestId('events-settings-load-region')).toHaveAttribute('aria-busy', 'true');
       await leaveForMood(page);
       retry.release();
-      expect(await retry.waitForCompleted()).toEqual(outcome === 'success' ? [200, 200] : [400, 400]);
+      expect(await retry.waitForCompleted()).toEqual(statuses);
       const settled = await waitForEventsSettlement(page);
-      expect(settled).toEqual({
-        ids: outcome === 'success' ? [witness.id] : [],
-        loading: false,
-        error: outcome === 'success' ? null : injectedLoadError,
-        view: 'mood',
-      });
+      expect(settled).toEqual({ ids: ids(witness), loading: false, error, view: 'mood' });
       await expect(page.getByTestId('mood-tracker')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Happy mood', exact: true })).toBeFocused();
       await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
