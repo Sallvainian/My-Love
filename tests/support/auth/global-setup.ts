@@ -8,6 +8,8 @@
  * lazily per-worker on first test.
  */
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '../../../src/types/database.types';
+import type { TypedSupabaseClient } from '../factories';
 import { initializeAuthSystem } from './setup';
 import { authStorageInit } from '@seontechnologies/playwright-utils/auth-session';
 import { TEST_USER_PASSWORD } from '../test-credentials';
@@ -19,8 +21,7 @@ const LEGACY_TEST_USERS = [
 ];
 
 async function ensureUser(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  admin: ReturnType<typeof createClient<any, any, any>>,
+  admin: TypedSupabaseClient,
   email: string,
   password: string,
   displayName: string
@@ -88,11 +89,7 @@ async function ensureUser(
   }
 }
 
-async function getAppUserIdByEmail(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  admin: ReturnType<typeof createClient<any, any, any>>,
-  email: string
-): Promise<string> {
+async function getAppUserIdByEmail(admin: TypedSupabaseClient, email: string): Promise<string> {
   const maxAttempts = 10;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const { data, error } = await admin.from('users').select('id').eq('email', email).single();
@@ -108,8 +105,7 @@ async function getAppUserIdByEmail(
 }
 
 async function linkUserPair(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  admin: ReturnType<typeof createClient<any, any, any>>,
+  admin: TypedSupabaseClient,
   firstEmail: string,
   secondEmail: string
 ): Promise<void> {
@@ -144,7 +140,7 @@ export default async function globalSetup(): Promise<void> {
     );
   }
 
-  const admin = createClient(url, serviceRoleKey, {
+  const admin = createClient<Database>(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
