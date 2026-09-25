@@ -46,6 +46,7 @@ import {
 } from '../api/errorHandlers';
 import type { Database } from '../api/supabaseClient';
 import { supabase } from '../api/supabaseClient';
+import { offlineMessage } from './accountDataError';
 import { formatDateISO } from '../utils/dateUtils';
 import { logger } from '../utils/logger';
 
@@ -330,7 +331,7 @@ class EventsService {
    */
   async getEventsPage(pagination?: EventsPagination | null): Promise<EventsPage> {
     if (!isOnline()) {
-      throw new Error('You are offline. Events need a connection to load.');
+      throw new Error(offlineMessage('Events', 'load'));
     }
     const todayISO = pagination?.todayISO ?? formatDateISO(new Date());
     const readWindow = async (ascending: boolean, previous?: EventWindowContinuation) => {
@@ -430,7 +431,7 @@ class EventsService {
       // NOT handleNetworkError: its message promises the change "will be
       // synced when you're back online", and events have no sync path in
       // either direction. Accurate and user-facing instead.
-      throw new Error('You are offline. Events need a connection to load.');
+      throw new Error(offlineMessage('Events', 'load'));
     }
 
     // The viewer's own calendar day, so the cut lands where Home's
@@ -559,10 +560,7 @@ class EventsService {
     if (!isOnline()) {
       // NOT handleNetworkError: no offline queue exists, so its "will be
       // synced when you're back online" promise is the opposite of the truth.
-      throw new EventWriteError(
-        'offline',
-        'You are offline. Events need a connection to save.'
-      );
+      throw new EventWriteError('offline', offlineMessage('Events'));
     }
 
     const parsedInput = parseEventDate(input.eventDate);
@@ -643,10 +641,7 @@ class EventsService {
     if (!isOnline()) {
       // NOT handleNetworkError: no offline queue exists, so its "will be
       // synced when you're back online" promise is the opposite of the truth.
-      throw new EventWriteError(
-        'offline',
-        'You are offline. Events need a connection to save.'
-      );
+      throw new EventWriteError('offline', offlineMessage('Events'));
     }
 
     // Same refusal as createEvent: an unreadable date must not reach the column.
@@ -720,10 +715,7 @@ class EventsService {
     if (!isOnline()) {
       // NOT handleNetworkError: no offline queue exists, so its "will be
       // synced when you're back online" promise is the opposite of the truth.
-      throw new EventWriteError(
-        'offline',
-        'You are offline. Events need a connection to save.'
-      );
+      throw new EventWriteError('offline', offlineMessage('Events', 'delete'));
     }
 
     try {
