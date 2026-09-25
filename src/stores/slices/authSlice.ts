@@ -11,11 +11,8 @@
  * - NOT persisted (derived from Supabase session on each app load)
  */
 
-import { serializeAccountDataWrite } from '../../services/accountDataQueue';
-import { customMessageService } from '../../services/customMessageService';
 import { deleteAccountImages } from '../../services/imageCache';
 import { deleteAccountCopies } from '../../services/localCopy';
-import { storageService } from '../../services/storage';
 import type { AppState, AppStateCreator } from '../types';
 import { revokePreviewUrlsFromNotes } from './notesSlice';
 
@@ -25,8 +22,8 @@ import { revokePreviewUrlsFromNotes } from './notesSlice';
  * `userId` is not persisted, so a boot with no recoverable session (expired or
  * revoked refresh token, sign-out-everywhere from another device) reaches
  * `clearAuth` with `userId` never set. This marker is how that path still
- * knows whose local copies, custom-message rows and favorites to delete. It
- * holds only an id — never the data itself.
+ * knows whose local copies and cached images to delete. It holds only an id —
+ * never the data itself.
  */
 export const ACCOUNT_OWNER_STORAGE_KEY = 'my-love-account-owner';
 
@@ -49,17 +46,16 @@ function getAccountOwner(): string | null {
 
 /**
  * Delete one account's saved data from this device: its local copies
- * (anniversaries, partner, couple settings, …), its cached images, its
- * custom-message rows and its favorites.
+ * (anniversaries, partner, couple settings, custom messages and favorites, …)
+ * and its cached images.
  * Nothing else — unsynced `moods` rows and any other queued write stay for
  * their owner to send on the next sign-in. The server keeps everything, so the
  * next signed-in refresh brings it back.
  *
  * Fire-and-forget: sign-out must not wait on IndexedDB, and a failed delete is
- * logged rather than blocking it. The mirror rows are deleted through the
- * account-data queue, so a refresh or write the outgoing account already
- * started finishes first and cannot put rows back afterwards; loaders re-check
- * identity before writing a copy or a mirror, so none is re-created later.
+ * logged rather than blocking it. Loaders and writes re-check identity before
+ * saving a copy, so a refresh or write the outgoing account already started
+ * cannot re-create its copy afterwards.
  */
 function deleteAccountData(userId: string): void {
   deleteAccountCopies(userId).catch((error: unknown) => {
@@ -67,12 +63,6 @@ function deleteAccountData(userId: string): void {
   });
   deleteAccountImages(userId).catch((error: unknown) => {
     console.error('[AuthSlice] Failed to delete the outgoing account\'s cached images:', error);
-  });
-  serializeAccountDataWrite(async () => {
-    await customMessageService.deleteMirrorForUser(userId);
-    await storageService.deleteFavoritesForUser(userId);
-  }).catch((error: unknown) => {
-    console.error('[AuthSlice] Failed to delete the outgoing account\'s messages data:', error);
   });
 }
 
@@ -297,8 +287,9 @@ function discardAccountState(
   setAccountOwner(identity.userId);
 
   // The outgoing account's saved data goes too, so the next account on this
-  // device can never read it: its local copies, custom-message rows and
-  // favorites. Unsynced `moods` rows stay for their owner (deleteAccountData).
+  // device can never read it: its local copies (custom messages and favorites
+  // among them) and cached images. Unsynced `moods` rows stay for their owner
+  // (deleteAccountData).
   if (outgoingUserId && outgoingUserId !== identity.userId) {
     deleteAccountData(outgoingUserId);
   }

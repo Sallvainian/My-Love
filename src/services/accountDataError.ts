@@ -69,8 +69,8 @@ export function requireOnline(what: string, action: NeedsConnectionAction = 'sav
 
 /**
  * Why a custom row without a server id refuses an edit, a delete or a
- * favorite: the server holds no row to change. The next mirror refresh
- * replaces it with the server's rows.
+ * favorite: the server holds no row to change. The next refresh replaces it
+ * with the server's rows.
  */
 export const NOT_SYNCED_MESSAGE =
   'This message has not been saved to your account yet. Try again in a moment.';

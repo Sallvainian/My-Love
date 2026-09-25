@@ -37,7 +37,7 @@ async function navigate(page: Page, view: 'home' | 'mood' | 'settings') {
   }, view);
 }
 
-async function localRows(page: Page, store: 'message-favorites' | 'moods') {
+async function localRows(page: Page, store: 'moods') {
   return page.evaluate(async (storeName) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('my-love-db');
@@ -54,6 +54,33 @@ async function localRows(page: Page, store: 'message-favorites' | 'moods') {
       db.close();
     }
   }, store);
+}
+
+/**
+ * The bundled favorites saved in one account's message-data copy, or null when
+ * the account has no copy on this device.
+ */
+async function savedFavoriteIds(page: Page, userId: string): Promise<number[] | null> {
+  return page.evaluate(async (owner) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('my-love-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<number[] | null>((resolve, reject) => {
+        const request = db
+          .transaction('local-copies')
+          .objectStore('local-copies')
+          .get([owner, 'message-data']);
+        request.onsuccess = () =>
+          resolve((request.result?.value as { bundledFavoriteIds: number[] } | undefined)?.bundledFavoriteIds ?? null);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      db.close();
+    }
+  }, userId);
 }
 
 async function signOut(page: Page) {
@@ -96,10 +123,7 @@ test.describe('Account data through the real browser and local services', () => 
     expect(original.currentId).toBeTruthy();
 
     await favorite.click();
-    await expect.poll(() => localRows(page, 'message-favorites')).toContainEqual({
-      messageId: original.currentId,
-      userId: original.userId,
-    });
+    await expect.poll(() => savedFavoriteIds(page, original.userId!)).toContain(original.currentId);
     await expect.poll(async () => (await snapshot(page)).favoriteIds).toContain(original.currentId);
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
 
@@ -115,12 +139,14 @@ test.describe('Account data through the real browser and local services', () => 
 
     // A's favorite left the device with A's session (CAP-7) — it stays on
     // the server — and B can add and remove the same daily favorite.
-    await expect.poll(() => localRows(page, 'message-favorites')).toEqual([]);
+    const userB = (await snapshot(page)).userId!;
+    await expect.poll(() => savedFavoriteIds(page, original.userId!)).toBeNull();
     await favorite.click();
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
+    await expect.poll(() => savedFavoriteIds(page, userB)).toEqual([original.currentId]);
     await favorite.click();
     await expect(favorite).toHaveAccessibleName('Add to favorites');
-    expect(await localRows(page, 'message-favorites')).toEqual([]);
+    await expect.poll(() => savedFavoriteIds(page, userB)).toEqual([]);
 
     // A's sign-in refreshes the favorite back from the server.
     await signOut(page);

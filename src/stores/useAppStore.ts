@@ -286,13 +286,13 @@ export const useAppStore = create<AppState>()(
         // under this single global key meant one account's mood notes were
         // rehydrated into the next account's session on a shared device,
         // before any fetch could correct them.
-        // Story 3.5: Custom messages now in IndexedDB (not LocalStorage)
-        // customMessages: NOT persisted (loaded from IndexedDB via loadCustomMessages)
+        // Custom messages live in the account's message-data local copy
+        // customMessages: NOT persisted (loaded from that copy via loadCustomMessages)
         // customMessagesLoaded: NOT persisted (runtime state)
         // NOT persisted (computed or transient):
         // - messages: Loaded from IndexedDB on init
         // - currentMessage: Computed from messages + messageHistory
-        // - customMessages: Loaded from IndexedDB via customMessageService
+        // - customMessages: Loaded from the message-data local copy
         // - isLoading, error: Runtime UI state only
       }),
       onRehydrateStorage: () => (state, error) => {

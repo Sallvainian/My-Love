@@ -14,8 +14,10 @@ import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
 
 /**
- * How many rows one account has in the three stores sign-out must empty for
- * it, and whether the seeded anniversary and custom message are among them.
+ * What one account has saved on the device — its local copies, and the custom
+ * messages and favorites inside its message-data copy — and whether the seeded
+ * anniversary and custom message are among them. `strayCustom` counts custom
+ * rows in the shared `messages` store, which holds bundled rows only.
  */
 async function ownedRowCounts(page: Page, owner: string, seed: { label: string; custom: string }) {
   return page.evaluate(async ({ userId, label, custom }) => {
@@ -32,13 +34,19 @@ async function ownedRowCounts(page: Page, owner: string, seed: { label: string; 
       });
     try {
       const copies = (await all('local-copies')).filter((row) => row.userId === userId);
-      const messages = (await all('messages')).filter((row) => row.userId === userId);
+      const messageData = copies.find((row) => row.kind === 'message-data')?.value as
+        | { custom: Array<{ text: string; isFavorite?: boolean }>; bundledFavoriteIds: number[] }
+        | undefined;
+      const customRows = messageData?.custom ?? [];
       return {
         copies: copies.length,
-        custom: messages.length,
-        favorites: (await all('message-favorites')).filter((row) => row.userId === userId).length,
+        custom: customRows.length,
+        favorites:
+          customRows.filter((row) => row.isFavorite).length +
+          (messageData?.bundledFavoriteIds.length ?? 0),
         seeded:
-          JSON.stringify(copies).includes(label) && messages.some((row) => row.text === custom),
+          JSON.stringify(copies).includes(label) && customRows.some((row) => row.text === custom),
+        strayCustom: (await all('messages')).filter((row) => row.isCustom).length,
       };
     } finally {
       db.close();
@@ -245,7 +253,7 @@ test.describe('Logout Flow', () => {
     // THEN: none of it is readable from IndexedDB or localStorage any more.
     await expect
       .poll(() => ownedRowCounts(page, userId, seed))
-      .toEqual({ copies: 0, custom: 0, favorites: 0, seeded: false });
+      .toEqual({ copies: 0, custom: 0, favorites: 0, seeded: false, strayCustom: 0 });
     const storage = await page.evaluate(() => JSON.stringify({ ...localStorage }));
     expect(storage).not.toContain(LABEL);
     expect(storage).not.toContain(CUSTOM);

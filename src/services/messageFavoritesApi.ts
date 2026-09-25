@@ -8,8 +8,8 @@
  * the text instead: `b:<sha-256 hex>`. A custom message's favorite is the
  * `is_favorite` column on its own row (`customMessagesApi.ts`).
  *
- * The IndexedDB `message-favorites` store stays the read mirror, keyed by the
- * local id; `storageService` maps between the two.
+ * The account's `message-data` local copy keeps the favorited bundled rows by
+ * their local ids; `storageService` maps between the two.
  *
  * Private to the author (owner-only RLS). Error convention: `accountDataError.ts`.
  *

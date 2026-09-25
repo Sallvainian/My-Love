@@ -18,7 +18,10 @@ import {
   upgradeDb,
 } from '../../../src/services/dbSchema';
 import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
+import { projectMessageFavorites } from '../../../src/services/messageFavorites';
 import { storeAuthToken } from '../../../src/sw-db';
+import type { Message } from '../../../src/types';
+import { getDailyMessage } from '../../../src/utils/messageRotation';
 
 // Mock import.meta.env.DEV to suppress console logs during tests
 vi.stubGlobal('import', {
@@ -62,7 +65,6 @@ describe('dbSchema', () => {
       });
 
       expect(db.objectStoreNames.contains('messages')).toBe(true);
-      expect(db.objectStoreNames.contains('message-favorites')).toBe(true);
       expect(db.objectStoreNames.contains('moods')).toBe(true);
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
       expect(db.objectStoreNames.contains('local-copies')).toBe(true);
@@ -70,24 +72,24 @@ describe('dbSchema', () => {
       expect(db.objectStoreNames.contains('note-queue')).toBe(true);
       // v11: photos live in Supabase; a fresh profile never gets the store.
       expect(unwrap(db).objectStoreNames.contains('photos')).toBe(false);
+      // v15: favorites live in the message-data local copy.
+      expect(unwrap(db).objectStoreNames.contains('message-favorites')).toBe(false);
     });
 
-    it('should create exactly 7 stores', async () => {
+    it('should create exactly 6 stores', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
       });
 
-      expect(db.objectStoreNames.length).toBe(7);
+      expect(db.objectStoreNames.length).toBe(6);
     });
   });
 
   describe('upgrade from v4 to v5', () => {
-    it('should add the messages by-user index to a store that already exists', async () => {
-      // The v4 seed above builds `messages` with by-category and by-date only,
-      // which is what every already-installed profile has. Adding an index to
-      // an existing store needs the versionchange transaction, so this is the
-      // branch that fails silently if `tx` is ever dropped from the call — the
-      // fresh-install case cannot see it, because it takes the create path.
+    it('keeps an existing messages store and its row without adding a by-user index', async () => {
+      // The v4 seed builds `messages` with by-category and by-date only. v8
+      // used to add `by-user` here; since v15 custom rows live in the
+      // message-data local copy and the index is never created.
       const dbV4 = await openDB(DB_NAME, 4, {
         upgrade(db) {
           const messageStore = db.createObjectStore('messages', {
@@ -116,7 +118,7 @@ describe('dbSchema', () => {
       const upgraded = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
       const store = upgraded.transaction('messages', 'readonly').objectStore('messages');
-      expect(store.indexNames.contains('by-user')).toBe(true);
+      expect((store.indexNames as DOMStringList).contains('by-user')).toBe(false);
       // The index it already had is untouched, and so is the row.
       expect(store.indexNames.contains('by-category')).toBe(true);
       expect(await upgraded.getAll('messages')).toHaveLength(1);
@@ -125,12 +127,9 @@ describe('dbSchema', () => {
 
   describe('upgrade from v7 to v8', () => {
     /**
-     * v7 is where every already-installed profile actually sits, and it is a
-     * different path through `upgradeDb` from v4 or v5: all eight stores exist,
-     * `moods` already carries `by-user-date`, and every v1–v7 branch is a
-     * no-op. The only thing left to do is add `by-user` to `messages` — so this
-     * is the one starting point where that branch runs alone, with nothing else
-     * to mask it.
+     * v7 is a different path through `upgradeDb` from v4 or v5: all eight
+     * stores exist, `moods` already carries `by-user-date`, and every v1–v7
+     * branch is a no-op.
      */
     async function seedV7(): Promise<void> {
       // Deliberately opened UNTYPED, as `storageSchema.test.ts`'s `seedLegacy`
@@ -267,15 +266,15 @@ describe('dbSchema', () => {
       }
     }
 
-    it('adds by-user to messages while every other store keeps its rows', async () => {
+    it('reaches the current schema while every other store keeps its rows', async () => {
       await seedV7();
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      // The migration itself.
+      // No v8 index: custom rows live in the message-data local copy since v15.
       const messages = db.transaction('messages', 'readonly').objectStore('messages');
-      expect(messages.indexNames.contains('by-user')).toBe(true);
-      // …without disturbing the indexes it already had.
+      expect((messages.indexNames as DOMStringList).contains('by-user')).toBe(false);
+      // …and the indexes it already had are undisturbed.
       expect(messages.indexNames.contains('by-category')).toBe(true);
       expect(messages.indexNames.contains('by-date')).toBe(true);
 
@@ -285,12 +284,12 @@ describe('dbSchema', () => {
       expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V7' });
       expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V7' });
 
-      // Seven stores (message-favorites is created at v9, local-copies at v12,
-      // image-cache at v13, note-queue at v14);
+      // Six stores (local-copies at v12, image-cache at v13, note-queue at
+      // v14; message-favorites is never created since v15);
       // the v7 scripture stores are dropped on the way to v10 and photos on the
-      // way to v11. The v7 moods index is untouched — v8 must not re-run the v7
-      // swap over a store that has already had it.
-      expect(db.objectStoreNames.length).toBe(7);
+      // way to v11. The v7 moods index is untouched — a later branch must not
+      // re-run the v7 swap over a store that has already had it.
+      expect(db.objectStoreNames.length).toBe(6);
       const remaining = Array.from(unwrap(db).objectStoreNames);
       expect(remaining).not.toContain('photos');
       expect(remaining).not.toContain('scripture-sessions');
@@ -302,16 +301,14 @@ describe('dbSchema', () => {
       expect((moods.indexNames as DOMStringList).contains('by-date')).toBe(false);
     });
 
-    it('creates it even when a service that does not own the messages store wins the upgrade', async () => {
+    it('upgrades fully even when a service that does not own the messages store wins the upgrade', async () => {
       // IndexedDB runs the upgrade callback of only the ONE open() that
       // performs the version-change transaction; every other concurrent open()
-      // just connects. Seven modules open this database, and which one gets
+      // just connects. Six modules open this database, and which one gets
       // there first is a race decided by app start-up order — so the store a
-      // service "owns" says nothing about which callback creates its indexes.
+      // service "owns" says nothing about which callback migrates it.
       // moodService reaches for `moods` and never touches `messages`, which
-      // makes it the right proof: if its open were to skip the messages branch
-      // (or fail to thread the versionchange transaction through), `by-user`
-      // would never exist for the service that does need it.
+      // makes it the right proof.
       await seedV7();
 
       const { moodService } = await import('../../../src/services/moodService');
@@ -323,28 +320,22 @@ describe('dbSchema', () => {
       await withinTimeout(moodService.init(), 'moodService.init()');
       openDbs.push({ close: () => moodHandle.db?.close() });
 
-      // It resolved rather than blocking, and it left the index behind for a
-      // store it has no interest in.
+      // It resolved rather than blocking, and the v7 row is still there:
+      // winning the upgrade is not a reset.
       const afterMood = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
-      expect(
-        afterMood.transaction('messages', 'readonly').objectStore('messages').indexNames.contains(
-          'by-user'
-        )
-      ).toBe(true);
-      // And the v7 row is still there: winning the upgrade is not a reset.
+      expect(afterMood.objectStoreNames.length).toBe(6);
       expect((await afterMood.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V7' });
 
-      // The service that DOES own the store now connects at the same version,
-      // which needs no versionchange transaction at all — the second open must
-      // not block behind the first service's still-open connection.
-      const { customMessageService } = await import('../../../src/services/customMessageService');
-      const customHandle = customMessageService as unknown as { db: { close: () => void } | null };
-      customHandle.db = null;
-      await withinTimeout(customMessageService.init(), 'customMessageService.init()');
-      openDbs.push({ close: () => customHandle.db?.close() });
-
-      // …and it can actually use the index's store through its scoped read.
-      expect(await customMessageService.getAllForUser('USER-A', { isCustom: true })).toEqual([]);
+      // The service that DOES read the store now connects at the same version,
+      // which needs no versionchange transaction at all.
+      const { storageService } = await import('../../../src/services/storage');
+      const storageHandle = storageService as unknown as { db: { close: () => void } | null };
+      storageHandle.db = null;
+      await withinTimeout(storageService.init(), 'storageService.init()');
+      openDbs.push({ close: () => storageHandle.db?.close() });
+      expect((await storageService.getAllMessages()).map((m) => m.text)).toEqual([
+        'WRITTEN-AT-V7',
+      ]);
     });
   });
 
@@ -473,15 +464,15 @@ describe('dbSchema', () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
       expect(db.objectStoreNames.contains('messages')).toBe(true);
-      expect(db.objectStoreNames.contains('message-favorites')).toBe(true);
       expect(db.objectStoreNames.contains('moods')).toBe(true);
       expect(db.objectStoreNames.contains('sw-auth')).toBe(true);
       expect(db.objectStoreNames.contains('local-copies')).toBe(true);
       expect(db.objectStoreNames.contains('image-cache')).toBe(true);
       expect(db.objectStoreNames.contains('note-queue')).toBe(true);
-      expect(db.objectStoreNames.length).toBe(7);
+      expect(db.objectStoreNames.length).toBe(6);
 
       const remaining = Array.from(unwrap(db).objectStoreNames);
+      expect(remaining).not.toContain('message-favorites');
       expect(remaining).not.toContain('photos');
       expect(remaining).not.toContain('scripture-sessions');
       expect(remaining).not.toContain('scripture-reflections');
@@ -489,9 +480,10 @@ describe('dbSchema', () => {
       expect(remaining).not.toContain('scripture-messages');
 
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V9' });
-      expect((await db.getAll('message-favorites'))[0]).toEqual({
-        messageId: 1,
-        userId: 'USER-A',
+      // v15: USER-A (the sw-auth account) keeps its favorite of bundled row 1.
+      expect((await db.get('local-copies', ['USER-A', 'message-data']))?.value).toMatchObject({
+        custom: [],
+        bundledFavoriteIds: [1],
       });
       expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V9' });
       expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V9' });
@@ -564,12 +556,12 @@ describe('dbSchema', () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('photos');
-      // The four survivors plus v12's local-copies, v13's image-cache and v14's note-queue.
-      expect(db.objectStoreNames.length).toBe(7);
+      // Three survivors (message-favorites goes at v15) plus v12's local-copies,
+      // v13's image-cache and v14's note-queue.
+      expect(db.objectStoreNames.length).toBe(6);
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
-      expect((await db.getAll('message-favorites'))[0]).toEqual({
-        messageId: 1,
-        userId: 'USER-A',
+      expect((await db.get('local-copies', ['USER-A', 'message-data']))?.value).toMatchObject({
+        bundledFavoriteIds: [1],
       });
       expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V10' });
       expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V10' });
@@ -582,7 +574,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(7);
+      expect(db.objectStoreNames.length).toBe(6);
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
     });
   });
@@ -623,7 +615,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(7);
+      expect(db.objectStoreNames.length).toBe(6);
       const copies = db.transaction('local-copies', 'readonly').objectStore('local-copies');
       expect(Array.from(copies.keyPath as string[])).toEqual(['userId', 'kind']);
       expect(copies.indexNames.contains('by-user')).toBe(true);
@@ -650,7 +642,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(7);
+      expect(db.objectStoreNames.length).toBe(6);
       expect(await db.get('local-copies', ['USER-A', 'partner'])).toMatchObject({
         value: { status: 'unlinked' },
       });
@@ -706,7 +698,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(7);
+      expect(db.objectStoreNames.length).toBe(6);
       const images = db.transaction('image-cache', 'readonly').objectStore('image-cache');
       expect(Array.from(images.keyPath as string[])).toEqual(['userId', 'path']);
       expect(images.indexNames.contains('by-user')).toBe(true);
@@ -722,7 +714,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(7);
+      expect(db.objectStoreNames.length).toBe(6);
       const images = db.transaction('image-cache', 'readonly').objectStore('image-cache');
       expect(images.indexNames.contains('by-user')).toBe(true);
       expect(
@@ -785,7 +777,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(7);
+      expect(db.objectStoreNames.length).toBe(6);
       const queue = db.transaction('note-queue', 'readonly').objectStore('note-queue');
       expect(queue.keyPath).toBe('id');
       expect(queue.indexNames.contains('by-user')).toBe(true);
@@ -801,12 +793,243 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(7);
+      expect(db.objectStoreNames.length).toBe(6);
       const queue = db.transaction('note-queue', 'readonly').objectStore('note-queue');
       expect(queue.indexNames.contains('by-user')).toBe(true);
       expect(await db.getAllFromIndex('note-queue', 'by-user', 'USER-A')).toEqual([
         expect.objectContaining({ id: 'temp-QUEUED-AT-V13', content: 'queued before v14' }),
       ]);
+    });
+  });
+
+  describe('upgrade to v15 (custom messages and favorites onto the local copy)', () => {
+    const A = 'USER-A';
+    const B = 'USER-B';
+    const BUNDLED = ['DAILY-1', 'DAILY-2', 'DAILY-3', 'DAILY-4', 'DAILY-5'];
+
+    type LegacyRow = Record<string, unknown>;
+
+    /**
+     * A pre-v15 profile: bundled rows 1-5, then custom rows written by A and B
+     * interleaved (ids 6-10) and one legacy unowned custom row (id 11).
+     * `version` 14 carries every v9-v14 store; 8 has no message-favorites and
+     * relies on the legacy `isFavorite` flag.
+     */
+    async function seedLegacy(options: {
+      version: 8 | 14;
+      token: string | null;
+      favorites?: Array<{ messageId: number; userId: string }>;
+      extraRows?: LegacyRow[];
+    }): Promise<void> {
+      const db = await openDB(DB_NAME, options.version, {
+        upgrade(database) {
+          const messages = database.createObjectStore('messages', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          messages.createIndex('by-category', 'category');
+          messages.createIndex('by-date', 'createdAt');
+          messages.createIndex('by-user', 'userId');
+          database
+            .createObjectStore('moods', { keyPath: 'id', autoIncrement: true })
+            .createIndex('by-user-date', ['userId', 'date'], { unique: true });
+          database.createObjectStore('sw-auth', { keyPath: 'id' });
+          if (options.version === 14) {
+            database
+              .createObjectStore('message-favorites', { keyPath: ['messageId', 'userId'] })
+              .createIndex('by-user', 'userId');
+            for (const name of ['local-copies', 'image-cache'] as const) {
+              database
+                .createObjectStore(name, { keyPath: ['userId', name === 'local-copies' ? 'kind' : 'path'] })
+                .createIndex('by-user', 'userId');
+            }
+            database.createObjectStore('note-queue', { keyPath: 'id' }).createIndex('by-user', 'userId');
+          } else {
+            database.createObjectStore('photos', { keyPath: 'id', autoIncrement: true });
+          }
+        },
+      });
+
+      const createdAt = new Date('2026-01-01T00:00:00.000Z');
+      const rows: LegacyRow[] = [
+        ...BUNDLED.map((text) => ({ text, category: 'reason', isCustom: false, createdAt })),
+        { text: 'A-ONE', category: 'custom', isCustom: true, userId: A, serverId: 'srv-a1', active: true, createdAt },
+        { text: 'B-ONE', category: 'custom', isCustom: true, userId: B, serverId: 'srv-b1', active: true, createdAt },
+        { text: 'A-TWO', category: 'custom', isCustom: true, userId: A, serverId: 'srv-a2', active: false, createdAt },
+        { text: 'B-TWO', category: 'custom', isCustom: true, userId: B, serverId: 'srv-b2', active: true, createdAt },
+        { text: 'A-THREE', category: 'memory', isCustom: true, userId: A, serverId: 'srv-a3', active: true, createdAt, tags: ['t'] },
+        { text: 'LEGACY-UNOWNED', category: 'custom', isCustom: true, active: true, createdAt },
+        ...(options.extraRows ?? []),
+      ];
+      for (const row of rows) await db.add('messages', row as never);
+      if (options.token) {
+        await db.put('sw-auth', {
+          id: 'current',
+          accessToken: 'a',
+          refreshToken: 'r',
+          expiresAt: 1,
+          userId: options.token,
+        } as never);
+      }
+      for (const favorite of options.favorites ?? []) {
+        await db.put('message-favorites' as never, favorite as never);
+      }
+      db.close();
+    }
+
+    async function readCopy(db: Awaited<ReturnType<typeof openTestDb>>, userId: string) {
+      return (await db.get('local-copies', [userId, 'message-data']))?.value as
+        | { custom: Array<Record<string, unknown>>; bundledFavoriteIds: number[]; nextCustomId: number }
+        | undefined;
+    }
+
+    it('moves the signed-in account’s rows (same ids) and favorites into its copy, then drops every custom row and the legacy stores', async () => {
+      await seedLegacy({
+        version: 14,
+        token: A,
+        favorites: [
+          { messageId: 2, userId: A }, // bundled
+          { messageId: 10, userId: A }, // A-THREE
+          { messageId: 3, userId: B }, // B's bundled favorite: not A's
+          { messageId: 7, userId: B }, // B-ONE
+        ],
+      });
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      const copy = await readCopy(db, A);
+      expect(copy?.custom.map((row) => [row.id, row.text, row.serverId, row.isFavorite])).toEqual([
+        [6, 'A-ONE', 'srv-a1', false],
+        [8, 'A-TWO', 'srv-a2', false],
+        [10, 'A-THREE', 'srv-a3', true],
+      ]);
+      expect(copy?.custom[1]).toMatchObject({ active: false, isCustom: true, userId: A });
+      expect(copy?.custom[2]).toMatchObject({ category: 'memory', tags: ['t'] });
+      expect(copy?.bundledFavoriteIds).toEqual([2]);
+      // Above every id the store ever held, so no deleted row's id comes back.
+      expect(copy?.nextCustomId).toBe(12);
+
+      // Only the bundled rows remain, unchanged.
+      expect((await db.getAll('messages')).map((row) => [row.id, row.text])).toEqual(
+        BUNDLED.map((text, index) => [index + 1, text])
+      );
+      const messages = db.transaction('messages', 'readonly').objectStore('messages');
+      expect((messages.indexNames as DOMStringList).contains('by-user')).toBe(false);
+      expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
+      expect(db.objectStoreNames.length).toBe(6);
+    });
+
+    it('deletes a stale account’s rows and favorites with the stores instead of copying them', async () => {
+      await seedLegacy({
+        version: 14,
+        token: A,
+        favorites: [
+          { messageId: 7, userId: B },
+          { messageId: 3, userId: B },
+        ],
+      });
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(await readCopy(db, B)).toBeUndefined();
+      const texts = (await db.getAll('messages')).map((row) => row.text);
+      expect(texts).not.toContain('B-ONE');
+      expect(texts).not.toContain('B-TWO');
+      expect(texts).not.toContain('LEGACY-UNOWNED');
+      expect(await db.getAllFromIndex('local-copies', 'by-user', B)).toEqual([]);
+    });
+
+    it('copies nothing when nobody is signed in, and still deletes the custom rows and favorites', async () => {
+      await seedLegacy({ version: 14, token: null, favorites: [{ messageId: 6, userId: A }] });
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      expect(await db.getAll('local-copies')).toEqual([]);
+      expect((await db.getAll('messages')).every((row) => !row.isCustom)).toBe(true);
+      expect(await db.count('messages')).toBe(BUNDLED.length);
+      expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
+    });
+
+    it('from v8, keeps only an owned custom row’s legacy isFavorite flag', async () => {
+      await seedLegacy({
+        version: 8,
+        token: A,
+        extraRows: [
+          {
+            text: 'A-LEGACY-FAVORITE',
+            category: 'custom',
+            isCustom: true,
+            userId: A,
+            serverId: 'srv-a4',
+            isFavorite: true,
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+        ],
+      });
+      // A bundled row's legacy flag names no account.
+      const flagged = await openDB(DB_NAME, 8);
+      const bundledRow = (await flagged.get('messages', 1)) as Record<string, unknown>;
+      await flagged.put('messages', { ...bundledRow, isFavorite: true } as never);
+      flagged.close();
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+
+      const copy = await readCopy(db, A);
+      expect(copy?.custom.map((row) => [row.id, row.text, row.isFavorite])).toEqual([
+        [6, 'A-ONE', false],
+        [8, 'A-TWO', false],
+        [10, 'A-THREE', false],
+        [12, 'A-LEGACY-FAVORITE', true],
+      ]);
+      expect(copy?.bundledFavoriteIds).toEqual([]);
+      expect(copy?.nextCustomId).toBe(13);
+      expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
+      expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('photos');
+      expect((await db.getAll('messages')).every((row) => !row.isCustom)).toBe(true);
+    });
+
+    it('keeps the rotation identical: same pool order, same message every day', async () => {
+      await seedLegacy({ version: 14, token: A });
+
+      // Before: what storageService handed the rotation — every row A could
+      // see, in key order, inactive custom rows filtered out by the slice.
+      const before = await openDB(DB_NAME, 14);
+      const visible = (await before.getAll('messages')).filter(
+        (row: { isCustom?: boolean; userId?: string }) => !row.isCustom || row.userId === A
+      ) as Message[];
+      before.close();
+      const poolBefore = visible.filter((m) => !m.isCustom || m.active !== false);
+
+      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+      const copy = await readCopy(db, A);
+      const poolAfter = projectMessageFavorites(
+        (await db.getAll('messages')) as Message[],
+        copy as never
+      ).filter((m) => !m.isCustom || m.active !== false);
+
+      expect(poolAfter.map((m) => m.id)).toEqual(poolBefore.map((m) => m.id));
+      for (let day = 0; day < 60; day++) {
+        const date = new Date(2026, 8, 1 + day);
+        const was = getDailyMessage(poolBefore, date);
+        const is = getDailyMessage(poolAfter, date);
+        expect([is.id, is.text]).toEqual([was.id, was.text]);
+      }
+    });
+
+    it('writes nothing on a later upgrade of a migrated profile, and keeps an existing copy', async () => {
+      await seedLegacy({ version: 14, token: A });
+      const migrated = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+      const saved = await migrated.get('local-copies', [A, 'message-data']);
+      await migrated.put('local-copies', {
+        ...saved!,
+        value: { custom: [], bundledFavoriteIds: [4], nextCustomId: 40 },
+      });
+      migrated.close();
+
+      // A later version re-runs upgradeDb: nothing legacy is left to move.
+      const next = await openTestDb(DB_NAME, DB_VERSION + 1, { upgrade: upgradeDb });
+      expect(await readCopy(next, A)).toEqual({ custom: [], bundledFavoriteIds: [4], nextCustomId: 40 });
+      expect(await next.count('messages')).toBe(BUNDLED.length);
     });
   });
 
@@ -980,13 +1203,11 @@ describe('dbSchema', () => {
 
     it('does not treat a closed service wrapper as already initialized', async () => {
       const { moodService } = await import('../../../src/services/moodService');
-      const { customMessageService } = await import('../../../src/services/customMessageService');
       const { storageService } = await import('../../../src/services/storage');
 
       type Handle = { db: { close: () => void } | null };
       const holders: Array<{ service: { init: () => Promise<void> }; handle: Handle }> = [
         { service: moodService, handle: moodService as unknown as Handle },
-        { service: customMessageService, handle: customMessageService as unknown as Handle },
         { service: storageService, handle: storageService as unknown as Handle },
       ];
 
@@ -1030,9 +1251,8 @@ describe('dbSchema', () => {
       const messagesStore = messagesTx.objectStore('messages');
       expect(messagesStore.indexNames.contains('by-category')).toBe(true);
       expect(messagesStore.indexNames.contains('by-date')).toBe(true);
-      // v8: custom messages carry an owner, so one account's rows can be
-      // separated from another's on a shared device.
-      expect(messagesStore.indexNames.contains('by-user')).toBe(true);
+      // v15: the store holds bundled rows only, so it has no owner index.
+      expect((messagesStore.indexNames as DOMStringList).contains('by-user')).toBe(false);
 
       // moods index (compound, unique on [userId, date])
       const moodsTx = db.transaction('moods', 'readonly');
@@ -1045,7 +1265,6 @@ describe('dbSchema', () => {
     it('should have correct core store names', () => {
       expect(STORE_NAMES).toEqual({
         MESSAGES: 'messages',
-        MESSAGE_FAVORITES: 'message-favorites',
         MOODS: 'moods',
         SW_AUTH: 'sw-auth',
         LOCAL_COPIES: 'local-copies',
@@ -1066,8 +1285,9 @@ describe('dbSchema', () => {
       // v8 adds by-user to messages; v9 stores favorites by account; v10 drops
       // the four scripture stores; v11 drops the unused photos store; v12 adds
       // the shared per-account local-copies store; v13 adds the per-account
-      // image-cache store; v14 adds the per-account note-queue store.
-      expect(DB_VERSION).toBe(14);
+      // image-cache store; v14 adds the per-account note-queue store; v15
+      // moves custom messages and favorites onto the message-data local copy.
+      expect(DB_VERSION).toBe(15);
     });
   });
 });

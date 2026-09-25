@@ -1,9 +1,9 @@
 /**
  * Always-succeeding stand-ins for the Supabase half of custom messages and
- * favorites, for tests that drive the real IndexedDB mirror.
+ * favorites, for tests that drive the real message-data local copy.
  *
  * `customMessageService` and `storageService.toggleFavorite` write the server
- * first; these fakes let a test exercise the mirror without a network. Wire
+ * first; these fakes let a test exercise the copy without a network. Wire
  * them with a partial mock so the pure helpers (`isMessageCategory`,
  * `bundledMessageKey`, `hashText`) stay real:
  *
