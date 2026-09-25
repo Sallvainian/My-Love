@@ -56,7 +56,7 @@ function setConnection(connection: object | undefined) {
 async function renderSettings() {
   render(<Settings />);
   await waitFor(() =>
-    expect(screen.getByTestId('settings-display-name').textContent).toBe('Frankie')
+    expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie')
   );
 }
 
@@ -65,7 +65,7 @@ describe('Settings: Download photos over mobile data', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     backend.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Frankie' });
+    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Jessie' });
     act(() => setPhotosOverMobileData(false));
     localStorage.removeItem(PHOTOS_OVER_MOBILE_DATA_KEY);
   });

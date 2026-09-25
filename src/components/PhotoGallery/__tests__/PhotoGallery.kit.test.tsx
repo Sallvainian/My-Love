@@ -56,8 +56,8 @@ async function renderGallery(onUploadClick = vi.fn()) {
 
 beforeEach(() => {
   resetFakePhotoStore();
-  names.own.mockResolvedValue('Frankie');
-  names.partner.mockResolvedValue('Gracie');
+  names.own.mockResolvedValue('Jessie');
+  names.partner.mockResolvedValue('Harper');
   listPhotos.mockResolvedValue(page(12));
 });
 
@@ -72,7 +72,7 @@ describe('PhotoGallery grid', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Photos' })).toBeTruthy();
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe(
-      '12 photos · shared with Gracie'
+      '12 photos · shared with Harper'
     );
 
     const upload = screen.getByTestId('photo-gallery-upload-fab');
@@ -103,7 +103,7 @@ describe('PhotoGallery grid', () => {
 
     // The whole list is held, so the count is exact, never "20+".
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe(
-      '25 photos · shared with Gracie'
+      '25 photos · shared with Harper'
     );
     expect(screen.getAllByTestId('photo-grid-item')).toHaveLength(20);
   });
@@ -113,7 +113,7 @@ describe('PhotoGallery grid', () => {
     await renderGallery();
 
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe(
-      '1 photo · shared with Gracie'
+      '1 photo · shared with Harper'
     );
   });
 
@@ -152,14 +152,14 @@ describe('PhotoGallery owner badge', () => {
     expect(own.className).toContain('w-5');
     expect(own.className).toContain('left-1.5');
     expect(own.className).toContain('bottom-1.5');
-    expect(own.querySelector('[aria-hidden="true"]')?.textContent).toBe('F');
+    expect(own.querySelector('[aria-hidden="true"]')?.textContent).toBe('J');
     expect(own.querySelector('.sr-only')?.textContent).toBe('Uploaded by you');
 
     expect(partner.className).toContain('bg-partner');
     expect(partner.className).toContain('text-card');
     expect(partner.className).not.toContain('text-white');
-    expect(partner.querySelector('[aria-hidden="true"]')?.textContent).toBe('G');
-    expect(partner.querySelector('.sr-only')?.textContent).toBe('Uploaded by Gracie');
+    expect(partner.querySelector('[aria-hidden="true"]')?.textContent).toBe('H');
+    expect(partner.querySelector('.sr-only')?.textContent).toBe('Uploaded by Harper');
 
     // The tile's aria-label wins over its content, so the uploader reaches
     // assistive tech through aria-describedby.
@@ -167,11 +167,11 @@ describe('PhotoGallery owner badge', () => {
     const describedText = (tile: HTMLElement) =>
       document.getElementById(tile.getAttribute('aria-describedby') ?? '')?.textContent;
     expect(describedText(ownTile)).toBe('Uploaded by you');
-    expect(describedText(partnerTile)).toBe('Uploaded by Gracie');
+    expect(describedText(partnerTile)).toBe('Uploaded by Harper');
   });
 
   it('keeps a name that opens with an emoji whole on the badge', async () => {
-    names.partner.mockResolvedValue('🌸Gracie');
+    names.partner.mockResolvedValue('🌸Harper');
     listPhotos.mockResolvedValue([photo(0, false)]);
     await renderGallery();
 
@@ -245,7 +245,7 @@ describe('PhotoGallery load error', () => {
 
     expect(screen.queryByTestId('photo-gallery-error-state')).toBeNull();
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe(
-      '12 photos · shared with Gracie'
+      '12 photos · shared with Harper'
     );
   });
 });

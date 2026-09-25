@@ -22,7 +22,7 @@ vi.mock('../../../stores/useAppStore', () => ({ useAppStore: () => state }));
 import { moodSyncService } from '../../../api/moodSyncService';
 import { PartnerMoodView } from '../PartnerMoodView';
 
-const PARTNER_DISPLAY_NAME = 'Gracie';
+const PARTNER_DISPLAY_NAME = 'Harper';
 
 function mood(overrides: Partial<MoodEntry>): MoodEntry {
   return {
@@ -94,7 +94,7 @@ describe('PartnerMoodView on the kit', () => {
     state = makeState({ partnerMoods: SEVERAL });
     render(<PartnerMoodView />);
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Gracie$/);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Harper$/);
 
     const cards = screen.getAllByTestId('partner-mood-card');
     expect(cards).toHaveLength(3);

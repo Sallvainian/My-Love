@@ -50,7 +50,7 @@ import { Settings } from '../Settings';
 async function renderSettings(props: { onShowWelcome?: () => void } = {}) {
   render(<Settings {...props} />);
   await waitFor(() =>
-    expect(screen.getByTestId('settings-display-name').textContent).toBe('Frankie')
+    expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie')
   );
 }
 
@@ -59,7 +59,7 @@ describe('Settings on the kit', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     backend.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Frankie' });
+    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Jessie' });
   });
 
   afterEach(() => {
@@ -160,7 +160,7 @@ describe('Settings on the kit', () => {
 
     expect(await screen.findByText('person@example.com')).toBeInTheDocument();
     expect(screen.getByText('Signed in')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-avatar').textContent).toBe('F');
+    expect(screen.getByTestId('settings-avatar').textContent).toBe('J');
   });
 
   it('takes the avatar initial from the email when no display name is set', async () => {
@@ -175,10 +175,10 @@ describe('Settings on the kit', () => {
   });
 
   it('shows a whole emoji, not half a surrogate pair, for an emoji-led name', async () => {
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: '💖 Frankie' });
+    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: '💖 Jessie' });
     render(<Settings />);
     await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('💖 Frankie')
+      expect(screen.getByTestId('settings-display-name').textContent).toBe('💖 Jessie')
     );
 
     expect(await screen.findByText('person@example.com')).toBeInTheDocument();
@@ -186,10 +186,10 @@ describe('Settings on the kit', () => {
   });
 
   it('shows a whole multi-code-point emoji for a name led by a skin-tone emoji', async () => {
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: '👍🏽 Frankie' });
+    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: '👍🏽 Jessie' });
     render(<Settings />);
     await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('👍🏽 Frankie')
+      expect(screen.getByTestId('settings-display-name').textContent).toBe('👍🏽 Jessie')
     );
 
     expect(await screen.findByText('person@example.com')).toBeInTheDocument();

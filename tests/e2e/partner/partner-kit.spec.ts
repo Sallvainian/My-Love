@@ -30,7 +30,7 @@ const KIT_CARD = {
 } as const;
 
 const PARTNER_ID = randomUUID();
-const PARTNER_NAME = 'Gracie Evangeline Montgomery-Whitfield';
+const PARTNER_NAME = 'Harper Evangeline Montgomery-Whitfield';
 
 /** User-authored text that may legitimately carry emoji. */
 const USER_NOTES = '[data-testid="partner-mood-entry-note"]';

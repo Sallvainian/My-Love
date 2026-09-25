@@ -70,13 +70,13 @@ describe('couplePair', () => {
 describe('fetchCoupleSettings', () => {
   it('reads the ordered pair and returns the start as an ISO string', async () => {
     results.push({
-      data: { user_a: LOW, user_b: HIGH, relationship_start: '2025-10-18T22:00:00+00:00' },
+      data: { user_a: LOW, user_b: HIGH, relationship_start: '2025-10-04T22:00:00+00:00' },
       error: null,
     });
 
     const settings = await coupleSettingsService.fetchCoupleSettings(HIGH, LOW);
 
-    expect(settings).toEqual({ relationshipStart: '2025-10-18T22:00:00.000Z', weddingDate: null });
+    expect(settings).toEqual({ relationshipStart: '2025-10-04T22:00:00.000Z', weddingDate: null });
     expect(calls[0].table).toBe('couple_settings');
     expect(argsOf('eq')).toEqual([
       ['user_a', LOW],
@@ -95,7 +95,7 @@ describe('fetchCoupleSettings', () => {
 
   it('returns the wedding date as the server stored it, and an unreadable one as unset', async () => {
     results.push({
-      data: { user_a: LOW, user_b: HIGH, relationship_start: null, wedding_date: '2027-06-12' },
+      data: { user_a: LOW, user_b: HIGH, relationship_start: null, wedding_date: '2027-06-19' },
       error: null,
     });
     results.push({
@@ -105,7 +105,7 @@ describe('fetchCoupleSettings', () => {
 
     expect(await coupleSettingsService.fetchCoupleSettings(LOW, HIGH)).toEqual({
       relationshipStart: null,
-      weddingDate: '2027-06-12',
+      weddingDate: '2027-06-19',
     });
     expect(await coupleSettingsService.fetchCoupleSettings(LOW, HIGH)).toEqual({
       relationshipStart: null,
@@ -134,18 +134,18 @@ describe('fetchCoupleSettings', () => {
 describe('saveStartDate', () => {
   it('upserts the ordered pair on its key and returns the stored start', async () => {
     results.push({
-      data: { user_a: LOW, user_b: HIGH, relationship_start: '2025-10-18T22:00:00+00:00' },
+      data: { user_a: LOW, user_b: HIGH, relationship_start: '2025-10-04T22:00:00+00:00' },
       error: null,
     });
 
-    const saved = await coupleSettingsService.saveStartDate(HIGH, LOW, '2025-10-18T22:00:00.000Z');
+    const saved = await coupleSettingsService.saveStartDate(HIGH, LOW, '2025-10-04T22:00:00.000Z');
 
-    expect(saved).toEqual({ relationshipStart: '2025-10-18T22:00:00.000Z', weddingDate: null });
+    expect(saved).toEqual({ relationshipStart: '2025-10-04T22:00:00.000Z', weddingDate: null });
     const [[row, options]] = argsOf('upsert') as [[Record<string, unknown>, unknown]];
     expect(row).toMatchObject({
       user_a: LOW,
       user_b: HIGH,
-      relationship_start: '2025-10-18T22:00:00.000Z',
+      relationship_start: '2025-10-04T22:00:00.000Z',
     });
     expect(typeof row.updated_at).toBe('string');
     expect(options).toEqual({ onConflict: 'user_a,user_b' });
@@ -155,7 +155,7 @@ describe('saveStartDate', () => {
     setOnline(false);
 
     const failure = await coupleSettingsService
-      .saveStartDate(LOW, HIGH, '2025-10-18T22:00:00.000Z')
+      .saveStartDate(LOW, HIGH, '2025-10-04T22:00:00.000Z')
       .catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(AccountDataError);
@@ -177,21 +177,21 @@ describe('saveWeddingDate', () => {
       data: {
         user_a: LOW,
         user_b: HIGH,
-        relationship_start: '2025-10-18T22:00:00+00:00',
-        wedding_date: '2027-06-12',
+        relationship_start: '2025-10-04T22:00:00+00:00',
+        wedding_date: '2027-06-19',
       },
       error: null,
     });
 
-    const saved = await coupleSettingsService.saveWeddingDate(HIGH, LOW, '2027-06-12');
+    const saved = await coupleSettingsService.saveWeddingDate(HIGH, LOW, '2027-06-19');
 
     expect(saved).toEqual({
-      relationshipStart: '2025-10-18T22:00:00.000Z',
-      weddingDate: '2027-06-12',
+      relationshipStart: '2025-10-04T22:00:00.000Z',
+      weddingDate: '2027-06-19',
     });
     const [[row, options]] = argsOf('upsert') as [[Record<string, unknown>, unknown]];
     expect(Object.keys(row).sort()).toEqual(['updated_at', 'user_a', 'user_b', 'wedding_date']);
-    expect(row).toMatchObject({ user_a: LOW, user_b: HIGH, wedding_date: '2027-06-12' });
+    expect(row).toMatchObject({ user_a: LOW, user_b: HIGH, wedding_date: '2027-06-19' });
     expect(options).toEqual({ onConflict: 'user_a,user_b' });
   });
 
@@ -213,7 +213,7 @@ describe('saveWeddingDate', () => {
       AccountDataError
     );
     setOnline(false);
-    await expect(coupleSettingsService.saveWeddingDate(LOW, HIGH, '2027-06-12')).rejects.toMatchObject({
+    await expect(coupleSettingsService.saveWeddingDate(LOW, HIGH, '2027-06-19')).rejects.toMatchObject({
       code: 'offline',
     });
     expect(calls).toHaveLength(0);

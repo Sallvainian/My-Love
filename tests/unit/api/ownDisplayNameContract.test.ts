@@ -78,13 +78,13 @@ describe('own display name contract', () => {
 
   describe('a chosen name is returned as chosen', () => {
     it('returns a name the user picked', async () => {
-      singleResult = { data: { display_name: 'Frankie' }, error: null };
-      await expect(lookup()).resolves.toEqual({ status: 'chosen', displayName: 'Frankie' });
+      singleResult = { data: { display_name: 'Jessie' }, error: null };
+      await expect(lookup()).resolves.toEqual({ status: 'chosen', displayName: 'Jessie' });
     });
 
     it('trims the stored value rather than rejecting it', async () => {
-      singleResult = { data: { display_name: '  Frankie  ' }, error: null };
-      await expect(lookup()).resolves.toEqual({ status: 'chosen', displayName: 'Frankie' });
+      singleResult = { data: { display_name: '  Jessie  ' }, error: null };
+      await expect(lookup()).resolves.toEqual({ status: 'chosen', displayName: 'Jessie' });
     });
 
     it("accepts a name that merely contains the email, rather than equalling it", async () => {
@@ -115,8 +115,8 @@ describe('own display name contract', () => {
 
     it('keeps a chosen name when the session carries no email at all', async () => {
       sessionResult = { data: { session: { user: { id: USER_ID } } }, error: null };
-      singleResult = { data: { display_name: 'Frankie' }, error: null };
-      await expect(lookup()).resolves.toEqual({ status: 'chosen', displayName: 'Frankie' });
+      singleResult = { data: { display_name: 'Jessie' }, error: null };
+      await expect(lookup()).resolves.toEqual({ status: 'chosen', displayName: 'Jessie' });
     });
   });
 
@@ -169,7 +169,7 @@ describe('own display name contract', () => {
 
   describe('getOwnDisplayName collapses the three answers for renderers', () => {
     it.each([
-      ['a chosen name', { data: { display_name: 'Frankie' }, error: null }, 'Frankie'],
+      ['a chosen name', { data: { display_name: 'Jessie' }, error: null }, 'Jessie'],
       ['a seed fallback', { data: { display_name: EMAIL }, error: null }, null],
       ['a failed read', { data: null, error: { code: '500', message: 'boom' } }, null],
     ])('returns %s', async (_label, result, expected) => {

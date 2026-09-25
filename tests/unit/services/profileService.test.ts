@@ -99,31 +99,31 @@ describe('fetchOwnProfile', () => {
 
 describe('saveBirthday', () => {
   it('updates only birthday and updated_at on the own row', async () => {
-    results.push({ data: { display_name: 'Sam', birthday: '1998-03-10' }, error: null });
+    results.push({ data: { display_name: 'Sam', birthday: '2000-05-20' }, error: null });
 
-    const saved = await profileService.saveBirthday('1998-03-10');
+    const saved = await profileService.saveBirthday('2000-05-20');
 
-    expect(saved).toEqual({ displayName: 'Sam', birthday: '1998-03-10' });
+    expect(saved).toEqual({ displayName: 'Sam', birthday: '2000-05-20' });
     const [[patch]] = argsOf('update') as [[Record<string, unknown>]];
     expect(Object.keys(patch).sort()).toEqual(['birthday', 'updated_at']);
-    expect(patch.birthday).toBe('1998-03-10');
+    expect(patch.birthday).toBe('2000-05-20');
     expect(argsOf('eq')).toEqual([['id', 'SELF-ID']]);
   });
 
   it('throws when no row was updated', async () => {
     results.push({ data: null, error: null });
 
-    await expect(profileService.saveBirthday('1998-03-10')).rejects.toBeInstanceOf(
+    await expect(profileService.saveBirthday('2000-05-20')).rejects.toBeInstanceOf(
       AccountDataError
     );
   });
 
   it('refuses offline, and an unreadable date, before any request', async () => {
-    await expect(profileService.saveBirthday('1998-02-30')).rejects.toBeInstanceOf(
+    await expect(profileService.saveBirthday('2000-02-30')).rejects.toBeInstanceOf(
       AccountDataError
     );
     setOnline(false);
-    await expect(profileService.saveBirthday('1998-03-10')).rejects.toMatchObject({
+    await expect(profileService.saveBirthday('2000-05-20')).rejects.toMatchObject({
       code: 'offline',
     });
     expect(calls).toHaveLength(0);

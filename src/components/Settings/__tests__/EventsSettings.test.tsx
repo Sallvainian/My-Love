@@ -272,7 +272,7 @@ describe('EventsSettings list', () => {
         makeEvent({ id: 'past-1', label: 'Last Christmas', date: new Date(2020, 11, 25) }),
         makeEvent({
           id: 'future-1',
-          label: 'Gracie visits',
+          label: 'Harper visits',
           date: new Date(2026, 8, 12),
           description: 'Two whole weeks',
         }),
@@ -283,7 +283,7 @@ describe('EventsSettings list', () => {
 
     expect(screen.getByTestId('event-label-past-1')).toHaveTextContent('Last Christmas');
     expect(screen.getByTestId('event-date-past-1')).toHaveTextContent('December 25, 2020');
-    expect(screen.getByTestId('event-label-future-1')).toHaveTextContent('Gracie visits');
+    expect(screen.getByTestId('event-label-future-1')).toHaveTextContent('Harper visits');
     expect(screen.getByTestId('event-date-future-1')).toHaveTextContent('September 12, 2026');
     expect(screen.getByTestId('event-description-future-1')).toHaveTextContent('Two whole weeks');
   });
@@ -914,13 +914,13 @@ describe('EventsSettings add', () => {
     await renderSection();
     openAddForm();
 
-    fillForm({ label: '  Gracie visits  ', date: '2026-09-12', description: '  Two weeks  ' });
+    fillForm({ label: '  Harper visits  ', date: '2026-09-12', description: '  Two weeks  ' });
     fireEvent.click(screen.getByTestId('events-form-icon-plane'));
     submitForm();
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     expect(store.state.addEvent).toHaveBeenCalledWith({
-      label: 'Gracie visits',
+      label: 'Harper visits',
       eventDate: '2026-09-12',
       description: 'Two weeks',
       icon: 'plane',
@@ -1083,7 +1083,7 @@ describe('EventsSettings edit', () => {
       events: [
         makeEvent({
           id: 'mine',
-          label: 'Gracie visits',
+          label: 'Harper visits',
           date: new Date(2026, 8, 12),
           description: 'Two whole weeks',
           icon: 'plane',
@@ -1097,7 +1097,7 @@ describe('EventsSettings edit', () => {
 
     fireEvent.click(screen.getByTestId('event-edit-mine'));
 
-    expect(screen.getByTestId('events-form-label')).toHaveValue('Gracie visits');
+    expect(screen.getByTestId('events-form-label')).toHaveValue('Harper visits');
     // formatDateISO over local components — the row above and this field name
     // the same calendar day.
     expect(screen.getByTestId('events-form-date')).toHaveValue('2026-09-12');
@@ -1113,7 +1113,7 @@ describe('EventsSettings edit', () => {
     // shape that makes the two disagree under the pinned zone.
     setStore({
       events: [
-        makeEvent({ id: 'mine', label: 'Gracie visits', date: new Date(2026, 8, 12, 20, 0, 0) }),
+        makeEvent({ id: 'mine', label: 'Harper visits', date: new Date(2026, 8, 12, 20, 0, 0) }),
       ] as AppState['events'],
     });
 
@@ -1125,18 +1125,18 @@ describe('EventsSettings edit', () => {
 
   it('routes the save through editEvent with the row id', async () => {
     setStore({
-      events: [makeEvent({ id: 'mine', label: 'Gracie visits' })] as AppState['events'],
+      events: [makeEvent({ id: 'mine', label: 'Harper visits' })] as AppState['events'],
     });
 
     await renderSection();
     fireEvent.click(screen.getByTestId('event-edit-mine'));
 
-    fillForm({ label: 'Gracie arrives', date: '2026-10-01' });
+    fillForm({ label: 'Harper arrives', date: '2026-10-01' });
     submitForm();
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     expect(store.state.editEvent).toHaveBeenCalledWith('mine', {
-      label: 'Gracie arrives',
+      label: 'Harper arrives',
       eventDate: '2026-10-01',
       description: null,
       icon: 'calendar',
@@ -1538,7 +1538,7 @@ describe.each(['add', 'edit'] as const)('EventsSettings %s save reconciliation',
 describe('EventsSettings delete', () => {
   it('asks for confirmation before deleting', async () => {
     setStore({
-      events: [makeEvent({ id: 'mine', label: 'Gracie visits' })] as AppState['events'],
+      events: [makeEvent({ id: 'mine', label: 'Harper visits' })] as AppState['events'],
     });
 
     await renderSection();
@@ -1581,7 +1581,7 @@ describe('EventsSettings delete', () => {
 
   it('keeps the row and shows the returned message when the delete is rejected', async () => {
     setStore({
-      events: [makeEvent({ id: 'mine', label: 'Gracie visits' })] as AppState['events'],
+      events: [makeEvent({ id: 'mine', label: 'Harper visits' })] as AppState['events'],
       removeEvent: vi.fn(async () => ({
         success: false as const,
         code: 'not-found' as const,

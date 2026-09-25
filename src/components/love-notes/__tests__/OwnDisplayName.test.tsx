@@ -99,8 +99,8 @@ describe('own display name in the chat', () => {
   });
 
   it('shows the chosen profile name', async () => {
-    api.getOwnDisplayName.mockResolvedValue('Frankie');
-    await expectOwnName('Frankie');
+    api.getOwnDisplayName.mockResolvedValue('Jessie');
+    await expectOwnName('Jessie');
   });
 
   it('falls back to the email prefix when the profile carries only the seed', async () => {
@@ -135,7 +135,7 @@ describe('own display name in the chat', () => {
   });
 
   it('still reads the partner name from the profile row', async () => {
-    api.getOwnDisplayName.mockResolvedValue('Frankie');
+    api.getOwnDisplayName.mockResolvedValue('Jessie');
     render(<LoveNotes />);
     await waitFor(() => expect(screen.getByTestId('partner-name')).toHaveTextContent('Partner Name'));
   });
@@ -160,7 +160,7 @@ describe('own display name in the chat', () => {
    */
   describe('the partner-side fallback', () => {
     it("falls back to 'Partner', never to an address, when the lookup answers null", async () => {
-      api.getOwnDisplayName.mockResolvedValue('Frankie');
+      api.getOwnDisplayName.mockResolvedValue('Jessie');
       api.getPartnerDisplayName.mockResolvedValue(null);
 
       render(<LoveNotes />);

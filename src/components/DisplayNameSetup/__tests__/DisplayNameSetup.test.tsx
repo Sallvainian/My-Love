@@ -105,10 +105,10 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   });
 
   it('writes display_name scoped to the caller and completes', async () => {
-    const onComplete = submit('Frankie');
+    const onComplete = submit('Jessie');
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
-    expect(backend.updatePayload).toMatchObject({ display_name: 'Frankie' });
+    expect(backend.updatePayload).toMatchObject({ display_name: 'Jessie' });
     expect(backend.eqColumn).toBe('id');
     expect(backend.eqValue).toBe('user-a');
     expect(screen.queryByTestId('display-name-error')).not.toBeInTheDocument();
@@ -117,7 +117,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   it('sets updated_at itself, because no trigger does', async () => {
     // `public.users` has no BEFORE UPDATE trigger, and the column grant covers
     // exactly (display_name, updated_at) so this is the client's job.
-    const onComplete = submit('Frankie');
+    const onComplete = submit('Jessie');
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
     expect(typeof backend.updatePayload?.updated_at).toBe('string');
@@ -125,7 +125,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   });
 
   it('never writes auth metadata', async () => {
-    const onComplete = submit('Frankie');
+    const onComplete = submit('Jessie');
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
     expect(backend.updateUser).not.toHaveBeenCalled();
@@ -134,7 +134,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   it('sends no column the caller may not write', async () => {
     // `id`, `email`, `partner_id`, `created_at` are all outside the grant, and
     // naming any of them makes the whole PATCH a 42501.
-    const onComplete = submit('Frankie');
+    const onComplete = submit('Jessie');
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
     expect(Object.keys(backend.updatePayload ?? {}).sort()).toEqual(['display_name', 'updated_at']);
@@ -154,7 +154,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
         hint: '',
       }),
     };
-    const onComplete = submit('Frankie');
+    const onComplete = submit('Jessie');
 
     await waitFor(() =>
       expect(screen.getByTestId('display-name-error')).toHaveTextContent(
@@ -169,7 +169,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     // The RLS shape: no error, no rows, nothing saved. The old code would have
     // called onComplete here.
     backend.result = { data: [], error: null };
-    const onComplete = submit('Frankie');
+    const onComplete = submit('Jessie');
 
     await waitFor(() =>
       expect(screen.getByTestId('display-name-error')).toHaveTextContent(
@@ -183,7 +183,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   it('offline: refused before getUser() or the write, with the offline reason inline', async () => {
     const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     try {
-      const onComplete = submit('Frankie');
+      const onComplete = submit('Jessie');
 
       expect(await screen.findByTestId('display-name-error')).toHaveTextContent(
         'You are offline. Name changes need a connection to save.'
@@ -199,7 +199,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
 
   it('reports a missing session without attempting a write', async () => {
     backend.getUser.mockResolvedValue(null);
-    const onComplete = submit('Frankie');
+    const onComplete = submit('Jessie');
 
     await waitFor(() =>
       expect(screen.getByTestId('display-name-error')).toHaveTextContent('User not authenticated')
@@ -256,10 +256,10 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
 
   it('accepts a chosen name when the account carries no email to compare against', async () => {
     backend.getUser.mockResolvedValue({ id: 'user-a', email: null });
-    const onComplete = submit('Frankie');
+    const onComplete = submit('Jessie');
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
-    expect(backend.updatePayload).toMatchObject({ display_name: 'Frankie' });
+    expect(backend.updatePayload).toMatchObject({ display_name: 'Jessie' });
   });
 
   it('rejects a too-short name before touching the network', async () => {
@@ -315,13 +315,13 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     }
 
     it('arrives with the current name already in the field', async () => {
-      renderEdit('Frankie');
+      renderEdit('Jessie');
 
-      expect(screen.getByLabelText('Display Name')).toHaveValue('Frankie');
+      expect(screen.getByLabelText('Display Name')).toHaveValue('Jessie');
     });
 
     it('wears edit copy rather than the first-run welcome', async () => {
-      renderEdit('Frankie');
+      renderEdit('Jessie');
 
       expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Change your name');
       expect(screen.getByTestId('display-name-submit')).toHaveTextContent('Save name');
@@ -329,7 +329,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     });
 
     it('closes through onCancel without writing anything', async () => {
-      const { onCancel, onComplete } = renderEdit('Frankie');
+      const { onCancel, onComplete } = renderEdit('Jessie');
 
       fireEvent.click(screen.getByTestId('display-name-cancel'));
 
@@ -343,7 +343,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       // It now opens over a live Settings page rather than replacing the app, so
       // without these a screen reader reads straight past the scrim into the
       // Change and Sign Out controls behind it.
-      renderEdit('Frankie');
+      renderEdit('Jessie');
 
       const dialog = screen.getByRole('dialog');
       expect(dialog).toHaveAttribute('aria-modal', 'true');
@@ -352,7 +352,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     });
 
     it('closes through onCancel when Escape is pressed', async () => {
-      const { onCancel, onComplete } = renderEdit('Frankie');
+      const { onCancel, onComplete } = renderEdit('Jessie');
 
       fireEvent.keyDown(document, { key: 'Escape' });
 
@@ -367,9 +367,9 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       // out -- and would drop a failed save's error onto an unmounted tree.
       // `getUser` never settling holds `isLoading` true for the whole test.
       backend.getUser.mockReturnValue(new Promise(() => {}));
-      const { onCancel, onComplete } = renderEdit('Frankie');
+      const { onCancel, onComplete } = renderEdit('Jessie');
 
-      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Frank' } });
+      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Casey' } });
       fireEvent.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() => {
@@ -383,9 +383,9 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     });
 
     it('saves an edited name through the same single profile write', async () => {
-      const { onComplete } = renderEdit('Frankie');
+      const { onComplete } = renderEdit('Jessie');
 
-      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Frank' } });
+      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Casey' } });
       fireEvent.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
@@ -393,7 +393,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
         'display_name',
         'updated_at',
       ]);
-      expect(backend.updatePayload).toMatchObject({ display_name: 'Frank' });
+      expect(backend.updatePayload).toMatchObject({ display_name: 'Casey' });
       expect(backend.eqColumn).toBe('id');
       expect(backend.eqValue).toBe('user-a');
       expect(backend.updateUser).not.toHaveBeenCalled();
@@ -403,7 +403,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       ['the account email', 'person@example.com'],
       ['the account email in another case', 'Person@Example.COM'],
     ])('still refuses %s when the field started prefilled', async (_label, name) => {
-      const { onComplete } = renderEdit('Frankie');
+      const { onComplete } = renderEdit('Jessie');
 
       fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: name } });
       fireEvent.click(screen.getByTestId('display-name-submit'));
@@ -420,7 +420,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     });
 
     it("still refuses the literal 'Unknown' when the field started prefilled", async () => {
-      const { onComplete } = renderEdit('Frankie');
+      const { onComplete } = renderEdit('Jessie');
 
       fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Unknown' } });
       fireEvent.click(screen.getByTestId('display-name-submit'));
@@ -438,9 +438,9 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       // The RLS shape. An edit surface that closed here would show the new name
       // in Settings while the row still held the old one.
       backend.result = { data: [], error: null };
-      const { onComplete } = renderEdit('Frankie');
+      const { onComplete } = renderEdit('Jessie');
 
-      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Frank' } });
+      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Casey' } });
       fireEvent.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() =>

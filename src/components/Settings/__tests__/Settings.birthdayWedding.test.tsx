@@ -63,11 +63,11 @@ describe('Settings — Birthday', () => {
   });
 
   it('shows the saved birthday, pre-fills it, and offers no Clear', () => {
-    useAppStore.setState({ ownProfile: { displayName: 'Sam', birthday: '1998-03-10' } });
+    useAppStore.setState({ ownProfile: { displayName: 'Sam', birthday: '2000-05-20' } });
     render(<Settings />);
 
-    expect(screen.getByTestId('settings-birthday-value')).toHaveTextContent('1998');
-    expect(screen.getByTestId('settings-birthday-date')).toHaveValue('1998-03-10');
+    expect(screen.getByTestId('settings-birthday-value')).toHaveTextContent('2000');
+    expect(screen.getByTestId('settings-birthday-date')).toHaveValue('2000-05-20');
     expect(screen.queryByTestId('settings-birthday-clear')).toBeNull();
   });
 
@@ -78,11 +78,11 @@ describe('Settings — Birthday', () => {
     render(<Settings />);
 
     fireEvent.change(screen.getByTestId('settings-birthday-date'), {
-      target: { value: '1998-03-10' },
+      target: { value: '2000-05-20' },
     });
     fireEvent.click(screen.getByTestId('settings-birthday-save'));
 
-    await waitFor(() => expect(save).toHaveBeenCalledWith('1998-03-10'));
+    await waitFor(() => expect(save).toHaveBeenCalledWith('2000-05-20'));
     expect(screen.queryByTestId('settings-birthday-error')).toBeNull();
   });
 
@@ -120,7 +120,7 @@ describe('Settings — Birthday', () => {
 
   // Matrix: "Offline edit" and "Save error shown in Settings, value unchanged".
   it('shows why a save was refused, and keeps the shown value', async () => {
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: '1998-03-10' } });
+    useAppStore.setState({ ownProfile: { displayName: null, birthday: '2000-05-20' } });
     const save = vi.fn(async () => {
       throw new AccountDataError('offline', 'You are offline. Profile changes need a connection to save.');
     });
@@ -135,7 +135,7 @@ describe('Settings — Birthday', () => {
     expect(await screen.findByTestId('settings-birthday-error')).toHaveTextContent(
       /need a connection/
     );
-    expect(useAppStore.getState().ownProfile?.birthday).toBe('1998-03-10');
+    expect(useAppStore.getState().ownProfile?.birthday).toBe('2000-05-20');
   });
 });
 
@@ -172,19 +172,19 @@ describe('Settings — Wedding', () => {
   });
 
   it('clears a saved wedding date', async () => {
-    useAppStore.setState({ coupleSettings: { ...LINKED, weddingDate: '2027-06-12' } });
+    useAppStore.setState({ coupleSettings: { ...LINKED, weddingDate: '2027-06-19' } });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setWeddingDate: save });
     render(<Settings />);
 
-    expect(screen.getByTestId('settings-wedding-date')).toHaveValue('2027-06-12');
+    expect(screen.getByTestId('settings-wedding-date')).toHaveValue('2027-06-19');
     fireEvent.click(screen.getByTestId('settings-wedding-clear'));
 
     await waitFor(() => expect(save).toHaveBeenCalledWith(null));
   });
 
   it('shows why a save was refused, and sends nothing without a date', async () => {
-    useAppStore.setState({ coupleSettings: { ...LINKED, weddingDate: '2027-06-12' } });
+    useAppStore.setState({ coupleSettings: { ...LINKED, weddingDate: '2027-06-19' } });
     const save = vi.fn(async () => {
       throw new AccountDataError('offline', 'You are offline. Couple settings need a connection to save.');
     });

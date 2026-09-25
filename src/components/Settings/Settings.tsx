@@ -204,7 +204,7 @@ function TogetherSinceForm({ start }: { start: string | null }) {
   );
 }
 
-/** A `YYYY-MM-DD` date as a long local date ("March 10, 1998"). */
+/** A `YYYY-MM-DD` date as a long local date ("May 20, 2000"). */
 function formatDateOnly(value: string): string {
   const date = parseEventDate(value);
   return date ? date.toLocaleDateString(undefined, { dateStyle: 'long' }) : value;

@@ -76,7 +76,7 @@ const nameField = () => screen.getByLabelText('Display Name');
 async function renderSettings(expected: string) {
   render(<Settings />);
   // textContent, not toHaveTextContent: that matcher is a substring match, so
-  // 'Frankie' would pass against a row still reading 'Loading...Frankie'.
+  // 'Jessie' would pass against a row still reading 'Loading...Jessie'.
   await waitFor(() => expect(nameRow().textContent).toContain(expected));
 }
 
@@ -88,7 +88,7 @@ describe('Settings offers a way to change the display name', () => {
     backend.updateResult = { data: [{ id: 'user-a' }], error: null };
     backend.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
     backend.sessionUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Frankie' });
+    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Jessie' });
   });
 
   afterEach(() => {
@@ -97,9 +97,9 @@ describe('Settings offers a way to change the display name', () => {
 
   describe('the row reports whatever the profile read answered', () => {
     it('shows a chosen name', async () => {
-      await renderSettings('Frankie');
+      await renderSettings('Jessie');
 
-      expect(nameRow().textContent).toBe('Frankie');
+      expect(nameRow().textContent).toBe('Jessie');
     });
 
     it('says so when no name has been chosen yet', async () => {
@@ -123,22 +123,22 @@ describe('Settings offers a way to change the display name', () => {
 
   describe('the Change control opens the real form', () => {
     it('is closed until asked for', async () => {
-      await renderSettings('Frankie');
+      await renderSettings('Jessie');
 
       expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument();
     });
 
     it('opens the form with the current name already in the field', async () => {
-      await renderSettings('Frankie');
+      await renderSettings('Jessie');
 
       fireEvent.click(changeButton());
 
       expect(screen.getByTestId('display-name-setup')).toBeInTheDocument();
-      expect(nameField()).toHaveValue('Frankie');
+      expect(nameField()).toHaveValue('Jessie');
     });
 
     it('offers a Cancel control, unlike the signup gate', async () => {
-      await renderSettings('Frankie');
+      await renderSettings('Jessie');
 
       fireEvent.click(changeButton());
 
@@ -170,20 +170,20 @@ describe('Settings offers a way to change the display name', () => {
 
   describe('completing the form re-reads the row', () => {
     it('shows the saved name without a reload', async () => {
-      await renderSettings('Frankie');
+      await renderSettings('Jessie');
 
       fireEvent.click(changeButton());
-      fireEvent.change(nameField(), { target: { value: 'Frank' } });
+      fireEvent.change(nameField(), { target: { value: 'Casey' } });
 
       // The second read is what the row renders from — the component never
       // takes the submitted string for granted, because the read applies the
       // seed rule and the write only refuses it.
-      backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Frank' });
+      backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Casey' });
       fireEvent.click(screen.getByTestId('display-name-submit'));
 
-      await waitFor(() => expect(nameRow().textContent).toBe('Frank'));
+      await waitFor(() => expect(nameRow().textContent).toBe('Casey'));
       expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument();
-      expect(backend.updatePayload).toMatchObject({ display_name: 'Frank' });
+      expect(backend.updatePayload).toMatchObject({ display_name: 'Casey' });
       expect(backend.lookupOwnDisplayName).toHaveBeenCalledTimes(2);
       // Home's own birthday card is labelled with the name: its copy refreshes.
       expect(backend.refreshLocalCopy).toHaveBeenCalledWith('profile');
@@ -195,10 +195,10 @@ describe('Settings offers a way to change the display name', () => {
       // click in that window reopened the form prefilled from `editPrefill` —
       // derived from that stale answer — and the next submit wrote the OLD name
       // straight back over the one just saved.
-      await renderSettings('Frankie');
+      await renderSettings('Jessie');
 
       fireEvent.click(changeButton());
-      fireEvent.change(nameField(), { target: { value: 'Frank' } });
+      fireEvent.change(nameField(), { target: { value: 'Casey' } });
 
       // Hold the re-read open so the window is observable at all.
       let releaseReRead: (v: { status: 'chosen'; displayName: string }) => void = () => {};
@@ -214,23 +214,23 @@ describe('Settings offers a way to change the display name', () => {
       await waitFor(() => expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument());
       await waitFor(() => expect(changeButton()).toBeDisabled());
 
-      releaseReRead({ status: 'chosen', displayName: 'Frank' });
+      releaseReRead({ status: 'chosen', displayName: 'Casey' });
 
-      await waitFor(() => expect(nameRow().textContent).toBe('Frank'));
+      await waitFor(() => expect(nameRow().textContent).toBe('Casey'));
       expect(changeButton()).toBeEnabled();
       // Reopening now prefills from the SAVED name, not the pre-save one.
       fireEvent.click(changeButton());
-      expect(nameField()).toHaveValue('Frank');
+      expect(nameField()).toHaveValue('Casey');
     });
 
     it('renders what the row answered, not what was typed', async () => {
       // If the re-read is ever replaced by "just show the submitted value",
       // this is the case that catches it: the row is the source of truth for
       // every other surface, so Settings must agree with it or silently lie.
-      await renderSettings('Frankie');
+      await renderSettings('Jessie');
 
       fireEvent.click(changeButton());
-      fireEvent.change(nameField(), { target: { value: 'Frank' } });
+      fireEvent.change(nameField(), { target: { value: 'Casey' } });
 
       backend.lookupOwnDisplayName.mockResolvedValue({
         status: 'chosen',
@@ -244,29 +244,29 @@ describe('Settings offers a way to change the display name', () => {
     it('keeps the form open and the row unchanged when the save fails closed', async () => {
       // Zero rows: the RLS shape, where nothing was written.
       backend.updateResult = { data: [], error: null };
-      await renderSettings('Frankie');
+      await renderSettings('Jessie');
 
       fireEvent.click(changeButton());
-      fireEvent.change(nameField(), { target: { value: 'Frank' } });
+      fireEvent.change(nameField(), { target: { value: 'Casey' } });
       fireEvent.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() => expect(screen.getByTestId('display-name-error')).toBeInTheDocument());
       expect(screen.getByTestId('display-name-setup')).toBeInTheDocument();
-      expect(nameRow().textContent).toBe('Frankie');
+      expect(nameRow().textContent).toBe('Jessie');
       expect(backend.lookupOwnDisplayName).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('cancelling changes nothing', () => {
     it('closes the form without a write or a re-read', async () => {
-      await renderSettings('Frankie');
+      await renderSettings('Jessie');
 
       fireEvent.click(changeButton());
       fireEvent.change(nameField(), { target: { value: 'Discarded' } });
       fireEvent.click(screen.getByTestId('display-name-cancel'));
 
       expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument();
-      expect(nameRow().textContent).toBe('Frankie');
+      expect(nameRow().textContent).toBe('Jessie');
       expect(backend.updatePayload).toBeNull();
       expect(backend.lookupOwnDisplayName).toHaveBeenCalledTimes(1);
     });
@@ -275,14 +275,14 @@ describe('Settings offers a way to change the display name', () => {
       // The form is mounted conditionally precisely so that each open is a
       // fresh mount; kept mounted behind `isOpen={false}` it would come back
       // still holding 'Discarded'.
-      await renderSettings('Frankie');
+      await renderSettings('Jessie');
 
       fireEvent.click(changeButton());
       fireEvent.change(nameField(), { target: { value: 'Discarded' } });
       fireEvent.click(screen.getByTestId('display-name-cancel'));
       fireEvent.click(changeButton());
 
-      expect(nameField()).toHaveValue('Frankie');
+      expect(nameField()).toHaveValue('Jessie');
     });
   });
 });

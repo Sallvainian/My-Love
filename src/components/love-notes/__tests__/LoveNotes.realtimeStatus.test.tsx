@@ -142,12 +142,12 @@ describe('LoveNotes realtime notice', () => {
     });
 
     it('uses the partner name and its initial once it is known', async () => {
-      api.getPartnerDisplayName.mockResolvedValue('gracie');
+      api.getPartnerDisplayName.mockResolvedValue('harper');
       await renderWith('connected');
 
       const row = screen.getByTestId(ROW);
-      expect(await within(row).findByText('gracie')).toBeVisible();
-      expect(within(row).getByText('G')).toHaveClass('bg-partner');
+      expect(await within(row).findByText('harper')).toBeVisible();
+      expect(within(row).getByText('H')).toHaveClass('bg-partner');
     });
 
     it('keeps a level-1 "Love Notes" heading, visually hidden, and no back control', async () => {

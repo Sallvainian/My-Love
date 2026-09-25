@@ -51,14 +51,14 @@ const A = 'USER-A-ID';
 const B = 'USER-B-ID';
 const P = 'PARTNER-ID';
 
-const START = '2025-10-18T22:00:00.000Z';
+const START = '2025-10-04T22:00:00.000Z';
 const SAVED_PROFILE = { displayName: 'SAVED-NAME', birthday: '1990-01-02' };
 const SERVER_PROFILE = { displayName: 'SERVER-NAME', birthday: '1991-03-04' };
 const SAVED_COUPLE = {
   status: 'linked',
   partnerId: P,
   relationshipStart: START,
-  weddingDate: '2027-06-12',
+  weddingDate: '2027-06-19',
 } as const;
 
 function setOnline(value: boolean): void {
@@ -141,12 +141,12 @@ describe('own profile (display name and birthday) on the local copy', () => {
 
   // Matrix: "Partner sets birthday" — the saving side.
   it('a confirmed birthday save updates state and the copy', async () => {
-    const saved = { displayName: 'SERVER-NAME', birthday: '1998-03-10' };
+    const saved = { displayName: 'SERVER-NAME', birthday: '2000-05-20' };
     saveBirthday.mockResolvedValue(saved);
 
-    await state().setBirthday('1998-03-10');
+    await state().setBirthday('2000-05-20');
 
-    expect(saveBirthday).toHaveBeenCalledWith('1998-03-10');
+    expect(saveBirthday).toHaveBeenCalledWith('2000-05-20');
     expect(state().ownProfile).toEqual(saved);
     expect(await readLocalCopy(A, PROFILE_COPY_KIND)).toEqual(saved);
   });
@@ -156,7 +156,7 @@ describe('own profile (display name and birthday) on the local copy', () => {
     useAppStore.setState({ ownProfile: SAVED_PROFILE });
     saveBirthday.mockRejectedValue(new AccountDataError('transport', 'save failed'));
 
-    await expect(state().setBirthday('1998-03-10')).rejects.toThrow('save failed');
+    await expect(state().setBirthday('2000-05-20')).rejects.toThrow('save failed');
 
     expect(state().ownProfile).toEqual(SAVED_PROFILE);
     expect(await readLocalCopy(A, PROFILE_COPY_KIND)).toEqual(SAVED_PROFILE);
@@ -168,7 +168,7 @@ describe('own profile (display name and birthday) on the local copy', () => {
     useAppStore.setState({ ownProfile: SAVED_PROFILE });
     setOnline(false);
 
-    const attempt = state().setBirthday('1998-03-10');
+    const attempt = state().setBirthday('2000-05-20');
     await expect(attempt).rejects.toMatchObject({ code: 'offline' });
     await expect(attempt).rejects.toThrow(/need a connection/);
 
@@ -221,11 +221,11 @@ describe('own profile (display name and birthday) on the local copy', () => {
       })
     );
 
-    const inFlight = state().setBirthday('1998-03-10');
+    const inFlight = state().setBirthday('2000-05-20');
     await vi.waitFor(() => expect(saveBirthday).toHaveBeenCalled());
     state().clearAuth();
     state().setAuthUser(B);
-    settle({ displayName: 'A-NAME', birthday: '1998-03-10' });
+    settle({ displayName: 'A-NAME', birthday: '2000-05-20' });
     await inFlight;
 
     expect(state().ownProfile).toBeNull();
@@ -278,7 +278,7 @@ describe('wedding date on the couple-settings copy', () => {
   });
 
   it.each([
-    ['sets', '2027-06-12'],
+    ['sets', '2027-06-19'],
     ['clears', null],
   ])('a confirmed save %s the wedding date in state and copy', async (_label, value) => {
     await writeLocalCopy(A, COUPLE_SETTINGS_COPY_KIND, SAVED_COUPLE);
@@ -322,9 +322,9 @@ describe('wedding date on the couple-settings copy', () => {
 
   it('an edit with no partner, or a failed lookup, is refused and sends nothing', async () => {
     lookupPartnerId.mockResolvedValueOnce({ status: 'unlinked' });
-    await expect(state().setWeddingDate('2027-06-12')).rejects.toThrow(/Link a partner/);
+    await expect(state().setWeddingDate('2027-06-19')).rejects.toThrow(/Link a partner/);
     lookupPartnerId.mockResolvedValueOnce({ status: 'error', reason: 'network' });
-    await expect(state().setWeddingDate('2027-06-12')).rejects.toBeInstanceOf(AccountDataError);
+    await expect(state().setWeddingDate('2027-06-19')).rejects.toBeInstanceOf(AccountDataError);
     expect(saveWeddingDate).not.toHaveBeenCalled();
   });
 });

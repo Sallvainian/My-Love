@@ -29,14 +29,14 @@ import { AccountDataError } from '../../../services/accountDataError';
 import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
 
-const START = new Date(2025, 9, 18, 18, 0, 0).toISOString();
+const START = new Date(2025, 9, 4, 18, 0, 0).toISOString();
 const realSetRelationshipStart = useAppStore.getState().setRelationshipStart;
 
 describe('Settings — Together since', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     backend.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Frankie' });
+    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Jessie' });
   });
 
   afterEach(() => {
@@ -71,7 +71,7 @@ describe('Settings — Together since', () => {
     });
     render(<Settings />);
 
-    expect(screen.getByTestId('settings-together-since-date')).toHaveValue('2025-10-18');
+    expect(screen.getByTestId('settings-together-since-date')).toHaveValue('2025-10-04');
     expect(screen.getByTestId('settings-together-since-time')).toHaveValue('18:00');
   });
 
@@ -84,7 +84,7 @@ describe('Settings — Together since', () => {
     render(<Settings />);
 
     fireEvent.change(screen.getByTestId('settings-together-since-date'), {
-      target: { value: '2025-10-18' },
+      target: { value: '2025-10-04' },
     });
     fireEvent.change(screen.getByTestId('settings-together-since-time'), {
       target: { value: '18:00' },

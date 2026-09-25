@@ -101,19 +101,19 @@ describe('partner display name contract', () => {
 
   describe('a name the partner chose is returned', () => {
     it('returns the stored name', async () => {
-      partnerRow('Frankie');
-      await expect(partnerName()).resolves.toBe('Frankie');
+      partnerRow('Jessie');
+      await expect(partnerName()).resolves.toBe('Jessie');
     });
 
     it('trims the stored value, matching the own-name reader', async () => {
-      partnerRow('  Frankie  ');
-      await expect(partnerName()).resolves.toBe('Frankie');
+      partnerRow('  Jessie  ');
+      await expect(partnerName()).resolves.toBe('Jessie');
     });
 
     it('returns a name for a partner row that has no email to compare against', async () => {
       // Nothing to equal, so nothing is a seed: the name stands.
-      partnerRow('Frankie', null);
-      await expect(partnerName()).resolves.toBe('Frankie');
+      partnerRow('Jessie', null);
+      await expect(partnerName()).resolves.toBe('Jessie');
     });
   });
 
@@ -170,7 +170,7 @@ describe('partner display name contract', () => {
       // silently degrades to only catching '' and 'Unknown' — the seed case
       // this whole contract is about would come back alive with every
       // assertion above still green if the column were dropped.
-      partnerRow('Frankie');
+      partnerRow('Jessie');
       await partnerName();
       expect(selectedColumns).toEqual(['partner_id', 'display_name, email']);
     });

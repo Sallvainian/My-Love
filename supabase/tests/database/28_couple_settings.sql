@@ -157,7 +157,7 @@ select tests.authenticate_as(current_setting('tests.b')::uuid);
 
 select lives_ok(
   format($$insert into public.couple_settings (user_a, user_b, relationship_start, updated_at)
-           values (%L, %L, timestamptz '2025-10-18 18:00:00+00', now())
+           values (%L, %L, timestamptz '2025-10-04 18:00:00+00', now())
            on conflict (user_a, user_b) do update
              set relationship_start = excluded.relationship_start,
                  updated_at = excluded.updated_at$$,
@@ -165,12 +165,12 @@ select lives_ok(
   'CS-DB-014: a partner can create the couple row with an upsert');
 
 select is((select relationship_start from public.couple_settings),
-  timestamptz '2025-10-18 18:00:00+00', 'CS-DB-015: the writing partner reads the start date');
+  timestamptz '2025-10-04 18:00:00+00', 'CS-DB-015: the writing partner reads the start date');
 
 select tests.authenticate_as(current_setting('tests.a')::uuid);
 
 select is((select relationship_start from public.couple_settings),
-  timestamptz '2025-10-18 18:00:00+00', 'CS-DB-016: the other partner reads the same start date');
+  timestamptz '2025-10-04 18:00:00+00', 'CS-DB-016: the other partner reads the same start date');
 
 -- ---------------------------------------------------------------------------
 -- The other partner updates it (last write wins), through the same upsert
@@ -204,7 +204,7 @@ select col_type_is('public', 'couple_settings', 'wedding_date', 'date',
 
 select lives_ok(
   format($$insert into public.couple_settings (user_a, user_b, wedding_date, updated_at)
-           values (%L, %L, date '2027-06-12', now())
+           values (%L, %L, date '2027-06-19', now())
            on conflict (user_a, user_b) do update
              set wedding_date = excluded.wedding_date,
                  updated_at = excluded.updated_at$$,
@@ -217,7 +217,7 @@ select is((select relationship_start from public.couple_settings),
 
 select tests.authenticate_as(current_setting('tests.a')::uuid);
 
-select is((select wedding_date from public.couple_settings), date '2027-06-12',
+select is((select wedding_date from public.couple_settings), date '2027-06-19',
   'CS-DB-033: the other partner reads the same wedding date');
 
 select tests.be_postgres();

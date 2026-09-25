@@ -58,7 +58,7 @@ const A = 'USER-A-ID';
 const B = 'USER-B-ID';
 const P = 'PARTNER-ID';
 
-const SAVED_START = '2025-10-18T22:00:00.000Z';
+const SAVED_START = '2025-10-04T22:00:00.000Z';
 const SERVER_START = '2025-10-19T13:30:00.000Z';
 
 const SAVED = { status: 'linked', partnerId: P, relationshipStart: SAVED_START, weddingDate: null } as const;
