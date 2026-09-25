@@ -122,8 +122,6 @@ function nextStep(step: FakeStep, times = 1): Promise<void> {
 }
 /** `channel(topic)` was called, whether it built a channel or handed back an existing one. */
 const nextChannelRequested = () => nextStep('channelRequested');
-/** A fresh channel object has been constructed (the topic was claimed). */
-const nextChannelOpened = (times = 1) => nextStep('channelOpened', times);
 /** `realtime.setAuth()` was called; the caller resumes only after this settles. */
 const nextAuthRequested = () => nextStep('authRequested');
 /** An httpSend has parked on the send gate. */
