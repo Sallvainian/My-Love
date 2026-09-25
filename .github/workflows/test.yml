@@ -340,7 +340,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 2 shards, not 4. Measured on run 35056348791 (head 2e40c7d6): E2E
+        # 2 shards, not 4. Measured on run 35056348791 (head 0a83dec8): E2E
         # jobs 197/224/251/259s total, setup 129/129/138/129s, test-step
         # 49/70/86/101s (306s combined). Historical 381s is run 32279178457,
         # not this run. The setup floor (129-138s) is paid per shard and this
@@ -481,7 +481,7 @@ jobs:
           # own, and Playwright exits 1 with "No tests found" — a red required
           # check for a PR that merely removed a spec. The single-invocation
           # version tolerated this because the surviving filters still matched
-          # something; three narrow invocations do not. Commit 401fd769 is
+          # something; three narrow invocations do not. PR #125 is
           # exactly this shape: 4 changed specs, one of them a deletion.
           CHANGED=$(git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD | grep -E '^tests/e2e/.*\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
 

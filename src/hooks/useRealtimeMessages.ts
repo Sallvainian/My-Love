@@ -4,7 +4,7 @@
  * Handles real-time message reception via Supabase Broadcast API.
  * Story 2.3 - AC-2.3.1 through AC-2.3.5
  *
- * Uses Broadcast API instead of postgres_changes per commit 9a02e56 findings:
+ * Uses Broadcast API instead of postgres_changes per PR #39 findings:
  * - postgres_changes doesn't work reliably for cross-user updates
  * - Broadcast API provides consistent cross-user messaging
  *
