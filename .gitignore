@@ -83,7 +83,7 @@ _bmad/*
 .contextstream/
 
 # Claude OS (auto-generated, user-specific)
-.claude-os/tree_sitter_cache.db
+**/.claude-os/tree_sitter_cache.db
 .claude-os/project-profile/
 
 # AgentVibes (local TTS preferences)

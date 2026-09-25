@@ -5,7 +5,7 @@
  * and rate limiting. Using `as const` for type-level immutability.
  *
  * Usage:
- *   import { IMAGE_COMPRESSION, IMAGE_STORAGE } from '@/config/images';
+ *   import { IMAGE_COMPRESSION, IMAGE_STORAGE } from '../config/images';
  *   const maxWidth = IMAGE_COMPRESSION.MAX_WIDTH; // Type: 2048 (literal)
  */
 
