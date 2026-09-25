@@ -2,6 +2,7 @@ import { AnimatePresence, m as motion } from 'motion/react';
 import { Download, Plus, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AccountDataError } from '../../services/accountDataError';
+import { CustomMessagesImportError } from '../../stores/slices/messagesSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import type { CustomMessage } from '../../types';
 import { NetworkStatusIndicator } from '../shared';
@@ -82,10 +83,14 @@ function AccountAdminPanel({ onExit }: AdminPanelProps) {
       if (!stillCurrent()) return;
       console.error('[AdminPanel] Import failed:', error);
       // Offline, the file is fine: say what actually stopped the import.
+      const offlineReason = (e: unknown) =>
+        e instanceof AccountDataError && e.code === 'offline' ? e.message : null;
       alert(
-        error instanceof AccountDataError && error.code === 'offline'
-          ? error.message
-          : 'Failed to import messages. Please check the file format and try again.'
+        error instanceof CustomMessagesImportError
+          ? `Import stopped after ${error.imported} of ${error.total} messages.\n` +
+              (offlineReason(error.cause) ?? 'Import the same file again to add the rest.')
+          : (offlineReason(error) ??
+              'Failed to import messages. Please check the file format and try again.')
       );
     } finally {
       // Reset file input
