@@ -1241,19 +1241,14 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         // Generate temporary ID for optimistic update
         const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
-        // If image provided, validate and prepare preview
-        let imagePreviewUrl: string | undefined;
-        let imageBlob: Blob | undefined;
-
-        if (imageFile) {
-          // Validate image file
-          const validation = imageCompressionService.validateImageFile(imageFile);
-          if (!validation.valid) {
-            throw new Error(validation.error || 'Invalid image file');
-          }
-          // Create preview URL for optimistic display
-          imagePreviewUrl = URL.createObjectURL(imageFile);
+        // Text notes returned above, so from here on the note carries a picture.
+        const validation = imageCompressionService.validateImageFile(imageFile);
+        if (!validation.valid) {
+          throw new Error(validation.error || 'Invalid image file');
         }
+        // Create preview URL for optimistic display
+        const imagePreviewUrl = URL.createObjectURL(imageFile);
+        let imageBlob: Blob | undefined;
 
         // Create optimistic note
         const optimisticNote: LoveNote = {
@@ -1264,7 +1259,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
           content,
           created_at: new Date().toISOString(),
           sending: true,
-          imageUploading: !!imageFile,
+          imageUploading: true,
           imagePreviewUrl,
         };
 
@@ -1277,54 +1272,52 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         logger.debug('[NotesSlice] Sending note (optimistic):', {
           tempId,
           content,
-          hasImage: !!imageFile,
+          hasImage: true,
         });
 
-        // Handle image compression and upload if provided
+        // Compress and upload the picture
         let storagePath: string | null = null;
 
-        if (imageFile) {
-          try {
-            // Compress the image
-            const compressionResult = await imageCompressionService.compressImage(imageFile);
-            imageBlob = compressionResult.blob;
+        try {
+          // Compress the image
+          const compressionResult = await imageCompressionService.compressImage(imageFile);
+          imageBlob = compressionResult.blob;
 
-            // Stop before uploading: signedOutState() dropped the optimistic note.
-            if (!ownsRequest()) return;
+          // Stop before uploading: signedOutState() dropped the optimistic note.
+          if (!ownsRequest()) return;
 
-            // Cache the compressed blob for retry flows
-            set((state) => ({
-              notes: state.notes.map((note) =>
-                note.tempId === tempId ? { ...note, imageBlob } : note
-              ),
-            }));
+          // Cache the compressed blob for retry flows
+          set((state) => ({
+            notes: state.notes.map((note) =>
+              note.tempId === tempId ? { ...note, imageBlob } : note
+            ),
+          }));
 
-            // Upload to storage
-            const uploadResult = await uploadCompressedBlob(imageBlob, userId);
-            storagePath = uploadResult.storagePath;
+          // Upload to storage
+          const uploadResult = await uploadCompressedBlob(imageBlob, userId);
+          storagePath = uploadResult.storagePath;
 
-            logger.debug('[NotesSlice] Image uploaded:', storagePath);
-          } catch (imageError) {
-            console.error('[NotesSlice] Image upload failed:', imageError);
-            if (!ownsRequest()) return;
-            // Mark message as failed with image error
-            set((state) => ({
-              notes: state.notes.map((note) =>
-                note.tempId === tempId
-                  ? { ...note, sending: false, imageUploading: false, error: true, imageBlob }
-                  : note
-              ),
-            }));
-            return;
-          }
+          logger.debug('[NotesSlice] Image uploaded:', storagePath);
+        } catch (imageError) {
+          console.error('[NotesSlice] Image upload failed:', imageError);
+          if (!ownsRequest()) return;
+          // Mark message as failed with image error
+          set((state) => ({
+            notes: state.notes.map((note) =>
+              note.tempId === tempId
+                ? { ...note, sending: false, imageUploading: false, error: true, imageBlob }
+                : note
+            ),
+          }));
+          return;
+        }
 
-          // The session ended during the upload. No insert has run, so nothing
-          // references the object just uploaded: remove it rather than post a
-          // note the signed-in session never showed as sending.
-          if (!ownsRequest()) {
-            await discardOrphanedImage(storagePath);
-            return;
-          }
+        // The session ended during the upload. No insert has run, so nothing
+        // references the object just uploaded: remove it rather than post a
+        // note the signed-in session never showed as sending.
+        if (!ownsRequest()) {
+          await discardOrphanedImage(storagePath);
+          return;
         }
 
         // Background insert to Supabase, keyed so a retry cannot post twice
@@ -1361,9 +1354,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
 
         // Success - replace optimistic note with server response
         // Clean up preview URL
-        if (imagePreviewUrl) {
-          URL.revokeObjectURL(imagePreviewUrl);
-        }
+        URL.revokeObjectURL(imagePreviewUrl);
 
         // The note is committed whatever happened to the session meanwhile. The
         // session check guards only the store write; the broadcast below still
