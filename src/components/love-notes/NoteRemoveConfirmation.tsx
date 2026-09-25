@@ -176,7 +176,7 @@ export function NoteRemoveConfirmation({
 
   return (
     <div
-      className={`${DIALOG_SCRIM} z-[70]`}
+      className={`${DIALOG_SCRIM} z-70`}
       onClick={handleBackdropClick}
       data-testid="note-remove-confirmation"
       role="dialog"
@@ -189,7 +189,7 @@ export function NoteRemoveConfirmation({
         className={`${DIALOG_SURFACE} max-w-md`}
       >
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
             <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           </div>
           <h2 id="remove-note-dialog-title" className="text-lg font-semibold text-ink">
@@ -226,7 +226,7 @@ export function NoteRemoveConfirmation({
             type="button"
             onClick={onClose}
             disabled={isRemoving}
-            className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+            className="h-12 rounded-full bg-tint px-5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
           >
             Cancel
           </button>
@@ -235,7 +235,7 @@ export function NoteRemoveConfirmation({
             onClick={handleRemove}
             disabled={isRemoving}
             data-testid="note-remove-confirm"
-            className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
+            className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
           >
             {isRemoving && <Loader2 className="h-4 w-4 animate-spin" />}
             {isRemoving ? 'Removing...' : 'Remove for me'}

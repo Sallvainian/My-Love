@@ -52,7 +52,7 @@ import {
 import { AnniversarySettings } from './AnniversarySettings';
 import { EventsSettings } from './EventsSettings';
 
-const ROW_BUTTON = `${ROW} w-full rounded-[14px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
+const ROW_BUTTON = `${ROW} w-full rounded-[14px] text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent`;
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -108,12 +108,12 @@ function TogetherSinceRow() {
     <div className="flex flex-col gap-2 py-1" data-testid="settings-together-since">
       <div className={ROW}>
         <span className={TILE} aria-hidden="true">
-          <Heart className="h-[17px] w-[17px]" />
+          <Heart className="h-4.25 w-4.25" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="text-[15px] font-medium text-ink">Together since</p>
           <p
-            className="text-[13px] break-words text-muted"
+            className="text-[13px] wrap-break-word text-muted"
             data-testid="settings-together-since-value"
           >
             {subtitle}
@@ -234,11 +234,11 @@ function BirthdayRow() {
     <div className="flex flex-col gap-2 py-1" data-testid="settings-birthday">
       <div className={ROW}>
         <span className={TILE} aria-hidden="true">
-          <Cake className="h-[17px] w-[17px]" />
+          <Cake className="h-4.25 w-4.25" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="text-[15px] font-medium text-ink">Birthday</p>
-          <p className="text-[13px] break-words text-muted" data-testid="settings-birthday-value">
+          <p className="text-[13px] wrap-break-word text-muted" data-testid="settings-birthday-value">
             {subtitle}
           </p>
         </div>
@@ -341,11 +341,11 @@ function WeddingRow() {
       <div className="flex flex-col gap-2 py-1" data-testid="settings-wedding">
         <div className={ROW}>
           <span className={TILE} aria-hidden="true">
-            <Gem className="h-[17px] w-[17px]" />
+            <Gem className="h-4.25 w-4.25" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <p className="text-[15px] font-medium text-ink">Wedding</p>
-            <p className="text-[13px] break-words text-muted" data-testid="settings-wedding-value">
+            <p className="text-[13px] wrap-break-word text-muted" data-testid="settings-wedding-value">
               {weddingDate ? formatDateOnly(weddingDate) : 'Not set yet'}
             </p>
           </div>
@@ -455,7 +455,7 @@ function MobileDataPhotosRow() {
       data-testid="settings-mobile-data-photos"
     >
       <span className={TILE} aria-hidden="true">
-        <Signal className="h-[17px] w-[17px]" />
+        <Signal className="h-4.25 w-4.25" />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span id="settings-mobile-data-photos-label" className="text-[15px] font-medium text-ink">
@@ -463,7 +463,7 @@ function MobileDataPhotosRow() {
         </span>
         <span
           id="settings-mobile-data-photos-helper"
-          className="text-[13px] break-words text-muted"
+          className="text-[13px] wrap-break-word text-muted"
           data-testid="settings-mobile-data-photos-helper"
         >
           {helper}
@@ -586,7 +586,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
 
   return (
     <div
-      className="mx-auto flex w-full max-w-[800px] flex-col gap-4 px-4 pt-3 pb-6"
+      className="mx-auto flex w-full max-w-200 flex-col gap-4 px-4 pt-3 pb-6"
       data-testid="settings-view"
     >
       <header className="px-1 pt-1">
@@ -620,7 +620,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
                   {avatarInitial}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <p className="text-[15px] font-medium break-words text-ink">{userEmail}</p>
+                  <p className="text-[15px] font-medium wrap-break-word text-ink">{userEmail}</p>
                   <p className="text-[13px] text-muted">Signed in</p>
                 </div>
               </div>
@@ -640,7 +640,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             data-testid="settings-display-name-edit"
           >
             <span className={TILE} aria-hidden="true">
-              <Pencil className="h-[17px] w-[17px]" />
+              <Pencil className="h-4.25 w-4.25" />
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               {/* "Change " keeps the verb the old Change button carried in
@@ -648,11 +648,11 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
               <span className="text-[15px] font-medium text-ink">
                 <span className="sr-only">Change </span>Display name
               </span>
-              <span className="text-[13px] break-words text-muted" data-testid="settings-display-name">
+              <span className="text-[13px] wrap-break-word text-muted" data-testid="settings-display-name">
                 {displayNameLabel}
               </span>
             </span>
-            <ChevronRight className="h-[18px] w-[18px] shrink-0 text-muted" aria-hidden="true" />
+            <ChevronRight className="h-4.5 w-4.5 shrink-0 text-muted" aria-hidden="true" />
           </button>
           <div className={DIVIDER} aria-hidden="true" />
           <BirthdayRow />
@@ -692,7 +692,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
         <div className={CARD}>
           <div className={ROW}>
             <span className={TILE} aria-hidden="true">
-              <Info className="h-[17px] w-[17px]" />
+              <Info className="h-4.25 w-4.25" />
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <p className="text-[15px] font-medium text-ink">My Love</p>
@@ -709,12 +709,12 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
                 data-testid="settings-replay-welcome"
               >
                 <span className={TILE} aria-hidden="true">
-                  <RotateCcw className="h-[17px] w-[17px]" />
+                  <RotateCcw className="h-4.25 w-4.25" />
                 </span>
                 <span className="min-w-0 flex-1 text-[15px] font-medium text-ink">
                   Replay welcome message
                 </span>
-                <ChevronRight className="h-[18px] w-[18px] shrink-0 text-muted" aria-hidden="true" />
+                <ChevronRight className="h-4.5 w-4.5 shrink-0 text-muted" aria-hidden="true" />
               </button>
             </>
           )}
@@ -735,9 +735,9 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             aria-hidden="true"
           >
             {isLoggingOut ? (
-              <Loader2 className="h-[17px] w-[17px] animate-spin" />
+              <Loader2 className="h-4.25 w-4.25 animate-spin" />
             ) : (
-              <LogOut className="h-[17px] w-[17px]" />
+              <LogOut className="h-4.25 w-4.25" />
             )}
           </span>
           {isLoggingOut ? 'Signing out…' : 'Sign out'}

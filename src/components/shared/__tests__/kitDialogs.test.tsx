@@ -123,7 +123,7 @@ describe('the delete dialogs scroll on a short screen', () => {
 
     const scrim = screen.getByTestId('note-remove-confirmation');
     expectSafeScrim(scrim);
-    expect(zClasses(scrim)).toEqual(['z-[70]']);
+    expect(zClasses(scrim)).toEqual(['z-70']);
     const panel = scrim.firstElementChild as HTMLElement;
     expect(panel).toHaveClass('max-h-full', 'overflow-y-auto', 'max-w-md');
     expect(panel).not.toHaveClass('p-5');

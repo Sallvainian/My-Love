@@ -118,7 +118,7 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
                   ref={closeButtonRef}
                   type="button"
                   onClick={onClose}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                   data-testid="close-history-button"
                   aria-label="Close"
                 >

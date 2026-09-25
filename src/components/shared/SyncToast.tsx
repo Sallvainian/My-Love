@@ -118,17 +118,17 @@ export function SyncToast({ syncResult, onDismiss, autoDismissMs = 5000 }: SyncT
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          className="fixed inset-x-0 top-[calc(5rem+env(safe-area-inset-top))] z-[100] mx-auto flex w-fit max-w-[90vw] min-w-[280px] items-center gap-3 rounded-[20px] border border-line bg-card py-1.5 pr-1.5 pl-4 shadow-float"
+          className="fixed inset-x-0 top-[calc(5rem+env(safe-area-inset-top))] z-100 mx-auto flex w-fit max-w-[90vw] min-w-70 items-center gap-3 rounded-[20px] border border-line bg-card py-1.5 pr-1.5 pl-4 shadow-float"
           role="alert"
           aria-live="polite"
           data-testid="sync-toast"
         >
-          <Icon className={`h-5 w-5 flex-shrink-0 ${config.iconColor}`} aria-hidden="true" />
+          <Icon className={`h-5 w-5 shrink-0 ${config.iconColor}`} aria-hidden="true" />
           <span className="flex-1 text-sm font-medium text-ink">{config.message}</span>
           <button
             type="button"
             onClick={handleDismiss}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Dismiss notification"
           >
             <X className="h-4 w-4" aria-hidden="true" />

@@ -36,7 +36,7 @@
  *
  * Gradients ARE measured, via their `from-`/`via-`/`to-` stops. They were not
  * at first, which made the property above false for the most-used button style
- * in the app: `bg-gradient-to-r from-pink-500 to-rose-500` has no
+ * in the app: `bg-linear-to-r from-pink-500 to-rose-500` has no
  * `bg-<colour>-<shade>` to match, so ten components' primary call-to-action sat
  * outside a guard whose whole point was that a new failure fails on its own. A
  * gradient is judged at its stops, and a stop below the floor fails: the text
@@ -440,9 +440,9 @@ function pairingsOnLine(
     }
 
     // A gradient carries its colours in `from-`/`via-`/`to-`, so the `bg-`
-    // matcher above sees nothing at all in `bg-gradient-to-r from-pink-500
+    // matcher above sees nothing at all in `bg-linear-to-r from-pink-500
     // to-rose-500`. Each stop is judged as its own ground.
-    if (!classes.includes('bg-gradient')) continue;
+    if (!/bg-(?:linear|radial|conic)-/.test(classes)) continue;
     for (const stop of classes.matchAll(
       /(?<![\w:-])(?:from|via|to)-([a-z]+-\d{2,3}|[a-z][a-z0-9]*)(?![\w-])/g
     )) {

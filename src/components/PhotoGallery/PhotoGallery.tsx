@@ -147,7 +147,7 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
           ref={uploadButtonRef}
           type="button"
           onClick={onUploadClick}
-          className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
           aria-label="Upload photo"
           data-testid="photo-gallery-upload-fab"
         >
@@ -176,7 +176,7 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
           <button
             type="button"
             onClick={handleRetry}
-            className="mt-1 h-12 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="mt-1 h-12 rounded-full bg-fill px-6 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
             data-testid="photo-gallery-error-retry-button"
           >
             Try Again
@@ -211,19 +211,19 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
         <div className="rounded-[20px] border border-line bg-card p-4 shadow-card">
           <div className="flex flex-col items-center gap-3.5 px-2 py-9 text-center">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-tint text-accent">
-              <Camera className="h-[30px] w-[30px]" aria-hidden="true" />
+              <Camera className="h-7.5 w-7.5" aria-hidden="true" />
             </div>
             <h2 className="font-serif text-[22px] font-semibold text-ink">No photos yet</h2>
-            <p className="max-w-[240px] text-[15px] leading-[1.45] text-muted">
+            <p className="max-w-60 text-[15px] leading-[1.45] text-muted">
               Start building your album — every photo you add shows up for both of you.
             </p>
             <button
               type="button"
               onClick={onUploadClick}
-              className="flex h-12 items-center justify-center gap-2 rounded-full bg-fill px-[22px] text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="flex h-12 items-center justify-center gap-2 rounded-full bg-fill px-5.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
               data-testid="photo-gallery-empty-upload-button"
             >
-              <Camera className="h-[18px] w-[18px]" aria-hidden="true" />
+              <Camera className="h-4.5 w-4.5" aria-hidden="true" />
               Upload a photo
             </button>
           </div>

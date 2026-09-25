@@ -375,7 +375,7 @@ export function PokeKissInterface() {
               ref={historyButtonRef}
               type="button"
               onClick={() => setShowHistory(true)}
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-1 text-[13px] font-semibold text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-1 text-[13px] font-semibold text-accent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
               data-testid="history-button"
             >
               <History className="h-4 w-4" aria-hidden="true" />
@@ -400,7 +400,7 @@ export function PokeKissInterface() {
                 type="button"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="relative isolate ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1.5 text-[11px] font-bold text-white after:absolute after:-inset-y-2 after:-right-4 after:-left-0.5 after:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+                className="relative isolate ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1.5 text-[11px] font-bold text-white after:absolute after:-inset-y-2 after:-right-4 after:-left-0.5 after:content-[''] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page"
                 onClick={handleBadgeClick}
                 data-testid="notification-badge"
                 aria-label={
@@ -434,7 +434,7 @@ export function PokeKissInterface() {
                 onClick={tile.onClick}
                 disabled={tile.disabled}
                 whileTap={tile.disabled ? undefined : { scale: 0.96 }}
-                className="flex min-h-[92px] min-w-0 flex-col items-center justify-center gap-2 rounded-[20px] bg-card px-1 py-2 text-sm font-semibold text-ink ring-1 ring-line ring-inset focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-h-23 min-w-0 flex-col items-center justify-center gap-2 rounded-[20px] bg-card px-1 py-2 text-sm font-semibold text-ink ring-1 ring-line ring-inset focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
                 data-testid={`${tile.id}-button`}
                 aria-label={tile.label}
                 aria-describedby={tile.cooldown > 0 ? cooldownId : undefined}
