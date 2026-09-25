@@ -1,6 +1,6 @@
 import type { PanInfo } from 'framer-motion';
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
-import { AlertTriangle, ChevronLeft, ChevronRight, ImageOff, Loader2, Trash2, X } from 'lucide-react';
+import { TriangleAlert, ChevronLeft, ChevronRight, ImageOff, LoaderCircle, Trash, X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import { useFocusTrap } from '../../hooks';
@@ -571,7 +571,7 @@ export function PhotoViewer({
               className="flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent text-danger"
               aria-label="Delete photo"
             >
-              <Trash2 className="h-5 w-5" aria-hidden="true" />
+              <Trash className="h-5 w-5" aria-hidden="true" />
             </button>
           )}
 
@@ -627,7 +627,7 @@ export function PhotoViewer({
             {/* AC 6.4.15: Loading spinner */}
             {(isLoading || image.status === 'loading') && !showImageError && !imageNotSaved && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 className="h-12 w-12 animate-spin text-white" />
+                <LoaderCircle className="h-12 w-12 animate-spin text-white" />
               </div>
             )}
 
@@ -715,7 +715,7 @@ export function PhotoViewer({
             >
               <div className="flex items-center gap-3 border-b border-line px-5 py-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
-                  <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                  <TriangleAlert className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <h3 id="photo-viewer-delete-title" className="text-lg font-semibold text-ink">
                   Delete Photo?
@@ -762,7 +762,7 @@ export function PhotoViewer({
                   disabled={isDeleting}
                   className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
                 >
-                  {isDeleting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  {isDeleting && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
                   Delete
                 </button>
               </div>

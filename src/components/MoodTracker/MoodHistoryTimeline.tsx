@@ -7,7 +7,7 @@
  * @module components/MoodTracker/MoodHistoryTimeline
  */
 
-import { AlertCircle, History } from 'lucide-react';
+import { CircleAlert, RotateCcwClock } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import type { ReactElement } from 'react';
 import { List } from 'react-window';
@@ -60,7 +60,7 @@ function EmptyMoodHistoryState() {
       data-testid="empty-mood-history-state"
     >
       <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-tint text-accent">
-        <History className="h-5 w-5" aria-hidden="true" />
+        <RotateCcwClock className="h-5 w-5" aria-hidden="true" />
       </div>
       <h3 className="mb-1 text-[15px] font-semibold text-ink">No mood history yet</h3>
       <p className="text-sm text-muted">
@@ -212,7 +212,7 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
   if (error) {
     return (
       <div className="flex flex-col items-center px-4 py-12 text-center" data-testid="error-state">
-        <AlertCircle className="mb-3 h-8 w-8 text-muted" aria-hidden="true" />
+        <CircleAlert className="mb-3 h-8 w-8 text-muted" aria-hidden="true" />
         <h3 className="mb-1 text-[15px] font-semibold text-ink">Failed to load mood history</h3>
         <p className="text-sm text-muted">{error}</p>
         <button

@@ -21,7 +21,7 @@
  * @component
  */
 
-import { CircleAlert, Loader2 } from 'lucide-react';
+import { CircleAlert, LoaderCircle } from 'lucide-react';
 import { useEffect, useState, type SubmitEvent } from 'react';
 import { getUser } from '../../api/auth/sessionService';
 import { isOnline } from '../../api/errorHandlers';
@@ -217,7 +217,7 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
     >
       {isLoading ? (
         <>
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
           {isEdit ? 'Saving...' : 'Setting up...'}
         </>
       ) : isEdit ? (

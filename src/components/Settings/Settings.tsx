@@ -12,13 +12,13 @@
  */
 
 import {
-  AlertCircle,
+  CircleAlert,
   Cake,
   ChevronRight,
   Gem,
   Heart,
   Info,
-  Loader2,
+  LoaderCircle,
   LogOut,
   Pencil,
   RotateCcw,
@@ -191,7 +191,7 @@ function TogetherSinceForm({ start }: { start: string | null }) {
           className={SMALL_SECONDARY}
           data-testid="settings-together-since-save"
         >
-          {isSaving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          {isSaving && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
           {isSaving ? 'Saving…' : 'Save start date'}
         </button>
       </div>
@@ -312,7 +312,7 @@ function BirthdayForm({ birthday }: { birthday: string | null }) {
           className={SMALL_SECONDARY}
           data-testid="settings-birthday-save"
         >
-          {isSaving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          {isSaving && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
           {isSaving ? 'Saving…' : 'Save birthday'}
         </button>
       </div>
@@ -414,7 +414,7 @@ function WeddingForm({ weddingDate }: { weddingDate: string | null }) {
           className={SMALL_SECONDARY}
           data-testid="settings-wedding-save"
         >
-          {isSaving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          {isSaving && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
           {isSaving ? 'Saving…' : 'Save wedding date'}
         </button>
       </div>
@@ -598,7 +598,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           className="flex items-center gap-2 rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
           role="alert"
         >
-          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </div>
       )}
@@ -735,7 +735,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             aria-hidden="true"
           >
             {isLoggingOut ? (
-              <Loader2 className="h-4.25 w-4.25 animate-spin" />
+              <LoaderCircle className="h-4.25 w-4.25 animate-spin" />
             ) : (
               <LogOut className="h-4.25 w-4.25" />
             )}

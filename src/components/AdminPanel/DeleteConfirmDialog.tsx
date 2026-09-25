@@ -1,5 +1,5 @@
 import { m as motion } from 'framer-motion';
-import { AlertTriangle } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { AccountDataError } from '../../services/accountDataError';
 import { useAppStore } from '../../stores/useAppStore';
@@ -86,7 +86,7 @@ export function DeleteConfirmDialog({
           {/* Header with warning icon */}
           <div className="p-6 text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+              <TriangleAlert className="h-6 w-6 text-red-600" />
             </div>
             <h2 id="delete-message-title" className="mb-2 text-xl font-bold text-gray-900">
               Delete Message?

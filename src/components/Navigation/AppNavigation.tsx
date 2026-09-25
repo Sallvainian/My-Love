@@ -24,7 +24,7 @@
  * light accent and muted are already deepened to hold 4.5:1 on its own tinted
  * fills and on the page ground seen through the glass.
  */
-import { Camera, Heart, MessageCircle, Settings as SettingsIcon, Smile, Users } from 'lucide-react';
+import { Camera, Heart, MessageCircle, Settings as SettingsIcon, FaceSlightlySmiling, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ViewType } from '../../stores/slices/navigationSlice';
 
@@ -34,7 +34,7 @@ interface Destination {
   label: string;
   Icon: LucideIcon;
   /**
-   * Fill the icon while active. Only the heart reads well solid -- Smile,
+   * Fill the icon while active. Only the heart reads well solid -- FaceSlightlySmiling,
    * MessageCircle, Camera and Users lose their inner strokes to the fill.
    */
   fillWhenActive?: boolean;
@@ -43,7 +43,7 @@ interface Destination {
 /** Settings is not here: it is the gear in the top bar. */
 const DESTINATIONS: readonly Destination[] = [
   { view: 'home', label: 'Home', Icon: Heart, fillWhenActive: true },
-  { view: 'mood', label: 'Mood', Icon: Smile },
+  { view: 'mood', label: 'Mood', Icon: FaceSlightlySmiling },
   { view: 'notes', label: 'Love Notes', Icon: MessageCircle },
   { view: 'photos', label: 'Photos', Icon: Camera },
   { view: 'partner', label: 'Partner', Icon: Users },

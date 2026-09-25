@@ -1,5 +1,5 @@
 import { m as motion } from 'framer-motion';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash } from 'lucide-react';
 import type { CustomMessage } from '../../types';
 
 interface MessageRowProps {
@@ -94,7 +94,7 @@ export function MessageRow({ message, onEdit, onDelete }: MessageRowProps) {
               aria-label="Delete message"
               data-testid="message-row-delete-button"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash className="h-4 w-4" />
             </button>
           </div>
         ) : (

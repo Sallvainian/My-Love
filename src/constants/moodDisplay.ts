@@ -8,7 +8,7 @@
  * ptint/partner pair).
  */
 import {
-  AlertCircle,
+  CircleAlert,
   Angry,
   Battery,
   Flame,
@@ -16,7 +16,7 @@ import {
   Heart,
   Meh,
   MessageCircle,
-  Smile,
+  FaceSlightlySmiling,
   Sparkles,
   UserMinus,
   Zap,
@@ -31,13 +31,13 @@ export interface MoodDisplay {
 
 export const MOOD_DISPLAY: Record<MoodType, MoodDisplay> = {
   loved: { icon: Heart, label: 'Loved' },
-  happy: { icon: Smile, label: 'Happy' },
+  happy: { icon: FaceSlightlySmiling, label: 'Happy' },
   content: { icon: Meh, label: 'Content' },
   excited: { icon: Zap, label: 'Excited' },
   thoughtful: { icon: MessageCircle, label: 'Thoughtful' },
   grateful: { icon: Sparkles, label: 'Grateful' },
   sad: { icon: Frown, label: 'Sad' },
-  anxious: { icon: AlertCircle, label: 'Anxious' },
+  anxious: { icon: CircleAlert, label: 'Anxious' },
   frustrated: { icon: Angry, label: 'Frustrated' },
   angry: { icon: Flame, label: 'Angry' },
   lonely: { icon: UserMinus, label: 'Lonely' },

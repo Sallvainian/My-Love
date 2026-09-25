@@ -38,15 +38,15 @@
 
 import { AnimatePresence, m as motion } from 'framer-motion';
 import {
-  AlertTriangle,
+  TriangleAlert,
   Calendar,
   Check,
-  Edit2,
+  Pen,
   Gem,
-  Loader2,
+  LoaderCircle,
   Plane,
   Plus,
-  Trash2,
+  Trash,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -463,7 +463,7 @@ export function EventsSettings() {
           data-testid="events-settings-retry"
           className={SMALL_SECONDARY}
         >
-          {retryIsActive && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          {retryIsActive && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
           {retryIsActive ? 'Retrying…' : 'Retry'}
         </button>
       </div>
@@ -525,7 +525,7 @@ export function EventsSettings() {
               role="status"
               aria-live="polite"
             >
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <LoaderCircle className="h-4 w-4 animate-spin" />
               <span>Loading events…</span>
             </div>
           </>
@@ -610,7 +610,7 @@ export function EventsSettings() {
                             className={EDIT_BUTTON}
                             aria-label={`Edit ${event.label}`}
                           >
-                            <Edit2 className="h-4 w-4" />
+                            <Pen className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
@@ -619,7 +619,7 @@ export function EventsSettings() {
                             className={DELETE_BUTTON}
                             aria-label={`Delete ${event.label}`}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash className="h-4 w-4" />
                           </button>
                         </div>
                       )}
@@ -668,7 +668,7 @@ export function EventsSettings() {
               ].filter(Boolean).join(' ') || undefined}
               className={SMALL_SECONDARY}
             >
-              {historyIsActive && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {historyIsActive && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
               {historyIsActive
                 ? 'Loading history…'
                 : eventsHistoryError
@@ -1188,7 +1188,7 @@ function EventForm({
                 className={PRIMARY_BUTTON}
               >
                 {isSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
                 ) : (
                   <Check className="h-4 w-4" />
                 )}
@@ -1337,7 +1337,7 @@ function EventDeleteConfirmation({
       >
         <div className="mb-2 flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
-            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            <TriangleAlert className="h-5 w-5" aria-hidden="true" />
           </div>
           <h3 id={titleId} className={DIALOG_TITLE}>
             Delete this event?
@@ -1389,7 +1389,7 @@ function EventDeleteConfirmation({
               data-testid="events-delete-confirm"
               className={DESTRUCTIVE_BUTTON}
             >
-              {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isDeleting && <LoaderCircle className="h-4 w-4 animate-spin" />}
               {isDeleting ? 'Deleting...' : 'Delete'}
             </button>
           )}

@@ -1,5 +1,5 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
-import { AlertTriangle, Camera, Check, Loader, Upload, X } from 'lucide-react';
+import { TriangleAlert, Camera, Check, Loader, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import { useFocusTrap } from '../../hooks';
@@ -315,7 +315,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                     className="flex items-start gap-3 rounded-[14px] bg-card2 p-4"
                     data-testid="storage-warning-banner"
                   >
-                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
+                    <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
                     <p className="text-sm font-medium text-ink">{storageWarning}</p>
                   </div>
                 )}

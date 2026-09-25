@@ -10,7 +10,7 @@
  */
 
 import { AnimatePresence, m as motion } from 'framer-motion';
-import { Check, Edit2, Heart, Plus, Trash2, X } from 'lucide-react';
+import { Check, Pen, Heart, Plus, Trash, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type RefObject, type SubmitEvent } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useSubmitKey } from '../../hooks/useSubmitKey';
@@ -152,7 +152,7 @@ export function AnniversarySettings() {
                       className={EDIT_BUTTON}
                       aria-label={`Edit ${anniversary.label}`}
                     >
-                      <Edit2 className="h-4 w-4" />
+                      <Pen className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
@@ -160,7 +160,7 @@ export function AnniversarySettings() {
                       className={DELETE_BUTTON}
                       aria-label={`Delete ${anniversary.label}`}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash className="h-4 w-4" />
                     </button>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 import { AnimatePresence, m as motion, type PanInfo } from 'framer-motion';
 import {
-  AlertCircle,
+  CircleAlert,
   Heart,
   MessageCircleHeart,
   Rainbow,
@@ -134,7 +134,7 @@ export function DailyMessage(_props: DailyMessageProps) {
     if (loadingTimeout || error) {
       return (
         <div className="flex min-h-100 flex-col items-center justify-center gap-6 px-4">
-          <AlertCircle className="h-16 w-16 text-muted" />
+          <CircleAlert className="h-16 w-16 text-muted" />
 
           <div className="text-center">
             <h2 className="mb-2 text-xl font-semibold text-ink">

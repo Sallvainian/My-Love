@@ -17,7 +17,7 @@
  */
 
 import { motion } from 'framer-motion';
-import { AlertCircle } from 'lucide-react';
+import { CircleAlert } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { authService } from '../../api/authService';
 import { getOwnDisplayName, getPartnerDisplayName } from '../../api/supabaseClient';
@@ -208,7 +208,7 @@ export function LoveNotes(): ReactElement {
           animate={{ opacity: 1, y: 0 }}
           className="mx-4 mt-3 flex shrink-0 items-center gap-3 rounded-[14px] bg-dtint p-3"
         >
-          <AlertCircle className="h-5 w-5 shrink-0 text-danger" aria-hidden="true" />
+          <CircleAlert className="h-5 w-5 shrink-0 text-danger" aria-hidden="true" />
           <p className="flex-1 text-sm text-danger" role="alert">
             {error}
           </p>

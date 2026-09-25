@@ -19,7 +19,7 @@
  */
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowDown, Heart, Loader2 } from 'lucide-react';
+import { ArrowDown, Heart, LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { List, useListRef } from 'react-window';
 import { useInfiniteLoader } from 'react-window-infinite-loader';
@@ -152,7 +152,7 @@ function LoadingSpinner({ style }: { style?: React.CSSProperties }) {
       style={style}
       data-testid="loading-spinner"
     >
-      <Loader2 className="h-6 w-6 animate-spin text-accent" />
+      <LoaderCircle className="h-6 w-6 animate-spin text-accent" />
     </div>
   );
 }
@@ -373,7 +373,7 @@ export function MessageList({
   if (isLoading && notes.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        <LoaderCircle className="h-8 w-8 animate-spin text-accent" />
       </div>
     );
   }

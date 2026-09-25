@@ -1,4 +1,4 @@
-import { AlertCircle, Camera, Plus } from 'lucide-react';
+import { CircleAlert, Camera, Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { getOwnDisplayName, getPartnerDisplayName } from '../../api/supabaseClient';
 import { useAppStore } from '../../stores/useAppStore';
@@ -167,7 +167,7 @@ export function PhotoGallery({ onUploadClick, uploadButtonRef }: PhotoGalleryPro
         {renderHeader(ALBUM_SUBTITLE, false)}
         <div className="flex flex-col items-center gap-3 rounded-[20px] border border-line bg-card px-4 py-8 text-center shadow-card">
           <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-dtint text-danger">
-            <AlertCircle className="h-7 w-7" aria-hidden="true" />
+            <CircleAlert className="h-7 w-7" aria-hidden="true" />
           </div>
           <h2 className="text-lg font-semibold text-ink">Failed to load photos</h2>
           <p className="max-w-xs rounded-[14px] bg-dtint px-3 py-2 text-sm text-danger" role="alert">

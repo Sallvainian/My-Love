@@ -18,7 +18,7 @@
  * Story 1.5: Task 2 - Network Status Indicator Component (AC-1.5.1)
  */
 
-import { Loader2, Wifi, WifiOff } from 'lucide-react';
+import { LoaderCircle, Wifi, WifiOff } from 'lucide-react';
 import { useNetworkStatus } from '../../hooks';
 
 interface NetworkStatusIndicatorProps {
@@ -73,7 +73,7 @@ export function NetworkStatusIndicator({
       return {
         dotColor: 'bg-accent',
         textColor: 'text-accent',
-        icon: Loader2,
+        icon: LoaderCircle,
         label: 'Connecting...',
         description: 'Reconnecting to the network...',
         showBanner: true,
