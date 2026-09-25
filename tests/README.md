@@ -84,7 +84,6 @@ tests/
 │   │   ├── index.ts                # TypedSupabaseClient export
 │   │   └── events.ts               # resolveWorkerPairIds, seedEvents, clearPairEvents
 │   └── helpers/
-│       ├── index.ts                # Generic utilities (generateTestEmail, getTestId, expectToast)
 │       ├── navigation.ts           # Tray destinations (six views)
 │       ├── events.ts               # Single-row event helpers
 │       ├── rls-security.ts
