@@ -348,7 +348,16 @@ describe('AdminPanel offline (ticket 11)', () => {
 
   it.each([
     ['went offline', () => new AccountDataError('offline', OFFLINE), OFFLINE],
-    ['failed', () => new Error('request failed'), 'Import the same file again to add the rest.'],
+    [
+      'lost the connection',
+      () => new AccountDataError('transport', 'Failed to fetch'),
+      'Import the same file again to add the rest.',
+    ],
+    [
+      'hit a row it refused',
+      () => new Error('Message text is required'),
+      'Message text is required',
+    ],
   ])(
     'import: an import that %s partway says how many were imported',
     async (_label, cause, reason) => {

@@ -85,10 +85,19 @@ function AccountAdminPanel({ onExit }: AdminPanelProps) {
       // Offline, the file is fine: say what actually stopped the import.
       const offlineReason = (e: unknown) =>
         e instanceof AccountDataError && e.code === 'offline' ? e.message : null;
+      // Importing again skips the saved rows, so it only helps when the
+      // request itself failed; a row the checks refuse would stop it again.
+      const stoppedReason = (e: unknown) =>
+        offlineReason(e) ??
+        (e instanceof AccountDataError && e.code === 'transport'
+          ? 'Import the same file again to add the rest.'
+          : e instanceof Error
+            ? e.message
+            : 'The rest were not imported.');
       alert(
         error instanceof CustomMessagesImportError
           ? `Import stopped after ${error.imported} of ${error.total} messages.\n` +
-              (offlineReason(error.cause) ?? 'Import the same file again to add the rest.')
+              stoppedReason(error.cause)
           : (offlineReason(error) ??
               'Failed to import messages. Please check the file format and try again.')
       );
