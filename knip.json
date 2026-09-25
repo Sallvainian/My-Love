@@ -16,5 +16,8 @@
   "ignoreBinaries": [
     "supabase"
   ],
+  "ignoreDependencies": [
+    "prettier"
+  ],
   "ignoreExportsUsedInFile": true
 }
