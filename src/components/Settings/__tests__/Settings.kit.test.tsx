@@ -160,7 +160,7 @@ describe('Settings on the kit', () => {
 
     expect(await screen.findByText('person@example.com')).toBeInTheDocument();
     expect(screen.getByText('Signed in')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-avatar').textContent).toBe('F');
+    expect(screen.getByTestId('settings-avatar').textContent).toBe('J');
   });
 
   it('takes the avatar initial from the email when no display name is set', async () => {

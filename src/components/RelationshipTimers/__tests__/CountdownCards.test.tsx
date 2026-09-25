@@ -45,8 +45,8 @@ function expectHighlighted(card: HTMLElement) {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  // Noon on 10 March 2026 -- the partner birthday used below.
-  vi.setSystemTime(new Date(2026, 2, 10, 12, 0, 0));
+  // Noon on 16 March 2026 -- the partner birthday used below.
+  vi.setSystemTime(new Date(2026, 2, 16, 12, 0, 0));
 });
 
 afterEach(() => {
@@ -59,7 +59,7 @@ describe('Countdown cards on the day itself', () => {
     render(
       <BirthdayCountdown
         name="Pat"
-        birthday="2000-05-20"
+        birthday="2000-03-16"
         tone="partner"
         testId="birthday-countdown-partner"
       />
@@ -75,14 +75,14 @@ describe('Countdown cards on the day itself', () => {
     render(
       <BirthdayCountdown
         name="Pat"
-        birthday="2000-05-22"
+        birthday="2000-03-18"
         tone="partner"
         testId="birthday-countdown-partner"
       />
     );
 
     const card = screen.getByTestId('birthday-countdown-partner');
-    // Noon on 10 March to midnight starting 12 March: 1 day 12h.
+    // Noon on 16 March to midnight starting 18 March: 1 day 12h.
     // Exact, on the value element: a substring match also passes "11 days".
     expect(card.querySelector('h3 + div')?.textContent).toBe('1 day');
     expect(card.querySelector('h3 ~ span')?.textContent).toBe('12h 00m 00s');
@@ -91,7 +91,7 @@ describe('Countdown cards on the day itself', () => {
   });
 
   it('highlights the tile and reads "Today!" for an event dated today', () => {
-    render(<EventCountdown label="Meetup" icon="plane" date={new Date(2026, 2, 10)} />);
+    render(<EventCountdown label="Meetup" icon="plane" date={new Date(2026, 2, 16)} />);
 
     const card = screen.getByTestId('event-countdown-meetup');
     expect(card).toHaveTextContent('Today!');
@@ -112,7 +112,7 @@ describe('Countdown cards on the day itself', () => {
   it('highlights a celebrating anniversary with Sparkles and "Today!"', () => {
     render(
       <CountdownTimer
-        anniversaries={[{ id: 1, date: '2024-03-10', label: 'First date' }]}
+        anniversaries={[{ id: 1, date: '2024-03-16', label: 'First date' }]}
         maxDisplay={3}
       />
     );
@@ -152,8 +152,8 @@ describe('Countdown cards on an ordinary day', () => {
   it('reads the same day count as an event on the same date', () => {
     render(
       <>
-        <BirthdayCountdown name="Pat" birthday="2000-05-22" testId="birthday-countdown-partner" />
-        <EventCountdown label="Meetup" icon="plane" date={new Date(2026, 2, 12)} />
+        <BirthdayCountdown name="Pat" birthday="2000-03-18" testId="birthday-countdown-partner" />
+        <EventCountdown label="Meetup" icon="plane" date={new Date(2026, 2, 18)} />
       </>
     );
 
@@ -170,7 +170,7 @@ describe('Countdown cards on an ordinary day', () => {
     // away, but the card reads what a wall clock would: 23h to midnight.
     vi.setSystemTime(new Date(2026, 2, 8, 1, 0, 0));
     render(
-      <BirthdayCountdown name="Pat" birthday="2000-05-19" testId="birthday-countdown-partner" />
+      <BirthdayCountdown name="Pat" birthday="2000-03-09" testId="birthday-countdown-partner" />
     );
 
     const card = screen.getByTestId('birthday-countdown-partner');
@@ -179,9 +179,9 @@ describe('Countdown cards on an ordinary day', () => {
   });
 
   it('ticks the clock every second and rolls into "Happy Birthday!" at midnight', () => {
-    vi.setSystemTime(new Date(2026, 2, 10, 23, 59, 58));
+    vi.setSystemTime(new Date(2026, 2, 16, 23, 59, 58));
     render(
-      <BirthdayCountdown name="Pat" birthday="2000-05-21" testId="birthday-countdown-partner" />
+      <BirthdayCountdown name="Pat" birthday="2000-03-17" testId="birthday-countdown-partner" />
     );
 
     const card = screen.getByTestId('birthday-countdown-partner');
@@ -201,8 +201,8 @@ describe('Countdown cards on an ordinary day', () => {
   });
 
   it('shows the live clock on an upcoming event', () => {
-    // Noon on 10 March to midnight starting 13 March: 2 days 12h.
-    render(<EventCountdown label="Meetup" icon="plane" date={new Date(2026, 2, 13)} />);
+    // Noon on 16 March to midnight starting 19 March: 2 days 12h.
+    render(<EventCountdown label="Meetup" icon="plane" date={new Date(2026, 2, 19)} />);
 
     const card = screen.getByTestId('event-countdown-meetup');
     expect(card.querySelector('h3 + div')?.textContent).toBe('2 days');
@@ -217,7 +217,7 @@ describe('Countdown cards on an ordinary day', () => {
   it('shows no clock on a card dated today or with no date', () => {
     render(
       <>
-        <EventCountdown label="Today" icon="calendar" date={new Date(2026, 2, 10)} />
+        <EventCountdown label="Today" icon="calendar" date={new Date(2026, 2, 16)} />
         <EventCountdown label="Wedding" icon="ring" date={null} />
       </>
     );
@@ -227,10 +227,10 @@ describe('Countdown cards on an ordinary day', () => {
   });
 
   it('shows a plain calendar tile, a day count and a live clock for an upcoming anniversary', () => {
-    // Noon on 10 March to midnight on 14 March: 3 days 12h 0m.
+    // Noon on 16 March to midnight on 20 March: 3 days 12h 0m.
     render(
       <CountdownTimer
-        anniversaries={[{ id: 2, date: '2024-03-14', label: 'First kiss' }]}
+        anniversaries={[{ id: 2, date: '2024-03-20', label: 'First kiss' }]}
         maxDisplay={3}
       />
     );
@@ -248,10 +248,10 @@ describe('Countdown cards on an ordinary day', () => {
 
 describe('Anniversary clock in the last minute', () => {
   it('keeps counting seconds until midnight, then reads "Today!"', () => {
-    vi.setSystemTime(new Date(2026, 2, 13, 23, 59, 30));
+    vi.setSystemTime(new Date(2026, 2, 19, 23, 59, 30));
     render(
       <CountdownTimer
-        anniversaries={[{ id: 3, date: '2024-03-14', label: 'First kiss' }]}
+        anniversaries={[{ id: 3, date: '2024-03-20', label: 'First kiss' }]}
         maxDisplay={3}
       />
     );
@@ -315,7 +315,7 @@ describe('Birthday cards from the server-held birthdays', () => {
     render(<BirthdayCountdown name={null} birthday="1999-08-14" testId="birthday-countdown-self" />);
 
     const card = screen.getByTestId('birthday-countdown-self');
-    // Noon on 10 March 2026: the next 14 August is in 2026, the 27th birthday.
+    // Noon on 16 March 2026: the next 14 August is in 2026, the 27th birthday.
     expect(card.querySelector('h3')?.textContent).toBe('You turn 27');
     expect(tileOf(card)).toHaveClass('bg-tint', 'text-accent');
   });
@@ -324,7 +324,7 @@ describe('Birthday cards from the server-held birthdays', () => {
     render(
       <BirthdayCountdown
         name="Partner"
-        birthday="2000-05-21"
+        birthday="2000-03-17"
         tone="partner"
         testId="birthday-countdown-partner"
       />
@@ -337,7 +337,7 @@ describe('Birthday cards from the server-held birthdays', () => {
   });
 
   it('counts to next year once this year\'s birthday has passed', () => {
-    render(<BirthdayCountdown name="Sam" birthday="1990-03-09" testId="birthday-countdown-self" />);
+    render(<BirthdayCountdown name="Sam" birthday="1990-03-15" testId="birthday-countdown-self" />);
 
     const card = screen.getByTestId('birthday-countdown-self');
     expect(card.querySelector('h3')?.textContent).toBe('Sam turns 37');
@@ -391,7 +391,7 @@ describe("Home's birthday and wedding cards", () => {
     email: 'partner@example.test',
     displayName: 'Pat',
     connectedAt: null,
-    birthday: '2000-05-22',
+    birthday: '2000-03-18',
   };
   const LINKED = { status: 'linked', partnerId: 'partner', relationshipStart: null } as const;
 
@@ -415,10 +415,10 @@ describe("Home's birthday and wedding cards", () => {
     const partnerCard = screen.getByTestId('birthday-countdown-partner');
     expect(partnerCard.querySelector('h3')?.textContent).toBe('Pat turns 26');
     expect(tileOf(partnerCard)).toHaveClass('bg-ptint', 'text-partner');
-    // Noon on 10 March to midnight starting 12 June 2026: 93 days 12h.
+    // Noon on 16 March to midnight starting 12 June 2026: 87 days 12h.
     expect(
       screen.getByTestId('event-countdown-wedding').querySelector('h3 + div')?.textContent
-    ).toBe('93 days');
+    ).toBe('87 days');
   });
 
   it('with no chosen names: "You turn N" and "Partner turns N"', () => {

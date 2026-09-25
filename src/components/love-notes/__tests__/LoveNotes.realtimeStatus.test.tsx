@@ -147,7 +147,7 @@ describe('LoveNotes realtime notice', () => {
 
       const row = screen.getByTestId(ROW);
       expect(await within(row).findByText('harper')).toBeVisible();
-      expect(within(row).getByText('G')).toHaveClass('bg-partner');
+      expect(within(row).getByText('H')).toHaveClass('bg-partner');
     });
 
     it('keeps a level-1 "Love Notes" heading, visually hidden, and no back control', async () => {

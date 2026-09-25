@@ -152,13 +152,13 @@ describe('PhotoGallery owner badge', () => {
     expect(own.className).toContain('w-5');
     expect(own.className).toContain('left-1.5');
     expect(own.className).toContain('bottom-1.5');
-    expect(own.querySelector('[aria-hidden="true"]')?.textContent).toBe('F');
+    expect(own.querySelector('[aria-hidden="true"]')?.textContent).toBe('J');
     expect(own.querySelector('.sr-only')?.textContent).toBe('Uploaded by you');
 
     expect(partner.className).toContain('bg-partner');
     expect(partner.className).toContain('text-card');
     expect(partner.className).not.toContain('text-white');
-    expect(partner.querySelector('[aria-hidden="true"]')?.textContent).toBe('G');
+    expect(partner.querySelector('[aria-hidden="true"]')?.textContent).toBe('H');
     expect(partner.querySelector('.sr-only')?.textContent).toBe('Uploaded by Harper');
 
     // The tile's aria-label wins over its content, so the uploader reaches
