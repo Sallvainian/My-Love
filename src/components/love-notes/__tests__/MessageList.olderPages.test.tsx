@@ -127,6 +127,17 @@ function list(
   );
 }
 
+/** A note of mine that failed to send: no server row yet, keyed by its tempId. */
+const unsent: LoveNote = {
+  id: 'temp-1',
+  tempId: 'temp-1',
+  from_user_id: 'me',
+  to_user_id: 'partner',
+  content: 'unsent note',
+  created_at: new Date(Date.UTC(2026, 0, 2)).toISOString(),
+  error: true,
+};
+
 /** Lets the list's queued state updates land. */
 async function settle() {
   await act(async () => {});
@@ -236,7 +247,34 @@ describe('MessageList older pages', () => {
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
-  it('asks once for an older page that fails, and again after the reader scrolls away and back', async () => {
+  it('asks for nothing more before the scroll back to the reader has landed', async () => {
+    const onLoadMore = vi.fn();
+    const { rerender } = await openAtNewest(onLoadMore);
+    await showRows(rerender, onLoadMore, 0, 5);
+    rerender(list(notesBetween(51, 100), onLoadMore, { isLoading: true }));
+    await settle();
+    rerender(list(notesBetween(1, 100), onLoadMore));
+    await settle();
+    expect(view.listRef.current.scrollToRow).toHaveBeenCalledWith({ index: 51, align: 'start' });
+
+    // The real List renders again from the old scroll offset before the scroll
+    // event lands, and reports a slightly different range at the top.
+    view.visible = { startIndex: 0, stopIndex: 6 };
+    rerender(list(notesBetween(1, 100), onLoadMore));
+    await settle();
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    // The scroll lands; back at the top later, the next page is asked for.
+    view.visible = { startIndex: 51, stopIndex: 56 };
+    rerender(list(notesBetween(1, 100), onLoadMore));
+    await settle();
+    view.visible = { startIndex: 0, stopIndex: 5 };
+    rerender(list(notesBetween(1, 100), onLoadMore));
+    await settle();
+    expect(onLoadMore).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks once for a page that fails, and again after scrolling away and back', async () => {
     const onLoadMore = vi.fn();
     const { rerender } = await openAtNewest(onLoadMore);
     await showRows(rerender, onLoadMore, 0, 5);
@@ -272,6 +310,60 @@ describe('MessageList older pages', () => {
       align: 'end',
       index: view.rowCount - 1,
     });
+    expect(screen.queryByTestId('new-message-indicator')).toBeNull();
+  });
+
+  it('counts a partner note arriving before an unsent note of mine as new', async () => {
+    view.visible = { startIndex: 20, stopIndex: 25 };
+    const onLoadMore = vi.fn();
+    const { rerender } = render(
+      list([...notesBetween(51, 100), unsent], onLoadMore, { hasMore: false })
+    );
+    await settle();
+
+    // A refresh puts the server's page first and the unconfirmed note last.
+    rerender(list([...notesBetween(51, 101), unsent], onLoadMore, { hasMore: false }));
+    await settle();
+
+    expect(screen.getByTestId('new-message-indicator')).toBeInTheDocument();
+  });
+
+  it('scrolls to a partner note arriving before an unsent note while at the bottom', async () => {
+    view.visible = { startIndex: 46, stopIndex: 51 };
+    const onLoadMore = vi.fn();
+    const { rerender } = render(
+      list([...notesBetween(51, 100), unsent], onLoadMore, { hasMore: false })
+    );
+    await settle();
+    view.listRef.current.scrollToRow.mockClear();
+
+    rerender(list([...notesBetween(51, 101), unsent], onLoadMore, { hasMore: false }));
+    await settle();
+
+    expect(view.listRef.current.scrollToRow).toHaveBeenCalledWith({
+      align: 'end',
+      index: view.rowCount - 1,
+    });
+  });
+
+  it('does not count my note being confirmed by the server as new', async () => {
+    view.visible = { startIndex: 20, stopIndex: 25 };
+    const onLoadMore = vi.fn();
+    const { rerender } = render(
+      list([...notesBetween(51, 100), unsent], onLoadMore, { hasMore: false })
+    );
+    await settle();
+
+    const confirmed = {
+      ...unsent,
+      id: 'server-id-1',
+      tempId: undefined,
+      error: false,
+      idempotency_key: unsent.tempId,
+    } as LoveNote;
+    rerender(list([...notesBetween(51, 100), confirmed], onLoadMore, { hasMore: false }));
+    await settle();
+
     expect(screen.queryByTestId('new-message-indicator')).toBeNull();
   });
 

@@ -161,6 +161,11 @@ function LoadingSpinner({ style }: { style?: React.CSSProperties }) {
   );
 }
 
+/** The key a note was composed with: its tempId, or a committed row's idempotency_key */
+function composedKey(note: LoveNote): string | undefined {
+  return note.tempId ?? (note as LoveNote & { idempotency_key?: string }).idempotency_key;
+}
+
 /** Rows beyond the visible range within which the loader asks for more */
 const LOAD_THRESHOLD = 10;
 
@@ -221,10 +226,13 @@ export function MessageList({
   // The notes at either end as of the last commit: an older page moves the
   // first, a new message the last. Length alone cannot tell the two apart.
   const prevFirstNoteId = useRef(notes[0]?.id);
-  const prevLastNoteId = useRef(notes[notes.length - 1]?.id);
+  const prevNotes = useRef(notes);
   // First visible row as last reported, to keep the reader's place when an
   // older page lands above it
   const firstVisibleRow = useRef(0);
+  // The row the reader is being scrolled back to after an older page landed,
+  // until a report shows the scroll has landed or left the top
+  const anchorRow = useRef<number | null>(null);
   // Whether the list has shown its last row since the thread appeared. It
   // opens scrolled to the newest note, but its first frame, before that
   // scroll, reports the top; older pages wait until the end has been seen.
@@ -293,6 +301,14 @@ export function MessageList({
       ) {
         return;
       }
+      // The List can render again from the old scroll offset before that
+      // scroll lands (a row count change re-measures synchronously), and
+      // report the top once more, now with the first note already moved on.
+      if (anchorRow.current !== null) {
+        const { startIndex } = visibleRows;
+        if (startIndex < anchorRow.current && startIndex <= LOAD_THRESHOLD) return;
+        anchorRow.current = null;
+      }
       firstVisibleRow.current = visibleRows.startIndex;
       // The header is out of the loader's range: back at the top, ask again
       if (visibleRows.startIndex > LOAD_THRESHOLD) setOlderAskedFrom(undefined);
@@ -348,21 +364,12 @@ export function MessageList({
   // Story 2.3: AC-2.3.4 - Handle new messages with conditional automatic scroll
   useEffect(() => {
     const prevFirstId = prevFirstNoteId.current;
-    const prevLastId = prevLastNoteId.current;
+    const before = prevNotes.current;
     prevFirstNoteId.current = notes[0]?.id;
-    prevLastNoteId.current = notes[notes.length - 1]?.id;
+    prevNotes.current = notes;
     // An emptied thread unmounts the list; a new one opens at its top again
     if (notes.length === 0) hasShownEnd.current = false;
     if (!listRef.current) return;
-
-    // A new message follows the previous last note (or starts the thread). A
-    // confirmed send swaps the last note's id in place and a removal uncovers
-    // an older one: neither is a new message.
-    const prevLastIndex =
-      prevLastId === undefined ? -1 : notes.findIndex((note) => note.id === prevLastId);
-    const newMessage =
-      notes.length > 0 &&
-      (prevLastId === undefined || (prevLastIndex >= 0 && prevLastIndex < notes.length - 1));
 
     // An older page puts notes above the previous first note. A refresh that
     // replaced the thread leaves no previous first note to find.
@@ -373,6 +380,22 @@ export function MessageList({
             0,
             notes.findIndex((note) => note.id === prevFirstId)
           );
+
+    // A new message is a note that was not there before, below any older
+    // page. Not only at the end: a refresh puts the server's page ahead of an
+    // unsent note. A confirmed send keeps its key (the committed row carries
+    // the tempId as idempotency_key) and a removal adds nothing.
+    const known = new Set<string>();
+    for (const note of before) {
+      known.add(note.id);
+      const key = composedKey(note);
+      if (key) known.add(key);
+    }
+    const newMessage = notes.some((note, index) => {
+      if (index < olderAdded || known.has(note.id)) return false;
+      const key = composedKey(note);
+      return !key || !known.has(key);
+    });
 
     if (!newMessage && olderAdded === 0) return;
 
@@ -389,8 +412,9 @@ export function MessageList({
     if (olderAdded > 0) {
       // Keep the row the reader was on (from the old first note down) at the
       // top; without this the list stays at the top and asks again.
-      const index = Math.max(firstVisibleRow.current, 1) + olderAdded;
-      listRef.current.scrollToRow({ index: Math.min(index, totalRowCount - 1), align: 'start' });
+      const index = Math.min(Math.max(firstVisibleRow.current, 1) + olderAdded, totalRowCount - 1);
+      anchorRow.current = index;
+      listRef.current.scrollToRow({ index, align: 'start' });
     }
 
     if (newMessage) {
