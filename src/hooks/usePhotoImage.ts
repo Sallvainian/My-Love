@@ -61,14 +61,14 @@ export const ERROR_RETRY_DELAYS_MS = [2_000, 10_000, 30_000] as const;
 // emptied that account's cache), so these read the store at each check rather
 // than through a subscription that the unmount would remove.
 function ownsCurrentSession(userId: string, authSessionVersion: number): boolean {
-  // eslint-disable-next-line no-restricted-properties
+  // eslint-disable-next-line no-restricted-properties -- downloads outlive unmount, so each check reads the live session
   const state = useAppStore.getState();
   return state.userId === userId && state.authSessionVersion === authSessionVersion;
 }
 
 /** The photo list the refusal rule picks an eviction from, read when a write is refused. */
 function currentPhotos(): readonly PhotoImageRef[] {
-  // eslint-disable-next-line no-restricted-properties
+  // eslint-disable-next-line no-restricted-properties -- downloads outlive unmount, so each check reads the live session
   return useAppStore.getState().photos;
 }
 

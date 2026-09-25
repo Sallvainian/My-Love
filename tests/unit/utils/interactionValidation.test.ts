@@ -25,10 +25,8 @@ describe('isValidUUID', () => {
   });
 
   it('rejects non-string input', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(isValidUUID(null as any)).toBe(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(isValidUUID(undefined as any)).toBe(false);
+    expect(isValidUUID(null as unknown as string)).toBe(false);
+    expect(isValidUUID(undefined as unknown as string)).toBe(false);
   });
 
   it('rejects malformed UUID', () => {

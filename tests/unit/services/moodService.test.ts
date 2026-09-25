@@ -48,8 +48,9 @@ describe('moodService', () => {
     });
 
     it('throws validation error for invalid mood type', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await expect(moodService.create(userId, ['invalid-mood' as any])).rejects.toThrow();
+      await expect(
+        moodService.create(userId, ['invalid-mood' as unknown as MoodEntry['mood']])
+      ).rejects.toThrow();
     });
 
     it('throws validation error for note exceeding 200 chars', async () => {
@@ -79,8 +80,9 @@ describe('moodService', () => {
 
     it('throws validation error for invalid mood in update', async () => {
       const created = await moodService.create(userId, ['happy']);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await expect(moodService.updateMood(created.id!, ['bad' as any])).rejects.toThrow();
+      await expect(
+        moodService.updateMood(created.id!, ['bad' as unknown as MoodEntry['mood']])
+      ).rejects.toThrow();
     });
 
     it('[A: edit after failed first sync] leaves timestamp untouched', async () => {

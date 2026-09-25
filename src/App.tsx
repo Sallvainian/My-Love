@@ -390,8 +390,7 @@ function App() {
         setTimeout(logStorageQuota, 100);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]); // Initialize when session is established
+  }, [session, initializeApp]); // Initialize when session is established
 
   // Custom messages and favorites refresh through their local-copy
   // refresher (kind `message-data`), which no-ops until the bundled rows are seeded (messagesSlice).

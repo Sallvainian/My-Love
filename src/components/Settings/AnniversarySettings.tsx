@@ -254,7 +254,7 @@ function AnniversaryDeleteConfirmation({
   useEffect(() => {
     return () => {
       if (!deleteSucceededRef.current) return;
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- reads the ref at cleanup on purpose: the fallback must be the node mounted now
       const fallback = fallbackFocusRef.current;
       if (fallback?.isConnected) {
         fallback.focus();
