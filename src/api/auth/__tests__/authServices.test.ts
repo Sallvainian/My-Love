@@ -261,7 +261,10 @@ describe('auth session/action services', () => {
     pendingStore.reject(error);
     await flushPersistence();
 
-    expect(errorLog).toHaveBeenCalledWith('[AuthService] Failed to update stored auth token:', error);
+    expect(errorLog).toHaveBeenCalledWith(
+      '[AuthService] Failed to update stored auth token:',
+      error
+    );
     expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
     errorLog.mockRestore();
   });
