@@ -311,7 +311,16 @@ export type PartnerLookup =
  * `unlinked` is deliberately returned for PGRST116 and for a missing
  * `partner_id`: neither is a failure, and retrying either would only delay a
  * correct answer.
+ *
+ * Known offline, it answers `error` with reason `PARTNER_LOOKUP_OFFLINE`
+ * without sending the query: the request could only fail, and every caller
+ * already keeps what it shows on `error`. Checked after the session read,
+ * which can resolve after the connection drops.
  */
+export const PARTNER_LOOKUP_OFFLINE = 'offline';
+
+const knownOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
 export const lookupPartnerId = async (): Promise<PartnerLookup> => {
   try {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -327,6 +336,8 @@ export const lookupPartnerId = async (): Promise<PartnerLookup> => {
       console.error('[Supabase] Cannot get partner ID: User not authenticated');
       return { status: 'unlinked' };
     }
+
+    if (knownOffline()) return { status: 'error', reason: PARTNER_LOOKUP_OFFLINE };
 
     // Query current user's partner_id from users table
     const { data, error } = await supabase
@@ -368,6 +379,8 @@ export const resolvePartnerLookupForDelivery = async (): Promise<PartnerLookup> 
   for (let attempt = 0; attempt < LOOKUP_ATTEMPTS; attempt += 1) {
     last = await lookupPartnerId();
     if (last.status !== 'error') return last;
+    // Retrying offline only waits out the backoff for the same answer.
+    if (last.reason === PARTNER_LOOKUP_OFFLINE) return last;
 
     const backoff = LOOKUP_BACKOFF_MS[attempt];
     if (backoff === undefined) break;

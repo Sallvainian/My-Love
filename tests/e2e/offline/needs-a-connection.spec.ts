@@ -13,11 +13,12 @@
  * still fires the `request` event, so a leaked write shows up.
  *
  * Background reads still go out on some screens after the tap is armed — seen
- * in runs: `GET /rest/v1/users?select=partner_id` (start-up and Realtime
- * partner lookups) on Photos and Love Notes, and `GET /rest/v1/partner_requests`
- * (PartnerMoodView's pending-request effect) on Partner. Tests on those screens
- * narrow the count to writes (every method but GET), and say so. The reads
- * those writes would have made first are pinned by unit tests.
+ * in runs: other mount-time reads on Photos and Love Notes, and
+ * `GET /rest/v1/partner_requests` (PartnerMoodView's pending-request effect) on
+ * Partner. Tests on those screens narrow the count to writes (every method but
+ * GET), and say so. The reads those writes would have made first are pinned by
+ * unit tests. The partner lookup (`GET /rest/v1/users?select=partner_id`) no
+ * longer goes out offline (DW-222), so those screens also assert that none does.
  *
  * Not covered here, by the spec's decision, and covered by unit tests instead
  * (tests/unit/stores/notesSlice.offlineQueue.test.ts and
@@ -60,17 +61,22 @@ async function goOffline(page: Page, isOffline: boolean) {
 /**
  * Record every request to the local Supabase API from now on. Arm it after
  * `goOffline(page, true)` and just before the tap. `writesOnly` skips GETs, for
- * screens where a background read is known to run (see the header).
+ * screens where a background read is known to run (see the header);
+ * `partnerLookups` records the partner lookups either way.
  */
 function watchSupabaseRequests(page: Page, { writesOnly = false } = {}) {
   const supabase = new URL(process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321');
   const local = ['localhost', '127.0.0.1'];
   const seen: string[] = [];
+  const partnerLookups: string[] = [];
   const listener = (request: Request) => {
     const url = new URL(request.url());
     const sameOrigin =
       url.host === supabase.host ||
       (url.port === supabase.port && local.includes(url.hostname) && local.includes(supabase.hostname));
+    if (sameOrigin && url.pathname === '/rest/v1/users' && url.searchParams.get('select') === 'partner_id') {
+      partnerLookups.push(`${request.method()} ${url.pathname}${url.search}`);
+    }
     if (writesOnly && request.method() === 'GET') return;
     if (sameOrigin && SUPABASE_PATHS.some((path) => url.pathname.startsWith(path))) {
       seen.push(`${request.method()} ${url.pathname}${url.search}`);
@@ -79,6 +85,7 @@ function watchSupabaseRequests(page: Page, { writesOnly = false } = {}) {
   page.on('request', listener);
   return {
     requests: seen,
+    partnerLookups,
     stop: () => page.off('request', listener),
   };
 }
@@ -131,6 +138,7 @@ test.describe('Photos offline', () => {
       );
       watch.stop();
       expect(watch.requests).toEqual([]);
+      expect(watch.partnerLookups).toEqual([]);
       expect(await pairPhotoIds(supabaseAdmin)).toEqual(before);
     } finally {
       await page.context().setOffline(false);
@@ -187,6 +195,7 @@ test.describe('Photos offline', () => {
       );
       watch.stop();
       expect(watch.requests).toEqual([]);
+      expect(watch.partnerLookups).toEqual([]);
       await expect(dialog).toBeVisible();
       await expect(viewer.getByRole('img', { name: caption })).toBeVisible();
       const still = await supabaseAdmin.from('photos').select('id').eq('id', photoId);
@@ -473,6 +482,7 @@ test.describe('Love notes offline', () => {
       ).toBeVisible();
       watch.stop();
       expect(watch.requests).toEqual([]);
+      expect(watch.partnerLookups).toEqual([]);
       await expect(page.getByText('Failed to send. Try again.')).toHaveCount(0);
       await expect(input).toHaveValue(text);
       await expect(page.getByAltText('Selected image preview')).toBeVisible();
@@ -511,6 +521,7 @@ test.describe('Love notes offline', () => {
       ).toBeVisible();
       watch.stop();
       expect(watch.requests).toEqual([]);
+      expect(watch.partnerLookups).toEqual([]);
       await expect(retry).toBeVisible();
       expect(await stampedNoteIds(supabaseAdmin, text)).toEqual([]);
     } finally {
@@ -554,6 +565,7 @@ test.describe('Love notes offline', () => {
       );
       watch.stop();
       expect(watch.requests).toEqual([]);
+      expect(watch.partnerLookups).toEqual([]);
       await expect(dialog).toBeVisible();
       expect(
         await page.evaluate(
