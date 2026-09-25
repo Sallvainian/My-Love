@@ -245,5 +245,3 @@ export function NoteRemoveConfirmation({
     </div>
   );
 }
-
-export default NoteRemoveConfirmation;

@@ -131,12 +131,6 @@ export const AUTHENTICATED_EVENTS_LABEL_CHECK = authenticatedCheckViolation(
   'events_label_check'
 );
 
-/** `events.icon` outside ('ring','plane','calendar'). */
-export const AUTHENTICATED_EVENTS_ICON_CHECK = authenticatedCheckViolation(
-  'events',
-  'events_icon_check'
-);
-
 /** `interactions.type` outside ('poke','kiss'). */
 export const AUTHENTICATED_INTERACTIONS_TYPE_CHECK = authenticatedCheckViolation(
   'interactions',

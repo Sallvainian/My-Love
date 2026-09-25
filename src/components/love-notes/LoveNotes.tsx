@@ -260,5 +260,3 @@ export function LoveNotes(): ReactElement {
     </div>
   );
 }
-
-export default LoveNotes;

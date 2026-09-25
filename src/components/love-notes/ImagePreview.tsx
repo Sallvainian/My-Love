@@ -130,4 +130,3 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
 }
 
 export const ImagePreview = memo(ImagePreviewComponent);
-export default ImagePreview;

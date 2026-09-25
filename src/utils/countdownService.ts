@@ -8,38 +8,6 @@
 import type { Anniversary } from '../types';
 
 /**
- * Time remaining breakdown
- */
-export interface TimeRemaining {
-  days: number;
-  hours: number;
-  minutes: number;
-}
-
-/**
- * Calculate time remaining until a target date
- * Handles edge cases: leap years, month boundaries, timezone consistency
- *
- * @param targetDate - Future date to count down to
- * @returns Object with days, hours, minutes remaining (rounded down)
- */
-export function calculateTimeRemaining(targetDate: Date): TimeRemaining {
-  const now = new Date();
-  const diff = targetDate.getTime() - now.getTime();
-
-  // If target is in the past, return zeros
-  if (diff <= 0) {
-    return { days: 0, hours: 0, minutes: 0 };
-  }
-
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-  return { days, hours, minutes };
-}
-
-/**
  * Get next 'n' upcoming anniversaries
  *
  * @param anniversaries - Array of anniversaries
@@ -102,17 +70,4 @@ export function getNextAnniversaryDate(dateString: string): Date {
   }
 
   return nextDate;
-}
-
-/**
- * Check if countdown should trigger celebration animation
- * Returns true when countdown reaches 0 days, 0 hours, 0 minutes
- * Uses 1-minute tolerance to account for update intervals
- *
- * @param targetDate - Anniversary date to check
- * @returns True if celebration should trigger
- */
-export function shouldTriggerCelebration(targetDate: Date): boolean {
-  const { days, hours, minutes } = calculateTimeRemaining(targetDate);
-  return days === 0 && hours === 0 && minutes === 0;
 }

@@ -216,5 +216,3 @@ function AccountAdminPanel({ onExit }: AdminPanelProps) {
     </div>
   );
 }
-
-export default AdminPanel;

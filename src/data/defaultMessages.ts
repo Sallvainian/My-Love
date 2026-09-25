@@ -1664,14 +1664,3 @@ export const defaultMessages: DefaultMessage[] = [
   ...future,
   ...custom,
 ];
-
-// Export by category for easy filtering
-export const messagesByCategory = {
-  reason: reasons,
-  memory: memories,
-  affirmation: affirmations,
-  future: future,
-  custom: custom,
-};
-
-export default defaultMessages;

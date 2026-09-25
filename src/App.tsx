@@ -44,7 +44,9 @@ const PartnerMoodView = lazy(() =>
     default: m.PartnerMoodView,
   }))
 );
-const AdminPanel = lazy(() => import('./components/AdminPanel/AdminPanel'));
+const AdminPanel = lazy(() =>
+  import('./components/AdminPanel/AdminPanel').then((m) => ({ default: m.AdminPanel }))
+);
 const LoveNotes = lazy(() =>
   import('./components/love-notes').then((m) => ({ default: m.LoveNotes }))
 );

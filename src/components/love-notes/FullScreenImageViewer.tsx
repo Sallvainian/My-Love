@@ -125,4 +125,3 @@ function FullScreenImageViewerComponent({
 }
 
 export const FullScreenImageViewer = memo(FullScreenImageViewerComponent);
-export default FullScreenImageViewer;

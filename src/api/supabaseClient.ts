@@ -587,5 +587,3 @@ export const getOwnDisplayName = async (): Promise<string | null> => {
 export const isSupabaseConfigured = (): boolean => {
   return !!(supabaseUrl && supabaseAnonKey);
 };
-
-export default supabase;
