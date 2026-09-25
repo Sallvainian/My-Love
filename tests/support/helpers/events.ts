@@ -1,9 +1,8 @@
 /**
  * Events test helpers — the couple pair, its rows, and the dates they carry.
  *
- * Import by this DEEP path, never through `../helpers`: the barrel at
- * `tests/support/helpers/index.ts` re-exports only `./navigation`, and
- * `../helpers` resolves to that barrel rather than to this module.
+ * Import by this deep path: `tests/support/helpers` has no barrel, so each
+ * helper module is imported directly.
  *
  * ── Why this module exists ────────────────────────────────────────────────
  *

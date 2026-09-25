@@ -18,7 +18,7 @@
  * - AC#5: Mark interaction as viewed after animation
  */
 
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import { Heart, RotateCcwClock, Wind, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
@@ -174,7 +174,7 @@ export function PokeKissInterface() {
     // sentence never reaches the user. Interactions are Supabase-only -- no
     // queue, no retry -- so say plainly that a connection is needed.
     if (!isOnline()) {
-      setShowToast('You are offline. A poke needs a connection to send.');
+      setShowToast(offlineMessage('A poke', 'send', 'needs'));
       setTimeout(() => setShowToast(null), 3000);
       return;
     }
@@ -210,7 +210,7 @@ export function PokeKissInterface() {
 
     // See the note in handlePoke: the offline guard has to precede the send.
     if (!isOnline()) {
-      setShowToast('You are offline. A kiss needs a connection to send.');
+      setShowToast(offlineMessage('A kiss', 'send', 'needs'));
       setTimeout(() => setShowToast(null), 3000);
       return;
     }

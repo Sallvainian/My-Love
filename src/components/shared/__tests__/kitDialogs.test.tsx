@@ -25,7 +25,7 @@ vi.mock('../../../utils/logger', () => ({
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
-vi.mock('framer-motion', () => {
+vi.mock('motion/react', () => {
   const div = ({ children, ...props }: MotionDivProps) => {
     const { initial: _i, animate: _a, exit: _e, ...rest } = props as Record<string, unknown>;
     return <div {...(rest as HTMLAttributes<HTMLDivElement>)}>{children}</div>;

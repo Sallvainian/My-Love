@@ -131,5 +131,3 @@ export const test = base.extend<CustomFixtures>({
     await clearPairEvents(supabaseAdmin, pair);
   },
 });
-
-export { expect } from '@playwright/test';

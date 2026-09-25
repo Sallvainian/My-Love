@@ -25,7 +25,9 @@
  *   read (in `fetchNotes` or `fetchOlderNotes`) leaves `notesError` null
  *   whenever any notes are on screen — from the copy or from an earlier
  *   server answer — so no banner covers the thread; an empty thread, an
- *   unlinked account or a signed-out call still shows the error.
+ *   unlinked account or a signed-out call still shows the error. A load that
+ *   starts known offline leaves a banner already showing in place, except a
+ *   stale load error.
  * - `fetchNotes` is also the kind's refresher, so the thread refreshes on
  *   signed-in start and on reconnect, not only when the Notes screen mounts.
  *   The refresher keeps the older pages its page joins onto; the mount
@@ -62,6 +64,10 @@
  * - A note with a picture keeps the direct send path and needs a connection;
  *   offline it is refused before anything is shown or uploaded. A confirmed
  *   send or resend of any note is broadcast to the partner.
+ * - The 10-per-minute limit applies to online sends and resends only. The
+ *   offline refusals come before it, and a note queued offline is neither
+ *   checked nor counted. `retryFailedMessage` never throws; its errors show
+ *   as `notesError`.
  * - Note images are cached separately, per account and storage path, by
  *   `LoveNoteMessage` through `services/imageCache.ts`. A confirmed
  *   `removeNote` deletes that note's cached image.
@@ -73,6 +79,7 @@
 import { CHECK_CONSTRAINT_MESSAGE, handleSupabaseError, isPostgrestError } from '../../api/errorHandlers';
 import { sendEphemeralBroadcast } from '../../api/ephemeralBroadcast';
 import { getPartnerId, lookupPartnerId, supabase } from '../../api/supabaseClient';
+import type { PartnerLookup } from '../../api/supabaseClient';
 import { NOTES_CONFIG } from '../../config/images';
 import { offlineMessage } from '../../services/accountDataError';
 import { deleteCachedImages } from '../../services/imageCache';
@@ -163,6 +170,18 @@ const NOTE_RETRY_MAX_DELAY_MS = 60_000;
 /** `navigator.onLine` says the device is offline for certain. */
 function knownOffline(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+/**
+ * The message for a partner lookup that failed. One that found the device
+ * offline says so in the screen's own sentence rather than its bare reason.
+ */
+function lookupFailure(
+  lookup: Extract<PartnerLookup, { status: 'error' }>,
+  offlineText: string,
+  fallback: string
+): string {
+  return lookup.offline ? offlineText : lookup.reason || fallback;
 }
 
 /**
@@ -457,6 +476,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
    * spinner of a load started after it. Per slice instance.
    */
   let notesLoadTicket = 0;
+  // The last banner a failed load raised, so a later offline load can tell it
+  // apart from a send's banner and clear it rather than keep it over notes.
+  let lastLoadError: string | null = null;
 
   /**
    * Retries in flight, by tempId. A retry keeps its note marked failed until
@@ -777,9 +799,18 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         get().userId === userId && get().authSessionVersion === requestedInSession;
       // Answers that are not a failed read: today's error stands whatever is shown.
       let conclusiveError = false;
+      // Known offline, the load changes no banner already showing (an offline
+      // picture refusal, a drain rejection): nothing replaces it over a thread.
+      // Only a stale load banner is cleared, so it does not sit over notes.
+      const startedOffline = knownOffline();
+      const keptError = () => {
+        const current = get().notesError;
+        const staleLoad = current === NOTES_LOAD_NEEDS_CONNECTION || current === lastLoadError;
+        return startedOffline && !staleLoad ? current : null;
+      };
 
       try {
-        set({ notesIsLoading: true, notesError: null });
+        set({ notesIsLoading: true, notesError: keptError() });
         notesLoadTicket += 1;
 
         if (!userId) {
@@ -793,7 +824,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         const serverRequest = (async () => {
           // Known offline: no request goes out. The saved thread still shows,
           // and the reason shows only over an empty thread (keepThreadClear).
-          if (knownOffline()) throw new Error(NOTES_LOAD_NEEDS_CONNECTION);
+          if (startedOffline) throw new Error(NOTES_LOAD_NEEDS_CONNECTION);
           // lookupPartnerId keeps "unlinked" apart from "the read failed":
           // offline the lookup fails, and that must keep the saved thread.
           const lookup = await lookupPartnerId();
@@ -802,7 +833,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
             throw new Error(PARTNER_NOT_CONFIGURED);
           }
           if (lookup.status === 'error') {
-            throw new Error(lookup.reason || 'Failed to fetch notes');
+            throw new Error(
+              lookupFailure(lookup, NOTES_LOAD_NEEDS_CONNECTION, 'Failed to fetch notes')
+            );
           }
           const partnerId = lookup.partnerId;
 
@@ -938,10 +971,12 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         // A failed read changes nothing, and while any notes are on screen (from
         // the copy or an earlier server answer) no banner covers them. An empty
         // thread, an unlinked account or a signed-out call still shows the error.
+        // Offline, a banner already showing stays (see keptError).
         const keepThreadClear = !conclusiveError && get().notes.length > 0;
+        if (!keepThreadClear) lastLoadError = errorMessage;
         set({
           notesIsLoading: false,
-          notesError: keepThreadClear ? null : errorMessage,
+          notesError: keepThreadClear ? keptError() : errorMessage,
         });
       }
     },
@@ -988,7 +1023,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
           throw new Error(PARTNER_NOT_CONFIGURED);
         }
         if (lookup.status === 'error') {
-          throw new Error(lookup.reason || 'Failed to fetch older notes');
+          throw new Error(
+            lookupFailure(lookup, NOTES_LOAD_NEEDS_CONNECTION, 'Failed to fetch older notes')
+          );
         }
         const partnerId = lookup.partnerId;
 
@@ -1068,6 +1105,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         // Same rule as fetchNotes: a failed read raises no banner over notes
         // already on screen.
         const keepThreadClear = !conclusiveError && get().notes.length > 0;
+        if (!keepThreadClear) lastLoadError = errorMessage;
         set({
           notesIsLoading: false,
           notesError: keepThreadClear ? null : errorMessage,
@@ -1158,12 +1196,29 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         get().userId === userId && get().authSessionVersion === requestedInSession;
 
       try {
-        // Check rate limiting
-        const { recentTimestamps, now } = get().checkRateLimit();
-
         if (!userId) {
           throw new Error('User not authenticated');
         }
+
+        // Offline refusals come before the rate limit, so the reason shown is
+        // the connection, not the limit. Thrown so the composer keeps the text
+        // (and picture).
+        const offline = knownOffline();
+        if (offline && imageFile) {
+          // A picture needs a connection: refused before anything is shown or
+          // uploaded.
+          set({ notesError: IMAGE_NOTE_NEEDS_CONNECTION });
+          throw new NoteRefusedOfflineError(IMAGE_NOTE_NEEDS_CONNECTION);
+        }
+        if (offline && !get().partner?.id) {
+          // Offline the partner lookup can only fail: refused before it goes out.
+          set({ notesError: NOTES_SEND_NEEDS_CONNECTION });
+          throw new NoteRefusedOfflineError(NOTES_SEND_NEEDS_CONNECTION);
+        }
+
+        // A text note queued offline is not counted toward the limit, and not
+        // checked against it. Online sends are checked and counted.
+        const rateLimit = offline ? null : get().checkRateLimit();
 
         // Text goes through the queue, online or offline: one send path, one
         // order. An online note sent directly would overtake queued ones.
@@ -1173,15 +1228,13 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
           // conclusive `linked` answer will do.
           let toUserId = get().partner?.id ?? null;
           if (!toUserId) {
-            // Offline the lookup can only fail: refused before it goes out,
-            // and thrown so the composer keeps the text.
-            if (knownOffline()) {
-              set({ notesError: NOTES_SEND_NEEDS_CONNECTION });
-              throw new NoteRefusedOfflineError(NOTES_SEND_NEEDS_CONNECTION);
-            }
             const lookup = await lookupPartnerId();
             if (lookup.status === 'unlinked') throw new Error(PARTNER_NOT_CONFIGURED);
-            if (lookup.status === 'error') throw new Error(lookup.reason || 'Failed to send note');
+            if (lookup.status === 'error') {
+              throw new Error(
+                lookupFailure(lookup, NOTES_SEND_NEEDS_CONNECTION, 'Failed to send note')
+              );
+            }
             toUserId = lookup.partnerId;
             if (!ownsRequest()) return;
           }
@@ -1213,7 +1266,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
                 queued: true,
               },
             ],
-            sentMessageTimestamps: [...recentTimestamps, now],
+            ...(rateLimit && {
+              sentMessageTimestamps: [...rateLimit.recentTimestamps, rateLimit.now],
+            }),
           }));
           logger.debug('[NotesSlice] Note queued:', tempId);
 
@@ -1221,12 +1276,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
           return;
         }
 
-        // A picture needs a connection: refused before anything is shown or
-        // uploaded, and thrown so the composer keeps the picture and text.
-        if (knownOffline()) {
-          set({ notesError: IMAGE_NOTE_NEEDS_CONNECTION });
-          throw new NoteRefusedOfflineError(IMAGE_NOTE_NEEDS_CONNECTION);
-        }
+        // An offline picture was refused above, so the limit was already
+        // checked; the fallback only narrows the type.
+        const { recentTimestamps, now } = rateLimit ?? get().checkRateLimit();
 
         const partnerId = await getPartnerId();
         if (!partnerId) {
@@ -1422,9 +1474,6 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
 
       retriesInFlight.set(tempId, (retriesInFlight.get(tempId) ?? 0) + 1);
       try {
-        // Check rate limiting before retry
-        const { recentTimestamps, now } = get().checkRateLimit();
-
         const { notes } = get();
 
         // Find the failed message
@@ -1432,6 +1481,19 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         if (!failedNote) {
           throw new Error('Message not found');
         }
+
+        // A note that is not queued carries a picture, and it needs a
+        // connection: refused before the rate limit, the partner lookup or any
+        // change, so it stays failed and the reason shown is the connection.
+        const offline = knownOffline();
+        if (offline && !failedNote.queued) {
+          set({ notesError: IMAGE_NOTE_NEEDS_CONNECTION });
+          return;
+        }
+
+        // A queued note retried offline is not checked against the limit or
+        // counted toward it (as in sendNote). Online retries are checked.
+        const rateLimit = offline ? null : get().checkRateLimit();
 
         // A queued note goes back through the drain under the same key, to the
         // recipient fixed when it was composed.
@@ -1454,19 +1516,17 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
             notes: state.notes.map((note) =>
               note.tempId === tempId ? { ...note, sending: !knownOffline(), error: false } : note
             ),
-            sentMessageTimestamps: [...recentTimestamps, now],
+            ...(rateLimit && {
+              sentMessageTimestamps: [...rateLimit.recentTimestamps, rateLimit.now],
+            }),
           }));
           await get().drainQueuedNotes();
           return;
         }
 
-        // Past the queue, only a note with a picture is left, and it needs a
-        // connection: refused before the partner lookup or any change, so it
-        // stays failed. Not thrown — the Retry button has no catch.
-        if (knownOffline()) {
-          set({ notesError: IMAGE_NOTE_NEEDS_CONNECTION });
-          return;
-        }
+        // An offline picture was refused above, so the limit was already
+        // checked; the fallback only narrows the type.
+        const { recentTimestamps, now } = rateLimit ?? get().checkRateLimit();
 
         // Get partner ID
         const partnerId = await getPartnerId();
@@ -1608,12 +1668,10 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         const errorMessage = error instanceof Error ? error.message : 'Failed to retry message';
         console.error('[NotesSlice] Error retrying message:', error);
 
-        // If it's a rate limit error, throw it up
-        if (errorMessage.includes('Rate limit')) {
-          throw error;
-        }
-
-        throw error;
+        // Shown, not thrown: the Retry button has no catch. The rate-limit
+        // error lands here too. A session that has ended gets no banner.
+        if (!ownsRequest()) return;
+        set({ notesError: errorMessage });
       } finally {
         const remaining = (retriesInFlight.get(tempId) ?? 1) - 1;
         if (remaining > 0) retriesInFlight.set(tempId, remaining);

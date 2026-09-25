@@ -116,7 +116,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
 
       // emulateMedia reducedMotion is set here, and it costs nothing — but
       // EventsSettings does not map that preference to zero-duration motion:
-      // its rows and both dialogs carry hardcoded framer-motion props
+      // its rows and both dialogs carry hardcoded Motion props
       // (EventsSettings.tsx:313-314, 585-586, 598-599, 932-933, 945-946), and
       // `grep -rn "MotionConfig" src/` finds no wrapper that would apply the
       // preference globally. So the explicit settle below — not this line — is

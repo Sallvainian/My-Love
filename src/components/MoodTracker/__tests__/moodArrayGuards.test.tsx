@@ -28,7 +28,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
 // Everything else — data-testid, role, aria-label, children — passes through, so
 // the components rendering through the real `m` elsewhere in this file are
 // unaffected in what they expose.
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   m: {
     div: ({
       children,

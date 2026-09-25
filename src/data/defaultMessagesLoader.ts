@@ -8,5 +8,5 @@ type SeedMessage = Omit<Message, 'id' | 'createdAt' | 'isCustom'>;
  */
 export const loadDefaultMessages = async (): Promise<SeedMessage[]> => {
   const module = await import('./defaultMessages');
-  return module.default;
+  return module.defaultMessages;
 };

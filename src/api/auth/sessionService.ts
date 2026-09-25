@@ -58,37 +58,49 @@ export const getAuthStatus = async (): Promise<AuthStatus> => {
 };
 
 export const onAuthStateChange = (callback: (session: Session | null) => void): (() => void) => {
+  // The SDK no longer waits for token writes, so this subscription queues
+  // them itself: each store/clear starts only after the previous one settles,
+  // committing in auth arrival order. Work items log their own errors, so the
+  // chain never rejects.
+  let persistence = Promise.resolve();
+
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange(async (event, session) => {
-    // Invalidate the app's previous session before token persistence can
-    // yield. Slow storage must not delay or reorder auth transitions.
+  } = supabase.auth.onAuthStateChange((event, session) => {
+    // Synchronous on purpose: auth-js awaits async listeners, which can
+    // deadlock a nested refresh triggered from TOKEN_REFRESHED. Invalidate the
+    // app's previous session before any token persistence is queued.
     try {
       callback(session);
     } finally {
-      // Attempt token persistence even if app delivery throws, while letting
-      // that original error propagate after these best-effort side effects.
+      // Queue token persistence even if app delivery throws, while letting
+      // that original error propagate synchronously.
       if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-        try {
-          await storeAuthToken({
-            accessToken: session.access_token,
-            refreshToken: session.refresh_token,
-            expiresAt: session.expires_at ?? 0,
-            userId: session.user?.id ?? '',
-          });
-          logger.debug(`[AuthService] Updated stored auth token (${event})`);
-        } catch (tokenError) {
-          console.error('[AuthService] Failed to update stored auth token:', tokenError);
-        }
+        const token = {
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt: session.expires_at ?? 0,
+          userId: session.user?.id ?? '',
+        };
+        persistence = persistence.then(async () => {
+          try {
+            await storeAuthToken(token);
+            logger.debug(`[AuthService] Updated stored auth token (${event})`);
+          } catch (tokenError) {
+            console.error('[AuthService] Failed to update stored auth token:', tokenError);
+          }
+        });
       }
 
       if (event === 'SIGNED_OUT') {
-        try {
-          await clearAuthToken();
-          logger.debug('[AuthService] Cleared stored auth token (SIGNED_OUT)');
-        } catch (tokenError) {
-          console.error('[AuthService] Failed to clear stored auth token:', tokenError);
-        }
+        persistence = persistence.then(async () => {
+          try {
+            await clearAuthToken();
+            logger.debug('[AuthService] Cleared stored auth token (SIGNED_OUT)');
+          } catch (tokenError) {
+            console.error('[AuthService] Failed to clear stored auth token:', tokenError);
+          }
+        });
       }
     }
   });

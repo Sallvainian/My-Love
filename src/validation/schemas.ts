@@ -59,20 +59,6 @@ export const UpdateMessageInputSchema = z.object({
 });
 
 // ============================================================================
-// Photo Validation
-// ============================================================================
-
-/**
- * Schema for photo upload input from user
- * Validates form data before photo processing
- */
-export const PhotoUploadInputSchema = z.object({
-  file: z.instanceof(File, { message: 'Must provide a valid file' }),
-  caption: z.string().max(500, 'Caption cannot exceed 500 characters').optional(),
-  tags: z.string().optional(), // Comma-separated string, will be parsed to array
-});
-
-// ============================================================================
 // Mood Validation
 // ============================================================================
 

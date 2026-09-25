@@ -1221,7 +1221,7 @@ describe('eventsService', () => {
       const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
       expect(failure).toMatchObject({
         code: 'offline',
-        message: 'You are offline. Events need a connection to save.',
+        message: 'You are offline. Events need a connection to delete.',
       });
       expect(backend.fromCalls).toBe(0);
     });

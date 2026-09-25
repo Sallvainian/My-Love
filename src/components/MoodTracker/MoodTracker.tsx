@@ -1,4 +1,4 @@
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import { CircleCheckBig, Cloud, CloudOff, Plus, RefreshCw, WifiOff } from 'lucide-react';
 import { useEffect, useState, type SubmitEvent } from 'react';
 import { getPartnerId } from '../../api/supabaseClient';

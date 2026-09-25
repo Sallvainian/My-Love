@@ -1,4 +1,4 @@
-import { m as motion } from 'framer-motion';
+import { m as motion } from 'motion/react';
 import { ArrowRight, Heart } from 'lucide-react';
 import { useMemo } from 'react';
 import { PRIMARY_BUTTON } from '../shared/kitClasses';
@@ -95,7 +95,7 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
             more to come. From the bottom of my heart, I love you Baby Cakes
           </motion.p>
 
-          {/* Continue button. The fade-in rides on a wrapper so framer's inline
+          {/* Continue button. The fade-in rides on a wrapper so Motion's inline
               opacity never fights the pill's hover opacity. */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

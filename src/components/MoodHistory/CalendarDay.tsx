@@ -1,4 +1,4 @@
-import { m as motion } from 'framer-motion';
+import { m as motion } from 'motion/react';
 import { memo } from 'react';
 import { MOOD_DISPLAY } from '../../constants/moodDisplay';
 import type { MoodEntry } from '../../types';

@@ -14,7 +14,7 @@
  * (a new gradient, or one removed) fails here and the pin is updated on
  * purpose.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -138,10 +138,11 @@ describe('style kit sweep', () => {
     expect(html).not.toMatch(/Dancing/);
   });
 
-  it('keeps every hex in src/index.css inside a --kit-* definition', () => {
+  it('keeps every hex in src/index.css inside a --kit-* or rose-scale definition', () => {
     // Comments stripped: the kit block's contrast notes quote the approved hex
     // values. Anything else holding a hex (the pre-kit pink scrollbar did) is a
-    // colour outside the kit.
+    // colour outside the kit. The one exception is the project's rose scale in
+    // the plain `@theme` block, which moved there from tailwind.config.js.
     // Each comment keeps its newlines, so reported line numbers stay true.
     const css = readFileSync(join(repoRoot, 'src/index.css'), 'utf8').replace(
       /\/\*[\s\S]*?\*\//g,
@@ -150,12 +151,16 @@ describe('style kit sweep', () => {
     const stray = css
       .split('\n')
       .map((text, index) => ({ line: index + 1, text: text.trim() }))
-      .filter(({ text }) => /#[0-9a-fA-F]{3,8}\b/.test(text) && !/^--kit-[\w-]+:/.test(text));
-    expect(stray, 'hex outside a --kit-* definition').toEqual([]);
+      .filter(({ text }) => /#[0-9a-fA-F]{3,8}\b/.test(text) && !/^--(?:kit-[\w-]+|color-rose-\d+):/.test(text));
+    expect(stray, 'hex outside a --kit-* or rose-scale definition').toEqual([]);
   });
 
-  it('keeps the removed palettes and the cursive family out of tailwind.config.js', () => {
-    const config = readFileSync(join(repoRoot, 'tailwind.config.js'), 'utf8');
-    expect(config).not.toMatch(/sunset|coral|ocean|lavender|cursive/);
+  it('keeps the theme in src/index.css, without the removed palettes or the cursive family', () => {
+    // tailwind.config.js is gone; a returning `@config` would bring a second
+    // theme source back.
+    expect(existsSync(join(repoRoot, 'tailwind.config.js'))).toBe(false);
+    const css = readFileSync(join(repoRoot, 'src/index.css'), 'utf8');
+    expect(css).not.toMatch(/@config\b/);
+    expect(css).not.toMatch(/sunset|coral|ocean|lavender|cursive/);
   });
 });

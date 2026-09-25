@@ -48,7 +48,7 @@ const server = {
   lookup: { status: 'linked', partnerId: PARTNER } as
     | { status: 'linked'; partnerId: string }
     | { status: 'unlinked' }
-    | { status: 'error'; reason: string },
+    | { status: 'error'; reason: string; offline?: true },
   readError: null as { message: string } | null,
   /** Every table a request went to, in order. */
   requests: [] as string[],
@@ -1027,6 +1027,214 @@ describe('notesSlice offline send queue', () => {
       expect(contents(store)).toEqual(['stays']);
       expect(store.getState().notesPendingRemoval).toEqual([]);
       expect(server.requests).toEqual([]);
+    });
+
+    it('a thread load over a saved copy keeps a banner already showing', async () => {
+      await writeLocalCopy(A, LOVE_NOTES_COPY_KIND, [sentRow('n4', 'saved')]);
+      const store = createTestStore();
+      store.setState({ notesError: IMAGE_NOTE_NEEDS_CONNECTION });
+      setOnline(false);
+
+      await store.getState().fetchNotes();
+
+      expect(contents(store)).toEqual(['saved']);
+      expect(store.getState().notesError).toBe(IMAGE_NOTE_NEEDS_CONNECTION);
+      expect(store.getState().notesIsLoading).toBe(false);
+    });
+
+    it('a thread load over a saved copy clears a stale load banner', async () => {
+      await writeLocalCopy(A, LOVE_NOTES_COPY_KIND, [sentRow('n5', 'saved')]);
+      const store = createTestStore();
+      store.setState({ notesError: 'You are offline. Love notes need a connection to load.' });
+      setOnline(false);
+
+      await store.getState().fetchNotes();
+
+      expect(contents(store)).toEqual(['saved']);
+      expect(store.getState().notesError).toBeNull();
+      expect(store.getState().notesIsLoading).toBe(false);
+    });
+
+    it('a thread load over a saved copy clears a banner an earlier failed load raised', async () => {
+      const store = createTestStore();
+      server.lookup = { status: 'error', reason: 'upstream request timeout' };
+      await store.getState().fetchNotes();
+      expect(store.getState().notesError).toBe('upstream request timeout');
+
+      await writeLocalCopy(A, LOVE_NOTES_COPY_KIND, [sentRow('n6', 'saved')]);
+      setOnline(false);
+      await store.getState().fetchNotes();
+
+      expect(contents(store)).toEqual(['saved']);
+      expect(store.getState().notesError).toBeNull();
+    });
+  });
+
+  it('a partner lookup that finds the device offline shows the load sentence, not its reason', async () => {
+    const store = createTestStore();
+    server.lookup = { status: 'error', reason: 'offline', offline: true };
+
+    await store.getState().fetchNotes();
+
+    expect(store.getState().notesError).toBe(
+      'You are offline. Love notes need a connection to load.'
+    );
+  });
+
+  describe('rate limit: notes queued offline do not count', () => {
+    /** Ten sends inside the last minute: the limit is reached. */
+    const atLimit = () => Array.from({ length: 10 }, () => Date.now());
+    const RATE_LIMIT = 'Rate limit exceeded: Maximum 10 messages per minute';
+
+    /** A queued text note shown failed, with its row marked failed. */
+    async function failedQueuedNote(store: Store, tempId = 'temp-failed'): Promise<string> {
+      const createdAt = '2026-09-24T09:00:00.000Z';
+      await enqueueNote({
+        id: tempId,
+        userId: A,
+        toUserId: PARTNER,
+        content: 'refused',
+        createdAt,
+        failed: true,
+      });
+      store.setState({
+        notes: [
+          {
+            id: tempId,
+            tempId,
+            from_user_id: A,
+            to_user_id: PARTNER,
+            content: 'refused',
+            created_at: createdAt,
+            sending: false,
+            error: true,
+            queued: true,
+          },
+        ],
+      });
+      return tempId;
+    }
+
+    it('offline at the limit, an image note gets the offline refusal, not the rate-limit error', async () => {
+      const store = createTestStore();
+      store.setState({ sentMessageTimestamps: atLimit() });
+      setOnline(false);
+
+      const refusal = store
+        .getState()
+        .sendNote('pic', new File(['x'], 'p.jpg', { type: 'image/jpeg' }));
+      await expect(refusal).rejects.toBeInstanceOf(NoteRefusedOfflineError);
+
+      expect(store.getState().notesError).toBe(IMAGE_NOTE_NEEDS_CONNECTION);
+      expect(store.getState().notes).toEqual([]);
+      expect(server.requests).toEqual([]);
+    });
+
+    it('offline at the limit with no partner loaded, a text note gets the offline refusal', async () => {
+      const store = createTestStore({ partnerLoaded: false });
+      store.setState({ sentMessageTimestamps: atLimit() });
+      setOnline(false);
+
+      await expect(store.getState().sendNote('keep me')).rejects.toBeInstanceOf(
+        NoteRefusedOfflineError
+      );
+
+      expect(store.getState().notesError).toBe(
+        'You are offline. Love notes need a connection to send.'
+      );
+      expect(await queuedIds()).toEqual([]);
+    });
+
+    it('eleven text notes written offline are all queued, and none is counted', async () => {
+      const store = createTestStore();
+      setOnline(false);
+
+      for (let i = 1; i <= 11; i++) {
+        await store.getState().sendNote(`offline ${i}`);
+      }
+
+      expect(contents(store)).toHaveLength(11);
+      expect(await queuedIds()).toHaveLength(11);
+      expect(store.getState().sentMessageTimestamps).toEqual([]);
+      expect(store.getState().notesError).toBeNull();
+    });
+
+    it('online, a text note is counted, and at the limit it is refused as before', async () => {
+      const store = createTestStore();
+
+      await store.getState().sendNote('counted');
+      await store.getState().drainQueuedNotes();
+      expect(store.getState().sentMessageTimestamps).toHaveLength(1);
+
+      store.setState({ sentMessageTimestamps: atLimit() });
+      await expect(store.getState().sendNote('one too many')).rejects.toThrow(RATE_LIMIT);
+      expect(contents(store)).toEqual(['counted']);
+      expect(await queuedIds()).toEqual([]);
+    });
+
+    it('online at the limit, Retry resolves and shows the rate-limit error', async () => {
+      const store = createTestStore();
+      const tempId = await failedQueuedNote(store);
+      store.setState({ sentMessageTimestamps: atLimit() });
+
+      // Resolves: the Retry button has no catch.
+      await expect(store.getState().retryFailedMessage(tempId)).resolves.toBeUndefined();
+
+      expect(store.getState().notesError).toBe(RATE_LIMIT);
+      expect(store.getState().notes[0]).toMatchObject({ tempId, error: true });
+      expect(server.upserts).toBe(0);
+    });
+
+    it('Retry of a note no longer in the thread resolves and shows the error', async () => {
+      const store = createTestStore();
+
+      await expect(store.getState().retryFailedMessage('temp-gone')).resolves.toBeUndefined();
+
+      expect(store.getState().notesError).toBe('Message not found');
+    });
+
+    it('offline at the limit, Retry of a queued note queues it again and is not counted', async () => {
+      const store = createTestStore();
+      const tempId = await failedQueuedNote(store);
+      const seeded = atLimit();
+      store.setState({ sentMessageTimestamps: seeded });
+      setOnline(false);
+
+      await expect(store.getState().retryFailedMessage(tempId)).resolves.toBeUndefined();
+
+      expect(store.getState().notesError).toBeNull();
+      expect(store.getState().notes[0]).toMatchObject({ tempId, error: false, sending: false });
+      expect(await listQueuedNotes(A)).toEqual([
+        expect.objectContaining({ id: tempId, failed: false }),
+      ]);
+      expect(store.getState().sentMessageTimestamps).toEqual(seeded);
+    });
+
+    it('a Retry failure after the session changed writes no banner', async () => {
+      const store = createTestStore();
+      store.setState({
+        notes: [
+          {
+            id: 'temp-pic',
+            tempId: 'temp-pic',
+            from_user_id: A,
+            to_user_id: PARTNER,
+            content: 'pic',
+            created_at: '2026-09-24T09:00:00.000Z',
+            sending: false,
+            error: true,
+          },
+        ],
+        notesError: null,
+      });
+      vi.mocked(getPartnerId).mockImplementationOnce(async () => {
+        store.setState({ authSessionVersion: 2 });
+        return null;
+      });
+
+      await expect(store.getState().retryFailedMessage('temp-pic')).resolves.toBeUndefined();
+
+      expect(store.getState().notesError).toBeNull();
     });
   });
 

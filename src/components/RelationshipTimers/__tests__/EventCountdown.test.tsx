@@ -28,7 +28,7 @@ import {
 // logs a warning per render, which is the same console channel a genuine
 // render error would surface on. EventCountdown imports only `m`, so nothing
 // else needs mocking here.
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   m: {
     div: ({
       children,
