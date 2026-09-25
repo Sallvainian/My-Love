@@ -16,7 +16,7 @@
  * Story 2.2: AC-2.2.1 (message input), AC-2.2.2 (send functionality)
  */
 
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { CircleAlert } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { authService } from '../../api/authService';
@@ -74,7 +74,7 @@ export function LoveNotes(): ReactElement {
   const removeNote = useAppStore((state) => state.removeNote);
 
   // The confirmation lives here rather than inside a message row: rows sit in
-  // MessageList's overflow-hidden virtualized container and framer-motion puts a
+  // MessageList's overflow-hidden virtualized container and Motion puts a
   // transform on the message wrapper, either of which would trap a
   // fixed-position dialog inside the row.
   const [notePendingRemoval, setNotePendingRemoval] = useState<LoveNote | null>(null);

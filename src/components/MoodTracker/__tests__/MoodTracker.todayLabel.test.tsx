@@ -27,7 +27,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
 // Motion-only props are destructured away rather than spread: React warns about
 // every one of them reaching a DOM element, and that noise is not what this
 // file pins. data-testid, aria-label and children still pass through.
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   m: {
     div: ({
       children,

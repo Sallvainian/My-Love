@@ -81,7 +81,7 @@ vi.mock('../MessageInput', () => ({
 vi.mock('../FullScreenImageViewer', () => ({
   FullScreenImageViewer: () => null,
 }));
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   motion: new Proxy(
     {},
     {

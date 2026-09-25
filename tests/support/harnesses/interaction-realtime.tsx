@@ -1,4 +1,4 @@
-import { LazyMotion, domAnimation } from 'framer-motion';
+import { LazyMotion, domAnimation } from 'motion/react';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PokeKissInterface } from '../../../src/components/PokeKissInterface';

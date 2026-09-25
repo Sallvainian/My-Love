@@ -1,4 +1,4 @@
-import { m as motion } from 'framer-motion';
+import { m as motion } from 'motion/react';
 import { TriangleAlert } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { AccountDataError } from '../../services/accountDataError';

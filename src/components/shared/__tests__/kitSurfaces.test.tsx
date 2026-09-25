@@ -35,10 +35,10 @@ const MOTION_PROPS = new Set([
 ]);
 
 /**
- * Every `m.<tag>` renders the plain tag with framer's own props stripped. One
+ * Every `m.<tag>` renders the plain tag with Motion's own props stripped. One
  * component per tag, cached, so a re-render does not remount the subtree.
  */
-vi.mock('framer-motion', () => {
+vi.mock('motion/react', () => {
   const byTag = new Map<string, ComponentType>();
   const motionFor = (tag: string) => {
     let component = byTag.get(tag);

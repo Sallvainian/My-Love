@@ -10,7 +10,7 @@
  * - isCompressing: Whether compression is in progress
  */
 
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { LoaderCircle, X } from 'lucide-react';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { IMAGE_VALIDATION } from '../../config/images';

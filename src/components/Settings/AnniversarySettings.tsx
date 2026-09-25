@@ -9,7 +9,7 @@
  * - Responsive mobile-first design
  */
 
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import { Check, Pen, Heart, Plus, Trash, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type RefObject, type SubmitEvent } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';

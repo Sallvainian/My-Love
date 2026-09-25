@@ -109,7 +109,7 @@ type MotionDivProps = HTMLAttributes<HTMLDivElement> & {
   transition?: unknown;
 };
 
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   m: {
     div: ({
       children,

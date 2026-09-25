@@ -3,7 +3,7 @@
 ![Tests](https://github.com/Sallvainian/My-Love/actions/workflows/test.yml/badge.svg)
 ![Deploy](https://github.com/Sallvainian/My-Love/actions/workflows/deploy.yml/badge.svg)
 
-A Progressive Web App for couples to exchange daily love messages, track moods, share photos, chat via love notes, and send playful interactions. Built with React 19, TypeScript, Vite, Tailwind CSS v4, Framer Motion, Zustand, and Supabase.
+A Progressive Web App for couples to exchange daily love messages, track moods, share photos, chat via love notes, and send playful interactions. Built with React 19, TypeScript, Vite, Tailwind CSS v4, Motion, Zustand, and Supabase.
 
 **Live**: https://my-love.sallvain.workers.dev/
 
@@ -237,7 +237,7 @@ The repository variable `SITE_URL` (`https://my-love.sallvain.workers.dev/`, tra
 - [TypeScript](https://www.typescriptlang.org/) — Type safety
 - [Vite](https://vite.dev/) — Build tool
 - [Tailwind CSS v4](https://tailwindcss.com/) — Styling
-- [Framer Motion](https://www.framer.com/motion/) — Animations
+- [Motion](https://motion.dev/) — Animations
 - [Zustand](https://zustand.docs.pmnd.rs/) — State management
 - [Supabase](https://supabase.com/) — Backend, auth, realtime
 - [Playwright](https://playwright.dev/) — E2E and integration testing

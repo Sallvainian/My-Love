@@ -14,7 +14,7 @@
  * - AC-5.3.5: Graceful empty state handling
  */
 
-import { m as motion } from 'framer-motion';
+import { m as motion } from 'motion/react';
 import { CircleAlert, User } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { MOOD_DISPLAY, MOOD_TONE } from '../../constants/moodDisplay';

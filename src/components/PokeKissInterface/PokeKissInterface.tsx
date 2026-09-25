@@ -18,7 +18,7 @@
  * - AC#5: Mark interaction as viewed after animation
  */
 
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import { Heart, RotateCcwClock, Wind, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';

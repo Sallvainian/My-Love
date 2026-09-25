@@ -1,4 +1,4 @@
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import { TriangleAlert, Camera, Check, Loader, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { isOnline } from '../../api/errorHandlers';

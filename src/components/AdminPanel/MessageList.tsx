@@ -1,4 +1,4 @@
-import { m as motion } from 'framer-motion';
+import { m as motion } from 'motion/react';
 import { Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useAppStore } from '../../stores/useAppStore';

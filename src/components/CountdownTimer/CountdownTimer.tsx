@@ -4,13 +4,13 @@
  * Displays countdown to next upcoming anniversary with celebration animations.
  * Features:
  * - A live h/m/s clock, ticking every second like the other Home countdowns
- * - Celebration animations using Framer Motion when countdown reaches zero
+ * - Celebration animations using Motion when countdown reaches zero
  * - Support for multiple anniversaries (displays next 3)
  * - Responsive mobile-first design
  * - Each anniversary renders the shared CountdownCard (CAP-3)
  */
 
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import { Calendar, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';

@@ -1,4 +1,4 @@
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import { Download, Plus, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AccountDataError } from '../../services/accountDataError';

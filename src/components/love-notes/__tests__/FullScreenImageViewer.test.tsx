@@ -14,8 +14,8 @@ import { FullScreenImageViewer } from '../FullScreenImageViewer';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
-// Mock framer-motion
-vi.mock('framer-motion', () => ({
+// Mock Motion
+vi.mock('motion/react', () => ({
   motion: {
     div: ({ children, onClick, ...props }: MotionDivProps) => (
       <div onClick={onClick} {...props}>

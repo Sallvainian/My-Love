@@ -26,7 +26,7 @@ const inertFallback = { current: null } as React.RefObject<HTMLElement | null>;
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   motion: {
     div: ({ children, ...props }: MotionDivProps) => <div {...props}>{children}</div>,
   },

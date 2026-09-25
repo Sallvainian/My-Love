@@ -36,7 +36,7 @@ export default defineConfig(() => ({
             // State management + storage
             { name: 'vendor-state', test: /[\\/]node_modules[\\/](zustand|idb|zod)[\\/]/ },
             // Animations (optional, can be lazy loaded)
-            { name: 'vendor-animation', test: /[\\/]node_modules[\\/]framer-motion[\\/]/ },
+            { name: 'vendor-animation', test: /[\\/]node_modules[\\/](?:motion|framer-motion)[\\/]/ },
             // Icons - tree-shakeable, but benefit from caching as separate chunk
             { name: 'vendor-icons', test: /[\\/]node_modules[\\/]lucide-react[\\/]/ },
           ],

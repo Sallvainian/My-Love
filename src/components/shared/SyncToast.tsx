@@ -7,7 +7,7 @@
  * Story 1.5: Task 5.3 - Sync Completion Feedback (AC-1.5.4)
  */
 
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import { CircleAlert, CircleCheck, Cloud, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 

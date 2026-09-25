@@ -18,7 +18,7 @@
  * Story 2.4: Message history with scroll performance
  */
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import { ArrowDown, Heart, LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { List, useListRef } from 'react-window';

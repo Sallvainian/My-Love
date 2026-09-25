@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { domAnimation, LazyMotion } from 'framer-motion';
+import { domAnimation, LazyMotion } from 'motion/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { deleteDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -33,7 +33,7 @@ vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => (
 type MotionProps = HTMLAttributes<HTMLElement> & {
   initial?: unknown; animate?: unknown; exit?: unknown; transition?: unknown; whileHover?: unknown;
 };
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   domAnimation: {},
   LazyMotion: ({ children }: { children: ReactNode }) => <>{children}</>,
   AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,

@@ -62,7 +62,7 @@ vi.mock('../MessageList', () => ({
 vi.mock('../MessageInput', () => ({
   MessageInput: () => <div data-testid="message-input" />,
 }));
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   motion: new Proxy(
     {},
     {
