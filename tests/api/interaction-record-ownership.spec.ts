@@ -22,12 +22,12 @@ import { test, expect } from '../support/merged-fixtures';
 // No production response schema exists for interactions. This local schema
 // validates the non-null defaults of the successful INSERT under test.
 const IncomingRecordSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   type: z.enum(['poke', 'kiss']),
-  from_user_id: z.string().uuid(),
-  to_user_id: z.string().uuid(),
+  from_user_id: z.uuid(),
+  to_user_id: z.uuid(),
   viewed: z.boolean(),
-  created_at: z.string().datetime({ offset: true }),
+  created_at: z.iso.datetime({ offset: true }),
 });
 const IncomingRecordsSchema = z.array(IncomingRecordSchema);
 

@@ -9,7 +9,7 @@ const contractSchema = z
   })
   .strict()
   .refine((contract) => new Set(contract.icons).size === contract.icons.length, {
-    message: 'Icon values must be unique',
+    error: 'Icon values must be unique',
   });
 
 export type EventsValidationContract = z.infer<typeof contractSchema>;

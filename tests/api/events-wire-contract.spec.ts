@@ -136,12 +136,10 @@ import {
  * The `public.events` row exactly as PostgREST returns it. Columns, nullability
  * and the icon union mirror
  * `supabase/migrations/20260818000002_create_events_table.sql:17-26`.
- * `z.string().uuid()` rather than `z.uuid()` to match the house style in
- * `src/validation/schemas.ts:231-240`.
  */
 const EventRowSchema = z.strictObject({
-  id: z.string().uuid(),
-  user_id: z.string().uuid(),
+  id: z.uuid(),
+  user_id: z.uuid(),
   label: z.string().max(100),
   event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   description: z.string().max(500).nullable(),
