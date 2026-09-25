@@ -1,12 +1,12 @@
 import 'fake-indexeddb/auto';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { domAnimation, LazyMotion } from 'framer-motion';
+import { domAnimation, LazyMotion } from 'motion/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { deleteDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminPanel } from '../../../src/components/AdminPanel/AdminPanel';
 import { DeleteConfirmDialog } from '../../../src/components/AdminPanel/DeleteConfirmDialog';
-import { requireOnline } from '../../../src/services/accountDataError';
+import { AccountDataError, requireOnline } from '../../../src/services/accountDataError';
 import {
   customMessageService,
   readMessageData,
@@ -14,6 +14,7 @@ import {
 } from '../../../src/services/customMessageService';
 import { DB_NAME } from '../../../src/services/dbSchema';
 import { storageService } from '../../../src/services/storage';
+import { CustomMessagesImportError } from '../../../src/stores/slices/messagesSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import type { CustomMessage, Message } from '../../../src/types';
 
@@ -33,7 +34,7 @@ vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => (
 type MotionProps = HTMLAttributes<HTMLElement> & {
   initial?: unknown; animate?: unknown; exit?: unknown; transition?: unknown; whileHover?: unknown;
 };
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   domAnimation: {},
   LazyMotion: ({ children }: { children: ReactNode }) => <>{children}</>,
   AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -344,4 +345,40 @@ describe('AdminPanel offline (ticket 11)', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it.each([
+    ['went offline', () => new AccountDataError('offline', OFFLINE), OFFLINE],
+    [
+      'lost the connection',
+      () => new AccountDataError('transport', 'Failed to fetch'),
+      'Import the same file again to add the rest.',
+    ],
+    [
+      'hit a row it refused',
+      () => new Error('Message text is required'),
+      'Message text is required',
+    ],
+  ])(
+    'import: an import that %s partway says how many were imported',
+    async (_label, cause, reason) => {
+      const alert = vi.fn();
+      vi.stubGlobal('alert', alert);
+      useAppStore.setState({
+        importCustomMessages: vi.fn(async () => {
+          throw new CustomMessagesImportError(2, 5, cause());
+        }),
+      });
+      panel();
+      const file = new File(['{}'], 'messages.json', { type: 'application/json' });
+      fireEvent.change(screen.getByTestId('import-file-input'), { target: { files: [file] } });
+
+      try {
+        await waitFor(() =>
+          expect(alert).toHaveBeenCalledWith(`Import stopped after 2 of 5 messages.\n${reason}`)
+        );
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }
+  );
 });

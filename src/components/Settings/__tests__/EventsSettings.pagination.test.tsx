@@ -36,7 +36,7 @@ type DivProps = HTMLAttributes<HTMLDivElement> & {
   exit?: unknown;
 };
 
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   m: {
     div: ({ children, initial: _i, animate: _a, exit: _e, ...props }: DivProps) => (
       <div {...props}>{children}</div>

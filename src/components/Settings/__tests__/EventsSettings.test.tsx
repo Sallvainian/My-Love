@@ -2,7 +2,7 @@
  * EventsSettings — behaviour
  *
  * The first test under `src/components/Settings/`, so it also fixes the
- * conventions for the directory: the framer-motion `m` mock the rest of the
+ * conventions for the directory: the Motion `m` mock the rest of the
  * tree uses, and fixtures built from local date components because
  * `vitest.config.ts` pins `TZ=America/New_York`.
  *
@@ -40,7 +40,7 @@ type DivProps = HTMLAttributes<HTMLDivElement> & {
   exit?: unknown;
 };
 
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   m: {
     div: ({ children, initial: _i, animate: _a, exit: _e, ...props }: DivProps) => (
       <div {...props}>{children}</div>

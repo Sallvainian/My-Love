@@ -14,7 +14,7 @@
  * device, and the wording says only that it failed to send.
  *
  * Rendered by LoveNotes, outside the virtualized list, rather than from inside a
- * row: MessageList's rows live in an overflow-hidden container and framer-motion
+ * row: MessageList's rows live in an overflow-hidden container and Motion
  * puts a transform on the message wrapper, which would make a fixed-position
  * child resolve against the row instead of the viewport.
  */
@@ -245,5 +245,3 @@ export function NoteRemoveConfirmation({
     </div>
   );
 }
-
-export default NoteRemoveConfirmation;

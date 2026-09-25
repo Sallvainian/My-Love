@@ -31,7 +31,7 @@
  * Line numbers are the `dist/module` build; `dist/main` is the same code at
  * different offsets.
  */
-import { RealtimeClient, type RealtimeChannel } from '@supabase/realtime-js';
+import { RealtimeClient, type RealtimeChannel } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const TOPIC = 'love-notes:00000000-0000-4000-8000-000000000000';

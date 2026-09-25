@@ -5,4 +5,4 @@
  */
 
 export { useFocusTrap } from './useFocusTrap';
-export { useNetworkStatus, type NetworkStatus } from './useNetworkStatus';
+export { useNetworkStatus } from './useNetworkStatus';

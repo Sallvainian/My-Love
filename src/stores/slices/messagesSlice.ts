@@ -108,6 +108,23 @@ export interface MessagesSlice {
 /** Local-copy kind for the account's custom messages and favorites. */
 export { MESSAGE_DATA_COPY_KIND };
 
+/**
+ * An import that stopped after saving some rows. The saved rows stay (they are
+ * on the server and in the copy), so the message can say how far it got;
+ * importing the same file again skips them as duplicates. `cause` is the error
+ * that stopped it.
+ */
+export class CustomMessagesImportError extends Error {
+  constructor(
+    readonly imported: number,
+    readonly total: number,
+    cause: unknown
+  ) {
+    super(cause instanceof Error ? cause.message : 'Import stopped', { cause });
+    this.name = 'CustomMessagesImportError';
+  }
+}
+
 /** The lowest id a new custom row may take: above every bundled id. */
 function minNewCustomId(bundled: Message[]): number {
   return Math.max(0, ...bundled.map((message) => message.id)) + 1;
@@ -872,10 +889,23 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
         // A fresh key per row, deliberately not one derived from the text: an
         // imported message edited since would own that key, and a re-import
         // would get the edited row back and store nothing.
-        for (const input of toCreate) {
-          await createCustomRow(requestedBy, requestedInSession, input, crypto.randomUUID());
+        let imported = 0;
+        try {
+          for (const input of toCreate) {
+            await createCustomRow(requestedBy, requestedInSession, input, crypto.randomUUID());
+            imported += 1;
+          }
+        } catch (error) {
+          if (imported === 0) throw error;
+          // Some rows were saved before the failure: show them now rather than
+          // at the next refresh. Both loaders report their own errors.
+          if (stillCurrent()) {
+            await get().loadCustomMessages();
+            await get().loadMessages();
+          }
+          throw new CustomMessagesImportError(imported, toCreate.length, error);
         }
-        const result = { imported: toCreate.length, skipped };
+        const result = { imported, skipped };
 
         // The rows are A's and stay A's; B's copy is simply not touched.
         if (!stillCurrent()) return result;

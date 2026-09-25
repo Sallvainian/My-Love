@@ -1,4 +1,4 @@
-import { AnimatePresence, m as motion, type PanInfo } from 'framer-motion';
+import { AnimatePresence, m as motion, type PanInfo } from 'motion/react';
 import {
   CircleAlert,
   Heart,

@@ -1,5 +1,5 @@
 import { normalizeMoodEntry } from '../../types/moods';
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import {
   Bell,
   Calendar,

@@ -1,5 +1,5 @@
-import type { PanInfo } from 'framer-motion';
-import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
+import type { PanInfo } from 'motion/react';
+import { AnimatePresence, motion, useMotionValue } from 'motion/react';
 import {
   TriangleAlert,
   ChevronLeft,
@@ -86,7 +86,7 @@ export function PhotoViewer({
   // AC 6.4.6: Double-tap zoom state
   const [lastTap, setLastTap] = useState(0);
 
-  // AC 6.4.4: Pinch-to-zoom state (removed - not supported by framer-motion)
+  // AC 6.4.4: Pinch-to-zoom state (removed - not supported by Motion)
 
   // Motion values for smooth animations
   const x = useMotionValue(0);

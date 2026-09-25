@@ -2,7 +2,6 @@
  * RelationshipTimers Component Exports
  */
 
-export { BirthdayCountdown } from './BirthdayCountdown';
 export { BirthdayWeddingCards } from './BirthdayWeddingCards';
 export { EventCountdown } from './EventCountdown';
 // `getCalendarDaysDiff` is deliberately not re-exported: App used to import it

@@ -166,4 +166,40 @@ describe('partner lookup contract', () => {
     await expect(getPartnerId()).resolves.toBeNull();
     expect(singleCalls).toBe(1);
   });
+
+  describe('known offline (DW-222)', () => {
+    let onLine: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    });
+    afterEach(() => {
+      onLine.mockRestore();
+    });
+
+    it('lookupPartnerId answers error without querying the users table', async () => {
+      singleResults = [linked];
+      const { lookupPartnerId } = await import('@/api/supabaseClient');
+      await expect(lookupPartnerId()).resolves.toEqual({
+        status: 'error',
+        reason: 'offline',
+        offline: true,
+      });
+      expect(singleCalls).toBe(0);
+    });
+
+    it('the delivery lookup does not retry or wait out the backoff', async () => {
+      singleResults = [linked];
+      const { resolvePartnerLookupForDelivery } = await import('@/api/supabaseClient');
+      // Fake timers are on: a backoff would leave this promise pending.
+      await expect(resolvePartnerLookupForDelivery()).resolves.toMatchObject({ status: 'error' });
+      expect(singleCalls).toBe(0);
+    });
+
+    it('getPartnerId is null, with no request', async () => {
+      singleResults = [linked];
+      const { getPartnerId } = await import('@/api/supabaseClient');
+      await expect(getPartnerId()).resolves.toBeNull();
+      expect(singleCalls).toBe(0);
+    });
+  });
 });

@@ -6,7 +6,7 @@
  * one key, and favoriting either would light up both on every device.
  */
 import { describe, expect, it } from 'vitest';
-import defaultMessages from '../../../src/data/defaultMessages';
+import { defaultMessages } from '../../../src/data/defaultMessages';
 import { bundledMessageKey } from '../../../src/services/messageFavoritesApi';
 
 describe('bundled message texts', () => {

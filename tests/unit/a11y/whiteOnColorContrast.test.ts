@@ -129,34 +129,25 @@ function readBuiltInPalette(): Map<string, Rgb> {
 /**
  * The palette THIS project adds on top of Tailwind's.
  *
- * `src/index.css:4` is `@config '../tailwind.config.js'`, and that file extends
- * `theme.colors` with its own `rose` scale, in hex. A guard that read only
+ * `src/index.css` has a plain `@theme` block that overrides Tailwind's `rose`
+ * scale with the project's own, in hex. A guard that read only
  * Tailwind's built-ins would silently skip any project scale — and silently is
  * the word, because an unknown swatch is indistinguishable from a class that is
  * not a colour at all. The love-notes send button was once `bg-coral-500`, the
  * worst pairing in the tree, and it was invisible here until this function
  * existed.
  *
- * Parsed by regex rather than imported: `tailwind.config.js` belongs to
- * `tsconfig.node.json` while this suite builds under `tsconfig.test.json`, so a
- * static import raises TS6307 — the same reason
- * `supabaseClientAuthFlow.test.ts:31-40` reads `vite.config.ts` through a path
- * instead of importing it.
+ * Only numbered shades in hex are read (`--color-rose-600: #e11d48;`); the
+ * `@theme inline` kit tokens have no shade number and are read by
+ * `readKitPalette()`.
  */
 function readProjectPalette(): Map<string, Rgb> {
-  const source = readFileSync(resolve(repoRoot, 'tailwind.config.js'), 'utf8');
+  const source = readFileSync(resolve(repoRoot, 'src/index.css'), 'utf8');
   const palette = new Map<string, Rgb>();
-  let family: string | null = null;
-  for (const line of source.split('\n')) {
-    const familyMatch = line.match(/^\s{8}([a-z]+):\s*\{\s*$/);
-    if (familyMatch) {
-      family = familyMatch[1];
-      continue;
-    }
-    const shadeMatch = line.match(/^\s{10}(\d{2,3}):\s*'(#[0-9a-fA-F]{6})'/);
-    if (shadeMatch && family) {
-      palette.set(`${family}-${shadeMatch[1]}`, hexToSrgb(shadeMatch[2]));
-    }
+  for (const [, family, shade, hex] of source.matchAll(
+    /^\s*--color-([a-z]+)-(\d{2,3}):\s*(#[0-9a-fA-F]{6});/gm
+  )) {
+    palette.set(`${family}-${shade}`, hexToSrgb(hex));
   }
   return palette;
 }
@@ -484,9 +475,9 @@ describe('white text on a coloured background clears WCAG AA', () => {
   it("reads the project's own palette too, not only Tailwind's", () => {
     const palette = readProjectPalette();
 
-    // `tailwind.config.js` extends Tailwind's defaults with its own scale. A
-    // guard blind to it reports clean while measuring only the utility colours.
-    // Read from the config itself (#e11d48), not the built-in rose-600.
+    // src/index.css overrides Tailwind's defaults with its own scale. A guard
+    // blind to it reports clean while measuring only the utility colours.
+    // Read from the stylesheet itself (#e11d48), not the built-in rose-600.
     expect(palette.get('rose-600'), 'the project palette must be loaded').toBeDefined();
     expect(contrastAgainstWhite(palette.get('rose-600') as Rgb)).toBeCloseTo(4.7, 1);
     // And the merged palette the scan uses carries the project's value, so the

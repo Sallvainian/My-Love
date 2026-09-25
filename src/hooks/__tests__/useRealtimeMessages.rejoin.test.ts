@@ -20,7 +20,7 @@
  * Line numbers are the `dist/module` build; `dist/main` is the same code at
  * different offsets.
  */
-import { RealtimeClient, type RealtimeChannel } from '@supabase/realtime-js';
+import { RealtimeClient, type RealtimeChannel } from '@supabase/supabase-js';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRealtimeMessages } from '../useRealtimeMessages';

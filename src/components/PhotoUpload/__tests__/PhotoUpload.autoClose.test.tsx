@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
-vi.mock('framer-motion', () => {
+vi.mock('motion/react', () => {
   const div = ({ children, ...props }: MotionDivProps) => {
     const { initial: _i, animate: _a, exit: _e, transition: _t, ...rest } = props as Record<
       string,

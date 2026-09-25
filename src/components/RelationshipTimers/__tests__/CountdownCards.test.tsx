@@ -19,7 +19,7 @@ import { TimeTogether } from '../TimeTogether';
 
 // Render every motion element as its plain tag, dropping animation props.
 const MOTION_PROPS = new Set(['initial', 'animate', 'exit', 'transition', 'whileHover']);
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   m: {
     div: ({ children, ...props }: { children?: ReactNode } & Record<string, unknown>) => (
       <div {...Object.fromEntries(Object.entries(props).filter(([key]) => !MOTION_PROPS.has(key)))}>

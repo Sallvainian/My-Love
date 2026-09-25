@@ -190,6 +190,29 @@ describe('PokeKissInterface sending', () => {
       )
     );
   });
+
+  it.each([
+    ['poke', 'sendPoke', 'poke-button', 'A poke'],
+    ['kiss', 'sendKiss', 'kiss-button', 'A kiss'],
+  ] as const)(
+    'offline: a %s is refused with the offline sentence and never sent',
+    async (_label, action, testId, subject) => {
+      const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+      try {
+        render(<PokeKissInterface />);
+        fireEvent.click(screen.getByTestId(testId));
+
+        await waitFor(() =>
+          expect(screen.getByTestId('toast-notification')).toHaveTextContent(
+            `You are offline. ${subject} needs a connection to send.`
+          )
+        );
+        expect(storeMocks[action]).not.toHaveBeenCalled();
+      } finally {
+        onLine.mockRestore();
+      }
+    }
+  );
 });
 
 describe('PokeKissInterface on the kit', () => {

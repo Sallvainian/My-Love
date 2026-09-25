@@ -17,7 +17,7 @@ const MOTION_PROPS = new Set([
   'initial', 'animate', 'exit', 'transition', 'variants', 'custom', 'drag', 'dragConstraints',
   'dragElastic', 'onDragEnd', 'whileHover', 'whileTap', 'layout',
 ]);
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   m: new Proxy(
     {},
     {

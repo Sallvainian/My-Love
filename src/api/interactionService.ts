@@ -21,6 +21,7 @@
  * @module api/interactionService
  */
 
+import { offlineMessage } from '../services/accountDataError';
 import { NoPartnerError, validatePartnerId } from '../utils/interactionValidation';
 import { logger } from '../utils/logger';
 import {
@@ -209,7 +210,7 @@ export class InteractionService {
       // synced when you're back online" promise is the opposite of the truth.
       // Stays ahead of the partner lookup, which would otherwise report a
       // missing partner for what is really a missing connection.
-      throw new InteractionWriteError(`You are offline. A ${type} needs a connection to send.`);
+      throw new InteractionWriteError(offlineMessage(`A ${type}`, 'send', 'needs'));
     }
 
     const lookup = await this.resolvePartnerLookup();

@@ -14,8 +14,8 @@ import { ImagePreview } from '../ImagePreview';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
-// Mock framer-motion to avoid animation issues in tests
-vi.mock('framer-motion', () => ({
+// Mock Motion to avoid animation issues in tests
+vi.mock('motion/react', () => ({
   motion: {
     div: ({ children, ...props }: MotionDivProps) => <div {...props}>{children}</div>,
   },

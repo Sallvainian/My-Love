@@ -1,4 +1,4 @@
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import { X } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useRef } from 'react';
@@ -24,7 +24,7 @@ interface MoodDetailModalProps {
  * - Shows note text if present
  * - Close button (X icon) in top-right
  * - ESC key handler for dismissal
- * - Framer Motion animations: slide up from bottom with backdrop fade
+ * - Motion animations: slide up from bottom with backdrop fade
  * - Focus trap: tab cycles within modal
  * - Focus returns to trigger on close (accessibility)
  */

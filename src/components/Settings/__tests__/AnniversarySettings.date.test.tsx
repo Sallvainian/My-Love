@@ -17,7 +17,7 @@ vi.mock('../../../api/supabaseClient', () => ({
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   m: {
     div: ({ children, ...props }: MotionDivProps) => <div {...props}>{children}</div>,
   },

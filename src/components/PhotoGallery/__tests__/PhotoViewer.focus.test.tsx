@@ -17,7 +17,7 @@ import { PhotoViewer } from '../PhotoViewer';
 
 type DivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   motion: {
     div: ({ children, ...props }: DivProps) => <div {...props}>{children}</div>,
     img: (props: ImgHTMLAttributes<HTMLImageElement>) => <img {...props} alt={props.alt ?? ''} />,

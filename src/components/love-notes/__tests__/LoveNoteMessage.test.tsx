@@ -22,8 +22,8 @@ interface FullScreenImageViewerMockProps {
   onClose: () => void;
 }
 
-// Mock framer-motion
-vi.mock('framer-motion', () => ({
+// Mock Motion
+vi.mock('motion/react', () => ({
   motion: {
     div: ({ children, ...props }: MotionDivProps) => <div {...props}>{children}</div>,
   },

@@ -16,7 +16,7 @@
  */
 
 import DOMPurify from 'dompurify';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { LoaderCircle, Trash } from 'lucide-react';
 import { memo, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { readCachedImage, writeCachedImage } from '../../services/imageCache';

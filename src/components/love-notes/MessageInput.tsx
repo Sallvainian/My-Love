@@ -16,7 +16,7 @@
  * @module components/love-notes/MessageInput
  */
 
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'motion/react';
 import { ImageIcon, LoaderCircle, Send } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useLoveNotes } from '../../hooks/useLoveNotes';

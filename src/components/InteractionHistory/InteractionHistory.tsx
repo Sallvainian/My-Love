@@ -15,7 +15,7 @@
  * - AC#6: Interaction history viewable (last 7 days)
  */
 
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, Heart, X, Zap } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks';

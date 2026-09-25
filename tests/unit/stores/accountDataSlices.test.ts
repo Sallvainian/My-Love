@@ -79,7 +79,7 @@ import { readLocalCopy, refreshLocalCopies, refreshLocalCopy, writeLocalCopy } f
 import { bundledMessageKey } from '../../../src/services/messageFavoritesApi';
 import { storageService } from '../../../src/services/storage';
 import { ACCOUNT_OWNER_STORAGE_KEY } from '../../../src/stores/slices/authSlice';
-import { MESSAGE_DATA_COPY_KIND } from '../../../src/stores/slices/messagesSlice';
+import { CustomMessagesImportError, MESSAGE_DATA_COPY_KIND } from '../../../src/stores/slices/messagesSlice';
 import { ANNIVERSARIES_COPY_KIND } from '../../../src/stores/slices/settingsSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import type { AppState } from '../../../src/stores/types';
@@ -1009,6 +1009,57 @@ describe('messages: favorites, custom messages and the message-data copy', () =>
       expect(keys).toHaveLength(2);
       expect(new Set(keys).size).toBe(2);
       expect(keys.some((key) => /^i:/.test(key))).toBe(false);
+    });
+
+    it('an import that stops partway shows the saved rows now and says how many were imported', async () => {
+      await seedBundled([`IMPORT-PARTIAL-${A}`]);
+      const file = {
+        version: '1.0',
+        exportDate: '2026-09-12T00:00:00.000Z',
+        messageCount: 3,
+        messages: ['Saved first', 'Stopped here', 'Never tried'].map((text) => ({
+          text, category: 'custom', active: true, tags: [],
+          createdAt: '2026-08-03T06:00:00.000Z', updatedAt: '2026-08-03T06:00:00.000Z',
+        })),
+      };
+      const stop = offline();
+      server.createCustomMessage
+        .mockImplementationOnce(async (_userId: string, fields: Record<string, unknown>) =>
+          serverRow(`srv-partial-${A}`, fields.text as string, fields)
+        )
+        .mockRejectedValueOnce(stop);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const failure = await useAppStore
+        .getState()
+        .importCustomMessages(new File([JSON.stringify(file)], 'backup.json'))
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(CustomMessagesImportError);
+      expect(failure).toMatchObject({ imported: 1, total: 3, cause: stop });
+      expect(server.createCustomMessage).toHaveBeenCalledTimes(2);
+      // Reloaded now, not at the next refresh.
+      expect(useAppStore.getState().customMessages.map((m) => m.text)).toEqual(['Saved first']);
+    });
+
+    it('an import that saves nothing rethrows the original error', async () => {
+      await seedBundled([`IMPORT-NONE-${A}`]);
+      const file = {
+        version: '1.0',
+        exportDate: '2026-09-12T00:00:00.000Z',
+        messageCount: 1,
+        messages: [{
+          text: 'Only one', category: 'custom', active: true, tags: [],
+          createdAt: '2026-08-03T06:00:00.000Z', updatedAt: '2026-08-03T06:00:00.000Z',
+        }],
+      };
+      const stop = offline();
+      server.createCustomMessage.mockRejectedValueOnce(stop);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(
+        useAppStore.getState().importCustomMessages(new File([JSON.stringify(file)], 'backup.json'))
+      ).rejects.toBe(stop);
     });
   });
 });
