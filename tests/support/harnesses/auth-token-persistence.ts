@@ -90,6 +90,7 @@ async function run(scenario: PersistenceScenario): Promise<PersistenceEvidence> 
   const operations = new WeakMap<IDBTransaction, Operation>();
   const activeActions = new Map<'put' | 'delete', Action>();
   const waiters = new Set<() => void>();
+  const listenerWrites: Origin[] = [];
   const checkpoints: PersistenceEvidence['checkpoints'] = [];
   const cleanup = { drained: false, restored: false, databaseDeleted: false };
   const sessions = [
@@ -200,6 +201,10 @@ async function run(scenario: PersistenceScenario): Promise<PersistenceEvidence> 
       actor, source: 'listener', event, method: session ? 'put' : 'delete', token: sessionLabel(session),
     };
     record('notification-dispatched', origin);
+    // The listener's write now runs on its subscription queue after the
+    // callback returns, outside this synchronous scope. Drain it separately.
+    listenerWrites.push(origin);
+    track(waitFor(actor, 'connection-closed'));
     const delivered = scoped(origin, () => callback!(event, session));
     return track(Promise.resolve(delivered).then(() => { record('notification-complete', origin); }));
   };
@@ -272,14 +277,21 @@ async function run(scenario: PersistenceScenario): Promise<PersistenceEvidence> 
       let origin = synchronousOrigin;
       if (!origin) {
         // This synchronous stack is inspected locally and never exported. It
-        // identifies the real caller, not an assumed FIFO of pending promises.
+        // identifies the real caller module. Listener writes then take the
+        // oldest delivered notification: sessionService's queue is FIFO by
+        // design, and observeRequest still checks each one's method and token.
         const stack = new Error().stack ?? '';
-        const method = /at signIn .*\/src\/api\/auth\/actionService\.ts:/.test(stack) ? 'put'
-          : /at signOut .*\/src\/api\/auth\/actionService\.ts:/.test(stack) ? 'delete' : undefined;
-        const action = method ? activeActions.get(method) : undefined;
-        if (!action || action.dispatched) throw new Error('Unattributed production persistence dispatch');
-        action.dispatched = true;
-        origin = action.origin;
+        if (/\/src\/api\/auth\/sessionService\.ts:/.test(stack)) {
+          origin = listenerWrites.shift();
+          if (!origin) throw new Error('Unattributed listener persistence dispatch');
+        } else {
+          const method = /at signIn .*\/src\/api\/auth\/actionService\.ts:/.test(stack) ? 'put'
+            : /at signOut .*\/src\/api\/auth\/actionService\.ts:/.test(stack) ? 'delete' : undefined;
+          const action = method ? activeActions.get(method) : undefined;
+          if (!action || action.dispatched) throw new Error('Unattributed production persistence dispatch');
+          action.dispatched = true;
+          origin = action.origin;
+        }
       }
       const operation: Operation = { origin, id: ++nextOperation };
       record('persistence-dispatched', origin, operation);
@@ -362,6 +374,9 @@ async function run(scenario: PersistenceScenario): Promise<PersistenceEvidence> 
       const olderActor = scenario === 'local-actions' || scenario === 'stale-clear'
         ? 'sign-out' : 'sign-in-A';
       await waitFor(olderActor + '-listener', 'transaction-created');
+      // The SDK response no longer waits for the listener's commit, so the
+      // older action's own write also queues behind the blocker first.
+      await waitFor(olderActor, 'transaction-created');
       const newer = scenario === 'local-actions'
         ? startAction('sign-in-B', b.session)
         : scenario === 'same-owner-refresh'
@@ -372,7 +387,11 @@ async function run(scenario: PersistenceScenario): Promise<PersistenceEvidence> 
       const newerActor = scenario === 'local-actions' ? 'sign-in-B-listener'
         : scenario === 'same-owner-refresh' ? 'refresh-A-v2'
           : scenario === 'stale-resurrection' ? 'independent-sign-out' : 'independent-B';
-      await waitFor(newerActor, 'transaction-created');
+      // The newer notification is delivered at once, but its write waits on the
+      // subscription queue behind the held listener write, so it cannot open
+      // a transaction before release. A newer action's own write can.
+      await waitFor(newerActor, 'identity-delivered');
+      if (scenario === 'local-actions') await waitFor('sign-in-B', 'transaction-created');
       releaseBlocker!();
       await Promise.all([older, newer]);
     }

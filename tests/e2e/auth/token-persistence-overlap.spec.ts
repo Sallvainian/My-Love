@@ -24,7 +24,7 @@ const runtime = {
   vite: version('vite'),
 };
 const scenarios: PersistenceScenario[] = [
-  'sequential', 'local-actions', 'stale-clear', 'stale-overwrite', 'same-owner-refresh',
+  'sequential', 'local-actions', 'stale-clear', 'stale-overwrite', 'stale-resurrection', 'same-owner-refresh',
 ];
 
 function entry(trace: PersistenceTraceEntry[], actor: string, phase: string) {
@@ -64,17 +64,27 @@ function assertNativeEvidence(evidence: PersistenceEvidence) {
     const commit = entry(trace, callback, 'native-complete');
     const notification = entry(trace, callback, 'notification-complete');
     const sdk = entry(trace, action.actor, 'sdk-response');
-    expect(notification.sequence).toBeGreaterThan(commit.sequence);
     expect(sdk.sequence).toBeGreaterThan(notification.sequence);
+    // The listener is synchronous, so the SDK no longer waits on its commit.
+    expect(sdk.sequence).toBeLessThan(commit.sequence);
     expect(entry(trace, action.actor, 'persistence-dispatched').sequence).toBeGreaterThan(sdk.sequence);
     expect(entry(trace, action.actor, 'action-complete').sequence)
       .toBeGreaterThan(entry(trace, action.actor, 'native-complete').sequence);
   }
-  for (const notification of trace.filter((row) => row.phase === 'notification-dispatched')) {
+  const notifications = trace.filter((row) => row.phase === 'notification-dispatched');
+  for (const notification of notifications) {
     expect(entry(trace, notification.actor, 'identity-delivered').sequence)
       .toBeLessThan(entry(trace, notification.actor, 'persistence-dispatched').sequence);
     expect(entry(trace, notification.actor, 'notification-complete').sequence)
-      .toBeGreaterThan(entry(trace, notification.actor, 'native-complete').sequence);
+      .toBeLessThan(entry(trace, notification.actor, 'native-complete').sequence);
+  }
+  // Listener writes share one subscription queue: each dispatches only after
+  // the previous one commits, so they commit in notification arrival order.
+  const listenerCommits = trace.filter((row) => row.source === 'listener' && row.phase === 'native-complete');
+  expect(listenerCommits.map((row) => row.actor)).toEqual(notifications.map((row) => row.actor));
+  for (let index = 1; index < notifications.length; index += 1) {
+    expect(entry(trace, notifications[index].actor, 'persistence-dispatched').sequence)
+      .toBeGreaterThan(entry(trace, notifications[index - 1].actor, 'native-complete').sequence);
   }
   // An allowlist guards retained/attached JSON, including opaque version labels.
   for (const row of trace) {
@@ -137,34 +147,33 @@ for (const scenario of scenarios) {
     } else {
       const older = scenario === 'local-actions' || scenario === 'stale-clear' ? 'sign-out' : 'sign-in-A';
       const newer = scenario === 'local-actions' ? 'sign-in-B-listener'
-        : scenario === 'same-owner-refresh' ? 'refresh-A-v2' : 'independent-B';
+        : scenario === 'same-owner-refresh' ? 'refresh-A-v2'
+          : scenario === 'stale-resurrection' ? 'independent-sign-out' : 'independent-B';
       const blocker = entry(trace, 'blocker', 'transaction-created');
       const release = entry(trace, 'blocker', 'blocker-released');
-      for (const actor of [older + '-listener', newer]) {
+      // Both older writes queue behind the blocker; the SDK returned without them.
+      for (const actor of [older + '-listener', older]) {
         expect(entry(trace, actor, 'transaction-created').sequence).toBeGreaterThan(blocker.sequence);
         expect(entry(trace, actor, 'transaction-created').sequence).toBeLessThan(release.sequence);
         expect(entry(trace, actor, 'native-complete').sequence)
           .toBeGreaterThan(entry(trace, 'blocker', 'native-complete').sequence);
       }
-      expect(entry(trace, newer, 'transaction-created').sequence)
-        .toBeLessThan(entry(trace, older, 'sdk-response').sequence);
-      expect(entry(trace, older, 'native-complete').sequence)
-        .toBeGreaterThan(entry(trace, newer, 'native-complete').sequence);
+      expect(entry(trace, older, 'sdk-response').sequence).toBeLessThan(release.sequence);
+      // The newer notification reaches the app while the older write is held,
+      // but its own write waits in the queue until that older write commits.
+      expect(entry(trace, newer, 'identity-delivered').sequence).toBeLessThan(release.sequence);
+      expect(entry(trace, newer, 'persistence-dispatched').sequence)
+        .toBeGreaterThan(entry(trace, older + '-listener', 'native-complete').sequence);
       const expectedActors = scenario === 'local-actions'
-        ? ['seed-A', 'sign-out-listener', newer, 'sign-out', 'sign-in-B']
-        : scenario === 'stale-clear' ? ['seed-A', 'sign-out-listener', newer, 'sign-out']
-          : ['sign-in-A-listener', newer, 'sign-in-A'];
+        ? ['seed-A', 'sign-out-listener', 'sign-out', 'sign-in-B', newer]
+        : scenario === 'stale-clear' ? ['seed-A', 'sign-out-listener', 'sign-out', newer]
+          : ['sign-in-A-listener', 'sign-in-A', newer];
       expect(writes.map((row) => row.actor)).toEqual(expectedActors);
-      if (scenario === 'local-actions') {
-        expect(evidence.finalToken).toEqual({ owner: 'B', version: 'v1' });
-      } else if (scenario === 'stale-clear') {
-        expect(evidence.finalToken).toBeNull();
-        expect(entry(trace, newer, 'native-complete').token).toEqual({ owner: 'B', version: 'v1' });
-      } else {
-        expect(evidence.finalToken).toEqual({ owner: 'A', version: 'v1' });
-        expect(entry(trace, newer, 'native-complete').token).toEqual(scenario === 'same-owner-refresh'
-          ? { owner: 'A', version: 'v2' } : { owner: 'B', version: 'v1' });
-      }
+      // The newest auth event now owns the stored token in every schedule.
+      expect(evidence.finalToken).toEqual(scenario === 'same-owner-refresh'
+        ? { owner: 'A', version: 'v2' }
+        : scenario === 'stale-resurrection' ? null : { owner: 'B', version: 'v1' });
+      expect(entry(trace, newer, 'native-complete').token).toEqual(evidence.finalToken);
     }
     // Ordinary E2E runs attach JSON only. The isolated config opts into retaining
     // passing evidence alongside this bundle's report, with no shared output file.
