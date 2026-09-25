@@ -245,7 +245,7 @@ describe('ViewErrorBoundary fallback on the kit', () => {
       'font-semibold',
       'text-ink'
     );
-    expect(screen.getByText('render failed')).toHaveClass('bg-card2', 'break-words');
+    expect(screen.getByText('render failed')).toHaveClass('bg-card2', 'wrap-break-word');
     expect(screen.getByTestId('error-try-again')).toHaveClass('bg-fill');
     const goHome = screen.getByTestId('error-go-home');
     expect(goHome).toHaveClass('bg-tint', 'text-accent');

@@ -23,19 +23,19 @@ export const GROUP_TITLE = 'text-[15px] font-medium text-ink';
 export const GROUP_SUBTITLE = 'text-[13px] text-muted';
 
 const ICON_BUTTON =
-  'flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50';
+  'flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50';
 export const ADD_BUTTON = `${ICON_BUTTON} bg-tint text-accent focus-visible:ring-accent`;
 export const EDIT_BUTTON = `${ICON_BUTTON} bg-card2 text-muted focus-visible:ring-accent`;
 export const DELETE_BUTTON = `${ICON_BUTTON} bg-dtint text-danger focus-visible:ring-danger`;
 
 /** A list row under a group header. */
 export const ITEM_ROW = 'flex min-h-12 items-center gap-3 py-1';
-export const ITEM_LABEL = 'text-[15px] font-medium break-words text-ink';
-export const ITEM_META = 'text-[13px] break-words text-muted';
+export const ITEM_LABEL = 'text-[15px] font-medium wrap-break-word text-ink';
+export const ITEM_META = 'text-[13px] wrap-break-word text-muted';
 
 /** Small (36px) secondary pill for in-card actions. */
 export const SMALL_SECONDARY =
-  'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60';
 
 /** The small uppercase label above a section of cards. */
 export const SECTION_LABEL = 'px-1 text-xs font-semibold tracking-[.08em] text-muted uppercase';
@@ -61,13 +61,13 @@ export const DIALOG_BACKDROP = `${DIALOG_SCRIM} z-50`;
  * is `fixed inset-0`, so that height is definite) and it scrolls past that.
  */
 export const DIALOG_SURFACE =
-  'max-h-full w-full overflow-y-auto rounded-[20px] bg-card shadow-float outline-none';
+  'max-h-full w-full overflow-y-auto rounded-[20px] bg-card shadow-float outline-hidden';
 export const DIALOG_PANEL = `${DIALOG_SURFACE} p-5`;
 export const DIALOG_TITLE = 'text-lg font-semibold text-ink';
 export const DIALOG_CLOSE = `${ICON_BUTTON} bg-card2 text-muted focus-visible:ring-accent`;
 
 const PILL =
-  'flex h-12 flex-1 items-center justify-center gap-2 rounded-full px-5 text-[15px] font-semibold transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50';
+  'flex h-12 flex-1 items-center justify-center gap-2 rounded-full px-5 text-[15px] font-semibold transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50';
 export const PRIMARY_BUTTON = `${PILL} bg-fill text-white focus-visible:ring-accent`;
 export const SECONDARY_BUTTON = `${PILL} bg-tint text-accent focus-visible:ring-accent`;
 export const DESTRUCTIVE_BUTTON = `${PILL} bg-dtint text-danger focus-visible:ring-danger`;
@@ -87,7 +87,7 @@ export const FAILURE_BOX = 'rounded-[14px] bg-dtint px-4 py-3 text-sm text-dange
  * about. Every text field in the app follows this.
  */
 export function fieldClass(hasError: boolean, multiline = false): string {
-  return `w-full rounded-[14px] bg-field px-4 text-base text-ink ring-inset placeholder:text-muted focus:ring-2 focus:outline-none ${
+  return `w-full rounded-[14px] bg-field px-4 text-base text-ink ring-inset placeholder:text-muted focus:ring-2 focus:outline-hidden ${
     multiline ? 'resize-none py-3' : 'h-12 scheme-light-dark'
   } ${hasError ? 'ring-2 ring-danger focus:ring-danger' : 'ring-1 ring-line-strong focus:ring-accent'}`;
 }

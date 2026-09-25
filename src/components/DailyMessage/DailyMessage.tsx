@@ -133,7 +133,7 @@ export function DailyMessage(_props: DailyMessageProps) {
   if (!currentMessage || !settings) {
     if (loadingTimeout || error) {
       return (
-        <div className="flex min-h-[400px] flex-col items-center justify-center gap-6 px-4">
+        <div className="flex min-h-100 flex-col items-center justify-center gap-6 px-4">
           <AlertCircle className="h-16 w-16 text-muted" />
 
           <div className="text-center">
@@ -151,7 +151,7 @@ export function DailyMessage(_props: DailyMessageProps) {
               setLoadingTimeout(false);
               initializeApp();
             }}
-            className="flex min-h-[44px] items-center gap-2 rounded-full bg-fill px-6 py-3 font-semibold text-white"
+            className="flex min-h-11 items-center gap-2 rounded-full bg-fill px-6 py-3 font-semibold text-white"
           >
             <RefreshCw className="h-5 w-5" />
             Retry
@@ -167,7 +167,7 @@ export function DailyMessage(_props: DailyMessageProps) {
 
     // Still loading (within timeout window)
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
+      <div className="flex min-h-100 flex-col items-center justify-center gap-4">
         <Heart className="h-14 w-14 animate-pulse fill-current text-accent" aria-hidden="true" />
         <div className="text-lg text-muted">Loading your daily message...</div>
       </div>

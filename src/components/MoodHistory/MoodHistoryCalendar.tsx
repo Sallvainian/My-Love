@@ -262,7 +262,7 @@ export function MoodHistoryCalendar() {
       <div className="mb-3 flex items-center justify-between">
         <button
           onClick={handlePreviousMonth}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-card2 text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-card2 text-muted focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
           aria-label={`Go to previous month from ${monthName} ${currentYear}`}
           data-testid="calendar-nav-prev"
         >
@@ -280,7 +280,7 @@ export function MoodHistoryCalendar() {
 
         <button
           onClick={handleNextMonth}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-card2 text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-card2 text-muted focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
           aria-label={`Go to next month from ${monthName} ${currentYear}`}
           data-testid="calendar-nav-next"
         >

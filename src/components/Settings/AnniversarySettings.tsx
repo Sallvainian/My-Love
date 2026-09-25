@@ -103,7 +103,7 @@ export function AnniversarySettings() {
           said by the subtitle alone, with no empty block below it. */}
       <div className={GROUP_ROW}>
         <span className={GROUP_TILE} aria-hidden="true">
-          <Heart className="h-[17px] w-[17px]" />
+          <Heart className="h-4.25 w-4.25" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h3 className={GROUP_TITLE}>Anniversaries</h3>

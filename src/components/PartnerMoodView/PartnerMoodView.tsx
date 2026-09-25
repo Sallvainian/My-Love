@@ -47,7 +47,7 @@ type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
 /** Kit card surface and small pill button (design-tokens.md). */
 const CARD = 'rounded-[20px] border border-line bg-card shadow-card';
 const PILL =
-  'flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2';
+  'flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2';
 
 export function PartnerMoodView() {
   const {
@@ -452,7 +452,7 @@ export function PartnerMoodView() {
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Enter email or name..."
-                  className="h-12 w-full rounded-[14px] bg-field pr-4 pl-11 text-base text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-none"
+                  className="h-12 w-full rounded-[14px] bg-field pr-4 pl-11 text-base text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-accent focus:outline-hidden"
                   data-testid="partner-search-input"
                 />
               </div>
@@ -603,7 +603,7 @@ export function PartnerMoodView() {
                 type="button"
                 onClick={handleRefresh}
                 disabled={isRefreshing || !syncStatus.isOnline}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card2 text-muted transition-opacity focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Refresh"
                 aria-busy={isRefreshing}
                 data-testid="partner-mood-refresh-button"
@@ -746,7 +746,7 @@ export const MoodCard = memo(function MoodCard({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
-        className={`${CARD} flex flex-col gap-3 p-[18px]`}
+        className={`${CARD} flex flex-col gap-3 p-4.5`}
         data-testid="partner-mood-card"
       >
         <h2 className="text-[13px] font-semibold tracking-[.08em] text-muted uppercase">
@@ -758,9 +758,9 @@ export const MoodCard = memo(function MoodCard({
             return (
               <span
                 key={`${m}-${index}`}
-                className={`flex h-[34px] items-center gap-1.5 rounded-full pr-3.5 pl-2.5 text-sm font-semibold ${MOOD_TONE.partner}`}
+                className={`flex h-8.5 items-center gap-1.5 rounded-full pr-3.5 pl-2.5 text-sm font-semibold ${MOOD_TONE.partner}`}
               >
-                <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
+                <Icon className="h-4.25 w-4.25" aria-hidden="true" />
                 {label}
               </span>
             );
@@ -790,7 +790,7 @@ export const MoodCard = memo(function MoodCard({
       <div
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${MOOD_TONE.partner}`}
       >
-        <PrimaryIcon className="h-[18px] w-[18px]" aria-hidden="true" />
+        <PrimaryIcon className="h-4.5 w-4.5" aria-hidden="true" />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <p className="text-[15px] font-medium wrap-break-word text-ink">{labels}</p>

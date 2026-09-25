@@ -25,7 +25,7 @@ export function MoodButton({ mood, icon: Icon, label, isSelected, onClick }: Moo
       onClick={onClick}
       whileTap={{ scale: 0.95 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-      className={`flex min-h-[76px] min-w-[48px] flex-col px-1 py-2 items-center justify-center gap-1.5 rounded-2xl text-[13px] font-medium transition-colors ${
+      className={`flex min-h-19 min-w-12 flex-col px-1 py-2 items-center justify-center gap-1.5 rounded-2xl text-[13px] font-medium transition-colors ${
         isSelected
           ? 'bg-tint text-accent ring-2 ring-accent ring-inset'
           : 'bg-card text-muted ring-1 ring-line-strong ring-inset'

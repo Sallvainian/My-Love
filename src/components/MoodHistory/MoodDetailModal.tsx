@@ -83,7 +83,7 @@ function MoodDetailContent({
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="absolute top-3 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-card2 text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="absolute top-3 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-card2 text-muted focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Close mood details modal"
             data-testid="modal-close-button"
           >

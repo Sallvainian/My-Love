@@ -53,7 +53,7 @@ const DESTINATIONS: readonly Destination[] = [
  * Shared by the bar and the dock. The dock alone adds `backdrop-saturate-[1.4]`
  * on top of it, on purpose, as the approved style kit's dock does.
  */
-const GLASS = 'bg-glass backdrop-blur-[16px]';
+const GLASS = 'bg-glass backdrop-blur-lg';
 
 export interface AppNavigationProps {
   currentView: ViewType;
@@ -77,7 +77,7 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
       <header className={`safe-top sticky top-0 z-40 ${GLASS}`} data-testid="app-header">
         <div className="flex h-16 items-center gap-2 px-3">
           {/* Balances the gear so the wordmark stays optically centred. */}
-          <span aria-hidden="true" className="min-h-[44px] min-w-[44px]" />
+          <span aria-hidden="true" className="min-h-11 min-w-11" />
 
           {/* The app name rather than the active destination, and a span rather
               than a heading: Mood, Notes, Partner and Settings each render
@@ -98,7 +98,7 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
           <button
             type="button"
             onClick={() => onViewChange('settings')}
-            className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full transition-colors ${
+            className={`flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors ${
               isSettings ? 'bg-tint text-accent' : 'text-muted hover:text-ink'
             }`}
             data-testid="nav-settings"
@@ -111,7 +111,7 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
       </header>
 
       <nav
-        className={`fixed inset-x-4 mx-auto max-w-md bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex h-[60px] items-center justify-between gap-1 rounded-full px-2 shadow-float ring-1 ring-line backdrop-saturate-[1.4] ${GLASS}`}
+        className={`fixed inset-x-4 mx-auto max-w-md bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex h-15 items-center justify-between gap-1 rounded-full px-2 shadow-float ring-1 ring-line backdrop-saturate-[1.4] ${GLASS}`}
         aria-label="Primary"
         data-testid="nav-dock"
       >
@@ -136,7 +136,7 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
               aria-current={isActive ? 'page' : undefined}
             >
               <Icon
-                className={`shrink-0 ${isActive ? 'h-5 w-5' : 'h-[22px] w-[22px]'} ${
+                className={`shrink-0 ${isActive ? 'h-5 w-5' : 'h-5.5 w-5.5'} ${
                   isActive && fillWhenActive ? 'fill-current' : ''
                 }`}
               />
