@@ -77,10 +77,9 @@ jobs:
 
             ## Before reviewing
 
-            1. Read `AGENTS.md`. It is the authoritative statement of this repo's
-               policy, layout, conventions and known pitfalls. The checklist below
-               is an index into it, not a replacement — where the two disagree,
-               `AGENTS.md` wins.
+            1. Read `AGENTS.md` (`CLAUDE.md` imports it, so it may already be in
+               your context). It is the authoritative statement of this repo's
+               policy, layout, conventions and known pitfalls.
             2. Run `gh pr diff ${{ github.event.pull_request.number }}` to get the full diff.
             3. Check if the diff ONLY contains lockfiles, markdown, version bumps, auto-generated files,
                or `database.types.ts`. If so, skip the review entirely and make your comment
@@ -104,56 +103,15 @@ jobs:
             findings that failed this gate; it carries its own additional bar, below.
 
             `AGENTS.md` deliberately names code that ALREADY violates its own rules —
-            the modules its Known pitfalls Realtime line says still call
-            `supabase.channel()` directly, and the migrations it says still contain
-            the removed `realtime.send()` pattern. That is documentation of known
-            debt, not a work list. Report it only if THIS diff touches that code and
-            leaves it worse. Opening a review by relisting it is a failed review.
+            documentation of known debt, not a work list. Report it only if THIS
+            diff touches that code and leaves it worse. Opening a review by
+            relisting it is a failed review.
 
-            ## Project-specific checks
+            ## Project checks
 
-            Run these first — they are where real bugs in this repo live. Each check
-            names what to look for in the diff and where the rule lives in
-            `AGENTS.md`. The rule is only there: read it before reporting, and quote
-            it under the filter gate.
-
-            1. **Cross-account leakage.** Diff: a `set(` after an `await` in
-               `src/stores/slices/`; a new field in a slice's state; a
-               `getAll(` call; a new IndexedDB store or localStorage key.
-               Rules: Known pitfalls (the `authSessionVersion`, sign-out and
-               `getAll()` lines); Maintained by hand (the `deleteAccountData()` line).
-            2. **Realtime.** Diff: `supabase.channel(`, `realtime.send`, a partner or
-               session lookup that can answer `null`. Rules: Known pitfalls (the
-               three Realtime lines).
-            3. **Retry idempotency.** Diff: an `.insert(` or Storage upload on a path
-               that can retry. Rules: Known pitfalls (the retryable-INSERT line).
-            4. **Wrong data model.** Diff: data-layer changes in `src/services/`,
-               `src/api/` or `src/stores/`. Rules: Maintained by hand (the
-               data-model line); Known pitfalls (the `localCopy.ts`/`dbSchema.ts`
-               line and the needs-a-connection line).
-            5. **Error contract.** Diff: a caller handling a service or API
-               function's failure. Rules: Conventions that differ from defaults
-               (the IndexedDB/Supabase error line).
-            6. **Imports, aliases and suppressions.** Diff: `from '@/` under `src/`; a
-               value import from `@playwright/test` in a spec; a new `eslint-disable`
-               directive without a same-line ` -- ` reason. Rules: Conventions (the
-               `@/` line); Where things are (the E2E fixtures line); Known pitfalls
-               (the `eslint-disable` line).
-            7. **Generated and frozen files.** Diff: `src/types/database.types.ts`,
-               `mise.lock`, `tests/e2e-archive/`. Rules: Policy.
-            8. **Load-bearing test config.** Diff: `tests/setup.ts`,
-               `playwright.config.ts`, a new `registerLocalCopy`. Rules: Known
-               pitfalls (the `nodeName`, `playwright.config.ts` and
-               `registerLocalCopy` lines).
-            9. **Secrets and personal data.** Diff: `.env*`, key-shaped strings,
-               anything under `_bmad-output/` or `.bmad-loop/`. Rules: Policy
-               (the fnox and public-repo lines).
-            10. **Architecture drift.** Diff: `react-router`, `manualChunks`,
-                `prettier` in `package.json`, a script or a workflow. Rules:
-                Conventions (the navigation, Vite chunking and Prettier lines).
-            11. **Database migrations.** Diff: `supabase/migrations/`,
-                `supabase/tests/database/`. Rules: Known pitfalls (the policy-trap,
-                row-level-security, `policies_are` and hosted-database lines).
+            Check the diff against every rule in `AGENTS.md` first — that is where
+            real bugs in this repo live. Quote the rule for any finding against it,
+            as the filter gate requires.
 
             ## General checks
 
