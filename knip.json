@@ -7,17 +7,10 @@
   "ignore": [
     "src/types/database.types.ts",
     "tests/e2e-archive/**",
-    "supabase/functions/**",
-    ".claude/**",
-    ".agents/**",
-    "_bmad/**",
-    "_bmad-output/**"
+    "supabase/functions/**"
   ],
   "ignoreBinaries": [
     "supabase"
-  ],
-  "ignoreDependencies": [
-    "prettier"
   ],
   "ignoreExportsUsedInFile": true
 }
