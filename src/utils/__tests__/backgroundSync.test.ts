@@ -98,7 +98,7 @@ describe('backgroundSync utilities', () => {
 
     it('should return false when Service Worker is not available', () => {
       const nav = getMutableNavigator();
-      // @ts-ignore
+      // @ts-expect-error -- serviceWorker is not optional on Navigator; the test removes it
       delete nav.serviceWorker;
 
       expect(isBackgroundSyncSupported()).toBe(false);
@@ -106,7 +106,6 @@ describe('backgroundSync utilities', () => {
 
     it('should return false when SyncManager is not available', () => {
       const win = getMutableWindow();
-      // @ts-ignore
       delete win.SyncManager;
 
       expect(isBackgroundSyncSupported()).toBe(false);
@@ -115,9 +114,8 @@ describe('backgroundSync utilities', () => {
     it('should return false when neither Service Worker nor SyncManager is available', () => {
       const nav = getMutableNavigator();
       const win = getMutableWindow();
-      // @ts-ignore
+      // @ts-expect-error -- serviceWorker is not optional on Navigator; the test removes it
       delete nav.serviceWorker;
-      // @ts-ignore
       delete win.SyncManager;
 
       expect(isBackgroundSyncSupported()).toBe(false);
@@ -146,7 +144,7 @@ describe('backgroundSync utilities', () => {
 
     it('should not throw when Service Worker is not available', async () => {
       const nav = getMutableNavigator();
-      // @ts-ignore
+      // @ts-expect-error -- serviceWorker is not optional on Navigator; the test removes it
       delete nav.serviceWorker;
 
       await expect(registerBackgroundSync('test-tag')).resolves.not.toThrow();
@@ -154,7 +152,6 @@ describe('backgroundSync utilities', () => {
 
     it('should not throw when SyncManager is not available', async () => {
       const win = getMutableWindow();
-      // @ts-ignore
       delete win.SyncManager;
 
       await expect(registerBackgroundSync('test-tag')).resolves.not.toThrow();

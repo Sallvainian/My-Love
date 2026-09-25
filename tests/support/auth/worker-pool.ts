@@ -35,7 +35,7 @@
  * accounts, this is the mechanism — but check for a genuine duplicate index
  * first.
  */
-import { cpus } from 'os';
+import { cpus } from 'node:os';
 
 export const MIN_AUTH_POOL_SIZE = 8;
 

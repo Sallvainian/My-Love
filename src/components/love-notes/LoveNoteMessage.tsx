@@ -17,7 +17,7 @@
 
 import DOMPurify from 'dompurify';
 import { motion } from 'framer-motion';
-import { Loader2, Trash2 } from 'lucide-react';
+import { LoaderCircle, Trash } from 'lucide-react';
 import { memo, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { readCachedImage, writeCachedImage } from '../../services/imageCache';
 import { downloadLoveNoteImage, getSignedImageUrl } from '../../services/loveNoteImageService';
@@ -338,7 +338,7 @@ function LoveNoteMessageComponent({
               aria-label={`Remove message from ${senderName} at ${fullTimestamp} from your history`}
               data-testid="note-remove-button"
             >
-              <Trash2 className="h-3 w-3" aria-hidden="true" />
+              <Trash className="h-3 w-3" aria-hidden="true" />
             </button>
           )}
         </span>
@@ -366,7 +366,7 @@ function LoveNoteMessageComponent({
             <div className="relative">
               {imageLoading && (
                 <div className="flex h-48 w-full items-center justify-center bg-card2">
-                  <Loader2 className="animate-spin text-muted" size={24} />
+                  <LoaderCircle className="animate-spin text-muted" size={24} />
                 </div>
               )}
 
@@ -397,7 +397,7 @@ function LoveNoteMessageComponent({
               {isImageUploading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                   <div className="flex items-center gap-2 text-sm text-white">
-                    <Loader2 className="animate-spin" size={16} />
+                    <LoaderCircle className="animate-spin" size={16} />
                     <span>Uploading...</span>
                   </div>
                 </div>

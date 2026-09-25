@@ -427,7 +427,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
 
         // Calculate delay with exponential backoff: baseDelay * 2^retryCount
         const delay = Math.min(
-          RETRY_CONFIG.baseDelay * Math.pow(2, retryCountRef.current),
+          RETRY_CONFIG.baseDelay * 2 ** retryCountRef.current,
           RETRY_CONFIG.maxDelay
         );
 

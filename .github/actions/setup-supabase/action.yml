@@ -47,7 +47,7 @@ runs:
     # pinned to this same version.
     - name: Cache Supabase CLI
       id: cli-cache
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ~/.local/bin/supabase
         key: ${{ runner.os }}-${{ runner.arch }}-supabase-cli-${{ inputs.supabase-version }}

@@ -1,4 +1,5 @@
-import { ZodError, type ZodIssue } from 'zod/v4';
+import { ZodError } from 'zod/v4';
+import type { $ZodIssue } from 'zod/v4/core';
 
 /**
  * Error message transformation utilities
@@ -45,7 +46,7 @@ const FIELD_NAME_MAP: Record<string, string> = {
 /**
  * Formats a Zod issue into a user-friendly error message
  */
-function formatIssue(issue: ZodIssue): { field: string; message: string } {
+function formatIssue(issue: $ZodIssue): { field: string; message: string } {
   const path = issue.path.join('.');
   const fieldName = FIELD_NAME_MAP[path] || path || 'Field';
 

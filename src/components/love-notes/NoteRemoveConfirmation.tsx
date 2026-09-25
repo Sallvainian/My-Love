@@ -18,7 +18,7 @@
  * puts a transform on the message wrapper, which would make a fixed-position
  * child resolve against the row instead of the viewport.
  */
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { TriangleAlert, LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
@@ -190,7 +190,7 @@ export function NoteRemoveConfirmation({
       >
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
-            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            <TriangleAlert className="h-5 w-5" aria-hidden="true" />
           </div>
           <h2 id="remove-note-dialog-title" className="text-lg font-semibold text-ink">
             Remove this message?
@@ -237,7 +237,7 @@ export function NoteRemoveConfirmation({
             data-testid="note-remove-confirm"
             className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
           >
-            {isRemoving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isRemoving && <LoaderCircle className="h-4 w-4 animate-spin" />}
             {isRemoving ? 'Removing...' : 'Remove for me'}
           </button>
         </div>

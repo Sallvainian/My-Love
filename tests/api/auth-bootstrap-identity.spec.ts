@@ -20,11 +20,11 @@ import { test, expect } from '../support/merged-fixtures';
 // No production response schema exists for /auth/v1/user. This local minimum
 // schema validates the identity and metadata fields consumed during bootstrap.
 const BootstrapIdentitySchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email(),
+  id: z.uuid(),
+  email: z.email(),
   aud: z.literal('authenticated'),
   app_metadata: z.record(z.string(), z.unknown()),
-  user_metadata: z.object({ display_name: z.string().optional() }).passthrough(),
+  user_metadata: z.object({ display_name: z.string().optional() }).loose(),
 });
 type BootstrapIdentity = z.infer<typeof BootstrapIdentitySchema>;
 

@@ -19,7 +19,7 @@
  */
 
 import { AnimatePresence, m as motion } from 'framer-motion';
-import { Heart, History, Wind, Zap, type LucideIcon } from 'lucide-react';
+import { Heart, RotateCcwClock, Wind, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import type { InteractionSubscriptionStatus } from '../../api/interactionService';
@@ -378,7 +378,7 @@ export function PokeKissInterface() {
               className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-1 text-[13px] font-semibold text-accent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
               data-testid="history-button"
             >
-              <History className="h-4 w-4" aria-hidden="true" />
+              <RotateCcwClock className="h-4 w-4" aria-hidden="true" />
               History
             </button>
             {/* Notification Badge. A button of its own, beside History rather

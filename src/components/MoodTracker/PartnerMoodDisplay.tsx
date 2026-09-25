@@ -15,7 +15,7 @@
  */
 
 import { m as motion } from 'framer-motion';
-import { AlertCircle, User } from 'lucide-react';
+import { CircleAlert, User } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { MOOD_DISPLAY, MOOD_TONE } from '../../constants/moodDisplay';
 import { usePartnerMood } from '../../hooks/usePartnerMood';
@@ -99,7 +99,7 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
         role="alert"
       >
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">
-          <AlertCircle className="h-5 w-5" aria-hidden="true" />
+          <CircleAlert className="h-5 w-5" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="text-[15px] font-medium text-ink">Unable to load partner mood</h3>

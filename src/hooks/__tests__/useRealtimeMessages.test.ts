@@ -551,7 +551,7 @@ describe('useRealtimeMessages', () => {
         });
 
         // Advance time for exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
-        const delay = Math.min(1000 * Math.pow(2, i), 30000);
+        const delay = Math.min(1000 * 2 ** i, 30000);
         await act(async () => {
           await vi.advanceTimersByTimeAsync(delay + 100);
         });
@@ -1447,7 +1447,7 @@ describe('useRealtimeMessages', () => {
           reporterFor(channels[attempt])('CHANNEL_ERROR', new Error('boom'));
         });
         await act(async () => {
-          await vi.advanceTimersByTimeAsync(Math.min(1000 * Math.pow(2, attempt), 30000) + 100);
+          await vi.advanceTimersByTimeAsync(Math.min(1000 * 2 ** attempt, 30000) + 100);
         });
       }
       expect(supabase.channel).toHaveBeenCalledTimes(5);
@@ -1508,7 +1508,7 @@ describe('useRealtimeMessages', () => {
       // that cannot read this has no way to tell a working feed from a dead one.
       for (let attempt = 1; attempt <= 5; attempt++) {
         await act(async () => {
-          await vi.advanceTimersByTimeAsync(Math.min(1000 * Math.pow(2, attempt), 30000) + 100);
+          await vi.advanceTimersByTimeAsync(Math.min(1000 * 2 ** attempt, 30000) + 100);
         });
         await act(async () => {
           reporterFor(channel)('CHANNEL_ERROR', new Error('boom'));

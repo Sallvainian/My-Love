@@ -1,5 +1,5 @@
-import { execSync } from 'child_process';
-import * as crypto from 'crypto';
+import { execSync } from 'node:child_process';
+import * as crypto from 'node:crypto';
 import { defineConfig, devices } from '@playwright/test';
 
 /**

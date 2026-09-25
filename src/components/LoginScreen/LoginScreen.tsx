@@ -13,8 +13,8 @@
  * @component
  */
 
-import { CircleAlert, Heart, Info, Loader2 } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { CircleAlert, Heart, Info, LoaderCircle } from 'lucide-react';
+import { useState, type SubmitEvent } from 'react';
 import { signIn, signInWithGoogle } from '../../api/auth/actionService';
 import type { AuthCallbackOutcome } from '../../api/supabaseClient';
 import {
@@ -98,7 +98,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
     return password.length >= 6; // Supabase minimum password length
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setNoticeDismissed(true);
@@ -277,7 +277,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
                   Signing in...
                 </>
               ) : (
@@ -304,7 +304,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
           >
             {isGoogleLoading ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
                 Redirecting to Google...
               </>
             ) : (

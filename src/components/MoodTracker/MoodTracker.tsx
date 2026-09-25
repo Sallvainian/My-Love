@@ -1,6 +1,6 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
-import { CheckCircle, Cloud, CloudOff, Plus, RefreshCw, WifiOff } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { CircleCheckBig, Cloud, CloudOff, Plus, RefreshCw, WifiOff } from 'lucide-react';
+import { useEffect, useState, type SubmitEvent } from 'react';
 import { getPartnerId } from '../../api/supabaseClient';
 import { CHALLENGING_MOODS, MOOD_DISPLAY, POSITIVE_MOODS } from '../../constants/moodDisplay';
 import { useAuth } from '../../hooks/useAuth';
@@ -184,7 +184,7 @@ export function MoodTracker() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (selectedMoods.length === 0) {
@@ -344,7 +344,7 @@ export function MoodTracker() {
                     className="flex items-center gap-2 rounded-[20px] border border-line bg-card p-3.5 text-ink shadow-card"
                     data-testid="mood-success-toast"
                   >
-                    <CheckCircle className="h-5 w-5 shrink-0 text-good" aria-hidden="true" />
+                    <CircleCheckBig className="h-5 w-5 shrink-0 text-good" aria-hidden="true" />
                     <span className="text-[15px] font-medium">
                       {isEditing ? 'Mood updated successfully!' : 'Mood logged successfully!'}
                     </span>

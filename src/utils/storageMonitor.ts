@@ -28,7 +28,7 @@ function getLocalStorageUsage(): number {
   let totalBytes = 0;
 
   for (const key in localStorage) {
-    if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
+    if (Object.hasOwn(localStorage, key)) {
       const value = localStorage.getItem(key);
       if (value !== null) {
         // Each character in JavaScript is 2 bytes (UTF-16)
