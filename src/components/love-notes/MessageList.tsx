@@ -67,23 +67,27 @@ function MessageRow({
   style: React.CSSProperties;
   ariaAttributes: { 'aria-posinset': number; 'aria-setsize': number; role: 'listitem' };
 } & MessageRowCustomProps): React.ReactElement {
-  // Show beginning of conversation at index 0 if all history loaded
-  if (showBeginning && index === 0) {
-    return (
-      <div style={style} {...ariaAttributes}>
-        <BeginningOfConversation />
-      </div>
-    );
+  // Row 0 sits above the oldest note: the beginning of the conversation once
+  // all history is loaded, otherwise the row whose coming into view asks for
+  // the older page.
+  if (index === 0) {
+    if (showBeginning) {
+      return (
+        <div style={style} {...ariaAttributes}>
+          <BeginningOfConversation />
+        </div>
+      );
+    }
+
+    // Story 2.4 - Task 2.3: Show loading at top when fetching older messages
+    if (isLoading) {
+      return <LoadingSpinner style={style} />;
+    }
+
+    return <div style={style} />;
   }
 
-  // Story 2.4 - Task 2.3: Show loading at top when fetching older messages
-  if (index === 0 && isLoading && notes.length > 0) {
-    return <LoadingSpinner style={style} />;
-  }
-
-  // Adjust index for notes array if beginning indicator is present
-  const adjustedIndex = showBeginning ? index - 1 : index;
-  const note = notes[adjustedIndex];
+  const note = notes[index - 1];
 
   if (!note) {
     return <div style={style} />;
@@ -157,6 +161,9 @@ function LoadingSpinner({ style }: { style?: React.CSSProperties }) {
   );
 }
 
+/** Rows beyond the visible range within which the loader asks for more */
+const LOAD_THRESHOLD = 10;
+
 /**
  * Calculate row height based on message content length and image presence
  * Story 2.4 - Task 1.3: Variable row height calculation
@@ -210,8 +217,18 @@ export function MessageList({
   // Use react-window v2's typed ref hook for proper API access
   const listRef = useListRef(null);
   const hasScrolledToBottom = useRef(false);
-  const prevNotesLength = useRef(notes.length);
   const scrollToBottomOnNextRender = useRef(false);
+  // The notes at either end as of the last commit: an older page moves the
+  // first, a new message the last. Length alone cannot tell the two apart.
+  const prevFirstNoteId = useRef(notes[0]?.id);
+  const prevLastNoteId = useRef(notes[notes.length - 1]?.id);
+  // First visible row as last reported, to keep the reader's place when an
+  // older page lands above it
+  const firstVisibleRow = useRef(0);
+  // Whether the list has shown its last row since the thread appeared. It
+  // opens scrolled to the newest note, but its first frame, before that
+  // scroll, reports the top; older pages wait until the end has been seen.
+  const hasShownEnd = useRef(false);
 
   // Story 2.3: Track if user is at bottom and show new message indicator
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -220,39 +237,44 @@ export function MessageList({
   // Calculate whether to show "Beginning of conversation"
   const showBeginning = !hasMore && notes.length > 0;
 
-  // Total row count including beginning indicator
-  const totalRowCount = showBeginning ? notes.length + 1 : notes.length;
+  // Row 0 is the header above the oldest note (beginning of conversation, or
+  // the older-page row); note i is row i + 1
+  const totalRowCount = notes.length + 1;
 
   // Story 2.4 - Task 2.1: Configure infinite loader
-  const isRowLoaded = useCallback(
-    (index: number) => {
-      // If beginning indicator is shown, adjust index
-      const adjustedIndex = showBeginning ? index - 1 : index;
-      return !hasMore || adjustedIndex < notes.length;
-    },
-    [hasMore, notes.length, showBeginning]
-  );
+  // Notes run oldest first, so the one row left to load is the header row,
+  // and only while older pages remain.
+  const isRowLoaded = useCallback((index: number) => !(hasMore && index === 0), [hasMore]);
 
   // Offline, an older page cannot load and nothing is asked for. The loader
   // keeps the rows it asked about in a Set it rebuilds only when this callback
   // changes identity, so `isOnline` is a dependency: back online, those rows
   // are forgotten and the next scroll up asks again.
   const { isOnline } = useNetworkStatus();
+  // The first note the last older page was asked from. Asked again from the
+  // same note, not loading and with more to come, that request came back
+  // without a page (a failed read clears the loading flag and sets no error
+  // over notes on screen): asking again at once would repeat it for as long as
+  // the header stays in range. It is cleared once the reader scrolls away from
+  // the top, so scrolling back retries.
+  const [olderAskedFrom, setOlderAskedFrom] = useState<string | undefined>();
+  const firstNoteId = notes[0]?.id;
   const loadMoreRows = useCallback(
     async (_startIndex: number, _stopIndex: number) => {
-      if (isOnline && !isLoading && hasMore && onLoadMore) {
+      if (isOnline && !isLoading && hasMore && onLoadMore && olderAskedFrom !== firstNoteId) {
+        setOlderAskedFrom(firstNoteId);
         await onLoadMore();
       }
     },
-    [isOnline, isLoading, hasMore, onLoadMore]
+    [isOnline, isLoading, hasMore, onLoadMore, olderAskedFrom, firstNoteId]
   );
 
   // Setup infinite loading hook - must be called before conditional returns
   const infiniteLoaderCallback = useInfiniteLoader({
     isRowLoaded,
     loadMoreRows,
-    rowCount: totalRowCount + (hasMore ? 1 : 0),
-    threshold: 10,
+    rowCount: totalRowCount,
+    threshold: LOAD_THRESHOLD,
     minimumBatchSize: 50,
   });
 
@@ -260,12 +282,29 @@ export function MessageList({
   // In react-window v2, onRowsRendered receives { startIndex, stopIndex } for visible rows
   const onRowsRendered = useCallback(
     (visibleRows: { startIndex: number; stopIndex: number }) => {
-      // Call the infinite loader callback first
-      infiniteLoaderCallback(visibleRows);
+      // The List reports before this component's effects run. When an older
+      // page has just landed, the rows it reports are the old top of the
+      // thread, not yet moved down to the note the reader was on: the header
+      // there would ask for the next page at once.
+      const prevFirstId = prevFirstNoteId.current;
+      if (
+        notes[0]?.id !== prevFirstId &&
+        notes.some((note, index) => index > 0 && note.id === prevFirstId)
+      ) {
+        return;
+      }
+      firstVisibleRow.current = visibleRows.startIndex;
+      // The header is out of the loader's range: back at the top, ask again
+      if (visibleRows.startIndex > LOAD_THRESHOLD) setOlderAskedFrom(undefined);
 
       // Track if user is at bottom (within last few rows)
       // stopIndex is the last visible row index
       const atBottom = visibleRows.stopIndex >= totalRowCount - 2;
+      if (atBottom) hasShownEnd.current = true;
+
+      // Call the infinite loader callback first
+      if (hasShownEnd.current) infiniteLoaderCallback(visibleRows);
+
       setIsAtBottom(atBottom);
 
       // Hide new message indicator when user scrolls to bottom
@@ -273,21 +312,21 @@ export function MessageList({
         setShowNewMessageIndicator(false);
       }
     },
-    [infiniteLoaderCallback, totalRowCount, showNewMessageIndicator]
+    [notes, infiniteLoaderCallback, totalRowCount, showNewMessageIndicator]
   );
 
   // Variable row height function
   const getRowHeight = useCallback(
     (index: number): number => {
-      if (showBeginning && index === 0) {
-        return 120; // BeginningOfConversation height
+      if (index === 0) {
+        // BeginningOfConversation height, or the older-page row's: the same
+        // whether or not its spinner shows, so the notes below do not move
+        return hasMore ? 80 : 120;
       }
 
-      const adjustedIndex = showBeginning ? index - 1 : index;
-      const note = notes[adjustedIndex];
-      return calculateRowHeight(note, adjustedIndex);
+      return calculateRowHeight(notes[index - 1], index - 1);
     },
-    [notes, showBeginning]
+    [notes, hasMore]
   );
 
   // Automatic scroll to bottom on initial load
@@ -308,23 +347,57 @@ export function MessageList({
 
   // Story 2.3: AC-2.3.4 - Handle new messages with conditional automatic scroll
   useEffect(() => {
-    if (notes.length > prevNotesLength.current && listRef.current) {
-      const wasAtBottom = isAtBottom;
+    const prevFirstId = prevFirstNoteId.current;
+    const prevLastId = prevLastNoteId.current;
+    prevFirstNoteId.current = notes[0]?.id;
+    prevLastNoteId.current = notes[notes.length - 1]?.id;
+    // An emptied thread unmounts the list; a new one opens at its top again
+    if (notes.length === 0) hasShownEnd.current = false;
+    if (!listRef.current) return;
 
-      if (wasAtBottom) {
-        // Automatic scroll to new message if user was at bottom
-        scrollToBottomOnNextRender.current = true;
-        queueMicrotask(() => {
-          setIsAtBottom(true);
-          setShowNewMessageIndicator(false);
-        });
-      } else {
-        // Show "new message" indicator if user scrolled up
-        queueMicrotask(() => setShowNewMessageIndicator(true));
-      }
+    // A new message follows the previous last note (or starts the thread). A
+    // confirmed send swaps the last note's id in place and a removal uncovers
+    // an older one: neither is a new message.
+    const prevLastIndex =
+      prevLastId === undefined ? -1 : notes.findIndex((note) => note.id === prevLastId);
+    const newMessage =
+      notes.length > 0 &&
+      (prevLastId === undefined || (prevLastIndex >= 0 && prevLastIndex < notes.length - 1));
+
+    // An older page puts notes above the previous first note. A refresh that
+    // replaced the thread leaves no previous first note to find.
+    const olderAdded =
+      prevFirstId === undefined || notes[0]?.id === prevFirstId
+        ? 0
+        : Math.max(
+            0,
+            notes.findIndex((note) => note.id === prevFirstId)
+          );
+
+    if (!newMessage && olderAdded === 0) return;
+
+    if (isAtBottom) {
+      // Automatic scroll to new message if user was at bottom
+      scrollToBottomOnNextRender.current = true;
+      queueMicrotask(() => {
+        setIsAtBottom(true);
+        setShowNewMessageIndicator(false);
+      });
+      return;
     }
-    prevNotesLength.current = notes.length;
-  }, [listRef, notes.length, isAtBottom]);
+
+    if (olderAdded > 0) {
+      // Keep the row the reader was on (from the old first note down) at the
+      // top; without this the list stays at the top and asks again.
+      const index = Math.max(firstVisibleRow.current, 1) + olderAdded;
+      listRef.current.scrollToRow({ index: Math.min(index, totalRowCount - 1), align: 'start' });
+    }
+
+    if (newMessage) {
+      // Show "new message" indicator if user scrolled up
+      queueMicrotask(() => setShowNewMessageIndicator(true));
+    }
+  }, [listRef, notes, isAtBottom, totalRowCount]);
 
   // Execute scroll to bottom after render (when new message arrives)
   useEffect(() => {
