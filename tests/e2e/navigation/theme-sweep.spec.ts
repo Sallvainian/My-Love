@@ -28,8 +28,6 @@ import { navigateTo, type NavDestination } from '../../support/helpers/navigatio
 
 type Scheme = 'light' | 'dark';
 
-const SCHEMES = ['light', 'dark'] as const satisfies readonly Scheme[];
-
 const PAGE_GROUND: Record<Scheme, string> = {
   light: 'rgb(253, 244, 247)', // #fdf4f7
   dark: 'rgb(11, 14, 20)', // #0b0e14
@@ -163,6 +161,10 @@ function findDancingScript(page: Page): Promise<string[]> {
   );
 }
 
+/**
+ * The checks every screen shares in both themes: the attached screenshot, the
+ * page ground, the scrollbar track and the absence of Dancing Script.
+ */
 async function sweep(page: Page, name: string, colorScheme: Scheme): Promise<void> {
   await test.info().attach(`${name}-${colorScheme}.png`, {
     body: await page.screenshot({ fullPage: true }),
@@ -186,15 +188,35 @@ async function sweep(page: Page, name: string, colorScheme: Scheme): Promise<voi
 
   const cursive = await findDancingScript(page);
   expect(cursive, `${name}: Dancing Script in use:\n${cursive.join('\n')}`).toEqual([]);
+}
 
-  if (colorScheme === 'dark') {
-    const surfaces = await findLightSurfaces(page);
-    expect(
-      surfaces,
-      `${name}: light surfaces in dark:\n` +
-        surfaces.map((s) => `${s.element} -> ${s.background} (L=${s.luminance})`).join('\n')
-    ).toEqual([]);
-  }
+/** Dark only: no visible in-viewport element paints an opaque light surface. */
+async function assertNoLightSurfaces(page: Page, name: string): Promise<void> {
+  const surfaces = await findLightSurfaces(page);
+  expect(
+    surfaces,
+    `${name}: light surfaces in dark:\n` +
+      surfaces.map((s) => `${s.element} -> ${s.background} (L=${s.luminance})`).join('\n')
+  ).toEqual([]);
+}
+
+/** Opens a signed-in screen at phone size in the given OS theme and waits for it. */
+async function openSignedInScreen(page: Page, screen: Screen, colorScheme: Scheme): Promise<void> {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme });
+  await page.goto('/');
+  await expect(page.getByTestId('nav-dock')).toBeVisible();
+
+  if (screen.view !== 'home') await navigateTo(page, screen.view);
+  await screen.ready(page);
+}
+
+/** Opens the signed-out sign-in screen at phone size in the given OS theme. */
+async function openSignIn(page: Page, colorScheme: Scheme): Promise<void> {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme });
+  await page.goto('/');
+  await expect(page.getByTestId('login-screen')).toBeVisible();
 }
 
 test.describe('Theme sweep, signed in', () => {
@@ -206,33 +228,30 @@ test.describe('Theme sweep, signed in', () => {
   });
 
   for (const screen of SIGNED_IN_SCREENS) {
-    for (const colorScheme of SCHEMES) {
-      test(`[P1] ${screen.view} stays on the kit in ${colorScheme}`, async ({ page }) => {
-        await page.setViewportSize({ width: 390, height: 844 });
-        await page.emulateMedia({ colorScheme });
-        await page.goto('/');
-        await expect(page.getByTestId('nav-dock')).toBeVisible();
+    test(`[P1] ${screen.view} stays on the kit in light`, async ({ page }) => {
+      await openSignedInScreen(page, screen, 'light');
+      await sweep(page, screen.view, 'light');
+    });
 
-        if (screen.view !== 'home') await navigateTo(page, screen.view);
-        await screen.ready(page);
-
-        await sweep(page, screen.view, colorScheme);
-      });
-    }
+    test(`[P1] ${screen.view} stays on the kit in dark`, async ({ page }) => {
+      await openSignedInScreen(page, screen, 'dark');
+      await sweep(page, screen.view, 'dark');
+      await assertNoLightSurfaces(page, screen.view);
+    });
   }
 });
 
 test.describe('Theme sweep, signed out', () => {
   test.use({ authSessionEnabled: false });
 
-  for (const colorScheme of SCHEMES) {
-    test(`[P1] Sign in stays on the kit in ${colorScheme}`, async ({ page }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
-      await page.emulateMedia({ colorScheme });
-      await page.goto('/');
-      await expect(page.getByTestId('login-screen')).toBeVisible();
+  test('[P1] Sign in stays on the kit in light', async ({ page }) => {
+    await openSignIn(page, 'light');
+    await sweep(page, 'sign-in', 'light');
+  });
 
-      await sweep(page, 'sign-in', colorScheme);
-    });
-  }
+  test('[P1] Sign in stays on the kit in dark', async ({ page }) => {
+    await openSignIn(page, 'dark');
+    await sweep(page, 'sign-in', 'dark');
+    await assertNoLightSurfaces(page, 'sign-in');
+  });
 });

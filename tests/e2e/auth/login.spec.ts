@@ -4,7 +4,15 @@
  * Critical path: Users must be able to log in to access the app.
  * Covers email/password login, error handling, and session persistence.
  */
+import type { Page } from '@playwright/test';
+import { getWorkerPairEmails } from '../../support/auth/worker-pool';
+import { resolveWorkerPairIds } from '../../support/factories/events';
 import { test, expect } from '../../support/merged-fixtures';
+import { TEST_USER_PASSWORD } from '../../support/test-credentials';
+
+// `.env.test` points the dev server at http://127.0.0.1:54321, and the SDK
+// derives its storage key as `sb-${hostname.split('.')[0]}-auth-token`.
+const STORAGE_KEY = 'sb-127-auth-token';
 
 test.describe('Login Flow', () => {
   // Auth tests must run WITHOUT the shared authenticated storage state
@@ -140,17 +148,46 @@ test.describe('Login Flow', () => {
     await expect(page.getByTestId('login-screen')).not.toBeVisible({ timeout: 5000 });
   });
 
-  test('[P0] should persist session across page reloads', async ({ page }) => {
-    // Note: This test verifies consistent unauthenticated behavior on reload.
+  test('[P0] should persist session across page reloads', async ({ page, supabaseAdmin }) => {
+    // GIVEN: This worker's own pool account, signed in through the real form
+    // against local Supabase, with the welcome splash already dismissed.
+    const pair = getWorkerPairEmails();
+    if (!pair) throw new Error('This test requires its worker-owned account pair');
+    const { userId } = await resolveWorkerPairIds(supabaseAdmin);
+    await page.addInitScript(() => {
+      localStorage.setItem('lastWelcomeView', Date.now().toString());
+    });
 
-    // GIVEN: User is not authenticated
     await page.goto('/');
     await expect(page.getByTestId('login-screen')).toBeVisible();
+    await page.getByLabel('Email', { exact: true }).fill(pair.user1Email);
+    await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+    await page.getByTestId('submit-button').click();
 
-    // WHEN: Page is reloaded
+    // THEN: The app is open and the SDK has persisted this account's session.
+    await expect(page.getByTestId('app-container')).toBeVisible();
+    await expect(page.getByTestId('login-screen')).toHaveCount(0);
+    await expect.poll(() => storedSessionUserId(page)).toBe(userId);
+
+    // WHEN: The page is reloaded
     await page.reload();
 
-    // THEN: Login screen still appears (consistent unauthenticated behavior)
-    await expect(page.getByTestId('login-screen')).toBeVisible();
+    // THEN: The same session is restored without signing in again.
+    await expect(page.getByTestId('app-container')).toBeVisible();
+    await expect(page.getByTestId('login-screen')).toHaveCount(0);
+    await expect.poll(() => storedSessionUserId(page)).toBe(userId);
   });
 });
+
+/** The user id of the session the SDK has persisted, or null when there is none. */
+async function storedSessionUserId(page: Page): Promise<string | null> {
+  return await page.evaluate((key) => {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    try {
+      return (JSON.parse(raw) as { user?: { id?: string } }).user?.id ?? null;
+    } catch {
+      return null;
+    }
+  }, STORAGE_KEY);
+}

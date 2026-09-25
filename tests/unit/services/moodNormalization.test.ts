@@ -68,11 +68,17 @@ describe('canonical mood normalization', () => {
     expect(source).toEqual(before);
   });
 
-  it('rejects invalid mood content, notes and timestamps before upload', () => {
-    for (const row of [raw('bad', [null]), raw('happy', [], { note: 5 as unknown as string }), raw('happy', [], { timestamp: new Date('bad') })]) {
-      expect(() => moodSyncPayload(row, A)).toThrow();
-      expect(() => moodSyncFingerprint(row)).toThrow();
-    }
+  // An invalid Date reaches `toISOString`, whose RangeError fires before the
+  // payload's own timestamp guard can, so that is the observable refusal.
+  it.each([
+    ['mood', raw('bad', [null]), Error, 'Mood contains no recognized values'],
+    ['note', raw('happy', [], { note: 5 as unknown as string }), Error, 'Mood note is invalid'],
+    ['timestamp', raw('happy', [], { timestamp: new Date('bad') }), RangeError, /Invalid time value/],
+  ] as const)('rejects invalid mood content, notes and timestamps before upload (%s)', (_field, row, errorClass, message) => {
+    expect(() => moodSyncPayload(row, A)).toThrow(errorClass);
+    expect(() => moodSyncPayload(row, A)).toThrow(message);
+    expect(() => moodSyncFingerprint(row)).toThrow(errorClass);
+    expect(() => moodSyncFingerprint(row)).toThrow(message);
   });
 });
 

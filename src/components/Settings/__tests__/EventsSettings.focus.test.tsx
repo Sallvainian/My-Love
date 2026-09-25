@@ -316,16 +316,39 @@ describe('EventsSettings form focus', () => {
     );
   });
 
-  it.each(['add', 'edit'] as const)('focuses Refresh after an uncertain %s and the header after reconciliation', async (kind) => {
+  it.each([
+    {
+      kind: 'add',
+      initialEvents: (): CoupleEvent[] => [],
+      writeAction: 'addEvent',
+      openerTestId: 'events-settings-empty-add',
+      openerSurvives: false,
+      loadingAfterRefresh: true,
+    },
+    {
+      kind: 'edit',
+      initialEvents: (): CoupleEvent[] => [makeEvent({ id: 'mine' })],
+      writeAction: 'editEvent',
+      openerTestId: 'event-edit-mine',
+      openerSurvives: true,
+      loadingAfterRefresh: false,
+    },
+  ] as const)('focuses Refresh after an uncertain $kind and the header after reconciliation', async ({
+    initialEvents,
+    writeAction,
+    openerTestId,
+    openerSurvives,
+    loadingAfterRefresh,
+  }) => {
     let finishRefresh!: () => void;
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
     const uncertain = vi.fn<() => Promise<EventWriteResult>>(async () => ({
       success: false, code: 'invalid-response', error: 'Unreadable response',
     }));
     setStore({
-      events: kind === 'edit' ? [makeEvent({ id: 'mine' })] : [],
+      events: initialEvents(),
       loadEvents,
-      ...(kind === 'add' ? { addEvent: uncertain } : { editEvent: uncertain }),
+      [writeAction]: uncertain,
     });
     await renderSection();
     loadEvents.mockImplementationOnce(() => {
@@ -342,7 +365,7 @@ describe('EventsSettings form focus', () => {
       });
     });
 
-    const opener = openBy(kind === 'add' ? 'events-settings-empty-add' : 'event-edit-mine');
+    const opener = openBy(openerTestId);
     fireEvent.change(screen.getByTestId('events-form-label'), { target: { value: 'Saved event' } });
     fireEvent.change(screen.getByTestId('events-form-date'), { target: { value: '2026-10-01' } });
     fireEvent.click(screen.getByTestId('events-form-submit'));
@@ -359,13 +382,13 @@ describe('EventsSettings form focus', () => {
     fireEvent.click(refresh);
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
-    expect(opener.isConnected).toBe(kind === 'edit');
-    if (kind === 'add') expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument();
+    expect(opener.isConnected).toBe(openerSurvives);
+    expect(Boolean(screen.queryByTestId('events-settings-loading'))).toBe(loadingAfterRefresh);
     expect(screen.getByTestId('events-settings-add')).toHaveFocus();
     expect(loadEvents).toHaveBeenCalledTimes(2);
     await act(async () => { finishRefresh(); });
     expect(screen.getByTestId('event-row-mine')).toHaveTextContent('Saved event');
-    expect(opener.isConnected).toBe(kind === 'edit');
+    expect(opener.isConnected).toBe(openerSurvives);
     expect(screen.getByTestId('events-settings-add')).toHaveFocus();
     expect(uncertain).toHaveBeenCalledTimes(1);
   });

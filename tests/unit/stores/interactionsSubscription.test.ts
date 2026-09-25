@@ -591,8 +591,9 @@ describe('interactionsSlice subscription bridge', () => {
     store.getState().setAuthUser(USER_ID);
 
     releaseLookup!(OTHER_USER_ID);
-    await pending.catch(() => undefined);
+    await expect(pending).rejects.toThrow('Cannot subscribe: account changed during partner lookup');
 
     expect(store.getState().interactionPartnerId).toBeNull();
+    expect(subscriptions).toHaveLength(0);
   });
 });

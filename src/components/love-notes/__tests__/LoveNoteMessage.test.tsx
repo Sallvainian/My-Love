@@ -8,13 +8,32 @@
  */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { Dispatch, HTMLAttributes, ReactNode, SetStateAction } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoveNote } from '../../../types/models';
 import { formatFullTimestamp } from '../../../utils/dateUtils';
 import { LoveNoteMessage } from '../LoveNoteMessage';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
+
+const stateSetterCalls = vi.hoisted(() => vi.fn<(next: unknown) => void>());
+
+vi.mock('react', async () => {
+  const actual = await vi.importActual<typeof import('react')>('react');
+  return {
+    ...actual,
+    // React 19 silently ignores unmounted updates. Observe the dispatch itself,
+    // forwarding to real state and preserving setter identity across renders.
+    useState<T,>(initial: T | (() => T)) {
+      const [value, setValue] = actual.useState(initial);
+      const observedSetter = actual.useCallback<Dispatch<SetStateAction<T>>>((next) => {
+        stateSetterCalls(next);
+        setValue(next);
+      }, [setValue]);
+      return [value, observedSetter];
+    },
+  };
+});
 
 interface FullScreenImageViewerMockProps {
   imageUrl: string | null | undefined;
@@ -648,7 +667,7 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={messageWithBoth} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText('Check out this photo!')).toBeInTheDocument();
+      expect(screen.getByTestId('love-note-text')).toHaveTextContent('Check out this photo!');
 
       await waitFor(() => {
         // Alt text includes the message caption
@@ -672,13 +691,8 @@ describe('LoveNoteMessage', () => {
         expect(screen.getByRole('img', { name: /photo shared by you/i })).toBeInTheDocument();
       });
 
-      // Should have no text content
-      const messageBubbles = screen.queryAllByText(/./);
-      // Filter to just content paragraphs, not controls/timestamp
-      const contentParagraphs = messageBubbles.filter(
-        (el) => el.tagName === 'P' && el.classList.contains('text-base') && el.textContent === ''
-      );
-      expect(contentParagraphs).toHaveLength(0);
+      // No text bubble is rendered for an empty caption
+      expect(screen.queryByTestId('love-note-text')).not.toBeInTheDocument();
     });
   });
 
@@ -718,7 +732,7 @@ describe('LoveNoteMessage', () => {
       });
       mockGetSignedImageUrl.mockReturnValue(deferredPromise);
 
-      // Spy on console.error to detect React warnings about unmounted state updates
+      // Keep console output quiet; the setter spy is what detects late updates
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const messageWithImage: LoveNote = {
@@ -733,7 +747,8 @@ describe('LoveNoteMessage', () => {
       // Verify the fetch was initiated
       expect(mockGetSignedImageUrl).toHaveBeenCalledWith('user-123/image.jpg');
 
-      // Unmount BEFORE the promise resolves
+      // Unmount BEFORE the promise resolves; only setter calls from here on count
+      stateSetterCalls.mockClear();
       unmount();
 
       // Now resolve the promise after unmount
@@ -745,14 +760,9 @@ describe('LoveNoteMessage', () => {
       // Wait a tick to allow any potential state updates to occur
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Should NOT have any React warnings about state updates on unmounted component
-      const reactWarnings = consoleErrorSpy.mock.calls.filter(
-        (call) =>
-          call[0]?.includes?.('unmounted') ||
-          call[0]?.includes?.('memory leak') ||
-          call[0]?.includes?.("Can't perform a React state update")
-      );
-      expect(reactWarnings).toHaveLength(0);
+      // React 19 no longer warns about unmounted updates, so observe the
+      // setters directly: the late resolve must not dispatch any state
+      expect(stateSetterCalls).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });
@@ -791,6 +801,10 @@ describe('LoveNoteMessage', () => {
       const img = screen.getByRole('img', { name: /image from you/i });
       fireEvent.error(img);
 
+      // The error handler bumps the retry count synchronously; only setter
+      // calls after unmount count
+      stateSetterCalls.mockClear();
+
       // Unmount during retry
       unmount();
 
@@ -802,14 +816,8 @@ describe('LoveNoteMessage', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Verify no React warnings
-      const reactWarnings = consoleErrorSpy.mock.calls.filter(
-        (call) =>
-          call[0]?.includes?.('unmounted') ||
-          call[0]?.includes?.('memory leak') ||
-          call[0]?.includes?.("Can't perform a React state update")
-      );
-      expect(reactWarnings).toHaveLength(0);
+      // The late retry result must not dispatch any state
+      expect(stateSetterCalls).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });
@@ -833,7 +841,8 @@ describe('LoveNoteMessage', () => {
         <LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />
       );
 
-      // Unmount before rejection
+      // Unmount before rejection; only setter calls from here on count
+      stateSetterCalls.mockClear();
       unmount();
 
       // Reject after unmount
@@ -841,14 +850,12 @@ describe('LoveNoteMessage', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Filter for React state update warnings only
-      const reactWarnings = consoleErrorSpy.mock.calls.filter(
-        (call) =>
-          call[0]?.includes?.('unmounted') ||
-          call[0]?.includes?.('memory leak') ||
-          call[0]?.includes?.("Can't perform a React state update")
+      // The rejection is logged, and must not dispatch any state
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[LoveNoteMessage] Failed to get signed URL:',
+        expect.any(Error)
       );
-      expect(reactWarnings).toHaveLength(0);
+      expect(stateSetterCalls).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });

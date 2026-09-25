@@ -1287,11 +1287,20 @@ describe('notesSlice offline send queue', () => {
       const store = createTestStore();
       await failOnce(store, 7);
 
-      let upserts = 1;
-      for (const delay of [5_000, 10_000, 20_000, 40_000, 60_000, 60_000, 60_000]) {
-        upserts += 1;
+      // [delay before this attempt, upserts after it, timers left behind]: the
+      // seventh failure schedules one more retry, and the eighth attempt lands.
+      const schedule = [
+        [5_000, 2, 1],
+        [10_000, 3, 1],
+        [20_000, 4, 1],
+        [40_000, 5, 1],
+        [60_000, 6, 1],
+        [60_000, 7, 1],
+        [60_000, 8, 0],
+      ] as const;
+      for (const [delay, upserts, timers] of schedule) {
         await expectRetryAfter(delay, upserts);
-        if (upserts <= 7) await until(() => vi.getTimerCount() === 1);
+        await until(() => vi.getTimerCount() === timers);
       }
       await until(() => store.getState().notes[0]?.id === 'server-1');
       await until(() => vi.getTimerCount() === 0);

@@ -328,16 +328,14 @@ describe('useNetworkStatus hook', () => {
       });
 
       expect(result.current.isConnecting).toBe(true);
+      // The pending "connecting" debounce is the only timer.
+      expect(vi.getTimerCount()).toBe(1);
 
       // Unmount before debounce completes
       unmount();
 
-      // Advance past debounce - should not cause errors
-      act(() => {
-        vi.runAllTimers();
-      });
-
-      // Test passes if no errors thrown
+      // Unmount clears the debounce rather than leaving it to fire later.
+      expect(vi.getTimerCount()).toBe(0);
     });
   });
 });

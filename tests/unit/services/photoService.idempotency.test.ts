@@ -172,14 +172,16 @@ describe('photoService upload idempotency', () => {
     });
   });
 
-  it.each(['23514', '23502'])('routes %s through the real service into the store result', async (code) => {
+  it.each([
+    ['23514', 'Some values are not allowed - check length and format limits'],
+    ['23502', 'Upload failed - no photo returned'],
+  ])('routes %s through the real service into the store result', async (code, expected) => {
     type Store = PhotosSlice & { userId: string; error: string | null };
     const store = create<Store>()(createPhotosSlice as unknown as StateCreator<Store>);
     store.setState({ userId: USER_ID });
     backend.errorCode = code;
     backend.failNextInsert = true;
     const result = await store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }));
-    const expected = code === '23514' ? 'Some values are not allowed - check length and format limits' : 'Upload failed - no photo returned';
     expect(result).toEqual({ success: false, error: expected });
     expect(store.getState().error).toBe(expected);
     expect(backend.objects.size).toBe(0);

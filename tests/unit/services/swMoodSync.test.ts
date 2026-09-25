@@ -83,11 +83,12 @@ function pendingMood(overrides: Partial<MoodEntry> = {}): MoodEntry {
 /**
  * Dispatch the Background Sync event sw.ts listens for and await its work.
  *
- * `swallow: false` surfaces the rejection instead of absorbing it — the browser
- * treats a rejected `waitUntil` as "retry this tag", so whether the work
- * rejects is itself behaviour worth asserting.
+ * A rejection surfaces rather than being absorbed — the browser treats a
+ * rejected `waitUntil` as "retry this tag", so whether the work rejects is
+ * itself behaviour worth asserting, and a worker that crashes must fail the
+ * test that fired it. A test that expects the rejection asserts it.
  */
-async function fireBackgroundSync({ swallow = true }: { swallow?: boolean } = {}): Promise<void> {
+async function fireBackgroundSync(): Promise<void> {
   const event = new Event('sync') as Event & {
     tag: string;
     waitUntil: (promise: Promise<unknown>) => void;
@@ -100,10 +101,6 @@ async function fireBackgroundSync({ swallow = true }: { swallow?: boolean } = {}
   };
 
   self.dispatchEvent(event);
-  if (swallow) {
-    await work.catch(() => undefined);
-    return;
-  }
   await work;
 }
 
@@ -129,7 +126,7 @@ describe('service worker mood background sync', () => {
       });
       mockedGetPendingMoods.mockResolvedValue([pendingMood()]);
 
-      await fireBackgroundSync();
+      await expect(fireBackgroundSync()).rejects.toThrow('mood sync lock held by another context');
 
       expect(fetchMock).not.toHaveBeenCalled();
       expect(mockedMarkMoodSynced).not.toHaveBeenCalled();
@@ -151,7 +148,7 @@ describe('service worker mood background sync', () => {
       });
       mockedGetPendingMoods.mockResolvedValue([pendingMood()]);
 
-      await expect(fireBackgroundSync({ swallow: false })).rejects.toThrow(/lock held/);
+      await expect(fireBackgroundSync()).rejects.toThrow(/lock held/);
     });
   });
 
@@ -164,7 +161,7 @@ describe('service worker mood background sync', () => {
       // Nothing landed cleanly, so this must reject: unlike the main thread the
       // worker has no second pass, and the newer value would otherwise sit
       // unsynced until an unrelated trigger fired.
-      await expect(fireBackgroundSync({ swallow: false })).rejects.toThrow(/1 deferred/);
+      await expect(fireBackgroundSync()).rejects.toThrow(/1 deferred/);
 
       // The write did land — the record is pending a newer value, not unwritten.
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -201,7 +198,7 @@ describe('service worker mood background sync', () => {
     fetchMock.mockResolvedValue(jsonResponse(201, [{ id: SERVER_ROW_ID }]));
     const postMessage = vi.fn();
     vi.mocked((globalScope.clients as { matchAll: ReturnType<typeof vi.fn> }).matchAll).mockResolvedValueOnce([{ postMessage }] as unknown as WindowClient[]);
-    await fireBackgroundSync({ swallow: false });
+    await fireBackgroundSync();
     expect(postMessage).toHaveBeenCalledWith({ type: 'BACKGROUND_SYNC_COMPLETED', successCount: 1, failCount: 1 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchCall(0).body).toMatchObject({ user_id: USER_ID, mood_type: 'loved', mood_types: ['sad', 'happy', 'sad'] });

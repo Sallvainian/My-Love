@@ -207,7 +207,9 @@ describe('sw-db against a real database', () => {
       // test has already passed.
       const aborted = tx.done.catch(() => undefined);
 
-      await expect(tx.store.add(mood({ userId: USER_A, date: '2026-08-03' }))).rejects.toThrow();
+      await expect(tx.store.add(mood({ userId: USER_A, date: '2026-08-03' }))).rejects.toMatchObject({
+        name: 'ConstraintError',
+      });
 
       await aborted;
       db.close();

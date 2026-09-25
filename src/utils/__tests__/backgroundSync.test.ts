@@ -11,6 +11,7 @@ import {
   registerBackgroundSync,
   setupServiceWorkerListener,
 } from '../backgroundSync';
+import { logger } from '../logger';
 
 // Mock Service Worker types
 interface MockServiceWorkerRegistration {
@@ -358,27 +359,36 @@ describe('backgroundSync utilities', () => {
     });
 
     it('should preserve message event data integrity', async () => {
-      const mockCallback = vi.fn().mockResolvedValue(undefined);
-      setupServiceWorkerListener(mockCallback);
+      const debug = vi.spyOn(logger, 'debug');
+      try {
+        const mockCallback = vi.fn().mockResolvedValue(undefined);
+        setupServiceWorkerListener(mockCallback);
 
-      const messageHandler = mockServiceWorker.addEventListener.mock.calls[0][1] as (
-        event: MessageEvent
-      ) => void;
+        const messageHandler = mockServiceWorker.addEventListener.mock.calls[0][1] as (
+          event: MessageEvent
+        ) => void;
 
-      const complexEvent = {
-        data: {
-          type: 'BACKGROUND_SYNC_COMPLETED',
-          successCount: 5,
-          failCount: 1,
-        },
-      } as MessageEvent;
+        const complexEvent = {
+          data: {
+            type: 'BACKGROUND_SYNC_COMPLETED',
+            successCount: 5,
+            failCount: 1,
+          },
+        } as MessageEvent;
 
-      messageHandler(complexEvent);
+        messageHandler(complexEvent);
 
-      // Wait for async callback
-      await vi.waitFor(() => {
-        expect(mockCallback).toHaveBeenCalled();
-      });
+        // The counts reach the log exactly as the worker sent them.
+        expect(debug).toHaveBeenCalledWith(
+          '[BackgroundSync] Service Worker completed background sync:',
+          { successCount: 5, failCount: 1 }
+        );
+        await vi.waitFor(() => {
+          expect(mockCallback).toHaveBeenCalledExactlyOnceWith();
+        });
+      } finally {
+        debug.mockRestore();
+      }
     });
   });
 });

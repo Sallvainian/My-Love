@@ -469,15 +469,17 @@ describe('interactionsSlice local copy', () => {
       );
     });
 
-    it.each(['sendPoke', 'sendKiss'] as const)(
+    it.each([
+      ['sendPoke', 'sent-poke'],
+      ['sendKiss', 'sent-kiss'],
+    ] as const)(
       'a confirmed %s is in state and in the copy',
-      async (action) => {
+      async (action, sentId) => {
         const store = createTestStore();
         store.setState({ interactions: [interaction('earlier')] });
 
         await store.getState()[action]();
 
-        const sentId = action === 'sendPoke' ? 'sent-poke' : 'sent-kiss';
         expect(store.getState().interactions.map((i) => i.id)).toEqual([sentId, 'earlier']);
         const copy = savedCopies.get(key(USER_A)) as Array<{ id: string }>;
         expect(copy.map((row) => row.id)).toEqual([sentId, 'earlier']);

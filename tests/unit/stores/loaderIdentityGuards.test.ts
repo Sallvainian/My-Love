@@ -1888,9 +1888,24 @@ describe('loader identity guards', () => {
       }
     );
 
-    it.each(['success', 'failure'])(
+    it.each([
+      [
+        'success',
+        (pending: ReturnType<typeof deferred<unknown[]>>) => pending.settle([aEvent]),
+        { status: 'success' },
+        [aEvent],
+        null,
+      ],
+      [
+        'failure',
+        (pending: ReturnType<typeof deferred<unknown[]>>) => pending.fail(new Error('CURRENT-SESSION-FAILURE')),
+        { status: 'failure', error: 'CURRENT-SESSION-FAILURE' },
+        [],
+        'CURRENT-SESSION-FAILURE',
+      ],
+    ] as const)(
       'allows current-session %s after a same-user auth refresh',
-      async (outcome) => {
+      async (_outcome, settle, expectedResult, expectedEvents, expectedError) => {
         const pending = deferred<unknown[]>();
         getEvents.mockReturnValue(pending.promise);
         const inFlight = useAppStore.getState().loadEvents();
@@ -1898,19 +1913,12 @@ describe('loader identity guards', () => {
 
         useAppStore.getState().setAuthUser(A, 'refreshed@example.com');
         expect(useAppStore.getState().authSessionVersion).toBe(version);
-        if (outcome === 'success') pending.settle([aEvent]);
-        else pending.fail(new Error('CURRENT-SESSION-FAILURE'));
+        settle(pending);
 
-        expect(await inFlight).toEqual(
-          outcome === 'success'
-            ? { status: 'success' }
-            : { status: 'failure', error: 'CURRENT-SESSION-FAILURE' }
-        );
+        expect(await inFlight).toEqual(expectedResult);
         expect(useAppStore.getState().eventsIsLoading).toBe(false);
-        expect(useAppStore.getState().events).toEqual(outcome === 'success' ? [aEvent] : []);
-        expect(useAppStore.getState().eventsError).toBe(
-          outcome === 'success' ? null : 'CURRENT-SESSION-FAILURE'
-        );
+        expect(useAppStore.getState().events).toEqual(expectedEvents);
+        expect(useAppStore.getState().eventsError).toBe(expectedError);
         expect(getEvents).toHaveBeenCalledTimes(1);
       }
     );
