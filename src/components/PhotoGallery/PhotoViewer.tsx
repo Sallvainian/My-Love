@@ -1,6 +1,14 @@
 import type { PanInfo } from 'framer-motion';
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
-import { TriangleAlert, ChevronLeft, ChevronRight, ImageOff, LoaderCircle, Trash, X } from 'lucide-react';
+import {
+  TriangleAlert,
+  ChevronLeft,
+  ChevronRight,
+  ImageOff,
+  LoaderCircle,
+  Trash,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import { useFocusTrap } from '../../hooks';
@@ -762,7 +770,9 @@ export function PhotoViewer({
                   disabled={isDeleting}
                   className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
                 >
-                  {isDeleting && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  {isDeleting && (
+                    <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  )}
                   Delete
                 </button>
               </div>

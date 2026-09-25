@@ -668,7 +668,9 @@ export function EventsSettings() {
               ].filter(Boolean).join(' ') || undefined}
               className={SMALL_SECONDARY}
             >
-              {historyIsActive && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {historyIsActive && (
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+              )}
               {historyIsActive
                 ? 'Loading history…'
                 : eventsHistoryError

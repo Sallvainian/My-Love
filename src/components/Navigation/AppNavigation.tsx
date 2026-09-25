@@ -24,7 +24,14 @@
  * light accent and muted are already deepened to hold 4.5:1 on its own tinted
  * fills and on the page ground seen through the glass.
  */
-import { Camera, Heart, MessageCircle, Settings as SettingsIcon, FaceSlightlySmiling, Users } from 'lucide-react';
+import {
+  Camera,
+  Heart,
+  MessageCircle,
+  Settings as SettingsIcon,
+  FaceSlightlySmiling,
+  Users,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ViewType } from '../../stores/slices/navigationSlice';
 

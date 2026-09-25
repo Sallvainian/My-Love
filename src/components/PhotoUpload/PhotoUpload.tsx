@@ -315,7 +315,10 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
                     className="flex items-start gap-3 rounded-[14px] bg-card2 p-4"
                     data-testid="storage-warning-banner"
                   >
-                    <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
+                    <TriangleAlert
+                      className="mt-0.5 h-5 w-5 shrink-0 text-accent"
+                      aria-hidden="true"
+                    />
                     <p className="text-sm font-medium text-ink">{storageWarning}</p>
                   </div>
                 )}
