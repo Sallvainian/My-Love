@@ -47,13 +47,11 @@ const updateEvent = vi.fn();
 const deleteEvent = vi.fn();
 const getInteractionHistory = vi.fn();
 const getAllStoredMessages = vi.fn();
+const getStoredMessage = vi.fn();
 const toggleStoredFavorite = vi.fn();
-const customGetAllForUser = vi.fn();
 const customCreate = vi.fn();
 const customUpdateMessage = vi.fn();
 const customDeleteForUser = vi.fn();
-const customExportMessages = vi.fn();
-const customImportMessages = vi.fn();
 const loveNotesQuery = vi.fn();
 
 vi.mock('../../../src/api/supabaseClient', () => ({
@@ -124,34 +122,34 @@ vi.mock('../../../src/api/interactionService', () => ({
 
 vi.mock('../../../src/services/storage', () => ({
   storageService: {
-    // The one read the rotation pool comes from. The captured owner is passed
-    // straight through, so a case can assert WHICH id the service was asked
-    // for, not merely that the store was not written.
-    getAllMessages: (userId: string | null) => getAllStoredMessages(userId),
+    // The bundled rows the rotation pool starts from. Shared by every account;
+    // each account's own rows come from its message-data copy (readLocalCopy).
+    getAllMessages: () => getAllStoredMessages(),
+    getMessage: (id: number) => getStoredMessage(id),
     init: vi.fn(),
     addMessage: vi.fn(),
     addMessages: vi.fn(),
-    deleteFavoritesForUser: vi.fn(async () => {}),
-    // Same shape as getAllMessages above, and for the same reason: the
-    // `messages` store is shared by every account on the device, so a case has
-    // to be able to assert WHICH id the write was made for.
-    toggleFavorite: (messageId: number, userId: string | null) =>
-      toggleStoredFavorite(messageId, userId),
+    bundledFavoriteIds: vi.fn(async () => []),
+    // The server half of a favorite; a case asserts WHICH account it names.
+    toggleFavorite: (userId: string | null, message: unknown, copy: unknown) =>
+      toggleStoredFavorite(userId, message, copy),
   },
 }));
 
-vi.mock('../../../src/services/customMessageService', () => ({
-  customMessageService: {
-    getAllForUser: (userId: string | null, filter?: unknown) => customGetAllForUser(userId, filter),
-    create: (userId: string | null, input: unknown) => customCreate(userId, input),
-    updateMessage: (userId: string | null, input: unknown) => customUpdateMessage(userId, input),
-    deleteForUser: (userId: string | null, id: number) => customDeleteForUser(userId, id),
-    exportMessages: (userId: string | null) => customExportMessages(userId),
-    importMessages: (userId: string | null, data: unknown) => customImportMessages(userId, data),
-    // Sign-out's per-owner delete (authSlice); nothing here asserts on it.
-    deleteMirrorForUser: vi.fn(async () => {}),
-  },
-}));
+// The server writes are faked; the copy transforms stay real.
+vi.mock('../../../src/services/customMessageService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/customMessageService')>();
+  return {
+    ...actual,
+    customMessageService: {
+      ...actual.customMessageService,
+      createRemote: (userId: string | null, input: unknown, clientKey: string) =>
+        customCreate(userId, input, clientKey),
+      updateRemote: (row: unknown, input: unknown) => customUpdateMessage(row, input),
+      deleteRemote: (row: unknown) => customDeleteForUser(row),
+    },
+  };
+});
 
 // The partner loader reads its saved copy before the server. Controlled here
 // so a case can hold the copy read open across an account switch.
@@ -334,7 +332,7 @@ describe('loader identity guards', () => {
     // Quiet by default: the custom-message cases each set what they need, and
     // several actions chain into loadMessages/loadCustomMessages afterwards.
     getAllStoredMessages.mockResolvedValue([]);
-    customGetAllForUser.mockResolvedValue([]);
+    getStoredMessage.mockResolvedValue(undefined);
     // uploadPhoto awaits the quota twice; unless a case says otherwise it is
     // quiet, so neither the reject nor the warning branch is what is measured.
     checkStorageQuota.mockResolvedValue({ used: 0, quota: 1_000, percent: 0, warning: 'none' });
@@ -544,18 +542,17 @@ describe('loader identity guards', () => {
   // ==========================================================================
   // messagesSlice — custom messages (CAP-8 / F8)
   //
-  // The `messages` store in IndexedDB holds every account that has signed in on
-  // this device. These actions read and write it, and the AdminPanel that
-  // drives them has Sign Out one tap away in the bottom nav — so a continuation
-  // raised by A lands in whatever store is on screen when it settles.
+  // Each account's custom messages and favorites are its message-data local
+  // copy, and the AdminPanel that drives these actions has Sign Out one tap
+  // away in the bottom nav — so a continuation raised by A lands in whatever
+  // store is on screen when it settles.
   //
-  // The owner is passed INTO the service rather than read inside it, which is
-  // what makes the pending-import case testable at all: the assertion is that
-  // the row is stamped with the id captured at entry, not with whoever is
-  // signed in when the write happens.
+  // The owner is captured at entry and passed INTO every read, server write and
+  // copy save, which is what makes these cases testable at all: the assertion
+  // is that A's id is used, not whoever is signed in when the write lands.
   // ==========================================================================
 
-  /** A's own custom row, as IndexedDB hands it back. */
+  /** A's own custom row, as A's saved copy holds it. */
   function aCustomMessage() {
     return {
       id: 7,
@@ -563,11 +560,42 @@ describe('loader identity guards', () => {
       category: 'custom' as const,
       isCustom: true,
       userId: A,
+      serverId: 'srv-a-7',
       active: true,
+      isFavorite: false,
       createdAt: new Date('2026-08-03T06:00:00.000Z'),
       updatedAt: new Date('2026-08-03T06:00:00.000Z'),
       tags: [],
     };
+  }
+
+  /** The server's copy of A's row, as a create or an edit answers. */
+  function aRemote(text = 'A-PRIVATE-CUSTOM-MESSAGE') {
+    return {
+      serverId: 'srv-a-7',
+      text,
+      category: 'custom' as const,
+      active: true,
+      isFavorite: false,
+      tags: [],
+      createdAt: new Date('2026-08-03T06:00:00.000Z'),
+      updatedAt: new Date('2026-08-03T06:00:00.000Z'),
+    };
+  }
+
+  function aCopy() {
+    return { custom: [aCustomMessage()], bundledFavoriteIds: [], nextCustomId: 8 };
+  }
+
+  /** Answer message-data reads from `copies` by account; every other kind is empty. */
+  function savedMessageData(copies: Record<string, unknown>) {
+    readLocalCopy.mockImplementation(async (userId: string, kind: string) =>
+      kind === 'message-data' ? (copies[userId] ?? null) : null
+    );
+  }
+
+  function messageDataWrites() {
+    return writeLocalCopy.mock.calls.filter(([, kind]) => kind === 'message-data');
   }
 
   /** What C already had on screen: a bundled daily row of their own session. */
@@ -620,7 +648,7 @@ describe('loader identity guards', () => {
   }
 
   describe('loadMessages', () => {
-    it('asks the service for the account that raised the read', async () => {
+    it('reads the copy of the account that raised the read', async () => {
       getAllStoredMessages.mockResolvedValue([]);
 
       await useAppStore.getState().loadMessages();
@@ -628,7 +656,7 @@ describe('loader identity guards', () => {
       // The rotation pool is shared daily rows PLUS the caller's own custom
       // rows, so the read has to name an owner. Passing the live id instead of
       // the captured one is what this pins.
-      expect(getAllStoredMessages).toHaveBeenCalledWith(A);
+      expect(readLocalCopy).toHaveBeenCalledWith(A, 'message-data');
     });
 
     it('reselects a daily message when the current custom row was deleted', async () => {
@@ -637,18 +665,19 @@ describe('loader identity guards', () => {
       useAppStore.setState({ messages: [own, daily], currentMessage: own });
       getAllStoredMessages.mockResolvedValueOnce([daily]);
       await useAppStore.getState().loadMessages();
-      expect(useAppStore.getState().currentMessage).toEqual(daily);
-      expect(useAppStore.getState().messages).toEqual([daily]);
+      expect(useAppStore.getState().currentMessage).toEqual({ ...daily, isFavorite: false });
+      expect(useAppStore.getState().messages).toEqual([{ ...daily, isFavorite: false }]);
     });
 
     it('discards the rotation pool when the account changed mid-flight', async () => {
       const pending = deferred<unknown[]>();
       getAllStoredMessages.mockReturnValue(pending.promise);
+      savedMessageData({ [A]: aCopy() });
 
       const inFlight = useAppStore.getState().loadMessages();
       switchToUserC({ messages: cRotationPool() });
 
-      pending.settle([aCustomMessage()]);
+      pending.settle([]);
       await inFlight;
 
       expect(useAppStore.getState().messages).toEqual(cRotationPool());
@@ -658,8 +687,16 @@ describe('loader identity guards', () => {
   });
 
   describe('toggleFavorite', () => {
-    it('names the account that raised the favorite when it reaches the store', async () => {
-      toggleStoredFavorite.mockResolvedValueOnce(true);
+    function toggled(isFavorite: boolean) {
+      return {
+        isFavorite,
+        copy: { ...aCopy(), custom: [{ ...aCustomMessage(), isFavorite }] },
+      };
+    }
+
+    it('names the account that raised the favorite, and saves its confirmed copy', async () => {
+      savedMessageData({ [A]: aCopy() });
+      toggleStoredFavorite.mockResolvedValueOnce(toggled(true));
       const own = aCustomMessage();
       useAppStore.setState({ currentMessage: { ...own, isFavorite: false }, messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
         typeof useAppStore.setState
@@ -667,10 +704,13 @@ describe('loader identity guards', () => {
 
       await useAppStore.getState().toggleFavorite(own.id);
 
-      // The favorite is a write into a store shared by every account on the
-      // device, so it has to name an owner. Passing `null` would still compile
-      // and would still flip the row — on whoever's row shares that id.
-      expect(toggleStoredFavorite).toHaveBeenCalledWith(own.id, A);
+      // The favorite is A's, read from A's copy and saved back into it.
+      expect(toggleStoredFavorite).toHaveBeenCalledWith(
+        A,
+        expect.objectContaining({ id: own.id, serverId: own.serverId }),
+        aCopy()
+      );
+      expect(writeLocalCopy).toHaveBeenCalledWith(A, 'message-data', toggled(true).copy);
       // The seeded row is read back: the optimistic flip and the favourite
       // list are the rest of this action, and without these the whole `set()`
       // could be deleted with the case still green.
@@ -680,9 +720,10 @@ describe('loader identity guards', () => {
     });
 
     it('uses the committed boolean even when the UI starts stale', async () => {
+      savedMessageData({ [A]: aCopy() });
       const own = aCustomMessage();
       useAppStore.setState({ messages: [{ ...own, isFavorite: false }], currentMessage: { ...own, isFavorite: false } });
-      toggleStoredFavorite.mockResolvedValueOnce(false);
+      toggleStoredFavorite.mockResolvedValueOnce(toggled(false));
       await useAppStore.getState().toggleFavorite(own.id);
       expect(useAppStore.getState().messages[0].isFavorite).toBe(false);
       expect(useAppStore.getState().currentMessage?.isFavorite).toBe(false);
@@ -690,15 +731,17 @@ describe('loader identity guards', () => {
     });
 
     it('discards the favorite write when the account changed mid-flight', async () => {
+      savedMessageData({ [A]: aCopy() });
       const own = aCustomMessage();
       useAppStore.setState({ messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
         typeof useAppStore.setState
       >[0]);
 
-      const pending = deferred<void>();
+      const pending = deferred<ReturnType<typeof toggled>>();
       toggleStoredFavorite.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().toggleFavorite(own.id);
+      await vi.waitFor(() => expect(toggleStoredFavorite).toHaveBeenCalled());
       // Seed C with a known favoriteIds list. An unguarded `map` is a no-op
       // when C's pool does not share A's id, so favoriteIds is the leak.
       const cFavoriteIds = [42];
@@ -710,26 +753,29 @@ describe('loader identity guards', () => {
         },
       });
 
-      pending.settle();
+      pending.settle(toggled(true));
       await inFlight;
 
       expect(useAppStore.getState().messages).toEqual(cRotationPool());
       expect(useAppStore.getState().messageHistory.favoriteIds).toEqual(cFavoriteIds);
+      expect(messageDataWrites()).toEqual([]);
     });
 
     it('discards the favorite write when the SAME account signs back in mid-flight', async () => {
       // `userId` is A again by the time the request lands, so an id-only
       // compare would let this through. `authSessionVersion` is the half
       // that distinguishes the dead session from the live one.
+      savedMessageData({ [A]: aCopy() });
       const own = aCustomMessage();
       useAppStore.setState({ messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
         typeof useAppStore.setState
       >[0]);
 
-      const pending = deferred<void>();
+      const pending = deferred<ReturnType<typeof toggled>>();
       toggleStoredFavorite.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().toggleFavorite(own.id);
+      await vi.waitFor(() => expect(toggleStoredFavorite).toHaveBeenCalled());
 
       useAppStore.getState().clearAuth();
       useAppStore.getState().setAuthUser(A);
@@ -742,15 +788,17 @@ describe('loader identity guards', () => {
         },
       } as unknown as Parameters<typeof useAppStore.setState>[0]);
 
-      pending.settle();
+      pending.settle(toggled(true));
       await inFlight;
 
       expect(useAppStore.getState().userId).toBe(A);
       expect(useAppStore.getState().messages).toEqual([{ ...own, isFavorite: false }]);
       expect(useAppStore.getState().messageHistory.favoriteIds).toEqual(knownFavoriteIds);
+      expect(messageDataWrites()).toEqual([]);
     });
 
     it('swallows a service rejection and does not write the favorite', async () => {
+      savedMessageData({ [A]: aCopy() });
       const own = aCustomMessage();
       useAppStore.setState({ messages: [{ ...own, isFavorite: false }] } as unknown as Parameters<
         typeof useAppStore.setState
@@ -766,6 +814,7 @@ describe('loader identity guards', () => {
         expect(useAppStore.getState().messages).toEqual([{ ...own, isFavorite: false }]);
         expect(useAppStore.getState().messageHistory.favoriteIds).toEqual(knownFavoriteIds);
         expect(log).toHaveBeenCalledWith('Error toggling favorite:', failure);
+        expect(messageDataWrites()).toEqual([]);
       } finally {
         log.mockRestore();
       }
@@ -786,6 +835,11 @@ describe('loader identity guards', () => {
       return [cRotationPool()[0], aCustomMessage()];
     }
 
+    /** C's pool as the rotation sees it: C has no copy, so no favorites. */
+    function cPool() {
+      return cRotationPool().map((message) => ({ ...message, isFavorite: false }));
+    }
+
     it('reloads for the incoming account when one signs in over another', async () => {
       useAppStore.setState({ messages: aPool() } as unknown as Parameters<
         typeof useAppStore.setState
@@ -796,8 +850,8 @@ describe('loader identity guards', () => {
       await flush();
 
       // Read for C, not for the account that just left.
-      expect(getAllStoredMessages).toHaveBeenLastCalledWith(C);
-      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+      expect(readLocalCopy).toHaveBeenLastCalledWith(C, 'message-data');
+      expect(useAppStore.getState().messages).toEqual(cPool());
     });
 
     it('reloads on a sign-out followed by a different sign-in', async () => {
@@ -813,8 +867,8 @@ describe('loader identity guards', () => {
       useAppStore.getState().setAuthUser(C);
       await flush();
 
-      expect(getAllStoredMessages).toHaveBeenLastCalledWith(C);
-      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+      expect(readLocalCopy).toHaveBeenLastCalledWith(C, 'message-data');
+      expect(useAppStore.getState().messages).toEqual(cPool());
     });
 
     it('does not re-read IndexedDB when the same user is re-notified', async () => {
@@ -876,6 +930,8 @@ describe('loader identity guards', () => {
       useAppStore.setState({ messages: aPool() } as unknown as Parameters<
         typeof useAppStore.setState
       >[0]);
+      // C's copy holds a row that must never reach D's screen.
+      savedMessageData({ [C]: aCopy() });
       // The two reloads must be distinguishable: D's own switch fires a reload
       // of its own, and with one shared mock result the stale write and the
       // legitimate one are byte-identical — the assertion could not tell them
@@ -886,25 +942,28 @@ describe('loader identity guards', () => {
       // A third identity arrives before C's read comes back.
       useAppStore.getState().setAuthUser('USER-D-ID');
 
-      pending.settle([aCustomMessage()]);
+      pending.settle(cRotationPool());
       await flush();
 
-      expect(useAppStore.getState().messages).toEqual(dPool);
+      expect(useAppStore.getState().messages).toEqual(
+        dPool.map((message) => ({ ...message, isFavorite: false }))
+      );
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
     });
   });
 
   describe('loadCustomMessages', () => {
     it('discards the AdminPanel list when the account changed mid-flight', async () => {
-      const pending = deferred<unknown[]>();
-      customGetAllForUser.mockReturnValue(pending.promise);
+      const pending = deferred<unknown>();
+      readLocalCopy.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().loadCustomMessages();
       switchToUserC({ customMessages: cCustomList(), customMessagesLoaded: true });
 
-      pending.settle([aCustomMessage()]);
+      pending.settle(aCopy());
       await inFlight;
 
+      expect(readLocalCopy).toHaveBeenCalledWith(A, 'message-data');
       expect(useAppStore.getState().customMessages).toEqual(cCustomList());
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
     });
@@ -914,8 +973,8 @@ describe('loader identity guards', () => {
       // true`. Unguarded, A's failure both blanks C's list and tells the
       // AdminPanel effect there is nothing left to fetch — so C's own load
       // never fires and the panel stays empty for the whole session.
-      const pending = deferred<unknown[]>();
-      customGetAllForUser.mockReturnValue(pending.promise);
+      const pending = deferred<unknown>();
+      readLocalCopy.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().loadCustomMessages();
       switchToUserC({ customMessages: cCustomList(), customMessagesLoaded: false });
@@ -939,14 +998,20 @@ describe('loader identity guards', () => {
       });
       switchToUserC({ customMessages: cCustomList() });
 
-      pending.settle(aCustomMessage());
+      pending.settle(aRemote());
       await inFlight;
 
-      // The row IS written, and it is A's — refusing the write would lose a
-      // message the user really did save. It is C's store that is withheld.
-      expect(customCreate).toHaveBeenCalledWith(A, expect.objectContaining({ category: 'custom' }));
+      // The row IS written to the server, and it is A's — refusing the write
+      // would lose a message the user really did save. It is C's store, and
+      // either account's saved copy, that are withheld.
+      expect(customCreate).toHaveBeenCalledWith(
+        A,
+        expect.objectContaining({ category: 'custom' }),
+        expect.any(String)
+      );
       expect(useAppStore.getState().customMessages).toEqual(cCustomList());
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+      expect(messageDataWrites()).toEqual([]);
     });
 
     it('does not reload the rotation pool under the new account', async () => {
@@ -956,9 +1021,11 @@ describe('loader identity guards', () => {
       const inFlight = useAppStore
         .getState()
         .createCustomMessage({ text: 'A-PRIVATE-CUSTOM-MESSAGE', category: 'custom' });
+      await vi.waitFor(() => expect(customCreate).toHaveBeenCalled());
       switchToUserC({ messages: cRotationPool() });
+      getAllStoredMessages.mockClear();
 
-      pending.settle(aCustomMessage());
+      pending.settle(aRemote());
       await inFlight;
 
       // loadMessages() is the second write this action makes. Guarding only the
@@ -984,49 +1051,74 @@ describe('loader identity guards', () => {
         typeof useAppStore.setState
       >[0]);
 
-      pending.settle(aCustomMessage());
+      pending.settle(aRemote());
       await inFlight;
 
       expect(useAppStore.getState().customMessages).toEqual([]);
+      expect(messageDataWrites()).toEqual([]);
     });
   });
 
   describe('updateCustomMessage', () => {
     it('does not repaint the new account’s list with the edit', async () => {
-      const pending = deferred<void>();
+      savedMessageData({ [A]: aCopy() });
+      const pending = deferred<unknown>();
       customUpdateMessage.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore
         .getState()
         .updateCustomMessage({ id: 7, text: 'A-PRIVATE-CUSTOM-MESSAGE' });
+      await vi.waitFor(() => expect(customUpdateMessage).toHaveBeenCalled());
       switchToUserC({ customMessages: cCustomList(), messages: cRotationPool() });
+      getAllStoredMessages.mockClear();
 
-      pending.settle();
+      pending.settle(aRemote());
       await inFlight;
 
-      expect(customUpdateMessage).toHaveBeenCalledWith(A, expect.objectContaining({ id: 7 }));
+      // The row edited is A's, found in A's copy.
+      expect(customUpdateMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 7, userId: A, serverId: 'srv-a-7' }),
+        expect.objectContaining({ id: 7 })
+      );
       expect(useAppStore.getState().customMessages).toEqual(cCustomList());
       expect(getAllStoredMessages).not.toHaveBeenCalled();
+      expect(messageDataWrites()).toEqual([]);
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+    });
+
+    it('sends nothing when the account changed before the queued edit started', async () => {
+      savedMessageData({ [A]: aCopy() });
+
+      const inFlight = useAppStore.getState().updateCustomMessage({ id: 7, text: 'X' });
+      switchToUserC({ customMessages: cCustomList() });
+      await inFlight;
+
+      expect(customUpdateMessage).not.toHaveBeenCalled();
+      expect(useAppStore.getState().customMessages).toEqual(cCustomList());
     });
   });
 
   describe('deleteCustomMessage', () => {
     it('does not remove a row from the new account’s list', async () => {
+      // C's own row happens to carry the same local id A's did.
+      savedMessageData({ [A]: { ...aCopy(), custom: [{ ...aCustomMessage(), id: 99 }] } });
       const pending = deferred<void>();
       customDeleteForUser.mockReturnValue(pending.promise);
 
-      // C's own row happens to carry the same auto-increment id A's did — the
-      // ids come from one shared IndexedDB keyspace, so this is not contrived.
       const inFlight = useAppStore.getState().deleteCustomMessage(99);
+      await vi.waitFor(() => expect(customDeleteForUser).toHaveBeenCalled());
       switchToUserC({ customMessages: cCustomList(), messages: cRotationPool() });
+      getAllStoredMessages.mockClear();
 
       pending.settle();
       await inFlight;
 
-      expect(customDeleteForUser).toHaveBeenCalledWith(A, 99);
+      expect(customDeleteForUser).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 99, userId: A })
+      );
       expect(useAppStore.getState().customMessages).toEqual(cCustomList());
       expect(getAllStoredMessages).not.toHaveBeenCalled();
+      expect(messageDataWrites()).toEqual([]);
     });
   });
 
@@ -1044,15 +1136,15 @@ describe('loader identity guards', () => {
 
       try {
         const pending = deferred<unknown>();
-        customExportMessages.mockReturnValue(pending.promise);
+        readLocalCopy.mockReturnValue(pending.promise);
 
         const inFlight = useAppStore.getState().exportCustomMessages();
         switchToUserC();
 
-        pending.settle({ ...exportFile(), messages: [{ text: 'A-PRIVATE-CUSTOM-MESSAGE' }] });
+        pending.settle(aCopy());
         await inFlight;
 
-        expect(customExportMessages).toHaveBeenCalledWith(A);
+        expect(readLocalCopy).toHaveBeenCalledWith(A, 'message-data');
         expect(createObjectURL).not.toHaveBeenCalled();
         expect(click).not.toHaveBeenCalled();
       } finally {
@@ -1064,8 +1156,8 @@ describe('loader identity guards', () => {
   describe('importCustomMessages', () => {
     it('stamps the imported rows with A and never writes under C', async () => {
       const fileRead = deferred<string>();
-      const importing = deferred<{ imported: number; skipped: number }>();
-      customImportMessages.mockReturnValue(importing.promise);
+      const creating = deferred<unknown>();
+      customCreate.mockReturnValue(creating.promise);
 
       const inFlight = useAppStore.getState().importCustomMessages(importFile(fileRead.promise));
 
@@ -1073,23 +1165,26 @@ describe('loader identity guards', () => {
       // is called at all. An owner read live at the call site would be C's, and
       // C would silently acquire a copy of every message in A's backup.
       switchToUserC({ customMessages: cCustomList(), messages: cRotationPool() });
+      getAllStoredMessages.mockClear();
 
       fileRead.settle(JSON.stringify(exportFile()));
-      await flush();
-      importing.settle({ imported: 1, skipped: 0 });
+      await vi.waitFor(() => expect(customCreate).toHaveBeenCalled());
+      creating.settle({ ...aRemote('A-IMPORTED-MESSAGE'), serverId: 'srv-imported' });
 
       // The caller still learns what happened to THEIR import…
       await expect(inFlight).resolves.toEqual({ imported: 1, skipped: 0 });
       // …the rows carry A's id, because it was captured before the switch…
-      expect(customImportMessages).toHaveBeenCalledWith(
+      expect(customCreate).toHaveBeenCalledWith(
         A,
-        expect.objectContaining({ version: '1.0' })
+        expect.objectContaining({ text: 'A-IMPORTED-MESSAGE' }),
+        expect.any(String)
       );
-      // …and C's store is untouched, neither list nor rotation pool.
+      // …duplicates were judged against A's copy, never C's…
+      expect(readLocalCopy).not.toHaveBeenCalledWith(C, 'message-data');
+      // …and C's store is untouched, neither list nor rotation pool, nor either copy.
       expect(useAppStore.getState().customMessages).toEqual(cCustomList());
       expect(useAppStore.getState().messages).toEqual(cRotationPool());
-      expect(customGetAllForUser).not.toHaveBeenCalled();
-      expect(getAllStoredMessages).not.toHaveBeenCalled();
+      expect(messageDataWrites()).toEqual([]);
     });
   });
 
@@ -2024,14 +2119,18 @@ describe('loader identity guards', () => {
 
     it('loadMessages writes normally', async () => {
       getAllStoredMessages.mockResolvedValue(cRotationPool());
+      savedMessageData({ [A]: aCopy() });
 
       await useAppStore.getState().loadMessages();
 
-      expect(useAppStore.getState().messages).toEqual(cRotationPool());
+      expect(useAppStore.getState().messages).toEqual([
+        { ...cRotationPool()[0], isFavorite: false },
+        aCustomMessage(),
+      ]);
     });
 
     it('loadCustomMessages writes normally', async () => {
-      customGetAllForUser.mockResolvedValue([aCustomMessage()]);
+      savedMessageData({ [A]: aCopy() });
 
       await useAppStore.getState().loadCustomMessages();
 
@@ -2042,22 +2141,26 @@ describe('loader identity guards', () => {
     });
 
     it('createCustomMessage writes normally', async () => {
-      customCreate.mockResolvedValue(aCustomMessage());
+      customCreate.mockResolvedValue(aRemote());
 
       await useAppStore
         .getState()
         .createCustomMessage({ text: 'A-PRIVATE-CUSTOM-MESSAGE', category: 'custom' });
 
       expect(useAppStore.getState().customMessages).toEqual([
-        expect.objectContaining({ id: 7, text: 'A-PRIVATE-CUSTOM-MESSAGE' }),
+        expect.objectContaining({ text: 'A-PRIVATE-CUSTOM-MESSAGE' }),
       ]);
-      // And it still refreshes the rotation pool afterwards.
-      expect(getAllStoredMessages).toHaveBeenCalledWith(A);
+      // The confirmed row is saved in A's copy…
+      expect(messageDataWrites()).toEqual([
+        [A, 'message-data', expect.objectContaining({ custom: [expect.objectContaining({ serverId: 'srv-a-7' })] })],
+      ]);
+      // …and it still refreshes the rotation pool afterwards.
+      expect(readLocalCopy).toHaveBeenLastCalledWith(A, 'message-data');
     });
 
     it('updateCustomMessage and deleteCustomMessage write normally', async () => {
-      customGetAllForUser.mockResolvedValue([aCustomMessage()]);
-      customUpdateMessage.mockResolvedValue(undefined);
+      savedMessageData({ [A]: aCopy() });
+      customUpdateMessage.mockResolvedValue(aRemote('A-EDITED'));
       customDeleteForUser.mockResolvedValue(undefined);
       await useAppStore.getState().loadCustomMessages();
 
@@ -2066,6 +2169,7 @@ describe('loader identity guards', () => {
 
       await useAppStore.getState().deleteCustomMessage(7);
       expect(useAppStore.getState().customMessages).toEqual([]);
+      expect(messageDataWrites()).toHaveLength(2);
     });
 
     it('exportCustomMessages still downloads the file', async () => {
@@ -2078,7 +2182,7 @@ describe('loader identity guards', () => {
         .mockImplementation(() => undefined);
 
       try {
-        customExportMessages.mockResolvedValue(exportFile());
+        savedMessageData({ [A]: aCopy() });
 
         await useAppStore.getState().exportCustomMessages();
 
@@ -2090,8 +2194,7 @@ describe('loader identity guards', () => {
     });
 
     it('importCustomMessages writes normally', async () => {
-      customImportMessages.mockResolvedValue({ imported: 1, skipped: 0 });
-      customGetAllForUser.mockResolvedValue([aCustomMessage()]);
+      customCreate.mockResolvedValue({ ...aRemote('A-IMPORTED-MESSAGE'), serverId: 'srv-imported' });
 
       await expect(
         useAppStore
@@ -2099,8 +2202,8 @@ describe('loader identity guards', () => {
           .importCustomMessages(importFile(Promise.resolve(JSON.stringify(exportFile()))))
       ).resolves.toEqual({ imported: 1, skipped: 0 });
 
-      expect(useAppStore.getState().customMessages).toHaveLength(1);
-      expect(getAllStoredMessages).toHaveBeenCalledWith(A);
+      expect(messageDataWrites()).toHaveLength(1);
+      expect(readLocalCopy).toHaveBeenLastCalledWith(A, 'message-data');
     });
 
     it('loadEvents writes normally', async () => {

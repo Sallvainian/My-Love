@@ -18,11 +18,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { openDB, unwrap, type IDBPDatabase } from 'idb';
 import { DB_NAME, DB_VERSION } from '../../../src/services/dbSchema';
-import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
+import type { MyLoveDBSchema, StoredMessageData } from '../../../src/services/dbSchema';
+import { projectMessageFavorites } from '../../../src/services/messageFavorites';
 import type { Message } from '../../../src/types';
 
-// The server half of custom messages and favorites; these tests drive the
-// IndexedDB mirror, which is written only after the server accepted a write.
+// The server half of custom messages and favorites; these tests drive
+// toggleFavorite, which writes the server before it changes the copy.
 vi.mock('../../../src/services/customMessagesApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../src/services/customMessagesApi')>()),
   customMessagesApi: (await import('../helpers/fakeAccountDataApis')).fakeCustomMessagesApi,
@@ -32,9 +33,11 @@ vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => (
   messageFavoritesApi: (await import('../helpers/fakeAccountDataApis')).fakeMessageFavoritesApi,
 }));
 
+type FakeCustom = typeof import('../helpers/fakeAccountDataApis').fakeCustomMessagesApi;
+type FakeFavorites = typeof import('../helpers/fakeAccountDataApis').fakeMessageFavoritesApi;
+
 const ALL_STORES = [
   'messages',
-  'message-favorites',
   'moods',
   'sw-auth',
   'local-copies',
@@ -162,17 +165,17 @@ describe('storageService schema', () => {
     }
   });
 
-  it('leaves a messages store custom rows can be partitioned in', async () => {
-    // The mirror of the moods case above. `by-user` is what separates one
-    // account's custom messages from the other's on a shared device, so
-    // `contains('messages')` alone is not enough of an assertion.
+  it('leaves a messages store for the bundled rows alone, with no owner index', async () => {
+    // v15: custom messages live in each account's message-data local copy, so
+    // the store needs no `by-user` index and the favorites store is gone.
     const storageService = await freshStorageService();
     await storageService.init();
 
     const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
     try {
       const store = db.transaction('messages', 'readonly').objectStore('messages');
-      expect(store.indexNames.contains('by-user')).toBe(true);
+      expect(Array.from(store.indexNames).sort()).toEqual(['by-category', 'by-date']);
+      expect(unwrap(db).objectStoreNames.contains('message-favorites')).toBe(false);
     } finally {
       db.close();
     }
@@ -196,16 +199,18 @@ describe('storageService schema', () => {
     const reopened = await freshStorageService();
     await reopened.init();
 
-    expect(await reopened.getMessage(messageId, null)).toMatchObject({ text: 'keep me' });
+    expect(await reopened.getMessage(messageId)).toMatchObject({ text: 'keep me' });
   });
 
-  it.each(['storage', 'mood', 'custom', 'worker'] as const)('migrates v8 once when %s opens first, preserving raw rows', async (opener) => {
+  /** A v8 profile: the owner index, no favorites store, legacy flags on rows. */
+  async function seedV8(): Promise<Message[]> {
     const legacy = await openDB<MyLoveDBSchema>(DB_NAME, 8, {
       upgrade(db) {
         const messages = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
         messages.createIndex('by-category', 'category');
         messages.createIndex('by-date', 'createdAt');
-        messages.createIndex('by-user', 'userId');
+        (messages as unknown as IDBObjectStore).createIndex('by-user', 'userId');
+        db.createObjectStore('sw-auth', { keyPath: 'id' });
       },
     });
     const raw: Message[] = [
@@ -214,48 +219,47 @@ describe('storageService schema', () => {
       { id: 3, text: 'ownerless', category: 'custom', isCustom: true, isFavorite: true, createdAt: new Date() },
     ];
     for (const row of raw) await legacy.put('messages', row);
+    await legacy.put('sw-auth', {
+      id: 'current',
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: 1,
+      userId: 'owner-a',
+    });
     legacy.close();
+    return raw;
+  }
+
+  it.each(['storage', 'mood', 'worker'] as const)('migrates v8 once when %s opens first', async (opener) => {
+    const raw = await seedV8();
     vi.resetModules();
     if (opener === 'worker') {
       await (await import('../../../src/sw-db')).getPendingMoods('owner-a');
     }
     const first = opener === 'storage' || opener === 'worker'
       ? (await import('../../../src/services/storage')).storageService
-      : opener === 'mood'
-        ? (await import('../../../src/services/moodService')).moodService
-        : (await import('../../../src/services/customMessageService')).customMessageService;
+      : (await import('../../../src/services/moodService')).moodService;
     openServices.push(first as unknown as { db: IDBPDatabase<MyLoveDBSchema> | null });
     await first.init();
     const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
     try {
-      expect(await db.getAll('messages')).toEqual(raw);
-      expect(await db.getAll('message-favorites')).toEqual([{ messageId: 2, userId: 'owner-a' }]);
-      expect(db.transaction('message-favorites').store.indexNames.contains('by-user')).toBe(true);
+      // The bundled row is untouched, legacy flag and all; the custom rows go.
+      expect(await db.getAll('messages')).toEqual([raw[0]]);
+      expect(unwrap(db).objectStoreNames.contains('message-favorites')).toBe(false);
+      // The signed-in account's own row moved with its id and its legacy flag;
+      // the ownerless row and the bundled row's flag name no account.
+      const copy = (await db.get('local-copies', ['owner-a', 'message-data']))?.value as StoredMessageData;
+      expect(copy.custom.map((row) => [row.id, row.text, row.isFavorite])).toEqual([[2, 'owned', true]]);
+      expect(copy.bundledFavoriteIds).toEqual([]);
       const service = await freshStorageService();
-      expect((await service.getAllMessages('owner-a')).map((row) => [row.id, row.isFavorite])).toEqual([[1, false], [2, true]]);
-      expect(await service.toggleFavorite(2, 'owner-a')).toBe(false);
-      const reopened = await freshStorageService();
-      expect(await reopened.getMessage(2, 'owner-a')).toMatchObject({ isFavorite: false });
-      expect(await db.getAll('messages')).toEqual(raw);
+      expect(
+        projectMessageFavorites(await service.getAllMessages(), copy).map((row) => [row.id, row.isFavorite])
+      ).toEqual([[1, false], [2, true]]);
     } finally { db.close(); }
   });
 
   it('migrates v8 when the worker open runs without window', async () => {
-    const legacy = await openDB<MyLoveDBSchema>(DB_NAME, 8, {
-      upgrade(db) {
-        const messages = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
-        messages.createIndex('by-category', 'category');
-        messages.createIndex('by-date', 'createdAt');
-        messages.createIndex('by-user', 'userId');
-      },
-    });
-    const raw: Message[] = [
-      { id: 1, text: 'daily', category: 'reason', isCustom: false, isFavorite: true, createdAt: new Date() },
-      { id: 2, text: 'owned', category: 'custom', isCustom: true, userId: 'owner-a', serverId: 'server-owned', isFavorite: true, createdAt: new Date() },
-      { id: 3, text: 'ownerless', category: 'custom', isCustom: true, isFavorite: true, createdAt: new Date() },
-    ];
-    for (const row of raw) await legacy.put('messages', row);
-    legacy.close();
+    await seedV8();
 
     const windowDesc = Object.getOwnPropertyDescriptor(globalThis, 'window');
     Object.defineProperty(globalThis, 'window', {
@@ -272,435 +276,146 @@ describe('storageService schema', () => {
       }
     }
 
+    // The worker has no localStorage; the sw-auth token names the account.
     const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
     try {
-      expect(await db.getAll('message-favorites')).toEqual([{ messageId: 2, userId: 'owner-a' }]);
+      const copy = (await db.get('local-copies', ['owner-a', 'message-data']))?.value as StoredMessageData;
+      expect(copy.custom.map((row) => row.id)).toEqual([2]);
+      expect(unwrap(db).objectStoreNames.contains('message-favorites')).toBe(false);
     } finally {
       db.close();
     }
   });
 
-  describe('message reads are scoped to one account', () => {
-    /**
-     * `getAllMessages` feeds the daily rotation and the Home screen, and the
-     * store holds every account that has signed in on this device — so
-     * unscoped it put one partner's private custom messages into the other's
-     * rotation pool. Driven through the real storageService against a real
-     * store, because the property under test is which ROWS come back.
-     */
+  describe('the messages store serves the bundled rows only', () => {
     const A = '00000000-0000-4000-8000-00000000000a';
-    const B = '00000000-0000-4000-8000-00000000000b';
 
-    async function seedSharedDevice() {
+    /** Bundled rows, plus a custom row written straight to disk as a stray. */
+    async function seedStore() {
       const storageService = await freshStorageService();
       await storageService.init();
-      await storageService.addMessage({
+      const dailyId = await storageService.addMessage({
         text: 'BUNDLED-DAILY',
         category: 'reason',
         isCustom: false,
-        isFavorite: false,
+        isFavorite: true,
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
       });
-      await storageService.addMessage({
-        text: 'A-PRIVATE-CUSTOM',
+      const strayId = await storageService.addMessage({
+        text: 'STRAY-CUSTOM',
         category: 'custom',
         isCustom: true,
         userId: A,
         serverId: 'server-a',
-        isFavorite: false,
         createdAt: new Date('2026-08-03T06:00:00.000Z'),
       });
-      await storageService.addMessage({
-        text: 'B-PRIVATE-CUSTOM',
-        category: 'custom',
-        isCustom: true,
-        userId: B,
-        serverId: 'server-b',
-        isFavorite: false,
-        createdAt: new Date('2026-08-03T06:00:00.000Z'),
-      });
-      // Legacy: written before custom rows carried an owner, or migrated from
-      // the Story 3.4 LocalStorage list. Belongs to nobody.
-      await storageService.addMessage({
-        text: 'LEGACY-OWNERLESS',
-        category: 'custom',
-        isCustom: true,
-        isFavorite: false,
-        createdAt: new Date('2026-08-03T06:00:00.000Z'),
-      });
-      return storageService;
+      return { storageService, dailyId, strayId };
     }
 
-    it('returns the shared daily rows plus only the caller’s own custom rows', async () => {
-      const storageService = await seedSharedDevice();
+    it('never hands out a custom row, through any read', async () => {
+      const { storageService, dailyId, strayId } = await seedStore();
 
-      expect((await storageService.getAllMessages(B)).map((m) => m.text).sort()).toEqual([
-        'B-PRIVATE-CUSTOM',
+      expect((await storageService.getAllMessages()).map((m) => m.text)).toEqual(['BUNDLED-DAILY']);
+      expect((await storageService.getMessagesByCategory('custom')).map((m) => m.text)).toEqual([]);
+      expect((await storageService.getMessagesByCategory('reason')).map((m) => m.text)).toEqual([
         'BUNDLED-DAILY',
       ]);
-      expect((await storageService.getAllMessages(A)).map((m) => m.text).sort()).toEqual([
-        'A-PRIVATE-CUSTOM',
-        'BUNDLED-DAILY',
-      ]);
+      expect(await storageService.getMessage(strayId)).toBeUndefined();
+      expect(await storageService.getMessage(dailyId)).toMatchObject({ text: 'BUNDLED-DAILY' });
     });
 
-    it('still loads the daily rows when nobody is signed in, and no custom row', async () => {
-      const storageService = await seedSharedDevice();
+    it('still degrades a failed read to undefined', async () => {
+      const { storageService, dailyId } = await seedStore();
+      const holder = storageService as unknown as { db: IDBPDatabase<MyLoveDBSchema> };
+      const real = holder.db;
+      holder.db = {
+        get: () => Promise.reject(new Error('IndexedDB is unavailable')),
+        close: () => real.close(),
+      } as unknown as IDBPDatabase<MyLoveDBSchema>;
 
-      // Signing out must not blank Home — the bundled messages are shared —
-      // but it must not leave anyone's custom rows in the pool either.
-      expect((await storageService.getAllMessages(null)).map((m) => m.text)).toEqual([
-        'BUNDLED-DAILY',
-      ]);
+      expect(await storageService.getMessage(dailyId)).toBeUndefined();
+    });
+  });
+
+  describe('toggleFavorite writes the server, then returns the changed copy', () => {
+    const A = '00000000-0000-4000-8000-00000000000a';
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    const bundled: Message = { id: 3, text: 'BUNDLED-DAILY', category: 'reason', isCustom: false, createdAt };
+    const custom: Message = {
+      id: 400,
+      text: 'A-CUSTOM',
+      category: 'custom',
+      isCustom: true,
+      userId: A,
+      serverId: 'server-a',
+      isFavorite: false,
+      createdAt,
+    };
+    const copy = (): StoredMessageData => ({ custom: [custom], bundledFavoriteIds: [], nextCustomId: 401 });
+
+    /**
+     * The storage module and the two API fakes it was built with, read from the
+     * same module registry — `freshStorageService` resets the registry, and the
+     * mocked API modules are the only handle on the fakes that module holds.
+     */
+    async function build() {
+      const service = await freshStorageService();
+      const fakeCustomMessagesApi = (await import('../../../src/services/customMessagesApi'))
+        .customMessagesApi as unknown as FakeCustom;
+      const fakeMessageFavoritesApi = (await import('../../../src/services/messageFavoritesApi'))
+        .messageFavoritesApi as unknown as FakeFavorites;
+      for (const fn of [
+        fakeCustomMessagesApi.updateCustomMessage,
+        fakeMessageFavoritesApi.addFavorite,
+        fakeMessageFavoritesApi.removeFavorite,
+      ]) {
+        fn.mockClear();
+      }
+      return { service, fakeCustomMessagesApi, fakeMessageFavoritesApi };
+    }
+
+    it('toggles a bundled favorite by its text key, on then off', async () => {
+      const { service, fakeMessageFavoritesApi } = await build();
+      const { bundledMessageKey } = await import('../../../src/services/messageFavoritesApi');
+
+      const on = await service.toggleFavorite(A, bundled, copy());
+      expect(on.isFavorite).toBe(true);
+      expect(on.copy.bundledFavoriteIds).toEqual([3]);
+      expect(fakeMessageFavoritesApi.addFavorite).toHaveBeenCalledWith(A, await bundledMessageKey('BUNDLED-DAILY'));
+
+      const off = await service.toggleFavorite(A, bundled, on.copy);
+      expect(off.isFavorite).toBe(false);
+      expect(off.copy.bundledFavoriteIds).toEqual([]);
+      expect(fakeMessageFavoritesApi.removeFavorite).toHaveBeenCalledTimes(1);
     });
 
-    it('excludes the legacy unowned row from every caller', async () => {
-      const storageService = await seedSharedDevice();
+    it('toggles a custom favorite on its server row', async () => {
+      const { service, fakeCustomMessagesApi } = await build();
 
-      for (const caller of [A, B, null]) {
-        const pool = await storageService.getAllMessages(caller);
-        expect(pool.map((m) => m.text)).not.toContain('LEGACY-OWNERLESS');
-      }
-      // …and it is still on disk: hidden, not deleted, not claimed.
-      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
-      try {
-        expect((await db.getAll('messages')).map((m) => m.text)).toContain('LEGACY-OWNERLESS');
-      } finally {
-        db.close();
-      }
+      const on = await service.toggleFavorite(A, custom, copy());
+      expect(on.isFavorite).toBe(true);
+      expect(on.copy.custom[0]).toMatchObject({ id: 400, isFavorite: true });
+      expect(fakeCustomMessagesApi.updateCustomMessage).toHaveBeenCalledWith('server-a', { isFavorite: true });
     });
 
-    it('scopes getMessagesByCategory the same way', async () => {
-      const storageService = await seedSharedDevice();
+    it('refuses a signed-out or unsynced toggle before anything is sent', async () => {
+      const { service, fakeCustomMessagesApi, fakeMessageFavoritesApi } = await build();
 
-      // This read goes through the by-category index rather than getAll, which
-      // is a separate path to the same rows.
-      expect((await storageService.getMessagesByCategory('custom', B)).map((m) => m.text)).toEqual([
-        'B-PRIVATE-CUSTOM',
-      ]);
-      expect(await storageService.getMessagesByCategory('custom', null)).toEqual([]);
-      expect((await storageService.getMessagesByCategory('reason', A)).map((m) => m.text)).toEqual([
-        'BUNDLED-DAILY',
-      ]);
+      await expect(service.toggleFavorite(null, bundled, copy())).rejects.toThrow(/signed-in/);
+      await expect(
+        service.toggleFavorite(A, { ...custom, serverId: undefined }, copy())
+      ).rejects.toMatchObject({ code: 'not-synced' });
+      expect(fakeCustomMessagesApi.updateCustomMessage).not.toHaveBeenCalled();
+      expect(fakeMessageFavoritesApi.addFavorite).not.toHaveBeenCalled();
     });
 
-    describe('reads and writes by id are scoped the same way', () => {
-      /**
-       * `getMessage`, `updateMessage`, `deleteMessage` and `toggleFavorite`
-       * reached any row in the shared store by id with no owner check, while
-       * their batch siblings above already filtered. Every case here drives the
-       * real service against the same seeded shared device and confirms what is
-       * actually ON DISK afterwards — a denied write that merely returns early
-       * and a denied write that writes anyway are indistinguishable from the
-       * caller's side, so the store is the only honest witness.
-       *
-       * Favorites require a signed-in caller who can see the row. Generic
-       * updates/deletes require ownership of a custom row and reject denial.
-       */
+    it('leaves the copy it was given unchanged when the server refuses', async () => {
+      const { service, fakeMessageFavoritesApi } = await build();
+      fakeMessageFavoritesApi.addFavorite.mockRejectedValueOnce(new Error('offline'));
+      const before = copy();
 
-      /** Every row as it actually sits on disk, bypassing the service's filter. */
-      async function rowsOnDisk(): Promise<Message[]> {
-        const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
-        try {
-          return await db.getAll('messages');
-        } finally {
-          db.close();
-        }
-      }
-
-      /** The row with this text as it sits on disk, or undefined once it is gone. */
-      async function diskRow(text: string): Promise<Message | undefined> {
-        return (await rowsOnDisk()).find((message) => message.text === text);
-      }
-
-      /** The row at this id as it sits on disk — the retargeting cases move text around. */
-      async function rowAt(id: number): Promise<Message | undefined> {
-        return (await rowsOnDisk()).find((message) => message.id === id);
-      }
-
-      /** The id of a seeded row, read off disk so a test can name a row it may not see. */
-      async function idOf(text: string): Promise<number> {
-        const row = await diskRow(text);
-        if (!row) throw new Error(`seed row not found on disk: ${text}`);
-        return row.id;
-      }
-
-      /**
-       * Swap the service's cached connection for one whose reads or writes fail.
-       *
-       * The split under test is the service's existing error contract — reads
-       * degrade to `undefined`, writes re-throw — and it only shows when the
-       * READ succeeds and the write does not, which a wholesale outage cannot
-       * produce. `close` forwards to the real connection so afterEach still
-       * releases it; `init()` sees a non-null `db` and leaves the stub alone.
-       *
-       * The transaction proxy injects read or write failures independently,
-       * while forwarding unmodified operations to the real IndexedDB store.
-       */
-      function breakStore(service: unknown, broken: { reads?: boolean; writes?: boolean }): void {
-        const holder = service as { db: IDBPDatabase<MyLoveDBSchema> };
-        const real = holder.db;
-        const fail = () => Promise.reject(new Error('IndexedDB is unavailable'));
-        holder.db = {
-          get: (store: 'messages', key: number) => (broken.reads ? fail() : real.get(store, key)),
-          getAll: (store: 'messages') => (broken.reads ? fail() : real.getAll(store)),
-          put: (store: 'messages', value: Message) =>
-            broken.writes ? fail() : real.put(store, value),
-          delete: (store: 'messages', key: number) =>
-            broken.writes ? fail() : real.delete(store, key),
-          transaction: (...args: Parameters<typeof real.transaction>) => {
-            const tx = real.transaction(...args);
-            const wrap = (store: object) => new Proxy(store, {
-              get(target, key) {
-                if ((broken.reads && ['get', 'getAll'].includes(String(key))) ||
-                    (broken.writes && ['put', 'delete'].includes(String(key)))) return fail;
-                const value = Reflect.get(target, key);
-                return typeof value === 'function' ? value.bind(target) : value;
-              },
-            });
-            return new Proxy(tx, {
-              get(target, key) {
-                if (key === 'store') return wrap(target.store!);
-                if (key === 'objectStore') return (name: never) => wrap(target.objectStore(name));
-                const value = Reflect.get(target, key);
-                return typeof value === 'function' ? value.bind(target) : value;
-              },
-            });
-          },
-          close: () => real.close(),
-        } as unknown as IDBPDatabase<MyLoveDBSchema>;
-      }
-
-      it('hides a null-owner legacy custom row from signed-out reads', async () => {
-        const service = await seedSharedDevice();
-        const id = await service.addMessage({
-          text: 'NULL-OWNER', category: 'custom', isCustom: true,
-          userId: null, createdAt: new Date(),
-        } as unknown as Omit<Message, 'id'>);
-        expect(await service.getMessage(id, null)).toBeUndefined();
-        expect((await service.getAllMessages(null)).some((row) => row.id === id)).toBe(false);
-        expect(await rowAt(id)).toBeDefined();
-      });
-
-      it('hands the owner their own custom row', async () => {
-        const storageService = await seedSharedDevice();
-
-        expect(await storageService.getMessage(await idOf('A-PRIVATE-CUSTOM'), A)).toMatchObject({
-          text: 'A-PRIVATE-CUSTOM',
-        });
-      });
-
-      it('answers a cross-account read exactly as it answers a missing id', async () => {
-        const storageService = await seedSharedDevice();
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-
-        // Identical answers: nothing tells B that this id is taken. Message ids
-        // are small sequential integers, so a distinguishable "exists but
-        // hidden" would be an enumeration oracle over A's private rows.
-        expect(await storageService.getMessage(aId, B)).toBeUndefined();
-        expect(await storageService.getMessage(999_999, B)).toBeUndefined();
-      });
-
-      it('leaves the shared daily row readable by every caller, signed out included', async () => {
-        const storageService = await seedSharedDevice();
-        const dailyId = await idOf('BUNDLED-DAILY');
-
-        expect(await storageService.getMessage(dailyId, B)).toMatchObject({
-          text: 'BUNDLED-DAILY',
-        });
-        expect(await storageService.getMessage(dailyId, null)).toMatchObject({
-          text: 'BUNDLED-DAILY',
-        });
-      });
-
-      it('hides the legacy unowned row from every caller', async () => {
-        const storageService = await seedSharedDevice();
-        const legacyId = await idOf('LEGACY-OWNERLESS');
-
-        for (const caller of [A, B, null]) {
-          expect(await storageService.getMessage(legacyId, caller)).toBeUndefined();
-        }
-        // Hidden, not deleted and not claimed.
-        expect(await diskRow('LEGACY-OWNERLESS')).toBeDefined();
-      });
-
-      it('refuses every write against the legacy unowned row', async () => {
-        const storageService = await seedSharedDevice();
-        const legacyId = await idOf('LEGACY-OWNERLESS');
-
-        // The only row excluded by `undefined !== null` rather than by two ids
-        // differing, so the signed-out caller is the case that actually
-        // exercises it — and it was asserted on the read path alone.
-        await expect(
-          storageService.updateMessage(legacyId, { text: 'CLAIMED' }, null)
-        ).rejects.toThrow();
-        await expect(storageService.toggleFavorite(legacyId, null)).rejects.toThrow();
-        await expect(storageService.deleteMessage(legacyId, null)).rejects.toThrow();
-
-        expect(await rowAt(legacyId)).toMatchObject({
-          text: 'LEGACY-OWNERLESS',
-          isFavorite: false,
-        });
-      });
-
-      it('refuses a cross-account update by throwing without writing', async () => {
-        const storageService = await seedSharedDevice();
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-
-        await expect(
-          storageService.updateMessage(aId, { text: 'B-OVERWROTE-IT' }, B)
-        ).rejects.toThrow();
-
-        expect((await rowsOnDisk()).map((message) => message.text)).not.toContain('B-OVERWROTE-IT');
-        expect(await diskRow('A-PRIVATE-CUSTOM')).toBeDefined();
-      });
-
-      it('pins the write to the row it checked, not to an id inside the updates', async () => {
-        const storageService = await seedSharedDevice();
-        const dailyId = await idOf('BUNDLED-DAILY');
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-
-        // The store is keyed on `id`, so `updates.id` is a second address for
-        // the write. B may see the shared daily row and may not see A's — so
-        // an unpinned put walks straight past the guard using a row it is
-        // allowed to name.
-        await expect(storageService.updateMessage(dailyId, { id: aId, text: 'B-OVERWROTE-IT' }, B)).rejects.toThrow('protected');
-
-        expect(await rowAt(aId)).toMatchObject({ text: 'A-PRIVATE-CUSTOM' });
-        // Protected-field rejection leaves both source and target untouched.
-        expect(await rowAt(dailyId)).toMatchObject({ text: 'BUNDLED-DAILY' });
-      });
-
-      it('applies the owner’s own update', async () => {
-        const storageService = await seedSharedDevice();
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-
-        await storageService.updateMessage(aId, { text: 'A-EDITED' }, A);
-
-        expect(await diskRow('A-EDITED')).toBeDefined();
-        expect(await diskRow('A-PRIVATE-CUSTOM')).toBeUndefined();
-      });
-
-      it('refuses a cross-account delete by throwing and leaves the row on disk', async () => {
-        const storageService = await seedSharedDevice();
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-
-        await expect(storageService.deleteMessage(aId, B)).rejects.toThrow();
-
-        expect(await diskRow('A-PRIVATE-CUSTOM')).toBeDefined();
-      });
-
-      it('applies the owner’s own delete', async () => {
-        const storageService = await seedSharedDevice();
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-
-        await storageService.deleteMessage(aId, A);
-
-        expect(await diskRow('A-PRIVATE-CUSTOM')).toBeUndefined();
-        // Only that row: a delete must not take the shared rotation with it.
-        expect(await diskRow('BUNDLED-DAILY')).toBeDefined();
-      });
-
-      it('refuses a cross-account favorite and leaves the flag as it was', async () => {
-        const storageService = await seedSharedDevice();
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-
-        await expect(storageService.toggleFavorite(aId, B)).rejects.toThrow();
-
-        expect(await diskRow('A-PRIVATE-CUSTOM')).toMatchObject({ isFavorite: false });
-      });
-
-      it('applies the owner’s own favorite', async () => {
-        const storageService = await seedSharedDevice();
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-
-        await storageService.toggleFavorite(aId, A);
-
-        expect(await storageService.getMessage(aId, A)).toMatchObject({ isFavorite: true });
-        expect(await diskRow('A-PRIVATE-CUSTOM')).toMatchObject({ isFavorite: false });
-      });
-
-      it('partitions shared daily favorites across accounts and refuses signed-out writes', async () => {
-        const service = await seedSharedDevice();
-        const id = await idOf('BUNDLED-DAILY');
-        expect(await service.toggleFavorite(id, A)).toBe(true);
-        expect(await service.getMessage(id, A)).toMatchObject({ isFavorite: true });
-        expect(await service.getMessage(id, B)).toMatchObject({ isFavorite: false });
-        expect(await service.getMessage(id, null)).toMatchObject({ isFavorite: false });
-        await expect(service.toggleFavorite(id, null)).rejects.toThrow();
-        const reopened = await freshStorageService();
-        expect(await reopened.getMessage(id, A)).toMatchObject({ isFavorite: true });
-        expect((await reopened.getMessagesByCategory('reason', A))[0].isFavorite).toBe(true);
-        expect((await reopened.getAllMessages(B)).every((row) => !row.isFavorite)).toBe(true);
-        expect(await rowAt(id)).toMatchObject({ isFavorite: false });
-      });
-
-      it('serializes concurrent toggles and returns each committed value', async () => {
-        const service = await seedSharedDevice();
-        const id = await idOf('BUNDLED-DAILY');
-        expect(await Promise.all([service.toggleFavorite(id, A), service.toggleFavorite(id, A)])).toEqual([true, false]);
-        expect(await service.getMessage(id, A)).toMatchObject({ isFavorite: false });
-      });
-
-      it('refuses shared and missing generic writes and every protected update', async () => {
-        const service = await seedSharedDevice();
-        const daily = await idOf('BUNDLED-DAILY');
-        const own = await idOf('A-PRIVATE-CUSTOM');
-        const before = await rowsOnDisk();
-        for (const id of [daily, 999999]) {
-          await expect(service.updateMessage(id, { text: 'changed' }, A)).rejects.toThrow();
-          await expect(service.deleteMessage(id, A)).rejects.toThrow();
-        }
-        for (const updates of [{ userId: B }, { isCustom: false }, { id: daily }, { createdAt: new Date() }, { isFavorite: true }]) {
-          await expect(service.updateMessage(own, updates, A)).rejects.toThrow('protected');
-        }
-        expect(await rowsOnDisk()).toEqual(before);
-      });
-
-      it('surfaces a real aborted transaction without changing favorites', async () => {
-        const service = await seedSharedDevice();
-        const id = await idOf('BUNDLED-DAILY');
-        const holder = service as unknown as { db: IDBPDatabase<MyLoveDBSchema> };
-        const native = unwrap(holder.db);
-        const original = native.transaction.bind(native);
-        const transaction = vi.spyOn(native, 'transaction').mockImplementationOnce((...args) => {
-          const tx = original(...args);
-          tx.abort();
-          return tx;
-        });
-        await expect(service.toggleFavorite(id, A)).rejects.toThrow();
-        transaction.mockRestore();
-        expect(await service.getMessage(id, A)).toMatchObject({ isFavorite: false });
-      });
-
-      it('still degrades a failed read to undefined', async () => {
-        const storageService = await seedSharedDevice();
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-        breakStore(storageService, { reads: true });
-
-        expect(await storageService.getMessage(aId, A)).toBeUndefined();
-      });
-
-      it('re-throws when the ownership read before a delete fails', async () => {
-        const storageService = await seedSharedDevice();
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-        breakStore(storageService, { reads: true });
-
-        // deleteMessage reads raw rather than through getMessage exactly so a
-        // broken store cannot present itself as "not found" and swallow the
-        // delete. Routing it through getMessage would resolve silently here.
-        await expect(storageService.deleteMessage(aId, A)).rejects.toThrow();
-      });
-
-      it('still re-throws a failed write', async () => {
-        const storageService = await seedSharedDevice();
-        const aId = await idOf('A-PRIVATE-CUSTOM');
-        breakStore(storageService, { writes: true });
-
-        await expect(storageService.updateMessage(aId, { text: 'X' }, A)).rejects.toThrow();
-        await expect(storageService.deleteMessage(aId, A)).rejects.toThrow();
-        await expect(storageService.toggleFavorite(aId, A)).rejects.toThrow();
-      });
+      await expect(service.toggleFavorite(A, bundled, before)).rejects.toThrow('offline');
+      expect(before).toEqual(copy());
     });
   });
 
@@ -790,11 +505,10 @@ describe('storageService schema', () => {
       }
     });
 
-    it('[from v5] adds the messages by-user index without dropping rows', async () => {
+    it('[from v5] keeps the messages rows and adds no owner index', async () => {
       // `seedLegacy` builds `messages` the way a pre-v8 profile has it: no
-      // owner index. Reached through storageService rather than by calling
-      // upgradeDb directly, because storage.ts has to thread the versionchange
-      // transaction through for the existing-store branch to run at all.
+      // owner index. Since v15 none is added — custom rows live in the
+      // message-data local copy.
       await seedLegacy(5, 'id');
 
       const storageService = await freshStorageService();
@@ -806,7 +520,7 @@ describe('storageService schema', () => {
         const indexNames = Array.from(tx.store.indexNames);
         await tx.done;
 
-        expect(indexNames).toContain('by-user');
+        expect(indexNames).not.toContain('by-user');
         expect(await db.getAll('messages')).toHaveLength(1);
       } finally {
         db.close();

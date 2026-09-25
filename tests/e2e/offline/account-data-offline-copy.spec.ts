@@ -6,6 +6,9 @@
  *   what comes back can only be the account's saved local copy.
  * - A favorite added on the server while this device is offline appears after
  *   the connection returns, without a reload (refresh on reconnect).
+ * - A favorite and a custom message loaded in one online session are shown
+ *   again when the server cannot be reached, from the account's message-data
+ *   copy; the shared `messages` store holds no custom row.
  *
  * Every server row touched here belongs to this worker's own account.
  */
@@ -49,6 +52,64 @@ async function savedAnniversaryLabels(page: Page): Promise<string[]> {
       };
     });
   });
+}
+
+/** Custom texts and bundled favorites in the signed-in account's message-data copy. */
+async function savedMessageData(page: Page): Promise<{ texts: string[]; bundledFavoriteIds: number[] }> {
+  return page.evaluate(async () => {
+    const empty = { texts: [] as string[], bundledFavoriteIds: [] as number[] };
+    const userId = window.__APP_STORE__?.getState().userId;
+    if (!userId) return empty;
+    return new Promise<typeof empty>((resolve) => {
+      const open = indexedDB.open('my-love-db');
+      open.onerror = () => resolve(empty);
+      open.onsuccess = () => {
+        const db = open.result;
+        const get = db
+          .transaction('local-copies')
+          .objectStore('local-copies')
+          .get([userId, 'message-data']);
+        get.onsuccess = () => {
+          db.close();
+          const value = get.result?.value as
+            | { custom: Array<{ text: string }>; bundledFavoriteIds: number[] }
+            | undefined;
+          resolve(
+            value
+              ? { texts: value.custom.map((row) => row.text), bundledFavoriteIds: value.bundledFavoriteIds }
+              : empty
+          );
+        };
+        get.onerror = () => {
+          db.close();
+          resolve(empty);
+        };
+      };
+    });
+  });
+}
+
+/** Custom rows left in the shared `messages` store (bundled rows only since v15). */
+async function customRowsInMessagesStore(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        const open = indexedDB.open('my-love-db');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const all = db.transaction('messages').objectStore('messages').getAll();
+          all.onsuccess = () => {
+            db.close();
+            resolve(all.result.filter((row: { isCustom?: boolean }) => row.isCustom).length);
+          };
+          all.onerror = () => {
+            db.close();
+            reject(all.error);
+          };
+        };
+      })
+  );
 }
 
 async function goOffline(page: Page, offline: boolean) {
@@ -153,6 +214,72 @@ test.describe('Account data from the local copy', () => {
       await expect(favorite).toHaveAccessibleName('Remove from favorites');
     } finally {
       await page.context().setOffline(false);
+      await clear();
+    }
+  });
+
+  test('a favorite and a custom message from one online session are shown when the server cannot be reached', async ({
+    page,
+    supabaseAdmin,
+  }, testInfo) => {
+    const favoritesRead = () =>
+      page.waitForResponse(
+        (response) =>
+          response.url().includes('/rest/v1/message_favorites') &&
+          response.request().method() === 'GET'
+      );
+    await page.goto('/');
+    const userId = await signedInUserId(page);
+    const custom = `Offline custom ${testInfo.workerIndex}-${Date.now()}`;
+    const clear = async () => {
+      for (const table of ['message_favorites', 'custom_messages'] as const) {
+        const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
+        expect(error).toBeNull();
+      }
+    };
+    await clear();
+    const { error: insertError } = await supabaseAdmin
+      .from('custom_messages')
+      .insert({ user_id: userId, text: custom, category: 'custom' });
+    expect(insertError).toBeNull();
+
+    try {
+      // GIVEN: one online session loads the custom message and favorites
+      // today's bundled message; both are saved in the account's copy.
+      const settled = favoritesRead();
+      await page.reload();
+      await settled;
+      const favorite = page.getByTestId('message-favorite-button');
+      await expect(favorite).toHaveAccessibleName('Add to favorites');
+      const todayId = await page.evaluate(() => window.__APP_STORE__!.getState().currentMessage!.id);
+      await favorite.click();
+      await expect(favorite).toHaveAccessibleName('Remove from favorites');
+      await expect.poll(() => savedMessageData(page)).toEqual({
+        texts: [custom],
+        bundledFavoriteIds: [todayId],
+      });
+      expect(await customRowsInMessagesStore(page)).toBe(0);
+
+      // WHEN: the app opens again with the server unreachable, then offline.
+      await page.route('**/rest/v1/custom_messages**', (route) => route.abort());
+      await page.route('**/rest/v1/message_favorites**', (route) => route.abort());
+      await page.reload();
+      await expect(page.getByTestId('daily-message')).toBeVisible();
+      await goOffline(page, true);
+
+      // THEN: the favorite is still shown — from the copy.
+      await expect(favorite).toHaveAccessibleName('Remove from favorites');
+
+      // …and so is the custom message, in the editor.
+      await goOffline(page, false);
+      await page.goto('/admin');
+      await expect(page.getByTestId('admin-message-row').filter({ hasText: custom })).toBeVisible();
+      await goOffline(page, true);
+      await expect(page.getByTestId('admin-message-row').filter({ hasText: custom })).toBeVisible();
+    } finally {
+      await page.context().setOffline(false);
+      await page.unroute('**/rest/v1/custom_messages**');
+      await page.unroute('**/rest/v1/message_favorites**');
       await clear();
     }
   });

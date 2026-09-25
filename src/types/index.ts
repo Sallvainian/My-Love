@@ -12,23 +12,16 @@ export interface Message {
   category: MessageCategory;
   isCustom: boolean;
   /**
-   * Owner of a CUSTOM row, on a device that more than one account signs in on.
-   *
-   * Optional because two kinds of row legitimately carry no owner:
-   * - the bundled daily messages (`isCustom: false`), which ship with the app
-   *   and are shared by everyone;
-   * - legacy custom rows written before this field existed, which belong to
-   *   nobody. They stay on disk and are hidden from every account — nothing
-   *   infers their owner from the signed-in user, the device or a timestamp.
-   *
-   * Anything that reads custom rows must compare this against the caller's id;
-   * `customMessageService` is the only place that should be doing so.
+   * Owner of a CUSTOM row. Absent on the bundled daily messages
+   * (`isCustom: false`), which ship with the app and are shared by everyone.
+   * Custom rows live in their owner's `message-data` local copy
+   * (`customMessageService`), so no other account can read them.
    */
   userId?: string;
   /**
-   * Id of the `public.custom_messages` row this CUSTOM row mirrors. Absent on
-   * bundled rows, on legacy unowned rows, and on an owned row from before the
-   * move to Supabase, which the next mirror refresh deletes.
+   * Id of the `public.custom_messages` row this CUSTOM row copies. Absent on
+   * bundled rows, and on an owned row from before the move to Supabase, which
+   * the next refresh drops.
    */
   serverId?: string;
   active?: boolean;

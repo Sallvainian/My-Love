@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { create } from 'zustand';
 import type { SettingsSlice } from '../../../src/stores/slices/settingsSlice';
+import { projectMessageFavorites } from '../../../src/services/messageFavorites';
 import type { Message } from '../../../src/types';
 
 const mockStorageService = {
@@ -10,6 +11,7 @@ const mockStorageService = {
 };
 
 const mockLoadDefaultMessages = vi.fn();
+const mockReadMessageData = vi.fn();
 
 vi.mock('../../../src/services/storage', () => ({
   storageService: mockStorageService,
@@ -17,6 +19,11 @@ vi.mock('../../../src/services/storage', () => ({
 
 vi.mock('../../../src/data/defaultMessagesLoader', () => ({
   loadDefaultMessages: mockLoadDefaultMessages,
+}));
+
+// The account's own custom messages and favorites: its message-data copy.
+vi.mock('../../../src/services/customMessageService', () => ({
+  readMessageData: mockReadMessageData,
 }));
 
 const SIGNED_IN_USER = 'USER-A-ID';
@@ -136,11 +143,16 @@ const buildTestStore = async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       loadMessagesRequestedBy.push(requestedBy);
       try {
-        const messages = await mockStorageService.getAllMessages(requestedBy);
+        // Same reads as production: the shared bundled rows, plus the copy of
+        // the account that raised the load.
+        const [bundled, copy] = await Promise.all([
+          mockStorageService.getAllMessages(),
+          requestedBy ? mockReadMessageData(requestedBy) : Promise.resolve(null),
+        ]);
         if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) {
           return;
         }
-        set({ messages });
+        set({ messages: projectMessageFavorites(bundled, copy) });
       } catch (error) {
         console.error('[MessagesSlice] Failed to load messages:', error);
       }
@@ -155,9 +167,15 @@ const buildTestStore = async () => {
   return { store, updateCurrentMessage, loadMessagesRequestedBy };
 };
 
+/** The pool as the rotation sees it: no copy, so no favorites. */
+function unfavorited(pool: Message[]): Message[] {
+  return pool.map((message) => ({ ...message, isFavorite: false }));
+}
+
 describe('createSettingsSlice initializeApp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadMessageData.mockResolvedValue(null);
   });
 
   it('loads default messages only when IndexedDB has no messages', async () => {
@@ -195,10 +213,12 @@ describe('createSettingsSlice initializeApp', () => {
     );
     expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(2);
     // Both reads — the "is this database seeded?" check and the re-read for
-    // auto-generated ids — are scoped to the signed-in account.
-    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(1, SIGNED_IN_USER);
-    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2, SIGNED_IN_USER);
-    expect(store.getState().messages).toEqual(seededMessages);
+    // auto-generated ids — are of the shared bundled rows; the signed-in
+    // account's own rows come from its copy.
+    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(1);
+    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2);
+    expect(mockReadMessageData).toHaveBeenCalledWith(SIGNED_IN_USER);
+    expect(store.getState().messages).toEqual(unfavorited(seededMessages));
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });
 
@@ -222,9 +242,26 @@ describe('createSettingsSlice initializeApp', () => {
     expect(mockLoadDefaultMessages).not.toHaveBeenCalled();
     expect(mockStorageService.addMessages).not.toHaveBeenCalled();
     expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(1);
-    expect(mockStorageService.getAllMessages).toHaveBeenCalledWith(SIGNED_IN_USER);
-    expect(store.getState().messages).toEqual(existingMessages);
+    expect(store.getState().messages).toEqual(unfavorited(existingMessages));
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds the signed-in account’s saved custom messages and favorites to the pool', async () => {
+    const bundled: Message = { id: 42, text: 'Daily', category: 'reason', isCustom: false, createdAt: new Date() };
+    const custom: Message = {
+      id: 400, text: 'Mine', category: 'custom', isCustom: true, userId: SIGNED_IN_USER,
+      serverId: 'srv-mine', active: true, isFavorite: true, createdAt: new Date(),
+    };
+    mockStorageService.init.mockResolvedValue(undefined);
+    mockStorageService.getAllMessages.mockResolvedValue([bundled]);
+    mockReadMessageData.mockResolvedValue({ custom: [custom], bundledFavoriteIds: [42], nextCustomId: 401 });
+
+    const { store } = await buildTestStore();
+    await store.getState().initializeApp();
+
+    expect(store.getState().messages).toEqual([{ ...bundled, isFavorite: true }, custom]);
+    expect((store.getState() as unknown as { messageHistory?: { favoriteIds: number[] } }).messageHistory?.favoriteIds)
+      .toEqual([42, 400]);
   });
 
   it('withholds the stale pool and re-reads under C when the account changes mid-flight (seeded)', async () => {
@@ -254,14 +291,18 @@ describe('createSettingsSlice initializeApp', () => {
     expect(store.getState().isLoading).toBe(false);
     // Handoff was issued under C, but its write has not landed yet.
     expect(loadMessagesRequestedBy).toEqual([USER_C]);
-    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(1, SIGNED_IN_USER);
-    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2, USER_C);
+    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(1);
+    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2);
+    // The handoff reads C's copy; the outgoing account's is never read once
+    // the session has moved on.
+    expect(mockReadMessageData).toHaveBeenCalledWith(USER_C);
+    expect(mockReadMessageData).not.toHaveBeenCalledWith(SIGNED_IN_USER);
 
     const incoming = cIncomingPool();
     handoffRead.settle(incoming);
     await flush();
 
-    expect(store.getState().messages).toEqual(incoming);
+    expect(store.getState().messages).toEqual(unfavorited(incoming));
     expect(store.getState().messages).not.toEqual([]);
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
 
@@ -308,7 +349,7 @@ describe('createSettingsSlice initializeApp', () => {
     handoffRead.settle(incoming);
     await flush();
 
-    expect(store.getState().messages).toEqual(incoming);
+    expect(store.getState().messages).toEqual(unfavorited(incoming));
     expect(store.getState().messages).not.toEqual([]);
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });
@@ -337,13 +378,15 @@ describe('createSettingsSlice initializeApp', () => {
     expect(updateCurrentMessage).not.toHaveBeenCalled();
     expect(store.getState().isLoading).toBe(false);
     expect(loadMessagesRequestedBy).toEqual([null]);
-    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2, null);
+    expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2);
+    // Signed out, the handoff reads no account's copy at all.
+    expect(mockReadMessageData).not.toHaveBeenCalled();
 
     const shared = sharedDailyPool();
     handoffRead.settle(shared);
     await flush();
 
-    expect(store.getState().messages).toEqual(shared);
+    expect(store.getState().messages).toEqual(unfavorited(shared));
     expect(store.getState().messages).not.toEqual([]);
     expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
