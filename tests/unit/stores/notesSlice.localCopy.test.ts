@@ -32,6 +32,8 @@ const server = {
     | { status: 'error'; reason: string },
   /** Hold the next page read until released (account-switch cases). */
   hold: null as Promise<void> | null,
+  /** Page reads that have reached `hold` and are parked on it. */
+  heldReads: 0,
   readError: null as { message: string } | null,
   insertError: null as { message: string; code?: string; details?: string; hint?: string } | null,
   removalError: null as { message: string } | null,
@@ -57,7 +59,10 @@ function readBuilder() {
     },
     then(onFulfilled: (r: { data: Row[] | null; error: unknown }) => unknown, onRejected?: (e: unknown) => unknown) {
       const run = async () => {
-        if (server.hold) await server.hold;
+        if (server.hold) {
+          server.heldReads += 1;
+          await server.hold;
+        }
         if (server.readError) return { data: null, error: server.readError };
         const newestFirst = server.rows
           .filter((row) => before === null || row.created_at < before)
@@ -191,7 +196,8 @@ function deferred<T = void>() {
   return { promise, resolve };
 }
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+/** Waits until `n` page reads in this test are parked on `server.hold`. */
+const readsHeld = (n: number) => vi.waitFor(() => expect(server.heldReads).toBe(n));
 
 function goOffline() {
   lookupPartnerId.mockResolvedValue({ status: 'error', reason: 'TypeError: Failed to fetch' });
@@ -226,6 +232,7 @@ describe('notesSlice love-notes local copy', () => {
     savedCopies.clear();
     server.rows = [];
     server.hold = null;
+    server.heldReads = 0;
     server.readError = null;
     server.insertError = null;
     server.removalError = null;
@@ -250,9 +257,8 @@ describe('notesSlice love-notes local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().fetchNotes();
-      await flush();
       // The copy is on screen before the server has answered.
-      expect(stateIds(store)).toEqual(['1']);
+      await vi.waitFor(() => expect(stateIds(store)).toEqual(['1']));
 
       gate.resolve();
       await inFlight;
@@ -269,8 +275,8 @@ describe('notesSlice love-notes local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().fetchNotes();
-      await flush();
-      expect(stateIds(store)).toEqual(['1']);
+      await vi.waitFor(() => expect(stateIds(store)).toEqual(['1']));
+      expect(lookupPartnerId).toHaveBeenCalledTimes(1);
 
       lookup.resolve({ status: 'linked', partnerId: PARTNER });
       await inFlight;
@@ -343,9 +349,10 @@ describe('notesSlice love-notes local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().fetchNotes();
-      await flush();
+      await vi.waitFor(() =>
+        expect(console.error).toHaveBeenCalledWith('[NotesSlice] Ignoring a malformed love-notes copy')
+      );
       expect(store.getState().notes).toEqual([]);
-      expect(console.error).toHaveBeenCalledWith('[NotesSlice] Ignoring a malformed love-notes copy');
 
       gate.resolve();
       await inFlight;
@@ -653,7 +660,7 @@ describe('notesSlice love-notes local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().fetchNotes();
-      await flush();
+      await readsHeld(1);
       store.setState({ userId: USER_B, authSessionVersion: 2, notes: [] });
       gate.resolve();
       await inFlight;
@@ -684,7 +691,7 @@ describe('notesSlice love-notes local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().fetchNotes();
-      await flush();
+      await readsHeld(1);
       store.setState({ authSessionVersion: 2, notes: [] });
       gate.resolve();
       await inFlight;
@@ -701,10 +708,9 @@ describe('notesSlice love-notes local copy', () => {
       await store.getState().fetchNotes();
 
       store.getState().addNote(row('2') as LoveNote);
-      await flush();
 
       expect(stateIds(store)).toEqual(['1', '2']);
-      expect(savedIds()).toEqual(['1', '2']);
+      await vi.waitFor(() => expect(savedIds()).toEqual(['1', '2']));
     });
 
     it('a duplicate Realtime note writes nothing', async () => {
@@ -713,10 +719,16 @@ describe('notesSlice love-notes local copy', () => {
       await store.getState().fetchNotes();
       writeLocalCopy.mockClear();
 
+      // addNote starts the copy write synchronously when it adds a note, so a
+      // write that was going to happen has already been requested.
       store.getState().addNote(row('1') as LoveNote);
-      await flush();
 
       expect(writeLocalCopy).not.toHaveBeenCalled();
+
+      // Positive control for that premise: a new note's write is requested
+      // before addNote returns.
+      store.getState().addNote(row('2') as LoveNote);
+      expect(writeLocalCopy).toHaveBeenCalledTimes(1);
     });
 
     it('a failed copy write on an incoming note is logged and the note still shows', async () => {
@@ -724,12 +736,13 @@ describe('notesSlice love-notes local copy', () => {
       writeLocalCopy.mockRejectedValue(new Error('QuotaExceededError'));
 
       store.getState().addNote(row('2') as LoveNote);
-      await flush();
 
       expect(stateIds(store)).toEqual(['2']);
-      expect(console.error).toHaveBeenCalledWith(
-        '[NotesSlice] Failed to save the love-notes copy:',
-        expect.any(Error)
+      await vi.waitFor(() =>
+        expect(console.error).toHaveBeenCalledWith(
+          '[NotesSlice] Failed to save the love-notes copy:',
+          expect.any(Error)
+        )
       );
     });
 
@@ -740,7 +753,6 @@ describe('notesSlice love-notes local copy', () => {
 
       await store.getState().sendNote('hello');
       await store.getState().drainQueuedNotes();
-      await flush();
 
       expect(stateIds(store)).toEqual(['1', 'server-1']);
       expect(savedIds()).toEqual(['1', 'server-1']);
@@ -758,7 +770,6 @@ describe('notesSlice love-notes local copy', () => {
       vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL }));
 
       await store.getState().sendNote('pic', new File(['x'], 'p.jpg', { type: 'image/jpeg' }));
-      await flush();
 
       const saved = savedCopies.get(key(USER_A)) as Record<string, unknown>[];
       expect(saved).toHaveLength(1);
@@ -775,7 +786,6 @@ describe('notesSlice love-notes local copy', () => {
 
       await store.getState().sendNote('will fail');
       await store.getState().drainQueuedNotes();
-      await flush();
 
       expect(store.getState().notes.at(-1)?.error).toBe(true);
       expect(savedIds()).toEqual(['1']);
@@ -810,7 +820,6 @@ describe('notesSlice love-notes local copy', () => {
         await expect(store.getState().sendNote('offline note')).rejects.toBeInstanceOf(
           NoteRefusedOfflineError
         );
-        await flush();
 
         // The recipient cannot be fixed offline without a loaded partner: refused
         // before the lookup goes out, with the offline wording.
@@ -836,8 +845,8 @@ describe('notesSlice love-notes local copy', () => {
       writeLocalCopy.mockClear();
       lookupPartnerId.mockClear();
 
+      // The lookup is awaited inside sendNote, so its refusal has landed.
       await store.getState().sendNote('lookup fails');
-      await flush();
 
       // A failed read is never "unlinked": refused with its reason.
       expect(lookupPartnerId).toHaveBeenCalled();
@@ -861,7 +870,9 @@ describe('notesSlice love-notes local copy', () => {
 
       reply.resolve();
       await sending;
-      await flush();
+      // sendNote only started the drain; the in-flight drain's own promise is
+      // what confirms the send.
+      await store.getState().drainQueuedNotes();
 
       expect(stateIds(store)).toEqual(['server-1']);
       expect(savedIds()).toEqual(['server-1']);
@@ -911,7 +922,7 @@ describe('notesSlice love-notes local copy', () => {
       const gate = deferred();
       server.hold = gate.promise;
       const older = store.getState().fetchOlderNotes(2);
-      await flush();
+      await readsHeld(1);
 
       // More than a page arrives: the refresh replaces the thread, so the page
       // below note 5 no longer joins onto anything on screen.
@@ -934,7 +945,7 @@ describe('notesSlice love-notes local copy', () => {
       const gate = deferred();
       server.hold = gate.promise;
       const older = store.getState().fetchOlderNotes(2);
-      await flush();
+      await readsHeld(1);
 
       server.hold = null;
       server.rows.push(row('7'));
@@ -953,7 +964,7 @@ describe('notesSlice love-notes local copy', () => {
       const first = deferred();
       server.hold = first.promise;
       const olderA = store.getState().fetchOlderNotes(2);
-      await flush();
+      await readsHeld(1);
 
       // A refresh lands mid-flight and clears the loading flag, so the list
       // asks again with the same cursor.
@@ -962,7 +973,7 @@ describe('notesSlice love-notes local copy', () => {
       const second = deferred();
       server.hold = second.promise;
       const olderB = store.getState().fetchOlderNotes(2);
-      await flush();
+      await readsHeld(2);
 
       first.resolve();
       await olderA;
@@ -981,7 +992,7 @@ describe('notesSlice love-notes local copy', () => {
       const first = deferred();
       server.hold = first.promise;
       const olderA = store.getState().fetchOlderNotes(2);
-      await flush();
+      await readsHeld(1);
 
       server.hold = null;
       server.rows.push(row('7'), row('8'));
@@ -989,7 +1000,7 @@ describe('notesSlice love-notes local copy', () => {
       const second = deferred();
       server.hold = second.promise;
       const olderB = store.getState().fetchOlderNotes(2);
-      await flush();
+      await readsHeld(2);
 
       // The first page no longer joins onto the thread and is dropped, but the
       // second page is still in flight and keeps its spinner.
@@ -1040,7 +1051,7 @@ describe('notesSlice love-notes local copy', () => {
       const gate = deferred();
       server.hold = gate.promise;
       const older = store.getState().fetchOlderNotes(2);
-      await flush();
+      await readsHeld(1);
 
       // The page below note 5 still joins onto note 6 once 5 is gone.
       await store.getState().removeNote('5');
@@ -1062,7 +1073,7 @@ describe('notesSlice love-notes local copy', () => {
       server.hold = gate.promise;
 
       const inFlight = store.getState().fetchOlderNotes(2);
-      await flush();
+      await readsHeld(1);
       store.setState({ userId: USER_B, authSessionVersion: 2, notes: [] });
       gate.resolve();
       await inFlight;

@@ -28,6 +28,7 @@ import { navigateTo } from '../../support/helpers/navigation';
 import {
   clearOwnPairEvents,
   clearPairEvents,
+  clockAnchor,
   isoDateDaysFromNow,
   resolveOwnPair,
   seedEvent,
@@ -243,14 +244,18 @@ test.describe('Home dashboard reads events from the store', () => {
     // `description: null` is the column's nullable case, which App coerces with
     // `event.description ?? undefined` — every other seeded row supplies a
     // string, so this is the only test that carries a null through.
+    // The page clock is pinned to the anchor the date is built from, so the
+    // event is "today" to the app even if the run crosses real midnight.
+    const anchor = clockAnchor();
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Today Meetup E2E',
-      eventDate: isoDateDaysFromNow(0),
+      eventDate: isoDateDaysFromNow(0, anchor),
       description: null,
       icon: 'calendar',
     });
 
+    await page.clock.install({ time: anchor });
     await page.goto('/');
 
     const card = page.getByTestId('event-countdown-today-meetup-e2e');

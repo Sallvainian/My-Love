@@ -101,11 +101,6 @@ function signOutAndBackInAsA(): void {
   useAppStore.getState().setAuthUser(A);
 }
 
-/** Drain already-resolved promises so the continuation under test has run. */
-function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 /** Count store writes from here on. */
 function countWrites(): { count: () => number; stop: () => void } {
   let writes = 0;
@@ -136,9 +131,10 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    // Sign-out deletes the outgoing account's mirror rows through the
-    // account-data queue, fire-and-forget; drain it so its log lines land
-    // inside the test rather than after the worker closes.
+    // Sign-out's deletes do not go through the account-data queue:
+    // `deleteAccountData` starts them fire-and-forget. The queue carries the
+    // account-data mirror writes and refreshes; drain it so anything a case
+    // queued lands inside the test rather than after the worker closes.
     await serializeAccountDataWrite(async () => {});
   });
 
@@ -147,9 +143,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     loveNotesQuery.mockReturnValue(builder(pending.promise));
 
     const inFlight = useAppStore.getState().fetchNotes();
-    await flush();
     // The held query is really reached, so the guard below is what is measured.
-    expect(loveNotesQuery).toHaveBeenCalled();
+    await vi.waitFor(() => expect(loveNotesQuery).toHaveBeenCalled());
     signOutAndBackInAsA();
     const fresh = [note('a1', 'FIRST'), note('a2', 'SENT-SINCE')];
     useAppStore.setState({ notes: fresh } as unknown as SetStateArg);
@@ -165,9 +160,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     loveNotesQuery.mockReturnValue(builder(pending.promise));
 
     const inFlight = useAppStore.getState().fetchNotes();
-    await flush();
     // The held query is really reached, so the guard below is what is measured.
-    expect(loveNotesQuery).toHaveBeenCalled();
+    await vi.waitFor(() => expect(loveNotesQuery).toHaveBeenCalled());
     signOutAndBackInAsA();
 
     pending.settle({ data: null, error: new Error('STALE-FAILURE') });
@@ -186,7 +180,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     loveNotesQuery.mockReturnValue(builder(pending.promise));
 
     const inFlight = useAppStore.getState().fetchOlderNotes();
-    await flush();
+    // The held query is really reached, so the guard below is what is measured.
+    await vi.waitFor(() => expect(loveNotesQuery).toHaveBeenCalled());
     signOutAndBackInAsA();
     const fresh = [note('a1', 'FIRST')];
     useAppStore.setState({ notes: fresh } as unknown as SetStateArg);
@@ -238,9 +233,9 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     const inFlight = useAppStore
       .getState()
       .sendNote('with picture', new File(['x'], 'a.jpg', { type: 'image/jpeg' }));
-    await flush();
+    // Parked on the held compression.
+    await vi.waitFor(() => expect(compressImage).toHaveBeenCalledTimes(1));
     signOutAndBackInAsA();
-    await flush();
 
     const writes = countWrites();
     compressed.settle({ blob: new Blob(['x'], { type: 'image/jpeg' }) });
@@ -259,10 +254,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     const inFlight = useAppStore
       .getState()
       .sendNote('with picture', new File(['x'], 'a.jpg', { type: 'image/jpeg' }));
-    await flush();
-    expect(uploadCompressedBlob).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(uploadCompressedBlob).toHaveBeenCalledTimes(1));
     signOutAndBackInAsA();
-    await flush();
 
     const writes = countWrites();
     upload.fail(new Error('upload failed'));
@@ -280,10 +273,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     const inFlight = useAppStore
       .getState()
       .sendNote('STALE-PICTURE-NOTE', new File(['x'], 'a.jpg', { type: 'image/jpeg' }));
-    await flush();
-    expect(uploadCompressedBlob).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(uploadCompressedBlob).toHaveBeenCalledTimes(1));
     signOutAndBackInAsA();
-    await flush();
 
     const writes = countWrites();
     upload.settle({ storagePath: `${A}/stale-upload.jpg` });
@@ -306,7 +297,6 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     // The queue's drain holds the insert open.
     await vi.waitFor(() => expect(loveNotesQuery).toHaveBeenCalledTimes(1));
     signOutAndBackInAsA();
-    await flush();
 
     const writes = countWrites();
     insert.settle({ data: committed, error: null });
@@ -334,10 +324,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     uploadCompressedBlob.mockReturnValue(upload.promise);
 
     const inFlight = useAppStore.getState().retryFailedMessage('temp-1');
-    await flush();
-    expect(uploadCompressedBlob).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(uploadCompressedBlob).toHaveBeenCalledTimes(1));
     signOutAndBackInAsA();
-    await flush();
 
     const writes = countWrites();
     upload.settle({ storagePath: `${A}/stale-retry.jpg` });
@@ -364,10 +352,8 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     uploadCompressedBlob.mockReturnValue(upload.promise);
 
     const inFlight = useAppStore.getState().retryFailedMessage('temp-1');
-    await flush();
-    expect(uploadCompressedBlob).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(uploadCompressedBlob).toHaveBeenCalledTimes(1));
     signOutAndBackInAsA();
-    await flush();
 
     const writes = countWrites();
     upload.fail(new Error('upload failed'));

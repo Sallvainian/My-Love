@@ -53,6 +53,11 @@ const HOSTILE_FRAGMENT =
 
 const VICTIM_USER_ID = '11111111-1111-4111-8111-111111111111';
 
+// Pinned to a whole second: GoTrue reads `Date.now()` to decide whether the
+// stored session is due a refresh, so its expiry is measured from this.
+const NOW = new Date('2026-09-15T16:00:00.000Z');
+const NOW_SEC = NOW.getTime() / 1000;
+
 function setUrl(url: string): void {
   (window as unknown as { happyDOM: { setURL: (u: string) => void } }).happyDOM.setURL(url);
 }
@@ -64,7 +69,7 @@ function seedVictimSession(): void {
     JSON.stringify({
       access_token: 'victim.access.token',
       refresh_token: 'victim-refresh-token',
-      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      expires_at: NOW_SEC + 3600,
       expires_in: 3600,
       token_type: 'bearer',
       user: {
@@ -73,7 +78,7 @@ function seedVictimSession(): void {
         aud: 'authenticated',
         app_metadata: {},
         user_metadata: {},
-        created_at: new Date().toISOString(),
+        created_at: NOW.toISOString(),
       },
     })
   );
@@ -99,6 +104,8 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
   let assignSpy: MockInstance<typeof window.location.assign> | null;
 
   beforeEach(() => {
+    // Only `Date` is faked; GoTrue's own timers stay real.
+    vi.setSystemTime(NOW);
     vi.resetModules();
     localStorage.clear();
     clients = [];
@@ -116,6 +123,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     // without this each leaves an auto-refresh ticker bound to the same storage
     // key -- and a stray refresh is exactly what would corrupt a fetch count.
     for (const client of clients) await client.auth.stopAutoRefresh();
+    vi.useRealTimers();
     fetchSpy.mockRestore();
     assignSpy?.mockRestore();
     assignSpy = null;
@@ -513,7 +521,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
         aud: 'authenticated',
         app_metadata: {},
         user_metadata: {},
-        created_at: new Date().toISOString(),
+        created_at: NOW.toISOString(),
       },
     };
     fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {

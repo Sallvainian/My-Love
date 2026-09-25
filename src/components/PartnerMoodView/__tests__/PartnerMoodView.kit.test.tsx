@@ -49,13 +49,6 @@ const SEVERAL: MoodEntry[] = [
   mood({ mood: 'tired', moods: ['tired'], date: '2020-09-10', supabaseId: 'm3' }),
 ];
 
-/** Today's local YYYY-MM-DD, the form MoodEntry.date carries. */
-function todayISO(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
 function makeState(overrides: Record<string, unknown> = {}) {
   return {
     partnerMoods: [] as MoodEntry[],
@@ -186,11 +179,39 @@ describe('PartnerMoodView on the kit', () => {
     );
   });
 
-  it('labels a mood logged today as Today', () => {
-    state = makeState({ partnerMoods: [mood({ date: todayISO(), supabaseId: 'today' })] });
-    render(<PartnerMoodView />);
+  describe('day labels, against a pinned clock', () => {
+    // Only `Date` is faked, so RTL's `waitFor` keeps its real timers.
+    beforeEach(() => {
+      vi.setSystemTime(new Date(2026, 8, 25, 12, 0, 0));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-    expect(screen.getByTestId('partner-mood-card')).toHaveTextContent(/Today · /);
+    /** The current card's text for one mood logged on `date`. */
+    function currentCardFor(date: string, timestamp: Date): HTMLElement {
+      state = makeState({ partnerMoods: [mood({ date, timestamp, supabaseId: date })] });
+      render(<PartnerMoodView />);
+      return screen.getByTestId('partner-mood-card');
+    }
+
+    it('labels a mood logged today as Today', () => {
+      expect(currentCardFor('2026-09-25', new Date(2026, 8, 25, 9, 15))).toHaveTextContent(
+        /Today · 9:15 AM/
+      );
+    });
+
+    it('labels a mood logged the day before as Yesterday', () => {
+      expect(currentCardFor('2026-09-24', new Date(2026, 8, 24, 9, 15))).toHaveTextContent(
+        /Yesterday · 9:15 AM/
+      );
+    });
+
+    it('labels an older mood by its weekday and date', () => {
+      expect(currentCardFor('2026-09-23', new Date(2026, 8, 23, 9, 15))).toHaveTextContent(
+        /Wednesday 23 September · 9:15 AM/
+      );
+    });
   });
 
   it('maps the realtime status to Connected / Reconnecting / Disconnected', async () => {

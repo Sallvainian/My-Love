@@ -6,8 +6,15 @@ import type { MoodEntry } from '@/types';
 
 describe('moodService', () => {
   const userId = '123e4567-e89b-42d3-a456-426614174000';
+  // Pinned (noon EDT): `create` stamps today's local date, so every read of
+  // "today" or of the days either side is the same day whenever this runs.
+  // Only `Date` is faked; fake-indexeddb keeps its real timers.
+  const NOW = new Date('2026-09-15T16:00:00.000Z');
+  const YESTERDAY = new Date(2026, 8, 14);
+  const TOMORROW = new Date(2026, 8, 16);
 
   beforeEach(async () => {
+    vi.setSystemTime(NOW);
     // Clear all moods before each test by clearing the store
     try {
       await moodService.clear();
@@ -125,8 +132,7 @@ describe('moodService', () => {
   describe('getMoodForDate', () => {
     it('returns mood entry for matching date', async () => {
       await moodService.create(userId, ['happy']);
-      const today = new Date();
-      const result = await moodService.getMoodForDate(today, userId);
+      const result = await moodService.getMoodForDate(NOW, userId);
       expect(result).not.toBeNull();
       expect(result!.mood).toBe('happy');
     });
@@ -143,12 +149,7 @@ describe('moodService', () => {
       const created = await moodService.create(userId, ['happy']);
       await moodService.create('223e4567-e89b-42d3-a456-426614174111', ['sad']);
 
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const result = await moodService.getMoodsInRange(yesterday, tomorrow, userId);
+      const result = await moodService.getMoodsInRange(YESTERDAY, TOMORROW, userId);
       expect(result).toEqual([created]);
     });
 
@@ -184,7 +185,7 @@ describe('moodService', () => {
       );
 
       expect(outcome).toBe('cleared');
-      const fetched = await moodService.getMoodForDate(new Date(), userId);
+      const fetched = await moodService.getMoodForDate(NOW, userId);
       expect(fetched!.synced).toBe(true);
       expect(fetched!.supabaseId).toBe('supa-123');
     });
@@ -449,7 +450,7 @@ describe('moodService', () => {
       // straight into the textarea on mount.
       await moodService.create(partnerId, ['sad'], 'their private note');
 
-      const mine = await moodService.getMoodForDate(new Date(), userId);
+      const mine = await moodService.getMoodForDate(NOW, userId);
 
       expect(mine).toBeNull();
     });
@@ -458,12 +459,7 @@ describe('moodService', () => {
       await moodService.create(userId, ['happy'], 'mine');
       await moodService.create(partnerId, ['sad'], 'theirs');
 
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const mine = await moodService.getMoodsInRange(yesterday, tomorrow, userId);
+      const mine = await moodService.getMoodsInRange(YESTERDAY, TOMORROW, userId);
 
       expect(mine).toHaveLength(1);
       expect(mine[0].userId).toBe(userId);

@@ -111,7 +111,12 @@ function setOnline(value: boolean) {
   Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+/**
+ * The copy read `loadInteractionHistory` started, as the promise it awaits. The
+ * slice registers its own `await` on it first, so a test awaiting it next
+ * resumes only after the slice has acted on the saved copy.
+ */
+const copyReadSettled = (call = 0) => readLocalCopy.mock.results[call].value as Promise<unknown>;
 
 describe('interactionsSlice local copy', () => {
   beforeEach(() => {
@@ -180,8 +185,7 @@ describe('interactionsSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadInteractionHistory(100);
-      await flush();
-      expect(store.getState().interactions).toEqual([interaction('old')]);
+      await vi.waitFor(() => expect(store.getState().interactions).toEqual([interaction('old')]));
       expect(store.getState().unviewedCount).toBe(1);
 
       const fresh = [interaction('new-1'), interaction('new-2'), interaction('old', { viewed: true })];
@@ -251,8 +255,10 @@ describe('interactionsSlice local copy', () => {
 
       getInteractionHistory.mockReturnValueOnce(new Promise(() => {}));
       void store.getState().loadInteractionHistory();
-      await flush();
 
+      // The load ran (the server request goes out synchronously), and the copy
+      // read would have been started synchronously beside it.
+      expect(getInteractionHistory).toHaveBeenCalledTimes(2);
       expect(readLocalCopy).not.toHaveBeenCalled();
       expect(store.getState().interactions).toEqual([interaction('server')]);
     });
@@ -264,7 +270,8 @@ describe('interactionsSlice local copy', () => {
       store.setState({ interactions: [interaction('live')], unviewedCount: 1 });
 
       void store.getState().loadInteractionHistory();
-      await flush();
+      expect(readLocalCopy).toHaveBeenCalledWith(USER_A, INTERACTIONS_COPY_KIND);
+      await copyReadSettled();
 
       expect(store.getState().interactions).toEqual([interaction('live')]);
     });
@@ -279,11 +286,12 @@ describe('interactionsSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadInteractionHistory();
-      await flush();
-      expect(store.getState().interactions).toEqual([]);
-      expect(console.error).toHaveBeenCalledWith(
-        '[InteractionsSlice] Ignoring a malformed interactions copy'
+      await vi.waitFor(() =>
+        expect(console.error).toHaveBeenCalledWith(
+          '[InteractionsSlice] Ignoring a malformed interactions copy'
+        )
       );
+      expect(store.getState().interactions).toEqual([]);
 
       server.resolve([interaction('server')]);
       await inFlight;
@@ -315,7 +323,8 @@ describe('interactionsSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadInteractionHistory();
-      await flush();
+      // Past the (empty) copy read, so the load is waiting on the server read.
+      await copyReadSettled();
       store.setState({ userId: USER_B, authSessionVersion: 2, interactions: [], unviewedCount: 0 });
       server.resolve([interaction('a-only')]);
       await inFlight;
@@ -331,7 +340,7 @@ describe('interactionsSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadInteractionHistory();
-      await flush();
+      await copyReadSettled();
       store.setState({ authSessionVersion: 2, interactions: [], unviewedCount: 0 });
       server.resolve([interaction('old-session')]);
       await inFlight;
@@ -434,15 +443,14 @@ describe('interactionsSlice local copy', () => {
       await store.getState().loadInteractionHistory();
 
       store.getState().addIncomingInteraction(record('rt-1'));
-      await flush();
 
       const expected = [
         interaction('rt-1', { createdAt: new Date('2026-09-21T08:00:00.000Z') }),
         interaction('earlier', { viewed: true }),
       ];
+      await vi.waitFor(() => expect(savedCopies.get(key(USER_A))).toEqual(expected.map(saved)));
       expect(store.getState().interactions).toEqual(expected);
       expect(store.getState().unviewedCount).toBe(1);
-      expect(savedCopies.get(key(USER_A))).toEqual(expected.map(saved));
     });
 
     it('a rejected or duplicate incoming row writes nothing', async () => {
@@ -450,9 +458,13 @@ describe('interactionsSlice local copy', () => {
       store.getState().addIncomingInteraction(record('stranger', { from_user_id: 'SOMEONE-ELSE' }));
       store.setState({ interactions: [interaction('dup')] });
       store.getState().addIncomingInteraction(record('dup'));
-      await flush();
 
+      // A copy save starts synchronously inside `addIncomingInteraction`.
       expect(writeLocalCopy).not.toHaveBeenCalled();
+
+      // Positive control: an accepted row does start one.
+      store.getState().addIncomingInteraction(record('fresh'));
+      expect(writeLocalCopy).toHaveBeenCalledTimes(1);
     });
 
     it('logs a failed copy write for an incoming row and keeps the row in state', async () => {
@@ -460,13 +472,14 @@ describe('interactionsSlice local copy', () => {
       const store = createTestStore();
 
       store.getState().addIncomingInteraction(record('rt-1'));
-      await flush();
 
-      expect(store.getState().interactions.map((i) => i.id)).toEqual(['rt-1']);
-      expect(console.error).toHaveBeenCalledWith(
-        '[InteractionsSlice] Failed to save the interactions copy:',
-        expect.any(Error)
+      await vi.waitFor(() =>
+        expect(console.error).toHaveBeenCalledWith(
+          '[InteractionsSlice] Failed to save the interactions copy:',
+          expect.any(Error)
+        )
       );
+      expect(store.getState().interactions.map((i) => i.id)).toEqual(['rt-1']);
     });
 
     it.each([
@@ -554,7 +567,7 @@ describe('interactionsSlice local copy', () => {
       await store.getState().sendPoke();
       store.setState({ interactions: [] });
       copyRead.resolve([saved(interaction('stale-copy'))]);
-      await flush();
+      await copyRead.promise;
 
       expect(store.getState().interactions).toEqual([]);
     });

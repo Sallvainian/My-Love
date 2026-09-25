@@ -505,8 +505,10 @@ describe('notesSlice send idempotency', () => {
           answerLookup = resolve;
         })
       );
+      const lookupsBefore = mockedGetPartnerId.mock.calls.length;
       const retry = store.getState().retryFailedMessage(tempId);
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      // The retry is parked on that held lookup.
+      await vi.waitFor(() => expect(mockedGetPartnerId).toHaveBeenCalledTimes(lookupsBefore + 1));
       expect(store.getState().notes.find((n) => n.tempId === tempId)).toMatchObject({
         error: true,
         sending: false,

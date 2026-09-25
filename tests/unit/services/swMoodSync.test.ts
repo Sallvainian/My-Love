@@ -36,6 +36,9 @@ const MOODS_URL = 'https://xojempkrugifnaveqtqc.supabase.co/rest/v1/moods';
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const LOG_TIME = '2026-01-26T23:52:29.297Z';
 const SERVER_ROW_ID = '00000000-0000-4000-8000-0000000000aa';
+// Pinned: the worker skips a token that expires within 300 s of `Date.now()`.
+const NOW = new Date('2026-01-26T12:00:00.000Z');
+const NOW_SEC = NOW.getTime() / 1000; // 1769428800
 
 const globalScope = globalThis as unknown as Record<string, unknown>;
 const fetchMock = vi.fn();
@@ -176,19 +179,22 @@ describe('service worker mood background sync', () => {
   });
 
   beforeEach(() => {
+    // Only `Date` is faked; the worker's own awaits need nothing else.
+    vi.setSystemTime(NOW);
     vi.clearAllMocks();
     mockedGetAuthToken.mockResolvedValue({
       id: 'current',
       userId: USER_ID,
       accessToken: 'test-access-token',
       refreshToken: 'test-refresh-token',
-      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      expiresAt: NOW_SEC + 3600,
     });
     mockedMarkMoodSynced.mockResolvedValue('cleared');
   });
 
   afterEach(() => {
     fetchMock.mockReset();
+    vi.useRealTimers();
   });
 
   it('sends normalized values while retaining failure accounting for invalid siblings', async () => {
@@ -247,13 +253,43 @@ describe('service worker mood background sync', () => {
         userId: USER_ID,
         accessToken: 'test-access-token',
         refreshToken: 'test-refresh-token',
-        expiresAt: Math.floor(Date.now() / 1000) - 1,
+        expiresAt: NOW_SEC - 1,
       });
 
       await fireBackgroundSync();
 
       expect(mockedGetPendingMoods).not.toHaveBeenCalled();
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('[token expires within the 5-minute buffer] never reads the moods store', async () => {
+      mockedGetAuthToken.mockResolvedValue({
+        id: 'current',
+        userId: USER_ID,
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: NOW_SEC + 299,
+      });
+
+      await fireBackgroundSync();
+
+      expect(mockedGetPendingMoods).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('[token expires exactly at the 5-minute buffer] reads the moods store', async () => {
+      mockedGetAuthToken.mockResolvedValue({
+        id: 'current',
+        userId: USER_ID,
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: NOW_SEC + 300,
+      });
+      mockedGetPendingMoods.mockResolvedValue([]);
+
+      await fireBackgroundSync();
+
+      expect(mockedGetPendingMoods).toHaveBeenCalledWith(USER_ID);
     });
   });
 

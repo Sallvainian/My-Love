@@ -37,6 +37,15 @@ function getMutableWindow(): MutableWindow {
   return global.window as MutableWindow;
 }
 
+/** A promise the test settles by hand, at the point it chooses. */
+function deferred<T>() {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
 describe('backgroundSync utilities', () => {
   let originalNavigator: typeof navigator;
   let mockServiceWorker: MockServiceWorker;
@@ -169,22 +178,6 @@ describe('backgroundSync utilities', () => {
       );
 
       consoleSpy.mockRestore();
-    });
-
-    it('should wait for service worker to be ready', async () => {
-      const delayedRegistration = {
-        sync: {
-          register: vi.fn().mockResolvedValue(undefined),
-        },
-      };
-
-      mockServiceWorker.ready = new Promise((resolve) => {
-        setTimeout(() => resolve(delayedRegistration), 100);
-      });
-
-      await registerBackgroundSync('delayed-tag');
-
-      expect(delayedRegistration.sync.register).toHaveBeenCalledWith('delayed-tag');
     });
   });
 
@@ -340,22 +333,22 @@ describe('backgroundSync utilities', () => {
       expect(mockRegistration.sync.register).toHaveBeenCalledTimes(3);
     });
 
-    it('should not resolve registerBackgroundSync when service worker never becomes ready', async () => {
-      // When navigator.serviceWorker.ready never resolves, registerBackgroundSync
-      // blocks indefinitely. This test verifies that sync.register is NOT called
-      // in that scenario (the function is still pending).
-      mockServiceWorker.ready = new Promise(() => {
-        // Intentionally never resolves — simulates a stuck service worker
-      });
+    it('waits for the service worker to become ready before registering', async () => {
+      const PENDING = Symbol('pending');
+      const ready = deferred<MockServiceWorkerRegistration>();
+      mockServiceWorker.ready = ready.promise;
 
-      // Start the registration (will hang on awaiting ready)
-      registerBackgroundSync('stuck-tag');
+      const run = registerBackgroundSync('stuck-tag');
 
-      // Give microtasks a chance to flush
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // sync.register should never be called because ready never resolved
+      // While `ready` is unsettled the registration is still pending and has
+      // registered nothing: an already-settled run would win this race.
+      expect(await Promise.race([run, Promise.resolve(PENDING)])).toBe(PENDING);
       expect(mockRegistration.sync.register).not.toHaveBeenCalled();
+
+      ready.resolve(mockRegistration);
+
+      await expect(run).resolves.toBeUndefined();
+      expect(mockRegistration.sync.register).toHaveBeenCalledWith('stuck-tag');
     });
 
     it('should preserve message event data integrity', async () => {

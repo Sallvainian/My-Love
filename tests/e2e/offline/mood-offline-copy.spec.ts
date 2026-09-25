@@ -20,7 +20,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
-import { resolveOwnPair } from '../../support/helpers/events';
+import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -35,12 +35,13 @@ function localISO(date: Date): string {
 }
 
 /**
- * An earlier moment inside the current month, so the calendar shows it without
- * a month change: yesterday at noon, or just after midnight on the 1st.
- * Browser and runner share the machine's timezone (no `timezoneId` is set).
+ * An earlier moment inside the anchor's month, so the calendar shows it without
+ * a month change: the day before at noon, or just after midnight on the 1st.
+ * The caller installs `anchor` as the page clock, so the page's "this month" is
+ * the anchor's. Browser and runner share the machine's timezone (no
+ * `timezoneId` is set).
  */
-function earlierThisMonth(): Date {
-  const now = new Date();
+function earlierThisMonth(now: Date): Date {
   if (now.getDate() > 1) {
     return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12, 0, 0);
   }
@@ -145,7 +146,8 @@ test.describe('Mood history and partner moods offline', () => {
     supabaseAdmin,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
-    const loggedAt = earlierThisMonth();
+    const anchor = clockAnchor();
+    const loggedAt = earlierThisMonth(anchor);
     const dateKey = localISO(loggedAt);
     const note = `backfill-e2e-${randomUUID()}`;
 
@@ -165,6 +167,8 @@ test.describe('Mood history and partner moods offline', () => {
 
     try {
       // GIVEN: signed in, then the moods store is emptied — a fresh device.
+      // The clock survives the reload below, so both loads share one month.
+      await page.clock.install({ time: anchor });
       await page.goto('/');
       await expect.poll(() => page.evaluate(() => window.__APP_STORE__?.getState().userId ?? null)).toBe(userId);
       // This load's own start backfill must land first, or it could merge after

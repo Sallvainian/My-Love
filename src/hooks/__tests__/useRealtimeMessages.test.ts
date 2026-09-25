@@ -118,6 +118,7 @@ function validNote(overrides: Record<string, unknown> = {}) {
 describe('useRealtimeMessages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockStoreState.userId = USER_ID;
     mocks.order.length = 0;
     mocks.getPartnerId.mockResolvedValue(PARTNER_ID);
     mocks.removeChannel.mockResolvedValue('ok');
@@ -199,9 +200,9 @@ describe('useRealtimeMessages', () => {
     // Nothing was ever claimed, so the cleanup has nothing to release.
     expect(supabase.removeChannel).not.toHaveBeenCalled();
 
+    // Async act drains every continuation of the released lookup.
     await act(async () => {
       releasePartner(PARTNER_ID);
-      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     // The parked run resumes, sees `cancelled`, and stops before creating one.
@@ -384,7 +385,6 @@ describe('useRealtimeMessages', () => {
 
     await act(async () => {
       releaseAuth();
-      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(mockChannel.subscribe).not.toHaveBeenCalled();
@@ -428,34 +428,65 @@ describe('useRealtimeMessages', () => {
     expect(supabase.removeChannel).toHaveBeenCalled();
   });
 
+  // Both gates are synchronous, so fake timers run every pending step of the
+  // open (including `waitForSocketReady`'s poll) without a wall-clock sleep,
+  // and the positive control proves the same run would have subscribed.
   it('should not subscribe when enabled is false', async () => {
     const { supabase } = await import('../../api/supabaseClient');
 
-    renderHook(() => useRealtimeMessages({ enabled: false }));
+    vi.useFakeTimers();
+    try {
+      let hook!: { rerender: (props: { enabled: boolean }) => void };
+      const initialProps: { enabled: boolean } = { enabled: false };
+      await act(async () => {
+        hook = renderHook((props: { enabled: boolean }) => useRealtimeMessages(props), {
+          initialProps,
+        });
+        await vi.runOnlyPendingTimersAsync();
+      });
 
-    // Wait a bit for any async operations
-    await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(supabase.channel).not.toHaveBeenCalled();
+      expect(mocks.setAuth).not.toHaveBeenCalled();
 
-    expect(supabase.channel).not.toHaveBeenCalled();
+      // Positive control: enabling the same hook subscribes.
+      await act(async () => {
+        hook.rerender({ enabled: true });
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should not subscribe when user is not authenticated', async () => {
     const { supabase } = await import('../../api/supabaseClient');
 
-    // Mock user not authenticated
-    const originalUserId = mockStoreState.userId;
+    // Mock user not authenticated; the top-level beforeEach restores it.
     mockStoreState.userId = null;
 
-    renderHook(() => useRealtimeMessages());
+    vi.useFakeTimers();
+    try {
+      let hook!: { rerender: () => void };
+      await act(async () => {
+        hook = renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
 
-    // Wait for async operations to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
+      // Should not attempt to create a channel
+      expect(supabase.channel).not.toHaveBeenCalled();
+      expect(mocks.setAuth).not.toHaveBeenCalled();
 
-    // Should not attempt to create a channel
-    expect(supabase.channel).not.toHaveBeenCalled();
-
-    // Restore
-    mockStoreState.userId = originalUserId;
+      // Positive control: once signed in, the same hook subscribes.
+      mockStoreState.userId = USER_ID;
+      await act(async () => {
+        hook.rerender();
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   describe('Error Handling and Retry Logic', () => {

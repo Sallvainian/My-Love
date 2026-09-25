@@ -11,31 +11,17 @@
  * Nothing here links, unlinks or resets an account; teardown resets only this
  * pair's own `birthday` columns and `wedding_date`.
  */
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
 import { test, expect } from '../../support/merged-fixtures';
 import type { TypedSupabaseClient } from '../../support/factories';
-import { resolveOwnPair } from '../../support/helpers/events';
-
-/**
- * A `YYYY-MM-DD` date `days` from today in the browser's local time, moved
- * `yearsBack` years into the past. Skips a 29 February, which rolls over.
- */
-async function localDateIn(page: Page, days: number, yearsBack = 0): Promise<string> {
-  return page.evaluate(
-    ({ days, yearsBack }) => {
-      const now = new Date();
-      let d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
-      if (d.getMonth() === 1 && d.getDate() === 29) {
-        d = new Date(d.getFullYear(), 2, 1);
-      }
-      const pad = (n: number) => String(n).padStart(2, '0');
-      return `${d.getFullYear() - yearsBack}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    },
-    { days, yearsBack }
-  );
-}
+import {
+  clockAnchorAvoidingLeapDay,
+  isoBirthdayDaysFromNow,
+  isoDateDaysFromNow,
+  resolveOwnPair,
+} from '../../support/helpers/events';
 
 async function resetPair(
   supabaseAdmin: TypedSupabaseClient,
@@ -76,9 +62,14 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await resetPair(supabaseAdmin, userId, partnerId);
 
+    // Both pages run on one pinned clock, and the dates are built from it, so
+    // the day counts below hold even if the run crosses real midnight.
+    const anchor = clockAnchorAvoidingLeapDay([10, 40]);
+
     let partnerContext: BrowserContext | undefined;
     try {
       await log.step('With nothing set, the partner card says so and the wedding is TBD');
+      await page.clock.install({ time: anchor });
       await page.goto('/');
       await expect(page.getByTestId('birthday-countdown-partner')).toContainText('Not set yet');
       await expect(page.getByTestId('birthday-countdown-self')).toContainText(
@@ -91,13 +82,14 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
         storageState: getStorageStatePath({ ...authOptions, userIdentifier: partnerUserIdentifier }),
         baseURL,
       });
+      await partnerContext.clock.install({ time: anchor });
       const partnerPage = await partnerContext.newPage();
       await partnerPage.goto('/settings');
       await expect(partnerPage.getByTestId('settings-birthday-value')).toHaveText('Not set yet');
       await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
 
       // Ten days from now, thirty years ago: "turns 30" in "10 days".
-      const birthday = await localDateIn(partnerPage, 10, 30);
+      const birthday = isoBirthdayDaysFromNow(10, 30, anchor);
       await partnerPage.getByTestId('settings-birthday-date').fill(birthday);
       const birthdaySaved = partnerPage.waitForResponse(
         (response) =>
@@ -110,7 +102,7 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
         .toBe(birthday);
       await expect(partnerPage.getByTestId('settings-birthday-error')).toHaveCount(0);
 
-      const wedding = await localDateIn(partnerPage, 40);
+      const wedding = isoDateDaysFromNow(40, anchor);
       await partnerPage.getByTestId('settings-wedding-date').fill(wedding);
       const weddingSaved = partnerPage.waitForResponse(
         (response) =>

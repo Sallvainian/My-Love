@@ -24,9 +24,27 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   getPartnerId: vi.fn(),
 }));
 
+// Pass-through spies: the deletes still run for real against IndexedDB, and a
+// test can also see whether sign-in asked for one at all. `setAuthUser` starts
+// them synchronously (fire-and-forget), so a delete that was never requested
+// is known the moment it returns.
+vi.mock('../../../src/services/localCopy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/localCopy')>();
+  return { ...actual, deleteAccountCopies: vi.fn(actual.deleteAccountCopies) };
+});
+vi.mock('../../../src/services/imageCache', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/imageCache')>();
+  return { ...actual, deleteAccountImages: vi.fn(actual.deleteAccountImages) };
+});
+
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { ACCOUNT_OWNER_STORAGE_KEY, signedOutState } from '../../../src/stores/slices/authSlice';
-import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
+import { deleteAccountImages } from '../../../src/services/imageCache';
+import {
+  deleteAccountCopies,
+  readLocalCopy,
+  writeLocalCopy,
+} from '../../../src/services/localCopy';
 import { MESSAGE_DATA_COPY_KIND, openMyLoveDB } from '../../../src/services/dbSchema';
 
 const EXPECTED_RESET: Record<string, unknown> = {
@@ -218,6 +236,8 @@ const pendingReloads: Promise<void>[] = [];
 
 describe('clearAuth on sign-out', () => {
   beforeEach(() => {
+    vi.mocked(deleteAccountCopies).mockClear();
+    vi.mocked(deleteAccountImages).mockClear();
     localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
     useAppStore.setState({
       loadMessages: () => {
@@ -813,6 +833,9 @@ describe('clearAuth on sign-out', () => {
     useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
 
     expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBe('USER-B-ID');
+    // Requested synchronously, for the recorded owner only.
+    expect(deleteAccountCopies).toHaveBeenCalledExactlyOnceWith(SECRETS.userId);
+    expect(deleteAccountImages).toHaveBeenCalledExactlyOnceWith(SECRETS.userId);
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
     await clearDevice();
   });
@@ -828,8 +851,9 @@ describe('clearAuth on sign-out', () => {
 
     useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
 
-    // Let any stray queued delete run before asserting nothing went.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Sign-in starts any delete synchronously, so none was ever requested.
+    expect(deleteAccountCopies).not.toHaveBeenCalled();
+    expect(deleteAccountImages).not.toHaveBeenCalled();
     expect(await readLocalCopy(SECRETS.userId, 'anniversaries')).not.toBeNull();
     const db = await openMyLoveDB();
     try {

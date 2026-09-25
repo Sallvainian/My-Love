@@ -89,6 +89,49 @@ let hangNextSend = false;
 let nextAuthFailure: string | null = null;
 
 /**
+ * When true, `removeChannel` acks its own leave as soon as it is requested
+ * instead of queueing it for the test. `settle()` turns it on.
+ */
+let autoAckLeaves = false;
+
+/**
+ * When true, a requested leave is acked the way the server's reply arrives:
+ * on a later task, after everything the client can run before it. A test that
+ * needs a send that did NOT wait for the ack to show itself uses this.
+ */
+let ackLeavesOverNetwork = false;
+
+/** The fake's steps a test can wait for. */
+type FakeStep = 'channelRequested' | 'channelOpened' | 'authRequested' | 'sendParked' | 'leaveRequested';
+let stepWaiters: Array<{ step: FakeStep; remaining: number; resolve: () => void }> = [];
+
+/** Called by the fake as it reaches `step`; resolves every waiter that is now due. */
+function reached(step: FakeStep): void {
+  for (const waiter of stepWaiters) {
+    if (waiter.step === step && --waiter.remaining === 0) waiter.resolve();
+  }
+  stepWaiters = stepWaiters.filter((waiter) => waiter.remaining > 0);
+}
+
+/**
+ * One-shot signal: resolves once the fake has reached `step` `times` more
+ * times. Arm it BEFORE the trigger, so an event cannot slip past unobserved.
+ */
+function nextStep(step: FakeStep, times = 1): Promise<void> {
+  return new Promise((resolve) => stepWaiters.push({ step, remaining: times, resolve }));
+}
+/** `channel(topic)` was called, whether it built a channel or handed back an existing one. */
+const nextChannelRequested = () => nextStep('channelRequested');
+/** A fresh channel object has been constructed (the topic was claimed). */
+const nextChannelOpened = (times = 1) => nextStep('channelOpened', times);
+/** `realtime.setAuth()` was called; the caller resumes only after this settles. */
+const nextAuthRequested = () => nextStep('authRequested');
+/** An httpSend has parked on the send gate. */
+const nextSendParked = (times = 1) => nextStep('sendParked', times);
+/** A `removeChannel` has queued its leave. */
+const nextLeaveRequested = (times = 1) => nextStep('leaveRequested', times);
+
+/**
  * The shared socket, modelled the way RealtimeClient actually behaves:
  * removing the LAST channel calls disconnect(), which parks the socket in
  * 'disconnecting' until onclose or a 100ms fallback timer.
@@ -99,12 +142,15 @@ const socket = {
   windowMs: 40,
   /** Set false to model the pre-fix library assumption (no window at all) */
   modelDisconnectWindow: true,
+  /** The pending end of the current disconnecting window, cleared between tests */
+  windowTimer: undefined as ReturnType<typeof setTimeout> | undefined,
 };
 
 vi.mock('@/api/supabaseClient', () => ({
   supabase: {
     channel: (topic: string, config?: unknown) => {
       channelConfigs.push(config);
+      reached('channelRequested');
       const existing = openChannels.get(topic);
       if (existing) return existing;
 
@@ -117,7 +163,10 @@ vi.mock('@/api/supabaseClient', () => ({
           opOrder.push(`httpSend:${chan.topic}`);
 
           if (gateSends) {
-            await new Promise<void>((resolve) => sendGate.push(resolve));
+            await new Promise<void>((resolve) => {
+              sendGate.push(resolve);
+              reached('sendParked');
+            });
           }
 
           if (hangNextSend) {
@@ -153,12 +202,14 @@ vi.mock('@/api/supabaseClient', () => ({
       };
       openChannels.set(topic, chan);
       constructedChannels.push(chan);
+      reached('channelOpened');
       return chan;
     },
     realtime: {
       isDisconnecting: () => socket.state === 'disconnecting',
       setAuth: async () => {
         opOrder.push('setAuth');
+        reached('authRequested');
         if (nextAuthFailure !== null) {
           const message = nextAuthFailure;
           nextAuthFailure = null;
@@ -170,18 +221,27 @@ vi.mock('@/api/supabaseClient', () => ({
     removeChannel: (chan: FakeChannel) => {
       chan.state = 'leaving';
       return new Promise<string>((resolve) => {
-        leaveQueue.push(() => {
+        const ack = () => {
           chan.state = 'closed';
           openChannels.delete(chan.topic);
           // RealtimeClient.js:217 — `if (this.channels.length === 0) { this.disconnect(); }`
           if (socket.modelDisconnectWindow && openChannels.size === 0) {
             socket.state = 'disconnecting';
-            setTimeout(() => {
+            clearTimeout(socket.windowTimer);
+            socket.windowTimer = setTimeout(() => {
               socket.state = 'connected';
             }, socket.windowMs);
           }
           resolve('ok');
-        });
+        };
+        if (autoAckLeaves) {
+          ack();
+        } else if (ackLeavesOverNetwork) {
+          setTimeout(ack, 0);
+        } else {
+          leaveQueue.push(ack);
+        }
+        reached('leaveRequested');
       });
     },
   },
@@ -193,42 +253,37 @@ import { sendEphemeralBroadcast } from '@/api/ephemeralBroadcast';
 
 const TOPIC = 'mood-updates:partner-1';
 
-function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+/** Every send this test started, so `settle()` can wait for all of them. */
+let inFlight: Array<Promise<void>> = [];
+
+/** `sendEphemeralBroadcast`, recorded for `settle()`. */
+function broadcast(topic: string, event: string, payload: Record<string, unknown>): Promise<void> {
+  const send = sendEphemeralBroadcast(topic, event, payload);
+  inFlight.push(send);
+  return send;
 }
 
 /**
- * Ack every queued leave until the queue stays empty.
+ * Let every send this test started run to completion.
  *
- * "Stays" is the load-bearing word. A send parked inside `waitForSocketReady`
- * wakes on its own poll tick, up to POLL_MS after the socket settles, so at the
- * instant the socket flips back to 'connected' there is a window in which both
- * queues are empty and yet a send is about to open a channel and queue another
- * leave. Breaking on a single quiet iteration returned before that send had
- * run, left its leave unacked, and the test then died on its 5s timeout —
- * which made this file fail 11 of 12 runs.
+ * Each send's own promise settles only after its own leave has been acked
+ * (`openSendClose` awaits `removeChannel` in its `finally`), so once gates stay
+ * open and leaves ack themselves, awaiting the sends IS quiescence -- including
+ * a send still parked in `waitForSocketReady`, which wakes on its own poll.
  */
-const QUIET_ITERATIONS_REQUIRED = 6;
-
 async function settle(): Promise<void> {
-  let quiet = 0;
-
-  for (let i = 0; i < 400; i++) {
+  // Restored afterwards, so steps after a mid-test settle() run in the mode
+  // the test set rather than silently in auto-ack.
+  const saved = { gateSends, autoAckLeaves };
+  gateSends = false;
+  autoAckLeaves = true;
+  try {
     while (sendGate.length > 0) sendGate.shift()!();
     while (leaveQueue.length > 0) leaveQueue.shift()!();
-    await new Promise((r) => setTimeout(r, 5));
-
-    const idle = leaveQueue.length === 0 && sendGate.length === 0 && socket.state === 'connected';
-    quiet = idle ? quiet + 1 : 0;
-    if (quiet >= QUIET_ITERATIONS_REQUIRED) return;
+    await Promise.allSettled(inFlight);
+  } finally {
+    ({ gateSends, autoAckLeaves } = saved);
   }
-
-  // Falling off the end used to return normally, so a genuine hang looked like
-  // a drained queue and surfaced later as a confusing assertion failure.
-  throw new Error(
-    `settle() never reached quiescence: leaveQueue=${leaveQueue.length} ` +
-      `sendGate=${sendGate.length} socket=${socket.state}`
-  );
 }
 
 describe('sendEphemeralBroadcast', () => {
@@ -250,17 +305,24 @@ describe('sendEphemeralBroadcast', () => {
     socket.state = 'connected';
     socket.windowMs = 40;
     socket.modelDisconnectWindow = true;
+    autoAckLeaves = false;
+    ackLeavesOverNetwork = false;
+    stepWaiters = [];
+    inFlight = [];
   });
 
   afterEach(async () => {
     // The queue lives on a module-level map; an unsettled send would park the
     // next test behind it.
     await settle();
+    // A disconnecting window still open would flip the next test's socket.
+    clearTimeout(socket.windowTimer);
+    socket.windowTimer = undefined;
     vi.clearAllMocks();
   });
 
   it('opens the topic as a private channel', async () => {
-    const send = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const send = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
     await settle();
     await expect(send).resolves.toBeUndefined();
 
@@ -270,7 +332,7 @@ describe('sendEphemeralBroadcast', () => {
   });
 
   it('installs the caller JWT before sending, and claims the topic before either', async () => {
-    const send = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const send = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
     await settle();
     await expect(send).resolves.toBeUndefined();
 
@@ -284,7 +346,7 @@ describe('sendEphemeralBroadcast', () => {
   });
 
   it('hands the send its own timeout rather than racing a timer against it', async () => {
-    const send = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const send = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
     await settle();
     await send;
 
@@ -296,7 +358,7 @@ describe('sendEphemeralBroadcast', () => {
     // already saved, only the realtime hop failed.
     nextAuthToken = null;
 
-    const send = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const send = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
     await settle();
 
     await expect(send).rejects.toThrow(/Unauthorized/);
@@ -308,7 +370,7 @@ describe('sendEphemeralBroadcast', () => {
   it('rejects a send that RESOLVES with the failure shape instead of throwing', async () => {
     nextSendFailureShape = { status: 403, error: 'Unauthorized' };
 
-    const send = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const send = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
     await settle();
 
     // Treating a resolved `{ success: false }` as delivered would drop the
@@ -318,8 +380,8 @@ describe('sendEphemeralBroadcast', () => {
   });
 
   it('delivers both of two overlapping sends to the same topic', async () => {
-    const first = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
-    const second = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-2' });
+    const first = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const second = broadcast(TOPIC, 'new_mood', { id: 'mood-2' });
 
     await settle();
     await expect(first).resolves.toBeUndefined();
@@ -332,8 +394,8 @@ describe('sendEphemeralBroadcast', () => {
   });
 
   it('opens a separate channel per send rather than reusing a closing one', async () => {
-    const first = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
-    const second = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-2' });
+    const first = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const second = broadcast(TOPIC, 'new_mood', { id: 'mood-2' });
 
     await settle();
     await Promise.all([first, second]);
@@ -348,23 +410,30 @@ describe('sendEphemeralBroadcast', () => {
   it('does not start the second send until the first channel has fully left', async () => {
     gateSends = true;
 
-    const first = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
-    const second = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-2' });
-    await flush();
+    const firstParked = nextSendParked();
+    const first = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const second = broadcast(TOPIC, 'new_mood', { id: 'mood-2' });
+    await firstParked;
 
     // Only the first has a channel; the second is still queued.
     expect(constructedChannels).toHaveLength(1);
 
-    // Let the first send through, but hold its leave unacked.
+    // Let the first send through. Its leave is acked the way the server's
+    // reply arrives, on a later task -- so a second send that did not wait for
+    // it gets every chance to ask for the topic first.
+    ackLeavesOverNetwork = true;
+    const firstLeaving = nextLeaveRequested();
+    const secondAsked = nextChannelRequested();
     sendGate.shift()!();
-    await flush();
+    await firstLeaving;
     expect(constructedChannels[0].state).toBe('leaving');
     // Still queued: the topic is claimed until the client lets it go, so
     // opening now would just retrieve the dying channel.
     expect(constructedChannels).toHaveLength(1);
 
-    leaveQueue.shift()!();
-    await flush();
+    // The second asks for the topic only once that leave has landed.
+    await secondAsked;
+    expect(constructedChannels[0].state).toBe('closed');
 
     // That leave removed the last open channel, so the socket is now
     // mid-disconnect. The second send claims the topic straight away — that is
@@ -375,7 +444,6 @@ describe('sendEphemeralBroadcast', () => {
     // A fresh object, not the dying one handed back by topic lookup.
     expect(constructedChannels[1]).not.toBe(constructedChannels[0]);
 
-    gateSends = false;
     await settle();
     await Promise.all([first, second]);
 
@@ -393,23 +461,26 @@ describe('sendEphemeralBroadcast', () => {
     // teardown can be the last one out.
     gateSends = true;
 
-    const other = sendEphemeralBroadcast('love-notes:partner-1', 'new_note', { id: 'note-1' });
-    await flush();
+    const otherParked = nextSendParked();
+    const other = broadcast('love-notes:partner-1', 'new_note', { id: 'note-1' });
+    await otherParked;
     expect(constructedChannels).toHaveLength(1);
 
+    const otherLeaving = nextLeaveRequested();
     sendGate.shift()!();
-    await flush();
+    await otherLeaving;
     // Its channel is leaving, and it is currently the only one registered.
     expect(leaveQueue).toHaveLength(1);
 
-    // The interleaving that matters, forced rather than hoped for. The chain
-    // runs openSendClose one microtask after this call, and this test's own
-    // continuation was queued before that microtask queued its next — so the
-    // ack below lands after the claim.
-    const mine = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
-    await Promise.resolve();
+    // The interleaving that matters, forced rather than hoped for: the other
+    // channel's leave lands while this send is still waiting on its token --
+    // after the claim, before any wait. `setAuth` settles only after this
+    // continuation has run, and the ack runs synchronously, so the socket
+    // state below is its verdict.
+    const mineAuthorizing = nextAuthRequested();
+    const mine = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    await mineAuthorizing;
     leaveQueue.shift()!();
-    await flush();
 
     // Claiming the topic before the wait is what makes this hold: the ack found
     // this channel already registered, so it was not the last one out and the
@@ -417,7 +488,6 @@ describe('sendEphemeralBroadcast', () => {
     expect(socket.state).toBe('connected');
     expect(constructedChannels).toHaveLength(2);
 
-    gateSends = false;
     await settle();
     await Promise.all([other, mine]);
 
@@ -429,8 +499,8 @@ describe('sendEphemeralBroadcast', () => {
   it('a failed send does not strand the next one', async () => {
     nextSendFailure = 'Internal Server Error';
 
-    const failing = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
-    const following = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-2' });
+    const failing = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const following = broadcast(TOPIC, 'new_mood', { id: 'mood-2' });
 
     await settle();
 
@@ -447,15 +517,17 @@ describe('sendEphemeralBroadcast', () => {
   it('sends to different topics do not queue behind each other', async () => {
     gateSends = true;
 
-    const toPartner = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
-    const toNotes = sendEphemeralBroadcast('love-notes:partner-1', 'new_message', { id: 'note-1' });
-    await flush();
+    // Both park on the gate at once: a send queued behind the other topic's
+    // would never get that far while the gate is shut.
+    const bothParked = nextSendParked(2);
+    const toPartner = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const toNotes = broadcast('love-notes:partner-1', 'new_message', { id: 'note-1' });
+    await bothParked;
 
     // Independent topics never collide in the client's registry, so serialising
     // across them would only add latency.
     expect(constructedChannels).toHaveLength(2);
 
-    gateSends = false;
     await settle();
     await Promise.all([toPartner, toNotes]);
   });
@@ -465,9 +537,9 @@ describe('sendEphemeralBroadcast', () => {
     // open channel calls disconnect(), and the socket sits in 'disconnecting'
     // for ~100ms. Two moods in one syncPendingMoods pass is enough, which is
     // the exact case this queue was added to fix.
-    const first = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
-    const second = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-2' });
-    const third = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-3' });
+    const first = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const second = broadcast(TOPIC, 'new_mood', { id: 'mood-2' });
+    const third = broadcast(TOPIC, 'new_mood', { id: 'mood-3' });
 
     await settle();
     await expect(first).resolves.toBeUndefined();
@@ -489,14 +561,14 @@ describe('sendEphemeralBroadcast', () => {
     // also pinned the shared socket open.
     nextAuthFailure = 'refresh failed';
 
-    const send = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+    const send = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
     await settle();
 
     await expect(send).rejects.toThrow('refresh failed');
     expect(openChannels.has(TOPIC)).toBe(false);
 
     // And the queue is not wedged: the topic is sendable again afterwards.
-    const next = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-2' });
+    const next = broadcast(TOPIC, 'new_mood', { id: 'mood-2' });
     await settle();
     await expect(next).resolves.toBeUndefined();
     expect(constructedChannels.at(-1)?.sent).toEqual([
@@ -509,7 +581,7 @@ describe('sendEphemeralBroadcast', () => {
     try {
       hangNextSend = true;
 
-      const stuck = sendEphemeralBroadcast(TOPIC, 'new_mood', { id: 'mood-1' });
+      const stuck = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
       const assertion = expect(stuck).rejects.toThrow(/aborted due to timeout/);
 
       await vi.advanceTimersByTimeAsync(16_000);

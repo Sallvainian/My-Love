@@ -169,8 +169,15 @@ export function stalePersistedEvent(
   };
 }
 
-/** A stale mood dated today, with a note no real row could produce. */
-export function stalePersistedMood(overrides: Partial<PersistedMoodSeed> = {}): PersistedMoodSeed {
+/**
+ * A stale mood dated the anchor's local day, with a note no real row could
+ * produce. A test that asserts on "today" passes the instant it installs as
+ * the page clock, so the mood's day and the app's day cannot drift apart.
+ */
+export function stalePersistedMood(
+  overrides: Partial<PersistedMoodSeed> = {},
+  anchor: Date = new Date()
+): PersistedMoodSeed {
   const nonce = faker.string.alphanumeric(8).toUpperCase();
 
   return {
@@ -179,8 +186,8 @@ export function stalePersistedMood(overrides: Partial<PersistedMoodSeed> = {}): 
     mood: 'sad',
     moods: ['sad'],
     note: `STALE-MOOD-NOTE-${nonce}`,
-    date: formatDateISO(new Date()),
-    timestamp: new Date().toISOString(),
+    date: formatDateISO(anchor),
+    timestamp: anchor.toISOString(),
     synced: true,
     ...overrides,
   };

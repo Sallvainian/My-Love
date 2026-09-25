@@ -44,6 +44,39 @@ let constructedChannels: FakeChannel[] = [];
 const removeChannel = vi.fn();
 /** Resolvers for in-flight leaves, so the server's ack can be timed by a test */
 let leaveQueue: Array<() => void> = [];
+/** Every leave `removeChannel` handed the service, so teardown can await them all. */
+let leavePromises: Array<Promise<string>> = [];
+/** When true, a requested leave is acked at once. Only teardown turns it on. */
+let autoAckLeaves = false;
+
+/** A mocked lookup the service awaited, as the promise it was handed. */
+type LookupKind = 'session' | 'partner';
+let lookupWaiters: Array<{ kind: LookupKind; resolve: (call: { promise: Promise<unknown> }) => void }> = [];
+
+/**
+ * Hand the promise a mocked lookup returns to every test waiting for that
+ * lookup. The service registers its own `await` on the promise as soon as the
+ * mock returns, before any waiter can -- so a test that awaits it next resumes
+ * only after the service has acted on the answer.
+ */
+function recordLookup<T>(kind: LookupKind, promise: Promise<T>): Promise<T> {
+  const due = lookupWaiters.filter((waiter) => waiter.kind === kind);
+  lookupWaiters = lookupWaiters.filter((waiter) => waiter.kind !== kind);
+  // Wrapped: resolving with the promise itself would adopt it.
+  due.forEach((waiter) => waiter.resolve({ promise }));
+  return promise;
+}
+
+/**
+ * Resolves once the NEXT `kind` lookup has been answered and the service has
+ * acted on the answer. Arm it before the trigger.
+ */
+async function nextLookupHandled(kind: LookupKind): Promise<void> {
+  const { promise } = await new Promise<{ promise: Promise<unknown> }>((resolve) =>
+    lookupWaiters.push({ kind, resolve })
+  );
+  await promise;
+}
 
 /**
  * The shared socket. Removing the LAST channel calls `disconnect()`
@@ -55,6 +88,8 @@ let leaveQueue: Array<() => void> = [];
 const socket = {
   state: 'connected' as 'connected' | 'disconnecting',
   windowMs: 40,
+  /** The pending end of the current disconnecting window, cleared between tests */
+  windowTimer: undefined as ReturnType<typeof setTimeout> | undefined,
 };
 
 /** Resolvers for pending getSession calls, so resolution order is controllable */
@@ -136,20 +171,25 @@ vi.mock('@/api/supabaseClient', () => ({
         return Promise.resolve('ok');
       }
       chan.state = 'leaving';
-      return new Promise<string>((resolve) => {
-        leaveQueue.push(() => {
+      const leave = new Promise<string>((resolve) => {
+        const ack = () => {
           chan.state = 'closed';
           openChannels.delete(chan.topic);
           // RealtimeClient.js:217 — the last channel out takes the socket with it.
           if (openChannels.size === 0) {
             socket.state = 'disconnecting';
-            setTimeout(() => {
+            clearTimeout(socket.windowTimer);
+            socket.windowTimer = setTimeout(() => {
               socket.state = 'connected';
             }, socket.windowMs);
           }
           resolve('ok');
-        });
+        };
+        if (autoAckLeaves) ack();
+        else leaveQueue.push(ack);
       });
+      leavePromises.push(leave);
+      return leave;
     },
     realtime: {
       isDisconnecting: () => socket.state === 'disconnecting',
@@ -163,28 +203,36 @@ vi.mock('@/api/supabaseClient', () => ({
   resolvePartnerIdForDelivery: (...args: unknown[]) => getPartnerId(...args),
   // Derived from the same stub: an id is `linked`, null is `unlinked`, and a
   // rejection is the inconclusive `error` a refresh must not write back.
-  resolvePartnerLookupForDelivery: async (...args: unknown[]) => {
-    try {
-      const partnerId = await getPartnerId(...args);
-      return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
-    } catch (error) {
-      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
-    }
-  },
+  resolvePartnerLookupForDelivery: (...args: unknown[]) =>
+    recordLookup(
+      'partner',
+      (async () => {
+        try {
+          const partnerId = await getPartnerId(...args);
+          return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
+        } catch (error) {
+          return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+        }
+      })()
+    ),
   getSignedInUserId: (...args: unknown[]) => getSignedInUserId(...args),
   // `verifyChannelOwner` reads the session through the discriminated lookup so
   // it can tell "signed out" from "the read failed". Derived from the same
   // `getSignedInUserId` mock so the existing setups keep their meaning: a
   // resolved id is `signed-in`, a resolved null is `signed-out`, and a REJECTED
   // promise is the inconclusive `error` case.
-  resolveSignedInUserForDelivery: async (...args: unknown[]) => {
-    try {
-      const userId = await getSignedInUserId(...args);
-      return userId ? { status: 'signed-in', userId } : { status: 'signed-out' };
-    } catch (error) {
-      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
-    }
-  },
+  resolveSignedInUserForDelivery: (...args: unknown[]) =>
+    recordLookup(
+      'session',
+      (async () => {
+        try {
+          const userId = await getSignedInUserId(...args);
+          return userId ? { status: 'signed-in', userId } : { status: 'signed-out' };
+        } catch (error) {
+          return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+        }
+      })()
+    ),
 }));
 
 import { moodSyncService } from '@/api/moodSyncService';
@@ -269,28 +317,15 @@ function ackNextLeave(): void {
   ack();
 }
 
-/** Let every already-queued microtask and continuation run */
-function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-/** Ack every in-flight leave, then wait out the socket's disconnect window */
+/**
+ * Ack every leave, including any requested from here on, and wait for all of
+ * them. Every subscribe a test starts is awaited by that test, so once its
+ * leaves have landed nothing of it is left running.
+ */
 async function settleLeaves(): Promise<void> {
-  // Sustained quiescence, not a single bounded wait. Its sibling in
-  // ephemeralBroadcast.test.ts used the one-shot form and failed 11 of 12 runs:
-  // a subscriber parked in waitForSocketReady wakes on its own poll tick, up to
-  // POLL_MS after the socket settles, and can queue another leave after the
-  // wait has already returned.
-  let quiet = 0;
-  for (let i = 0; i < 400; i++) {
-    while (leaveQueue.length > 0) ackNextLeave();
-    await new Promise((r) => setTimeout(r, 5));
-    quiet = leaveQueue.length === 0 && socket.state === 'connected' ? quiet + 1 : 0;
-    if (quiet >= 6) return;
-  }
-  throw new Error(
-    `settleLeaves() never reached quiescence: leaveQueue=${leaveQueue.length} socket=${socket.state}`
-  );
+  autoAckLeaves = true;
+  while (leaveQueue.length > 0) ackNextLeave();
+  await Promise.all(leavePromises);
 }
 
 describe('subscribeMoodUpdates channel ownership', () => {
@@ -299,6 +334,9 @@ describe('subscribeMoodUpdates channel ownership', () => {
     constructedChannels = [];
     sessionQueue = [];
     leaveQueue = [];
+    leavePromises = [];
+    autoAckLeaves = false;
+    lookupWaiters = [];
     channelConfigs = [];
     opOrder = [];
     removeChannel.mockClear();
@@ -319,6 +357,10 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // leave would outlive the test and park the next test's subscribe on a
     // promise whose resolver was thrown away with the queue.
     await settleLeaves();
+    // A disconnecting window still open would flip the next test's socket.
+    clearTimeout(socket.windowTimer);
+    socket.windowTimer = undefined;
+    socket.state = 'connected';
     vi.clearAllMocks();
   });
 
@@ -390,7 +432,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     expect(openChannels.get(TOPIC)).toBe(channel);
     expect(channel.state).toBe('leaving');
 
-    await settleLeaves();
+    ackNextLeave();
     expect(openChannels.has(TOPIC)).toBe(false);
   });
 
@@ -498,7 +540,8 @@ describe('subscribeMoodUpdates channel ownership', () => {
     const onMoodB = vi.fn();
     const pendingB = moodSyncService.subscribeMoodUpdates(onMoodB);
     resolveNextSession();
-    await flush();
+    // B has installed its token, the last step before it looks for the topic.
+    await vi.waitFor(() => expect(setAuth).toHaveBeenCalledTimes(2));
 
     // The defect this guards: B used to take the leaving channel, call
     // subscribe() on it — a no-op, since the join is gated on state 'closed' —
@@ -506,7 +549,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // still be waiting, not holding a channel.
     expect(constructedChannels).toHaveLength(1);
 
-    await settleLeaves();
+    ackNextLeave();
     const unsubscribeB = await pendingB;
 
     expect(constructedChannels).toHaveLength(2);
@@ -532,9 +575,11 @@ describe('subscribeMoodUpdates channel ownership', () => {
     const pendingC = moodSyncService.subscribeMoodUpdates(vi.fn());
     resolveNextSession();
     resolveNextSession();
-    await flush();
+    // Both have installed their tokens (A's was the first), so both are
+    // waiting on that one leave.
+    await vi.waitFor(() => expect(setAuth).toHaveBeenCalledTimes(3));
 
-    await settleLeaves();
+    ackNextLeave();
     const [unsubscribeB, unsubscribeC] = await Promise.all([pendingB, pendingC]);
 
     // Exactly one replacement — both waiters must not each open their own.
@@ -560,7 +605,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     emitStatus(dead, 'SUBSCRIBED');
 
     unsubscribeA();
-    await settleLeaves();
+    ackNextLeave();
 
     // A replacement opens under the same topic.
     const pendingB = moodSyncService.subscribeMoodUpdates(vi.fn());
@@ -678,8 +723,9 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // still open. The next join re-checks, and the topic no longer belongs to
     // whoever is signed in.
     getSignedInUserId.mockResolvedValue(OUTSIDER_ID);
+    const sessionChecked = nextLookupHandled('session');
     emitStatus(channel, 'SUBSCRIBED');
-    await flush();
+    await sessionChecked;
 
     emitMood(channel, 'after-switch');
     expect(onMood).toHaveBeenCalledTimes(1);
@@ -700,14 +746,24 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     const channel = constructedChannels[0];
     const lookupsAfterJoin = getPartnerId.mock.calls.length;
+    const sessionReadsAfterJoin = getSignedInUserId.mock.calls.length;
 
     // Were this SUBSCRIBED to refresh, the mood below would land in the window
     // where the snapshot is null and be dropped.
+    const sessionChecked = nextLookupHandled('session');
     emitStatus(channel, 'SUBSCRIBED');
     emitMood(channel, 'immediately-after-join');
     expect(onMood).toHaveBeenCalledTimes(1);
 
-    await flush();
+    // The join's only check is the session read; once it has been acted on,
+    // the identity check is over.
+    await sessionChecked;
+    // Exactly one session read. A refresh chained after the check starts with
+    // a second one, before this line runs -- and clears the snapshot, so the
+    // mood below would be dropped.
+    expect(getSignedInUserId.mock.calls.length).toBe(sessionReadsAfterJoin + 1);
+    emitMood(channel, 'after-the-check');
+    expect(onMood).toHaveBeenCalledTimes(2);
     // And it cost no second round-trip.
     expect(getPartnerId.mock.calls.length).toBe(lookupsAfterJoin);
 
@@ -723,14 +779,16 @@ describe('subscribeMoodUpdates channel ownership', () => {
     const channel = constructedChannels[0];
 
     // The join itself. Everything after this is a re-join.
+    const joinChecked = nextLookupHandled('session');
     emitStatus(channel, 'SUBSCRIBED');
-    await flush();
+    await joinChecked;
 
     // The relationship ended while the channel was up. RLS is re-evaluated at
     // the re-join, and so is this snapshot.
     getPartnerId.mockResolvedValue(null);
+    const refreshed = nextLookupHandled('partner');
     emitStatus(channel, 'SUBSCRIBED');
-    await flush();
+    await refreshed;
 
     emitMood(channel, 'after-unlink');
     expect(onMood).not.toHaveBeenCalled();
@@ -754,13 +812,15 @@ describe('subscribeMoodUpdates channel ownership', () => {
     const channel = constructedChannels[0];
 
     // The join itself. Everything after this is a re-join.
+    const joinChecked = nextLookupHandled('session');
     emitStatus(channel, 'SUBSCRIBED');
-    await flush();
+    await joinChecked;
 
     // The socket drops and rejoins; the `users` read fails outright.
     getPartnerId.mockRejectedValueOnce(new Error('network down'));
+    const refreshed = nextLookupHandled('partner');
     emitStatus(channel, 'SUBSCRIBED');
-    await flush();
+    await refreshed;
 
     emitMood(channel, 'after-the-blip');
     expect(onMood).toHaveBeenCalledTimes(1);
@@ -784,12 +844,14 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     // The join, then the re-join whose lookup fails. Only a RE-join refreshes,
     // so the failing lookup has to be the second SUBSCRIBED.
+    const joinChecked = nextLookupHandled('session');
     emitStatus(channel, 'SUBSCRIBED');
-    await flush();
+    await joinChecked;
 
     getPartnerId.mockResolvedValue(null);
+    const refreshed = nextLookupHandled('partner');
     emitStatus(channel, 'SUBSCRIBED');
-    await flush();
+    await refreshed;
 
     emitMood(channel, 'while-muted');
     expect(onMoodA).not.toHaveBeenCalled();
@@ -864,8 +926,9 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     // The retry succeeds this time.
     getPartnerId.mockResolvedValue(PARTNER_ID);
+    const refreshed = nextLookupHandled('partner');
     emitStatus(channel, 'SUBSCRIBED');
-    await flush();
+    await refreshed;
 
     emitMood(channel, 'after-recovery');
     expect(onMood).toHaveBeenCalledTimes(1);
@@ -888,8 +951,9 @@ describe('subscribeMoodUpdates channel ownership', () => {
     const channel = constructedChannels[0];
 
     getSignedInUserId.mockRejectedValue(new Error('network down'));
+    const sessionChecked = nextLookupHandled('session');
     emitStatus(channel, 'SUBSCRIBED');
-    await flush();
+    await sessionChecked;
 
     // The read told us nothing, so the join-time snapshot stands.
     emitMood(channel, 'after-inconclusive-read');
@@ -909,8 +973,9 @@ describe('subscribeMoodUpdates channel ownership', () => {
     const channel = constructedChannels[0];
 
     getSignedInUserId.mockResolvedValue(OUTSIDER_ID);
+    const sessionChecked = nextLookupHandled('session');
     emitStatus(channel, 'SUBSCRIBED');
-    await flush();
+    await sessionChecked;
 
     emitMood(channel, 'after-account-change');
     expect(onMood).not.toHaveBeenCalled();

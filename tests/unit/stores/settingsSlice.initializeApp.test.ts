@@ -56,17 +56,6 @@ function deferred<T>() {
   return { promise, settle, fail };
 }
 
-/**
- * Let every already-resolved promise in the chain settle before the switch.
- *
- * This uses a REAL `setTimeout`. If a shared `vi.useFakeTimers()` is ever added
- * to this file's `beforeEach`, every case that calls `flush()` hangs with no
- * diagnostic — advance the timers or swap this for a microtask drain first.
- */
-function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 function aOutgoingPool(): Message[] {
   return [
     {
@@ -109,6 +98,12 @@ const buildTestStore = async () => {
   const { createSettingsSlice } = await import('../../../src/stores/slices/settingsSlice');
   const updateCurrentMessage = vi.fn();
   const loadMessagesRequestedBy: Array<string | null> = [];
+  /**
+   * Every `loadMessages` run, as the promise its caller got. The handoff chains
+   * its completion onto that promise before a test can, so awaiting the run
+   * resumes the test only after the handoff has acted on it.
+   */
+  const loadMessagesRuns: Array<Promise<void>> = [];
 
   const store = create<TestState>()((set, get, api) => ({
     __isHydrated: true,
@@ -139,23 +134,27 @@ const buildTestStore = async () => {
      * production does not have, and the case asserting that `.catch()` would
      * then be green for the wrong reason (DW-137).
      */
-    loadMessages: async () => {
-      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      loadMessagesRequestedBy.push(requestedBy);
-      try {
-        // Same reads as production: the shared bundled rows, plus the copy of
-        // the account that raised the load.
-        const [bundled, copy] = await Promise.all([
-          mockStorageService.getAllMessages(),
-          requestedBy ? mockReadMessageData(requestedBy) : Promise.resolve(null),
-        ]);
-        if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) {
-          return;
+    loadMessages: () => {
+      const run = (async () => {
+        const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+        loadMessagesRequestedBy.push(requestedBy);
+        try {
+          // Same reads as production: the shared bundled rows, plus the copy of
+          // the account that raised the load.
+          const [bundled, copy] = await Promise.all([
+            mockStorageService.getAllMessages(),
+            requestedBy ? mockReadMessageData(requestedBy) : Promise.resolve(null),
+          ]);
+          if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) {
+            return;
+          }
+          set({ messages: projectMessageFavorites(bundled, copy) });
+        } catch (error) {
+          console.error('[MessagesSlice] Failed to load messages:', error);
         }
-        set({ messages: projectMessageFavorites(bundled, copy) });
-      } catch (error) {
-        console.error('[MessagesSlice] Failed to load messages:', error);
-      }
+      })();
+      loadMessagesRuns.push(run);
+      return run;
     },
     ...createSettingsSlice(
       set as unknown as Parameters<typeof createSettingsSlice>[0],
@@ -164,7 +163,17 @@ const buildTestStore = async () => {
     ),
   }));
 
-  return { store, updateCurrentMessage, loadMessagesRequestedBy };
+  /**
+   * Resolves once the most recent `loadMessages` run, and the handoff chained on
+   * it, are done. Throws when no run was recorded, rather than resuming at once.
+   */
+  const lastLoadSettled = () => {
+    const run = loadMessagesRuns.at(-1);
+    if (!run) throw new Error('lastLoadSettled: no loadMessages run was recorded');
+    return run;
+  };
+
+  return { store, updateCurrentMessage, loadMessagesRequestedBy, lastLoadSettled };
 };
 
 /** The pool as the rotation sees it: no copy, so no favorites. */
@@ -272,9 +281,11 @@ describe('createSettingsSlice initializeApp', () => {
       .mockReturnValueOnce(initRead.promise)
       .mockReturnValueOnce(handoffRead.promise);
 
-    const { store, updateCurrentMessage, loadMessagesRequestedBy } = await buildTestStore();
+    const { store, updateCurrentMessage, loadMessagesRequestedBy, lastLoadSettled } =
+      await buildTestStore();
     const inFlight = store.getState().initializeApp();
-    await flush();
+    // Parked on the held read, so the switch lands mid-flight.
+    await vi.waitFor(() => expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(1));
 
     store.setState({
       userId: USER_C,
@@ -300,7 +311,7 @@ describe('createSettingsSlice initializeApp', () => {
 
     const incoming = cIncomingPool();
     handoffRead.settle(incoming);
-    await flush();
+    await lastLoadSettled();
 
     expect(store.getState().messages).toEqual(unfavorited(incoming));
     expect(store.getState().messages).not.toEqual([]);
@@ -323,14 +334,14 @@ describe('createSettingsSlice initializeApp', () => {
     mockStorageService.addMessages.mockResolvedValue(undefined);
     mockLoadDefaultMessages.mockResolvedValue([{ text: 'Seeded', category: 'memory' }]);
 
-    const { store, updateCurrentMessage, loadMessagesRequestedBy } = await buildTestStore();
+    const { store, updateCurrentMessage, loadMessagesRequestedBy, lastLoadSettled } =
+      await buildTestStore();
     const inFlight = store.getState().initializeApp();
-    await flush();
 
     // First read returned `[]`, so the seeding branch is in flight on the
     // re-read. Switching now is what makes a deleted guard on THAT `set()` fail.
+    await vi.waitFor(() => expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(2));
     expect(mockStorageService.addMessages).toHaveBeenCalledTimes(1);
-    expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(2);
 
     store.setState({
       userId: USER_C,
@@ -347,7 +358,7 @@ describe('createSettingsSlice initializeApp', () => {
 
     const incoming = cIncomingPool();
     handoffRead.settle(incoming);
-    await flush();
+    await lastLoadSettled();
 
     expect(store.getState().messages).toEqual(unfavorited(incoming));
     expect(store.getState().messages).not.toEqual([]);
@@ -362,9 +373,11 @@ describe('createSettingsSlice initializeApp', () => {
       .mockReturnValueOnce(initRead.promise)
       .mockReturnValueOnce(handoffRead.promise);
 
-    const { store, updateCurrentMessage, loadMessagesRequestedBy } = await buildTestStore();
+    const { store, updateCurrentMessage, loadMessagesRequestedBy, lastLoadSettled } =
+      await buildTestStore();
     const inFlight = store.getState().initializeApp();
-    await flush();
+    // Parked on the held read, so the sign-out lands mid-flight.
+    await vi.waitFor(() => expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(1));
 
     store.setState({
       userId: null,
@@ -384,7 +397,7 @@ describe('createSettingsSlice initializeApp', () => {
 
     const shared = sharedDailyPool();
     handoffRead.settle(shared);
-    await flush();
+    await lastLoadSettled();
 
     expect(store.getState().messages).toEqual(unfavorited(shared));
     expect(store.getState().messages).not.toEqual([]);
@@ -395,13 +408,14 @@ describe('createSettingsSlice initializeApp', () => {
     const pending = deferred<Message[]>();
     mockStorageService.init.mockResolvedValue(undefined);
     mockStorageService.getAllMessages.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(sharedDailyPool());
-    const { store, updateCurrentMessage, loadMessagesRequestedBy } = await buildTestStore();
+    const { store, updateCurrentMessage, loadMessagesRequestedBy, lastLoadSettled } =
+      await buildTestStore();
     const run = store.getState().initializeApp();
-    await flush();
+    await vi.waitFor(() => expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(1));
     store.setState({ authSessionVersion: 2 });
     pending.settle(aOutgoingPool());
     await run;
-    await flush();
+    await lastLoadSettled();
     expect(store.getState().messages.map((row) => row.text)).toEqual(['SHARED-DAILY']);
     expect(loadMessagesRequestedBy).toEqual([SIGNED_IN_USER]);
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
@@ -412,15 +426,18 @@ describe('createSettingsSlice initializeApp', () => {
     const handoff = deferred<Message[]>();
     mockStorageService.init.mockResolvedValue(undefined);
     mockStorageService.getAllMessages.mockReturnValueOnce(pending.promise).mockReturnValueOnce(handoff.promise);
-    const { store, updateCurrentMessage } = await buildTestStore();
+    const { store, updateCurrentMessage, loadMessagesRequestedBy, lastLoadSettled } =
+      await buildTestStore();
     const run = store.getState().initializeApp();
-    await flush();
+    await vi.waitFor(() => expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(1));
     store.setState({ authSessionVersion: 2 });
     pending.settle(aOutgoingPool());
     await run;
     store.setState({ authSessionVersion: 3 });
     handoff.settle(sharedDailyPool());
-    await flush();
+    // The handoff checks the session as soon as its load settles.
+    await lastLoadSettled();
+    expect(loadMessagesRequestedBy).toEqual([SIGNED_IN_USER]);
     expect(updateCurrentMessage).not.toHaveBeenCalled();
   });
 
@@ -433,12 +450,13 @@ describe('createSettingsSlice initializeApp', () => {
     updateCurrentMessage.mockImplementation(() => { throw failure; });
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const run = store.getState().initializeApp();
-    await flush();
+    await vi.waitFor(() => expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(1));
     store.setState({ authSessionVersion: 2 });
     pending.settle(aOutgoingPool());
     await run;
-    await flush();
-    expect(log).toHaveBeenCalledWith('[App Init] Failed to reload the rotation pool:', failure);
+    await vi.waitFor(() =>
+      expect(log).toHaveBeenCalledWith('[App Init] Failed to reload the rotation pool:', failure)
+    );
     expect(store.getState().isLoading).toBe(false);
     log.mockRestore();
   });

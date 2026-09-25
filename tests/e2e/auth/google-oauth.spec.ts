@@ -36,7 +36,7 @@ test.describe('Google OAuth', () => {
     const authorizeUrls: string[] = [];
     await page.route('**/auth/v1/authorize**', (route) => {
       authorizeUrls.push(route.request().url());
-      route.fulfill({
+      return route.fulfill({
         status: 302,
         headers: { Location: appBaseUrl + '/' },
       });

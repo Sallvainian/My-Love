@@ -294,12 +294,13 @@ describe('notesSlice removeNote', () => {
     mockedDeleteCachedImages.mockRejectedValueOnce(new Error('idb unavailable'));
 
     await expect(store.getState().removeNote('note-0')).resolves.toBeUndefined();
-    await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(store.getState().notes.map((n) => n.id)).toEqual(['note-1']);
-    expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining('cached image'),
-      expect.any(Error)
+    await vi.waitFor(() =>
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining('cached image'),
+        expect.any(Error)
+      )
     );
     consoleError.mockRestore();
   });
@@ -434,8 +435,7 @@ describe('notesSlice removeNote', () => {
     // own anti-join already excludes the note, and the test passes whether or not
     // the client-side guard exists — which is exactly how the previous version
     // of this test managed to prove nothing.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(backend.releaseHeldRead).not.toBeNull();
+    await vi.waitFor(() => expect(backend.releaseHeldRead).not.toBeNull());
 
     await store.getState().removeNote('note-1');
 

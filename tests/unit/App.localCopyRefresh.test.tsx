@@ -147,10 +147,16 @@ function session(userId = USER_ID): Session {
 
 const initialState = useAppStore.getInitialState();
 
+// Pinned (noon EDT), so the welcome splash's "seen it recently" stamp below is
+// measured against a fixed clock rather than the live one. Only `Date` is
+// faked, so RTL's `waitFor` keeps its real timers.
+const NOW = new Date('2026-09-15T16:00:00.000Z');
+
 beforeEach(() => {
+  vi.setSystemTime(NOW);
   vi.clearAllMocks();
   localStorage.clear();
-  localStorage.setItem('lastWelcomeView', String(Date.now()));
+  localStorage.setItem('lastWelcomeView', String(NOW.getTime()));
   window.history.replaceState({}, '', '/');
   auth.getSession.mockResolvedValue(session());
   profile.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Copy User' });
@@ -172,6 +178,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   localStorage.clear();
+  vi.useRealTimers();
 });
 
 async function renderApp() {
@@ -279,7 +286,8 @@ describe('App drains the love-note send queue', () => {
   });
 
   it('on the 5-minute interval while signed in', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    // 'Date' too: faking timers without it would un-pin the clock.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     try {
       await renderApp();
       drain().mockClear();
@@ -295,7 +303,8 @@ describe('App drains the love-note send queue', () => {
   });
 
   it('not at all while signed out, including on the online event and the interval', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    // 'Date' too: faking timers without it would un-pin the clock.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     try {
       auth.getSession.mockResolvedValue(null);
       await renderApp();

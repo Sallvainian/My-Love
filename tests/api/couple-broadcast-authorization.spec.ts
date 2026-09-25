@@ -47,6 +47,14 @@
  * No worker account is linked, unlinked or reset anywhere in this file; those
  * rows are shared with every other worker.
  *
+ * Sentinel assumption. Non-delivery is proved with a sentinel: a message that
+ * must arrive, sent only after the forbidden call has returned. That proof
+ * rests on Realtime delivering to one subscriber in the order the server
+ * accepted the messages, across senders and across the REST and websocket
+ * paths. It holds on the single-node local stack this file runs against; it is
+ * not a guarantee Realtime makes in general, so on a multi-node deployment a
+ * leak could land after its sentinel and go unseen here.
+ *
  * playwright-utils deviation: the library has no Supabase Realtime/WebSocket
  * subscription utility, so the channels below are opened with the SDK directly,
  * following tests/api/interaction-realtime.spec.ts.
@@ -60,9 +68,6 @@ import type { TypedSupabaseClient } from '../support/factories';
 
 /** A terminal subscribe status — anything the server will not move on from. */
 const TERMINAL_FAILURES = ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'];
-
-/** How long to let a delivery that should NOT happen fail to happen. */
-const NON_DELIVERY_GRACE_MS = 3000;
 
 function envPair(): { url: string; anonKey: string } {
   const url = process.env.SUPABASE_URL;
@@ -97,18 +102,25 @@ interface Subscription {
   received: Array<Record<string, unknown>>;
 }
 
-/** Open one topic and start collecting statuses and payloads from it. */
+/**
+ * Open one topic and start collecting statuses and payloads from it.
+ *
+ * `ack: true` makes a websocket `send()` on the returned channel wait for the
+ * server's reply, so a later sentinel is known to have been sent after it.
+ */
 function join(
   client: SupabaseClient,
   topic: string,
   event: string,
-  options: { private: boolean }
+  options: { private: boolean; ack?: boolean }
 ): Subscription {
   const statuses: string[] = [];
   const received: Array<Record<string, unknown>> = [];
 
   const channel = client
-    .channel(topic, { config: { broadcast: { self: false }, private: options.private } })
+    .channel(topic, {
+      config: { broadcast: { self: false, ack: options.ack ?? false }, private: options.private },
+    })
     .on('broadcast', { event }, (message) => {
       received.push(message.payload as Record<string, unknown>);
     })
@@ -302,10 +314,11 @@ test.describe('Couple broadcast authorization', () => {
       expect(legacyResult, 'the SDK send() no longer reports ok on a denied forge').toBe('ok');
       await forger.removeChannel(forged);
 
-      await new Promise((resolve) => setTimeout(resolve, NON_DELIVERY_GRACE_MS));
-      expect(notes.received, 'the victim received a forged note').toHaveLength(0);
-
-      await log.step('And the partner can still deliver afterwards');
+      // Both forged calls have returned, so the partner's note below is a
+      // sentinel: a forged note, had one been delivered, would have landed
+      // first and made the exact list below fail -- given in-order delivery
+      // (see "Sentinel assumption" in the header).
+      await log.step('Only the partner note that follows the forgeries reaches the victim');
       const senderNotes = partner.channel(`love-notes:${victimId}`, { config: { private: true } });
       expect(
         await senderNotes.httpSend('new_message', { message: { id: 'real-1', content: 'real' } })
@@ -316,7 +329,9 @@ test.describe('Couple broadcast authorization', () => {
         (n: never) => (n as unknown as number) >= 1,
         { timeout: 15000, interval: 100, log: 'Waiting for the legitimate note' }
       );
-      expect(notes.received).toEqual([{ message: { id: 'real-1', content: 'real' } }]);
+      expect(notes.received, 'the victim received a forged note').toEqual([
+        { message: { id: 'real-1', content: 'real' } },
+      ]);
     } catch (error) {
       failure = error;
     }
@@ -373,11 +388,15 @@ test.describe('Couple broadcast authorization', () => {
     const victim = await signedInClient(supabaseAdmin, victimId);
     const partner = await signedInClient(supabaseAdmin, partnerId);
     const anon = anonClient();
+    const anonSender = anonClient();
     const poll = recurse as unknown as Poll;
     const { url, anonKey } = envPair();
 
     let failure: unknown;
-    const eavesdrop = join(anon, `love-notes:${victimId}`, 'new_message', { private: false });
+    const eavesdrop = join(anon, `love-notes:${victimId}`, 'new_message', {
+      private: false,
+      ack: true,
+    });
     const listener = join(victim, `love-notes:${victimId}`, 'new_message', { private: true });
     const sender = partner.channel(`love-notes:${victimId}`, { config: { private: true } });
 
@@ -408,10 +427,28 @@ test.describe('Couple broadcast authorization', () => {
         (n: never) => (n as unknown as number) >= 1,
         { timeout: 15000, interval: 100, log: 'Waiting for the private delivery' }
       );
-      await new Promise((resolve) => setTimeout(resolve, NON_DELIVERY_GRACE_MS));
-      expect(eavesdrop.received, 'a public subscriber received a private broadcast').toHaveLength(
-        0
+      // The private send has been delivered, so a PUBLIC sentinel sent now is
+      // what bounds a leak: had private-1 reached the public subscriber, it
+      // would sit ahead of the sentinel in the exact list below, given in-order
+      // delivery (see "Sentinel assumption" in the header). It comes from a
+      // second anon client because `channel()` hands the partner back its
+      // existing private channel for the same topic.
+      const publicSender = anonSender.channel(`love-notes:${victimId}`, {
+        config: { private: false },
+      });
+      expect(
+        await publicSender.httpSend('new_message', {
+          message: { id: 'public-sentinel', content: 'sentinel' },
+        })
+      ).toEqual({ success: true });
+      await poll(
+        async () => eavesdrop.received.length,
+        (n: never) => (n as unknown as number) >= 1,
+        { timeout: 15000, interval: 100, log: 'Waiting for the public sentinel' }
       );
+      expect(eavesdrop.received, 'a public subscriber received a private broadcast').toEqual([
+        { message: { id: 'public-sentinel', content: 'sentinel' } },
+      ]);
 
       // The other half of CAP-2/CAP-3, and the one that matters more: not just
       // that a stranger cannot READ the couple's traffic, but that a stranger
@@ -451,15 +488,28 @@ test.describe('Couple broadcast authorization', () => {
       // so the non-delivery below is measured against a message it took.
       expect(restResponse.status, 'the anon REST broadcast was not accepted').toBe(202);
 
-      await new Promise((resolve) => setTimeout(resolve, NON_DELIVERY_GRACE_MS));
+      // Both injections have been answered by the server (the websocket send
+      // is acked), so a private sentinel from the partner now bounds them: an
+      // injected message would arrive ahead of it, given in-order delivery
+      // (see "Sentinel assumption" in the header).
+      expect(
+        await sender.httpSend('new_message', {
+          message: { id: 'private-sentinel', content: 'sentinel' },
+        })
+      ).toEqual({ success: true });
+      await poll(
+        async () => listener.received.length,
+        (n: never) => (n as unknown as number) >= 2,
+        { timeout: 15000, interval: 100, log: 'Waiting for the private sentinel' }
+      );
       // Both public paths report success — 'ok' and 202 — and neither is
       // delivered. What stops the injection is the private subscriber's
       // separate delivery path, not the sender being told "no", which is
       // exactly why this has to be asserted on the RECEIVER.
-      expect(
-        listener.received,
-        'a public sender injected into a private subscriber'
-      ).toEqual([{ message: { id: 'private-1', content: 'private' } }]);
+      expect(listener.received, 'a public sender injected into a private subscriber').toEqual([
+        { message: { id: 'private-1', content: 'private' } },
+        { message: { id: 'private-sentinel', content: 'sentinel' } },
+      ]);
     } catch (error) {
       failure = error;
     }
@@ -468,6 +518,7 @@ test.describe('Couple broadcast authorization', () => {
       victim.removeAllChannels(),
       partner.removeAllChannels(),
       anon.removeAllChannels(),
+      anonSender.removeAllChannels(),
     ]);
     if (failure !== undefined) throw failure;
   });

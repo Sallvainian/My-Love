@@ -164,26 +164,31 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+// Pinned (noon EDT), so the welcome splash's "seen it recently" stamp below is
+// measured against a fixed clock rather than the live one. Only `Date` is
+// faked, so RTL's `waitFor` keeps its real timers.
+const NOW = new Date('2026-09-15T16:00:00.000Z');
+
+/** An upcoming event, a week after the pinned NOW. */
 function event(label: string): CoupleEvent {
-  const date = new Date();
-  date.setDate(date.getDate() + 7);
   return {
     id: label,
     userId: USER_ID,
     label,
-    date,
+    date: new Date(2026, 8, 22),
     description: null,
     icon: 'calendar',
-    createdAt: new Date(),
+    createdAt: NOW,
   };
 }
 
 const initialState = useAppStore.getInitialState();
 
 beforeEach(() => {
+  vi.setSystemTime(NOW);
   vi.clearAllMocks();
   localStorage.clear();
-  localStorage.setItem('lastWelcomeView', String(Date.now()));
+  localStorage.setItem('lastWelcomeView', String(NOW.getTime()));
   window.history.replaceState({}, '', '/');
   auth.getSession.mockResolvedValue(session());
   profile.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Home User' });
@@ -203,6 +208,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   localStorage.clear();
+  vi.useRealTimers();
 });
 
 async function renderHome() {

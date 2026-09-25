@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import {
   hashDateString,
   getDailyMessage,
@@ -179,17 +179,27 @@ describe('getAvailableHistoryDays', () => {
 });
 
 describe('isNewDay', () => {
+  // Pinned: "today" is read from the clock, so each timestamp sits on a known
+  // side of local midnight. Only `Date` is faked.
+  beforeEach(() => {
+    vi.setSystemTime(new Date(2026, 8, 22, 12));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns true when lastShownDate is null', () => {
     expect(isNewDay(null)).toBe(true);
   });
 
   it('returns false when lastShownDate is today', () => {
-    expect(isNewDay(new Date().toISOString())).toBe(false);
+    expect(isNewDay(new Date(2026, 8, 22, 12).toISOString())).toBe(false);
+    expect(isNewDay(new Date(2026, 8, 22, 0, 0, 0, 0).toISOString())).toBe(false);
   });
 
   it('returns true when lastShownDate is yesterday', () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    expect(isNewDay(yesterday.toISOString())).toBe(true);
+    expect(isNewDay(new Date(2026, 8, 21, 12).toISOString())).toBe(true);
+    expect(isNewDay(new Date(2026, 8, 21, 23, 59, 59, 999).toISOString())).toBe(true);
   });
 });

@@ -9,7 +9,6 @@ import { createMoodSlice, type MoodSlice } from '../../../src/stores/slices/mood
 import { getPendingMoods, markMoodSynced } from '../../../src/sw-db';
 import type { MoodEntry } from '../../../src/types';
 import { MOOD_TYPES, normalizeMoodEntry, normalizeMoodValues } from '../../../src/types/moods';
-import { formatDateISO } from '../../../src/utils/dateUtils';
 import { isValidationError } from '../../../src/validation/errorMessages';
 
 const A = '00000000-0000-4000-8000-000000000001';
@@ -31,12 +30,22 @@ async function seedRaw(entry: MoodEntry): Promise<MoodEntry> {
   }
 }
 
+// Pinned (noon EDT): the slice stamps new moods with today's local date, so
+// a row seeded for TODAY is the same day whenever the suite runs. Only `Date`
+// is faked; fake-indexeddb schedules on the real setImmediate.
+const NOW = new Date('2026-09-15T16:00:00.000Z');
+const TODAY = '2026-09-15';
+
 beforeEach(async () => {
+  vi.setSystemTime(NOW);
   await moodService.clear();
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
 });
 
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 
 describe('canonical mood normalization', () => {
   it.each(MOOD_TYPES)('accepts the legacy scalar %s', (mood) => {
@@ -155,7 +164,7 @@ function storeForA() {
 
 describe('mood store repair and session guards', () => {
   it('replaces a hidden same-day row and publishes it to the store', async () => {
-    const hidden = await seedRaw(raw('bad', [], { date: formatDateISO(new Date()) }));
+    const hidden = await seedRaw(raw('bad', [], { date: TODAY }));
     const store = storeForA();
     await store.getState().loadMoods();
     expect(store.getState().moods).toEqual([]);
@@ -166,7 +175,7 @@ describe('mood store repair and session guards', () => {
   });
 
   it.each(['add-switch', 'add-relogin', 'update-switch', 'update-relogin'])('keeps a stale %s write on its captured owner’s disk only', async (scenario) => {
-    const today = formatDateISO(new Date());
+    const today = TODAY;
     const hidden = await seedRaw(raw('bad', [], { date: today }));
     const store = storeForA();
     let release!: () => void;

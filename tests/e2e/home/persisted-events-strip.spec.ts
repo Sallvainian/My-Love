@@ -58,6 +58,7 @@ import {
   stalePersistedEvent,
   stalePersistedMood,
 } from '../../support/helpers/persisted-blob';
+import { clockAnchor } from '../../support/helpers/events';
 
 test.describe('stale persisted events never rehydrate', () => {
   test('[P0] a device carrying a previous couple\'s events blob shows none of it, and Home still renders', async ({
@@ -146,11 +147,15 @@ test.describe('stale persisted events never rehydrate', () => {
     // Dated today on purpose: `MoodTracker`'s seeding block only reads
     // `getMoodForDate(formatDateISO(new Date()))`
     // (`src/components/MoodTracker/MoodTracker.tsx:165-181`), so a mood dated
-    // any other day never reaches the branch that would disclose it.
-    const staleMood = stalePersistedMood();
+    // any other day never reaches the branch that would disclose it. The page
+    // clock is pinned to the mood's instant, so "today" is the mood's day even
+    // if the run crosses real midnight.
+    const anchor = clockAnchor();
+    const staleMood = stalePersistedMood({}, anchor);
 
     await seedPersistedBlob(page, { events: [staleEvent], moods: [staleMood] });
 
+    await page.clock.install({ time: anchor });
     await page.goto('/');
 
     await expect(page.getByTestId('time-together')).toBeVisible();

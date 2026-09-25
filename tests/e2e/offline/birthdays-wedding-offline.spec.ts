@@ -14,7 +14,12 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import type { TypedSupabaseClient } from '../../support/factories';
-import { resolveOwnPair } from '../../support/helpers/events';
+import {
+  clockAnchorAvoidingLeapDay,
+  isoBirthdayDaysFromNow,
+  isoDateDaysFromNow,
+  resolveOwnPair,
+} from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -22,15 +27,6 @@ test.use({ trace: 'off', video: 'off' });
 
 function orderedPair(a: string, b: string) {
   return a < b ? { user_a: a, user_b: b } : { user_a: b, user_b: a };
-}
-
-/** A local `YYYY-MM-DD` `days` from today, `yearsBack` years ago; never 29 Feb. */
-function localDateIn(days: number, yearsBack = 0): string {
-  const now = new Date();
-  let d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
-  if (d.getMonth() === 1 && d.getDate() === 29) d = new Date(d.getFullYear(), 2, 1);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear() - yearsBack}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 async function setValues(
@@ -107,13 +103,17 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     supabaseAdmin,
   }) => {
     const ids = await resolveOwnPair(supabaseAdmin);
-    const own = localDateIn(5, 31);
-    const partner = localDateIn(10, 30);
-    const wedding = localDateIn(40);
+    // The day counts below are measured from the page clock, pinned to the
+    // anchor the dates are built from; the reload keeps it.
+    const anchor = clockAnchorAvoidingLeapDay([5, 10, 40]);
+    const own = isoBirthdayDaysFromNow(5, 31, anchor);
+    const partner = isoBirthdayDaysFromNow(10, 30, anchor);
+    const wedding = isoDateDaysFromNow(40, anchor);
     await setValues(supabaseAdmin, ids, { own, partner, wedding });
 
     try {
       // GIVEN: one online session loads all three, which saves the copies.
+      await page.clock.install({ time: anchor });
       await page.goto('/');
       await expect.poll(() => savedCopy(page, 'profile')).toMatchObject({ birthday: own });
       await expect
@@ -158,7 +158,7 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     supabaseAdmin,
   }) => {
     const ids = await resolveOwnPair(supabaseAdmin);
-    const own = localDateIn(20, 29);
+    const own = isoBirthdayDaysFromNow(20, 29, clockAnchorAvoidingLeapDay([20]));
     await setValues(supabaseAdmin, ids, { own, partner: null, wedding: null });
 
     try {

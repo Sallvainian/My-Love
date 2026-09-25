@@ -166,21 +166,29 @@ describe('createOutsiderClient', () => {
     const pendingCleanup = new Promise<typeof cleanupResponse>((resolve) => {
       finishCleanup = resolve;
     });
-    let signalCleanupStarted!: () => void;
-    const cleanupStarted = new Promise<void>((resolve) => {
-      signalCleanupStarted = resolve;
+    let signalCleanupAwaited!: () => void;
+    const cleanupAwaited = new Promise<void>((resolve) => {
+      signalCleanupAwaited = resolve;
     });
-    deleteUser.mockImplementationOnce(() => {
-      signalCleanupStarted();
-      return pendingCleanup;
-    });
+    // A thenable rather than a promise, so the helper's own `await` on the
+    // deletion is observable: awaiting a thenable calls its `then`.
+    deleteUser.mockImplementationOnce(() => ({
+      then: (
+        onFulfilled: (response: typeof cleanupResponse) => unknown,
+        onRejected: (reason: unknown) => unknown
+      ) => {
+        signalCleanupAwaited();
+        return pendingCleanup.then(onFulfilled, onRejected);
+      },
+    }));
     const settled = vi.fn();
     const outsider = createOutsiderClient(supabaseAdmin);
     void outsider.then(settled, settled);
 
-    await cleanupStarted;
-    // Let all queued promise reactions run while the deletion remains pending.
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    // Either the helper is now waiting on the deletion, or -- had it not
+    // waited -- it has already rejected. `settled` was attached first, so in
+    // that case it has run by the time this race resumes.
+    await Promise.race([cleanupAwaited, outsider.catch(() => {})]);
     expect(settled).not.toHaveBeenCalled();
     expect(deleteUser).toHaveBeenCalledExactlyOnceWith(userId);
 

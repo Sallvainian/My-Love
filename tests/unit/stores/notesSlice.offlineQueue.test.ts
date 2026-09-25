@@ -161,6 +161,25 @@ vi.mock('../../../src/services/loveNoteImageService', () => ({
   deleteLoveNoteImage: vi.fn(async () => undefined),
 }));
 
+/**
+ * Every love-notes copy write, as the promise its caller got. The slice starts
+ * some of them without awaiting (`void saveNotesCopy`), but always calls
+ * `writeLocalCopy` synchronously, so a check that the copy was NOT written
+ * awaits every recorded write before reading it back.
+ */
+const copyWrites = vi.hoisted(() => [] as Promise<unknown>[]);
+vi.mock('../../../src/services/localCopy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/localCopy')>();
+  return {
+    ...actual,
+    writeLocalCopy: (...args: Parameters<typeof actual.writeLocalCopy>) => {
+      const write = actual.writeLocalCopy(...args);
+      copyWrites.push(write);
+      return write;
+    },
+  };
+});
+
 vi.mock('../../../src/services/imageCompressionService', () => ({
   imageCompressionService: {
     validateImageFile: vi.fn(() => ({ valid: true })),
@@ -206,7 +225,12 @@ function setOnline(value: boolean) {
   online = value;
 }
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+/** The ids in the account's saved love-notes copy. */
+const copyIds = async (userId = A) =>
+  (await readLocalCopy<{ id: string }[]>(userId, LOVE_NOTES_COPY_KIND))?.map((n) => n.id);
+
+/** Wait for every copy write started so far, so a read-back sees them all. */
+const copyWritesSettled = () => Promise.allSettled(copyWrites);
 
 function deferred() {
   let resolve: () => void = () => {};
@@ -275,6 +299,7 @@ async function sendThreeOffline(store: Store) {
 describe('notesSlice offline send queue', () => {
   beforeEach(async () => {
     await clearStores();
+    copyWrites.length = 0;
     server.reset();
     vi.clearAllMocks();
     setOnline(true);
@@ -325,9 +350,8 @@ describe('notesSlice offline send queue', () => {
     expect(server.upserts).toBe(3);
     expect(store.getState().notes.map((n) => n.id)).toEqual(['server-1', 'server-2', 'server-3']);
     expect(store.getState().notes.every((n) => !n.queued && !n.sending && !n.error)).toBe(true);
-    await flush();
-    const copy = (await readLocalCopy<{ id: string }[]>(A, LOVE_NOTES_COPY_KIND))?.map((n) => n.id);
-    expect(copy).toEqual(['server-1', 'server-2', 'server-3']);
+    // The drain saves the copy without awaiting it.
+    await vi.waitFor(async () => expect(await copyIds()).toEqual(['server-1', 'server-2', 'server-3']));
     expect(await queuedIds()).toEqual([]);
     expect(sendEphemeralBroadcast.mock.calls.map(([topic, , payload]) => [
       topic,
@@ -356,9 +380,11 @@ describe('notesSlice offline send queue', () => {
       created_at: server.rows[0].created_at,
       written_at: composedAt,
     });
-    await flush();
-    const copy = await readLocalCopy<Array<{ id: string; written_at?: string | null }>>(A, LOVE_NOTES_COPY_KIND);
-    expect(copy).toEqual([expect.objectContaining({ id: 'server-1', written_at: composedAt })]);
+    // The drain saves the copy without awaiting it.
+    await vi.waitFor(async () => {
+      const copy = await readLocalCopy<Array<{ id: string; written_at?: string | null }>>(A, LOVE_NOTES_COPY_KIND);
+      expect(copy).toEqual([expect.objectContaining({ id: 'server-1', written_at: composedAt })]);
+    });
 
     // A reload reads it back from the copy.
     const reloaded = createTestStore();
@@ -411,11 +437,10 @@ describe('notesSlice offline send queue', () => {
     expect(contents(store)).toEqual(['saved', 'one', 'two', 'three']);
     expect(store.getState().notes.slice(1).every((n) => n.queued && !n.sending && !n.error)).toBe(true);
     expect(store.getState().notesError).toBeNull();
-    // Queued notes never go in the copy.
-    await flush();
-    expect((await readLocalCopy<{ id: string }[]>(A, LOVE_NOTES_COPY_KIND))?.map((n) => n.id)).toEqual([
-      'saved-1',
-    ]);
+    // Queued notes never go in the copy: every write either store started has
+    // landed, and the copy still holds only the saved row.
+    await copyWritesSettled();
+    expect(await copyIds()).toEqual(['saved-1']);
   });
 
   it('fetchNotes skips a queued row already on screen or already in the server page', async () => {
@@ -543,9 +568,7 @@ describe('notesSlice offline send queue', () => {
     // Confirmed from the stored row, not sent a second time or broadcast by tab 2.
     expect(server.upserts).toBe(2);
     expect(sendEphemeralBroadcast).toHaveBeenCalledTimes(2);
-    await flush();
-    const copy = (await readLocalCopy<{ id: string }[]>(A, LOVE_NOTES_COPY_KIND))?.map((n) => n.id);
-    expect(copy).toContain('server-2');
+    await vi.waitFor(async () => expect(await copyIds()).toContain('server-2'));
   });
 
   it('another tab sends this tab\'s waiting note and the server rejects it: this tab shows it failed, with Retry', async () => {
@@ -613,11 +636,14 @@ describe('notesSlice offline send queue', () => {
 
     // A note composed during that wait joins it: nothing sends from tab 2 yet.
     await tab2.getState().sendNote('second');
-    await flush();
-    expect(tab2.getState().notes.find((n) => n.content === 'second')).toMatchObject({
-      queued: true,
-      sending: false,
-    });
+    await vi.waitFor(() =>
+      expect(tab2.getState().notes.find((n) => n.content === 'second')).toMatchObject({
+        queued: true,
+        sending: false,
+      })
+    );
+    // Still only tab 1's insert has reached the server.
+    expect(server.upserts).toBe(1);
 
     reply.resolve();
     await tab1.getState().drainQueuedNotes();
@@ -1082,9 +1108,23 @@ describe('notesSlice offline send queue', () => {
   });
 
   describe('rate limit: notes queued offline do not count', () => {
-    /** Ten sends inside the last minute: the limit is reached. */
-    const atLimit = () => Array.from({ length: 10 }, () => Date.now());
+    // Pinned: the window keeps sends with `now - timestamp < 60 000`, so each
+    // seeded timestamp sits an exact distance from `Date.now()`. Only `Date`
+    // is faked; IndexedDB keeps its real setImmediate.
+    const NOW = new Date('2026-09-15T16:00:00.000Z');
+
+    /** Ten sends `ageMs` ago; the default, just inside the minute, is the limit. */
+    const atLimit = (ageMs = 59_999) =>
+      Array.from({ length: 10 }, () => NOW.getTime() - ageMs);
     const RATE_LIMIT = 'Rate limit exceeded: Maximum 10 messages per minute';
+
+    beforeEach(() => {
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
     /** A queued text note shown failed, with its row marked failed. */
     async function failedQueuedNote(store: Store, tempId = 'temp-failed'): Promise<string> {
@@ -1170,6 +1210,18 @@ describe('notesSlice offline send queue', () => {
       await expect(store.getState().sendNote('one too many')).rejects.toThrow(RATE_LIMIT);
       expect(contents(store)).toEqual(['counted']);
       expect(await queuedIds()).toEqual([]);
+    });
+
+    it('online, ten sends exactly a minute old have left the window', async () => {
+      const store = createTestStore();
+      store.setState({ sentMessageTimestamps: atLimit(60_000) });
+
+      await store.getState().sendNote('outside the window');
+      await store.getState().drainQueuedNotes();
+
+      expect(contents(store)).toEqual(['outside the window']);
+      expect(store.getState().notesError).toBeNull();
+      expect(store.getState().sentMessageTimestamps).toEqual([NOW.getTime()]);
     });
 
     it('online at the limit, Retry resolves and shows the rate-limit error', async () => {
@@ -1492,12 +1544,11 @@ describe('notesSlice offline send queue', () => {
       const store = createTestStore();
 
       await store.getState().drainQueuedNotes();
-      await flush();
+      // A copy write the drain started would be recorded by now; let it land.
+      await copyWritesSettled();
 
       expect(server.rows.map((r) => r.content)).toEqual(['queued']);
-      expect((await readLocalCopy<{ id: string }[]>(A, LOVE_NOTES_COPY_KIND))?.map((n) => n.id)).toEqual([
-        'saved-1',
-      ]);
+      expect(await copyIds()).toEqual(['saved-1']);
     });
   });
 });

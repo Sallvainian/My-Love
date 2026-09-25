@@ -122,23 +122,67 @@ describe('Settings — Together since', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  it('refuses a start in the future and sends nothing', async () => {
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
+  describe('"in the past", against a pinned clock', () => {
+    // The form refuses a start later than `Date.now()`. Only `Date` is faked,
+    // so RTL's `waitFor` keeps its real timers. 12:00 EDT is 16:00Z.
+    beforeEach(() => {
+      vi.setSystemTime(new Date(2026, 8, 25, 12, 0, 0, 0));
     });
-    const save = vi.fn(async () => {});
-    useAppStore.setState({ setRelationshipStart: save });
-    render(<Settings />);
-
-    const nextYear = new Date().getFullYear() + 1;
-    fireEvent.change(screen.getByTestId('settings-together-since-date'), {
-      target: { value: `${nextYear}-01-01` },
+    afterEach(() => {
+      vi.useRealTimers();
     });
-    fireEvent.click(screen.getByTestId('settings-together-since-save'));
 
-    expect(await screen.findByTestId('settings-together-since-error')).toHaveTextContent(
-      /in the past/i
-    );
-    expect(save).not.toHaveBeenCalled();
+    /** Enters a start and saves it; returns the save spy. */
+    function submitStart(date: string, time?: string) {
+      useAppStore.setState({
+        coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
+      });
+      const save = vi.fn(async () => {});
+      useAppStore.setState({ setRelationshipStart: save });
+      render(<Settings />);
+
+      fireEvent.change(screen.getByTestId('settings-together-since-date'), {
+        target: { value: date },
+      });
+      if (time !== undefined) {
+        fireEvent.change(screen.getByTestId('settings-together-since-time'), {
+          target: { value: time },
+        });
+      }
+      fireEvent.click(screen.getByTestId('settings-together-since-save'));
+      return save;
+    }
+
+    it('refuses a start in the future and sends nothing', async () => {
+      const save = submitStart('2026-09-26');
+
+      expect(await screen.findByTestId('settings-together-since-error')).toHaveTextContent(
+        /in the past/i
+      );
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('refuses a start one minute from now, today', async () => {
+      const save = submitStart('2026-09-25', '12:01');
+
+      expect(await screen.findByTestId('settings-together-since-error')).toHaveTextContent(
+        /in the past/i
+      );
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('accepts a start at exactly now', async () => {
+      const save = submitStart('2026-09-25', '12:00');
+
+      await waitFor(() => expect(save).toHaveBeenCalledWith('2026-09-25T16:00:00.000Z'));
+      expect(screen.queryByTestId('settings-together-since-error')).toBeNull();
+    });
+
+    it('accepts today with no time, as local midnight', async () => {
+      const save = submitStart('2026-09-25');
+
+      await waitFor(() => expect(save).toHaveBeenCalledWith('2026-09-25T04:00:00.000Z'));
+      expect(screen.queryByTestId('settings-together-since-error')).toBeNull();
+    });
   });
 });

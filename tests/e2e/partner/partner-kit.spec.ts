@@ -88,36 +88,42 @@ test.describe('Partner on the style kit', () => {
       interceptNetworkCall,
     }) => {
       // Only this browser's reads are faked; no worker-pool row is touched.
-      interceptNetworkCall({
+      // Each stub is awaited after the load that hits it, bounded by a timeout.
+      const partnerLink = interceptNetworkCall({
         method: 'GET',
         url: '**/rest/v1/users?select=partner_id*',
         fulfillResponse: {
           status: 200,
           body: { partner_id: PARTNER_ID, updated_at: '2026-01-01T00:00:00Z' },
         },
+        timeout: 15000,
       });
-      interceptNetworkCall({
+      const partnerProfile = interceptNetworkCall({
         method: 'GET',
         url: '**/rest/v1/users?select=id*',
         fulfillResponse: {
           status: 200,
           body: { id: PARTNER_ID, email: 'partner@example.test', display_name: PARTNER_NAME },
         },
+        timeout: 15000,
       });
-      interceptNetworkCall({
+      const requests = interceptNetworkCall({
         method: 'GET',
         url: '**/rest/v1/partner_requests**',
         fulfillResponse: { status: 200, body: [] },
+        timeout: 15000,
       });
-      interceptNetworkCall({
+      const moods = interceptNetworkCall({
         method: 'GET',
         url: '**/rest/v1/moods**',
         fulfillResponse: { status: 200, body: partnerMoodRows() },
+        timeout: 15000,
       });
 
       await page.setViewportSize({ width: 390, height: 844 });
       await page.emulateMedia({ colorScheme });
       await page.goto('/partner');
+      await Promise.all([partnerLink, partnerProfile, requests, moods]);
 
       const view = page.getByTestId('partner-mood-view');
       await expect(view).toBeVisible();
@@ -187,23 +193,27 @@ test.describe('Partner on the style kit', () => {
     interceptNetworkCall,
   }) => {
     // Fake only this browser's read of its own link; never unlink worker-pool users.
-    interceptNetworkCall({
+    // Each stub is awaited after the load that hits it, bounded by a timeout.
+    const partnerLink = interceptNetworkCall({
       method: 'GET',
       url: '**/rest/v1/users?select=partner_id*',
       fulfillResponse: {
         status: 200,
         body: { partner_id: null, updated_at: '2026-01-01T00:00:00Z' },
       },
+      timeout: 15000,
     });
-    interceptNetworkCall({
+    const requests = interceptNetworkCall({
       method: 'GET',
       url: '**/rest/v1/partner_requests**',
       fulfillResponse: { status: 200, body: [] },
+      timeout: 15000,
     });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('/partner');
+    await Promise.all([partnerLink, requests]);
 
     const view = page.getByTestId('partner-mood-view');
     await expect(view).toBeVisible();

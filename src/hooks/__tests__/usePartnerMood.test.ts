@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { moodSyncService, type SupabaseMoodRecord } from '../../api/moodSyncService';
 import { usePartnerMood } from '../usePartnerMood';
@@ -154,14 +154,17 @@ describe('usePartnerMood', () => {
 
     expect(result.current.partnerMood).toEqual(initialMood);
 
-    // Simulate broadcast from different user
-    broadcastCallback!(otherUserMood);
-
-    // Wait a bit to ensure it doesn't update
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Simulate broadcast from different user. The callback is synchronous,
+    // so act has flushed any update it made by the time it returns.
+    act(() => broadcastCallback!(otherUserMood));
 
     // Mood should NOT change
     expect(result.current.partnerMood).toEqual(initialMood);
+
+    // Positive control: the same path does update for the partner's own mood
+    const partnerMood2 = { ...otherUserMood, id: '3', user_id: mockPartnerId };
+    act(() => broadcastCallback!(partnerMood2));
+    expect(result.current.partnerMood).toEqual(partnerMood2);
   });
 
   it('unsubscribes on unmount', async () => {

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InteractionSubscriptionStatus } from '../../../api/interactionService';
 
 const storeMocks = vi.hoisted(() => ({
@@ -391,15 +391,64 @@ describe('PokeKissInterface on the kit', () => {
     expect(screen.queryByTestId('interaction-history-modal')).not.toBeInTheDocument();
   });
 
-  it('disables a tile in cooldown and shows the remaining m:ss under its label', () => {
-    localStorage.setItem('lastPokeTime', String(Date.now() - 60_000));
+  describe('cooldown against a pinned clock', () => {
+    // The 30-minute cooldown is measured from `Date.now()` and re-read by a 1s
+    // interval, so both are faked; nothing in these cases waits on a timer.
+    const T = new Date(2026, 8, 25, 12, 0, 0).getTime();
 
-    render(<PokeKissInterface />);
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+      vi.setSystemTime(T);
+    });
 
-    expect(screen.getByTestId('poke-button')).toBeDisabled();
-    expect(screen.getByTestId('poke-cooldown').textContent).toMatch(/^2[89]:\d{2}$/);
-    expect(screen.getByTestId('kiss-button')).toBeEnabled();
-    expect(screen.queryByTestId('kiss-cooldown')).not.toBeInTheDocument();
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('disables a tile in cooldown and shows the remaining m:ss under its label', () => {
+      localStorage.setItem('lastPokeTime', String(T - 60_000));
+
+      render(<PokeKissInterface />);
+
+      expect(screen.getByTestId('poke-button')).toBeDisabled();
+      expect(screen.getByTestId('poke-cooldown')).toHaveTextContent(/^29:00$/);
+      expect(screen.getByTestId('kiss-button')).toBeEnabled();
+      expect(screen.queryByTestId('kiss-cooldown')).not.toBeInTheDocument();
+
+      // The countdown ticks with the clock.
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.getByTestId('poke-cooldown')).toHaveTextContent(/^28:59$/);
+    });
+
+    it('re-enables a tile exactly 30 minutes after the last send', () => {
+      localStorage.setItem('lastPokeTime', String(T - 1_800_000));
+
+      render(<PokeKissInterface />);
+
+      expect(screen.getByTestId('poke-button')).toBeEnabled();
+      expect(screen.queryByTestId('poke-cooldown')).not.toBeInTheDocument();
+    });
+
+    it('keeps a tile disabled one second before the cooldown ends', () => {
+      localStorage.setItem('lastPokeTime', String(T - 1_799_000));
+
+      render(<PokeKissInterface />);
+
+      expect(screen.getByTestId('poke-button')).toBeDisabled();
+      expect(screen.getByTestId('poke-cooldown')).toHaveTextContent(/^0:01$/);
+    });
+
+    it('re-enables the tile when the countdown ticks through its last second', () => {
+      localStorage.setItem('lastPokeTime', String(T - 1_799_000));
+
+      render(<PokeKissInterface />);
+      expect(screen.getByTestId('poke-button')).toBeDisabled();
+
+      act(() => vi.advanceTimersByTime(1000));
+
+      expect(screen.getByTestId('poke-button')).toBeEnabled();
+      expect(screen.queryByTestId('poke-cooldown')).not.toBeInTheDocument();
+    });
   });
 
   it('sends toasts with no emoji', async () => {

@@ -366,19 +366,47 @@ describe('message history limit from the couple start', () => {
     });
   }
 
+  // Pinned: whole days since the start are floored from `Date.now()`, so each
+  // start below sits an exact distance from it. Only `Date` is faked.
+  const NOW = new Date('2026-09-15T16:00:00.000Z');
+
+  function startedAt(relationshipStart: string) {
+    useAppStore.setState({
+      coupleSettings: { status: 'linked', partnerId: P, relationshipStart, weddingDate: null },
+    });
+  }
+
+  beforeEach(() => {
+    vi.setSystemTime(NOW);
+  });
+
   afterEach(() => {
     useAppStore.setState({ coupleSettings: null });
     atIndex(0);
+    vi.useRealTimers();
   });
 
   it('stops at the start: five days in, index 5 cannot go further back', () => {
-    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - 60_000).toISOString();
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: P, relationshipStart: fiveDaysAgo, weddingDate: null },
-    });
+    startedAt('2026-09-10T15:59:00.000Z'); // five days and one minute
     atIndex(5);
     expect(state().canNavigateBack()).toBe(false);
     atIndex(4);
+    expect(state().canNavigateBack()).toBe(true);
+  });
+
+  it('counts a start exactly five days ago as five days', () => {
+    startedAt('2026-09-10T16:00:00.000Z');
+    atIndex(5);
+    expect(state().canNavigateBack()).toBe(false);
+    atIndex(4);
+    expect(state().canNavigateBack()).toBe(true);
+  });
+
+  it('counts a start one millisecond short of five days as four days', () => {
+    startedAt('2026-09-10T16:00:00.001Z');
+    atIndex(4);
+    expect(state().canNavigateBack()).toBe(false);
+    atIndex(3);
     expect(state().canNavigateBack()).toBe(true);
   });
 

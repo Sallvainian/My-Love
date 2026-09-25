@@ -6,6 +6,12 @@ const subscribeInteractions = vi.hoisted(() => vi.fn());
 const resolvePartnerId = vi.hoisted(() => vi.fn<() => Promise<string | null>>());
 const sendPoke = vi.hoisted(() => vi.fn());
 const sendKiss = vi.hoisted(() => vi.fn());
+/**
+ * Every partner lookup the slice started, as the promise it was handed. The
+ * slice attaches its own `.then` the moment the lookup returns, so a test that
+ * awaits the latest one resumes only after the slice has acted on the answer.
+ */
+const partnerLookups = vi.hoisted((): Array<Promise<unknown>> => []);
 
 vi.mock('../../../src/api/interactionService', () => ({
   InteractionService: class {
@@ -14,13 +20,17 @@ vi.mock('../../../src/api/interactionService', () => ({
     // Derived from the same stub so every existing `resolvePartnerId.mock*`
     // setup keeps working: an id is `linked`, null is `unlinked`, and a
     // rejection is the inconclusive `error` the reconnect path must not act on.
-    resolvePartnerLookup = async () => {
-      try {
-        const partnerId = await resolvePartnerId();
-        return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
-      } catch (error) {
-        return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
-      }
+    resolvePartnerLookup = () => {
+      const lookup = (async () => {
+        try {
+          const partnerId = await resolvePartnerId();
+          return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
+        } catch (error) {
+          return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+        }
+      })();
+      partnerLookups.push(lookup);
+      return lookup;
     };
     sendPoke = sendPoke;
     sendKiss = sendKiss;
@@ -58,12 +68,6 @@ interface CapturedSubscription {
 
 const subscriptions: CapturedSubscription[] = [];
 
-async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
 function createTestStore() {
   const createSlices: AppStateCreator<TestStore> = (...args) => ({
     ...createAuthSlice(...args),
@@ -96,6 +100,7 @@ describe('interactionsSlice subscription bridge', () => {
     vi.clearAllMocks();
     localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
     subscriptions.length = 0;
+    partnerLookups.length = 0;
     resolvePartnerId.mockResolvedValue(OTHER_USER_ID);
     subscribeInteractions.mockImplementation(
       (
@@ -392,7 +397,10 @@ describe('interactionsSlice subscription bridge', () => {
     // Wi-Fi blips; the channel rejoins and the `users` read fails outright.
     resolvePartnerId.mockRejectedValue(new Error('network down'));
     subscription.reportStatus('SUBSCRIBED');
-    await flushMicrotasks();
+    // The subscribe's lookup, then this re-join's: missing the second would
+    // leave `at(-1)` an already-settled promise.
+    expect(partnerLookups).toHaveLength(2);
+    await partnerLookups.at(-1);
 
     subscription.reportInteraction(interaction('after-the-blip'));
     expect(store.getState().interactions.map(({ id }) => id)).toEqual([
@@ -437,7 +445,10 @@ describe('interactionsSlice subscription bridge', () => {
 
     resolvePartnerId.mockResolvedValue(null);
     subscription.reportStatus('SUBSCRIBED');
-    await flushMicrotasks();
+    // The subscribe's lookup, then this re-join's: missing the second would
+    // leave `at(-1)` an already-settled promise.
+    expect(partnerLookups).toHaveLength(2);
+    await partnerLookups.at(-1);
 
     subscription.reportInteraction(interaction('after-the-unlink'));
     expect(store.getState().interactions.map(({ id }) => id)).toEqual(['while-linked']);
@@ -500,8 +511,10 @@ describe('interactionsSlice subscription bridge', () => {
 
     store.getState().clearAuth();
     releaseRefresh!(OTHER_USER_ID);
-    await Promise.resolve();
-    await Promise.resolve();
+    // The subscribe's lookup, then this re-join's: missing the second would
+    // leave `at(-1)` an already-settled promise.
+    expect(partnerLookups).toHaveLength(2);
+    await partnerLookups.at(-1);
 
     // Restoring it here would re-arm addIncomingInteraction for the couple that
     // just signed out.

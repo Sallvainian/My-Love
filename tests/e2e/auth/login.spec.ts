@@ -4,7 +4,7 @@
  * Critical path: Users must be able to log in to access the app.
  * Covers email/password login, error handling, and session persistence.
  */
-import type { Page } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { test, expect } from '../../support/merged-fixtures';
@@ -82,36 +82,28 @@ test.describe('Login Flow', () => {
       },
     });
 
-    // Intercept the user endpoint (called after auth state change)
-    interceptNetworkCall({
-      url: '**/auth/v1/user**',
-      method: 'GET',
-      fulfillResponse: {
-        status: 200,
-        body: {
-          id: 'test-user-id',
-          email: 'test@example.com',
-        },
-      },
-    });
+    // The reads below are defensive stubs: each may fire zero times or many,
+    // so none is awaited. Every GET is answered; anything else falls through.
+    // playwright-utils deviation: interceptNetworkCall resolves on the first
+    // hit and never settles when a route is not hit, so it cannot serve a read
+    // that may fire any number of times.
+    const serve = (body: unknown) => (route: Route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+        : route.fallback();
 
-    // Intercept the events fetch Home fires once auth settles — against the
-    // real API the fake access token above earns it a 401, which the
-    // network-error monitor turns into a test failure.
-    interceptNetworkCall({
-      url: '**/rest/v1/events**',
-      method: 'GET',
-      fulfillResponse: { status: 200, body: [] },
-    });
+    // The user endpoint (called after auth state change).
+    await page.route('**/auth/v1/user**', serve({ id: 'test-user-id', email: 'test@example.com' }));
+
+    // The events fetch Home fires once auth settles — against the real API the
+    // fake access token above earns it a 401, which the network-error monitor
+    // turns into a test failure.
+    await page.route('**/rest/v1/events**', serve([]));
 
     // Same reason, for the profile read App fires to decide whether this
     // account still needs the display-name setup screen. A chosen name keeps
     // that modal shut, which is what "redirected to the app" means here.
-    interceptNetworkCall({
-      url: '**/rest/v1/users?select=display_name**',
-      method: 'GET',
-      fulfillResponse: { status: 200, body: { display_name: 'Test User' } },
-    });
+    await page.route('**/rest/v1/users?select=display_name**', serve({ display_name: 'Test User' }));
 
     // Same reason, for the mirror refresh App runs after sign-in: the
     // anniversary and message mirrors, the mood history, the poke/kiss
@@ -126,11 +118,7 @@ test.describe('Login Flow', () => {
       'love_notes_visible',
       'photos',
     ]) {
-      interceptNetworkCall({
-        url: `**/rest/v1/${table}?**`,
-        method: 'GET',
-        fulfillResponse: { status: 200, body: [] },
-      });
+      await page.route(`**/rest/v1/${table}?**`, serve([]));
     }
 
     // GIVEN: User is on login screen

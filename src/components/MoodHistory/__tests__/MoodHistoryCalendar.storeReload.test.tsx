@@ -29,11 +29,12 @@ vi.mock('../../../stores/useAppStore', () => ({
 
 import { MoodHistoryCalendar } from '../MoodHistoryCalendar';
 
-function todayISO(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
+// The calendar opens on the clock's month, so the clock is pinned: a mood
+// dated TODAY is always in the month on screen, whenever the suite runs.
+// Only `Date` is faked (`setSystemTime` without fake timers), so RTL's
+// `waitFor` keeps its real timers.
+const NOW = new Date(2026, 8, 25, 12, 0, 0);
+const TODAY = '2026-09-25';
 
 function mood(): MoodEntry {
   return {
@@ -41,8 +42,8 @@ function mood(): MoodEntry {
     userId: 'user-1',
     mood: 'happy',
     moods: ['happy'],
-    date: todayISO(),
-    timestamp: new Date(),
+    date: TODAY,
+    timestamp: NOW,
     synced: true,
     supabaseId: 'server-1',
   };
@@ -50,12 +51,14 @@ function mood(): MoodEntry {
 
 describe('MoodHistoryCalendar store reload', () => {
   beforeEach(() => {
+    vi.setSystemTime(NOW);
     getMoodsInRange.mockReset();
     store.setState({ userId: 'user-1', moods: [] });
   });
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it('shows moods written to IndexedDB after mount once the store reloads, without a month change', async () => {
@@ -70,6 +73,7 @@ describe('MoodHistoryCalendar store reload', () => {
     act(() => store.setState({ moods: [mood()] }));
 
     expect(await screen.findByText('1 mood logged this month')).toBeInTheDocument();
+    expect(screen.getByTestId(`calendar-day-${TODAY}`)).toHaveAttribute('data-has-mood', 'true');
     expect(screen.getByTestId('calendar-month-header').textContent).toBe(header);
     expect(getMoodsInRange).toHaveBeenCalledTimes(2);
     expect(getMoodsInRange).toHaveBeenLastCalledWith(expect.any(Date), expect.any(Date), 'user-1');
@@ -90,7 +94,7 @@ describe('MoodHistoryCalendar store reload', () => {
 
     expect(screen.queryByTestId('calendar-loading')).not.toBeInTheDocument();
     expect(screen.getByText('1 mood logged this month')).toBeInTheDocument();
-    expect(screen.getByTestId(`calendar-day-${todayISO()}`)).toHaveAttribute('data-has-mood', 'true');
+    expect(screen.getByTestId(`calendar-day-${TODAY}`)).toHaveAttribute('data-has-mood', 'true');
   });
 
   it('keeps the grid on screen (no loading skeleton) while re-reading the same month', async () => {

@@ -138,12 +138,18 @@ function deferred<T>() {
 
 const initialState = useAppStore.getInitialState();
 
+// Pinned (noon EDT), so the welcome splash's "seen it recently" stamp below is
+// measured against a fixed clock rather than the live one. Only `Date` is
+// faked, so RTL's `waitFor` keeps its real timers.
+const NOW = new Date('2026-09-15T16:00:00.000Z');
+
 beforeEach(() => {
+  vi.setSystemTime(NOW);
   vi.clearAllMocks();
   localStorage.clear();
   // The welcome splash renders over the shell and would answer for the app
   // instead of `app-container`; this is the "seen it recently" state.
-  localStorage.setItem('lastWelcomeView', String(Date.now()));
+  localStorage.setItem('lastWelcomeView', String(NOW.getTime()));
   window.history.replaceState({}, '', '/');
   // Signed out: the login screen is the only surface a notice has.
   auth.getSession.mockResolvedValue(null);
@@ -166,6 +172,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   localStorage.clear();
+  vi.useRealTimers();
 });
 
 async function renderSignedOut() {

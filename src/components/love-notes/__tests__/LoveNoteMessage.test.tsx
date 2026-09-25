@@ -7,7 +7,7 @@
  * Love Notes Images: Task 11 - Component tests (AC-7, AC-9)
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Dispatch, HTMLAttributes, ReactNode, SetStateAction } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoveNote } from '../../../types/models';
@@ -96,6 +96,17 @@ vi.mock('../FullScreenImageViewer', () => ({
       </div>
     ) : null,
 }));
+
+/** A promise the test settles by hand, at the point it chooses. */
+function deferred<T>() {
+  let resolve: (value: T) => void = () => {};
+  let reject: (error: Error) => void = () => {};
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 describe('LoveNoteMessage', () => {
   const baseMessage: LoveNote = {
@@ -261,10 +272,9 @@ describe('LoveNoteMessage', () => {
     });
 
     it('should show loading spinner while fetching image URL', async () => {
-      // Make the signed URL promise never resolve immediately
-      mockGetSignedImageUrl.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ url: 'test' }), 100))
-      );
+      // The signed URL stays pending until the spinner has been seen
+      const signedUrl = deferred<{ url: string; expiresAt: number }>();
+      mockGetSignedImageUrl.mockReturnValue(signedUrl.promise);
 
       const messageWithImage: LoveNote = {
         ...baseMessage,
@@ -278,6 +288,17 @@ describe('LoveNoteMessage', () => {
         const loadingSpinner = document.querySelector('.animate-spin');
         expect(loadingSpinner).toBeInTheDocument();
       });
+
+      // Once the URL arrives, the image replaces the spinner
+      await act(async () => {
+        signedUrl.resolve({ url: 'https://storage.example.com/late.jpg', expiresAt: 0 });
+        await signedUrl.promise;
+      });
+      expect(screen.getByRole('img', { name: /image from you/i })).toHaveAttribute(
+        'src',
+        'https://storage.example.com/late.jpg'
+      );
+      expect(document.querySelector('.animate-spin')).not.toBeInTheDocument();
     });
 
     it('should show error state when image fails to load', async () => {
@@ -329,16 +350,6 @@ describe('LoveNoteMessage', () => {
       URL.createObjectURL = originalCreate;
       URL.revokeObjectURL = originalRevoke;
     });
-
-    function deferred<T>() {
-      let resolve: (value: T) => void = () => {};
-      const promise = new Promise<T>((res) => {
-        resolve = res;
-      });
-      return { promise, resolve };
-    }
-
-    const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 
     it('shows a cached image from the cache, with no download or signed URL', async () => {
       const blob = new Blob(['cached']);
@@ -426,8 +437,11 @@ describe('LoveNoteMessage', () => {
       await waitFor(() => expect(mockDownloadLoveNoteImage).toHaveBeenCalled());
 
       switchIdentity({ userId: 'user-B', authSessionVersion: 2 });
-      download.resolve(new Blob(['A-IMAGE']));
-      await settle();
+      // Async act drains every continuation of the resolved download
+      await act(async () => {
+        download.resolve(new Blob(['A-IMAGE']));
+        await download.promise;
+      });
 
       expect(mockWriteCachedImage).not.toHaveBeenCalled();
       expect(createObjectURL).not.toHaveBeenCalled();
@@ -442,8 +456,10 @@ describe('LoveNoteMessage', () => {
       await waitFor(() => expect(mockReadCachedImage).toHaveBeenCalled());
 
       switchIdentity({ authSessionVersion: 2 });
-      read.resolve(new Blob(['A-IMAGE']));
-      await settle();
+      await act(async () => {
+        read.resolve(new Blob(['A-IMAGE']));
+        await read.promise;
+      });
 
       expect(createObjectURL).not.toHaveBeenCalled();
       expect(mockDownloadLoveNoteImage).not.toHaveBeenCalled();
@@ -470,7 +486,13 @@ describe('LoveNoteMessage', () => {
           senderName="You"
         />
       );
-      await settle();
+      // The preview is on screen, so the image effect has already run
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: /image from you/i })).toHaveAttribute(
+          'src',
+          'blob:http://localhost/preview-1'
+        );
+      });
 
       expect(mockReadCachedImage).not.toHaveBeenCalled();
       expect(mockWriteCachedImage).not.toHaveBeenCalled();
@@ -726,11 +748,8 @@ describe('LoveNoteMessage', () => {
   describe('Memory Leak Prevention', () => {
     it('should not update state after unmount during signed URL fetch', async () => {
       // Create a deferred promise we can control
-      let resolveSignedUrl: (value: { url: string; expiresAt: number }) => void;
-      const deferredPromise = new Promise<{ url: string; expiresAt: number }>((resolve) => {
-        resolveSignedUrl = resolve;
-      });
-      mockGetSignedImageUrl.mockReturnValue(deferredPromise);
+      const signedUrl = deferred<{ url: string; expiresAt: number }>();
+      mockGetSignedImageUrl.mockReturnValue(signedUrl.promise);
 
       // Keep console output quiet; the setter spy is what detects late updates
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -751,14 +770,12 @@ describe('LoveNoteMessage', () => {
       stateSetterCalls.mockClear();
       unmount();
 
-      // Now resolve the promise after unmount
-      resolveSignedUrl!({
-        url: 'https://storage.example.com/signed.jpg',
-        expiresAt: Date.now() + 3600000,
+      // Now resolve the promise after unmount; async act drains every
+      // continuation, so a late update would already have been dispatched
+      await act(async () => {
+        signedUrl.resolve({ url: 'https://storage.example.com/signed.jpg', expiresAt: 0 });
+        await signedUrl.promise;
       });
-
-      // Wait a tick to allow any potential state updates to occur
-      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // React 19 no longer warns about unmounted updates, so observe the
       // setters directly: the late resolve must not dispatch any state
@@ -791,11 +808,8 @@ describe('LoveNoteMessage', () => {
       });
 
       // Set up a deferred promise for the retry attempt
-      let resolveRetry: (value: { url: string; expiresAt: number }) => void;
-      const retryPromise = new Promise<{ url: string; expiresAt: number }>((resolve) => {
-        resolveRetry = resolve;
-      });
-      mockGetSignedImageUrl.mockReturnValue(retryPromise);
+      const retry = deferred<{ url: string; expiresAt: number }>();
+      mockGetSignedImageUrl.mockReturnValue(retry.promise);
 
       // Trigger image error (simulating 403 expired URL)
       const img = screen.getByRole('img', { name: /image from you/i });
@@ -809,12 +823,10 @@ describe('LoveNoteMessage', () => {
       unmount();
 
       // Resolve retry after unmount
-      resolveRetry!({
-        url: 'https://storage.example.com/new-signed.jpg',
-        expiresAt: Date.now() + 3600000,
+      await act(async () => {
+        retry.resolve({ url: 'https://storage.example.com/new-signed.jpg', expiresAt: 0 });
+        await retry.promise;
       });
-
-      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // The late retry result must not dispatch any state
       expect(stateSetterCalls).not.toHaveBeenCalled();
@@ -824,11 +836,8 @@ describe('LoveNoteMessage', () => {
 
     it('should not update state after unmount when fetch fails', async () => {
       // Create a deferred rejection
-      let rejectSignedUrl: (error: Error) => void;
-      const deferredPromise = new Promise<{ url: string; expiresAt: number }>((_, reject) => {
-        rejectSignedUrl = reject;
-      });
-      mockGetSignedImageUrl.mockReturnValue(deferredPromise);
+      const signedUrl = deferred<{ url: string; expiresAt: number }>();
+      mockGetSignedImageUrl.mockReturnValue(signedUrl.promise);
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -846,9 +855,10 @@ describe('LoveNoteMessage', () => {
       unmount();
 
       // Reject after unmount
-      rejectSignedUrl!(new Error('Network error'));
-
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await act(async () => {
+        signedUrl.reject(new Error('Network error'));
+        await signedUrl.promise.catch(() => {});
+      });
 
       // The rejection is logged, and must not dispatch any state
       expect(consoleErrorSpy).toHaveBeenCalledWith(

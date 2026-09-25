@@ -124,13 +124,13 @@ test.describe('Bottom Dock', () => {
     });
 
     // Stub storage URLs so thumbnails resolve
-    await page.route('**/storage/v1/object/**', (route) => {
+    await page.route('**/storage/v1/object/**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'image/jpeg',
         body: Buffer.from('fake-image'),
-      });
-    });
+      })
+    );
 
     await page.goto('/photos');
     await photosCall;

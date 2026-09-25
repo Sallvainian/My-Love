@@ -50,6 +50,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.useRealTimers();
   useAppStore.setState({ ownProfile: null, coupleSettings: null, ...real });
 });
 
@@ -86,20 +87,46 @@ describe('Settings — Birthday', () => {
     expect(screen.queryByTestId('settings-birthday-error')).toBeNull();
   });
 
-  it('refuses a birthday that is not in the past, and sends nothing', async () => {
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
-    const save = vi.fn(async () => {});
-    useAppStore.setState({ setBirthday: save });
-    render(<Settings />);
+  describe('"in the past", against a pinned clock', () => {
+    // Pinned before each render: the form reads the clock both for its `max`
+    // and when it validates. Only `Date` is faked, so RTL's `waitFor` keeps
+    // its real timers.
+    beforeEach(() => {
+      vi.setSystemTime(new Date(2026, 8, 25, 12, 0, 0));
+    });
 
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    fireEvent.change(screen.getByTestId('settings-birthday-date'), { target: { value: today } });
-    fireEvent.click(screen.getByTestId('settings-birthday-save'));
+    it('refuses a birthday that is not in the past, and sends nothing', async () => {
+      useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
+      const save = vi.fn(async () => {});
+      useAppStore.setState({ setBirthday: save });
+      render(<Settings />);
 
-    expect(await screen.findByTestId('settings-birthday-error')).toHaveTextContent(/in the past/i);
-    expect(save).not.toHaveBeenCalled();
+      fireEvent.change(screen.getByTestId('settings-birthday-date'), {
+        target: { value: '2026-09-25' },
+      });
+      fireEvent.click(screen.getByTestId('settings-birthday-save'));
+
+      expect(await screen.findByTestId('settings-birthday-error')).toHaveTextContent(
+        /in the past/i
+      );
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('accepts yesterday, the latest date the field offers', async () => {
+      useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
+      const save = vi.fn(async () => {});
+      useAppStore.setState({ setBirthday: save });
+      render(<Settings />);
+
+      expect(screen.getByTestId('settings-birthday-date')).toHaveAttribute('max', '2026-09-24');
+      fireEvent.change(screen.getByTestId('settings-birthday-date'), {
+        target: { value: '2026-09-24' },
+      });
+      fireEvent.click(screen.getByTestId('settings-birthday-save'));
+
+      await waitFor(() => expect(save).toHaveBeenCalledWith('2026-09-24'));
+      expect(screen.queryByTestId('settings-birthday-error')).toBeNull();
+    });
   });
 
   it('refuses a birthday before 1900 (a mistyped year), and sends nothing', async () => {
@@ -157,18 +184,20 @@ describe('Settings — Wedding', () => {
   });
 
   it('saves any date, including one in the future', async () => {
+    // Pinned before render, so the date below stays in the future whenever
+    // this runs.
+    vi.setSystemTime(new Date(2026, 8, 25, 12, 0, 0));
     useAppStore.setState({ coupleSettings: { ...LINKED, weddingDate: null } });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setWeddingDate: save });
     render(<Settings />);
 
-    const nextYear = new Date().getFullYear() + 1;
     fireEvent.change(screen.getByTestId('settings-wedding-date'), {
-      target: { value: `${nextYear}-06-12` },
+      target: { value: '2027-06-12' },
     });
     fireEvent.click(screen.getByTestId('settings-wedding-save'));
 
-    await waitFor(() => expect(save).toHaveBeenCalledWith(`${nextYear}-06-12`));
+    await waitFor(() => expect(save).toHaveBeenCalledWith('2027-06-12'));
   });
 
   it('clears a saved wedding date', async () => {

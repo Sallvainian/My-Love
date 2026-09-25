@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import type { AppState } from '../../../src/stores/types';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
+import { clockAnchor } from '../../support/helpers/events';
 import { test, expect } from '../../support/merged-fixtures';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
@@ -163,6 +164,9 @@ test.describe('Account data through the real browser and local services', () => 
   });
 
   test('[P1] repairs an invalid local mood through the form, preserving its row and syncing the result', async ({ page, supabaseAdmin }) => {
+    // The seeded row is dated by the page's clock and the form edits today's
+    // mood, so the clock is pinned: a real midnight cannot split the two.
+    await page.clock.install({ time: clockAnchor() });
     await page.goto('/');
     await expect(page.getByTestId('daily-message')).toBeVisible();
     const seeded = await page.evaluate(async () => {

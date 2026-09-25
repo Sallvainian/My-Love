@@ -29,7 +29,7 @@
  * gates both of its branches on `isLoadingPartner` — so a stranded flag is a
  * permanently blank tab, not a cosmetic wobble.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const getPartner = vi.fn();
 const getPendingRequests = vi.fn();
@@ -226,17 +226,6 @@ function note(id: string, content: string) {
     content,
     created_at: `2026-08-03T06:00:0${id.length}.000Z`,
   };
-}
-
-/**
- * Let every already-resolved promise in the chain settle before the switch.
- *
- * This uses a REAL `setTimeout`. If a shared `vi.useFakeTimers()` is ever added
- * to this file's `beforeEach`, every case that calls `flush()` hangs with no
- * diagnostic — advance the timers or swap this for a microtask drain first.
- */
-function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 /** The minimum a PhotoUploadInput needs; nothing here reaches a real service. */
@@ -840,6 +829,31 @@ describe('loader identity guards', () => {
       return cRotationPool().map((message) => ({ ...message, isFavorite: false }));
     }
 
+    /**
+     * Every rotation reload `setAuthUser` started. It starts them fire-and-forget,
+     * but always synchronously, through the store's `loadMessages` -- so this
+     * pass-through records each one's promise for the case to await, and an
+     * empty list right after `setAuthUser` means no reload was asked for.
+     */
+    const realLoadMessages = useAppStore.getState().loadMessages;
+    let reloads: Promise<void>[] = [];
+
+    beforeEach(() => {
+      reloads = [];
+      useAppStore.setState({
+        loadMessages: () => {
+          const reload = realLoadMessages();
+          reloads.push(reload);
+          return reload;
+        },
+      });
+    });
+
+    afterEach(async () => {
+      await Promise.allSettled(reloads);
+      useAppStore.setState({ loadMessages: realLoadMessages });
+    });
+
     it('reloads for the incoming account when one signs in over another', async () => {
       useAppStore.setState({ messages: aPool() } as unknown as Parameters<
         typeof useAppStore.setState
@@ -847,7 +861,8 @@ describe('loader identity guards', () => {
       getAllStoredMessages.mockResolvedValue(cRotationPool());
 
       useAppStore.getState().setAuthUser(C);
-      await flush();
+      expect(reloads).toHaveLength(1);
+      await Promise.all(reloads);
 
       // Read for C, not for the account that just left.
       expect(readLocalCopy).toHaveBeenLastCalledWith(C, 'message-data');
@@ -865,7 +880,8 @@ describe('loader identity guards', () => {
 
       useAppStore.getState().clearAuth();
       useAppStore.getState().setAuthUser(C);
-      await flush();
+      expect(reloads).toHaveLength(1);
+      await Promise.all(reloads);
 
       expect(readLocalCopy).toHaveBeenLastCalledWith(C, 'message-data');
       expect(useAppStore.getState().messages).toEqual(cPool());
@@ -879,8 +895,9 @@ describe('loader identity guards', () => {
       >[0]);
 
       useAppStore.getState().setAuthUser(A);
-      await flush();
 
+      // A reload would have started inside that call.
+      expect(reloads).toEqual([]);
       expect(getAllStoredMessages).not.toHaveBeenCalled();
     });
 
@@ -893,8 +910,9 @@ describe('loader identity guards', () => {
       >[0]);
 
       useAppStore.getState().setAuthUser(C);
-      await flush();
 
+      // A reload would have started inside that call.
+      expect(reloads).toEqual([]);
       expect(getAllStoredMessages).not.toHaveBeenCalled();
     });
 
@@ -911,7 +929,7 @@ describe('loader identity guards', () => {
       useAppStore.getState().setAuthUser(C);
       expect(useAppStore.getState().currentMessage).toBeNull();
 
-      await flush();
+      await Promise.all(reloads);
 
       expect(useAppStore.getState().currentMessage).toMatchObject({ text: 'C-ONSCREEN-DAILY' });
     });
@@ -943,7 +961,9 @@ describe('loader identity guards', () => {
       useAppStore.getState().setAuthUser('USER-D-ID');
 
       pending.settle(cRotationPool());
-      await flush();
+      // Both reloads -- C's stale one and D's own -- have finished.
+      expect(reloads).toHaveLength(2);
+      await Promise.all(reloads);
 
       expect(useAppStore.getState().messages).toEqual(
         dPool.map((message) => ({ ...message, isFavorite: false }))
@@ -1230,7 +1250,8 @@ describe('loader identity guards', () => {
       listAllPhotos.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().loadPhotos();
-      await flush();
+      // The held read is really reached, so the guard below is what is measured.
+      await vi.waitFor(() => expect(listAllPhotos).toHaveBeenCalled());
       useAppStore.getState().clearAuth();
       useAppStore.getState().setAuthUser(A);
       useAppStore.setState({ photos: [aGalleryRow()] } as unknown as Parameters<
@@ -1332,7 +1353,8 @@ describe('loader identity guards', () => {
 
       // Between 80 and 95: A's account is filling up, C's is not.
       quota.settle({ used: 850, quota: 1_000, percent: 85, warning: 'approaching' });
-      await flush();
+      // The warning is written, or not, before the upload starts.
+      await vi.waitFor(() => expect(uploadPhotoService).toHaveBeenCalled());
 
       expect(useAppStore.getState().storageWarning).toBeNull();
 
@@ -1351,7 +1373,8 @@ describe('loader identity guards', () => {
       uploadPhotoService.mockResolvedValue(aPhoto());
 
       const inFlight = useAppStore.getState().uploadPhoto(uploadInput());
-      await flush();
+      // Parked on the post-upload quota read, past the insert.
+      await vi.waitFor(() => expect(checkStorageQuota).toHaveBeenCalledTimes(2));
 
       // A's photo is in A's gallery by now — that write was legitimate.
       expect(useAppStore.getState().photos).toHaveLength(1);

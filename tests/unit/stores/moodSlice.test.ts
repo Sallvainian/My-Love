@@ -78,6 +78,12 @@ function createTestStore(extraState: Record<string, unknown> = {}) {
   return { get, set };
 }
 
+// Pinned in the top-level beforeEach (noon EDT): the slice keys new moods by
+// today's local date, so a fixture dated TODAY is the slice's today whenever
+// this runs. Only `Date` is faked; `vi.waitFor` keeps its real timers.
+const NOW = new Date('2026-09-15T16:00:00.000Z');
+const TODAY = '2026-09-15';
+
 function makeMoodEntry(overrides: Partial<MoodEntry> = {}): MoodEntry {
   return {
     id: 1,
@@ -85,11 +91,8 @@ function makeMoodEntry(overrides: Partial<MoodEntry> = {}): MoodEntry {
     mood: 'happy',
     moods: ['happy'],
     note: '',
-    date: (() => {
-      const d = new Date();
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    })(),
-    timestamp: new Date(),
+    date: TODAY,
+    timestamp: NOW,
     synced: false,
     ...overrides,
   };
@@ -97,6 +100,7 @@ function makeMoodEntry(overrides: Partial<MoodEntry> = {}): MoodEntry {
 
 describe('moodSlice', () => {
   beforeEach(() => {
+    vi.setSystemTime(NOW);
     vi.clearAllMocks();
     // loadMoods runs as a side effect of several actions under test, so give
     // the scoped read a default rather than letting it resolve undefined.
@@ -115,6 +119,7 @@ describe('moodSlice', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   describe('initial state', () => {
@@ -199,7 +204,7 @@ describe('moodSlice', () => {
 
   describe('getMoodForDate', () => {
     it('returns mood for matching date', () => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = TODAY;
       const entry = makeMoodEntry({ date: today });
       const { get, set } = createTestStore({ userId: 'user-123' });
       set({ moods: [entry] } as Partial<MoodSlice>);
@@ -215,7 +220,7 @@ describe('moodSlice', () => {
     it('does not return another account\'s entry for the same date', () => {
       // The device is shared. A signed out, B signed in; A's row can still be
       // in state, and MoodTracker pre-fills its note straight into B's form.
-      const today = new Date().toISOString().split('T')[0];
+      const today = TODAY;
       const partnersEntry = makeMoodEntry({ date: today, userId: 'user-A', note: 'private' });
       const { get, set } = createTestStore({ userId: 'user-B' });
       set({ moods: [partnersEntry] } as Partial<MoodSlice>);

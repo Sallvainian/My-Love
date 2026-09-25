@@ -52,40 +52,46 @@ test.describe('Partner Mood View', () => {
     // the couple-settings refresher reuses the partner_id answer to address
     // `couple_settings`, and a non-uuid id is a 400 there (RLS answers a
     // well-formed stranger's pair with no row).
-    interceptNetworkCall({
+    // Each stub is awaited after the load that hits it, bounded by a timeout.
+    const partnerLink = interceptNetworkCall({
       url: '**/rest/v1/users?select=partner_id*',
       fulfillResponse: {
         status: 200,
         body: { partner_id: FAKE_PARTNER_ID, updated_at: '2024-01-01T00:00:00Z' },
       },
+      timeout: 15000,
     });
 
-    interceptNetworkCall({
+    const partnerProfile = interceptNetworkCall({
       url: '**/rest/v1/users?select=id*',
       fulfillResponse: {
         status: 200,
         body: { id: FAKE_PARTNER_ID, email: 'partner@test.com', display_name: 'Test Partner' },
       },
+      timeout: 15000,
     });
 
-    interceptNetworkCall({
+    const requests = interceptNetworkCall({
       url: '**/rest/v1/partner_requests**',
       fulfillResponse: {
         status: 200,
         body: [],
       },
+      timeout: 15000,
     });
 
     // Stub partner moods fetch
-    interceptNetworkCall({
+    const moods = interceptNetworkCall({
       url: '**/rest/v1/moods**',
       fulfillResponse: {
         status: 200,
         body: [],
       },
+      timeout: 15000,
     });
 
     await page.goto('/partner');
+    await Promise.all([partnerLink, partnerProfile, requests, moods]);
 
     // WHEN: View loads with connected partner
     await expect(page.getByTestId('partner-mood-view')).toBeVisible();

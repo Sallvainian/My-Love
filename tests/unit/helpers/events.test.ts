@@ -2,7 +2,12 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventDateFrom } from '../../support/factories/events';
-import { isoDateDaysFromNow } from '../../support/helpers/events';
+import {
+  clockAnchor,
+  clockAnchorAvoidingLeapDay,
+  isoBirthdayDaysFromNow,
+  isoDateDaysFromNow,
+} from '../../support/helpers/events';
 
 describe('isoDateDaysFromNow', () => {
   beforeEach(() => {
@@ -142,4 +147,68 @@ describe('isoDateDaysFromNow', () => {
       expect(anchor.getTime()).toBe(anchorTimestamp);
     }
   );
+});
+
+// Explicit `now` values throughout, under Vitest's pinned America/New_York: no
+// clock is read, so nothing here needs a child process or a faked Date.
+describe('clockAnchor', () => {
+  it('is local noon the same day once noon has passed', () => {
+    const anchor = clockAnchor(new Date(2026, 8, 25, 15, 30));
+    expect(anchor).toEqual(new Date(2026, 8, 25, 12, 0, 0, 0));
+  });
+
+  it('is exactly now at local noon', () => {
+    expect(clockAnchor(new Date(2026, 8, 25, 12, 0, 0, 0))).toEqual(new Date(2026, 8, 25, 12));
+  });
+
+  it('is the previous day at noon before local noon, never ahead of now', () => {
+    const now = new Date(2026, 8, 25, 11, 59, 59, 999);
+    const anchor = clockAnchor(now);
+    expect(anchor).toEqual(new Date(2026, 8, 24, 12, 0, 0, 0));
+    expect(anchor.getTime()).toBeLessThanOrEqual(now.getTime());
+  });
+
+  it('crosses a month end backwards', () => {
+    expect(clockAnchor(new Date(2026, 9, 1, 8))).toEqual(new Date(2026, 8, 30, 12));
+  });
+});
+
+describe('clockAnchorAvoidingLeapDay', () => {
+  it('keeps the plain anchor when no offset lands on 29 February', () => {
+    const now = new Date(2026, 8, 25, 15);
+    expect(clockAnchorAvoidingLeapDay([5, 10, 40], now)).toEqual(clockAnchor(now));
+  });
+
+  it('steps back a day when an offset lands on 29 February', () => {
+    // 24 Feb 2028 + 5 days is 29 Feb 2028.
+    const anchor = clockAnchorAvoidingLeapDay([5, 10, 40], new Date(2028, 1, 24, 13));
+    expect(anchor).toEqual(new Date(2028, 1, 23, 12));
+    expect(isoDateDaysFromNow(5, anchor)).toBe('2028-02-28');
+  });
+
+  it('keeps stepping while adjacent offsets land on 29 February in turn', () => {
+    // From 24 Feb 2028, offset 5 is 29 Feb; one step back puts offset 6 there.
+    const anchor = clockAnchorAvoidingLeapDay([5, 6], new Date(2028, 1, 24, 13));
+    expect(anchor).toEqual(new Date(2028, 1, 22, 12));
+    expect(isoDateDaysFromNow(5, anchor)).toBe('2028-02-27');
+    expect(isoDateDaysFromNow(6, anchor)).toBe('2028-02-28');
+  });
+});
+
+describe('isoBirthdayDaysFromNow', () => {
+  it('moves the date `yearsBack` years earlier, keeping its day and month', () => {
+    const anchor = new Date(2026, 8, 25, 12);
+    expect(isoBirthdayDaysFromNow(10, 30, anchor)).toBe('1996-10-05');
+  });
+
+  it('counts the years from the date it lands on, across a year end', () => {
+    // 30 Dec 2026 + 5 days is 4 Jan 2027, so 31 years back is 1996.
+    const anchor = new Date(2026, 11, 30, 12);
+    expect(isoBirthdayDaysFromNow(5, 31, anchor)).toBe('1996-01-04');
+  });
+
+  it('refuses a 29 February birthday', () => {
+    const anchor = new Date(2028, 1, 24, 12);
+    expect(() => isoBirthdayDaysFromNow(5, 31, anchor)).toThrow(/29 February/);
+  });
 });
