@@ -662,7 +662,7 @@ class MoodSyncService {
     }
 
     const delay = Math.min(
-      RETRY_CONFIG.baseDelay * Math.pow(2, entry.closedRetryCount),
+      RETRY_CONFIG.baseDelay * 2 ** entry.closedRetryCount,
       RETRY_CONFIG.maxDelay
     );
     entry.closedRetryCount++;
