@@ -104,53 +104,56 @@ jobs:
             findings that failed this gate; it carries its own additional bar, below.
 
             `AGENTS.md` deliberately names code that ALREADY violates its own rules —
-            the two modules still calling `supabase.channel()` directly. That is
-            documentation of known debt, not a work list. Report it only if THIS
-            diff touches that code and leaves it worse. Opening a review by
-            relisting it is a failed review.
+            the modules its Known pitfalls Realtime line says still call
+            `supabase.channel()` directly, and the migrations it says still contain
+            the removed `realtime.send()` pattern. That is documentation of known
+            debt, not a work list. Report it only if THIS diff touches that code and
+            leaves it worse. Opening a review by relisting it is a failed review.
 
             ## Project-specific checks
 
-            Run these first — they are where real bugs in this repo live. Each line
-            indexes a rule in `AGENTS.md`; read the full statement there before
-            reporting against it.
+            Run these first — they are where real bugs in this repo live. Each check
+            names what to look for in the diff and where the rule lives in
+            `AGENTS.md`. The rule is only there: read it before reporting, and quote
+            it under the filter gate.
 
-            1. **Cross-account leakage.** An async store action that `set()`s after an
-               `await` without first capturing `{ userId, authSessionVersion }` and
-               re-checking both. A new `BaseIndexedDBService.getAll()` call not
-               scoped by `userId` in the service layer.
-            2. **Realtime teardown.** Any new direct `supabase.channel()` call. New
-               Realtime work belongs in `moodSyncService`'s refcounted registry or
-               `sendEphemeralBroadcast()`.
-            3. **Retry idempotency.** A retryable INSERT that mints a fresh key per
-               attempt, or lacks the DB `UNIQUE` constraint plus
-               `.upsert(..., { onConflict, ignoreDuplicates: true })`. Compare against
-               `notesSlice.ts` or `photoService.ts`.
-            4. **Wrong data model.** Data-layer code written for a model the feature
-               does not use: photos, partner interactions and the love-notes thread
-               are sent online but shown offline from per-account local copies,
-               love-note text is queued offline, and mood and the bundled daily
-               messages are offline-first with IndexedDB primary. Check how the
-               feature is wired.
-            5. **Error contract.** Assuming IndexedDB semantics (reads return
-               `null`/`[]`, writes throw) of a Supabase API function or the reverse.
-               The Supabase layer is inconsistent — check the specific function called.
-            6. **Imports and aliases.** The `@/` alias inside `src/` — it typechecks and
-               then fails the production build. `@playwright/test` imported in a spec
-               instead of `tests/support/merged-fixtures.ts`.
-            7. **Generated and frozen files.** Hand edits to
-               `src/types/database.types.ts` or `mise.lock`. New or repaired specs
-               under `tests/e2e-archive/`.
-            8. **Load-bearing test config.** Removal of the `nodeName` shim from
-               `tests/setup.ts`. POSIX rewrites of the shell idioms in
-               `playwright.config.ts`, or guarding its Supabase env block.
-            9. **Secrets.** Anything written into `.env` or source instead of
-               age-encrypted in `fnox.toml`.
-            10. **Architecture drift.** react-router added instead of
-                `navigationSlice.currentView`. Vite chunking moved to `manualChunks`
-                instead of `rolldownOptions.output.codeSplitting.groups`. Prettier run
-                over whole files (a `prettier --write` script, a CI format check),
-                or its version range loosened from an exact pin.
+            1. **Cross-account leakage.** Diff: a `set(` after an `await` in
+               `src/stores/slices/`; a new field in a slice's state; a
+               `getAll(` call; a new IndexedDB store or localStorage key.
+               Rules: Known pitfalls (the `authSessionVersion`, sign-out and
+               `getAll()` lines); Maintained by hand (the `deleteAccountData()` line).
+            2. **Realtime.** Diff: `supabase.channel(`, `realtime.send`, a partner or
+               session lookup that can answer `null`. Rules: Known pitfalls (the
+               three Realtime lines).
+            3. **Retry idempotency.** Diff: an `.insert(` or Storage upload on a path
+               that can retry. Rules: Known pitfalls (the retryable-INSERT line).
+            4. **Wrong data model.** Diff: data-layer changes in `src/services/`,
+               `src/api/` or `src/stores/`. Rules: Maintained by hand (the
+               data-model line); Known pitfalls (the `localCopy.ts`/`dbSchema.ts`
+               line and the needs-a-connection line).
+            5. **Error contract.** Diff: a caller handling a service or API
+               function's failure. Rules: Conventions that differ from defaults
+               (the IndexedDB/Supabase error line).
+            6. **Imports, aliases and suppressions.** Diff: `from '@/` under `src/`; a
+               value import from `@playwright/test` in a spec; a new `eslint-disable`
+               directive without a same-line ` -- ` reason. Rules: Conventions (the
+               `@/` line); Where things are (the E2E fixtures line); Known pitfalls
+               (the `eslint-disable` line).
+            7. **Generated and frozen files.** Diff: `src/types/database.types.ts`,
+               `mise.lock`, `tests/e2e-archive/`. Rules: Policy.
+            8. **Load-bearing test config.** Diff: `tests/setup.ts`,
+               `playwright.config.ts`, a new `registerLocalCopy`. Rules: Known
+               pitfalls (the `nodeName`, `playwright.config.ts` and
+               `registerLocalCopy` lines).
+            9. **Secrets and personal data.** Diff: `.env*`, key-shaped strings,
+               anything under `_bmad-output/` or `.bmad-loop/`. Rules: Policy
+               (the fnox and public-repo lines).
+            10. **Architecture drift.** Diff: `react-router`, `manualChunks`,
+                `prettier` in `package.json`, a script or a workflow. Rules:
+                Conventions (the navigation, Vite chunking and Prettier lines).
+            11. **Database migrations.** Diff: `supabase/migrations/`,
+                `supabase/tests/database/`. Rules: Known pitfalls (the policy-trap,
+                row-level-security, `policies_are` and hosted-database lines).
 
             ## General checks
 
