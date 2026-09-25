@@ -151,7 +151,7 @@ deferred:
   - `[low]` `[reject]` (blind) Countdown components assume a `p-3` parent — both are mounted only inside the Settings Countdowns card; decoupling adds structure for a mount that does not exist.
   - `[false]` `[reject]` (blind) Dialogs inside the card could be clipped — no ancestor card has transform/filter/overflow; the Settings comment is about DisplayNameSetup only and is accurate.
   - `[false]` `[reject]` (blind) Anniversaries empty state lost its CTA — it is exactly the approved artboard; the + button is visible and named "Add Anniversary".
-  - `[low]` `[patch]` (blind) Display-name row's accessible name lost the "Change" verb — confirmed (name was "Display name [owner]ie"); moot, folded into amendment (`sr-only` "Change ").
+  - `[low]` `[patch]` (blind) Display-name row's accessible name lost the "Change" verb — confirmed (name was "Display name [owner]"); moot, folded into amendment (`sr-only` "Change ").
   - `[low]` `[reject]` (blind) Replay returns to the top of Settings and re-reads — the splash replaces the app tree by existing App design; rare action, fix would restructure App.
   - `[false]` `[reject]` (blind) console.error spy never restored in Settings.kit.test — vitest isolates per file and the sibling Settings.displayName.test uses the same pattern; no test relies on console output, so nothing is hidden.
   - `[low]` `[patch]` (blind) Stale test title "icon-only below the sm breakpoint" — confirmed; moot, folded into amendment (rename).
