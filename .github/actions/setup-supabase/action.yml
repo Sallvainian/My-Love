@@ -44,7 +44,8 @@ runs:
     # takes the cold path once (it can only read caches from its own ref or
     # main), so a cold download on a fresh branch is normal, not a broken cache.
     # deploy.yml's migrate job and supabase-migrations.yml still use setup-cli,
-    # pinned to this same version.
+    # pinned to this same version, and package.json's supabase:up and
+    # supabase:down run `npx supabase@<version>` — bump all of them together.
     - name: Cache Supabase CLI
       id: cli-cache
       uses: actions/cache@v6
