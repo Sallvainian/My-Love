@@ -1186,7 +1186,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
             if (!ownsRequest()) return;
           }
 
-          const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
           const createdAt = nextQueuedAt();
           try {
             await enqueueNote({ id: tempId, userId, toUserId, content, createdAt, failed: false });
@@ -1239,7 +1239,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         if (!ownsRequest()) return;
 
         // Generate temporary ID for optimistic update
-        const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
         // If image provided, validate and prepare preview
         let imagePreviewUrl: string | undefined;

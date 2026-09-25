@@ -24,8 +24,8 @@
  *   node scripts/smoke-tests.cjs
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 // ANSI color codes
 const colors = {

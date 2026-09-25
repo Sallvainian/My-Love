@@ -25,7 +25,7 @@
  * Only rows this spec inserts, found by their unique `storage_path` prefix, are
  * deleted, before and after each test. Both are this worker's own account.
  */
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { test, expect } from '../support/merged-fixtures';
 import type { TypedSupabaseClient } from '../support/factories';
 import { resolveWorkerPairIds } from '../support/factories/events';

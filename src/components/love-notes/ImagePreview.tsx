@@ -11,7 +11,7 @@
  */
 
 import { motion } from 'framer-motion';
-import { Loader2, X } from 'lucide-react';
+import { LoaderCircle, X } from 'lucide-react';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { IMAGE_VALIDATION } from '../../config/images';
 import { imageCompressionService } from '../../services/imageCompressionService';
@@ -109,7 +109,7 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
             aria-live="polite"
           >
             <div className="flex items-center gap-2 text-sm text-white">
-              <Loader2 className="animate-spin" size={16} aria-hidden="true" />
+              <LoaderCircle className="animate-spin" size={16} aria-hidden="true" />
               <span>Compressing...</span>
             </div>
           </div>

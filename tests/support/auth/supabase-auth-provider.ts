@@ -12,7 +12,7 @@ import {
   getStorageStatePath,
   saveStorageState,
 } from '@seontechnologies/playwright-utils/auth-session';
-import fs from 'fs';
+import fs from 'node:fs';
 import { TEST_USER_PASSWORD } from '../test-credentials';
 
 

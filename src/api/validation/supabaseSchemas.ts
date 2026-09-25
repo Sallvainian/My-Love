@@ -18,7 +18,7 @@ import { z } from 'zod/v4';
 /**
  * UUID schema for Supabase record IDs
  */
-export const UUIDSchema = z.string().uuid('Invalid UUID format');
+export const UUIDSchema = z.uuid({ error: 'Invalid UUID format' });
 
 /**
  * ISO timestamp schema for Supabase timestamps
@@ -38,7 +38,7 @@ export const TimestampSchema = z.string().refine(
     const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)?$/;
     return isoRegex.test(val);
   },
-  { message: 'Invalid timestamp format' }
+  { error: 'Invalid timestamp format' }
 );
 
 // ============================================================================

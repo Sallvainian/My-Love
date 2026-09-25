@@ -156,7 +156,7 @@ function moodRecord(moodTypes: unknown): SupabaseMood {
   };
 }
 
-/** The lucide class MOOD_DISPLAY's icon renders for 'happy' (Smile)... */
+/** The lucide class MOOD_DISPLAY's icon renders for 'happy' (FaceSlightlySmiling, via its `smile` alias)... */
 const HAPPY_ICON = '.lucide-smile';
 /** ...and for 'tired' (Battery). */
 const TIRED_ICON = '.lucide-battery';

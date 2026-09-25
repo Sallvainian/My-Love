@@ -304,9 +304,9 @@ test.describe('CHECK-constraint rejections over the wire', () => {
     // 2. The key is nonetheless present, which is the only thing
     //    `isPostgrestError` looks at. Drop the key and the mapper is never
     //    called for any SQLSTATE at all.
-    expect(Object.prototype.hasOwnProperty.call(body, 'details')).toBe(true);
-    expect(Object.prototype.hasOwnProperty.call(body, 'code')).toBe(true);
-    expect(Object.prototype.hasOwnProperty.call(body, 'message')).toBe(true);
+    expect(Object.hasOwn(body, 'details')).toBe(true);
+    expect(Object.hasOwn(body, 'code')).toBe(true);
+    expect(Object.hasOwn(body, 'message')).toBe(true);
   });
 
   test('[P1] a rejected CHECK write commits no row, so this spec has nothing to clean up', async ({
