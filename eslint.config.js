@@ -28,8 +28,8 @@ export default defineConfig(
   ...tseslint.configs.recommended,
   // A disable directive is a written exemption, so a dead one is a false claim about the
   // code. ESLint reports these as warnings by default and `npm run lint` passes no
-  // --max-warnings, which is how the stale suppressions cleaned up in 2226cc01 and
-  // e9d41bad survived in the first place. Error makes CI reject them.
+  // --max-warnings, which is how the stale suppressions cleaned up in PR #247
+  // survived in the first place. Error makes CI reject them.
   {
     linterOptions: {
       reportUnusedDisableDirectives: 'error',

@@ -12,7 +12,7 @@ jobs:
     # a review nobody wanted: 51 of the last 100 runs. Adding dependabot to
     # `allowed_bots` would run the review instead of suppressing it.
     #
-    # claude[bot] is the deliberate exception. 53c93ee6 added `allowed_bots:
+    # claude[bot] is the deliberate exception. PR #169 added `allowed_bots:
     # 'claude'` below so its PRs still get reviewed, and a blanket type check
     # would undo that. Matching on `user.type` covers copilot-swe-agent and
     # ecc-tools too, without maintaining a login denylist.
