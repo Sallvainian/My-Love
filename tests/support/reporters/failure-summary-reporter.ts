@@ -20,7 +20,7 @@ interface FailureEntry {
 }
 
 function stripAnsi(s: string): string {
-  // eslint-disable-next-line no-control-regex
+  // eslint-disable-next-line no-control-regex -- strips ANSI colour codes, which start with the \x1b control character
   return s.replace(/\x1b\[[0-9;]*m/g, '').replace(/\[(\d+)m/g, '');
 }
 

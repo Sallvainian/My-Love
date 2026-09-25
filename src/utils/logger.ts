@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+/* eslint-disable no-console -- this module is the console wrapper */
 const isDev = import.meta.env.DEV;
 
 export const logger = {
