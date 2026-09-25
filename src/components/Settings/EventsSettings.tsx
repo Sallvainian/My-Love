@@ -100,7 +100,7 @@ type EventLoadOwner = { userId: string; authSessionVersion: number };
 
 function ownsCurrentSession(owner: EventLoadOwner): boolean {
   // Async callbacks can run before React cleans up the old session's effects.
-  // eslint-disable-next-line no-restricted-properties
+  // eslint-disable-next-line no-restricted-properties -- async callbacks need the live session, not the last-rendered one
   const state = useAppStore.getState();
   return state.userId === owner.userId && state.authSessionVersion === owner.authSessionVersion;
 }
@@ -800,7 +800,7 @@ function EventForm({
   useEffect(() => {
     return () => {
       if (refreshRequestedRef.current) {
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- reads the ref at cleanup on purpose: the fallback must be the node mounted now
         const refreshFallback = refreshFocusRef.current;
         if (refreshFallback?.isConnected) {
           refreshFallback.focus();
@@ -809,7 +809,7 @@ function EventForm({
       }
 
       if (!saveSucceededRef.current) return;
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- reads the ref at cleanup on purpose: the fallback must be the node mounted now
       const fallback = fallbackFocusRef?.current;
       if (fallback?.isConnected) {
         fallback.focus();
@@ -1257,7 +1257,7 @@ function EventDeleteConfirmation({
   useEffect(() => {
     return () => {
       if (!deleteSucceededRef.current && !refreshRequestedRef.current) return;
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- reads the ref at cleanup on purpose: the fallback must be the node mounted now
       const fallback = fallbackFocusRef.current;
       if (fallback?.isConnected) {
         fallback.focus();

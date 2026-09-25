@@ -119,7 +119,7 @@ export function NoteRemoveConfirmation({
       // wants the node copied in at effect time; doing that would re-freeze a DOM
       // node the way the version this replaced did, which is what broke the
       // last-note case.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- reads the ref at cleanup on purpose: the fallback must be the node mounted now
       const fallback = fallbackFocusRef.current;
       if (fallback?.isConnected) {
         fallback.focus();
