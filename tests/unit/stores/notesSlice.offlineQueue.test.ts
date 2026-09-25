@@ -48,7 +48,7 @@ const server = {
   lookup: { status: 'linked', partnerId: PARTNER } as
     | { status: 'linked'; partnerId: string }
     | { status: 'unlinked' }
-    | { status: 'error'; reason: string },
+    | { status: 'error'; reason: string; offline?: true },
   readError: null as { message: string } | null,
   /** Every table a request went to, in order. */
   requests: [] as string[],
@@ -1054,6 +1054,31 @@ describe('notesSlice offline send queue', () => {
       expect(store.getState().notesError).toBeNull();
       expect(store.getState().notesIsLoading).toBe(false);
     });
+
+    it('a thread load over a saved copy clears a banner an earlier failed load raised', async () => {
+      const store = createTestStore();
+      server.lookup = { status: 'error', reason: 'upstream request timeout' };
+      await store.getState().fetchNotes();
+      expect(store.getState().notesError).toBe('upstream request timeout');
+
+      await writeLocalCopy(A, LOVE_NOTES_COPY_KIND, [sentRow('n6', 'saved')]);
+      setOnline(false);
+      await store.getState().fetchNotes();
+
+      expect(contents(store)).toEqual(['saved']);
+      expect(store.getState().notesError).toBeNull();
+    });
+  });
+
+  it('a partner lookup that finds the device offline shows the load sentence, not its reason', async () => {
+    const store = createTestStore();
+    server.lookup = { status: 'error', reason: 'offline', offline: true };
+
+    await store.getState().fetchNotes();
+
+    expect(store.getState().notesError).toBe(
+      'You are offline. Love notes need a connection to load.'
+    );
   });
 
   describe('rate limit: notes queued offline do not count', () => {

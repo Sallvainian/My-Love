@@ -178,10 +178,11 @@ describe('partner lookup contract', () => {
 
     it('lookupPartnerId answers error without querying the users table', async () => {
       singleResults = [linked];
-      const { lookupPartnerId, PARTNER_LOOKUP_OFFLINE } = await import('@/api/supabaseClient');
+      const { lookupPartnerId } = await import('@/api/supabaseClient');
       await expect(lookupPartnerId()).resolves.toEqual({
         status: 'error',
-        reason: PARTNER_LOOKUP_OFFLINE,
+        reason: 'offline',
+        offline: true,
       });
       expect(singleCalls).toBe(0);
     });

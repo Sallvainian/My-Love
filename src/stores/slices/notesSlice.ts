@@ -79,6 +79,7 @@
 import { CHECK_CONSTRAINT_MESSAGE, handleSupabaseError, isPostgrestError } from '../../api/errorHandlers';
 import { sendEphemeralBroadcast } from '../../api/ephemeralBroadcast';
 import { getPartnerId, lookupPartnerId, supabase } from '../../api/supabaseClient';
+import type { PartnerLookup } from '../../api/supabaseClient';
 import { NOTES_CONFIG } from '../../config/images';
 import { offlineMessage } from '../../services/accountDataError';
 import { deleteCachedImages } from '../../services/imageCache';
@@ -169,6 +170,18 @@ const NOTE_RETRY_MAX_DELAY_MS = 60_000;
 /** `navigator.onLine` says the device is offline for certain. */
 function knownOffline(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+/**
+ * The message for a partner lookup that failed. One that found the device
+ * offline says so in the screen's own sentence rather than its bare reason.
+ */
+function lookupFailure(
+  lookup: Extract<PartnerLookup, { status: 'error' }>,
+  offlineText: string,
+  fallback: string
+): string {
+  return lookup.offline ? offlineText : lookup.reason || fallback;
 }
 
 /**
@@ -463,6 +476,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
    * spinner of a load started after it. Per slice instance.
    */
   let notesLoadTicket = 0;
+  // The last banner a failed load raised, so a later offline load can tell it
+  // apart from a send's banner and clear it rather than keep it over notes.
+  let lastLoadError: string | null = null;
 
   /**
    * Retries in flight, by tempId. A retry keeps its note marked failed until
@@ -789,7 +805,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
       const startedOffline = knownOffline();
       const keptError = () => {
         const current = get().notesError;
-        return startedOffline && current !== NOTES_LOAD_NEEDS_CONNECTION ? current : null;
+        const staleLoad = current === NOTES_LOAD_NEEDS_CONNECTION || current === lastLoadError;
+        return startedOffline && !staleLoad ? current : null;
       };
 
       try {
@@ -816,7 +833,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
             throw new Error(PARTNER_NOT_CONFIGURED);
           }
           if (lookup.status === 'error') {
-            throw new Error(lookup.reason || 'Failed to fetch notes');
+            throw new Error(
+              lookupFailure(lookup, NOTES_LOAD_NEEDS_CONNECTION, 'Failed to fetch notes')
+            );
           }
           const partnerId = lookup.partnerId;
 
@@ -954,6 +973,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         // thread, an unlinked account or a signed-out call still shows the error.
         // Offline, a banner already showing stays (see keptError).
         const keepThreadClear = !conclusiveError && get().notes.length > 0;
+        if (!keepThreadClear) lastLoadError = errorMessage;
         set({
           notesIsLoading: false,
           notesError: keepThreadClear ? keptError() : errorMessage,
@@ -1003,7 +1023,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
           throw new Error(PARTNER_NOT_CONFIGURED);
         }
         if (lookup.status === 'error') {
-          throw new Error(lookup.reason || 'Failed to fetch older notes');
+          throw new Error(
+            lookupFailure(lookup, NOTES_LOAD_NEEDS_CONNECTION, 'Failed to fetch older notes')
+          );
         }
         const partnerId = lookup.partnerId;
 
@@ -1083,6 +1105,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
         // Same rule as fetchNotes: a failed read raises no banner over notes
         // already on screen.
         const keepThreadClear = !conclusiveError && get().notes.length > 0;
+        if (!keepThreadClear) lastLoadError = errorMessage;
         set({
           notesIsLoading: false,
           notesError: keepThreadClear ? null : errorMessage,
@@ -1207,7 +1230,11 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, api) => 
           if (!toUserId) {
             const lookup = await lookupPartnerId();
             if (lookup.status === 'unlinked') throw new Error(PARTNER_NOT_CONFIGURED);
-            if (lookup.status === 'error') throw new Error(lookup.reason || 'Failed to send note');
+            if (lookup.status === 'error') {
+              throw new Error(
+                lookupFailure(lookup, NOTES_SEND_NEEDS_CONNECTION, 'Failed to send note')
+              );
+            }
             toUserId = lookup.partnerId;
             if (!ownsRequest()) return;
           }

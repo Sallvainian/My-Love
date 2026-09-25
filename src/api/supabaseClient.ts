@@ -295,7 +295,7 @@ export const resolveSignedInUserForDelivery = async (): Promise<SessionLookup> =
 export type PartnerLookup =
   | { status: 'linked'; partnerId: string }
   | { status: 'unlinked' }
-  | { status: 'error'; reason: string };
+  | { status: 'error'; reason: string; offline?: true };
 
 /**
  * The partner lookup, with the two null cases kept apart.
@@ -312,13 +312,11 @@ export type PartnerLookup =
  * `partner_id`: neither is a failure, and retrying either would only delay a
  * correct answer.
  *
- * Known offline, it answers `error` with reason `PARTNER_LOOKUP_OFFLINE`
- * without sending the query: the request could only fail, and every caller
+ * Known offline, it answers `error` marked `offline: true` without sending
+ * the query: the request could only fail, and every caller
  * already keeps what it shows on `error`. Checked after the session read,
  * which can resolve after the connection drops.
  */
-export const PARTNER_LOOKUP_OFFLINE = 'offline';
-
 const knownOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
 export const lookupPartnerId = async (): Promise<PartnerLookup> => {
@@ -337,7 +335,7 @@ export const lookupPartnerId = async (): Promise<PartnerLookup> => {
       return { status: 'unlinked' };
     }
 
-    if (knownOffline()) return { status: 'error', reason: PARTNER_LOOKUP_OFFLINE };
+    if (knownOffline()) return { status: 'error', reason: 'offline', offline: true };
 
     // Query current user's partner_id from users table
     const { data, error } = await supabase
@@ -380,7 +378,7 @@ export const resolvePartnerLookupForDelivery = async (): Promise<PartnerLookup> 
     last = await lookupPartnerId();
     if (last.status !== 'error') return last;
     // Retrying offline only waits out the backoff for the same answer.
-    if (last.reason === PARTNER_LOOKUP_OFFLINE) return last;
+    if (last.offline) return last;
 
     const backoff = LOOKUP_BACKOFF_MS[attempt];
     if (backoff === undefined) break;
