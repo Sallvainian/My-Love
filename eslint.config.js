@@ -133,7 +133,6 @@ export default defineConfig(
     rules: {
       'react-hooks/rules-of-hooks': 'off', // Test fixtures may use hooks in non-standard ways
       'no-empty-pattern': 'off', // Playwright fixtures use empty destructuring for deps
-      '@typescript-eslint/ban-ts-comment': 'off', // Tests may need to use @ts-ignore for mocking
       '@typescript-eslint/no-unused-vars': 'off', // Tests often have unused imports/mocks/fixtures
       'no-global-assign': 'off', // Tests may mock global objects like Date
       '@typescript-eslint/no-unused-expressions': 'off', // Tests may have expressions for side effects
