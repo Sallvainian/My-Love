@@ -12,7 +12,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PhotoWithUrls } from '../../../services/photoService';
 import { PhotoViewer } from '../PhotoViewer';
 
@@ -37,6 +37,12 @@ const deletePhotoMock = vi.hoisted(() => vi.fn());
 vi.mock('../../../stores/useAppStore', () => ({
   useAppStore: () => ({ deletePhoto: deletePhotoMock }),
 }));
+
+// Each case sets its own answer; resetting here keeps one from leaking into
+// the next even when an assertion throws first.
+afterEach(() => {
+  deletePhotoMock.mockReset();
+});
 
 const photo = {
   id: 'photo-1',
@@ -227,7 +233,6 @@ describe('PhotoViewer focus', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
     });
-    deletePhotoMock.mockReset();
   });
 
   it('keeps the confirmation open when Cancel or Escape is pressed while the delete is pending', async () => {
@@ -254,7 +259,6 @@ describe('PhotoViewer focus', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
     });
-    deletePhotoMock.mockReset();
   });
 
   it('keeps focus inside the container after confirming a delete', async () => {
@@ -327,7 +331,6 @@ describe('PhotoViewer failed delete', () => {
   // rejecting. The confirmation used to close anyway, leaving the photo on
   // screen with nothing to say the delete had not happened.
   it('keeps the confirmation open with an alert, and focus inside it', async () => {
-    deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValue(false);
     const user = userEvent.setup();
     render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
@@ -347,11 +350,9 @@ describe('PhotoViewer failed delete', () => {
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }));
     });
     expect(screen.getByRole('button', { name: 'Delete' })).not.toBeDisabled();
-    deletePhotoMock.mockReset();
   });
 
   it('closes and clears the error when a retry succeeds', async () => {
-    deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const user = userEvent.setup();
     render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
@@ -368,11 +369,9 @@ describe('PhotoViewer failed delete', () => {
     expect(screen.queryByTestId('photo-viewer-delete-error')).not.toBeInTheDocument();
     expect(deletePhotoMock).toHaveBeenLastCalledWith('photo-1');
     expect(deletePhotoMock).toHaveBeenCalledTimes(2);
-    deletePhotoMock.mockReset();
   });
 
   it('clears the error when the confirmation is dismissed and reopened', async () => {
-    deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValue(false);
     const user = userEvent.setup();
     render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
@@ -390,13 +389,11 @@ describe('PhotoViewer failed delete', () => {
     await user.click(screen.getByLabelText('Delete photo'));
     expect(await screen.findByRole('dialog', { name: 'Delete Photo?' })).toBeInTheDocument();
     expect(screen.queryByTestId('photo-viewer-delete-error')).not.toBeInTheDocument();
-    deletePhotoMock.mockReset();
   });
 });
 
 describe('PhotoViewer offline delete (ticket 11)', () => {
   it('refuses before any request: the dialog stays open with the offline reason', async () => {
-    deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValue(true);
     const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     const user = userEvent.setup();
@@ -415,7 +412,6 @@ describe('PhotoViewer offline delete (ticket 11)', () => {
       expect(screen.getByRole('button', { name: 'Delete' })).not.toBeDisabled();
     } finally {
       onLine.mockRestore();
-      deletePhotoMock.mockReset();
     }
   });
 });
