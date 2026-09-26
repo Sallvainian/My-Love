@@ -7,6 +7,8 @@
  * page reload while editing it.
  */
 
+import { calendarDaysBetween } from '../../utils/dateUtils';
+
 /**
  * Local-midnight calendar-day difference between today and `date`.
  *
@@ -20,9 +22,7 @@
  * from different days.
  */
 export function getCalendarDaysDiff(date: Date, now: Date = new Date()): number {
-  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const targetMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  return Math.round((targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+  return calendarDaysBetween(date, now);
 }
 
 /** Whole days plus the clock remainder, as a countdown card shows them. */
