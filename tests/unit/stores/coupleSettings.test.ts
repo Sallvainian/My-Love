@@ -66,6 +66,11 @@ function linked(relationshipStart: string | null, weddingDate: string | null = n
   return { status: 'linked', partnerId: P, relationshipStart, weddingDate };
 }
 
+/** The couple-settings service's answer: what a fetch or a save resolves with. */
+function serverAnswer(start: string | null = SERVER_START, wedding: string | null = null) {
+  return { relationshipStart: start, weddingDate: wedding };
+}
+
 /** `lookupPartnerId`'s answer for a linked account. */
 const LINKED_LOOKUP = { status: 'linked', partnerId: P } as const;
 
@@ -133,7 +138,7 @@ describe('couple settings on the local copy', () => {
   it('online: replaces the copy with the server date and saves it', async () => {
     await writeLocalCopy(A, COUPLE_SETTINGS_COPY_KIND, SAVED);
     lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
-    fetchCoupleSettings.mockResolvedValue({ relationshipStart: SERVER_START, weddingDate: null });
+    fetchCoupleSettings.mockResolvedValue(serverAnswer());
 
     await state().loadCoupleSettings();
 
@@ -146,7 +151,7 @@ describe('couple settings on the local copy', () => {
   // Matrix: "Not set yet — Linked, no row".
   it('linked with no row: a linked state with no start date, saved as such', async () => {
     lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
-    fetchCoupleSettings.mockResolvedValue({ relationshipStart: null, weddingDate: null });
+    fetchCoupleSettings.mockResolvedValue(serverAnswer(null));
 
     await state().loadCoupleSettings();
 
@@ -203,7 +208,7 @@ describe('couple settings on the local copy', () => {
   // Matrix: "Partner edits — B saves a new date online".
   it('a confirmed save updates state and the copy', async () => {
     lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
-    saveStartDate.mockResolvedValue({ relationshipStart: SERVER_START, weddingDate: null });
+    saveStartDate.mockResolvedValue(serverAnswer());
 
     await state().setRelationshipStart(SERVER_START);
 
@@ -264,7 +269,7 @@ describe('couple settings on the local copy', () => {
   // Matrix: "Sign-out — A out, B in".
   it("sign-out: A's copy is deleted and B never sees A's date", async () => {
     lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
-    fetchCoupleSettings.mockResolvedValue({ relationshipStart: SERVER_START, weddingDate: null });
+    fetchCoupleSettings.mockResolvedValue(serverAnswer());
     await state().loadCoupleSettings();
     expect(state().coupleSettings).not.toBeNull();
 
@@ -293,7 +298,7 @@ describe('couple settings on the local copy', () => {
     await vi.waitFor(() => expect(fetchCoupleSettings).toHaveBeenCalled());
     state().clearAuth();
     state().setAuthUser(B);
-    settle({ relationshipStart: SERVER_START, weddingDate: null });
+    settle(serverAnswer());
     await inFlight;
 
     expect(state().coupleSettings).toBeNull();
@@ -310,7 +315,7 @@ describe('couple settings on the local copy', () => {
     fetchCoupleSettings.mockRejectedValue(new AccountDataError('transport', '500'));
 
     const refresh = state().loadCoupleSettings();
-    saveStartDate.mockResolvedValue({ relationshipStart: SERVER_START, weddingDate: null });
+    saveStartDate.mockResolvedValue(serverAnswer());
     await state().setRelationshipStart(SERVER_START);
     read.settle(SAVED);
     await refresh;
@@ -325,7 +330,7 @@ describe('couple settings on the local copy', () => {
     // A second refresh, reading no copy, gets the server answer first.
     copyRead.hook = async () => null;
     lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
-    fetchCoupleSettings.mockResolvedValueOnce({ relationshipStart: SERVER_START, weddingDate: null });
+    fetchCoupleSettings.mockResolvedValueOnce(serverAnswer());
     await state().loadCoupleSettings();
     fetchCoupleSettings.mockRejectedValue(new AccountDataError('transport', '500'));
     read.settle(SAVED);
@@ -345,7 +350,7 @@ describe('couple settings on the local copy', () => {
     });
     partner.getPendingRequests.mockResolvedValue({ sent: [], received: [] });
     lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
-    fetchCoupleSettings.mockResolvedValue({ relationshipStart: SERVER_START, weddingDate: null });
+    fetchCoupleSettings.mockResolvedValue(serverAnswer());
 
     await state().acceptPartnerRequest('request-1');
 
