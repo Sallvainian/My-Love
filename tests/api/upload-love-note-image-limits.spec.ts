@@ -23,6 +23,7 @@
  */
 import { log } from '@seontechnologies/playwright-utils';
 import type { TypedSupabaseClient } from '../support/factories';
+import { closeContext } from '../support/fixtures/cleanup';
 import { resolveOwnPair } from '../support/helpers/events';
 import { test, expect } from '../support/merged-fixtures';
 
@@ -270,7 +271,7 @@ test.describe('Love note image upload limits', () => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const functionUrl = `${process.env.SUPABASE_URL}${FUNCTION_PATH}`;
     const context = await browser.newContext();
-    cleanup.defer('close the browser context', () => context.close());
+    cleanup.defer('close the browser context', () => closeContext(context));
     const page = await context.newPage();
     const created: string[] = [];
     cleanup.defer('remove the uploaded objects', () => removeObjects(supabaseAdmin, created));
