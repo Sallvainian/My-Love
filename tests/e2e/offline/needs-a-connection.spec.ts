@@ -13,12 +13,14 @@
  * still fires the `request` event, so a leaked write shows up.
  *
  * Background reads still go out on some screens after the tap is armed — seen
- * in runs: other mount-time reads on Photos and Love Notes, and background
- * reads on Partner. Tests on those screens narrow the count to writes (every
- * method but GET), and say so. PartnerMoodView's pending-request read is a POST
- * (`rpc/get_my_pending_partner_requests`) but runs only while online, so it
- * never lands inside an offline watch. The reads those writes would have made first are pinned by
- * unit tests. The partner lookup (`GET /rest/v1/users?select=partner_id`) no
+ * in runs: other mount-time reads on Photos and Love Notes, and
+ * PartnerMoodView's pending-request read on Partner. Tests on those screens
+ * narrow the count to writes (every method but GET, less the read-only RPCs in
+ * `READ_RPCS`), and say so. The pending-request read is a POST to
+ * `rpc/get_my_pending_partner_requests`, and it can go out after the device is
+ * offline: it waits on `auth.getUser()` first, and StrictMode sends it twice.
+ * The reads those writes would have made first are pinned by unit tests. The
+ * partner lookup (`GET /rest/v1/users?select=partner_id`) no
  * longer goes out offline (DW-222), so those screens also assert that none does.
  *
  * Not covered here, by the spec's decision, and covered by unit tests instead
@@ -72,11 +74,14 @@ async function goOffline(page: Page, isOffline: boolean) {
   await page.evaluate((event) => window.dispatchEvent(new Event(event)), isOffline ? 'offline' : 'online');
 }
 
+/** POSTs that only read, so a writes-only watch skips them like a GET. */
+const READ_RPCS = ['/rest/v1/rpc/get_my_pending_partner_requests'];
+
 /**
  * Record every request to the local Supabase API from now on. Arm it after
- * `goOffline(page, true)` and just before the tap. `writesOnly` skips GETs, for
- * screens where a background read is known to run (see the header);
- * `partnerLookups` records the partner lookups either way.
+ * `goOffline(page, true)` and just before the tap. `writesOnly` skips GETs and
+ * `READ_RPCS`, for screens where a background read is known to run (see the
+ * header); `partnerLookups` records the partner lookups either way.
  */
 function watchSupabaseRequests(page: Page, { writesOnly = false } = {}) {
   const supabase = new URL(process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321');
@@ -91,7 +96,7 @@ function watchSupabaseRequests(page: Page, { writesOnly = false } = {}) {
     if (sameOrigin && url.pathname === '/rest/v1/users' && url.searchParams.get('select') === 'partner_id') {
       partnerLookups.push(`${request.method()} ${url.pathname}${url.search}`);
     }
-    if (writesOnly && request.method() === 'GET') return;
+    if (writesOnly && (request.method() === 'GET' || READ_RPCS.includes(url.pathname))) return;
     if (sameOrigin && SUPABASE_PATHS.some((path) => url.pathname.startsWith(path))) {
       seen.push(`${request.method()} ${url.pathname}${url.search}`);
     }
@@ -421,14 +426,7 @@ test.describe('Poke and kiss badge offline', () => {
       );
 
       const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
-      // The pending-request read is a POST (an RPC), so it must have finished
-      // before the writes-only watch below is armed, or it would count as one.
-      const pendingRead = interceptNetworkCall({
-        method: 'POST',
-        url: '**/rest/v1/rpc/get_my_pending_partner_requests',
-      });
       await page.goto('/partner');
-      expect((await pendingRead).status).toBe(200);
       const history = await historyRead;
       expect(history.status).toBe(200);
       expect(history.responseJson).toEqual(
@@ -438,7 +436,7 @@ test.describe('Poke and kiss badge offline', () => {
       await expect(badge).toBeVisible();
 
       await goOffline(page, true);
-      // Writes only: other Partner-screen reads (GETs) can still go out.
+      // Writes only: the Partner screen's pending-request read can still go out.
       const watch = watchSupabaseRequests(page, { writesOnly: true });
       await badge.click();
       // The animation still plays offline; ending it asks to mark it seen.
