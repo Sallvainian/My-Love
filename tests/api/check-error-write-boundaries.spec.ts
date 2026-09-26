@@ -13,7 +13,6 @@
  */
 import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../support/merged-fixtures';
-import { throwCollected } from '../support/helpers/collected-failures';
 import { getWorkerPairEmails } from '../support/auth/worker-pool';
 import { checkViolation, type PostgrestErrorEnvelope } from '../support/check-constraint-envelopes';
 import {
@@ -26,6 +25,7 @@ test.describe('DW-38 CHECK write boundaries', () => {
     test(`[P1] DW38-API-${scenario.table} rejects ${scenario.constraint} without committing a row`, async ({
       apiRequest,
       authToken,
+      cleanup,
     }) => {
       const pair = getWorkerPairEmails();
       if (!pair) throw new Error('DW-38 requires TEST_WORKER_INDEX from the worker pool');
@@ -50,62 +50,51 @@ test.describe('DW-38 CHECK write boundaries', () => {
           : { to_user_id: own.body.id };
       const payload = createCheckWritePayload(scenario.table, own.body.id, partner.body[0].id, overrides);
       const query = scenario.conflict ? `?on_conflict=${scenario.conflict}` : '';
-      const failures: unknown[] = [];
-
-      try {
-        await log.step(`Reject an invalid ${scenario.table} write with the production conflict policy`);
-        const rejected = await apiRequest<PostgrestErrorEnvelope>({
-          method: 'POST',
-          path: `/rest/v1/${scenario.table}${query}`,
-          headers: {
-            ...headers,
-            Prefer: scenario.conflict
-              ? 'resolution=ignore-duplicates,return=representation'
-              : 'return=representation',
-          },
-          body: payload,
-        });
-        expect(rejected.status).toBe(400);
-        // No response schema exists for these PostgREST errors; assert the
-        // exact fields consumed by isPostgrestError and the CHECK-only mapper.
-        expect(rejected.body).toEqual(checkViolation({
-          message: `new row for relation "${scenario.table}" violates check constraint "${scenario.constraint}"`,
-        }));
-
-        await log.step('Confirm the rejected UUID is absent through an authorized read');
-        const read = await apiRequest<{ id: string }[]>({
-          method: 'GET',
-          path: `/rest/v1/${scenario.table}?select=id&id=eq.${payload.id}`,
-          headers,
-        });
-        expect(read.status).toBe(200);
-        expect(read.body).toEqual([]);
-      } catch (error) {
-        failures.push(error);
-      }
-
-      // Collected rather than asserted in a `finally`, so a cleanup failure is
-      // reported beside the test's own error instead of replacing it.
-      try {
-        // Some tables lack authenticated DELETE. Admin is used only for this
-        // test-generated UUID, including when a regression accepts the write.
-        const cleanup = await apiRequest({
+      // Some tables lack authenticated DELETE. Admin is used only for this
+      // test-generated UUID, including when a regression accepts the write.
+      cleanup.defer(`delete the ${scenario.table} row`, async () => {
+        const deleted = await apiRequest({
           method: 'DELETE',
           path: `/rest/v1/${scenario.table}?id=eq.${payload.id}`,
           headers: { apikey: adminKey, Authorization: `Bearer ${adminKey}` },
         });
-        expect(cleanup.status).toBe(204);
-      } catch (error) {
-        failures.push(error);
-      }
+        expect(deleted.status).toBe(204);
+      });
 
-      throwCollected(failures, `DW-38 ${scenario.table} assertion or cleanup failed`);
+      await log.step(`Reject an invalid ${scenario.table} write with the production conflict policy`);
+      const rejected = await apiRequest<PostgrestErrorEnvelope>({
+        method: 'POST',
+        path: `/rest/v1/${scenario.table}${query}`,
+        headers: {
+          ...headers,
+          Prefer: scenario.conflict
+            ? 'resolution=ignore-duplicates,return=representation'
+            : 'return=representation',
+        },
+        body: payload,
+      });
+      expect(rejected.status).toBe(400);
+      // No response schema exists for these PostgREST errors; assert the
+      // exact fields consumed by isPostgrestError and the CHECK-only mapper.
+      expect(rejected.body).toEqual(checkViolation({
+        message: `new row for relation "${scenario.table}" violates check constraint "${scenario.constraint}"`,
+      }));
+
+      await log.step('Confirm the rejected UUID is absent through an authorized read');
+      const read = await apiRequest<{ id: string }[]>({
+        method: 'GET',
+        path: `/rest/v1/${scenario.table}?select=id&id=eq.${payload.id}`,
+        headers,
+      });
+      expect(read.status).toBe(200);
+      expect(read.body).toEqual([]);
     });
   }
 
   test('[P2] DW38-API-photo-limit accepts a 500-character caption as the positive boundary control', async ({
     apiRequest,
     authToken,
+    cleanup,
   }) => {
     const headers = { Authorization: `Bearer ${authToken}` };
     const own = await apiRequest<{ id: string }>({ method: 'GET', path: '/auth/v1/user', headers });
@@ -113,44 +102,32 @@ test.describe('DW-38 CHECK write boundaries', () => {
     const payload = createCheckWritePayload('photos', own.body.id, own.body.id, {
       caption: 'x'.repeat(500),
     });
-    const failures: unknown[] = [];
-
-    try {
-      await log.step('Accept photo metadata at the caption limit');
-      const created = await apiRequest<{ id: string; caption: string }[]>({
-        method: 'POST',
-        path: '/rest/v1/photos?on_conflict=storage_path',
-        headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=representation' },
-        body: payload,
-      });
-      expect(created.status).toBe(201);
-      expect(created.body).toHaveLength(1);
-      expect(created.body[0]).toMatchObject({ id: payload.id, caption: payload.caption });
-      const read = await apiRequest<{ id: string; caption: string }[]>({
-        method: 'GET',
-        path: `/rest/v1/photos?select=id,caption&id=eq.${payload.id}`,
-        headers,
-      });
-      expect(read.status).toBe(200);
-      expect(read.body).toEqual([{ id: payload.id, caption: payload.caption }]);
-    } catch (error) {
-      failures.push(error);
-    }
-
-    // Collected rather than asserted in a `finally`, so a cleanup failure is
-    // reported beside the test's own error instead of replacing it.
-    try {
-      // Metadata has no FK to storage.objects; this test creates no blob.
-      const cleanup = await apiRequest({
+    // Metadata has no FK to storage.objects; this test creates no blob.
+    cleanup.defer('delete the photo row', async () => {
+      const deleted = await apiRequest({
         method: 'DELETE',
         path: `/rest/v1/photos?id=eq.${payload.id}`,
         headers,
       });
-      expect(cleanup.status).toBe(204);
-    } catch (error) {
-      failures.push(error);
-    }
+      expect(deleted.status).toBe(204);
+    });
 
-    throwCollected(failures, 'DW-38 caption-limit assertion or cleanup failed');
+    await log.step('Accept photo metadata at the caption limit');
+    const created = await apiRequest<{ id: string; caption: string }[]>({
+      method: 'POST',
+      path: '/rest/v1/photos?on_conflict=storage_path',
+      headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: payload,
+    });
+    expect(created.status).toBe(201);
+    expect(created.body).toHaveLength(1);
+    expect(created.body[0]).toMatchObject({ id: payload.id, caption: payload.caption });
+    const read = await apiRequest<{ id: string; caption: string }[]>({
+      method: 'GET',
+      path: `/rest/v1/photos?select=id,caption&id=eq.${payload.id}`,
+      headers,
+    });
+    expect(read.status).toBe(200);
+    expect(read.body).toEqual([{ id: payload.id, caption: payload.caption }]);
   });
 });

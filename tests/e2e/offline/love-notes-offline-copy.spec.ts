@@ -24,6 +24,7 @@ import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { LOVE_NOTES_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
+import { deleteRowById } from '../../support/helpers/teardown';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -128,16 +129,9 @@ async function seedPartnerImage(supabaseAdmin: TypedSupabaseClient): Promise<str
   return path;
 }
 
-async function deleteNotes(supabaseAdmin: TypedSupabaseClient, ids: string[]) {
-  if (ids.length === 0) return;
-  const { error } = await supabaseAdmin.from('love_notes').delete().in('id', ids);
-  expect.soft(error).toBeNull();
-}
-
-async function deleteImage(supabaseAdmin: TypedSupabaseClient, path: string | null) {
-  if (!path) return;
+async function deleteImage(supabaseAdmin: TypedSupabaseClient, path: string) {
   const { error } = await supabaseAdmin.storage.from(BUCKET).remove([path]);
-  expect.soft(error).toBeNull();
+  if (error) throw error;
 }
 
 function noteBubble(page: Page, content: string) {
@@ -156,130 +150,125 @@ test.describe('Love notes from the local copy', () => {
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     const stamp = Date.now();
     const textContent = `E2E offline text ${stamp}`;
     const imageContent = `E2E offline image ${stamp}`;
+    // Each seed's delete is deferred as it lands, so a failed later seed still
+    // undoes the earlier ones.
+    const path = await seedPartnerImage(supabaseAdmin);
+    cleanup.defer('delete the seeded image', () => deleteImage(supabaseAdmin, path));
     const noteIds: string[] = [];
-    let imagePath: string | null = null;
-
-    try {
-      imagePath = await seedPartnerImage(supabaseAdmin);
-      noteIds.push(await seedPartnerNote(supabaseAdmin, textContent));
-      noteIds.push(await seedPartnerNote(supabaseAdmin, imageContent, imagePath));
-      const path = imagePath;
-
-      // GIVEN: the thread loads online; showing the image caches it.
-      const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
-      await page.goto('/notes');
-      const thread = await threadRead;
-      expect(thread.status).toBe(200);
-      expect(thread.responseJson).toEqual(
-        expect.arrayContaining(noteIds.map((id) => expect.objectContaining({ id })))
-      );
-      await expect(noteBubble(page, textContent)).toBeVisible();
-      await expect(noteBubble(page, imageContent).locator('img')).toBeVisible();
-      await recurseUntil(
-        async () => {
-          const ids = (await savedNoteIds(page)) ?? [];
-          return noteIds.every((id) => ids.includes(id));
-        },
-        (v) => {
-          expect(v).toBe(true);
-        }
-      );
-      await recurseUntil(() => imageCached(page, path), (v) => { expect(v).toBe(true); });
-
-      // WHEN: the app reloads with neither the thread nor Storage answering,
-      // and the device goes offline.
-      let abortedReads = 0;
-      // playwright-utils deviation: the route must be installed before the next navigation and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-      await page.route(NOTES_REST, (route) => {
-        abortedReads += 1;
-        return route.abort();
-      });
-      await page.route(STORAGE, (route) => route.abort());
-      await page.reload();
-      await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
-      // The start read really hit the aborted route, so nothing after this
-      // point can have come from the server.
-      await recurseUntil(async () => abortedReads, (v) => { expect(v).toBeGreaterThan(0); });
-      await goOffline(page, true);
-
-      // THEN: both saved notes are listed, the image decoded from the cache…
-      await expect(noteBubble(page, textContent)).toBeVisible();
-      const image = noteBubble(page, imageContent).locator('img');
-      await expect(image).toBeVisible();
-      await expect(image).toHaveAttribute('src', /^blob:/);
-      await recurseUntil(
-        () => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
-        (v) => {
-          expect(v).toBe(true);
-        }
-      );
-      await expect(noteBubble(page, imageContent).getByText('Failed to load image')).toHaveCount(0);
-      // …and no error banner covers the saved thread.
-      await expect(page.getByRole('button', { name: 'Dismiss' })).toHaveCount(0);
-    } finally {
-      await page.context().setOffline(false);
-      await page.unroute(NOTES_REST);
-      await page.unroute(STORAGE);
-      await deleteNotes(supabaseAdmin, noteIds);
-      await deleteImage(supabaseAdmin, imagePath);
+    for (const [content, image] of [[textContent, null], [imageContent, path]] as const) {
+      const id = await seedPartnerNote(supabaseAdmin, content, image);
+      cleanup.defer('delete a seeded note', () => deleteRowById(supabaseAdmin, 'love_notes', id));
+      noteIds.push(id);
     }
+
+    // GIVEN: the thread loads online; showing the image caches it.
+    const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
+    await page.goto('/notes');
+    const thread = await threadRead;
+    expect(thread.status).toBe(200);
+    expect(thread.responseJson).toEqual(
+      expect.arrayContaining(noteIds.map((id) => expect.objectContaining({ id })))
+    );
+    await expect(noteBubble(page, textContent)).toBeVisible();
+    await expect(noteBubble(page, imageContent).locator('img')).toBeVisible();
+    await recurseUntil(
+      async () => {
+        const ids = (await savedNoteIds(page)) ?? [];
+        return noteIds.every((id) => ids.includes(id));
+      },
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
+    await recurseUntil(() => imageCached(page, path), (v) => { expect(v).toBe(true); });
+
+    // WHEN: the app reloads with neither the thread nor Storage answering,
+    // and the device goes offline.
+    let abortedReads = 0;
+    // playwright-utils deviation: the route must be installed before the next navigation and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route(NOTES_REST, (route) => {
+      abortedReads += 1;
+      return route.abort();
+    });
+    await page.route(STORAGE, (route) => route.abort());
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
+    // The start read really hit the aborted route, so nothing after this
+    // point can have come from the server.
+    await recurseUntil(async () => abortedReads, (v) => { expect(v).toBeGreaterThan(0); });
+    await goOffline(page, true);
+
+    // THEN: both saved notes are listed, the image decoded from the cache…
+    await expect(noteBubble(page, textContent)).toBeVisible();
+    const image = noteBubble(page, imageContent).locator('img');
+    await expect(image).toBeVisible();
+    await expect(image).toHaveAttribute('src', /^blob:/);
+    await recurseUntil(
+      () => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
+    await expect(noteBubble(page, imageContent).getByText('Failed to load image')).toHaveCount(0);
+    // …and no error banner covers the saved thread.
+    await expect(page.getByRole('button', { name: 'Dismiss' })).toHaveCount(0);
   });
 
   test('[P1] a note written while offline appears after reconnect without a reload', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     const content = `E2E reconnect note ${Date.now()}`;
-    let noteId: string | null = null;
+    // GIVEN: signed in on the Notes screen, thread loaded, then offline.
+    const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
+    await page.goto('/notes');
+    expect((await threadRead).status).toBe(200);
+    await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
+    await recurseUntil(() => savedNoteIds(page), (v) => { expect(v).not.toBeNull(); });
+    await goOffline(page, true);
 
-    try {
-      // GIVEN: signed in on the Notes screen, thread loaded, then offline.
-      const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
-      await page.goto('/notes');
-      expect((await threadRead).status).toBe(200);
-      await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
-      await recurseUntil(() => savedNoteIds(page), (v) => { expect(v).not.toBeNull(); });
-      await goOffline(page, true);
+    // WHEN: the partner writes while this device is offline, then it reconnects.
+    const id = await seedPartnerNote(supabaseAdmin, content);
+    cleanup.defer('delete the seeded note', () => deleteRowById(supabaseAdmin, 'love_notes', id));
+    // playwright-utils deviation: observe mode takes the first matching request and throws when it fails; a fetchNotes the page load started can still be in its partner lookup when the device goes offline, and its read then goes out offline and fails in this window, so this waits for the first successful read.
+    const refreshRead = page.waitForResponse(
+      (res) =>
+        res.request().method() === 'GET' && res.url().includes('/rest/v1/love_notes_visible?') && res.ok()
+    );
+    await goOffline(page, false);
+    // The reconnect itself re-reads the server (the kind's refresher), and
+    // that read carries the note — the seed sends no broadcast, so this does
+    // not rest on Realtime.
+    const response = await refreshRead;
+    expect(response.status()).toBe(200);
+    // playwright-utils deviation: parses the response of the waitForResponse above, which interceptNetworkCall cannot replace.
+    const rows = (await response.json()) as { id: string }[];
+    expect(rows.map((row) => row.id)).toContain(id);
 
-      // WHEN: the partner writes while this device is offline, then it reconnects.
-      noteId = await seedPartnerNote(supabaseAdmin, content);
-      const id = noteId;
-      const refreshRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
-      await goOffline(page, false);
-      // The reconnect itself re-reads the server (the kind's refresher), and
-      // that read carries the note — the seed sends no broadcast, so this does
-      // not rest on Realtime.
-      const response = await refreshRead;
-      expect(response.status).toBe(200);
-      const rows = response.responseJson as { id: string }[];
-      expect(rows.map((row) => row.id)).toContain(id);
-
-      // THEN: the note is in state, the copy and the thread.
-      await recurseUntil(
-        () =>
-          page.evaluate(
-            (wanted) => window.__APP_STORE__?.getState().notes.some((n) => n.id === wanted) ?? false,
-            id
-          ),
-        (v) => {
-          expect(v).toBe(true);
-        }
-      );
-      await recurseUntil(
-        async () => (await savedNoteIds(page))?.includes(id) ?? false,
-        (v) => {
-          expect(v).toBe(true);
-        }
-      );
-      await expect(noteBubble(page, content)).toBeVisible();
-    } finally {
-      await page.context().setOffline(false);
-      await deleteNotes(supabaseAdmin, noteId ? [noteId] : []);
-    }
+    // THEN: the note is in state, the copy and the thread.
+    await recurseUntil(
+      () =>
+        page.evaluate(
+          (wanted) => window.__APP_STORE__?.getState().notes.some((n) => n.id === wanted) ?? false,
+          id
+        ),
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
+    await recurseUntil(
+      async () => (await savedNoteIds(page))?.includes(id) ?? false,
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
+    await expect(noteBubble(page, content)).toBeVisible();
   });
 });

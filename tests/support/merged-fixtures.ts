@@ -7,7 +7,7 @@
  * @see https://github.com/seontechnologies/playwright-utils
  * @see _bmad/bmm/testarch/knowledge/fixtures-composition.md
  */
-import { test as base, mergeTests } from '@playwright/test';
+import { test as base, mergeTests, type TestType } from '@playwright/test';
 
 // Playwright-utils fixtures (production-ready utilities)
 import { test as apiRequestFixture } from '@seontechnologies/playwright-utils/api-request/fixtures';
@@ -23,6 +23,7 @@ import { test as interactionRealtimeFixture } from './fixtures/interaction-realt
 import { test as interactionOwnershipFixture } from './fixtures/interaction-record-ownership';
 import { test as authBootstrapFixture } from './fixtures/auth-bootstrap-notification-order';
 import { test as eventsRefreshFixture } from './fixtures/events-refresh-control';
+import { CLEANUP_TIMEOUT_MS, provideCleanup, type Cleanup } from './fixtures/cleanup';
 
 /**
  * Create network error monitor with project-specific exclusions.
@@ -40,18 +41,7 @@ const networkMonitorFixture = base.extend(
   })
 );
 
-/**
- * Merged test object with all utilities:
- * - apiRequest: Typed HTTP client with schema validation
- * - recurse: Polling for async operations
- * - log: Playwright report-integrated logging
- * - networkErrorMonitor: Automatic HTTP 4xx/5xx detection
- * - Plus any custom fixtures from ./fixtures
- *
- * Auth: Uses SupabaseAuthProvider via @seontechnologies/playwright-utils auth-session.
- * Each worker gets a unique user identity via authOptions (worker-scoped).
- */
-export const test: ReturnType<
+type MergedTest = ReturnType<
   typeof mergeTests<
     [
       typeof apiRequestFixture,
@@ -67,7 +57,14 @@ export const test: ReturnType<
       typeof eventsRefreshFixture,
     ]
   >
-> = mergeTests(
+>;
+
+type WithCleanup<T> =
+  T extends TestType<infer TestArgs, infer WorkerArgs>
+    ? TestType<TestArgs & { cleanup: Cleanup }, WorkerArgs>
+    : never;
+
+const merged: MergedTest = mergeTests(
   apiRequestFixture,
   recurseFixture,
   logFixture,
@@ -80,5 +77,32 @@ export const test: ReturnType<
   authBootstrapFixture,
   eventsRefreshFixture
 );
+
+/**
+ * Merged test object with all utilities:
+ * - apiRequest: Typed HTTP client with schema validation
+ * - recurse: Polling for async operations
+ * - log: Playwright report-integrated logging
+ * - networkErrorMonitor: Automatic HTTP 4xx/5xx detection
+ * - cleanup: teardown registered mid-test that still runs on a timeout
+ * - Plus any custom fixtures from ./fixtures
+ *
+ * Auth: Uses SupabaseAuthProvider via @seontechnologies/playwright-utils auth-session.
+ * Each worker gets a unique user identity via authOptions (worker-scoped).
+ *
+ * `cleanup` is declared here, after the merge, because it names the fixtures
+ * its deferred functions use: Playwright tears a fixture down before the
+ * fixtures it depends on, so `page` (and its context), `apiRequest` (and
+ * `request`) and `supabaseAdmin` are still open while the deferred functions
+ * run, whatever order a test lists its fixtures in. `page` costs nothing extra:
+ * the auto `networkErrorMonitor` already sets it up in every test. Its
+ * `timeout` gives it a teardown slot of its own; see `./fixtures/cleanup.ts`.
+ */
+export const test: WithCleanup<MergedTest> = merged.extend<{ cleanup: Cleanup }>({
+  cleanup: [
+    async ({ page, apiRequest, supabaseAdmin }, use) => provideCleanup(use),
+    { timeout: CLEANUP_TIMEOUT_MS },
+  ],
+});
 
 export { expect } from '@playwright/test';

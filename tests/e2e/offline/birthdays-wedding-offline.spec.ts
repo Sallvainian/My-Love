@@ -56,6 +56,7 @@ async function setValues(
   expect(couple.error).toBeNull();
 }
 
+/** Teardown: both writes are attempted before either failure is reported. */
 async function resetValues(
   supabaseAdmin: TypedSupabaseClient,
   ids: { userId: string; partnerId: string }
@@ -64,14 +65,16 @@ async function resetValues(
     .from('users')
     .update({ birthday: null })
     .in('id', [ids.userId, ids.partnerId]);
-  expect.soft(users.error).toBeNull();
   const pair = orderedPair(ids.userId, ids.partnerId);
   const couple = await supabaseAdmin
     .from('couple_settings')
     .update({ wedding_date: null })
     .eq('user_a', pair.user_a)
     .eq('user_b', pair.user_b);
-  expect.soft(couple.error).toBeNull();
+  expect([users.error, couple.error], 'resetting the birthdays and wedding date').toEqual([
+    null,
+    null,
+  ]);
 }
 
 /** The signed-in account's saved copy of `kind`, or `null`. */
@@ -108,6 +111,7 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     const ids = await resolveOwnPair(supabaseAdmin);
     // The day counts below are measured from the page clock, pinned to the
@@ -116,123 +120,116 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     const own = isoBirthdayDaysFromNow(5, 31, anchor);
     const partner = isoBirthdayDaysFromNow(10, 30, anchor);
     const wedding = isoDateDaysFromNow(40, anchor);
+    // Deferred before the writes, so a seed that fails half-way is still reset.
+    cleanup.defer('reset the birthdays and wedding date', () => resetValues(supabaseAdmin, ids));
     await setValues(supabaseAdmin, ids, { own, partner, wedding });
 
-    try {
-      // GIVEN: one online session loads all three, which saves the copies.
-      await page.clock.install({ time: anchor });
-      const profileRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
-      const partnerRead = interceptNetworkCall({ method: 'GET', url: PARTNER_RECORD_READ });
-      const coupleRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
-      await page.goto('/');
-      const [profile, partnerRecord, couple] = await Promise.all([
-        profileRead,
-        partnerRead,
-        coupleRead,
-      ]);
-      expect(profile.status).toBe(200);
-      // `maybeSingle` reads come back as a one-row array.
-      expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
-      expect(partnerRecord.status).toBe(200);
-      expect(partnerRecord.responseJson).toEqual([
-        expect.objectContaining({ id: ids.partnerId, birthday: partner }),
-      ]);
-      expect(couple.status).toBe(200);
-      expect(couple.responseJson).toEqual([expect.objectContaining({ wedding_date: wedding })]);
-      await recurseUntil(
-        () => savedCopy(page, 'profile'),
-        (v) => {
-          expect(v).toMatchObject({ birthday: own });
-        }
-      );
-      await recurseUntil(
-        () => savedCopy(page, 'partner'),
-        (v) => {
-          expect(v).toMatchObject({ status: 'linked', partner: { birthday: partner } });
-        }
-      );
-      await recurseUntil(
-        () => savedCopy(page, 'couple-settings'),
-        (v) => {
-          expect(v).toMatchObject({ status: 'linked', weddingDate: wedding });
-        }
-      );
+    // GIVEN: one online session loads all three, which saves the copies.
+    await page.clock.install({ time: anchor });
+    const profileRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
+    const partnerRead = interceptNetworkCall({ method: 'GET', url: PARTNER_RECORD_READ });
+    const coupleRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
+    await page.goto('/');
+    const [profile, partnerRecord, couple] = await Promise.all([
+      profileRead,
+      partnerRead,
+      coupleRead,
+    ]);
+    expect(profile.status).toBe(200);
+    // `maybeSingle` reads come back as a one-row array.
+    expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
+    expect(partnerRecord.status).toBe(200);
+    expect(partnerRecord.responseJson).toEqual([
+      expect.objectContaining({ id: ids.partnerId, birthday: partner }),
+    ]);
+    expect(couple.status).toBe(200);
+    expect(couple.responseJson).toEqual([expect.objectContaining({ wedding_date: wedding })]);
+    await recurseUntil(
+      () => savedCopy(page, 'profile'),
+      (v) => {
+        expect(v).toMatchObject({ birthday: own });
+      }
+    );
+    await recurseUntil(
+      () => savedCopy(page, 'partner'),
+      (v) => {
+        expect(v).toMatchObject({ status: 'linked', partner: { birthday: partner } });
+      }
+    );
+    await recurseUntil(
+      () => savedCopy(page, 'couple-settings'),
+      (v) => {
+        expect(v).toMatchObject({ status: 'linked', weddingDate: wedding });
+      }
+    );
 
-      // WHEN: the app opens again with the server unreachable, then offline.
-      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-      await page.route('**/rest/v1/**', (route) => route.abort());
-      await page.reload();
-      await expect(page.getByTestId('app-container')).toBeVisible();
-      await goOffline(page, true);
+    // WHEN: the app opens again with the server unreachable, then offline.
+    // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/**', (route) => route.abort());
+    await page.reload();
+    await expect(page.getByTestId('app-container')).toBeVisible();
+    await goOffline(page, true);
 
-      // THEN: all three cards count from the saved values: whole days left,
-      // one fewer than the calendar days while the clock carries today's rest.
-      await expect(page.getByTestId('birthday-countdown-self').locator('h3')).toHaveText(
-        /turns? 31$/
-      );
-      await expect(
-        page.getByTestId('birthday-countdown-self').getByTestId('countdown-value')
-      ).toHaveText('4 days');
-      await expect(page.getByTestId('birthday-countdown-partner').locator('h3')).toContainText(
-        'turns 30'
-      );
-      await expect(
-        page.getByTestId('birthday-countdown-partner').getByTestId('countdown-value')
-      ).toHaveText('9 days');
-      await expect(
-        page.getByTestId('event-countdown-wedding').getByTestId('countdown-value')
-      ).toHaveText('39 days');
-    } finally {
-      await page.context().setOffline(false);
-      await page.unroute('**/rest/v1/**');
-      await resetValues(supabaseAdmin, ids);
-    }
+    // THEN: all three cards count from the saved values: whole days left,
+    // one fewer than the calendar days while the clock carries today's rest.
+    await expect(page.getByTestId('birthday-countdown-self').locator('h3')).toHaveText(
+      /turns? 31$/
+    );
+    await expect(
+      page.getByTestId('birthday-countdown-self').getByTestId('countdown-value')
+    ).toHaveText('4 days');
+    await expect(page.getByTestId('birthday-countdown-partner').locator('h3')).toContainText(
+      'turns 30'
+    );
+    await expect(
+      page.getByTestId('birthday-countdown-partner').getByTestId('countdown-value')
+    ).toHaveText('9 days');
+    await expect(
+      page.getByTestId('event-countdown-wedding').getByTestId('countdown-value')
+    ).toHaveText('39 days');
   });
 
   test('[P1] an offline birthday edit is refused with a needs-a-connection message and changes nothing', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     const ids = await resolveOwnPair(supabaseAdmin);
     const own = isoBirthdayDaysFromNow(20, 29, clockAnchorAvoidingLeapDay([20]));
+    cleanup.defer('reset the birthdays and wedding date', () => resetValues(supabaseAdmin, ids));
     await setValues(supabaseAdmin, ids, { own, partner: null, wedding: null });
 
-    try {
-      const profileRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
-      await page.goto('/');
-      const profile = await profileRead;
-      expect(profile.status).toBe(200);
-      expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
-      await navigateTo(page, 'settings');
-      const dateInput = page.getByTestId('settings-birthday-date');
-      await expect(dateInput).toHaveValue(own);
+    const profileRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
+    await page.goto('/');
+    const profile = await profileRead;
+    expect(profile.status).toBe(200);
+    expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
+    await navigateTo(page, 'settings');
+    const dateInput = page.getByTestId('settings-birthday-date');
+    await expect(dateInput).toHaveValue(own);
 
-      await goOffline(page, true);
-      await dateInput.fill('1990-02-02');
-      await page.getByTestId('settings-birthday-save').click();
+    await goOffline(page, true);
+    await dateInput.fill('1990-02-02');
+    await page.getByTestId('settings-birthday-save').click();
 
-      await expect(page.getByTestId('settings-birthday-error')).toContainText(/need a connection/i);
-      // Store, copy and server all still hold the saved birthday.
-      expect(
-        await page.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday)
-      ).toBe(own);
-      await recurseUntil(
-        () => savedCopy(page, 'profile'),
-        (v) => {
-          expect(v).toMatchObject({ birthday: own });
-        }
-      );
-      const { data, error } = await supabaseAdmin
-        .from('users')
-        .select('birthday')
-        .eq('id', ids.userId)
-        .single();
-      expect(error).toBeNull();
-      expect(data!.birthday).toBe(own);
-    } finally {
-      await page.context().setOffline(false);
-      await resetValues(supabaseAdmin, ids);
-    }
+    await expect(page.getByTestId('settings-birthday-error')).toContainText(/need a connection/i);
+    // Store, copy and server all still hold the saved birthday.
+    expect(
+      await page.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday)
+    ).toBe(own);
+    await recurseUntil(
+      () => savedCopy(page, 'profile'),
+      (v) => {
+        expect(v).toMatchObject({ birthday: own });
+      }
+    );
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .select('birthday')
+      .eq('id', ids.userId)
+      .single();
+    expect(error).toBeNull();
+    expect(data!.birthday).toBe(own);
   });
 });

@@ -113,6 +113,7 @@ test.describe('PKCE code exchange', () => {
   test('[P0] a code is exchanged only by the client that started the flow', async ({
     supabaseAdmin,
     request,
+    cleanup,
   }) => {
     // Fail rather than skip in CI, and gate only this case. `MAILPIT_URL` is
     // published solely by `playwright.config.ts`'s `supabase status` parse,
@@ -148,136 +149,155 @@ test.describe('PKCE code exchange', () => {
       throw new Error(`Failed to create PKCE test account: ${createError?.message}`);
     }
     const userId = created.user.id;
+    cleanup.defer('delete the PKCE test account', async () => {
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (error) throw error;
+    });
 
-    try {
-      const initiator = pkceClient();
-      await log.step('Start a PKCE flow from the initiating client');
-      const { error: otpError } = await initiator.client.auth.signInWithOtp({ email: address });
-      expect(otpError, 'OTP send should succeed on the local stack').toBeNull();
+    const initiator = pkceClient();
+    await log.step('Start a PKCE flow from the initiating client');
+    const { error: otpError } = await initiator.client.auth.signInWithOtp({ email: address });
+    expect(otpError, 'OTP send should succeed on the local stack').toBeNull();
 
-      // The flow INDEX key also ends in `-code-verifier`
-      // (`auth-js/dist/module/lib/helpers.js:269`
-      // `${storageKey}-flows-code-verifier`), and it holds an array of flow
-      // ids, not a verifier. Exclude it, so "stored a verifier" means a real
-      // verifier slot — and so the impostor loop below overwrites only slots.
-      const verifierKeys = [...initiator.storage.entries.keys()].filter(
-        (key) => key.endsWith('-code-verifier') && !key.endsWith('-flows-code-verifier')
+    // The flow INDEX key also ends in `-code-verifier`
+    // (`auth-js/dist/module/lib/helpers.js:269`
+    // `${storageKey}-flows-code-verifier`), and it holds an array of flow
+    // ids, not a verifier. Exclude it, so "stored a verifier" means a real
+    // verifier slot — and so the impostor loop below overwrites only slots.
+    const verifierKeys = [...initiator.storage.entries.keys()].filter(
+      (key) => key.endsWith('-code-verifier') && !key.endsWith('-flows-code-verifier')
+    );
+    expect(verifierKeys.length, 'the initiating client stored a verifier').toBeGreaterThan(0);
+    // Our redirects carry no `sb_flow_id`, so `retrievePKCEVerifier` reads
+    // the fixed legacy key (`helpers.js:313-319`). That is the slot whose
+    // contents decide every exchange below.
+    expect(
+      verifierKeys.some((key) => !key.includes('-flow-')),
+      'the legacy slot the exchange reads was written'
+    ).toBe(true);
+
+    // When GoTrue mints a real auth code for that flow.
+    await log.step('Follow the mailed verify link to obtain the auth code');
+    const verifyLink = await waitForVerifyLink(request, address);
+    // playwright-utils deviation: apiRequest returns no response headers and cannot disable redirects, and the Location header of this redirect is the evidence.
+    const verifyResponse = await fetch(verifyLink, { redirect: 'manual' });
+    // Any redirect: GoTrue answers 303 on this CLI version, but the evidence
+    // this case needs is what the Location carries, not which 3xx code
+    // carried it. Pinning 303 would redden a P0 security case on an
+    // unrelated CLI bump.
+    expect(verifyResponse.status).toBeGreaterThanOrEqual(300);
+    expect(verifyResponse.status).toBeLessThan(400);
+    const redirectLocation = verifyResponse.headers.get('location') ?? '';
+    const code = new URL(redirectLocation).searchParams.get('code');
+    expect(code, 'PKCE verify redirects with a code, not a token fragment').toBeTruthy();
+    expect(redirectLocation).not.toContain('access_token');
+
+    // Then a client holding no verifier is refused without reaching the server,
+    // which is why this attempt cannot consume the single-use code.
+    await log.step('Reject an exchange from a client with no verifier');
+    const stranger = pkceClient();
+    const strangerResult = await stranger.client.auth.exchangeCodeForSession(code!);
+    expect(strangerResult.data.session).toBeNull();
+    expect(strangerResult.error).toMatchObject({
+      name: 'AuthPKCECodeVerifierMissingError',
+      code: 'pkce_code_verifier_not_found',
+      status: 400,
+    });
+    expect(stranger.pkceGrantCalls(), 'refused locally, so the code is untouched').toBe(0);
+
+    // And a client holding the wrong verifier is refused by the server itself.
+    await log.step('Reject an exchange carrying the wrong verifier');
+    const impostor = pkceClient();
+    for (const key of verifierKeys) {
+      // JSON-encoded: the SDK writes every storage value through
+      // `setItemAsync` and treats a non-JSON entry as absent
+      // (`auth-js/dist/module/lib/helpers.js:104-117`), which would make this
+      // a missing-verifier case rather than a wrong-verifier one.
+      impostor.storage.entries.set(
+        key,
+        JSON.stringify('a-verifier-this-client-never-generated-0123456789')
       );
-      expect(verifierKeys.length, 'the initiating client stored a verifier').toBeGreaterThan(0);
-      // Our redirects carry no `sb_flow_id`, so `retrievePKCEVerifier` reads
-      // the fixed legacy key (`helpers.js:313-319`). That is the slot whose
-      // contents decide every exchange below.
-      expect(
-        verifierKeys.some((key) => !key.includes('-flow-')),
-        'the legacy slot the exchange reads was written'
-      ).toBe(true);
-
-      // When GoTrue mints a real auth code for that flow.
-      await log.step('Follow the mailed verify link to obtain the auth code');
-      const verifyLink = await waitForVerifyLink(request, address);
-      // playwright-utils deviation: apiRequest returns no response headers and cannot disable redirects, and the Location header of this redirect is the evidence.
-      const verifyResponse = await fetch(verifyLink, { redirect: 'manual' });
-      // Any redirect: GoTrue answers 303 on this CLI version, but the evidence
-      // this case needs is what the Location carries, not which 3xx code
-      // carried it. Pinning 303 would redden a P0 security case on an
-      // unrelated CLI bump.
-      expect(verifyResponse.status).toBeGreaterThanOrEqual(300);
-      expect(verifyResponse.status).toBeLessThan(400);
-      const redirectLocation = verifyResponse.headers.get('location') ?? '';
-      const code = new URL(redirectLocation).searchParams.get('code');
-      expect(code, 'PKCE verify redirects with a code, not a token fragment').toBeTruthy();
-      expect(redirectLocation).not.toContain('access_token');
-
-      // Then a client holding no verifier is refused without reaching the server,
-      // which is why this attempt cannot consume the single-use code.
-      await log.step('Reject an exchange from a client with no verifier');
-      const stranger = pkceClient();
-      const strangerResult = await stranger.client.auth.exchangeCodeForSession(code!);
-      expect(strangerResult.data.session).toBeNull();
-      expect(strangerResult.error).toMatchObject({
-        name: 'AuthPKCECodeVerifierMissingError',
-        code: 'pkce_code_verifier_not_found',
-        status: 400,
-      });
-      expect(stranger.pkceGrantCalls(), 'refused locally, so the code is untouched').toBe(0);
-
-      // And a client holding the wrong verifier is refused by the server itself.
-      await log.step('Reject an exchange carrying the wrong verifier');
-      const impostor = pkceClient();
-      for (const key of verifierKeys) {
-        // JSON-encoded: the SDK writes every storage value through
-        // `setItemAsync` and treats a non-JSON entry as absent
-        // (`auth-js/dist/module/lib/helpers.js:104-117`), which would make this
-        // a missing-verifier case rather than a wrong-verifier one.
-        impostor.storage.entries.set(
-          key,
-          JSON.stringify('a-verifier-this-client-never-generated-0123456789')
-        );
-      }
-      const impostorResult = await impostor.client.auth.exchangeCodeForSession(code!);
-      expect(impostorResult.data.session).toBeNull();
-      expect(impostorResult.error).toMatchObject({
-        name: 'AuthApiError',
-        status: 400,
-        code: 'bad_code_verifier',
-      });
-      expect(impostor.pkceGrantCalls(), 'the server evaluated and rejected it').toBeGreaterThan(0);
-
-      // While the initiating client completes the exchange for its own account.
-      // This runs after the server-side rejection above, so it also pins an
-      // assumption worth stating: GoTrue does not consume or invalidate the flow
-      // state when the verifier comparison fails. If that ever changes, this
-      // assertion reddens rather than the security cases.
-      await log.step('Accept the exchange from the initiating client');
-      const initiatorResult = await initiator.client.auth.exchangeCodeForSession(code!);
-      expect(initiatorResult.error).toBeNull();
-      expect(initiatorResult.data.session?.user?.id).toBe(userId);
-      expect(initiatorResult.data.session?.user?.email).toBe(address);
-    } finally {
-      await supabaseAdmin.auth.admin.deleteUser(userId);
     }
+    const impostorResult = await impostor.client.auth.exchangeCodeForSession(code!);
+    expect(impostorResult.data.session).toBeNull();
+    expect(impostorResult.error).toMatchObject({
+      name: 'AuthApiError',
+      status: 400,
+      code: 'bad_code_verifier',
+    });
+    expect(impostor.pkceGrantCalls(), 'the server evaluated and rejected it').toBeGreaterThan(0);
+
+    // While the initiating client completes the exchange for its own account.
+    // This runs after the server-side rejection above, so it also pins an
+    // assumption worth stating: GoTrue does not consume or invalidate the flow
+    // state when the verifier comparison fails. If that ever changes, this
+    // assertion reddens rather than the security cases.
+    await log.step('Accept the exchange from the initiating client');
+    const initiatorResult = await initiator.client.auth.exchangeCodeForSession(code!);
+    expect(initiatorResult.error).toBeNull();
+    expect(initiatorResult.data.session?.user?.id).toBe(userId);
+    expect(initiatorResult.data.session?.user?.email).toBe(address);
   });
 
-  test('[P0] password signup still completes under PKCE', async ({ supabaseAdmin }) => {
+  test('[P0] password signup still completes under PKCE', async ({ supabaseAdmin, cleanup }) => {
     // CAP-13 names signup among the flows that must keep working. `signUp` sends
     // a code challenge under PKCE (`GoTrueClient.js:738-750`), so this checks the
     // server still accepts that request shape and returns the account.
     const address = `pkce-signup-${Date.now()}@test.example.com`;
     const applicant = pkceClient();
 
+    // Deferred before signUp: a signup that misbehaves or never answers may
+    // still have created the account. Deleted by the id signUp returned; found
+    // by address only when there is none.
+    const signup: { userId?: string; succeeded: boolean } = { succeeded: false };
+    cleanup.defer('delete the signup account', async () => {
+      let accountId = signup.userId;
+      if (!accountId) {
+        // `listUsers()` pages at 50 by default and this scans one page, so a
+        // stack holding more accounts than that would leak the throwaway
+        // account precisely when signUp already misbehaved.
+        const { data: found, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+          perPage: 1000,
+        });
+        if (listError) throw listError;
+        accountId = found.users.find((user) => user.email === address)?.id;
+      }
+      if (!accountId) {
+        if (signup.succeeded) {
+          throw new Error(
+            'signUp succeeded, but its account was found neither by id nor by address'
+          );
+        }
+        return;
+      }
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(accountId);
+      if (deleteError) throw deleteError;
+    });
+
     const { data, error } = await applicant.client.auth.signUp({
       email: address,
       password: TEST_USER_PASSWORD,
     });
+    signup.userId = data.user?.id;
+    signup.succeeded = !error;
 
-    let userId = data.user?.id;
-    try {
-      expect(error).toBeNull();
-      expect(data.user?.email).toBe(address);
-      expect(userId, 'signup returned an account').toBeTruthy();
+    const userId = data.user?.id;
+    expect(error).toBeNull();
+    expect(data.user?.email).toBe(address);
+    expect(userId, 'signup returned an account').toBeTruthy();
 
-      // The local stack has `enable_confirmations = false`, so the session comes
-      // back directly and no code round-trip is involved. Where confirmation IS
-      // enabled — as it is on the hosted project — the same request instead
-      // mails a link that returns as `?code=`, which is the flow the case above
-      // measures end to end.
-      expect(data.session?.user?.id).toBe(userId);
+    // The local stack has `enable_confirmations = false`, so the session comes
+    // back directly and no code round-trip is involved. Where confirmation IS
+    // enabled — as it is on the hosted project — the same request instead
+    // mails a link that returns as `?code=`, which is the flow the case above
+    // measures end to end.
+    expect(data.session?.user?.id).toBe(userId);
 
-      // A verifier was still stored, so a confirmation code would be redeemable
-      // by this client and by no other.
-      const verifierKeys = [...applicant.storage.entries.keys()].filter(
-        (key) => key.endsWith('-code-verifier') && !key.endsWith('-flows-code-verifier')
-      );
-      expect(verifierKeys.length, 'signup started a PKCE flow').toBeGreaterThan(0);
-    } finally {
-      if (!userId) {
-        // `listUsers()` pages at 50 by default and this scans one page, so a
-        // stack holding more accounts than that would leak the throwaway
-        // account precisely when signUp already misbehaved.
-        const { data: found } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-        userId = found?.users?.find((user) => user.email === address)?.id;
-      }
-      if (userId) await supabaseAdmin.auth.admin.deleteUser(userId);
-    }
+    // A verifier was still stored, so a confirmation code would be redeemable
+    // by this client and by no other.
+    const verifierKeys = [...applicant.storage.entries.keys()].filter(
+      (key) => key.endsWith('-code-verifier') && !key.endsWith('-flows-code-verifier')
+    );
+    expect(verifierKeys.length, 'signup started a PKCE flow').toBeGreaterThan(0);
   });
 });

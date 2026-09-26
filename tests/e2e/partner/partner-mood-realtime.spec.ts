@@ -37,11 +37,12 @@
  * uuid.
  */
 import { randomUUID } from 'node:crypto';
-import type { BrowserContext, Page, Request } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
 import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { closeContext } from '../../support/fixtures/cleanup';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { partnerMoodListRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -83,6 +84,7 @@ test.describe('Partner mood realtime delivery', () => {
       authOptions,
       partnerUserIdentifier,
       partnerAuthToken,
+      cleanup,
     }) => {
       // Depended on for its side effect: `partnerAuthToken` is what calls
       // `provider.manageAuthToken` for `worker-N-partner`, which writes that
@@ -115,150 +117,16 @@ test.describe('Partner mood realtime delivery', () => {
       const expectedBroadcastPath = `${BROADCAST_PATH}${encodeURIComponent(
         `mood-updates:${partnerId}`
       )}/events/new_mood`;
-      let partnerContext: BrowserContext | undefined;
       // Whether a `moods` row exists for teardown to find. Raised once the
       // broadcast has been observed, which only happens after the sync wrote
       // the row. Without it, a failure before the send would add a misleading
       // second failure from the row check below.
       let moodRowCommitted = false;
-
-      try {
-        await log.step('Park the partner on /partner until its own view reports SUBSCRIBED');
-        partnerContext = await browser.newContext({
-          storageState: getStorageStatePath({
-            ...authOptions,
-            userIdentifier: partnerUserIdentifier,
-          }),
-          // Explicit: the storage state is scoped to this origin, and a context
-          // built without it resolves relative gotos against nothing.
-          baseURL,
-        });
-        const partnerPage: Page = await partnerContext.newPage();
-
-        // The receiver's reads of the sender's moods, tracked from before its
-        // goto: the view's mount read and the start refresh both send one, and
-        // a read still in flight at the send could land the mood without the
-        // broadcast. The receiver's partner is this test's sender.
-        const senderMoodsRead = partnerMoodListRead(userId);
-        const isSenderMoodsRead = (request: Request) => {
-          if (request.method() !== 'GET') return false;
-          const url = new URL(request.url());
-          return (
-            url.pathname.endsWith('/rest/v1/moods') &&
-            url.searchParams.get('user_id') === `eq.${userId}`
-          );
-        };
-        let senderMoodReadsInFlight = 0;
-        // playwright-utils deviation: counts every sender-moods read the receiver starts, to know when none is in flight; interceptNetworkCall's observe mode latches onto the first matching request only.
-        partnerPage.on('request', (request) => {
-          if (isSenderMoodsRead(request)) senderMoodReadsInFlight += 1;
-        });
-        const settleSenderMoodsRead = (request: Request) => {
-          if (isSenderMoodsRead(request)) senderMoodReadsInFlight -= 1;
-        };
-        // playwright-utils deviation: settles every sender-moods read that answers against the count above; interceptNetworkCall's observe mode latches onto the first matching request only.
-        partnerPage.on('requestfinished', settleSenderMoodsRead);
-        // playwright-utils deviation: settles every sender-moods read that fails, too; interceptNetworkCall's observe mode throws on a request that gets no response rather than reporting it.
-        partnerPage.on('requestfailed', settleSenderMoodsRead);
-        // A page in a second context: the fixture is bound to `page`.
-        const moodListRead = interceptNetworkCall({
-          page: partnerPage,
-          method: 'GET',
-          url: senderMoodsRead,
-          timeout: 30_000,
-        });
-
-        // Registered BEFORE the navigation that causes the log. Registering it
-        // after would race the join and could miss it entirely, which would read
-        // as "the partner never subscribed" on a perfectly healthy run.
-        const subscribed = partnerPage.waitForEvent('console', {
-          predicate: (message) => SUBSCRIBED_LOG.test(message.text()),
-          timeout: 30_000,
-        });
-        await partnerPage.goto('/partner');
-        try {
-          await subscribed;
-        } catch (cause) {
-          throw new Error(
-            "The partner page's PartnerMoodView never reported SUBSCRIBED within 30s of " +
-              'landing on /partner, so the receiver was never joined and no send could be measured.',
-            { cause }
-          );
-        }
-        expect((await moodListRead).status).toBe(200);
-
-        // This page is not touched again until the assertions: no reload, no
-        // second goto, no manual refresh. Its refresh button
-        // (`PartnerMoodView.tsx:579`) is deliberately never clicked, so anything
-        // that appears from here on can only have arrived over the broadcast.
-
-        await log.step('Log a mood with a unique note from the sender, through the real UI');
-        await page.goto('/mood');
-        await expect(page.getByTestId('mood-tracker')).toBeVisible();
-        await page.getByRole('button', { name: /happy/i }).click();
-        // The note field is collapsed by default (`MoodTracker.tsx:549-557`),
-        // so the toggle has to be opened before the marker can be typed.
-        await page.getByTestId('mood-add-note-toggle').click();
-        await page.getByTestId('mood-note-input').fill(moodNote);
-
-        // The standalone form: the fixture drops `timeout`.
-        const broadcast = interceptNetworkCall({
-          page,
-          method: 'POST',
-          url: `**${expectedBroadcastPath}?*`,
-          // Bounds only the wait for the POST to be sent: the utility then awaits
-          // `request.response()` with no bound of its own. A send the app aborts
-          // at `BROADCAST_TIMEOUT_MS` (15s, `src/api/ephemeralBroadcast.ts:77`)
-          // therefore fails here as "No response received for the request", and
-          // only a send that never starts runs into these 30s.
-          timeout: 30_000,
-        });
-        // Checked here, after the whole sender setup, so the receiver's start-up
-        // reads — including the one its mood sync sends only once its own sync
-        // has finished — have had that time to start and settle.
-        await recurseUntil(
-          async () => senderMoodReadsInFlight,
-          (v) => {
-            expect(v, "none of the receiver's reads of the sender's moods is in flight").toBe(0);
-          }
-        );
-        await expect(partnerPage.getByTestId('partner-mood-refresh-button')).toHaveAttribute(
-          'aria-busy',
-          'false'
-        );
-        await page.getByTestId('mood-submit-button').click();
-
-        await log.step('The private INSERT policy admits the app own client send');
-        const { status: broadcastStatus, request: broadcastRequest } = await broadcast;
-        moodRowCommitted = true;
-        // Asserted before the UI: the broadcast is fire-and-forget and
-        // `moodSyncService.ts:232` swallows its rejection, so checking the
-        // partner's screen first would report a refused send as a missing
-        // element and point at the wrong layer.
-        expect(broadcastStatus).toBe(202);
-        const broadcastUrl = broadcastRequest!.url();
-        expect(broadcastUrl).toContain(expectedBroadcastPath);
-        expect(new URL(broadcastUrl).searchParams.get('private')).toBe('true');
-
-        await log.step('The mood reaches the partner live, with no reload and no refresh');
-        // The toast first, while it is still on screen: it auto-hides five
-        // seconds after arrival (`PartnerMoodView.tsx:194-196`), and it is the
-        // immediate live signal rather than anything a refetch could produce.
-        await expect(partnerPage.getByTestId('partner-mood-notification')).toContainText(moodNote);
-        await expect(partnerPage.getByTestId('partner-mood-notification')).toContainText(
-          `${senderName} just logged a mood`
-        );
-
-        // Then the durable half. The broadcast handler also refetches
-        // (`PartnerMoodView.tsx:200`), so the mood has to survive into the
-        // rendered list rather than only flashing past in a toast.
-        await expect(
-          partnerPage.getByTestId('partner-mood-card').filter({ hasText: moodNote })
-        ).toBeVisible();
-      } finally {
-        // A close that rejects must not become the failure the report shows
-        // instead of the real one.
-        await partnerContext?.close().catch(() => {});
+      cleanup.defer('delete the mood row this test created', async () => {
+        // The sender's page first: its mood sync could otherwise write the row
+        // after the delete. Its context, not just the page, so a failure's
+        // page snapshot is the sender's (see `closeContext`).
+        await page.context().close();
 
         // Keyed on this test's own uuid AND on this worker's own pair, so a
         // mis-resolved identity deletes nothing rather than another worker's
@@ -270,11 +138,7 @@ test.describe('Partner mood realtime delivery', () => {
           .eq('note', moodNote)
           .in('user_id', [userId, partnerId])
           .select('id');
-
-        // Soft, and deliberately so. A hard assertion here throws out of a
-        // `finally` and replaces whatever the test was already failing on — the
-        // one failure worth reading — with a teardown message.
-        expect.soft(error, 'Teardown must delete the mood row this test created').toBeNull();
+        if (error) throw error;
 
         // Exactly one, and guarded by `moodRowCommitted` so a failure before
         // the send cannot add a false teardown failure on top of the real one.
@@ -295,7 +159,141 @@ test.describe('Partner mood realtime delivery', () => {
             .soft(deleted ?? [], 'Teardown must not match rows outside this pair')
             .toHaveLength(1);
         }
+      });
+
+      await log.step('Park the partner on /partner until its own view reports SUBSCRIBED');
+      const partnerContext = await browser.newContext({
+        storageState: getStorageStatePath({
+          ...authOptions,
+          userIdentifier: partnerUserIdentifier,
+        }),
+        // Explicit: the storage state is scoped to this origin, and a context
+        // built without it resolves relative gotos against nothing.
+        baseURL,
+      });
+      cleanup.defer('close the partner context', () => closeContext(partnerContext));
+      const partnerPage: Page = await partnerContext.newPage();
+
+      // The receiver's reads of the sender's moods, tracked from before its
+      // goto: the view's mount read and the start refresh both send one, and
+      // a read still in flight at the send could land the mood without the
+      // broadcast. The receiver's partner is this test's sender.
+      const senderMoodsRead = partnerMoodListRead(userId);
+      const isSenderMoodsRead = (request: Request) => {
+        if (request.method() !== 'GET') return false;
+        const url = new URL(request.url());
+        return (
+          url.pathname.endsWith('/rest/v1/moods') &&
+          url.searchParams.get('user_id') === `eq.${userId}`
+        );
+      };
+      let senderMoodReadsInFlight = 0;
+      // playwright-utils deviation: counts every sender-moods read the receiver starts, to know when none is in flight; interceptNetworkCall's observe mode latches onto the first matching request only.
+      partnerPage.on('request', (request) => {
+        if (isSenderMoodsRead(request)) senderMoodReadsInFlight += 1;
+      });
+      const settleSenderMoodsRead = (request: Request) => {
+        if (isSenderMoodsRead(request)) senderMoodReadsInFlight -= 1;
+      };
+      // playwright-utils deviation: settles every sender-moods read that answers against the count above; interceptNetworkCall's observe mode latches onto the first matching request only.
+      partnerPage.on('requestfinished', settleSenderMoodsRead);
+      // playwright-utils deviation: settles every sender-moods read that fails, too; interceptNetworkCall's observe mode throws on a request that gets no response rather than reporting it.
+      partnerPage.on('requestfailed', settleSenderMoodsRead);
+      // A page in a second context: the fixture is bound to `page`.
+      const moodListRead = interceptNetworkCall({
+        page: partnerPage,
+        method: 'GET',
+        url: senderMoodsRead,
+        timeout: 30_000,
+      });
+
+      // Registered BEFORE the navigation that causes the log. Registering it
+      // after would race the join and could miss it entirely, which would read
+      // as "the partner never subscribed" on a perfectly healthy run.
+      const subscribed = partnerPage.waitForEvent('console', {
+        predicate: (message) => SUBSCRIBED_LOG.test(message.text()),
+        timeout: 30_000,
+      });
+      await partnerPage.goto('/partner');
+      try {
+        await subscribed;
+      } catch (cause) {
+        throw new Error(
+          "The partner page's PartnerMoodView never reported SUBSCRIBED within 30s of " +
+            'landing on /partner, so the receiver was never joined and no send could be measured.',
+          { cause }
+        );
       }
+      expect((await moodListRead).status).toBe(200);
+
+      // This page is not touched again until the assertions: no reload, no
+      // second goto, no manual refresh. Its refresh button
+      // (`PartnerMoodView.tsx:579`) is deliberately never clicked, so anything
+      // that appears from here on can only have arrived over the broadcast.
+
+      await log.step('Log a mood with a unique note from the sender, through the real UI');
+      await page.goto('/mood');
+      await expect(page.getByTestId('mood-tracker')).toBeVisible();
+      await page.getByRole('button', { name: /happy/i }).click();
+      // The note field is collapsed by default (`MoodTracker.tsx:549-557`),
+      // so the toggle has to be opened before the marker can be typed.
+      await page.getByTestId('mood-add-note-toggle').click();
+      await page.getByTestId('mood-note-input').fill(moodNote);
+
+      // The standalone form: the fixture drops `timeout`.
+      const broadcast = interceptNetworkCall({
+        page,
+        method: 'POST',
+        url: `**${expectedBroadcastPath}?*`,
+        // Bounds only the wait for the POST to be sent: the utility then awaits
+        // `request.response()` with no bound of its own. A send the app aborts
+        // at `BROADCAST_TIMEOUT_MS` (15s, `src/api/ephemeralBroadcast.ts:77`)
+        // therefore fails here as "No response received for the request", and
+        // only a send that never starts runs into these 30s.
+        timeout: 30_000,
+      });
+      // Checked here, after the whole sender setup, so the receiver's start-up
+      // reads — including the one its mood sync sends only once its own sync
+      // has finished — have had that time to start and settle.
+      await recurseUntil(
+        async () => senderMoodReadsInFlight,
+        (v) => {
+          expect(v, "none of the receiver's reads of the sender's moods is in flight").toBe(0);
+        }
+      );
+      await expect(partnerPage.getByTestId('partner-mood-refresh-button')).toHaveAttribute(
+        'aria-busy',
+        'false'
+      );
+      await page.getByTestId('mood-submit-button').click();
+
+      await log.step('The private INSERT policy admits the app own client send');
+      const { status: broadcastStatus, request: broadcastRequest } = await broadcast;
+      moodRowCommitted = true;
+      // Asserted before the UI: the broadcast is fire-and-forget and
+      // `moodSyncService.ts:232` swallows its rejection, so checking the
+      // partner's screen first would report a refused send as a missing
+      // element and point at the wrong layer.
+      expect(broadcastStatus).toBe(202);
+      const broadcastUrl = broadcastRequest!.url();
+      expect(broadcastUrl).toContain(expectedBroadcastPath);
+      expect(new URL(broadcastUrl).searchParams.get('private')).toBe('true');
+
+      await log.step('The mood reaches the partner live, with no reload and no refresh');
+      // The toast first, while it is still on screen: it auto-hides five
+      // seconds after arrival (`PartnerMoodView.tsx:194-196`), and it is the
+      // immediate live signal rather than anything a refetch could produce.
+      await expect(partnerPage.getByTestId('partner-mood-notification')).toContainText(moodNote);
+      await expect(partnerPage.getByTestId('partner-mood-notification')).toContainText(
+        `${senderName} just logged a mood`
+      );
+
+      // Then the durable half. The broadcast handler also refetches
+      // (`PartnerMoodView.tsx:200`), so the mood has to survive into the
+      // rendered list rather than only flashing past in a toast.
+      await expect(
+        partnerPage.getByTestId('partner-mood-card').filter({ hasText: moodNote })
+      ).toBeVisible();
     }
   );
 });

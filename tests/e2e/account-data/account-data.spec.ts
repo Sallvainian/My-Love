@@ -231,7 +231,11 @@ test.describe('Account data through the real browser and local services', () => 
     expect(afterRelogin.favoriteIds).toEqual([original.currentId]);
   });
 
-  test('[P1] repairs an invalid local mood through the form, preserving its row and syncing the result', async ({ page, supabaseAdmin }) => {
+  test('[P1] repairs an invalid local mood through the form, preserving its row and syncing the result', async ({
+    page,
+    supabaseAdmin,
+    cleanup,
+  }) => {
     // The seeded row is dated by the page's clock and the form edits today's
     // mood, so the clock is pinned: a real midnight cannot split the two.
     await page.clock.install({ time: clockAnchor() });
@@ -273,79 +277,87 @@ test.describe('Account data through the real browser and local services', () => 
       }
     });
 
-    try {
-      await navigate(page, 'mood');
-      await expect(page.getByTestId('mood-tracker')).toBeVisible();
-      await recurseUntil(async () => (await snapshot(page)).pending, (v) => { expect(v).toBe(1); });
-      expect((await snapshot(page)).moods).toEqual([]);
-      expect(await localRows(page, 'moods')).toContainEqual(expect.objectContaining({
-        id: seeded.id,
-        mood: 'retired-mood',
-        note: seeded.note,
-        synced: false,
-      }));
-      await expect(page.getByTestId('mood-submit-button')).toBeDisabled();
+    // Whether the save's POST answered 2xx, so the teardown knows a row exists.
+    let committed = false;
+    cleanup.defer('delete the synced mood row', async () => {
+      // Close the page first: its sync retries could otherwise land a row after
+      // the delete. Its context, not just the page, so a failure's page
+      // snapshot is this page (see `closeContext`).
+      await page.context().close();
+      // Only the row this test created, matched by its owner and timestamp.
+      const { data, error } = await supabaseAdmin.from('moods').delete()
+        .eq('user_id', seeded.owner).eq('created_at', seeded.timestamp).select('id');
+      if (error) throw error;
+      if (committed) {
+        expect.soft(data, 'Teardown must delete exactly the mood row this test created')
+          .toHaveLength(1);
+      }
+    });
 
-      // playwright-utils deviation: matches on the request body (this seeded row's owner and timestamp), which a method + URL glob cannot express.
-      const savedResponse = page.waitForResponse((response) => {
-        const request = response.request();
-        if (!response.url().includes('/rest/v1/moods') || request.method() !== 'POST') return false;
-        const body = request.postDataJSON();
-        return body.user_id === seeded.owner && body.created_at === seeded.timestamp;
-      });
-      await page.getByTestId('mood-button-happy').click();
-      await page.getByTestId('mood-submit-button').click();
-      const response = await savedResponse;
-      expect(response.status()).toBe(201);
-      // playwright-utils deviation: parses the response of the body-matched waitForResponse above, which interceptNetworkCall cannot replace.
-      const body = await response.json();
-      expect(body).toEqual(expect.objectContaining({
-        user_id: seeded.owner,
-        mood_type: 'happy',
-        mood_types: ['happy'],
-        note: seeded.note,
-      }));
-      const serverId = body.id as string;
-      await recurseUntil(
-        async () => (await snapshot(page)).moods,
-        (v) => {
-          expect(v).toContainEqual({
-            id: seeded.id,
-            mood: 'happy',
-            note: seeded.note,
-            synced: true,
-            supabaseId: serverId,
-          });
-        }
-      );
-      await recurseUntil(
-        () => localRows(page, 'moods'),
-        (v) => {
-          expect(v).toEqual([expect.objectContaining({
-            id: seeded.id,
-            userId: seeded.owner,
-            timestamp: seeded.timestamp,
-            moods: ['happy'],
-            note: seeded.note,
-            synced: true,
-            supabaseId: serverId,
-          })]);
-        }
-      );
-      await expect(page.getByTestId('mood-success-toast')).toBeVisible();
-      await expect(page.getByTestId('mood-note-input')).toHaveValue(seeded.note);
-      await recurseUntil(async () => (await snapshot(page)).pending, (v) => { expect(v).toBe(0); });
-      const persisted = await supabaseAdmin.from('moods').select('mood_type,mood_types,note').eq('id', serverId).single();
-      expect(persisted.error).toBeNull();
-      expect(persisted.data).toEqual({ mood_type: 'happy', mood_types: ['happy'], note: seeded.note });
-    } finally {
-      // Stop this page's retries before deleting only the row this test created.
-      // A close that rejects, and a failed delete, are recorded without
-      // replacing the error the test was already failing on.
-      await page.close().catch(() => {});
-      const cleanup = await supabaseAdmin.from('moods').delete()
-        .eq('user_id', seeded.owner).eq('created_at', seeded.timestamp);
-      expect.soft(cleanup.error, 'Teardown must delete the mood row this test created').toBeNull();
-    }
+    await navigate(page, 'mood');
+    await expect(page.getByTestId('mood-tracker')).toBeVisible();
+    await recurseUntil(async () => (await snapshot(page)).pending, (v) => { expect(v).toBe(1); });
+    expect((await snapshot(page)).moods).toEqual([]);
+    expect(await localRows(page, 'moods')).toContainEqual(expect.objectContaining({
+      id: seeded.id,
+      mood: 'retired-mood',
+      note: seeded.note,
+      synced: false,
+    }));
+    await expect(page.getByTestId('mood-submit-button')).toBeDisabled();
+
+    // playwright-utils deviation: matches on the request body (this seeded row's owner and timestamp), which a method + URL glob cannot express.
+    const savedResponse = page.waitForResponse((response) => {
+      const request = response.request();
+      if (!response.url().includes('/rest/v1/moods') || request.method() !== 'POST') return false;
+      const body = request.postDataJSON();
+      return body.user_id === seeded.owner && body.created_at === seeded.timestamp;
+    });
+    await page.getByTestId('mood-button-happy').click();
+    await page.getByTestId('mood-submit-button').click();
+    const response = await savedResponse;
+    committed = response.ok();
+    expect(response.status()).toBe(201);
+    // playwright-utils deviation: parses the response of the body-matched waitForResponse above, which interceptNetworkCall cannot replace.
+    const body = await response.json();
+    expect(body).toEqual(expect.objectContaining({
+      user_id: seeded.owner,
+      mood_type: 'happy',
+      mood_types: ['happy'],
+      note: seeded.note,
+    }));
+    const serverId = body.id as string;
+    await recurseUntil(
+      async () => (await snapshot(page)).moods,
+      (v) => {
+        expect(v).toContainEqual({
+          id: seeded.id,
+          mood: 'happy',
+          note: seeded.note,
+          synced: true,
+          supabaseId: serverId,
+        });
+      }
+    );
+    await recurseUntil(
+      () => localRows(page, 'moods'),
+      (v) => {
+        expect(v).toEqual([expect.objectContaining({
+          id: seeded.id,
+          userId: seeded.owner,
+          timestamp: seeded.timestamp,
+          moods: ['happy'],
+          note: seeded.note,
+          synced: true,
+          supabaseId: serverId,
+        })]);
+      }
+    );
+    await expect(page.getByTestId('mood-success-toast')).toBeVisible();
+    await expect(page.getByTestId('mood-note-input')).toHaveValue(seeded.note);
+    await recurseUntil(async () => (await snapshot(page)).pending, (v) => { expect(v).toBe(0); });
+    const persisted = await supabaseAdmin.from('moods').select('mood_type,mood_types,note').eq('id', serverId).single();
+    expect(persisted.error).toBeNull();
+    expect(persisted.data).toEqual({ mood_type: 'happy', mood_types: ['happy'], note: seeded.note });
   });
 });

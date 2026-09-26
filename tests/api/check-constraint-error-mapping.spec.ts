@@ -21,13 +21,14 @@
  * feeds the body it gets back through the production mapper. It is the only
  * place the two halves meet.
  *
- * ## Why these writes need no cleanup
+ * ## Why the cleanup is only a safety net
  *
  * Every request here is one the database REJECTS. A failed INSERT commits no
- * row, so nothing is created, nothing is owned, and nothing is torn down — the
- * last test asserts that rather than assuming it. That matters under
- * `AGENTS.md`'s rule that a spec must not null a shared row at teardown: this
- * one has no teardown at all.
+ * row, so nothing should be created — the last test asserts that rather than
+ * assuming it. Each body still carries its own client-generated `id`, and each
+ * test defers a delete of exactly that id, so a regression that lets a CHECK
+ * accept the row fails the test without leaving the row behind. The delete
+ * matches only this test's own fresh id, so it never touches a shared row.
  *
  * ## Why service_role is not used
  *
@@ -37,6 +38,7 @@
  * would assert against a body the app never receives. Every request below
  * carries a real user's JWT.
  */
+import { randomUUID } from 'node:crypto';
 import { test, expect } from '../support/merged-fixtures';
 import { getWorkerPairEmails } from '../support/auth/worker-pool';
 import { resolveOwnPair } from '../support/helpers/events';
@@ -79,15 +81,37 @@ const FAR_FUTURE_EVENT_DATE = '2030-01-01';
 /**
  * An events insert body. The defaults are the `events_label_check` case's body
  * (an over-long label); any other case overrides the label as well as the
- * column its own CHECK is about.
+ * column its own CHECK is about. The `id` is the handle the teardown deletes by.
  */
 function eventBody(userId: string, overrides: Record<string, unknown> = {}) {
   return {
+    id: randomUUID(),
     user_id: userId,
     label: OVER_LONG_LABEL,
     event_date: FAR_FUTURE_EVENT_DATE,
     ...overrides,
   };
+}
+
+type ProbeTable =
+  | 'events'
+  | 'interactions'
+  | 'moods'
+  | 'photos'
+  | 'love_notes'
+  | 'partner_requests';
+
+/**
+ * Teardown: delete the row a rejected write should never have committed, by
+ * the probe's own id. Deletes nothing when the CHECK held.
+ */
+async function deleteProbeRow(
+  supabaseAdmin: TypedSupabaseClient,
+  table: ProbeTable,
+  id: string
+): Promise<void> {
+  const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
+  if (error) throw error;
 }
 
 /**
@@ -157,6 +181,7 @@ test.describe('CHECK-constraint rejections over the wire', () => {
       context: 'InteractionService.sendInteraction',
       priority: 'P1',
       body: (userId: string, partnerId: string) => ({
+        id: randomUUID(),
         type: 'hug',
         from_user_id: userId,
         to_user_id: partnerId,
@@ -168,6 +193,7 @@ test.describe('CHECK-constraint rejections over the wire', () => {
       context: 'MoodApi.create',
       priority: 'P1',
       body: (userId: string) => ({
+        id: randomUUID(),
         user_id: userId,
         mood_type: 'happy',
         note: OVER_LONG_NOTE,
@@ -231,6 +257,7 @@ test.describe('CHECK-constraint rejections over the wire', () => {
     test(`[${rejection.priority}] ${rejection.constraint} rejects with an envelope the mapper turns into the generic sentence`, async ({
       apiRequest,
       supabaseAdmin,
+      cleanup,
     }) => {
       // The interactions row needs the partner too: since
       // 20260912020000_partner_only_immutable_interactions.sql an INSERT is
@@ -238,12 +265,16 @@ test.describe('CHECK-constraint rejections over the wire', () => {
       // caller's current partner, and this file is about the CHECK envelope.
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       const userToken = await getUserAccessToken(supabaseAdmin, userId);
+      const probe = rejection.body(userId, partnerId);
+      cleanup.defer(`delete any committed ${rejection.table} probe`, () =>
+        deleteProbeRow(supabaseAdmin, rejection.table, probe.id)
+      );
 
       const { status, body } = await apiRequest<PostgrestErrorEnvelope>({
         method: 'POST',
         path: `/rest/v1/${rejection.table}`,
         headers: { Authorization: `Bearer ${userToken}` },
-        body: rejection.body(userId, partnerId),
+        body: probe,
       });
 
       // The server's half of the contract.
@@ -273,15 +304,20 @@ test.describe('CHECK-constraint rejections over the wire', () => {
   test('[P1] the server withholds the failing row from an authenticated caller, but still sends the details key', async ({
     apiRequest,
     supabaseAdmin,
+    cleanup,
   }) => {
     const userId = await resolveOwnUserId(supabaseAdmin);
     const userToken = await getUserAccessToken(supabaseAdmin, userId);
+    const probe = eventBody(userId);
+    cleanup.defer('delete any committed events probe', () =>
+      deleteProbeRow(supabaseAdmin, 'events', probe.id)
+    );
 
     const { body } = await apiRequest<PostgrestErrorEnvelope>({
       method: 'POST',
       path: '/rest/v1/events',
       headers: { Authorization: `Bearer ${userToken}` },
-      body: eventBody(userId),
+      body: probe,
     });
 
     // Two separate claims, and the mapping depends on the second one.
@@ -299,23 +335,28 @@ test.describe('CHECK-constraint rejections over the wire', () => {
     expect(Object.hasOwn(body, 'message')).toBe(true);
   });
 
-  test('[P1] a rejected CHECK write commits no row, so this spec has nothing to clean up', async ({
+  test('[P1] a rejected CHECK write commits no row', async ({
     apiRequest,
     supabaseAdmin,
+    cleanup,
   }) => {
     const userId = await resolveOwnUserId(supabaseAdmin);
     const userToken = await getUserAccessToken(supabaseAdmin, userId);
 
-    // A label short enough to pass `events_label_check` and unique enough to
-    // find, on a row that `events_icon_check` will refuse. If the INSERT ever
+    // A label short enough to pass `events_label_check` and unique to this
+    // run, on a row that `events_icon_check` will refuse. If the INSERT ever
     // partially committed, this exact label would be sitting in the table.
-    const probeLabel = `check-probe-${userId}`;
+    const probeLabel = `check-probe-${randomUUID()}`;
+    const probe = eventBody(userId, { label: probeLabel, icon: 'not-an-icon' });
+    cleanup.defer('delete any committed events probe', () =>
+      deleteProbeRow(supabaseAdmin, 'events', probe.id)
+    );
 
     const { status, body } = await apiRequest<PostgrestErrorEnvelope>({
       method: 'POST',
       path: '/rest/v1/events',
       headers: { Authorization: `Bearer ${userToken}` },
-      body: eventBody(userId, { label: probeLabel, icon: 'not-an-icon' }),
+      body: probe,
     });
 
     expect(status).toBe(CHECK_VIOLATION_HTTP_STATUS);

@@ -14,7 +14,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveWorkerPairIds } from '../../support/factories/events';
-import { createOutsiderClient } from '../../support/helpers/rls-security';
+import { createOutsiderClient, deleteOutsider } from '../../support/helpers/rls-security';
+import type { Cleanup } from '../../support/fixtures/cleanup';
 
 // `.env.test` points the dev server at http://127.0.0.1:54321, and the SDK
 // derives its storage key as `sb-${hostname.split('.')[0]}-auth-token`.
@@ -27,17 +28,20 @@ const STORAGE_KEY = 'sb-127-auth-token';
 const DB_NAME = 'my-love-db';
 const SW_AUTH_STORE = 'sw-auth';
 
-type ForeignSession = {
-  userId: string;
-  fragment: string;
-  cleanup: () => Promise<unknown>;
-};
+type ForeignSession = { userId: string; fragment: string };
 
-/** Mint a real second account and build its complete implicit grant fragment. */
+/**
+ * Mint a real second account and build its complete implicit grant fragment.
+ * The account's deletion is deferred the moment it exists, so a missing
+ * session below still deletes it.
+ */
 async function createForeignSession(
-  supabaseAdmin: Parameters<typeof createOutsiderClient>[0]
+  supabaseAdmin: Parameters<typeof createOutsiderClient>[0],
+  cleanup: Cleanup
 ): Promise<ForeignSession> {
-  const { client, userId, cleanup } = await createOutsiderClient(supabaseAdmin, 'pkce-attacker');
+  const outsider = await createOutsiderClient(supabaseAdmin, 'pkce-attacker');
+  cleanup.defer('delete the foreign account', () => deleteOutsider(outsider));
+  const { client, userId } = outsider;
   const { data } = await client.auth.getSession();
   const session = data.session;
   if (!session) throw new Error('Foreign account produced no session to forge a fragment from');
@@ -51,7 +55,7 @@ async function createForeignSession(
     String(session.expires_in ?? 3600) +
     '&token_type=bearer';
 
-  return { userId, fragment, cleanup };
+  return { userId, fragment };
 }
 
 /** The user id of the session the SDK has persisted, or null when there is none. */
@@ -121,76 +125,69 @@ test.describe('Foreign implicit fragment — signed out', () => {
   test('[P0] cannot establish a session from another account’s token fragment', async ({
     page,
     supabaseAdmin,
+    cleanup,
   }) => {
     // GIVEN: a real second account whose complete token set an attacker holds.
-    const foreign = await createForeignSession(supabaseAdmin);
+    const foreign = await createForeignSession(supabaseAdmin, cleanup);
 
-    try {
-      // WHEN: the victim opens the app through a link carrying that fragment.
-      await page.goto('/' + foreign.fragment);
+    // WHEN: the victim opens the app through a link carrying that fragment.
+    await page.goto('/' + foreign.fragment);
 
-      // THEN: the app is still signed out and nothing was persisted.
-      await expect(page.getByTestId('login-screen')).toBeVisible();
-      expect(await storedSessionKeys(page)).toEqual([]);
-      expect(await storedSessionUserId(page, STORAGE_KEY)).toBeNull();
-      expect(await backgroundSyncUserId(page, DB_NAME, SW_AUTH_STORE)).toBeNull();
-    } finally {
-      await foreign.cleanup();
-    }
+    // THEN: the app is still signed out and nothing was persisted.
+    await expect(page.getByTestId('login-screen')).toBeVisible();
+    expect(await storedSessionKeys(page)).toEqual([]);
+    expect(await storedSessionUserId(page, STORAGE_KEY)).toBeNull();
+    expect(await backgroundSyncUserId(page, DB_NAME, SW_AUTH_STORE)).toBeNull();
   });
 });
 
 test.describe('Foreign implicit fragment — already signed in', () => {
   // The default authenticated storage state: this worker's own account.
 
-  test('[P0] cannot replace the signed-in account', async ({ page, supabaseAdmin }) => {
+  test('[P0] cannot replace the signed-in account', async ({ page, supabaseAdmin, cleanup }) => {
     // GIVEN: this worker's account is signed in, and a real second account exists.
     const { userId: workerUserId } = await resolveWorkerPairIds(supabaseAdmin);
-    const foreign = await createForeignSession(supabaseAdmin);
+    const foreign = await createForeignSession(supabaseAdmin, cleanup);
     expect(foreign.userId).not.toBe(workerUserId);
 
-    try {
-      await page.goto('/');
-      await expect(page.getByTestId('app-container')).toBeVisible();
-      expect(await storedSessionUserId(page, STORAGE_KEY)).toBe(workerUserId);
+    await page.goto('/');
+    await expect(page.getByTestId('app-container')).toBeVisible();
+    expect(await storedSessionUserId(page, STORAGE_KEY)).toBe(workerUserId);
 
-      // WHEN: the signed-in victim opens the attacker's link. The reload is
-      // load-bearing: `goto` to a URL that differs only by its fragment is a
-      // same-document navigation, so without it the client is never rebuilt and
-      // the callback is never classified at all.
-      await page.goto('/' + foreign.fragment);
-      await page.reload();
+    // WHEN: the signed-in victim opens the attacker's link. The reload is
+    // load-bearing: `goto` to a URL that differs only by its fragment is a
+    // same-document navigation, so without it the client is never rebuilt and
+    // the callback is never classified at all.
+    await page.goto('/' + foreign.fragment);
+    await page.reload();
 
-      // THEN: the app settles back into its normal shell. This wait is also the
-      // assertion, and it is what makes reading storage below race-free: the
-      // attacker's account is brand new and has no display name, so a client
-      // that accepted the fragment lands on the setup overlay instead, which
-      // `src/App.tsx:581` returns *in place of* the shell.
-      await expect(page.getByTestId('app-container')).toBeVisible();
-      await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
-      await expect(page.getByTestId('login-screen')).toHaveCount(0);
+    // THEN: the app settles back into its normal shell. This wait is also the
+    // assertion, and it is what makes reading storage below race-free: the
+    // attacker's account is brand new and has no display name, so a client
+    // that accepted the fragment lands on the setup overlay instead, which
+    // `src/App.tsx:581` returns *in place of* the shell.
+    await expect(page.getByTestId('app-container')).toBeVisible();
+    await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
+    await expect(page.getByTestId('login-screen')).toHaveCount(0);
 
-      // Session and Background Sync token still belong to the original account.
-      expect(await storedSessionUserId(page, STORAGE_KEY)).toBe(workerUserId);
-      // The requirement is that this record never comes to belong to the
-      // attacker. Both admissible values are accepted deliberately, and this
-      // is not a weakening to "fix" on a later pass:
-      //   null   -- the measured value today. A session restored from storage
-      //             emits no SIGNED_IN, and `sessionService.ts:71` writes the
-      //             record only on SIGNED_IN or TOKEN_REFRESHED, so a returning
-      //             browser has no record at all.
-      //   worker -- the same line writes it on TOKEN_REFRESHED, which the app
-      //             client (autoRefreshToken: true) fires on its own schedule.
-      //             A cached worker token close to expiry therefore produces a
-      //             record mid-test, and pinning `toBeNull()` would redden this
-      //             P0 for a reason that has nothing to do with PKCE.
-      // A callback that bound the attacker's identity fails either way, and the
-      // session assertion above already proves the victim's session survived.
-      const syncUserId = await backgroundSyncUserId(page, DB_NAME, SW_AUTH_STORE);
-      expect(syncUserId).not.toBe(foreign.userId);
-      expect([null, workerUserId]).toContain(syncUserId);
-    } finally {
-      await foreign.cleanup();
-    }
+    // Session and Background Sync token still belong to the original account.
+    expect(await storedSessionUserId(page, STORAGE_KEY)).toBe(workerUserId);
+    // The requirement is that this record never comes to belong to the
+    // attacker. Both admissible values are accepted deliberately, and this
+    // is not a weakening to "fix" on a later pass:
+    //   null   -- the measured value today. A session restored from storage
+    //             emits no SIGNED_IN, and `sessionService.ts:71` writes the
+    //             record only on SIGNED_IN or TOKEN_REFRESHED, so a returning
+    //             browser has no record at all.
+    //   worker -- the same line writes it on TOKEN_REFRESHED, which the app
+    //             client (autoRefreshToken: true) fires on its own schedule.
+    //             A cached worker token close to expiry therefore produces a
+    //             record mid-test, and pinning `toBeNull()` would redden this
+    //             P0 for a reason that has nothing to do with PKCE.
+    // A callback that bound the attacker's identity fails either way, and the
+    // session assertion above already proves the victim's session survived.
+    const syncUserId = await backgroundSyncUserId(page, DB_NAME, SW_AUTH_STORE);
+    expect(syncUserId).not.toBe(foreign.userId);
+    expect([null, workerUserId]).toContain(syncUserId);
   });
 });

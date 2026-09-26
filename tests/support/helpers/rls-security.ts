@@ -79,7 +79,8 @@ export async function createOutsiderClient(
         }
       };
 
-      // Playwright reports omit AggregateError.errors, so include both details here.
+      // Playwright lists each AggregateError child too; the message also names
+      // both, so a reporter that prints only the top-level error shows them.
       throw new AggregateError(
         [error, cleanupError],
         `Failed to set up and clean up outsider account ${userId}. ` +
@@ -91,4 +92,12 @@ export async function createOutsiderClient(
   });
 
   return { client, userId, cleanup };
+}
+
+/** A `cleanup.defer` body: delete a throwaway account, throwing the delete's error. */
+export async function deleteOutsider(outsider: {
+  cleanup: () => Promise<{ error: Error | null }>;
+}): Promise<void> {
+  const { error } = await outsider.cleanup();
+  if (error) throw error;
 }

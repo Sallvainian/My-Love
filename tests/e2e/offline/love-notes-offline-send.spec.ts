@@ -15,9 +15,10 @@
  *
  * Test data: three notes from THIS worker's user to its partner
  * (`resolveOwnPair`, keyed on TEST_WORKER_INDEX), found by a per-run content
- * stamp and deleted by id at teardown. No partner is linked or unlinked, no
+ * stamp and deleted by that stamp at teardown. No partner is linked or unlinked, no
  * password reset, no shared row nulled.
  */
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
@@ -93,10 +94,19 @@ async function sentRows(
   return data ?? [];
 }
 
-async function deleteNotes(supabaseAdmin: TypedSupabaseClient, ids: string[]) {
-  if (ids.length === 0) return;
-  const { error } = await supabaseAdmin.from('love_notes').delete().in('id', ids);
-  expect.soft(error).toBeNull();
+/** Delete this worker's notes to its partner carrying `stamp`. */
+async function deleteStampedNotes(
+  supabaseAdmin: TypedSupabaseClient,
+  pair: { userId: string; partnerId: string },
+  stamp: string
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('love_notes')
+    .delete()
+    .eq('from_user_id', pair.userId)
+    .eq('to_user_id', pair.partnerId)
+    .like('content', `%${stamp}%`);
+  if (error) throw error;
 }
 
 test.beforeEach(async ({ page }) => {
@@ -111,139 +121,130 @@ test.describe('Love-note text sent offline', () => {
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     const stamp = `E2E-QUEUE-${Date.now()}`;
     const contents = [`${stamp} one`, `${stamp} two`, `${stamp} three`];
-    let routed = false;
-    // Resolved before the `try`, so the teardown below reuses it rather than
-    // resolving again where a throw would skip the delete.
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    const pair = await resolveOwnPair(supabaseAdmin);
+    const { partnerId } = pair;
+    cleanup.defer('delete the notes this run sent', async () => {
+      // Stop the producer first: the queue's drain retry (`scheduleDrainRetry`
+      // in notesSlice.ts) can still send a note after a delete. Guarded: on a
+      // closed page `unrouteAll` throws, which would skip both deletes. The
+      // context, not just the page, so a failure's page snapshot is this page
+      // (see `closeContext`).
+      if (!page.isClosed()) await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await page.context().close();
+      await deleteStampedNotes(supabaseAdmin, pair, stamp);
+      // A POST already in flight when the page closed still commits, so look
+      // again once it has had time to land.
+      await sleep(2000);
+      await deleteStampedNotes(supabaseAdmin, pair, stamp);
+      expect(await sentRows(supabaseAdmin, stamp), 'no note from this run may remain').toEqual([]);
+    });
 
-    try {
-      // GIVEN: signed in on the Notes screen with the partner loaded, then offline.
-      const partnerRead = interceptNetworkCall({ method: 'GET', url: partnerRecordRead(partnerId) });
-      await page.goto('/notes');
-      expect((await partnerRead).status).toBe(200);
-      await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
-      await recurseUntil(
-        () => page.evaluate(() => window.__APP_STORE__?.getState().partner?.id ?? null),
-        (v) => {
-          expect(v).toBe(partnerId);
-        }
-      );
-      await goOffline(page, true);
-
-      // WHEN: three notes are sent offline.
-      const input = page.getByLabel('Love note message input');
-      for (const content of contents) {
-        await input.fill(content);
-        await page.getByLabel('Send message', { exact: true }).click();
-        await expect(input).toHaveValue('');
+    // GIVEN: signed in on the Notes screen with the partner loaded, then offline.
+    const partnerRead = interceptNetworkCall({ method: 'GET', url: partnerRecordRead(partnerId) });
+    await page.goto('/notes');
+    expect((await partnerRead).status).toBe(200);
+    await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
+    await recurseUntil(
+      () => page.evaluate(() => window.__APP_STORE__?.getState().partner?.id ?? null),
+      (v) => {
+        expect(v).toBe(partnerId);
       }
+    );
+    await goOffline(page, true);
 
-      // THEN (1): all three show at once, in order, waiting to send.
-      for (const content of contents) {
-        await expect(noteBubble(page, content)).toContainText('Waiting to send');
+    // WHEN: three notes are sent offline.
+    const input = page.getByLabel('Love note message input');
+    for (const content of contents) {
+      await input.fill(content);
+      await page.getByLabel('Send message', { exact: true }).click();
+      await expect(input).toHaveValue('');
+    }
+
+    // THEN (1): all three show at once, in order, waiting to send.
+    for (const content of contents) {
+      await expect(noteBubble(page, content)).toContainText('Waiting to send');
+    }
+    await recurseUntil(
+      () => page.getByTestId('love-note-message').filter({ hasText: stamp }).allTextContents(),
+      (shownOrder) => {
+        expect(shownOrder.map((text) => contents.findIndex((c) => text.includes(c)))).toEqual([0, 1, 2]);
       }
-      await recurseUntil(
-        () => page.getByTestId('love-note-message').filter({ hasText: stamp }).allTextContents(),
-        (shownOrder) => {
-          expect(shownOrder.map((text) => contents.findIndex((c) => text.includes(c)))).toEqual([0, 1, 2]);
-        }
-      );
-      await recurseUntil(
-        () => queuedContents(page),
-        (queued) => {
-          expect(queued).toEqual(contents);
-        }
-      );
-      const composedAt = (await queuedRows(page)).map((row) => row.createdAt);
-
-      // WHEN: the app reloads with no love-notes server answer, then goes offline.
-      let abortedCalls = 0;
-      // playwright-utils deviation: the route must be installed before the next navigation and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-      await page.route(isNotesRest, (route) => {
-        abortedCalls += 1;
-        return route.abort();
-      });
-      routed = true;
-      await page.context().setOffline(false);
-      await page.reload();
-      await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
-      await recurseUntil(async () => abortedCalls, (v) => { expect(v).toBeGreaterThan(0); });
-      await goOffline(page, true);
-
-      // THEN (2): the notes still show pending, from the queue.
-      for (const content of contents) {
-        await expect(noteBubble(page, content)).toContainText('Waiting to send');
+    );
+    await recurseUntil(
+      () => queuedContents(page),
+      (queued) => {
+        expect(queued).toEqual(contents);
       }
-      await recurseUntil(
-        () => queuedContents(page),
-        (queued) => {
-          expect(queued).toEqual(contents);
-        }
-      );
-      expect(await sentRows(supabaseAdmin, stamp)).toEqual([]);
+    );
+    const composedAt = (await queuedRows(page)).map((row) => row.createdAt);
 
-      // WHEN: the connection returns.
-      await page.unroute(isNotesRest);
-      routed = false;
-      await goOffline(page, false);
+    // WHEN: the app reloads with no love-notes server answer, then goes offline.
+    let abortedCalls = 0;
+    // playwright-utils deviation: the route must be installed before the next navigation and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route(isNotesRest, (route) => {
+      abortedCalls += 1;
+      return route.abort();
+    });
+    await page.context().setOffline(false);
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
+    await recurseUntil(async () => abortedCalls, (v) => { expect(v).toBeGreaterThan(0); });
+    await goOffline(page, true);
 
-      // THEN (3): the partner's view holds exactly the three notes, in order,
-      // and the sender's thread shows them confirmed without a reload.
-      await recurseUntil(
-        async () => (await sentRows(supabaseAdmin, stamp)).length,
-        (v) => {
-          expect(v).toBe(3);
-        },
-        { timeout: 15000 }
-      );
-      const rows = await sentRows(supabaseAdmin, stamp);
-      expect(rows.map((row) => row.content)).toEqual(contents);
-      // Each carries when it was written; created_at is the later delivery.
-      expect(rows.map((row) => row.written_at && Date.parse(row.written_at))).toEqual(
-        composedAt.map((at) => Date.parse(at))
-      );
-      for (const row of rows) {
-        expect(Date.parse(row.created_at)).toBeGreaterThan(Date.parse(row.written_at!));
+    // THEN (2): the notes still show pending, from the queue.
+    for (const content of contents) {
+      await expect(noteBubble(page, content)).toContainText('Waiting to send');
+    }
+    await recurseUntil(
+      () => queuedContents(page),
+      (queued) => {
+        expect(queued).toEqual(contents);
       }
-      await recurseUntil(() => queuedContents(page), (v) => { expect(v).toEqual([]); });
-      await recurseUntil(
-        () =>
-          page.evaluate(
-            (ids) => {
-              const notes = window.__APP_STORE__?.getState().notes ?? [];
-              return ids.every((id) => notes.some((n) => n.id === id && !n.queued && !n.sending));
-            },
-            rows.map((row) => row.id)
-          ),
-        (v) => {
-          expect(v).toBe(true);
-        }
-      );
-      for (const content of contents) {
-        await expect(noteBubble(page, content)).not.toContainText('Waiting to send');
+    );
+    expect(await sentRows(supabaseAdmin, stamp)).toEqual([]);
+
+    // WHEN: the connection returns.
+    await page.unroute(isNotesRest);
+    await goOffline(page, false);
+
+    // THEN (3): the partner's view holds exactly the three notes, in order,
+    // and the sender's thread shows them confirmed without a reload.
+    await recurseUntil(
+      async () => (await sentRows(supabaseAdmin, stamp)).length,
+      (v) => {
+        expect(v).toBe(3);
+      },
+      { timeout: 15000 }
+    );
+    const rows = await sentRows(supabaseAdmin, stamp);
+    expect(rows.map((row) => row.content)).toEqual(contents);
+    // Each carries when it was written; created_at is the later delivery.
+    expect(rows.map((row) => row.written_at && Date.parse(row.written_at))).toEqual(
+      composedAt.map((at) => Date.parse(at))
+    );
+    for (const row of rows) {
+      expect(Date.parse(row.created_at)).toBeGreaterThan(Date.parse(row.written_at!));
+    }
+    await recurseUntil(() => queuedContents(page), (v) => { expect(v).toEqual([]); });
+    await recurseUntil(
+      () =>
+        page.evaluate(
+          (ids) => {
+            const notes = window.__APP_STORE__?.getState().notes ?? [];
+            return ids.every((id) => notes.some((n) => n.id === id && !n.queued && !n.sending));
+          },
+          rows.map((row) => row.id)
+        ),
+      (v) => {
+        expect(v).toBe(true);
       }
-    } finally {
-      // Guarded, so neither can skip the delete below or replace the test's error.
-      if (routed) await page.unroute(isNotesRest).catch(() => {});
-      await page.context().setOffline(false).catch(() => {});
-      // TEARDOWN (4): delete exactly the rows this run sent. The ids are read
-      // here with a soft check rather than through `sentRows`, whose hard
-      // assertion would throw out of this `finally` and replace the test's own
-      // error.
-      const { data: sent, error: sentError } = await supabaseAdmin
-        .from('love_notes')
-        .select('id')
-        .eq('from_user_id', userId)
-        .eq('to_user_id', partnerId)
-        .like('content', `%${stamp}%`);
-      expect.soft(sentError, 'Teardown must find the notes this test sent').toBeNull();
-      await deleteNotes(
-        supabaseAdmin,
-        (sent ?? []).map((row) => row.id)
-      );
+    );
+    for (const content of contents) {
+      await expect(noteBubble(page, content)).not.toContainText('Waiting to send');
     }
   });
 });

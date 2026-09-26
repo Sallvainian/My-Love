@@ -102,15 +102,15 @@
  * password, or touches a row owned by another worker. The one identity that is
  * NOT from the pool — DE.5-API-008's outsider — is self-provisioned by
  * `createOutsiderClient` (`tests/support/helpers/rls-security.ts:43`), which
- * makes its own throwaway `auth.users` account; it is deleted in a `finally`, so
- * it cannot leak. Every label is prefixed
+ * makes its own throwaway `auth.users` account; its deletion is deferred to the
+ * `cleanup` fixture, so it cannot leak. Every label is prefixed
  * `Events Wire` so no row can ever slugify onto Home's fixed
  * `event-countdown-wedding` testid.
  */
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../support/merged-fixtures';
-// The `log` VALUE, not the destructured fixture. The fixture merged into
-// merged-fixtures.ts:15 is `(params: LogParams) => Promise<void>`
+// The `log` VALUE, not the destructured fixture. The `log` fixture that
+// merged-fixtures.ts merges in as `logFixture` is `(params: LogParams) => Promise<void>`
 // (node_modules/@seontechnologies/playwright-utils/dist/esm/log/log-fixture.d.ts);
 // only the value export carries `.step`/`.info` (dist/esm/log/log.d.ts). This
 // project's merged fixtures do not re-export it, so it is imported from the
@@ -118,7 +118,7 @@ import { test, expect } from '../support/merged-fixtures';
 import { log } from '@seontechnologies/playwright-utils';
 import { z } from 'zod';
 import { getUserAccessToken } from '../support/helpers/supabase';
-import { createOutsiderClient } from '../support/helpers/rls-security';
+import { createOutsiderClient, deleteOutsider } from '../support/helpers/rls-security';
 // The pair resolution, the scoped teardown and the local-components date all
 // live in one module now. They were hand-copied into eight files before it
 // existed, and `clearPairEvents` is the teardown that keeps one worker's rows
@@ -134,7 +134,6 @@ import {
 // Only the batch seeder: this factory module also exports a `clearPairEvents`,
 // with a different signature from the helpers' one imported above.
 import { seedEvents } from '../support/factories/events';
-import type { TypedSupabaseClient } from '../support/factories';
 
 /**
  * The `public.events` row exactly as PostgREST returns it. Columns, nullability
@@ -191,55 +190,6 @@ const OUTSIDER_PARTNER_LABEL = 'Events Wire Outsider Partner Row';
 /** DE.5-API-008b fixtures — the pair rows the shared teardown must clear. */
 const TEARDOWN_CREATOR_LABEL = 'Events Wire Teardown Creator Row';
 const TEARDOWN_PARTNER_LABEL = 'Events Wire Teardown Partner Row';
-
-type Outsider = Awaited<ReturnType<typeof createOutsiderClient>>;
-
-/**
- * Run `body` with a throwaway, unlinked account of its own, and delete that
- * account afterwards even when `body` throws. Its rows cascade on the delete
- * (`events.user_id … on delete cascade`).
- */
-async function withOutsider(
-  supabaseAdmin: TypedSupabaseClient,
-  emailPrefix: string,
-  body: (outsider: Outsider) => Promise<void>
-): Promise<void> {
-  const outsider = await createOutsiderClient(supabaseAdmin, emailPrefix);
-  let testFailure: unknown;
-  let testFailed = false;
-  let cleanupFailure: Error | null = null;
-
-  try {
-    await body(outsider);
-  } catch (error) {
-    testFailed = true;
-    testFailure = error;
-  } finally {
-    // Always, even on failure: the account exists in auth.users until this runs.
-    try {
-      const { error: cleanupError } = await outsider.cleanup();
-      if (cleanupError) {
-        cleanupFailure = new Error(
-          `Failed to clean up outsider account ${outsider.userId}: ${cleanupError.message}`
-        );
-      }
-    } catch (error) {
-      cleanupFailure =
-        error instanceof Error
-          ? error
-          : new Error(`Outsider account cleanup rejected with: ${String(error)}`);
-    }
-  }
-
-  if (testFailed && cleanupFailure) {
-    throw new AggregateError(
-      [testFailure, cleanupFailure],
-      'The outsider test and its account cleanup both failed'
-    );
-  }
-  if (cleanupFailure) throw cleanupFailure;
-  if (testFailed) throw testFailure;
-}
 
 test.describe('Events wire contract over PostgREST — story 5', () => {
   // Scoped to this worker's own pair, and checked. Runs even when a test throws
@@ -626,6 +576,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
   test('[P1] DE.5-API-008 an authenticated but unlinked outsider reads none of the couple\'s events', async ({
     apiRequest,
     supabaseAdmin,
+    cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -648,56 +599,58 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     // A throwaway account of its own, never a pool account belonging to another
     // worker. It is linked to nobody, which is the whole point: it is exactly
     // the caller `get_my_partner_id()` returns NULL for.
-    await withOutsider(supabaseAdmin, 'events-wire-outsider', async (outsider) => {
-      // GIVEN (positive control): the same endpoint does serve the creator both rows,
-      // so an empty outsider read cannot be a dead endpoint masquerading as RLS.
-      await log.step('Positive control: the creator can see both rows over the same endpoint');
-      // Without this the outsider's empty array would also be the answer if the
-      // rows had never been seeded, or if the endpoint were broken for everyone.
-      const creatorToken = await getUserAccessToken(supabaseAdmin, userId);
-      const visible = await apiRequest<EventRow[]>({
-        method: 'GET',
-        path: '/rest/v1/events?select=*&order=event_date.asc,created_at.asc',
-        headers: { Authorization: `Bearer ${creatorToken}` },
-      }).validateSchema<z.infer<typeof EventRowsSchema>>(EventRowsSchema);
+    // Its rows cascade on the delete (`events.user_id … on delete cascade`).
+    const outsider = await createOutsiderClient(supabaseAdmin, 'events-wire-outsider');
+    cleanup.defer('delete the outsider account', () => deleteOutsider(outsider));
 
-      expect(visible.status).toBe(200);
-      expect(visible.body.map((row) => row.label)).toEqual([
-        OUTSIDER_CREATOR_LABEL,
-        OUTSIDER_PARTNER_LABEL,
-      ]);
+    // GIVEN (positive control): the same endpoint does serve the creator both rows,
+    // so an empty outsider read cannot be a dead endpoint masquerading as RLS.
+    await log.step('Positive control: the creator can see both rows over the same endpoint');
+    // Without this the outsider's empty array would also be the answer if the
+    // rows had never been seeded, or if the endpoint were broken for everyone.
+    const creatorToken = await getUserAccessToken(supabaseAdmin, userId);
+    const visible = await apiRequest<EventRow[]>({
+      method: 'GET',
+      path: '/rest/v1/events?select=*&order=event_date.asc,created_at.asc',
+      headers: { Authorization: `Bearer ${creatorToken}` },
+    }).validateSchema<z.infer<typeof EventRowsSchema>>(EventRowsSchema);
 
-      // WHEN: an authenticated but unlinked account reads the same endpoint
-      await log.step('The unlinked outsider reads the same endpoint with a real bearer token');
-      const outsiderToken = await getUserAccessToken(supabaseAdmin, outsider.userId);
-      const denied = await apiRequest<EventRow[]>({
-        method: 'GET',
-        path: '/rest/v1/events?select=*&order=event_date.asc,created_at.asc',
-        headers: { Authorization: `Bearer ${outsiderToken}` },
-      }).validateSchema<z.infer<typeof EventRowsSchema>>(EventRowsSchema);
+    expect(visible.status).toBe(200);
+    expect(visible.body.map((row) => row.label)).toEqual([
+      OUTSIDER_CREATOR_LABEL,
+      OUTSIDER_PARTNER_LABEL,
+    ]);
 
-      // MEASURED: 200 with an empty array — NOT the 401/42501 the anon role gets
-      // in DE.5-API-007. The outsider clears the grant and is then filtered out
-      // row by row, so PostgREST reports a perfectly successful read of nothing.
-      expect(denied.status).toBe(200);
-      expect(denied.body).toEqual([]);
+    // WHEN: an authenticated but unlinked account reads the same endpoint
+    await log.step('The unlinked outsider reads the same endpoint with a real bearer token');
+    const outsiderToken = await getUserAccessToken(supabaseAdmin, outsider.userId);
+    const denied = await apiRequest<EventRow[]>({
+      method: 'GET',
+      path: '/rest/v1/events?select=*&order=event_date.asc,created_at.asc',
+      headers: { Authorization: `Bearer ${outsiderToken}` },
+    }).validateSchema<z.infer<typeof EventRowsSchema>>(EventRowsSchema);
 
-      // Stated the other way round as well, so the assertion cannot pass just
-      // because the array happened to be empty for some unrelated reason.
-      expect(denied.body.map((row) => row.label)).not.toContain(OUTSIDER_CREATOR_LABEL);
-      expect(denied.body.map((row) => row.label)).not.toContain(OUTSIDER_PARTNER_LABEL);
+    // MEASURED: 200 with an empty array — NOT the 401/42501 the anon role gets
+    // in DE.5-API-007. The outsider clears the grant and is then filtered out
+    // row by row, so PostgREST reports a perfectly successful read of nothing.
+    expect(denied.status).toBe(200);
+    expect(denied.body).toEqual([]);
 
-      // THEN: it sees none of them, and both rows are still there — the caller was
-      // filtered by the row predicate, not the data removed
-      await log.step('Confirm both rows still exist — the outsider was filtered, not the data');
-      const { data: stillThere, error: stillError } = await supabaseAdmin
-        .from('events')
-        .select('label')
-        .in('user_id', [userId, partnerId]);
+    // Stated the other way round as well, so the assertion cannot pass just
+    // because the array happened to be empty for some unrelated reason.
+    expect(denied.body.map((row) => row.label)).not.toContain(OUTSIDER_CREATOR_LABEL);
+    expect(denied.body.map((row) => row.label)).not.toContain(OUTSIDER_PARTNER_LABEL);
 
-      expect(stillError).toBeNull();
-      expect(stillThere).toHaveLength(2);
-    });
+    // THEN: it sees none of them, and both rows are still there — the caller was
+    // filtered by the row predicate, not the data removed
+    await log.step('Confirm both rows still exist — the outsider was filtered, not the data');
+    const { data: stillThere, error: stillError } = await supabaseAdmin
+      .from('events')
+      .select('label')
+      .in('user_id', [userId, partnerId]);
+
+    expect(stillError).toBeNull();
+    expect(stillThere).toHaveLength(2);
   });
 
   // ==========================================================================
@@ -707,6 +660,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
   // ==========================================================================
   test('[P1] DE.5-API-008b the shared pair teardown deletes this pair\'s events and leaves an outsider\'s row', async ({
     supabaseAdmin,
+    cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -726,34 +680,36 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
 
     expect(seeded).toHaveLength(2);
 
-    await withOutsider(supabaseAdmin, 'events-wire-teardown-outsider', async (outsider) => {
-      // The shared afterEach helper must remain scoped to this worker's pair.
-      // Give a non-pool user a row, run the real helper, and prove that row
-      // survives while the couple's two rows are cleared.
-      await log.step('Confirm shared cleanup leaves an outsider-owned row untouched');
-      const outsiderEventId = await seedEvent(supabaseAdmin, {
-        userId: outsider.userId,
-        label: 'Events Wire Outsider Cleanup Witness',
-        eventDate: isoDateDaysFromNow(24, anchor),
-      });
+    // Its rows cascade on the delete (`events.user_id … on delete cascade`).
+    const outsider = await createOutsiderClient(supabaseAdmin, 'events-wire-teardown-outsider');
+    cleanup.defer('delete the outsider account', () => deleteOutsider(outsider));
 
-      await clearOwnPairEvents(supabaseAdmin);
-
-      const { data: outsiderRow, error: outsiderRowError } = await supabaseAdmin
-        .from('events')
-        .select('id')
-        .eq('id', outsiderEventId)
-        .single();
-      const { count: remainingPairRows, error: pairCountError } = await supabaseAdmin
-        .from('events')
-        .select('id', { count: 'exact', head: true })
-        .in('user_id', [userId, partnerId]);
-
-      expect(outsiderRowError).toBeNull();
-      expect(outsiderRow?.id).toBe(outsiderEventId);
-      expect(pairCountError).toBeNull();
-      expect(remainingPairRows).toBe(0);
+    // The shared afterEach helper must remain scoped to this worker's pair.
+    // Give a non-pool user a row, run the real helper, and prove that row
+    // survives while the couple's two rows are cleared.
+    await log.step('Confirm shared cleanup leaves an outsider-owned row untouched');
+    const outsiderEventId = await seedEvent(supabaseAdmin, {
+      userId: outsider.userId,
+      label: 'Events Wire Outsider Cleanup Witness',
+      eventDate: isoDateDaysFromNow(24, anchor),
     });
+
+    await clearOwnPairEvents(supabaseAdmin);
+
+    const { data: outsiderRow, error: outsiderRowError } = await supabaseAdmin
+      .from('events')
+      .select('id')
+      .eq('id', outsiderEventId)
+      .single();
+    const { count: remainingPairRows, error: pairCountError } = await supabaseAdmin
+      .from('events')
+      .select('id', { count: 'exact', head: true })
+      .in('user_id', [userId, partnerId]);
+
+    expect(outsiderRowError).toBeNull();
+    expect(outsiderRow?.id).toBe(outsiderEventId);
+    expect(pairCountError).toBeNull();
+    expect(remainingPairRows).toBe(0);
   });
 
   // ==========================================================================

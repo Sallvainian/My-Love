@@ -4,6 +4,7 @@ import type { AppState } from '../../../src/stores/types';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { test, expect } from '../../support/merged-fixtures';
+import { closeContext, type Cleanup } from '../../support/fixtures/cleanup';
 import {
   ANNIVERSARIES_READ,
   CUSTOM_MESSAGE_SAVE,
@@ -43,18 +44,29 @@ async function resolveWorkerAccount(
   return { email: pair.user1Email, userId: account.id };
 }
 
-// This worker account's own rows only, in the one table a test writes: start
-// clean so a re-run is valid. Hard before the test, so it never runs on
-// leftover rows; soft in the teardown, so the test's own error stands.
-async function clearTable(
-  supabaseAdmin: TypedSupabaseClient,
-  table: AccountTable,
-  userId: string,
-  { soft }: { soft: boolean }
-) {
+// This worker account's own rows only, in the one table a test writes: cleared
+// before the test so a re-run is valid, and again at teardown.
+async function clearTable(supabaseAdmin: TypedSupabaseClient, table: AccountTable, userId: string) {
   const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
-  const message = `clearing ${table} for this worker account`;
-  (soft ? expect.soft(error, message) : expect(error, message)).toBeNull();
+  expect(error, `clearing ${table} for this worker account`).toBeNull();
+}
+
+/**
+ * Clear `table` at teardown, after both contexts are closed: either one can
+ * still be writing when a test times out, and a write that lands after the
+ * clear would leak into the next run.
+ */
+function deferTeardown(
+  cleanup: Cleanup,
+  page: Page,
+  second: BrowserContext,
+  clear: () => Promise<void>
+) {
+  cleanup.defer('clear the table', clear);
+  // The first context, not just its page, and the second one pages first, so
+  // a failure's page snapshot is the first page (see `closeContext`).
+  cleanup.defer('close the first context', () => page.context().close());
+  cleanup.defer('close the second context', () => closeContext(second));
 }
 
 // Nothing but the welcome-splash timestamp: no session, no mirrors.
@@ -98,45 +110,42 @@ test.describe('Account data follows the account, not the browser', () => {
     browser,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }, testInfo) => {
     const { email, userId } = await resolveWorkerAccount(supabaseAdmin);
-    await clearTable(supabaseAdmin, 'message_favorites', userId, { soft: false });
+    await clearTable(supabaseAdmin, 'message_favorites', userId);
     const second = await newBareContext(browser, testInfo);
+    deferTeardown(cleanup, page, second, () =>
+      clearTable(supabaseAdmin, 'message_favorites', userId)
+    );
 
-    try {
-      // ---- First context: favorite through the UI ----
-      // The favorites read of the mirror refresh App runs on every signed-in start.
-      const refreshed = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
-      await page.goto('/');
-      const favorite = page.getByTestId('message-favorite-button');
-      await expect(favorite).toHaveAccessibleName('Add to favorites');
-      expect((await refreshed).status).toBe(200);
+    // ---- First context: favorite through the UI ----
+    // The favorites read of the mirror refresh App runs on every signed-in start.
+    const refreshed = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
+    await page.goto('/');
+    const favorite = page.getByTestId('message-favorite-button');
+    await expect(favorite).toHaveAccessibleName('Add to favorites');
+    expect((await refreshed).status).toBe(200);
 
-      const favoriteSaved = interceptNetworkCall({
-        method: 'POST',
-        url: '**/rest/v1/message_favorites*',
-      });
-      await favorite.click();
-      expect((await favoriteSaved).status).toBe(201);
-      await expect(favorite).toHaveAccessibleName('Remove from favorites');
-      // Read only now, so the text is the message the button above favorited.
-      const favoriteText = (await page.getByTestId('message-text').textContent())?.trim();
-      expect(favoriteText).toBeTruthy();
+    const favoriteSaved = interceptNetworkCall({
+      method: 'POST',
+      url: '**/rest/v1/message_favorites*',
+    });
+    await favorite.click();
+    expect((await favoriteSaved).status).toBe(201);
+    await expect(favorite).toHaveAccessibleName('Remove from favorites');
+    // Read only now, so the text is the message the button above favorited.
+    const favoriteText = (await page.getByTestId('message-text').textContent())?.trim();
+    expect(favoriteText).toBeTruthy();
 
-      const fresh = await signInFresh(second, email);
+    const fresh = await signInFresh(second, email);
 
-      await recurseUntil(
-        () => favoritedTexts(fresh),
-        (v) => {
-          expect(v).toContain(favoriteText);
-        }
-      );
-    } finally {
-      // A close that rejects must not skip the clear below.
-      await second.close().catch(() => {});
-      await page.close().catch(() => {});
-      await clearTable(supabaseAdmin, 'message_favorites', userId, { soft: true });
-    }
+    await recurseUntil(
+      () => favoritedTexts(fresh),
+      (v) => {
+        expect(v).toContain(favoriteText);
+      }
+    );
   });
 
   test('[P1] a custom message made in one context appears in a fresh one', async ({
@@ -144,41 +153,38 @@ test.describe('Account data follows the account, not the browser', () => {
     browser,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }, testInfo) => {
     const { email, userId } = await resolveWorkerAccount(supabaseAdmin);
-    await clearTable(supabaseAdmin, 'custom_messages', userId, { soft: false });
+    await clearTable(supabaseAdmin, 'custom_messages', userId);
     const customText = `Cross-device custom message ${testInfo.workerIndex}-${Date.now()}`;
     const second = await newBareContext(browser, testInfo);
+    deferTeardown(cleanup, page, second, () =>
+      clearTable(supabaseAdmin, 'custom_messages', userId)
+    );
 
-    try {
-      // ---- First context: create through the UI ----
-      await page.goto('/admin');
-      await page.getByTestId('admin-create-button').click();
-      await page.getByTestId('admin-create-form-text').fill(customText);
-      const customSaved = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });
-      await page.getByTestId('admin-create-form-save').click();
-      expect((await customSaved).status).toBe(201);
-      await expect(page.getByTestId('message-row-text').filter({ hasText: customText })).toBeVisible();
+    // ---- First context: create through the UI ----
+    await page.goto('/admin');
+    await page.getByTestId('admin-create-button').click();
+    await page.getByTestId('admin-create-form-text').fill(customText);
+    const customSaved = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });
+    await page.getByTestId('admin-create-form-save').click();
+    expect((await customSaved).status).toBe(201);
+    await expect(page.getByTestId('message-row-text').filter({ hasText: customText })).toBeVisible();
 
-      const fresh = await signInFresh(second, email);
+    const fresh = await signInFresh(second, email);
 
-      const customRead = observeOn({
-        page: fresh,
-        method: 'GET',
-        url: CUSTOM_MESSAGES_READ,
-        timeout: SECOND_CONTEXT_READ_TIMEOUT,
-      });
-      await fresh.goto('/admin');
-      const customRows = await customRead;
-      expect(customRows.status).toBe(200);
-      expect(customRows.responseJson).toEqual([expect.objectContaining({ text: customText })]);
-      await expect(fresh.getByTestId('message-row-text').filter({ hasText: customText })).toBeVisible();
-    } finally {
-      // A close that rejects must not skip the clear below.
-      await second.close().catch(() => {});
-      await page.close().catch(() => {});
-      await clearTable(supabaseAdmin, 'custom_messages', userId, { soft: true });
-    }
+    const customRead = observeOn({
+      page: fresh,
+      method: 'GET',
+      url: CUSTOM_MESSAGES_READ,
+      timeout: SECOND_CONTEXT_READ_TIMEOUT,
+    });
+    await fresh.goto('/admin');
+    const customRows = await customRead;
+    expect(customRows.status).toBe(200);
+    expect(customRows.responseJson).toEqual([expect.objectContaining({ text: customText })]);
+    await expect(fresh.getByTestId('message-row-text').filter({ hasText: customText })).toBeVisible();
   });
 
   test('[P1] an anniversary made in one context appears in a fresh one', async ({
@@ -186,47 +192,44 @@ test.describe('Account data follows the account, not the browser', () => {
     browser,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }, testInfo) => {
     const { email, userId } = await resolveWorkerAccount(supabaseAdmin);
-    await clearTable(supabaseAdmin, 'anniversaries', userId, { soft: false });
+    await clearTable(supabaseAdmin, 'anniversaries', userId);
     const anniversaryLabel = `Cross-device anniversary ${testInfo.workerIndex}-${Date.now()}`;
     const second = await newBareContext(browser, testInfo);
+    deferTeardown(cleanup, page, second, () =>
+      clearTable(supabaseAdmin, 'anniversaries', userId)
+    );
 
-    try {
-      // ---- First context: add through the UI ----
-      await page.goto('/settings');
-      await page.getByRole('button', { name: 'Add Anniversary' }).click();
-      const anniversaryForm = page.getByRole('dialog', { name: 'Add Anniversary' });
-      await anniversaryForm.getByLabel('Label').fill(anniversaryLabel);
-      await anniversaryForm.getByLabel('Date').fill('2024-02-14');
-      const anniversarySaved = interceptNetworkCall({
-        method: 'POST',
-        url: '**/rest/v1/anniversaries*',
-      });
-      await page.getByRole('button', { name: 'Add', exact: true }).click();
-      expect((await anniversarySaved).status).toBe(201);
-      await expect(page.getByRole('heading', { level: 4, name: anniversaryLabel })).toBeVisible();
+    // ---- First context: add through the UI ----
+    await page.goto('/settings');
+    await page.getByRole('button', { name: 'Add Anniversary' }).click();
+    const anniversaryForm = page.getByRole('dialog', { name: 'Add Anniversary' });
+    await anniversaryForm.getByLabel('Label').fill(anniversaryLabel);
+    await anniversaryForm.getByLabel('Date').fill('2024-02-14');
+    const anniversarySaved = interceptNetworkCall({
+      method: 'POST',
+      url: '**/rest/v1/anniversaries*',
+    });
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    expect((await anniversarySaved).status).toBe(201);
+    await expect(page.getByRole('heading', { level: 4, name: anniversaryLabel })).toBeVisible();
 
-      const fresh = await signInFresh(second, email);
+    const fresh = await signInFresh(second, email);
 
-      const anniversaryRead = observeOn({
-        page: fresh,
-        method: 'GET',
-        url: ANNIVERSARIES_READ,
-        timeout: SECOND_CONTEXT_READ_TIMEOUT,
-      });
-      await fresh.goto('/settings');
-      const anniversaryRows = await anniversaryRead;
-      expect(anniversaryRows.status).toBe(200);
-      expect(anniversaryRows.responseJson).toEqual([
-        expect.objectContaining({ label: anniversaryLabel }),
-      ]);
-      await expect(fresh.getByRole('heading', { level: 4, name: anniversaryLabel })).toBeVisible();
-    } finally {
-      // A close that rejects must not skip the clear below.
-      await second.close().catch(() => {});
-      await page.close().catch(() => {});
-      await clearTable(supabaseAdmin, 'anniversaries', userId, { soft: true });
-    }
+    const anniversaryRead = observeOn({
+      page: fresh,
+      method: 'GET',
+      url: ANNIVERSARIES_READ,
+      timeout: SECOND_CONTEXT_READ_TIMEOUT,
+    });
+    await fresh.goto('/settings');
+    const anniversaryRows = await anniversaryRead;
+    expect(anniversaryRows.status).toBe(200);
+    expect(anniversaryRows.responseJson).toEqual([
+      expect.objectContaining({ label: anniversaryLabel }),
+    ]);
+    await expect(fresh.getByRole('heading', { level: 4, name: anniversaryLabel })).toBeVisible();
   });
 });

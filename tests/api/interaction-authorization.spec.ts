@@ -30,10 +30,9 @@ import {
 import type { SupabaseInteractionRecord } from '../../src/api/interactionService';
 import type { TypedSupabaseClient } from '../support/factories';
 import { createInteractionInsert } from '../support/factories/interaction-record-ownership';
-import { createOutsiderClient } from '../support/helpers/rls-security';
+import { createOutsiderClient, deleteOutsider } from '../support/helpers/rls-security';
 import { resolveOwnPair } from '../support/helpers/events';
 import { test, expect } from '../support/merged-fixtures';
-import { throwCollected } from '../support/helpers/collected-failures';
 
 /** PostgREST maps SQLSTATE 42501 — RLS denial and privilege denial alike — to 403. */
 const DENIED_HTTP_STATUS = 403;
@@ -101,11 +100,7 @@ async function seedPokes(
   }
 }
 
-/**
- * The throwaway account's bearer token. Call it inside the test's try: a failed
- * session check must still reach the outsider's deletion rather than leak the
- * account.
- */
+/** The throwaway account's bearer token. */
 async function outsiderToken(outsider: Outsider): Promise<string> {
   const { data: outsiderSession } = await outsider.client.auth.getSession();
   const token = outsiderSession.session?.access_token;
@@ -113,31 +108,14 @@ async function outsiderToken(outsider: Outsider): Promise<string> {
   return token!;
 }
 
-/** Cleanup: delete the rows a test seeded, recording a failure instead of throwing. */
-async function deleteRows(apiRequest: ApiRequest, ids: string[], failures: unknown[]) {
-  try {
-    const { status } = await apiRequest({
-      method: 'DELETE',
-      path: `/rest/v1/interactions?id=in.(${ids.join(',')})`,
-      headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
-    });
-    expect(status).toBe(204);
-  } catch (error) {
-    failures.push(error);
-  }
-}
-
-/**
- * Cleanup: delete the throwaway account. Its own try, separate from the row
- * DELETE, so a failed row cleanup cannot skip the account deletion.
- */
-async function deleteOutsider(outsider: Outsider, failures: unknown[]) {
-  try {
-    const { error: cleanupError } = await outsider.cleanup();
-    expect(cleanupError).toBeNull();
-  } catch (error) {
-    failures.push(error);
-  }
+/** Cleanup: delete the rows a test seeds. Deferred before seeding, by id. */
+async function deleteRows(apiRequest: ApiRequest, ids: string[]) {
+  const { status } = await apiRequest({
+    method: 'DELETE',
+    path: `/rest/v1/interactions?id=in.(${ids.join(',')})`,
+    headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
+  });
+  expect(status).toBe(204);
 }
 
 test.describe('Interaction authorization boundary', () => {
@@ -145,13 +123,17 @@ test.describe('Interaction authorization boundary', () => {
     apiRequest,
     authToken,
     supabaseAdmin,
+    cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const outsider = await createOutsiderClient(supabaseAdmin, 'interaction-insert-outsider');
+    cleanup.defer('delete the outsider account', () => deleteOutsider(outsider));
 
     const acceptedIds = [randomUUID(), randomUUID()];
     const refusedIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
-    const failures: unknown[] = [];
+    cleanup.defer('delete the interaction rows', () =>
+      deleteRows(apiRequest, [...acceptedIds, ...refusedIds])
+    );
 
     const send = (token: string, body: Record<string, unknown>) =>
       apiRequest<ErrorEnvelope>({
@@ -162,84 +144,56 @@ test.describe('Interaction authorization boundary', () => {
         retryConfig: { maxRetries: 0 },
       });
 
-    try {
-      // Inside the try: a failed session check must still reach the outsider's
-      // deletion below, rather than leak the throwaway account.
-      const { data: outsiderSession } = await outsider.client.auth.getSession();
-      const outsiderToken = outsiderSession.session?.access_token;
-      expect(outsiderToken, 'the outsider account must hold a session').toBeTruthy();
+    const { data: outsiderSession } = await outsider.client.auth.getSession();
+    const outsiderToken = outsiderSession.session?.access_token;
+    expect(outsiderToken, 'the outsider account must hold a session').toBeTruthy();
 
-      await log.step('A linked partner can send both interaction types');
-      for (const [index, type] of (['poke', 'kiss'] as const).entries()) {
-        const { status } = await send(
-          authToken,
-          createInteractionInsert({
-            id: acceptedIds[index],
-            type,
-            from_user_id: userId,
-            to_user_id: partnerId,
-          })
-        );
-        expect(status, `${type} to the current partner`).toBe(201);
-      }
-
-      await log.step('Self, stranger and spoofed-sender inserts are all refused');
-      const refusals = [
-        { label: 'self-targeting', id: refusedIds[0], token: authToken, body: {
-          from_user_id: userId, to_user_id: userId,
-        } },
-        { label: 'targeting a stranger', id: refusedIds[1], token: authToken, body: {
-          from_user_id: userId, to_user_id: outsider.userId,
-        } },
-        { label: 'spoofing the sender', id: refusedIds[2], token: authToken, body: {
-          from_user_id: partnerId, to_user_id: userId,
-        } },
-        { label: 'an unlinked outsider sending', id: refusedIds[3], token: outsiderToken!, body: {
-          from_user_id: outsider.userId, to_user_id: userId,
-        } },
-      ];
-
-      for (const refusal of refusals) {
-        const { status, body } = await send(
-          refusal.token,
-          createInteractionInsert({ id: refusal.id, type: 'poke', ...refusal.body })
-        );
-        expect(status, refusal.label).toBe(DENIED_HTTP_STATUS);
-        expect(body.code, refusal.label).toBe(DENIED_CODE);
-      }
-
-      await log.step('Only the two legitimate rows reached the table');
-      const { data: persisted, error } = await supabaseAdmin
-        .from('interactions')
-        .select('id')
-        .in('id', [...acceptedIds, ...refusedIds]);
-      expect(error).toBeNull();
-      expect((persisted ?? []).map((row) => row.id).sort()).toEqual([...acceptedIds].sort());
-    } catch (error) {
-      failures.push(error);
+    await log.step('A linked partner can send both interaction types');
+    for (const [index, type] of (['poke', 'kiss'] as const).entries()) {
+      const { status } = await send(
+        authToken,
+        createInteractionInsert({
+          id: acceptedIds[index],
+          type,
+          from_user_id: userId,
+          to_user_id: partnerId,
+        })
+      );
+      expect(status, `${type} to the current partner`).toBe(201);
     }
 
-    try {
-      const { status } = await apiRequest({
-        method: 'DELETE',
-        path: `/rest/v1/interactions?id=in.(${[...acceptedIds, ...refusedIds].join(',')})`,
-        headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
-      });
-      expect(status).toBe(204);
-    } catch (error) {
-      failures.push(error);
+    await log.step('Self, stranger and spoofed-sender inserts are all refused');
+    const refusals = [
+      { label: 'self-targeting', id: refusedIds[0], token: authToken, body: {
+        from_user_id: userId, to_user_id: userId,
+      } },
+      { label: 'targeting a stranger', id: refusedIds[1], token: authToken, body: {
+        from_user_id: userId, to_user_id: outsider.userId,
+      } },
+      { label: 'spoofing the sender', id: refusedIds[2], token: authToken, body: {
+        from_user_id: partnerId, to_user_id: userId,
+      } },
+      { label: 'an unlinked outsider sending', id: refusedIds[3], token: outsiderToken!, body: {
+        from_user_id: outsider.userId, to_user_id: userId,
+      } },
+    ];
+
+    for (const refusal of refusals) {
+      const { status, body } = await send(
+        refusal.token,
+        createInteractionInsert({ id: refusal.id, type: 'poke', ...refusal.body })
+      );
+      expect(status, refusal.label).toBe(DENIED_HTTP_STATUS);
+      expect(body.code, refusal.label).toBe(DENIED_CODE);
     }
 
-    // Separate from the row DELETE, so a failed row cleanup cannot skip the
-    // account deletion.
-    try {
-      const { error: cleanupError } = await outsider.cleanup();
-      expect(cleanupError).toBeNull();
-    } catch (error) {
-      failures.push(error);
-    }
-
-    throwCollected(failures, 'Interaction insert-boundary assertion or cleanup failed');
+    await log.step('Only the two legitimate rows reached the table');
+    const { data: persisted, error } = await supabaseAdmin
+      .from('interactions')
+      .select('id')
+      .in('id', [...acceptedIds, ...refusedIds]);
+    expect(error).toBeNull();
+    expect((persisted ?? []).map((row) => row.id).sort()).toEqual([...acceptedIds].sort());
   });
 
   test('[P0] a received interaction is viewed-only for its recipient', async ({
@@ -247,10 +201,12 @@ test.describe('Interaction authorization boundary', () => {
     authToken,
     partnerAuthToken,
     supabaseAdmin,
+    cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     // Only its user id is used here: the forgeries below write it into the row.
     const outsider = await createOutsiderClient(supabaseAdmin, 'interaction-update-outsider');
+    cleanup.defer('delete the outsider account', () => deleteOutsider(outsider));
 
     // Two legitimate rows: one to mark viewed, one kept unviewed so the combined
     // patch below can be shown to change nothing at all.
@@ -259,190 +215,162 @@ test.describe('Interaction authorization boundary', () => {
     // Bound, not inlined: if column immutability ever regresses, this id names a
     // real row and the cleanup below has to be able to reach it.
     const forgedRowId = randomUUID();
-    const failures: unknown[] = [];
+    cleanup.defer('delete the interaction rows', () =>
+      deleteRows(apiRequest, [viewedRowId, untouchedRowId, forgedRowId])
+    );
 
-    try {
-      await log.step('The linked sender creates two interactions');
-      await seedPokes(apiRequest, authToken, userId, partnerId, [viewedRowId, untouchedRowId]);
+    await log.step('The linked sender creates two interactions');
+    await seedPokes(apiRequest, authToken, userId, partnerId, [viewedRowId, untouchedRowId]);
 
-      await log.step('The recipient can mark one viewed, and it persists');
-      const { status: viewedStatus } = await patch(apiRequest, partnerAuthToken, viewedRowId, {
-        viewed: true,
-      });
-      expect(viewedStatus).toBe(204);
-      expect((await readRow(supabaseAdmin, viewedRowId)).viewed).toBe(true);
+    await log.step('The recipient can mark one viewed, and it persists');
+    const { status: viewedStatus } = await patch(apiRequest, partnerAuthToken, viewedRowId, {
+      viewed: true,
+    });
+    expect(viewedStatus).toBe(204);
+    expect((await readRow(supabaseAdmin, viewedRowId)).viewed).toBe(true);
 
-      await log.step('Every other column is refused, and nothing moves');
-      const before = await readRow(supabaseAdmin, viewedRowId);
-      const forgeries = [
-        { label: 'type', body: { type: 'kiss' } },
-        { label: 'sender', body: { from_user_id: outsider.userId } },
-        { label: 'recipient', body: { to_user_id: outsider.userId } },
-        { label: 'id', body: { id: forgedRowId } },
-        { label: 'creation metadata', body: { created_at: '2020-01-01T00:00:00.000Z' } },
-      ];
+    await log.step('Every other column is refused, and nothing moves');
+    const before = await readRow(supabaseAdmin, viewedRowId);
+    const forgeries = [
+      { label: 'type', body: { type: 'kiss' } },
+      { label: 'sender', body: { from_user_id: outsider.userId } },
+      { label: 'recipient', body: { to_user_id: outsider.userId } },
+      { label: 'id', body: { id: forgedRowId } },
+      { label: 'creation metadata', body: { created_at: '2020-01-01T00:00:00.000Z' } },
+    ];
 
-      for (const forgery of forgeries) {
-        const { status, body } = await patch(
-          apiRequest,
-          partnerAuthToken,
-          viewedRowId,
-          forgery.body
-        );
-        expect(status, forgery.label).toBe(DENIED_HTTP_STATUS);
-        expect(body.code, forgery.label).toBe(DENIED_CODE);
-        expect(await readRow(supabaseAdmin, viewedRowId), forgery.label).toEqual(before);
-      }
-
-      await log.step('A combined viewed-plus-forgery patch is refused whole');
-      const { status: combinedStatus, body: combinedBody } = await patch(
+    for (const forgery of forgeries) {
+      const { status, body } = await patch(
         apiRequest,
         partnerAuthToken,
-        untouchedRowId,
-        { viewed: true, type: 'kiss' }
+        viewedRowId,
+        forgery.body
       );
-      expect(combinedStatus).toBe(DENIED_HTTP_STATUS);
-      expect(combinedBody.code).toBe(DENIED_CODE);
-      // The discriminator: `viewed` is the one column the recipient may write,
-      // so a patch applied column-by-column would have flipped it.
-      const afterCombined = await readRow(supabaseAdmin, untouchedRowId);
-      expect(afterCombined.viewed).toBe(false);
-      expect(afterCombined.type).toBe('poke');
-
-      await log.step('The recipient cannot delete a received interaction either');
-      const { status: deleteStatus } = await apiRequest<ErrorEnvelope>({
-        method: 'DELETE',
-        path: `/rest/v1/interactions?id=eq.${untouchedRowId}`,
-        headers: { Authorization: `Bearer ${partnerAuthToken}` },
-        retryConfig: { maxRetries: 0 },
-      });
-      expect(deleteStatus).toBe(DENIED_HTTP_STATUS);
-      expect((await readRow(supabaseAdmin, untouchedRowId)).id).toBe(untouchedRowId);
-    } catch (error) {
-      failures.push(error);
+      expect(status, forgery.label).toBe(DENIED_HTTP_STATUS);
+      expect(body.code, forgery.label).toBe(DENIED_CODE);
+      expect(await readRow(supabaseAdmin, viewedRowId), forgery.label).toEqual(before);
     }
 
-    await deleteRows(apiRequest, [viewedRowId, untouchedRowId, forgedRowId], failures);
-    await deleteOutsider(outsider, failures);
+    await log.step('A combined viewed-plus-forgery patch is refused whole');
+    const { status: combinedStatus, body: combinedBody } = await patch(
+      apiRequest,
+      partnerAuthToken,
+      untouchedRowId,
+      { viewed: true, type: 'kiss' }
+    );
+    expect(combinedStatus).toBe(DENIED_HTTP_STATUS);
+    expect(combinedBody.code).toBe(DENIED_CODE);
+    // The discriminator: `viewed` is the one column the recipient may write,
+    // so a patch applied column-by-column would have flipped it.
+    const afterCombined = await readRow(supabaseAdmin, untouchedRowId);
+    expect(afterCombined.viewed).toBe(false);
+    expect(afterCombined.type).toBe('poke');
 
-    throwCollected(failures, 'Interaction immutability assertion or cleanup failed');
+    await log.step('The recipient cannot delete a received interaction either');
+    const { status: deleteStatus } = await apiRequest<ErrorEnvelope>({
+      method: 'DELETE',
+      path: `/rest/v1/interactions?id=eq.${untouchedRowId}`,
+      headers: { Authorization: `Bearer ${partnerAuthToken}` },
+      retryConfig: { maxRetries: 0 },
+    });
+    expect(deleteStatus).toBe(DENIED_HTTP_STATUS);
+    expect((await readRow(supabaseAdmin, untouchedRowId)).id).toBe(untouchedRowId);
   });
 
   test('[P0] neither the sender nor an outsider can mark a received interaction viewed', async ({
     apiRequest,
     authToken,
     supabaseAdmin,
+    cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const outsider = await createOutsiderClient(supabaseAdmin, 'interaction-viewed-outsider');
+    cleanup.defer('delete the outsider account', () => deleteOutsider(outsider));
 
     const rowId = randomUUID();
-    const failures: unknown[] = [];
+    cleanup.defer('delete the interaction row', () => deleteRows(apiRequest, [rowId]));
 
-    try {
-      const token = await outsiderToken(outsider);
+    const token = await outsiderToken(outsider);
 
-      await log.step('The linked sender creates an interaction');
-      await seedPokes(apiRequest, authToken, userId, partnerId, [rowId]);
+    await log.step('The linked sender creates an interaction');
+    await seedPokes(apiRequest, authToken, userId, partnerId, [rowId]);
 
-      await log.step('Neither the sender nor an outsider can mark it viewed');
-      // No error: RLS hides the row from both, so the UPDATE matches nothing.
-      for (const [label, callerToken] of [
-        ['the sender', authToken],
-        ['an outsider', token],
-      ] as const) {
-        const { status } = await patch(apiRequest, callerToken, rowId, { viewed: true });
-        expect(status, label).toBe(204);
-        expect((await readRow(supabaseAdmin, rowId)).viewed, label).toBe(false);
-      }
-    } catch (error) {
-      failures.push(error);
+    await log.step('Neither the sender nor an outsider can mark it viewed');
+    // No error: RLS hides the row from both, so the UPDATE matches nothing.
+    for (const [label, callerToken] of [
+      ['the sender', authToken],
+      ['an outsider', token],
+    ] as const) {
+      const { status } = await patch(apiRequest, callerToken, rowId, { viewed: true });
+      expect(status, label).toBe(204);
+      expect((await readRow(supabaseAdmin, rowId)).viewed, label).toBe(false);
     }
-
-    await deleteRows(apiRequest, [rowId], failures);
-    await deleteOutsider(outsider, failures);
-
-    throwCollected(failures, 'Interaction viewed-by-others assertion or cleanup failed');
   });
 
   test('[P0] the anon key is refused on GET, POST and PATCH of interactions', async ({
     apiRequest,
     authToken,
     supabaseAdmin,
+    cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
 
     const rowId = randomUUID();
-    const failures: unknown[] = [];
+    cleanup.defer('delete the interaction row', () => deleteRows(apiRequest, [rowId]));
 
-    try {
-      await log.step('The linked sender creates an interaction');
-      await seedPokes(apiRequest, authToken, userId, partnerId, [rowId]);
+    await log.step('The linked sender creates an interaction');
+    await seedPokes(apiRequest, authToken, userId, partnerId, [rowId]);
 
-      await log.step('The anon key reaches the table not at all');
-      // pgTAP proves anon holds no privilege; this proves PostgREST's role
-      // mapping still puts an unauthenticated caller in that role.
-      for (const [method, body] of [
-        ['GET', undefined],
-        [
-          'POST',
-          createInteractionInsert({ type: 'poke', from_user_id: userId, to_user_id: partnerId }),
-        ],
-        ['PATCH', { viewed: true }],
-      ] as const) {
-        const { status, body: denial } = await apiRequest<ErrorEnvelope>({
-          method,
-          path:
-            method === 'POST' ? '/rest/v1/interactions' : `/rest/v1/interactions?id=eq.${rowId}`,
-          // No Authorization header: the apikey alone speaks as anon.
-          body,
-          retryConfig: { maxRetries: 0 },
-        });
-        expect(status, `anon ${method}`).toBe(ANON_DENIED_HTTP_STATUS);
-        expect(denial.code, `anon ${method}`).toBe(DENIED_CODE);
-      }
-      expect((await readRow(supabaseAdmin, rowId)).viewed).toBe(false);
-    } catch (error) {
-      failures.push(error);
+    await log.step('The anon key reaches the table not at all');
+    // pgTAP proves anon holds no privilege; this proves PostgREST's role
+    // mapping still puts an unauthenticated caller in that role.
+    for (const [method, body] of [
+      ['GET', undefined],
+      [
+        'POST',
+        createInteractionInsert({ type: 'poke', from_user_id: userId, to_user_id: partnerId }),
+      ],
+      ['PATCH', { viewed: true }],
+    ] as const) {
+      const { status, body: denial } = await apiRequest<ErrorEnvelope>({
+        method,
+        path:
+          method === 'POST' ? '/rest/v1/interactions' : `/rest/v1/interactions?id=eq.${rowId}`,
+        // No Authorization header: the apikey alone speaks as anon.
+        body,
+        retryConfig: { maxRetries: 0 },
+      });
+      expect(status, `anon ${method}`).toBe(ANON_DENIED_HTTP_STATUS);
+      expect(denial.code, `anon ${method}`).toBe(DENIED_CODE);
     }
-
-    await deleteRows(apiRequest, [rowId], failures);
-
-    throwCollected(failures, 'Interaction anon-refusal assertion or cleanup failed');
+    expect((await readRow(supabaseAdmin, rowId)).viewed).toBe(false);
   });
 
   test('[P0] an outsider reads none of the couple\'s interactions', async ({
     apiRequest,
     authToken,
     supabaseAdmin,
+    cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const outsider = await createOutsiderClient(supabaseAdmin, 'interaction-read-outsider');
+    cleanup.defer('delete the outsider account', () => deleteOutsider(outsider));
 
     const rowIds = [randomUUID(), randomUUID()];
-    const failures: unknown[] = [];
+    cleanup.defer('delete the interaction rows', () => deleteRows(apiRequest, rowIds));
 
-    try {
-      const token = await outsiderToken(outsider);
+    const token = await outsiderToken(outsider);
 
-      await log.step('The linked sender creates two interactions');
-      await seedPokes(apiRequest, authToken, userId, partnerId, rowIds);
+    await log.step('The linked sender creates two interactions');
+    await seedPokes(apiRequest, authToken, userId, partnerId, rowIds);
 
-      await log.step('An outsider reads none of the couple traffic');
-      const { status: readStatus, body: outsiderRows } = await apiRequest<unknown[]>({
-        method: 'GET',
-        path: `/rest/v1/interactions?id=in.(${rowIds.join(',')})&select=*`,
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      expect(readStatus).toBe(200);
-      expect(outsiderRows).toEqual([]);
-    } catch (error) {
-      failures.push(error);
-    }
-
-    await deleteRows(apiRequest, rowIds, failures);
-    await deleteOutsider(outsider, failures);
-
-    throwCollected(failures, 'Interaction outsider-read assertion or cleanup failed');
+    await log.step('An outsider reads none of the couple traffic');
+    const { status: readStatus, body: outsiderRows } = await apiRequest<unknown[]>({
+      method: 'GET',
+      path: `/rest/v1/interactions?id=in.(${rowIds.join(',')})&select=*`,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(readStatus).toBe(200);
+    expect(outsiderRows).toEqual([]);
   });
 });

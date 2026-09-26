@@ -37,6 +37,7 @@ test.describe('Interaction record contract', () => {
     authToken,
     partnerAuthToken,
     supabaseAdmin,
+    cleanup,
   }) => {
     // Given this worker's linked sender and receiver.
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
@@ -53,59 +54,47 @@ test.describe('Interaction record contract', () => {
       to_user_id: record.to_user_id,
       viewed: record.viewed,
     };
-    const failures: unknown[] = [];
-
-    try {
-      // When the sender creates a partner interaction through PostgREST.
-      await log.step('Insert a partner interaction as the authenticated sender');
-      // Standard JSON keeps the utility's response parser on its supported media type;
-      // PostgREST represents a single inserted row as a one-element array here.
-      const { status: insertStatus, body: inserted } = await apiRequest<SupabaseInteractionRecord[]>({
-        method: 'POST',
-        path: '/rest/v1/interactions',
-        headers: {
-          Authorization: 'Bearer ' + authToken,
-          Prefer: 'return=representation',
-        },
-        // Omit created_at to verify the server supplies the timestamp.
-        body: insert,
-        // A failed non-idempotent INSERT must not be retried automatically.
-        retryConfig: { maxRetries: 0 },
-      }).validateSchema<z.infer<typeof IncomingRecordsSchema>>(IncomingRecordsSchema);
-
-      expect(insertStatus).toBe(201);
-      expect(inserted).toHaveLength(1);
-      expect(inserted[0]).toMatchObject(insert);
-
-      // Then the authenticated receiver reads the exact persisted wire record.
-      await log.step('Read that exact record using the receiving partner token');
-      const { status: readStatus, body: received } = await apiRequest<SupabaseInteractionRecord[]>({
-        method: 'GET',
-        path: '/rest/v1/interactions?id=eq.' + record.id + '&select=*',
-        headers: { Authorization: 'Bearer ' + partnerAuthToken },
-      }).validateSchema<z.infer<typeof IncomingRecordsSchema>>(IncomingRecordsSchema);
-
-      expect(readStatus).toBe(200);
-      expect(received).toEqual(inserted);
-    } catch (error) {
-      failures.push(error);
-    }
-
-    // Register the UUID before INSERT and always clean it, even if the request
+    // Deferred before the INSERT: the row is deleted even if the request
     // committed but its response or a contract assertion failed.
-    try {
-      const { status: cleanupStatus } = await apiRequest({
+    cleanup.defer('delete the interaction row', async () => {
+      const { status } = await apiRequest({
         method: 'DELETE',
         path: '/rest/v1/interactions?id=eq.' + record.id,
         headers: { Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY },
       });
-      expect(cleanupStatus).toBe(204);
-    } catch (error) {
-      failures.push(error);
-    }
+      expect(status).toBe(204);
+    });
 
-    if (failures.length > 0) {
-      throw new AggregateError(failures, 'Interaction contract assertion or exact-row cleanup failed');
-    }
+    // When the sender creates a partner interaction through PostgREST.
+    await log.step('Insert a partner interaction as the authenticated sender');
+    // Standard JSON keeps the utility's response parser on its supported media type;
+    // PostgREST represents a single inserted row as a one-element array here.
+    const { status: insertStatus, body: inserted } = await apiRequest<SupabaseInteractionRecord[]>({
+      method: 'POST',
+      path: '/rest/v1/interactions',
+      headers: {
+        Authorization: 'Bearer ' + authToken,
+        Prefer: 'return=representation',
+      },
+      // Omit created_at to verify the server supplies the timestamp.
+      body: insert,
+      // A failed non-idempotent INSERT must not be retried automatically.
+      retryConfig: { maxRetries: 0 },
+    }).validateSchema<z.infer<typeof IncomingRecordsSchema>>(IncomingRecordsSchema);
+
+    expect(insertStatus).toBe(201);
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject(insert);
+
+    // Then the authenticated receiver reads the exact persisted wire record.
+    await log.step('Read that exact record using the receiving partner token');
+    const { status: readStatus, body: received } = await apiRequest<SupabaseInteractionRecord[]>({
+      method: 'GET',
+      path: '/rest/v1/interactions?id=eq.' + record.id + '&select=*',
+      headers: { Authorization: 'Bearer ' + partnerAuthToken },
+    }).validateSchema<z.infer<typeof IncomingRecordsSchema>>(IncomingRecordsSchema);
+
+    expect(readStatus).toBe(200);
+    expect(received).toEqual(inserted);
   });
 });
