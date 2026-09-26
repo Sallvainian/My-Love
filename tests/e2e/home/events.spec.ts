@@ -341,8 +341,8 @@ test.describe('Home dashboard reads events from the store', () => {
     await expect(card.getByText('Today Meetup E2E')).toBeVisible();
     await expect(card.getByText('Today!')).toBeVisible();
 
-    // No description paragraph is rendered next to the label for a null value.
-    await expect(card.locator('h3 ~ p')).toHaveCount(0);
+    // No description line is rendered for a null value.
+    await expect(card.getByTestId('countdown-description')).toHaveCount(0);
 
     await expect(page.getByTestId('events-empty-placeholder')).toHaveCount(0);
   });

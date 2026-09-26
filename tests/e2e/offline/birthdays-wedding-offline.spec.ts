@@ -168,18 +168,18 @@ test.describe('Birthdays and wedding date from the local copy', () => {
       await expect(page.getByTestId('birthday-countdown-self').locator('h3')).toHaveText(
         /turns? 31$/
       );
-      await expect(page.getByTestId('birthday-countdown-self').locator('h3 + div')).toHaveText(
-        '4 days'
-      );
+      await expect(
+        page.getByTestId('birthday-countdown-self').getByTestId('countdown-value')
+      ).toHaveText('4 days');
       await expect(page.getByTestId('birthday-countdown-partner').locator('h3')).toContainText(
         'turns 30'
       );
-      await expect(page.getByTestId('birthday-countdown-partner').locator('h3 + div')).toHaveText(
-        '9 days'
-      );
-      await expect(page.getByTestId('event-countdown-wedding').locator('h3 + div')).toHaveText(
-        '39 days'
-      );
+      await expect(
+        page.getByTestId('birthday-countdown-partner').getByTestId('countdown-value')
+      ).toHaveText('9 days');
+      await expect(
+        page.getByTestId('event-countdown-wedding').getByTestId('countdown-value')
+      ).toHaveText('39 days');
     } finally {
       await page.context().setOffline(false);
       await page.unroute('**/rest/v1/**');
