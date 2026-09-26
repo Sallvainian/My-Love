@@ -55,38 +55,50 @@ export interface PartnerRequest {
 
 class PartnerService {
   /**
-   * Get current user's partner information.
+   * Get the partner of `userId`, the account the caller captured before asking.
    *
    * Three answers, never collapsed: `linked` with the partner, `unlinked` when
    * the server says there is no `partner_id`, and `error` when the read itself
    * failed. Mirrors `PartnerLookup` in supabaseClient.ts — a failed read is not
    * "no partner", and treating it as one showed "Connect with Your Partner" to
    * a linked user whenever the network hiccupped.
+   *
+   * The session is re-read after every await. A sign-out landing mid-lookup
+   * sends the remaining reads without a session, RLS hides the rows, and an
+   * empty answer to that request says nothing about whether `userId` is linked
+   * — so any read answered while the session is not `userId`'s is an `error`.
    */
-  async getPartner(): Promise<PartnerResult> {
+  async getPartner(userId: string): Promise<PartnerResult> {
+    // Why the session is not `userId`'s, or null while it still is.
+    const sessionMismatch = async (): Promise<string | null> => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) return error.message;
+      const sessionUserId = data.session?.user?.id ?? null;
+      if (sessionUserId === userId) return null;
+      return sessionUserId ? 'Signed-in account changed' : 'Not authenticated';
+    };
+
     try {
-      const { data: currentUser, error: userError } = await supabase.auth.getUser();
-      if (userError || !currentUser?.user) {
-        // Not evidence of being unlinked: getUser goes to the network and fails
-        // offline, and a signed-out answer must never be saved as "unlinked".
-        return { status: 'error', reason: userError?.message ?? 'Not authenticated' };
-      }
+      const before = await sessionMismatch();
+      if (before) return { status: 'error', reason: before };
 
       // Get user record with partner_id
       const { data: userRecord, error } = await supabase
         .from('users')
         .select('partner_id, updated_at')
-        .eq('id', currentUser.user.id)
-        .single();
+        .eq('id', userId)
+        .maybeSingle();
+
+      const afterUser = await sessionMismatch();
+      if (afterUser) return { status: 'error', reason: afterUser };
 
       if (error) {
-        // PGRST116 = no row yet: the profile exists without a partner, same as
-        // lookupPartnerId. Anything else is a failed read.
-        if (error.code === 'PGRST116') return { status: 'unlinked' };
         console.error('[PartnerService] Error fetching user record:', error);
         return { status: 'error', reason: error.message };
       }
 
+      // No row while the session is still this account's: the profile exists
+      // without a partner, the same answer lookupPartnerId gives.
       if (!userRecord?.partner_id) {
         return { status: 'unlinked' };
       }
@@ -96,7 +108,10 @@ class PartnerService {
         .from('users')
         .select('id, email, display_name, birthday')
         .eq('id', userRecord.partner_id)
-        .single();
+        .maybeSingle();
+
+      const afterPartner = await sessionMismatch();
+      if (afterPartner) return { status: 'error', reason: afterPartner };
 
       if (partnerError || !partnerRecord) {
         console.error('[PartnerService] Error fetching partner record:', partnerError);
@@ -393,8 +408,8 @@ class PartnerService {
    * @returns true if linked, false if the server says unlinked
    * @throws Error when the read failed — a failed read is not "no partner"
    */
-  async hasPartner(): Promise<boolean> {
-    const result = await this.getPartner();
+  async hasPartner(userId: string): Promise<boolean> {
+    const result = await this.getPartner(userId);
     if (result.status === 'error') {
       throw new Error(`Could not determine partner: ${result.reason}`);
     }

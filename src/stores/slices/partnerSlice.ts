@@ -170,7 +170,7 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       // 3. The server answer replaces the copy — only when it is an answer.
       let result: Awaited<ReturnType<typeof partnerService.getPartner>>;
       try {
-        result = await partnerService.getPartner();
+        result = await partnerService.getPartner(userId);
       } catch (error) {
         result = { status: 'error', reason: error instanceof Error ? error.message : String(error) };
       }
