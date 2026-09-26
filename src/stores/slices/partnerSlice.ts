@@ -18,6 +18,7 @@
  *   once, online or offline, then refreshed from Supabase.
  */
 
+import { moodSyncService } from '../../api/moodSyncService';
 import type { PartnerInfo, PartnerRequest, PartnerSearchResult } from '../../api/partnerService';
 import { partnerService } from '../../api/partnerService';
 import { toDateOnlyOrNull } from '../../services/eventsService';
@@ -300,8 +301,22 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
     },
 
     acceptPartnerRequest: async (requestId: string) => {
+      // The sender, read before the reload below drops the accepted request.
+      const senderId =
+        get().receivedRequests.find((request) => request.id === requestId)?.from_user_id ?? null;
       try {
         await partnerService.acceptPartnerRequest(requestId);
+        // The sender's open Partner tab re-reads its partner only on mount,
+        // start or reconnect, so tell it the link exists. Not awaited: a lost
+        // announcement delays the sender's view, it does not undo the link.
+        if (senderId) {
+          moodSyncService.announcePartnerLinked(senderId).catch((error: unknown) => {
+            console.error('[PartnerSlice] Failed to tell the sender about the link:', error);
+          });
+        }
+        // This device's mood channel joined while unlinked; re-arm it so the
+        // new partner's moods are not dropped until the next re-join.
+        void moodSyncService.refreshPartnerSnapshots();
         // Reload partner and requests after accepting, and the couple's shared
         // settings: the new pair has its own row (or none yet), and the copy
         // still says "unlinked".

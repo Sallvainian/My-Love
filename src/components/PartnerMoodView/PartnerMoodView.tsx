@@ -205,6 +205,12 @@ export function PartnerMoodView() {
           } else if (status === 'TIMED_OUT') {
             setConnectionStatus('reconnecting');
           }
+        },
+        () => {
+          // The account this one asked just accepted. Re-read from the server:
+          // the Connect screen gives way to the partner without a reload.
+          void loadPartner();
+          void loadPendingRequests();
         }
       );
 
@@ -234,7 +240,7 @@ export function PartnerMoodView() {
         unsubscribe();
       }
     };
-  }, [syncStatus.isOnline, fetchPartnerMoods]); // Re-subscribe if online status changes
+  }, [syncStatus.isOnline, fetchPartnerMoods, loadPartner, loadPendingRequests]); // Re-subscribe if online status changes
 
   // Format date for display - memoized for performance
   // `date` is a local YYYY-MM-DD; `new Date(date)` would read it as UTC midnight

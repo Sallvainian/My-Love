@@ -2,8 +2,11 @@
  * PartnerMoodView's request lists name the other person: their chosen name,
  * else their sign-in email. Both used to read "Unknown User" for every request
  * (see 20260926010000_my_pending_partner_requests.sql).
+ *
+ * And the sender's side of an accept: when the account it asked accepts, the
+ * view re-reads its partner and requests, with no reload.
  */
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PartnerRequest } from '../../../api/partnerService';
 
@@ -14,6 +17,7 @@ vi.mock('../../../api/moodSyncService', () => ({
 vi.mock('../../PokeKissInterface', () => ({ PokeKissInterface: () => null }));
 vi.mock('../../../stores/useAppStore', () => ({ useAppStore: () => state }));
 
+import { moodSyncService } from '../../../api/moodSyncService';
 import { PartnerMoodView } from '../PartnerMoodView';
 
 function request(overrides: Partial<PartnerRequest>): PartnerRequest {
@@ -77,5 +81,30 @@ describe('PartnerMoodView request lists', () => {
     const received = within(screen.getByTestId('received-requests-list'));
     expect(received.getByText('Jessie')).toBeInTheDocument();
     expect(screen.queryByText('Unknown User')).not.toBeInTheDocument();
+  });
+});
+
+describe('PartnerMoodView when a sent request is accepted', () => {
+  beforeEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('re-reads the partner and the requests on the partner-linked broadcast', async () => {
+    state = makeState({
+      sentRequests: [request({ id: 's1', other_display_name: 'Harper' })],
+    });
+    render(<PartnerMoodView />);
+    const subscribe = vi.mocked(moodSyncService.subscribeMoodUpdates);
+    await waitFor(() => expect(subscribe).toHaveBeenCalled());
+    const onPartnerLinked = subscribe.mock.calls[0][2];
+    expect(onPartnerLinked).toBeTypeOf('function');
+    const partnerLoads = state.loadPartner.mock.calls.length;
+    const requestLoads = state.loadPendingRequests.mock.calls.length;
+
+    act(() => onPartnerLinked!());
+
+    expect(state.loadPartner).toHaveBeenCalledTimes(partnerLoads + 1);
+    expect(state.loadPendingRequests).toHaveBeenCalledTimes(requestLoads + 1);
   });
 });

@@ -11,6 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   constructedChannels,
+  emitEvent,
   emitMood,
   emitStatus,
   fakeChannel,
@@ -336,6 +337,75 @@ describe('subscribeMoodUpdates channel ownership', () => {
     emitMood(channel, 'after-account-change');
     expect(onMood).not.toHaveBeenCalled();
 
+    unsubscribe();
+  });
+});
+
+describe('a partner link made while the channel is open', () => {
+  beforeEach(() => {
+    resetRealtimeFake();
+    // The account is unlinked when the channel joins.
+    getPartnerId.mockResolvedValue(null);
+  });
+
+  afterEach(async () => {
+    await teardownRealtimeFake();
+  });
+
+  /** Subscribe unlinked, and let the first SUBSCRIBED finish its (null) lookup. */
+  async function joinUnlinked(onMood = vi.fn(), onPartnerLinked?: () => void) {
+    const pending = moodSyncService.subscribeMoodUpdates(onMood, undefined, onPartnerLinked);
+    resolveNextSession();
+    const unsubscribe = await pending;
+    const channel = constructedChannels[0];
+    // Unlinked at join, so the first SUBSCRIBED re-takes the snapshot, and it
+    // is still null.
+    const joined = nextLookupHandled('partner');
+    emitStatus(channel, 'SUBSCRIBED');
+    await joined;
+    return { channel, unsubscribe };
+  }
+
+  it('drops the new partner\'s moods until something re-arms the snapshot', async () => {
+    // The premise the two fixes below exist for.
+    const onMood = vi.fn();
+    const { channel, unsubscribe } = await joinUnlinked(onMood);
+    getPartnerId.mockResolvedValue(PARTNER_ID);
+
+    emitMood(channel, 'after-link-before-rearm');
+
+    expect(onMood).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
+  it('partner_linked tells every subscriber and re-arms the snapshot', async () => {
+    const onMood = vi.fn();
+    const onPartnerLinked = vi.fn();
+    const { channel, unsubscribe } = await joinUnlinked(onMood, onPartnerLinked);
+
+    // The other account accepted this one's request, then announced it.
+    getPartnerId.mockResolvedValue(PARTNER_ID);
+    const rearmed = nextLookupHandled('partner');
+    emitEvent(channel, 'partner_linked');
+    expect(onPartnerLinked).toHaveBeenCalledTimes(1);
+    await rearmed;
+
+    emitMood(channel, 'after-link');
+    expect(onMood).toHaveBeenCalledTimes(1);
+    // A mood is not a link announcement.
+    expect(onPartnerLinked).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it('refreshPartnerSnapshots re-arms the accepting device\'s own channel', async () => {
+    const onMood = vi.fn();
+    const { channel, unsubscribe } = await joinUnlinked(onMood);
+
+    getPartnerId.mockResolvedValue(PARTNER_ID);
+    await moodSyncService.refreshPartnerSnapshots();
+
+    emitMood(channel, 'after-accept');
+    expect(onMood).toHaveBeenCalledTimes(1);
     unsubscribe();
   });
 });

@@ -267,9 +267,8 @@ test.describe('Connecting with a partner', () => {
     await expect(bPage.getByRole('heading', { level: 1, name: a.name })).toBeVisible();
     await expect(bPage.getByTestId('partner-search-card')).toHaveCount(0);
 
-    // ---- A sees B as partner once the tab reloads its partner ----
-    await page.reload();
-    await navigateTo(page, 'partner');
+    // ---- A, still on the Partner tab and never reloaded, sees B as partner ----
+    // B's accept announces the link on A's mood topic, and A re-reads.
     await expect.poll(() => storePartnerId(page)).toBe(b.userId);
     await expect(page.getByRole('heading', { level: 1, name: b.name })).toBeVisible();
     await expect(page.getByTestId('partner-search-card')).toHaveCount(0);
