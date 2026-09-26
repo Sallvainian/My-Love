@@ -15,7 +15,7 @@
  * Clearing a SUBSET is worse than clearing nothing, because absence is itself a
  * render condition: clearing `partner` alone flips PartnerMoodView into its
  * `!partner` branch, which paints `sentRequests`, `receivedRequests` and
- * `searchResults`.
+ * `searchResult`.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
@@ -63,7 +63,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   sentRequests: [],
   receivedRequests: [],
   isLoadingRequests: false,
-  searchResults: [],
+  searchResult: null,
   isSearching: false,
   notes: [],
   notesIsLoading: false,
@@ -178,7 +178,10 @@ function seedSignedInSession(): void {
     partnerLoadError: true,
     sentRequests: [{ id: 'req-1', toEmail: SECRETS.requestedEmail }],
     receivedRequests: [{ id: 'req-2', fromEmail: SECRETS.requestedEmail }],
-    searchResults: [{ id: 'USER-C-ID', displayName: SECRETS.searchHitName }],
+    searchResult: {
+      status: 'found',
+      user: { id: 'USER-C-ID', email: 'c@example.com', displayName: SECRETS.searchHitName },
+    },
 
     notes: [accountNote()],
     sentMessageTimestamps: [1],
@@ -350,7 +353,7 @@ describe('clearAuth on sign-out', () => {
     // renders its search-and-request UI precisely when `partner` is null.
     expect(state.sentRequests).toEqual([]);
     expect(state.receivedRequests).toEqual([]);
-    expect(state.searchResults).toEqual([]);
+    expect(state.searchResult).toBeNull();
   });
 
   it('clears the love-notes chat', () => {

@@ -65,7 +65,7 @@ function makeState(overrides: Record<string, unknown> = {}) {
     partnerLoadError: false,
     sentRequests: [],
     receivedRequests: [],
-    searchResults: [],
+    searchResult: null,
     isSearching: false,
     loadPartner: vi.fn(),
     loadPendingRequests: vi.fn(),

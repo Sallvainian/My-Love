@@ -249,7 +249,7 @@ test.describe('Partner on the style kit', () => {
 
     const view = page.getByTestId('partner-mood-view');
     await expect(view).toBeVisible();
-    await expect(page.getByLabel('Search by email or display name')).toBeVisible();
+    await expect(page.getByLabel("Your partner's email")).toBeVisible();
     await expect(view).toHaveCSS('background-color', KIT_PAGE.dark);
     await expect(page.getByTestId('partner-search-card')).toHaveCSS(
       'background-color',

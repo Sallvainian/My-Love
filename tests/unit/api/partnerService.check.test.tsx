@@ -36,7 +36,7 @@ import { PartnerMoodView } from '@/components/PartnerMoodView/PartnerMoodView';
 const state = {
   partnerMoods: [], partner: null, isLoadingPartner: false,
   syncStatus: { isOnline: true }, sentRequests: [], isSearching: false,
-  searchResults: [{ id: 'target', email: 'target@example.com', displayName: 'Target' }],
+  searchResult: { status: 'found', user: { id: 'target', email: 'target@example.com', displayName: 'Target' } },
   receivedRequests: [{ id: 'request', from_user_display_name: 'Sender', created_at: '2026-09-01' }],
   fetchPartnerMoods: vi.fn(), loadPartner: vi.fn(), loadPendingRequests: vi.fn(),
   searchUsers: vi.fn(), clearSearch: vi.fn(),
@@ -50,6 +50,18 @@ const actions = [
   ['declinePartnerRequest', 'Decline', 'decline'],
 ] as const;
 const friendly = 'Some values are not allowed - check length and format limits';
+
+/**
+ * Click an action's button in the rendered view. Send Request exists only under
+ * an answered search for the address in the box, so that one searches first.
+ */
+async function clickAction(user: ReturnType<typeof userEvent.setup>, button: string) {
+  if (button === 'Send Request') {
+    await user.type(screen.getByLabelText("Your partner's email"), 'target@example.com');
+    await user.click(screen.getByRole('button', { name: 'Find' }));
+  }
+  await user.click(screen.getByRole('button', { name: button }));
+}
 const raw = { code: '23514', message: 'raw constraint with incidental duplicate unique words', details: 'diagnostics', hint: 'hint' };
 
 describe('partner request CHECK presentation', () => {
@@ -99,7 +111,7 @@ describe('partner request CHECK presentation', () => {
     backend.error = { ...raw };
     const user = userEvent.setup();
     render(<PartnerMoodView />);
-    await user.click(screen.getByRole('button', { name: button }));
+    await clickAction(user, button);
     await vi.waitFor(() => expect(screen.getByText(friendly)).toBeDefined());
     expect(screen.queryByText(/raw constraint/)).toBeNull();
   });
@@ -108,7 +120,7 @@ describe('partner request CHECK presentation', () => {
     backend.error = { ...raw, code: '23502', message: 'original database message' };
     const user = userEvent.setup();
     render(<PartnerMoodView />);
-    await user.click(screen.getByRole('button', { name: button }));
+    await clickAction(user, button);
     await vi.waitFor(() => expect(screen.getByText(`Failed to ${verb} partner request`)).toBeDefined());
     expect((backend.error as { message: string }).message).toBe('original database message');
   });
@@ -117,7 +129,7 @@ describe('partner request CHECK presentation', () => {
     backend.error = new Error('original error');
     const user = userEvent.setup();
     render(<PartnerMoodView />);
-    await user.click(screen.getByRole('button', { name: button }));
+    await clickAction(user, button);
     await vi.waitFor(() => expect(screen.getByText('original error')).toBeDefined());
   });
 
@@ -148,7 +160,7 @@ describe('partner requests offline (ticket 11)', () => {
       const user = userEvent.setup();
       render(<PartnerMoodView />);
 
-      await user.click(screen.getByRole('button', { name: button }));
+      await clickAction(user, button);
 
       await vi.waitFor(() =>
         expect(screen.getByTestId('partner-connection-error')).toHaveTextContent(

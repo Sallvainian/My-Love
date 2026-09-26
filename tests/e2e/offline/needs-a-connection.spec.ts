@@ -345,22 +345,25 @@ test.describe('Partner requests offline', () => {
         : // A write here would be a regressed guard: never let it land.
           route.abort()
     );
-    // The sender lookup behind the request list (`id=in.(…)`) and the search
-    // results (`or=…`) share one select.
-    // playwright-utils deviation: matches either of two query shapes with a URL predicate, which one method + URL glob cannot express, and must be installed before the next navigation; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    // The sender lookup behind the request list (`id=in.(…)`).
+    // playwright-utils deviation: matches the query shape with a URL predicate, which one method + URL glob cannot express, and must be installed before the next navigation; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route(
       (url) =>
         url.pathname === '/rest/v1/users' &&
         (url.searchParams.get('select') ?? '').replace(/\s/g, '') === 'id,email,display_name' &&
-        (url.searchParams.has('or') || (url.searchParams.get('id') ?? '').startsWith('in.')),
-      (route) => {
-        const url = new URL(route.request().url());
-        return route.fulfill({
-          json: url.searchParams.has('or')
-            ? [{ id: FAKE_TARGET, email: 'target@example.test', display_name: 'Offline Target' }]
-            : [{ id: FAKE_SENDER, email: 'sender@example.test', display_name: 'Offline Sender' }],
-        });
-      }
+        (url.searchParams.get('id') ?? '').startsWith('in.'),
+      (route) =>
+        route.fulfill({
+          json: [{ id: FAKE_SENDER, email: 'sender@example.test', display_name: 'Offline Sender' }],
+        })
+    );
+    // The partner search, answered with an unlinked account so a Send Request
+    // button exists to press offline.
+    // playwright-utils deviation: the route must be installed before the next navigation; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/rpc/find_partner_by_email', (route) =>
+      route.fulfill({
+        json: [{ id: FAKE_TARGET, display_name: 'Offline Target', is_taken: false }],
+      })
     );
     // playwright-utils deviation: the route must be installed before the next navigation and abort every accept and decline call; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route(/\/rest\/v1\/rpc\/(accept|decline)_partner_request/, (route) => route.abort());
@@ -369,7 +372,8 @@ test.describe('Partner requests offline', () => {
       await page.goto('/partner');
       await expect(page.getByTestId('partner-search-input')).toBeVisible();
       await expect(page.getByTestId(`accept-request-${FAKE_REQUEST}`)).toBeVisible();
-      await page.getByTestId('partner-search-input').fill('offline');
+      await page.getByTestId('partner-search-input').fill('target@example.test');
+      await page.getByTestId('partner-search-submit').click();
       const send = page.getByTestId(`send-request-${FAKE_TARGET}`);
       await expect(send).toBeVisible();
 
