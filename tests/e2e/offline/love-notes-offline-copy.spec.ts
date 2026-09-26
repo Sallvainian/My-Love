@@ -237,14 +237,19 @@ test.describe('Love notes from the local copy', () => {
     // WHEN: the partner writes while this device is offline, then it reconnects.
     const id = await seedPartnerNote(supabaseAdmin, content);
     cleanup.defer('delete the seeded note', () => deleteRowById(supabaseAdmin, 'love_notes', id));
-    const refreshRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
+    // playwright-utils deviation: observe mode takes the first matching request and throws when it fails; a fetchNotes the page load started can still be in its partner lookup when the device goes offline, and its read then goes out offline and fails in this window, so this waits for the first successful read.
+    const refreshRead = page.waitForResponse(
+      (res) =>
+        res.request().method() === 'GET' && res.url().includes('/rest/v1/love_notes_visible?') && res.ok()
+    );
     await goOffline(page, false);
     // The reconnect itself re-reads the server (the kind's refresher), and
     // that read carries the note — the seed sends no broadcast, so this does
     // not rest on Realtime.
     const response = await refreshRead;
-    expect(response.status).toBe(200);
-    const rows = response.responseJson as { id: string }[];
+    expect(response.status()).toBe(200);
+    // playwright-utils deviation: parses the response of the waitForResponse above, which interceptNetworkCall cannot replace.
+    const rows = (await response.json()) as { id: string }[];
     expect(rows.map((row) => row.id)).toContain(id);
 
     // THEN: the note is in state, the copy and the thread.

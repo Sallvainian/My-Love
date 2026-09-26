@@ -153,14 +153,18 @@ test.describe('Poke and kiss history from the local copy', () => {
     // WHEN: the partner pokes while this device is offline, then it reconnects.
     const id = await seedPartnerPoke(supabaseAdmin);
     cleanup.defer('delete the seeded poke', () => deleteRowById(supabaseAdmin, 'interactions', id));
-    const refreshRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
+    // playwright-utils deviation: observe mode takes the first matching request and throws when it fails; it is armed while offline, where a read the page started earlier fails, so this waits for the first successful read, as the love-notes reconnect test does.
+    const refreshRead = page.waitForResponse(
+      (res) => res.request().method() === 'GET' && res.url().includes('/rest/v1/interactions?') && res.ok()
+    );
     await goOffline(page, false);
     // The reconnect itself re-reads the server (the kind's refresher), and
     // that read carries the poke — so the test does not rest on Realtime,
     // whose socket setOffline may leave open.
     const response = await refreshRead;
-    expect(response.status).toBe(200);
-    const rows = response.responseJson as { id: string }[];
+    expect(response.status()).toBe(200);
+    // playwright-utils deviation: parses the response of the waitForResponse above, which interceptNetworkCall cannot replace.
+    const rows = (await response.json()) as { id: string }[];
     expect(rows.map((row) => row.id)).toContain(id);
 
     // THEN: the poke is in state, the copy and the sheet, with the badge showing.
