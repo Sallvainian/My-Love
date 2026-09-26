@@ -104,7 +104,7 @@ let autoAckLeaves = false;
 let ackLeavesOverNetwork = false;
 
 /** The fake's steps a test can wait for. */
-type FakeStep = 'channelRequested' | 'channelOpened' | 'authRequested' | 'sendParked' | 'leaveRequested';
+type FakeStep = 'channelRequested' | 'authRequested' | 'sendParked' | 'leaveRequested';
 let stepWaiters: Array<{ step: FakeStep; remaining: number; resolve: () => void }> = [];
 
 /** Called by the fake as it reaches `step`; resolves every waiter that is now due. */
@@ -202,7 +202,6 @@ vi.mock('@/api/supabaseClient', () => ({
       };
       openChannels.set(topic, chan);
       constructedChannels.push(chan);
-      reached('channelOpened');
       return chan;
     },
     realtime: {
