@@ -59,8 +59,8 @@
  * password, or touches a row owned by another worker.
  */
 import { test, expect } from '../support/merged-fixtures';
-// The `log` VALUE, not the destructured fixture. The fixture merged into
-// merged-fixtures.ts:15 is `(params: LogParams) => Promise<void>`
+// The `log` VALUE, not the destructured fixture. The `log` fixture that
+// merged-fixtures.ts merges in as `logFixture` is `(params: LogParams) => Promise<void>`
 // (node_modules/@seontechnologies/playwright-utils/dist/esm/log/log-fixture.d.ts);
 // only the value export carries `.step`/`.info`
 // (dist/esm/log/log.d.ts). This project's merged fixtures do not re-export it,
@@ -102,42 +102,6 @@ const SEEDED_LABEL = 'Events API Seeded Trip';
 const PARTNER_ATTEMPT_LABEL = 'Events API Partner Overwrite';
 const CREATOR_EDIT_LABEL = 'Events API Creator Voyage';
 
-/** Preserve the test-body failure when checked teardown fails too. */
-async function runWithPairCleanup(
-  supabaseAdmin: Parameters<typeof clearPairEvents>[0],
-  userId: string,
-  partnerId: string,
-  action: () => Promise<void>
-): Promise<void> {
-  let actionFailure: unknown;
-  let actionFailed = false;
-
-  try {
-    await action();
-  } catch (error) {
-    actionFailed = true;
-    actionFailure = error;
-  }
-
-  let cleanupFailure: unknown;
-  let cleanupFailed = false;
-  try {
-    await clearPairEvents(supabaseAdmin, userId, partnerId);
-  } catch (error) {
-    cleanupFailed = true;
-    cleanupFailure = error;
-  }
-
-  if (actionFailed && cleanupFailed) {
-    throw new AggregateError(
-      [actionFailure, cleanupFailure],
-      'The events wire-shape assertion and pair cleanup both failed'
-    );
-  }
-  if (cleanupFailed) throw cleanupFailure;
-  if (actionFailed) throw actionFailure;
-}
-
 test.describe('Events write wire shape over PostgREST — story 5', () => {
   // ==========================================================================
   // DE.5-API-001
@@ -147,58 +111,60 @@ test.describe('Events write wire shape over PostgREST — story 5', () => {
   test('[P1] DE.5-API-001 a partner PATCH on the creator\'s event returns 200 with zero rows, not an error', async ({
     supabaseAdmin,
     apiRequest,
+    cleanup,
   }) => {
     await log.step('Resolve this worker\'s own pair and clear its events');
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
+    cleanup.defer('clear the pair events', () =>
+      clearPairEvents(supabaseAdmin, userId, partnerId)
+    );
 
-    await runWithPairCleanup(supabaseAdmin, userId, partnerId, async () => {
-      await log.step('Seed one event owned by the creator');
-      const seededDate = isoDateDaysFromNow(30);
-      const eventId = await seedEvent(supabaseAdmin, {
-        userId,
-        label: SEEDED_LABEL,
-        eventDate: seededDate,
-        description: 'Seeded by the events write wire-shape test',
-        icon: 'calendar',
-      });
-
-      await log.step('Sign in as the PARTNER and PATCH the creator\'s row');
-      const partnerToken = await getUserAccessToken(supabaseAdmin, partnerId);
-
-      // `Prefer: return=representation` is what supabase-js's `.select()` sends.
-      // Drop it and PostgREST answers 204, which is not the shape the service reads.
-      const { status, body } = await apiRequest<EventRow[]>({
-        method: 'PATCH',
-        path: `/rest/v1/events?id=eq.${eventId}`,
-        headers: {
-          Authorization: `Bearer ${partnerToken}`,
-          Prefer: 'return=representation',
-        },
-        body: {
-          label: PARTNER_ATTEMPT_LABEL,
-          updated_at: new Date().toISOString(),
-        },
-      });
-
-      // THEN: RLS filters the write to nothing and PostgREST reports SUCCESS.
-      // A 403/404 here would mean the service's `data.length === 0` branch is
-      // unreachable and its error message never fires.
-      expect(status).toBe(200);
-      expect(Array.isArray(body)).toBe(true);
-      expect(body).toHaveLength(0);
-
-      await log.step('Confirm the creator\'s row is untouched');
-      const { data: afterRow, error: afterError } = await supabaseAdmin
-        .from('events')
-        .select('label, event_date')
-        .eq('id', eventId)
-        .single();
-
-      expect(afterError).toBeNull();
-      expect(afterRow?.label).toBe(SEEDED_LABEL);
-      expect(afterRow?.event_date).toBe(seededDate);
+    await log.step('Seed one event owned by the creator');
+    const seededDate = isoDateDaysFromNow(30);
+    const eventId = await seedEvent(supabaseAdmin, {
+      userId,
+      label: SEEDED_LABEL,
+      eventDate: seededDate,
+      description: 'Seeded by the events write wire-shape test',
+      icon: 'calendar',
     });
+
+    await log.step('Sign in as the PARTNER and PATCH the creator\'s row');
+    const partnerToken = await getUserAccessToken(supabaseAdmin, partnerId);
+
+    // `Prefer: return=representation` is what supabase-js's `.select()` sends.
+    // Drop it and PostgREST answers 204, which is not the shape the service reads.
+    const { status, body } = await apiRequest<EventRow[]>({
+      method: 'PATCH',
+      path: `/rest/v1/events?id=eq.${eventId}`,
+      headers: {
+        Authorization: `Bearer ${partnerToken}`,
+        Prefer: 'return=representation',
+      },
+      body: {
+        label: PARTNER_ATTEMPT_LABEL,
+        updated_at: new Date().toISOString(),
+      },
+    });
+
+    // THEN: RLS filters the write to nothing and PostgREST reports SUCCESS.
+    // A 403/404 here would mean the service's `data.length === 0` branch is
+    // unreachable and its error message never fires.
+    expect(status).toBe(200);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toHaveLength(0);
+
+    await log.step('Confirm the creator\'s row is untouched');
+    const { data: afterRow, error: afterError } = await supabaseAdmin
+      .from('events')
+      .select('label, event_date')
+      .eq('id', eventId)
+      .single();
+
+    expect(afterError).toBeNull();
+    expect(afterRow?.label).toBe(SEEDED_LABEL);
+    expect(afterRow?.event_date).toBe(seededDate);
   });
 
   // ==========================================================================
@@ -209,48 +175,50 @@ test.describe('Events write wire shape over PostgREST — story 5', () => {
   test('[P1] DE.5-API-002 a partner DELETE on the creator\'s event returns 200 with zero rows, not an error', async ({
     supabaseAdmin,
     apiRequest,
+    cleanup,
   }) => {
     await log.step('Resolve this worker\'s own pair and clear its events');
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
+    cleanup.defer('clear the pair events', () =>
+      clearPairEvents(supabaseAdmin, userId, partnerId)
+    );
 
-    await runWithPairCleanup(supabaseAdmin, userId, partnerId, async () => {
-      await log.step('Seed one event owned by the creator');
-      const seededDate = isoDateDaysFromNow(45);
-      const eventId = await seedEvent(supabaseAdmin, {
-        userId,
-        label: SEEDED_LABEL,
-        eventDate: seededDate,
-        description: 'Seeded by the events write wire-shape test',
-        icon: 'calendar',
-      });
-
-      await log.step('Sign in as the PARTNER and DELETE the creator\'s row');
-      const partnerToken = await getUserAccessToken(supabaseAdmin, partnerId);
-
-      const { status, body } = await apiRequest<EventRow[]>({
-        method: 'DELETE',
-        path: `/rest/v1/events?id=eq.${eventId}`,
-        headers: {
-          Authorization: `Bearer ${partnerToken}`,
-          Prefer: 'return=representation',
-        },
-      });
-
-      expect(status).toBe(200);
-      expect(Array.isArray(body)).toBe(true);
-      expect(body).toHaveLength(0);
-
-      await log.step('Confirm the creator\'s row survives');
-      const { data: survivors, error: surviveError } = await supabaseAdmin
-        .from('events')
-        .select('id, label')
-        .eq('id', eventId);
-
-      expect(surviveError).toBeNull();
-      expect(survivors).toHaveLength(1);
-      expect(survivors?.[0]?.label).toBe(SEEDED_LABEL);
+    await log.step('Seed one event owned by the creator');
+    const seededDate = isoDateDaysFromNow(45);
+    const eventId = await seedEvent(supabaseAdmin, {
+      userId,
+      label: SEEDED_LABEL,
+      eventDate: seededDate,
+      description: 'Seeded by the events write wire-shape test',
+      icon: 'calendar',
     });
+
+    await log.step('Sign in as the PARTNER and DELETE the creator\'s row');
+    const partnerToken = await getUserAccessToken(supabaseAdmin, partnerId);
+
+    const { status, body } = await apiRequest<EventRow[]>({
+      method: 'DELETE',
+      path: `/rest/v1/events?id=eq.${eventId}`,
+      headers: {
+        Authorization: `Bearer ${partnerToken}`,
+        Prefer: 'return=representation',
+      },
+    });
+
+    expect(status).toBe(200);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toHaveLength(0);
+
+    await log.step('Confirm the creator\'s row survives');
+    const { data: survivors, error: surviveError } = await supabaseAdmin
+      .from('events')
+      .select('id, label')
+      .eq('id', eventId);
+
+    expect(surviveError).toBeNull();
+    expect(survivors).toHaveLength(1);
+    expect(survivors?.[0]?.label).toBe(SEEDED_LABEL);
   });
 
   // ==========================================================================
@@ -263,62 +231,64 @@ test.describe('Events write wire shape over PostgREST — story 5', () => {
   test('[P1] DE.5-API-003 the creator\'s own PATCH on the same row returns 200 with exactly one updated row', async ({
     supabaseAdmin,
     apiRequest,
+    cleanup,
   }) => {
     await log.step('Resolve this worker\'s own pair and clear its events');
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
+    cleanup.defer('clear the pair events', () =>
+      clearPairEvents(supabaseAdmin, userId, partnerId)
+    );
 
-    await runWithPairCleanup(supabaseAdmin, userId, partnerId, async () => {
-      await log.step('Seed one event owned by the creator');
-      const seededDate = isoDateDaysFromNow(60);
-      const eventId = await seedEvent(supabaseAdmin, {
-        userId,
-        label: SEEDED_LABEL,
-        eventDate: seededDate,
-        description: 'Seeded by the events write wire-shape test',
-        icon: 'calendar',
-      });
-
-      await log.step('Sign in as the CREATOR and PATCH their own row');
-      const creatorToken = await getUserAccessToken(supabaseAdmin, userId);
-
-      // `updated_at` is client-maintained on this table — there is no trigger
-      // and PostgREST does not set it (migration comment, :39-42), so the
-      // writing client sends it, exactly as eventsService.updateEvent does.
-      const newUpdatedAt = new Date().toISOString();
-      const { status, body } = await apiRequest<EventRow[]>({
-        method: 'PATCH',
-        path: `/rest/v1/events?id=eq.${eventId}`,
-        headers: {
-          Authorization: `Bearer ${creatorToken}`,
-          Prefer: 'return=representation',
-        },
-        body: {
-          label: CREATOR_EDIT_LABEL,
-          updated_at: newUpdatedAt,
-        },
-      });
-
-      expect(status).toBe(200);
-      expect(Array.isArray(body)).toBe(true);
-      expect(body).toHaveLength(1);
-      expect(body[0].id).toBe(eventId);
-      expect(body[0].user_id).toBe(userId);
-      expect(body[0].label).toBe(CREATOR_EDIT_LABEL);
-      // Untouched columns come back unchanged — the representation is the row,
-      // not just the patched fields.
-      expect(body[0].event_date).toBe(seededDate);
-      expect(body[0].icon).toBe('calendar');
-
-      await log.step('Confirm the new label is what landed in the table');
-      const { data: afterRow, error: afterError } = await supabaseAdmin
-        .from('events')
-        .select('label')
-        .eq('id', eventId)
-        .single();
-
-      expect(afterError).toBeNull();
-      expect(afterRow?.label).toBe(CREATOR_EDIT_LABEL);
+    await log.step('Seed one event owned by the creator');
+    const seededDate = isoDateDaysFromNow(60);
+    const eventId = await seedEvent(supabaseAdmin, {
+      userId,
+      label: SEEDED_LABEL,
+      eventDate: seededDate,
+      description: 'Seeded by the events write wire-shape test',
+      icon: 'calendar',
     });
+
+    await log.step('Sign in as the CREATOR and PATCH their own row');
+    const creatorToken = await getUserAccessToken(supabaseAdmin, userId);
+
+    // `updated_at` is client-maintained on this table — there is no trigger
+    // and PostgREST does not set it (migration comment, :39-42), so the
+    // writing client sends it, exactly as eventsService.updateEvent does.
+    const newUpdatedAt = new Date().toISOString();
+    const { status, body } = await apiRequest<EventRow[]>({
+      method: 'PATCH',
+      path: `/rest/v1/events?id=eq.${eventId}`,
+      headers: {
+        Authorization: `Bearer ${creatorToken}`,
+        Prefer: 'return=representation',
+      },
+      body: {
+        label: CREATOR_EDIT_LABEL,
+        updated_at: newUpdatedAt,
+      },
+    });
+
+    expect(status).toBe(200);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toHaveLength(1);
+    expect(body[0].id).toBe(eventId);
+    expect(body[0].user_id).toBe(userId);
+    expect(body[0].label).toBe(CREATOR_EDIT_LABEL);
+    // Untouched columns come back unchanged — the representation is the row,
+    // not just the patched fields.
+    expect(body[0].event_date).toBe(seededDate);
+    expect(body[0].icon).toBe('calendar');
+
+    await log.step('Confirm the new label is what landed in the table');
+    const { data: afterRow, error: afterError } = await supabaseAdmin
+      .from('events')
+      .select('label')
+      .eq('id', eventId)
+      .single();
+
+    expect(afterError).toBeNull();
+    expect(afterRow?.label).toBe(CREATOR_EDIT_LABEL);
   });
 });

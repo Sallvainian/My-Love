@@ -24,6 +24,7 @@ test.describe('Interactions Realtime API', () => {
     recurse,
     supabaseAdmin,
     supabaseAsUser,
+    cleanup,
   }) => {
     const { userId: receiverId } = await resolveOwnPair(supabaseAdmin);
     const statuses: string[] = [];
@@ -42,29 +43,23 @@ test.describe('Interactions Realtime API', () => {
         () => {}
       )
       .subscribe((status) => statuses.push(status));
+    cleanup.defer('remove the interactions channel', async () => {
+      expect(await supabaseAsUser.removeChannel(channel)).toBe('ok');
+    });
 
-    let testFailure: unknown;
-    try {
-      await log.step('Wait until the receiving worker user is subscribed');
-      const subscribedStatus = await recurse(
-        async () => statuses.find((status) => status === 'SUBSCRIBED') ?? null,
-        (status) => status === 'SUBSCRIBED',
-        {
-          timeout: 15000,
-          interval: 100,
-          log: 'Waiting for the interactions Realtime channel to subscribe',
-        }
-      );
+    await log.step('Wait until the receiving worker user is subscribed');
+    const subscribedStatus = await recurse(
+      async () => statuses.find((status) => status === 'SUBSCRIBED') ?? null,
+      (status) => status === 'SUBSCRIBED',
+      {
+        timeout: 15000,
+        interval: 100,
+        log: 'Waiting for the interactions Realtime channel to subscribe',
+      }
+    );
 
-      expect(subscribedStatus).toBe('SUBSCRIBED');
-      expect(statuses).not.toContain('CHANNEL_ERROR');
-      expect(statuses).not.toContain('TIMED_OUT');
-    } catch (error) {
-      testFailure = error;
-    }
-
-    const removalStatus = await supabaseAsUser.removeChannel(channel);
-    expect(removalStatus).toBe('ok');
-    if (testFailure !== undefined) throw testFailure;
+    expect(subscribedStatus).toBe('SUBSCRIBED');
+    expect(statuses).not.toContain('CHANNEL_ERROR');
+    expect(statuses).not.toContain('TIMED_OUT');
   });
 });

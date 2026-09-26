@@ -93,3 +93,11 @@ export async function createOutsiderClient(
 
   return { client, userId, cleanup };
 }
+
+/** A `cleanup.defer` body: delete a throwaway account, throwing the delete's error. */
+export async function deleteOutsider(outsider: {
+  cleanup: () => Promise<{ error: Error | null }>;
+}): Promise<void> {
+  const { error } = await outsider.cleanup();
+  if (error) throw error;
+}

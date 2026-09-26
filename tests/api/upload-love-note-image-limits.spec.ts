@@ -73,22 +73,17 @@ function storagePathOf(body: string): string | null {
 }
 
 /**
- * Teardown: remove the objects a test created. It runs from `finally`, so a
- * failure is recorded with `expect.soft` rather than thrown — a throw there
- * would replace the test's own error and skip the steps after it.
+ * Teardown for `cleanup.defer`: remove the objects a test created. Deferred
+ * before the upload with an empty list the test fills in, so a path learned
+ * from a 200 is removed even if a later assertion throws.
  */
 async function removeObjects(
   supabaseAdmin: TypedSupabaseClient,
   paths: string[]
 ): Promise<void> {
   if (paths.length === 0) return;
-  const what = `Failed to clean up ${paths.join(', ')}`;
-  try {
-    const { error } = await supabaseAdmin.storage.from(BUCKET).remove(paths);
-    expect.soft(error, what).toBeNull();
-  } catch (error) {
-    expect.soft(error, what).toBeUndefined();
-  }
+  const { error } = await supabaseAdmin.storage.from(BUCKET).remove(paths);
+  if (error) throw new Error(`Failed to clean up ${paths.join(', ')}`, { cause: error });
 }
 
 test.describe('Love note image upload limits', () => {
@@ -96,79 +91,75 @@ test.describe('Love note image upload limits', () => {
     request,
     authToken,
     supabaseAdmin,
+    cleanup,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const before = await listOwnPrefix(supabaseAdmin, userId);
     const created: string[] = [];
+    cleanup.defer('remove the uploaded objects', () => removeObjects(supabaseAdmin, created));
 
-    try {
-      // playwright-utils deviation: apiRequest returns no response headers, and this case asserts x-ratelimit-remaining.
-      const response = await request.post(FUNCTION_PATH, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          'Content-Type': 'application/octet-stream',
-        },
-        data: pngBody(64 * 1024),
-      });
+    // playwright-utils deviation: apiRequest returns no response headers, and this case asserts x-ratelimit-remaining.
+    const response = await request.post(FUNCTION_PATH, {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/octet-stream',
+      },
+      data: pngBody(64 * 1024),
+    });
 
-      expect(response.status(), 'a supported upload is accepted').toBe(200);
-      const body = await response.json();
-      // Registered for cleanup before any assertion can throw: a failure after
-      // a 200 would otherwise leak the object into this worker's prefix and
-      // skew the before/after counts of every later case.
-      if (body.storagePath) created.push(body.storagePath);
+    expect(response.status(), 'a supported upload is accepted').toBe(200);
+    const body = await response.json();
+    // Recorded for cleanup before any assertion can throw: a failure after
+    // a 200 would otherwise leak the object into this worker's prefix and
+    // skew the before/after counts of every later case.
+    if (body.storagePath) created.push(body.storagePath);
 
-      expect(body.success).toBe(true);
-      expect(body.size).toBe(64 * 1024);
-      expect(body.mimeType).toBe('image/png');
-      expect(
-        body.storagePath.startsWith(`${userId}/`),
-        `storagePath ${body.storagePath} must be under the uploader's own prefix`
-      ).toBe(true);
-      expect(response.headers()['x-ratelimit-remaining']).toBeDefined();
+    expect(body.success).toBe(true);
+    expect(body.size).toBe(64 * 1024);
+    expect(body.mimeType).toBe('image/png');
+    expect(
+      body.storagePath.startsWith(`${userId}/`),
+      `storagePath ${body.storagePath} must be under the uploader's own prefix`
+    ).toBe(true);
+    expect(response.headers()['x-ratelimit-remaining']).toBeDefined();
 
-      const after = await listOwnPrefix(supabaseAdmin, userId);
-      expect(after.length, 'exactly one object was written').toBe(before.length + 1);
-      expect(after).toContain(body.storagePath.slice(`${userId}/`.length));
-    } finally {
-      await removeObjects(supabaseAdmin, created);
-    }
+    const after = await listOwnPrefix(supabaseAdmin, userId);
+    expect(after.length, 'exactly one object was written').toBe(before.length + 1);
+    expect(after).toContain(body.storagePath.slice(`${userId}/`.length));
   });
 
   test('[P0] a body at exactly the cap is accepted', async ({
     apiRequest,
     authToken,
     supabaseAdmin,
+    cleanup,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const before = await listOwnPrefix(supabaseAdmin, userId);
     const created: string[] = [];
+    cleanup.defer('remove the uploaded objects', () => removeObjects(supabaseAdmin, created));
 
-    try {
-      const { status, body } = await apiRequest<UploadReply>({
-        method: 'POST',
-        path: FUNCTION_PATH,
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          'Content-Type': 'application/octet-stream',
-        },
-        body: pngBody(MAX_FILE_SIZE_BYTES),
-        retryConfig: { maxRetries: 0 },
-      });
+    const { status, body } = await apiRequest<UploadReply>({
+      method: 'POST',
+      path: FUNCTION_PATH,
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: pngBody(MAX_FILE_SIZE_BYTES),
+      retryConfig: { maxRetries: 0 },
+    });
 
-      expect(status, 'the cap itself is inclusive').toBe(200);
-      // Registered for cleanup before any assertion can throw: a failure after
-      // a 200 would otherwise leak the object into this worker's prefix and
-      // skew the before/after counts of every later case.
-      if (body.storagePath) created.push(body.storagePath);
+    expect(status, 'the cap itself is inclusive').toBe(200);
+    // Recorded for cleanup before any assertion can throw: a failure after
+    // a 200 would otherwise leak the object into this worker's prefix and
+    // skew the before/after counts of every later case.
+    if (body.storagePath) created.push(body.storagePath);
 
-      expect(body.size).toBe(MAX_FILE_SIZE_BYTES);
+    expect(body.size).toBe(MAX_FILE_SIZE_BYTES);
 
-      const after = await listOwnPrefix(supabaseAdmin, userId);
-      expect(after.length).toBe(before.length + 1);
-    } finally {
-      await removeObjects(supabaseAdmin, created);
-    }
+    const after = await listOwnPrefix(supabaseAdmin, userId);
+    expect(after.length).toBe(before.length + 1);
   });
 
   test('[P0] one byte past the cap is refused with 413 and writes nothing', async ({
@@ -274,59 +265,55 @@ test.describe('Love note image upload limits', () => {
     browser,
     authToken,
     supabaseAdmin,
+    cleanup,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const functionUrl = `${process.env.SUPABASE_URL}${FUNCTION_PATH}`;
     const context = await browser.newContext();
+    cleanup.defer('close the browser context', () => context.close());
     const page = await context.newPage();
     const created: string[] = [];
+    cleanup.defer('remove the uploaded objects', () => removeObjects(supabaseAdmin, created));
 
-    try {
-      // Any document on the dev server's origin will do — what is being measured
-      // is the browser's own framing of a Blob body, not the page.
-      await page.goto('http://localhost:5173/');
+    // Any document on the dev server's origin will do — what is being measured
+    // is the browser's own framing of a Blob body, not the page.
+    await page.goto('http://localhost:5173/');
 
-      const result = await page.evaluate(
-        async ({ url, token, magic }) => {
-          const bytes = new Uint8Array(4096);
-          bytes.set(magic);
-          const blob = new Blob([bytes], { type: 'image/png' });
+    const result = await page.evaluate(
+      async ({ url, token, magic }) => {
+        const bytes = new Uint8Array(4096);
+        bytes.set(magic);
+        const blob = new Blob([bytes], { type: 'image/png' });
 
-          // playwright-utils deviation: the browser's own fetch of a Blob is what is measured; apiRequest runs in Node and frames the body itself.
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/octet-stream',
-            },
-            body: blob,
-          });
+        // playwright-utils deviation: the browser's own fetch of a Blob is what is measured; apiRequest runs in Node and frames the body itself.
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/octet-stream',
+          },
+          body: blob,
+        });
 
-          return { status: response.status, body: await response.text() };
-        },
-        // PNG_MAGIC is a Node Buffer; the page is handed its bytes as a plain array.
-        { url: functionUrl, token: authToken, magic: Array.from(PNG_MAGIC) }
-      );
-      // Registered for cleanup before any assertion can throw: a failure after
-      // a 200 would otherwise leak the object into this worker's prefix.
-      const storagePath = storagePathOf(result.body);
-      if (storagePath) created.push(storagePath);
+        return { status: response.status, body: await response.text() };
+      },
+      // PNG_MAGIC is a Node Buffer; the page is handed its bytes as a plain array.
+      { url: functionUrl, token: authToken, magic: Array.from(PNG_MAGIC) }
+    );
+    // Recorded for cleanup before any assertion can throw: a failure after
+    // a 200 would otherwise leak the object into this worker's prefix.
+    const storagePath = storagePathOf(result.body);
+    if (storagePath) created.push(storagePath);
 
-      await log.step(`browser Blob upload answered ${result.status}`);
-      expect(
-        result.status,
-        `411 would mean the browser sent no Content-Length; got ${result.body}`
-      ).not.toBe(411);
-      expect(result.status, 'the blob reached the magic-byte check intact').toBe(200);
+    await log.step(`browser Blob upload answered ${result.status}`);
+    expect(
+      result.status,
+      `411 would mean the browser sent no Content-Length; got ${result.body}`
+    ).not.toBe(411);
+    expect(result.status, 'the blob reached the magic-byte check intact').toBe(200);
 
-      const parsed = JSON.parse(result.body) as { storagePath: string; size: number };
-      expect(parsed.size).toBe(4096);
-      expect(parsed.storagePath.startsWith(`${userId}/`)).toBe(true);
-    } finally {
-      // Objects first: a context that fails to close must not skip their
-      // removal, and the removal records rather than throws, so the close runs.
-      await removeObjects(supabaseAdmin, created);
-      await context.close().catch(() => {});
-    }
+    const parsed = JSON.parse(result.body) as { storagePath: string; size: number };
+    expect(parsed.size).toBe(4096);
+    expect(parsed.storagePath.startsWith(`${userId}/`)).toBe(true);
   });
 });
