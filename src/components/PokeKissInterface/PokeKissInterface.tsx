@@ -400,6 +400,10 @@ export function PokeKissInterface() {
                 type="button"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
+                // Critically damped: motion's default scale spring (stiffness
+                // 550, damping 30) overshoots to ~1.07, and the hit area scales
+                // with it, covering History's edge until it settles.
+                transition={{ type: 'spring', stiffness: 550, damping: 47 }}
                 className="relative isolate ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-fill px-1.5 text-[11px] font-bold text-white after:absolute after:-inset-y-2 after:-right-4 after:-left-0.5 after:content-[''] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page"
                 onClick={handleBadgeClick}
                 data-testid="notification-badge"
