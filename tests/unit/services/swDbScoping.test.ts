@@ -13,7 +13,7 @@
  *    whole branch left the suite green, because every other test creates the
  *    store fresh and takes the `!contains('moods')` path instead.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { openDB, type IDBPDatabase } from 'idb';
@@ -64,13 +64,14 @@ describe('sw-db against a real database', () => {
   beforeEach(() => {
     // A fresh factory per test: these open at differing versions and a database
     // left behind by the previous test would skip the upgrade under test.
-    globalThis.indexedDB = new IDBFactory();
+    vi.stubGlobal('indexedDB', new IDBFactory());
     openConnections = [];
   });
 
   afterEach(() => {
     openConnections.forEach((db) => db.close());
     openConnections = [];
+    vi.unstubAllGlobals();
   });
 
   describe('getPendingMoods account scoping', () => {
