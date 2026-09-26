@@ -109,6 +109,44 @@ const SECRETS = {
 /** A bundled daily message: shared by everyone, and must SURVIVE sign-out. */
 const SHARED_DAILY_TEXT = 'A-BUNDLED-DAILY-MESSAGE';
 
+/** The bundled daily row. A new object per call, so no two seeds share one. */
+function sharedDaily() {
+  return {
+    id: 1,
+    text: SHARED_DAILY_TEXT,
+    category: 'reason',
+    isCustom: false,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  };
+}
+
+/**
+ * The signed-in account's own custom row. A new object per call:
+ * `currentMessage` is a copy of the pool row, never a reference into it.
+ */
+function ownCustom() {
+  return {
+    id: 7,
+    text: SECRETS.customMessage,
+    category: 'custom',
+    isCustom: true,
+    userId: SECRETS.userId,
+    createdAt: new Date('2026-08-03T06:00:00.000Z'),
+  };
+}
+
+/** A love note from the signed-in account to its partner. */
+function accountNote(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'note-1',
+    from_user_id: SECRETS.userId,
+    to_user_id: 'USER-B-ID',
+    content: SECRETS.chatMessage,
+    created_at: '2026-08-03T06:00:00.000Z',
+    ...overrides,
+  };
+}
+
 function moodEntry(userId: string, note: string) {
   return {
     id: 1,
@@ -142,15 +180,7 @@ function seedSignedInSession(): void {
     receivedRequests: [{ id: 'req-2', fromEmail: SECRETS.requestedEmail }],
     searchResults: [{ id: 'USER-C-ID', displayName: SECRETS.searchHitName }],
 
-    notes: [
-      {
-        id: 'note-1',
-        from_user_id: SECRETS.userId,
-        to_user_id: 'USER-B-ID',
-        content: SECRETS.chatMessage,
-        created_at: '2026-08-03T06:00:00.000Z',
-      },
-    ],
+    notes: [accountNote()],
     sentMessageTimestamps: [1],
     // Which messages the previous account removed is theirs, not the next
     // signer-in's — and left behind it would filter their notes by stale ids.
@@ -175,33 +205,10 @@ function seedSignedInSession(): void {
     ],
     customMessagesLoaded: true,
     favoriteError: 'A favorite write failed',
-    messages: [
-      {
-        id: 1,
-        text: SHARED_DAILY_TEXT,
-        category: 'reason',
-        isCustom: false,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      },
-      {
-        id: 7,
-        text: SECRETS.customMessage,
-        category: 'custom',
-        isCustom: true,
-        userId: SECRETS.userId,
-        createdAt: new Date('2026-08-03T06:00:00.000Z'),
-      },
-    ],
+    messages: [sharedDaily(), ownCustom()],
     // DailyMessage renders `currentMessage.text` straight onto Home, and it is
     // a COPY of the row rather than a reference into `messages`.
-    currentMessage: {
-      id: 7,
-      text: SECRETS.customMessage,
-      category: 'custom',
-      isCustom: true,
-      userId: SECRETS.userId,
-      createdAt: new Date('2026-08-03T06:00:00.000Z'),
-    },
+    currentMessage: ownCustom(),
 
     interactions: [{ id: 'int-1', from_user_id: 'USER-B-ID', type: 'poke' }],
     unviewedCount: 3,
@@ -448,13 +455,7 @@ describe('clearAuth on sign-out', () => {
     // The other half of the rule: a bundled row is not account state, and
     // nulling it would blank Home for the next account with nothing to
     // re-derive it before the next page load.
-    const shared = {
-      id: 1,
-      text: SHARED_DAILY_TEXT,
-      category: 'reason',
-      isCustom: false,
-      createdAt: new Date('2026-01-01T00:00:00.000Z'),
-    };
+    const shared = sharedDaily();
     useAppStore.setState({ currentMessage: shared } as unknown as Parameters<
       typeof useAppStore.setState
     >[0]);
@@ -588,14 +589,10 @@ describe('clearAuth on sign-out', () => {
 
     useAppStore.setState({
       notes: [
-        {
+        accountNote({
           id: 'note-failed',
-          from_user_id: SECRETS.userId,
-          to_user_id: 'USER-B-ID',
-          content: SECRETS.chatMessage,
-          created_at: '2026-08-03T06:00:00.000Z',
           imagePreviewUrl: 'blob:http://localhost/ORPHANED-BLOB',
-        },
+        }),
       ],
     } as unknown as Parameters<typeof useAppStore.setState>[0]);
 
@@ -616,14 +613,10 @@ describe('clearAuth on sign-out', () => {
     seedSignedInSession();
     useAppStore.setState({
       notes: [
-        {
+        accountNote({
           id: 'note-failed',
-          from_user_id: SECRETS.userId,
-          to_user_id: 'USER-B-ID',
-          content: SECRETS.chatMessage,
-          created_at: '2026-08-03T06:00:00.000Z',
           imagePreviewUrl: 'blob:http://localhost/SWITCH-ORPHANED-BLOB',
-        },
+        }),
       ],
     } as unknown as Parameters<typeof useAppStore.setState>[0]);
     expect(useAppStore.getState().notes.length).toBeGreaterThan(0);
@@ -683,9 +676,9 @@ describe('clearAuth on sign-out', () => {
         userId: 'OTHER-ACCOUNT', path: 'partner/pic.jpg', blob: 'OTHER-IMAGE' as never, savedAt: 1,
       });
       const at = new Date('2026-08-03T06:00:00.000Z');
-      const bundledId = await db.add('messages', {
-        text: SHARED_DAILY_TEXT, category: 'reason', isCustom: false, createdAt: at,
-      } as never);
+      // The id is IndexedDB's to assign.
+      const { id: _bundledId, ...bundledRow } = sharedDaily();
+      const bundledId = await db.add('messages', { ...bundledRow, createdAt: at } as never);
       const ownId = 900;
       const otherId = 901;
       const customRow = (id: number, userId: string, text: string, serverId: string) => ({

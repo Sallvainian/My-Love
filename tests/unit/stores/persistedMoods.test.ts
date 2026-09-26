@@ -12,33 +12,14 @@
  * adapter strips it on the way in. This drives that adapter directly.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-const STORAGE_KEY = 'my-love-storage';
+import { PERSISTED_MOOD, persistedBlob, STORAGE_KEY } from '../helpers/persistedBlob';
 
 /** A persisted blob shaped like the real one, including the leaked moods */
-function persistedBlob(extra: Record<string, unknown> = {}) {
-  return JSON.stringify({
-    version: 0,
-    state: {
-      isOnboarded: true,
-      settings: {
-        relationship: { anniversaries: [] },
-      },
-      messageHistory: { shownMessages: [], currentIndex: 0 },
-      moods: [
-        {
-          id: 1,
-          userId: 'user-A',
-          mood: 'sad',
-          moods: ['sad'],
-          note: 'a private note',
-          date: '2026-07-26',
-          timestamp: '2026-07-26T06:00:00.000Z',
-          synced: true,
-        },
-      ],
-      ...extra,
-    },
+function blobWithMoods(extra: Record<string, unknown> = {}): string {
+  return persistedBlob({
+    messageHistory: { shownMessages: [], currentIndex: 0 },
+    moods: [PERSISTED_MOOD],
+    ...extra,
   });
 }
 
@@ -64,7 +45,7 @@ describe('persisted moods', () => {
 
   it('does not write moods back into localStorage', async () => {
     localStorage.clear();
-    localStorage.setItem(STORAGE_KEY, persistedBlob());
+    localStorage.setItem(STORAGE_KEY, blobWithMoods());
 
     vi.resetModules();
     const { useAppStore } = await import('@/stores/useAppStore');
@@ -97,7 +78,7 @@ describe('persisted moods', () => {
   it('leaves the rest of the persisted state intact', async () => {
     // Stripping one key must not look like corruption and blow away settings —
     // the adapter clears the whole blob when validation fails.
-    await readThroughAdapter(persistedBlob());
+    await readThroughAdapter(blobWithMoods());
 
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);
 
@@ -107,7 +88,7 @@ describe('persisted moods', () => {
 
   it('does not hydrate the stored moods into store state', async () => {
     localStorage.clear();
-    localStorage.setItem(STORAGE_KEY, persistedBlob());
+    localStorage.setItem(STORAGE_KEY, blobWithMoods());
 
     vi.resetModules();
     const { useAppStore } = await import('@/stores/useAppStore');
@@ -117,7 +98,7 @@ describe('persisted moods', () => {
     expect(useAppStore.getState().moods).toEqual([]);
   });
   it('discards legacy global favorite IDs on hydration and omits them from new writes', async () => {
-    localStorage.setItem(STORAGE_KEY, persistedBlob({
+    localStorage.setItem(STORAGE_KEY, blobWithMoods({
       messageHistory: { shownMessages: [], currentIndex: 0, favoriteIds: [17, 42] },
     }));
     const { useAppStore } = await import('@/stores/useAppStore');

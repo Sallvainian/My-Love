@@ -121,6 +121,18 @@ function currentEvents(): CoupleEvent[] {
 const ok: EventWriteResult = { success: true };
 const loadOk: EventLoadResult = { status: 'success' };
 
+type EventWriteFailure = Extract<EventWriteResult, { success: false }>;
+
+/** A refused write, as the slice resolves it. */
+function writeFailure(code: EventWriteFailure['code'], error: string): EventWriteFailure {
+  return { success: false, code, error };
+}
+
+/** A save whose response could not be read: it may or may not have landed. */
+const UNREADABLE = writeFailure('invalid-response', 'Unreadable response');
+/** A write against a row that is gone or no longer the caller's. */
+const STALE = writeFailure('not-found', 'Stale row');
+
 // Use the real auth transitions against the subscribable double: in particular,
 // clearAuth must synchronously reset event state and invalidate load ownership.
 const authSlice = createAuthSlice(
@@ -460,11 +472,7 @@ describe('EventsSettings list states', () => {
             };
           })
       ),
-      addEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'transport' as const,
-        error: 'This event did not save',
-      })),
+      addEvent: vi.fn(async () => writeFailure('transport', 'This event did not save')),
     });
 
     render(<EventsSettings />);
@@ -1040,11 +1048,9 @@ describe('EventsSettings add', () => {
   it('keeps the form open and renders the write’s own message when the save is rejected', async () => {
     const user = userEvent.setup();
     setStore({
-      addEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'offline' as const,
-        error: 'You are offline. Events need a connection to save.',
-      })),
+      addEvent: vi.fn(async () =>
+        writeFailure('offline', 'You are offline. Events need a connection to save.')
+      ),
     });
 
     await renderSection();
@@ -1104,11 +1110,7 @@ describe('EventsSettings add', () => {
     async (code, offersRefresh, expectedError) => {
       const user = userEvent.setup();
       setStore({
-        addEvent: vi.fn(async () => ({
-          success: false as const,
-          code,
-          error: 'The same returned message',
-        })),
+        addEvent: vi.fn(async () => writeFailure(code, 'The same returned message')),
       });
 
       await renderSection();
@@ -1252,11 +1254,9 @@ describe('EventsSettings edit', () => {
     const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
-      editEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Event not found or not yours to edit',
-      })),
+      editEvent: vi.fn(async () =>
+        writeFailure('not-found', 'Event not found or not yours to edit')
+      ),
     });
 
     await renderSection();
@@ -1277,11 +1277,9 @@ describe('EventsSettings edit', () => {
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
-      editEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'This prose is deliberately arbitrary',
-      })),
+      editEvent: vi.fn(async () =>
+        writeFailure('not-found', 'This prose is deliberately arbitrary')
+      ),
     });
 
     await renderSection();
@@ -1320,11 +1318,7 @@ describe('EventsSettings edit', () => {
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
-      editEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Stale row',
-      })),
+      editEvent: vi.fn(async () => STALE),
     });
 
     await renderSection();
@@ -1359,11 +1353,7 @@ describe('EventsSettings edit', () => {
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
-      editEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Stale row',
-      })),
+      editEvent: vi.fn(async () => STALE),
     });
 
     render(<EventsSettings />);
@@ -1449,7 +1439,7 @@ describe.each([
       'An arbitrary returned message',
     ])('explains uncertainty and preserves the fields for invalid-response: %s', async (error) => {
       const user = userEvent.setup();
-      saveAction().mockResolvedValueOnce({ success: false, code: 'invalid-response', error });
+      saveAction().mockResolvedValueOnce(writeFailure('invalid-response', error));
       await renderSection();
       await prepareForm(user);
       await submitForm(user);
@@ -1472,17 +1462,14 @@ describe.each([
       const user = userEvent.setup();
       let finishSave!: (result: EventWriteResult) => void;
       const pendingSave = new Promise<EventWriteResult>((resolve) => { finishSave = resolve; });
-      const failure: EventWriteResult = {
-        success: false, code: 'invalid-response', error: 'Unreadable response',
-      };
-      saveAction().mockReturnValueOnce(pendingSave).mockResolvedValue(failure);
+      saveAction().mockReturnValueOnce(pendingSave).mockResolvedValue(UNREADABLE);
       await renderSection();
       await prepareForm(user);
       await submitForm(user);
       const form = screen.getByTestId('events-form-label').closest('form')!;
 
       await act(async () => {
-        finishSave(failure);
+        finishSave(UNREADABLE);
         // The save continuation has received invalid-response, but React still
         // exposes the previous render's submit handler during this microtask.
         await Promise.resolve();
@@ -1498,9 +1485,7 @@ describe.each([
 
     it('blocks direct and keyboard submissions, including after field edits', async () => {
       const user = userEvent.setup();
-      saveAction().mockResolvedValue({
-        success: false, code: 'invalid-response', error: 'Unreadable response',
-      });
+      saveAction().mockResolvedValue(UNREADABLE);
       await renderSection();
       await prepareForm(user);
       await submitForm(user);
@@ -1542,9 +1527,7 @@ describe.each([
       const user = userEvent.setup();
       const pending = deferredLoad();
       const loadEvents = vi.mocked(store.state.loadEvents as AppState['loadEvents']);
-      saveAction().mockResolvedValueOnce({
-        success: false, code: 'invalid-response', error: 'Unreadable response',
-      });
+      saveAction().mockResolvedValueOnce(UNREADABLE);
       await renderSection();
       loadEvents.mockImplementationOnce(() => {
         store.patch({ eventsIsLoading: true, eventsError: null });
@@ -1587,9 +1570,7 @@ describe.each([
       const refresh = deferredLoad();
       const retry = deferredLoad();
       const loadEvents = vi.mocked(store.state.loadEvents as AppState['loadEvents']);
-      saveAction().mockResolvedValueOnce({
-        success: false, code: 'invalid-response', error: 'Unreadable response',
-      });
+      saveAction().mockResolvedValueOnce(UNREADABLE);
       await renderSection();
       loadEvents.mockImplementationOnce(() => {
         store.patch({ eventsIsLoading: true, eventsError: null });
@@ -1643,7 +1624,7 @@ describe.each([
     it.each(['offline', 'transport'] as const)('allows a deliberate %s retry with the entered fields', async (code) => {
       const user = userEvent.setup();
       const error = `Returned ${code} message`;
-      saveAction().mockResolvedValueOnce({ success: false, code, error });
+      saveAction().mockResolvedValueOnce(writeFailure(code, error));
       await renderSection();
       await prepareForm(user);
       await submitForm(user);
@@ -1720,11 +1701,9 @@ describe('EventsSettings delete', () => {
     const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine', label: 'Harper visits' })] as AppState['events'],
-      removeEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Event not found or not yours to delete',
-      })),
+      removeEvent: vi.fn(async () =>
+        writeFailure('not-found', 'Event not found or not yours to delete')
+      ),
     });
 
     await renderSection();
@@ -1746,11 +1725,9 @@ describe('EventsSettings delete', () => {
     const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
-      removeEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'transport' as const,
-        error: 'Event not found or not yours to delete',
-      })),
+      removeEvent: vi.fn(async () =>
+        writeFailure('transport', 'Event not found or not yours to delete')
+      ),
     });
 
     await renderSection();
@@ -1793,11 +1770,7 @@ describe('EventsSettings delete', () => {
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
-      removeEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Stale row',
-      })),
+      removeEvent: vi.fn(async () => STALE),
     });
 
     await renderSection();
@@ -2157,7 +2130,7 @@ describe('EventsSettings authentication session ownership', () => {
       .mockResolvedValueOnce(loadOk)
       .mockReturnValueOnce(refresh.promise)
       .mockReturnValueOnce(current.promise);
-    const missing: EventWriteResult = { success: false, code: 'not-found', error: 'Event removed' };
+    const missing = writeFailure('not-found', 'Event removed');
     setStore({
       events: [makeEvent({ id: 'mine' })],
       loadEvents,

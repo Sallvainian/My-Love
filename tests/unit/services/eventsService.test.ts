@@ -23,6 +23,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const USER_ID = 'USER-A-ID';
 const PARTNER_ID = 'USER-B-ID';
+// Rows per window when the caller names no limit. A page reads one row past it
+// to learn whether more remain.
+const PAGE_SIZE = 50; // src/services/eventsService.ts DEFAULT_EVENTS_PAGE_SIZE (module-private)
 
 interface EventRow {
   id: string;
@@ -99,6 +102,11 @@ function row(overrides: Partial<EventRow> = {}): EventRow {
     updated_at: '2026-08-18T00:00:00.000Z',
     ...overrides,
   };
+}
+
+/** PostgREST's row-level-security refusal (SQLSTATE 42501, insufficient_privilege). */
+function permissionDenied(message = 'permission denied'): FakePostgrestError {
+  return { code: '42501', message, details: '', hint: '' };
 }
 
 /** Evaluate the supported PostgREST boolean grammar independently of page logic. */
@@ -272,7 +280,12 @@ import {
   eventsService,
   isEventIcon,
   parseEventDate,
+  type EventCreateInput,
 } from '@/services/eventsService';
+
+function eventInput(overrides: Partial<EventCreateInput> = {}): EventCreateInput {
+  return { userId: USER_ID, label: 'x', eventDate: '2026-10-01', ...overrides };
+}
 
 async function eventWriteFailure(promise: Promise<unknown>): Promise<EventWriteError> {
   const failure = await promise.then(
@@ -378,19 +391,22 @@ describe('eventsService', () => {
     });
     afterEach(() => vi.useRealTimers());
 
-    it.each([0, 50, 51])('returns truthful raw continuation for %i rows in each window', async (count) => {
+    // Empty, exactly one page, and one row past it.
+    const WINDOW_SIZES = [0, PAGE_SIZE, PAGE_SIZE + 1];
+    it.each(WINDOW_SIZES)('returns truthful raw continuation for %i rows in each window', async (count) => {
       backend.rows = ['2026-09-11', '2026-09-12'].flatMap((date, side) =>
         Array.from({ length: count }, (_, index) => row({
           id: `${side}-${String(index).padStart(3, '0')}`, event_date: date,
         }))
       );
       const page = await eventsService.getEventsPage();
-      expect(page.events).toHaveLength(Math.min(count, 50) * 2);
-      expect(page.pagination.upcoming.hasMore).toBe(count > 50);
-      expect(page.pagination.past.hasMore).toBe(count > 50);
+      expect(page.events).toHaveLength(Math.min(count, PAGE_SIZE) * 2);
+      expect(page.pagination.upcoming.hasMore).toBe(count > PAGE_SIZE);
+      expect(page.pagination.past.hasMore).toBe(count > PAGE_SIZE);
       expect(backend.queries).toHaveLength(2);
       for (const query of backend.queries) {
-        expect(query.range).toEqual({ from: 0, to: 50 });
+        // PostgREST's range is inclusive, so `to: PAGE_SIZE` is the one-row lookahead.
+        expect(query.range).toEqual({ from: 0, to: PAGE_SIZE });
         expect(query.orderings.map((order) => order.column)).toEqual(['event_date', 'created_at', 'id']);
       }
       expect(backend.filters).toEqual([]);
@@ -398,7 +414,7 @@ describe('eventsService', () => {
     });
 
     it('continues only unfinished windows, with fixed local today across midnight', async () => {
-      backend.rows = Array.from({ length: 101 }, (_, index) => row({
+      backend.rows = Array.from({ length: 2 * PAGE_SIZE + 1 }, (_, index) => row({
         id: `past-${String(index).padStart(3, '0')}`, event_date: '2026-09-11',
       })).concat(row({ id: 'upcoming', event_date: '2026-09-12' }));
       const first = await eventsService.getEventsPage();
@@ -406,9 +422,9 @@ describe('eventsService', () => {
       const second = await eventsService.getEventsPage(first.pagination);
       const last = await eventsService.getEventsPage(second.pagination);
       const all = [...first.events, ...second.events, ...last.events];
-      expect(all).toHaveLength(102);
-      expect(new Set(all.map((event) => event.id)).size).toBe(102);
-      expect(second.events).toHaveLength(50);
+      expect(all).toHaveLength(2 * PAGE_SIZE + 2);
+      expect(new Set(all.map((event) => event.id)).size).toBe(2 * PAGE_SIZE + 2);
+      expect(second.events).toHaveLength(PAGE_SIZE);
       expect(last.events).toHaveLength(1);
       expect(last.pagination.past.hasMore).toBe(false);
       expect(backend.queries).toHaveLength(4);
@@ -443,7 +459,7 @@ describe('eventsService', () => {
     });
 
     it('does not shift a page after a previously read row is deleted', async () => {
-      backend.rows = Array.from({ length: 51 }, (_, index) => row({
+      backend.rows = Array.from({ length: PAGE_SIZE + 1 }, (_, index) => row({
         id: `event-${String(index).padStart(3, '0')}`, event_date: '2026-09-11',
       }));
       const first = await eventsService.getEventsPage();
@@ -453,7 +469,7 @@ describe('eventsService', () => {
     });
 
     it('advances raw cursors even when an entire page cannot convert', async () => {
-      backend.rows = Array.from({ length: 51 }, (_, index) => row({
+      backend.rows = Array.from({ length: PAGE_SIZE + 1 }, (_, index) => row({
         id: `event-${String(index).padStart(3, '0')}`, event_date: 'infinity',
       }));
       const first = await eventsService.getEventsPage();
@@ -463,21 +479,21 @@ describe('eventsService', () => {
       const last = await eventsService.getEventsPage(first.pagination);
       expect(last.events).toEqual([]);
       expect(last.pagination.upcoming.hasMore).toBe(false);
-      expect(console.error).toHaveBeenCalledTimes(51);
+      expect(console.error).toHaveBeenCalledTimes(PAGE_SIZE + 1);
     });
 
     it('keeps lookahead truthful before cross-window deduplication', async () => {
-      backend.nextData = Array.from({ length: 51 }, (_, index) => row({ id: String(index) }));
+      backend.nextData = Array.from({ length: PAGE_SIZE + 1 }, (_, index) => row({ id: String(index) }));
       const page = await eventsService.getEventsPage();
-      expect(page.events).toHaveLength(50);
-      expect(new Set(page.events.map((event) => event.id)).size).toBe(50);
+      expect(page.events).toHaveLength(PAGE_SIZE);
+      expect(new Set(page.events.map((event) => event.id)).size).toBe(PAGE_SIZE);
       expect(page.pagination.past.hasMore).toBe(true);
       expect(page.pagination.upcoming.hasMore).toBe(true);
     });
 
     it.each(['gte', 'lt'] as const)('retries both unfinished windows after the %s window fails', async (bound) => {
       backend.rows = ['2026-09-11', '2026-09-12'].flatMap((eventDate, side) =>
-        Array.from({ length: 51 }, (_, index) => row({
+        Array.from({ length: PAGE_SIZE + 1 }, (_, index) => row({
           id: `event-${side}-${index}`, event_date: eventDate,
         }))
       );
@@ -557,7 +573,7 @@ describe('eventsService', () => {
           // The created_at tiebreak: Postgres leaves same-day order unspecified.
           { column: 'created_at', ascending: true },
         ],
-        range: { from: 0, to: 49 },
+        range: { from: 0, to: PAGE_SIZE - 1 },
       });
       expect(windowFor('lt')).toEqual({
         bounds: [{ column: 'event_date', op: 'lt', value: '2026-08-19' }],
@@ -565,7 +581,7 @@ describe('eventsService', () => {
           { column: 'event_date', ascending: false },
           { column: 'created_at', ascending: false },
         ],
-        range: { from: 0, to: 49 },
+        range: { from: 0, to: PAGE_SIZE - 1 },
       });
       // Exactly two, and only two. `windowFor` uses `.find`, so without this a
       // regression that added a third — an unbounded `.select('*')` alongside
@@ -719,8 +735,8 @@ describe('eventsService', () => {
 
       const events = await eventsService.getEvents(limit);
 
-      expect(windowFor('gte')?.range).toEqual({ from: 0, to: 49 });
-      expect(windowFor('lt')?.range).toEqual({ from: 0, to: 49 });
+      expect(windowFor('gte')?.range).toEqual({ from: 0, to: PAGE_SIZE - 1 });
+      expect(windowFor('lt')?.range).toEqual({ from: 0, to: PAGE_SIZE - 1 });
       expect(events.map((e) => e.id)).toEqual(['upcoming']);
     });
 
@@ -874,12 +890,7 @@ describe('eventsService', () => {
     });
 
     it('throws the mapped message when the query is rejected', async () => {
-      backend.nextError = {
-        code: '42501',
-        message: 'permission denied',
-        details: '',
-        hint: '',
-      };
+      backend.nextError = permissionDenied();
 
       await expect(eventsService.getEvents()).rejects.toThrow(
         /Permission denied - check Row Level Security policies/
@@ -900,12 +911,7 @@ describe('eventsService', () => {
           row({ id: 'upcoming', event_date: dateFromToday(5) }),
         ];
         backend.errorForBound = bound;
-        backend.nextError = {
-          code: '42501',
-          message: 'permission denied',
-          details: '',
-          hint: '',
-        };
+        backend.nextError = permissionDenied();
 
         await expect(eventsService.getEvents()).rejects.toThrow(
           /Permission denied - check Row Level Security policies/
@@ -978,7 +984,7 @@ describe('eventsService', () => {
       setOnline(false);
 
       const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
+        eventsService.createEvent(eventInput())
       );
       expect(failure).toMatchObject({
         code: 'offline',
@@ -990,7 +996,7 @@ describe('eventsService', () => {
 
     it('refuses an unreadable date before issuing any request', async () => {
       const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: 'infinity' })
+        eventsService.createEvent(eventInput({ eventDate: 'infinity' }))
       );
       expect(failure).toMatchObject({
         code: 'validation',
@@ -1004,7 +1010,7 @@ describe('eventsService', () => {
       backend.nextData = null;
 
       const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
+        eventsService.createEvent(eventInput())
       );
 
       expect(failure).toMatchObject({
@@ -1017,7 +1023,7 @@ describe('eventsService', () => {
       backend.nextData = [row({ event_date: 'infinity' })];
 
       const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
+        eventsService.createEvent(eventInput())
       );
 
       expect(failure).toMatchObject({
@@ -1027,15 +1033,10 @@ describe('eventsService', () => {
     });
 
     it('surfaces the reason when the insert is rejected', async () => {
-      backend.nextError = {
-        code: '42501',
-        message: 'new row violates row-level security policy',
-        details: '',
-        hint: '',
-      };
+      backend.nextError = permissionDenied('new row violates row-level security policy');
 
       const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: PARTNER_ID, label: 'x', eventDate: '2026-10-01' })
+        eventsService.createEvent(eventInput({ userId: PARTNER_ID }))
       );
       expect(failure.code).toBe('transport');
       expect(failure.message).toMatch(/Permission denied - check Row Level Security policies/);
@@ -1049,7 +1050,7 @@ describe('eventsService', () => {
       backend.nextError = originalError;
 
       const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
+        eventsService.createEvent(eventInput())
       );
 
       expect(failure.message).toBe(
@@ -1168,7 +1169,7 @@ describe('eventsService', () => {
 
     it('surfaces the reason when the update is rejected', async () => {
       backend.rows = [row({ id: 'event-1' })];
-      backend.nextError = { code: '42501', message: 'permission denied', details: '', hint: '' };
+      backend.nextError = permissionDenied();
 
       const failure = await eventWriteFailure(
         eventsService.updateEvent('event-1', { label: 'x' })
@@ -1232,7 +1233,7 @@ describe('eventsService', () => {
     });
 
     it('surfaces the reason when the delete is rejected', async () => {
-      backend.nextError = { code: '42501', message: 'permission denied', details: '', hint: '' };
+      backend.nextError = permissionDenied();
 
       const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
       expect(failure.code).toBe('transport');
@@ -1257,10 +1258,7 @@ describe('eventsService', () => {
   });
 
   describe.each([
-    [
-      'createEvent',
-      () => eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' }),
-    ],
+    ['createEvent', () => eventsService.createEvent(eventInput())],
     ['updateEvent', () => eventsService.updateEvent('event-1', { label: 'x' })],
     ['deleteEvent', () => eventsService.deleteEvent('event-1')],
   ] as const)('%s transport rejections', (operation, write) => {

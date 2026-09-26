@@ -42,6 +42,9 @@ import { couplePair, coupleSettingsService } from '../../../src/services/coupleS
 const LOW = '00000000-0000-4000-8000-000000000001';
 const HIGH = '00000000-0000-4000-8000-000000000002';
 
+/** A stored couple_settings row, addressed by the ordered pair. */
+const settingsRow = (overrides: Record<string, unknown> = {}) => ({ user_a: LOW, user_b: HIGH, ...overrides });
+
 function setOnline(online: boolean) {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online);
 }
@@ -70,7 +73,7 @@ describe('couplePair', () => {
 describe('fetchCoupleSettings', () => {
   it('reads the ordered pair and returns the start as an ISO string', async () => {
     results.push({
-      data: { user_a: LOW, user_b: HIGH, relationship_start: '2025-10-04T22:00:00+00:00' },
+      data: settingsRow({ relationship_start: '2025-10-04T22:00:00+00:00' }),
       error: null,
     });
 
@@ -95,11 +98,11 @@ describe('fetchCoupleSettings', () => {
 
   it('returns the wedding date as the server stored it, and an unreadable one as unset', async () => {
     results.push({
-      data: { user_a: LOW, user_b: HIGH, relationship_start: null, wedding_date: '2027-06-19' },
+      data: settingsRow({ relationship_start: null, wedding_date: '2027-06-19' }),
       error: null,
     });
     results.push({
-      data: { user_a: LOW, user_b: HIGH, relationship_start: null, wedding_date: 'garbage' },
+      data: settingsRow({ relationship_start: null, wedding_date: 'garbage' }),
       error: null,
     });
 
@@ -136,7 +139,7 @@ describe('fetchCoupleSettings', () => {
 describe('saveStartDate', () => {
   it('upserts the ordered pair on its key and returns the stored start', async () => {
     results.push({
-      data: { user_a: LOW, user_b: HIGH, relationship_start: '2025-10-04T22:00:00+00:00' },
+      data: settingsRow({ relationship_start: '2025-10-04T22:00:00+00:00' }),
       error: null,
     });
 
@@ -176,12 +179,7 @@ describe('saveStartDate', () => {
 describe('saveWeddingDate', () => {
   it('upserts only the wedding date and updated_at, never the start date', async () => {
     results.push({
-      data: {
-        user_a: LOW,
-        user_b: HIGH,
-        relationship_start: '2025-10-04T22:00:00+00:00',
-        wedding_date: '2027-06-19',
-      },
+      data: settingsRow({ relationship_start: '2025-10-04T22:00:00+00:00', wedding_date: '2027-06-19' }),
       error: null,
     });
 
@@ -199,7 +197,7 @@ describe('saveWeddingDate', () => {
 
   it('clears the wedding date by sending null', async () => {
     results.push({
-      data: { user_a: LOW, user_b: HIGH, relationship_start: null, wedding_date: null },
+      data: settingsRow({ relationship_start: null, wedding_date: null }),
       error: null,
     });
 

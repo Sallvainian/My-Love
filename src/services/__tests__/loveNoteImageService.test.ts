@@ -34,6 +34,22 @@ function createSessionResponse(accessToken: string | null): SessionResponse {
   } as unknown as SessionResponse;
 }
 
+/** The picture every upload test hands the service. */
+function jpegFile(): File {
+  return new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
+}
+
+/** A refusal from the upload Edge Function: its status and JSON error body. */
+function edgeError(
+  status: number,
+  error: string,
+  message?: string,
+  detail: Record<string, string> = {}
+) {
+  const body = { error, ...(message === undefined ? {} : { message }), ...detail };
+  return { ok: false, status, json: () => Promise.resolve(body) };
+}
+
 function createStorageBucket(overrides: Partial<StorageBucket> = {}): StorageBucket {
   return {
     upload: vi.fn(),
@@ -132,7 +148,7 @@ describe('loveNoteImageService', () => {
           }),
       });
 
-      const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
       const userId = 'user-123';
 
       const result = await uploadLoveNoteImage(mockFile, userId);
@@ -186,7 +202,7 @@ describe('loveNoteImageService', () => {
 
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse(null));
 
-      const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow('Not authenticated');
     });
@@ -196,17 +212,11 @@ describe('loveNoteImageService', () => {
 
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 429,
-        json: () =>
-          Promise.resolve({
-            error: 'Rate limit exceeded',
-            message: 'Too many uploads. Please wait a minute.',
-          }),
-      });
+      mockFetch.mockResolvedValue(
+        edgeError(429, 'Rate limit exceeded', 'Too many uploads. Please wait a minute.')
+      );
 
-      const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
         'Too many uploads. Please wait a minute and try again.'
@@ -218,17 +228,9 @@ describe('loveNoteImageService', () => {
 
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 413,
-        json: () =>
-          Promise.resolve({
-            error: 'File too large',
-            message: 'Maximum file size is 5MB',
-          }),
-      });
+      mockFetch.mockResolvedValue(edgeError(413, 'File too large', 'Maximum file size is 5MB'));
 
-      const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
         'Image is too large. Please try a smaller image.'
@@ -240,17 +242,11 @@ describe('loveNoteImageService', () => {
 
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 415,
-        json: () =>
-          Promise.resolve({
-            error: 'Invalid file type',
-            detectedType: 'application/pdf',
-          }),
-      });
+      mockFetch.mockResolvedValue(
+        edgeError(415, 'Invalid file type', undefined, { detectedType: 'application/pdf' })
+      );
 
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
         'Invalid image type. Please use JPEG, PNG, WebP, or GIF.'
@@ -262,17 +258,11 @@ describe('loveNoteImageService', () => {
 
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 411,
-        json: () =>
-          Promise.resolve({
-            error: 'Length required',
-            message: 'A Content-Length header is required',
-          }),
-      });
+      mockFetch.mockResolvedValue(
+        edgeError(411, 'Length required', 'A Content-Length header is required')
+      );
 
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
         'Image upload was interrupted. Please try again.'
@@ -284,17 +274,15 @@ describe('loveNoteImageService', () => {
 
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: () =>
-          Promise.resolve({
-            error: 'Content-Length mismatch',
-            message: 'Content-Length declared 1048576 bytes but 524288 were received',
-          }),
-      });
+      mockFetch.mockResolvedValue(
+        edgeError(
+          400,
+          'Content-Length mismatch',
+          'Content-Length declared 1048576 bytes but 524288 were received'
+        )
+      );
 
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
         'Image upload was interrupted. Please try again.'
@@ -343,15 +331,7 @@ describe('loveNoteImageService', () => {
 
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 500,
-        json: () =>
-          Promise.resolve({
-            error: 'Upload failed',
-            message: 'Network error',
-          }),
-      });
+      mockFetch.mockResolvedValue(edgeError(500, 'Upload failed', 'Network error'));
 
       const mockBlob = new Blob(['data'], { type: 'image/jpeg' });
 

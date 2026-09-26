@@ -46,6 +46,12 @@ const photo = {
   caption: 'a photo',
 } as unknown as PhotoWithUrls;
 
+/** The first photo plus a second one, for navigation and delete cases. */
+const TWO_PHOTOS = [
+  photo,
+  { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
+];
+
 function Harness({ open }: { open: boolean }) {
   return (
     <>
@@ -105,12 +111,8 @@ describe('PhotoViewer focus', () => {
   it('suspends arrow-key navigation while the delete confirmation is open', async () => {
     // The dialog names the photo on screen; navigating behind it would leave
     // the dialog asking about a photo the user can no longer see.
-    const two = [
-      photo,
-      { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
-    ];
     const user = userEvent.setup();
-    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+    render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     await user.click(screen.getByLabelText('Delete photo'));
     expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
@@ -194,11 +196,7 @@ describe('PhotoViewer focus', () => {
     deletePhotoMock.mockClear();
     let resolveDelete!: (deleted: boolean) => void;
     deletePhotoMock.mockReturnValue(new Promise<boolean>((r) => (resolveDelete = r)));
-    const two = [
-      photo,
-      { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
-    ];
-    render(<PhotoViewer photos={two} selectedPhotoId="photo-2" onClose={vi.fn()} />);
+    render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-2" onClose={vi.fn()} />);
 
     await user.click(screen.getByLabelText('Delete photo'));
     const deleteButton = await screen.findByRole('button', { name: 'Delete' });
@@ -235,12 +233,8 @@ describe('PhotoViewer focus', () => {
     // The focused Delete button unmounts with the dialog; without the explicit
     // refocus, focus falls to <body> and the trap's Tab cycle dies.
     deletePhotoMock.mockResolvedValue(true);
-    const two = [
-      photo,
-      { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
-    ];
     const user = userEvent.setup();
-    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+    render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     await user.click(screen.getByLabelText('Delete photo'));
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
@@ -259,12 +253,8 @@ describe('PhotoViewer focus', () => {
     // re-opens the wrong-photo deletion the arrow guard closed, and "Close
     // viewer" unmounts the viewer around the open confirmation. Disabling them
     // also drops them from FOCUSABLE_SELECTOR, confining Tab to Cancel/Delete.
-    const two = [
-      photo,
-      { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
-    ];
     const user = userEvent.setup();
-    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+    render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     await user.click(screen.getByLabelText('Delete photo'));
     expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
@@ -308,16 +298,11 @@ describe('PhotoViewer failed delete', () => {
   // deletePhoto resolves false on failure (offline, server error) rather than
   // rejecting. The confirmation used to close anyway, leaving the photo on
   // screen with nothing to say the delete had not happened.
-  const two = [
-    photo,
-    { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
-  ];
-
   it('keeps the confirmation open with an alert, and focus inside it', async () => {
     deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValue(false);
     const user = userEvent.setup();
-    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+    render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     await user.click(screen.getByLabelText('Delete photo'));
     // The click focuses Delete, so focus leaves the auto-focused Cancel and
@@ -341,7 +326,7 @@ describe('PhotoViewer failed delete', () => {
     deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const user = userEvent.setup();
-    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+    render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     await user.click(screen.getByLabelText('Delete photo'));
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
@@ -362,7 +347,7 @@ describe('PhotoViewer failed delete', () => {
     deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValue(false);
     const user = userEvent.setup();
-    render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
+    render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     await user.click(screen.getByLabelText('Delete photo'));
     await user.click(await screen.findByRole('button', { name: 'Delete' }));

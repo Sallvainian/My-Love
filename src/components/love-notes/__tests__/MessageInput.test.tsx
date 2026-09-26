@@ -55,6 +55,9 @@ vi.stubGlobal('URL', {
   revokeObjectURL: vi.fn(),
 });
 
+/** The picture a user attaches in every image test. */
+const jpegFile = () => new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+
 describe('MessageInput', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -141,7 +144,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
 
@@ -182,7 +185,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
 
@@ -199,7 +202,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
 
@@ -216,7 +219,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
 
@@ -260,7 +263,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
 
@@ -334,7 +337,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
 
@@ -359,7 +362,7 @@ describe('MessageInput', () => {
 
       // Select image
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
       await user.upload(fileInput, mockFile);
 
       // Type caption
@@ -391,7 +394,7 @@ describe('MessageInput', () => {
 
       // Add image
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
       await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
@@ -446,7 +449,7 @@ describe('MessageInput', () => {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      await user.upload(fileInput, new File(['test'], 'photo.jpg', { type: 'image/jpeg' }));
+      await user.upload(fileInput, jpegFile());
       await user.type(screen.getByRole('textbox'), 'Look!');
       await waitFor(() => {
         expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
@@ -524,7 +527,7 @@ describe('MessageInput', () => {
 
       // Add image
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = jpegFile();
       await user.upload(fileInput, mockFile);
 
       await waitFor(() => {

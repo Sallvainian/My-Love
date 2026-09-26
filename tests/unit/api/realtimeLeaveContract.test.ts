@@ -304,6 +304,12 @@ describe('the SDK leave/close contract the channel registries depend on', () => 
 const MOOD_TOPIC = `mood-updates:${harness.USER_ID}`;
 const MOOD_REALTIME_TOPIC = `realtime:${MOOD_TOPIC}`;
 
+/**
+ * The first reopen after an unsolicited CLOSED waits the base delay (retry
+ * count 0, so `baseDelay * 2 ** 0`).
+ */
+const FIRST_MOOD_REOPEN_DELAY_MS = 1000; // src/api/moodSyncService.ts RETRY_CONFIG.baseDelay (module-private)
+
 function installMoodClient(): void {
   const client = new RealtimeClient('ws://localhost:54321/realtime/v1', {
     params: { apikey: 'test-anon-key' },
@@ -360,7 +366,7 @@ describe('moodSyncService unsolicited CLOSED reopen', () => {
     serverCloses(MOOD_REALTIME_TOPIC);
     await Promise.resolve();
 
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(FIRST_MOOD_REOPEN_DELAY_MS);
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
@@ -386,7 +392,7 @@ describe('moodSyncService unsolicited CLOSED reopen', () => {
     unsubscribe();
     await Promise.resolve();
 
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(FIRST_MOOD_REOPEN_DELAY_MS);
     await Promise.resolve();
     await Promise.resolve();
 

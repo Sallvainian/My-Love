@@ -24,6 +24,15 @@ const BASE_REPORTERS = [
   ['./tests/support/reporters/failure-summary-reporter.ts'],
 ];
 
+/**
+ * GitHub Actions run ids the e2e shard-count comment in
+ * `.github/workflows/test.yml` cites as its evidence: the run whose timings
+ * justify 2 shards, and the run behind the historical 381s figure. The comment
+ * must keep both, so the choice stays checkable.
+ */
+const SHARD_MEASUREMENT_RUN_ID = '35056348791';
+const HISTORICAL_BASELINE_RUN_ID = '32279178457';
+
 describe('Playwright shard reporting', () => {
   it.each([
     [undefined, BASE_REPORTERS],
@@ -66,8 +75,8 @@ describe('Playwright shard reporting', () => {
     expect(job('burn-in')).toMatch(/shard: \[1, 2, 3\]/);
     expect(workflow).not.toContain('scripture-reflection-2.2-errors');
     expect(workflow).not.toContain('scripture-stats');
-    expect(shards).toContain('35056348791');
-    expect(shards).toContain('32279178457');
+    expect(shards).toContain(SHARD_MEASUREMENT_RUN_ID);
+    expect(shards).toContain(HISTORICAL_BASELINE_RUN_ID);
   });
 
   it('pins CI workers to 2 and drops the scripture shard-block comment', async () => {

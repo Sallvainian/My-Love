@@ -41,6 +41,8 @@ const real = {
 };
 
 const LINKED = { status: 'linked', partnerId: 'p', relationshipStart: null } as const;
+/** A profile with neither a chosen name nor a birthday. */
+const NO_PROFILE = { displayName: null, birthday: null } as const;
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -57,7 +59,7 @@ afterEach(() => {
 
 describe('Settings — Birthday', () => {
   it('shows "Not set yet" and an empty field when no birthday is saved', () => {
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
+    useAppStore.setState({ ownProfile: NO_PROFILE });
     render(<Settings />);
 
     expect(screen.getByTestId('settings-birthday-value')).toHaveTextContent('Not set yet');
@@ -75,7 +77,7 @@ describe('Settings — Birthday', () => {
 
   it('saves the picked date as YYYY-MM-DD', async () => {
     const user = userEvent.setup();
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
+    useAppStore.setState({ ownProfile: NO_PROFILE });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setBirthday: save });
     render(<Settings />);
@@ -97,7 +99,7 @@ describe('Settings — Birthday', () => {
 
     it('refuses a birthday that is not in the past, and sends nothing', async () => {
       const user = userEvent.setup();
-      useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
+      useAppStore.setState({ ownProfile: NO_PROFILE });
       const save = vi.fn(async () => {});
       useAppStore.setState({ setBirthday: save });
       render(<Settings />);
@@ -113,7 +115,7 @@ describe('Settings — Birthday', () => {
 
     it('accepts yesterday, the latest date the field offers', async () => {
       const user = userEvent.setup();
-      useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
+      useAppStore.setState({ ownProfile: NO_PROFILE });
       const save = vi.fn(async () => {});
       useAppStore.setState({ setBirthday: save });
       render(<Settings />);
@@ -129,7 +131,7 @@ describe('Settings — Birthday', () => {
 
   it('refuses a birthday before 1900 (a mistyped year), and sends nothing', async () => {
     const user = userEvent.setup();
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
+    useAppStore.setState({ ownProfile: NO_PROFILE });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setBirthday: save });
     render(<Settings />);
@@ -145,7 +147,7 @@ describe('Settings — Birthday', () => {
   // Matrix: "Offline edit" and "Save error shown in Settings, value unchanged".
   it('shows why a save was refused, and keeps the shown value', async () => {
     const user = userEvent.setup();
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: '2000-05-20' } });
+    useAppStore.setState({ ownProfile: { ...NO_PROFILE, birthday: '2000-05-20' } });
     const save = vi.fn(async () => {
       throw new AccountDataError('offline', 'You are offline. Profile changes need a connection to save.');
     });

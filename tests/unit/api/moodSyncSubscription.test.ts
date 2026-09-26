@@ -1005,7 +1005,18 @@ describe('subscribeMoodUpdates channel ownership', () => {
       vi.useRealTimers();
     });
 
-    async function fireReopen(delayMs = 1000): Promise<void> {
+    // src/api/moodSyncService.ts RETRY_CONFIG (module-private), mirrored.
+    const MOOD_RETRY = { maxRetries: 5, baseDelay: 1000, maxDelay: 30000 };
+
+    /** The wait before each retry, as `armMoodReopen` computes it: 1s, 2s, 4s, 8s, 16s. */
+    const MOOD_REOPEN_DELAYS_MS = Array.from({ length: MOOD_RETRY.maxRetries }, (_, retry) =>
+      Math.min(MOOD_RETRY.baseDelay * 2 ** retry, MOOD_RETRY.maxDelay)
+    );
+
+    /** The delay cap, so no backoff can outlast it. */
+    const PAST_EVERY_BACKOFF_MS = MOOD_RETRY.maxDelay;
+
+    async function fireReopen(delayMs = MOOD_RETRY.baseDelay): Promise<void> {
       await vi.advanceTimersByTimeAsync(delayMs);
       while (leaveQueue.length > 0) ackNextLeave();
       await vi.advanceTimersByTimeAsync(socket.windowMs + 20);
@@ -1112,7 +1123,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
       emitStatus(constructedChannels[1], 'SUBSCRIBED');
 
       serverClosesTopic(constructedChannels[1]);
-      await fireReopen(1000);
+      await fireReopen(MOOD_RETRY.baseDelay);
 
       expect(constructedChannels).toHaveLength(3);
 
@@ -1153,7 +1164,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
       onStatus.mockClear();
       emitStatus(first, 'CLOSED');
-      await fireReopen(30000);
+      await fireReopen(PAST_EVERY_BACKOFF_MS);
 
       expect(constructedChannels).toHaveLength(2);
       expect(onStatus).not.toHaveBeenCalledWith('CLOSED');
@@ -1168,8 +1179,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
       resolveNextSession();
       const unsubscribe = await pending;
 
-      const delays = [1000, 2000, 4000, 8000, 16000];
-      for (const delay of delays) {
+      for (const delay of MOOD_REOPEN_DELAYS_MS) {
         serverClosesTopic(constructedChannels[constructedChannels.length - 1]);
         await fireReopen(delay);
       }
@@ -1177,7 +1187,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
       expect(constructedChannels).toHaveLength(6);
 
       serverClosesTopic(constructedChannels[5]);
-      await fireReopen(30000);
+      await fireReopen(PAST_EVERY_BACKOFF_MS);
 
       expect(constructedChannels).toHaveLength(6);
       expect(errorSpy).toHaveBeenCalledWith(

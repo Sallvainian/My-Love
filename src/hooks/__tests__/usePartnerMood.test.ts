@@ -20,19 +20,23 @@ vi.mock('../../api/moodSyncService');
 describe('usePartnerMood', () => {
   const mockPartnerId = 'partner-123';
 
+  /** A partner's mood row; a fixed timestamp, since the hook never reads it. */
+  const moodRecord = (overrides: Partial<SupabaseMoodRecord> = {}): SupabaseMoodRecord => ({
+    id: '1',
+    user_id: mockPartnerId,
+    mood_type: 'happy',
+    note: null,
+    created_at: '2026-09-25T08:00:00.000Z',
+    updated_at: '2026-09-25T08:00:00.000Z',
+    ...overrides,
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('loads partner mood on mount', async () => {
-    const mockMood = {
-      id: '1',
-      user_id: mockPartnerId,
-      mood_type: 'happy' as const,
-      note: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const mockMood = moodRecord();
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(mockMood);
     vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(() => {});
@@ -73,23 +77,9 @@ describe('usePartnerMood', () => {
   });
 
   it('updates mood when broadcast received for partner', async () => {
-    const initialMood = {
-      id: '1',
-      user_id: mockPartnerId,
-      mood_type: 'happy' as const,
-      note: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const initialMood = moodRecord();
 
-    const updatedMood = {
-      id: '2',
-      user_id: mockPartnerId,
-      mood_type: 'excited' as const,
-      note: 'Great news!',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const updatedMood = moodRecord({ id: '2', mood_type: 'excited', note: 'Great news!' });
 
     let broadcastCallback: ((mood: SupabaseMoodRecord) => void) | null = null;
 
@@ -118,23 +108,13 @@ describe('usePartnerMood', () => {
   });
 
   it('does not update mood when broadcast is from different user', async () => {
-    const initialMood = {
-      id: '1',
-      user_id: mockPartnerId,
-      mood_type: 'happy' as const,
-      note: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const initialMood = moodRecord();
 
-    const otherUserMood = {
+    const otherUserMood = moodRecord({
       id: '2',
       user_id: 'different-user-123',
-      mood_type: 'excited' as const,
-      note: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+      mood_type: 'excited',
+    });
 
     let broadcastCallback: ((mood: SupabaseMoodRecord) => void) | null = null;
 

@@ -131,6 +131,9 @@ import {
   resolveOwnPair,
   seedEvent,
 } from '../support/helpers/events';
+// Only the batch seeder: this factory module also exports a `clearPairEvents`,
+// with a different signature from the helpers' one imported above.
+import { seedEvents } from '../support/factories/events';
 
 /**
  * The `public.events` row exactly as PostgREST returns it. Columns, nullability
@@ -413,57 +416,58 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     const base = anchor.getTime();
     const createdAt = (offsetMs: number): string => new Date(base + offsetMs).toISOString();
 
-    const soonest = isoDateDaysFromNow(10, anchor);
-    const middle = isoDateDaysFromNow(25, anchor);
-    const later = isoDateDaysFromNow(40, anchor);
-    const last = isoDateDaysFromNow(60, anchor);
+    const dayOffset = { soonest: 10, middle: 25, later: 40, last: 60 };
+    const soonest = isoDateDaysFromNow(dayOffset.soonest, anchor);
+    const middle = isoDateDaysFromNow(dayOffset.middle, anchor);
+    const later = isoDateDaysFromNow(dayOffset.later, anchor);
+    const last = isoDateDaysFromNow(dayOffset.last, anchor);
 
     // GIVEN: five rows across both halves of the pair, inserted out of order
     await log.step('Seed five rows across both halves of the pair, in scrambled insert order');
     // Insert order is deliberately NOT the expected read order: if the service
     // query lost its `.order()` calls, PostgREST would hand rows back in
     // whatever order the table yields and this test would catch it.
-    const { error: seedError } = await supabaseAdmin.from('events').insert([
-      {
-        user_id: userId,
-        label: ORDER_CREATOR_LATER,
-        event_date: later,
-        icon: 'plane',
-        created_at: createdAt(3000),
-      },
-      {
-        user_id: partnerId,
-        label: ORDER_PARTNER_LAST,
-        event_date: last,
-        icon: 'ring',
-        created_at: createdAt(4000),
-      },
-      {
-        // Same event_date as ORDER_PARTNER_SOONEST, created one second LATER —
-        // this pair is the whole point of the created_at tiebreak.
-        user_id: userId,
-        label: ORDER_CREATOR_SAME_DAY,
-        event_date: soonest,
-        icon: 'calendar',
-        created_at: createdAt(1000),
-      },
-      {
-        user_id: userId,
-        label: ORDER_CREATOR_MIDDLE,
-        event_date: middle,
-        icon: 'calendar',
-        created_at: createdAt(2000),
-      },
-      {
-        user_id: partnerId,
-        label: ORDER_PARTNER_SOONEST,
-        event_date: soonest,
-        icon: 'calendar',
-        created_at: createdAt(0),
-      },
-    ]);
-
-    expect(seedError).toBeNull();
+    await seedEvents(
+      supabaseAdmin,
+      { userId, partnerId },
+      [
+        {
+          label: ORDER_CREATOR_LATER,
+          dayOffset: dayOffset.later,
+          icon: 'plane',
+          createdAt: createdAt(3000),
+        },
+        {
+          owner: 'partner',
+          label: ORDER_PARTNER_LAST,
+          dayOffset: dayOffset.last,
+          icon: 'ring',
+          createdAt: createdAt(4000),
+        },
+        {
+          // Same event_date as ORDER_PARTNER_SOONEST, created one second LATER —
+          // this pair is the whole point of the created_at tiebreak.
+          label: ORDER_CREATOR_SAME_DAY,
+          dayOffset: dayOffset.soonest,
+          icon: 'calendar',
+          createdAt: createdAt(1000),
+        },
+        {
+          label: ORDER_CREATOR_MIDDLE,
+          dayOffset: dayOffset.middle,
+          icon: 'calendar',
+          createdAt: createdAt(2000),
+        },
+        {
+          owner: 'partner',
+          label: ORDER_PARTNER_SOONEST,
+          dayOffset: dayOffset.soonest,
+          icon: 'calendar',
+          createdAt: createdAt(0),
+        },
+      ],
+      anchor
+    );
 
     // WHEN: the creator issues one raw, unbounded ascending PostgREST read
     // THEN: PostgREST returns both halves of the pair in event_date, created_at order
@@ -542,15 +546,16 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     // GIVEN: one event on each half of the couple
     const anchor = new Date();
     await log.step('Seed one event on each half of the pair');
-    const { data: seeded, error: seedError } = await supabaseAdmin
-      .from('events')
-      .insert([
-        { user_id: userId, label: OUTSIDER_CREATOR_LABEL, event_date: isoDateDaysFromNow(12, anchor) },
-        { user_id: partnerId, label: OUTSIDER_PARTNER_LABEL, event_date: isoDateDaysFromNow(18, anchor) },
-      ])
-      .select('id');
+    const seeded = await seedEvents(
+      supabaseAdmin,
+      { userId, partnerId },
+      [
+        { label: OUTSIDER_CREATOR_LABEL, dayOffset: 12 },
+        { owner: 'partner', label: OUTSIDER_PARTNER_LABEL, dayOffset: 18 },
+      ],
+      anchor
+    );
 
-    expect(seedError).toBeNull();
     expect(seeded).toHaveLength(2);
 
     // A throwaway account of its own, never a pool account belonging to another

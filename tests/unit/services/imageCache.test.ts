@@ -24,6 +24,9 @@ import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 const A = 'USER-A';
 const B = 'USER-B';
 const PATH = 'partner-id/1726000000-pic.jpg';
+// DOMException's legacy numeric code for QuotaExceededError (DOMException.QUOTA_EXCEEDED_ERR),
+// which src/services/imageCache.ts isQuotaError still accepts from older engines.
+const LEGACY_QUOTA_EXCEEDED_ERR = 22;
 
 async function clearStores(): Promise<void> {
   const db = await openMyLoveDB();
@@ -134,7 +137,7 @@ describe('isQuotaError', () => {
   it('recognises a QuotaExceededError', () => {
     expect(isQuotaError(new DOMException('full', 'QuotaExceededError'))).toBe(true);
     expect(isQuotaError({ name: 'NS_ERROR_DOM_QUOTA_REACHED' })).toBe(true);
-    expect(isQuotaError({ name: 'Error', code: 22 })).toBe(true);
+    expect(isQuotaError({ name: 'Error', code: LEGACY_QUOTA_EXCEEDED_ERR })).toBe(true);
   });
 
   it('recognises a transaction aborted with one', () => {

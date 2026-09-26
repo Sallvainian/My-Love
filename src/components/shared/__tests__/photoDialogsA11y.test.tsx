@@ -325,12 +325,19 @@ describe('DW-177: the viewer delete confirmation is a dialog', () => {
 });
 
 describe('DW-182: photo dialog errors are announced', () => {
+  // src/components/PhotoUpload/PhotoUpload.tsx `parsedTags.length > 10` (inline literal).
+  const MAX_PHOTO_TAGS = 10;
+
   it('the upload tag error', async () => {
     const user = userEvent.setup();
     render(<PhotoUpload isOpen onClose={vi.fn()} />);
     await selectFile(user);
 
-    await user.type(screen.getByTestId('photo-upload-tags-input'), 'a,b,c,d,e,f,g,h,i,j,k');
+    // One tag over the limit: 'a,b,…,k'.
+    const tooManyTags = Array.from({ length: MAX_PHOTO_TAGS + 1 }, (_, i) =>
+      String.fromCharCode(97 + i)
+    ).join(',');
+    await user.type(screen.getByTestId('photo-upload-tags-input'), tooManyTags);
 
     expect(screen.getByRole('alert')).toBe(screen.getByTestId('photo-upload-tag-error'));
   });

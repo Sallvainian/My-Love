@@ -24,6 +24,7 @@
 import { randomUUID } from 'node:crypto';
 import { log } from '@seontechnologies/playwright-utils';
 import type { SupabaseInteractionRecord } from '../../src/api/interactionService';
+import { createInteractionInsert } from '../support/factories/interaction-record-ownership';
 import { createOutsiderClient } from '../support/helpers/rls-security';
 import { resolveOwnPair } from '../support/helpers/events';
 import { test, expect } from '../support/merged-fixtures';
@@ -72,12 +73,15 @@ test.describe('Interaction authorization boundary', () => {
 
       await log.step('A linked partner can send both interaction types');
       for (const [index, type] of (['poke', 'kiss'] as const).entries()) {
-        const { status } = await send(authToken, {
-          id: acceptedIds[index],
-          type,
-          from_user_id: userId,
-          to_user_id: partnerId,
-        });
+        const { status } = await send(
+          authToken,
+          createInteractionInsert({
+            id: acceptedIds[index],
+            type,
+            from_user_id: userId,
+            to_user_id: partnerId,
+          })
+        );
         expect(status, `${type} to the current partner`).toBe(201);
       }
 
@@ -98,11 +102,10 @@ test.describe('Interaction authorization boundary', () => {
       ];
 
       for (const refusal of refusals) {
-        const { status, body } = await send(refusal.token, {
-          id: refusal.id,
-          type: 'poke',
-          ...refusal.body,
-        });
+        const { status, body } = await send(
+          refusal.token,
+          createInteractionInsert({ id: refusal.id, type: 'poke', ...refusal.body })
+        );
         expect(status, refusal.label).toBe(DENIED_HTTP_STATUS);
         expect(body.code, refusal.label).toBe(DENIED_CODE);
       }
@@ -191,7 +194,12 @@ test.describe('Interaction authorization boundary', () => {
           method: 'POST',
           path: '/rest/v1/interactions',
           headers: { Authorization: `Bearer ${authToken}` },
-          body: { id, type: 'poke', from_user_id: userId, to_user_id: partnerId },
+          body: createInteractionInsert({
+            id,
+            type: 'poke',
+            from_user_id: userId,
+            to_user_id: partnerId,
+          }),
           retryConfig: { maxRetries: 0 },
         });
         expect(status).toBe(201);
@@ -259,7 +267,10 @@ test.describe('Interaction authorization boundary', () => {
       // mapping still puts an unauthenticated caller in that role.
       for (const [method, body] of [
         ['GET', undefined],
-        ['POST', { type: 'poke', from_user_id: userId, to_user_id: partnerId }],
+        [
+          'POST',
+          createInteractionInsert({ type: 'poke', from_user_id: userId, to_user_id: partnerId }),
+        ],
         ['PATCH', { viewed: true }],
       ] as const) {
         const { status, body: denial } = await apiRequest<ErrorEnvelope>({

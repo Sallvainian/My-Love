@@ -56,40 +56,21 @@ function deferred<T>() {
   return { promise, settle, fail };
 }
 
+/** A bundled daily message unless `overrides` say otherwise. */
+function message(id: number, text: string, overrides: Partial<Message> = {}): Message {
+  return { id, text, category: 'reason', isCustom: false, createdAt: new Date(), ...overrides };
+}
+
 function aOutgoingPool(): Message[] {
-  return [
-    {
-      id: 7,
-      text: 'A-OUTGOING-CUSTOM',
-      category: 'custom',
-      isCustom: true,
-      createdAt: new Date(),
-    },
-  ];
+  return [message(7, 'A-OUTGOING-CUSTOM', { category: 'custom', isCustom: true })];
 }
 
 function cIncomingPool(): Message[] {
-  return [
-    {
-      id: 1,
-      text: 'C-INCOMING-DAILY',
-      category: 'reason',
-      isCustom: false,
-      createdAt: new Date(),
-    },
-  ];
+  return [message(1, 'C-INCOMING-DAILY')];
 }
 
 function sharedDailyPool(): Message[] {
-  return [
-    {
-      id: 1,
-      text: 'SHARED-DAILY',
-      category: 'reason',
-      isCustom: false,
-      createdAt: new Date(),
-    },
-  ];
+  return [message(1, 'SHARED-DAILY')];
 }
 
 const buildTestStore = async () => {
@@ -188,15 +169,7 @@ describe('createSettingsSlice initializeApp', () => {
   });
 
   it('loads default messages only when IndexedDB has no messages', async () => {
-    const seededMessages: Message[] = [
-      {
-        id: 1,
-        text: 'Seeded',
-        category: 'memory',
-        isCustom: false,
-        createdAt: new Date(),
-      },
-    ];
+    const seededMessages = [message(1, 'Seeded', { category: 'memory' })];
 
     mockStorageService.init.mockResolvedValue(undefined);
     mockStorageService.getAllMessages
@@ -232,15 +205,7 @@ describe('createSettingsSlice initializeApp', () => {
   });
 
   it('skips default message loader when IndexedDB already contains messages', async () => {
-    const existingMessages: Message[] = [
-      {
-        id: 42,
-        text: 'Already stored',
-        category: 'reason',
-        isCustom: false,
-        createdAt: new Date(),
-      },
-    ];
+    const existingMessages = [message(42, 'Already stored')];
 
     mockStorageService.init.mockResolvedValue(undefined);
     mockStorageService.getAllMessages.mockResolvedValue(existingMessages);
@@ -256,11 +221,11 @@ describe('createSettingsSlice initializeApp', () => {
   });
 
   it('adds the signed-in account’s saved custom messages and favorites to the pool', async () => {
-    const bundled: Message = { id: 42, text: 'Daily', category: 'reason', isCustom: false, createdAt: new Date() };
-    const custom: Message = {
-      id: 400, text: 'Mine', category: 'custom', isCustom: true, userId: SIGNED_IN_USER,
-      serverId: 'srv-mine', active: true, isFavorite: true, createdAt: new Date(),
-    };
+    const bundled = message(42, 'Daily');
+    const custom = message(400, 'Mine', {
+      category: 'custom', isCustom: true, userId: SIGNED_IN_USER,
+      serverId: 'srv-mine', active: true, isFavorite: true,
+    });
     mockStorageService.init.mockResolvedValue(undefined);
     mockStorageService.getAllMessages.mockResolvedValue([bundled]);
     mockReadMessageData.mockResolvedValue({ custom: [custom], bundledFavoriteIds: [42], nextCustomId: 401 });

@@ -1,5 +1,6 @@
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAuthBootstrapSession } from '../../../../tests/support/factories/auth-bootstrap-notification-order';
 import { signIn, signOut } from '../actionService';
 import { onAuthStateChange } from '../sessionService';
 
@@ -67,12 +68,14 @@ function deferred() {
 // positive `vi.waitFor` on its side effect, or the deferred it settled (the
 // queue's own continuation on that promise was registered first).
 
-const listenerSession = {
-  access_token: 'listener-access-token',
-  refresh_token: 'listener-refresh-token',
-  expires_at: 777,
-  user: { id: 'listener-user', email: 'listener@example.com' },
-} as Session;
+const listenerSession = createAuthBootstrapSession({
+  userId: 'listener-user',
+  email: 'listener@example.com',
+  displayName: null,
+  accessToken: 'listener-access-token',
+  refreshToken: 'listener-refresh-token',
+  expiresAt: 777,
+});
 
 /**
  * Each auth transition with the token side effect it queues, the session the
@@ -128,19 +131,17 @@ describe('auth session/action services', () => {
   });
 
   it('stores SW auth token on successful sign-in', async () => {
-    const user = {
-      id: 'user-123',
+    const session = createAuthBootstrapSession({
+      userId: 'user-123',
       email: 'user@example.com',
-    } as unknown as User;
-    const session = {
-      access_token: 'access-token',
-      refresh_token: 'refresh-token',
-      expires_at: 12345,
-      user,
-    } as unknown as Session;
+      displayName: null,
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: 12345,
+    });
 
     mockSignInWithPassword.mockResolvedValue({
-      data: { user, session },
+      data: { user: session.user, session },
       error: null,
     });
 
@@ -166,16 +167,14 @@ describe('auth session/action services', () => {
   });
 
   it('applies token side effects in onAuthStateChange for sign-in and sign-out events', async () => {
-    const user = {
-      id: 'user-456',
+    const session = createAuthBootstrapSession({
+      userId: 'user-456',
       email: 'auth@example.com',
-    } as unknown as User;
-    const session = {
-      access_token: 'new-access-token',
-      refresh_token: 'new-refresh-token',
-      expires_at: 777,
-      user,
-    } as unknown as Session;
+      displayName: null,
+      accessToken: 'new-access-token',
+      refreshToken: 'new-refresh-token',
+      expiresAt: 777,
+    });
 
     const listener = vi.fn();
     const unsubscribe = onAuthStateChange(listener);

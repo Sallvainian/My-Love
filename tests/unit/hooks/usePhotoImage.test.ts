@@ -49,6 +49,13 @@ import { useAppStore } from '@/stores/useAppStore';
 
 const PATH = 'owner/p0.jpg';
 
+/**
+ * Twenty times the whole automatic-retry schedule (840 s today, never less
+ * than the ten minutes these checks used to wait): long enough that any retry
+ * timer would have fired, and it grows with `ERROR_RETRY_DELAYS_MS`.
+ */
+const PAST_EVERY_RETRY_MS = 20 * ERROR_RETRY_DELAYS_MS.reduce((total, delay) => total + delay, 0);
+
 function setOnline(value: boolean) {
   Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
@@ -377,7 +384,7 @@ describe('usePhotoImage recovers without a remount', () => {
     expect(downloadPhoto).toHaveBeenCalledTimes(1 + ERROR_RETRY_DELAYS_MS.length);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      await vi.advanceTimersByTimeAsync(PAST_EVERY_RETRY_MS);
     });
     await settle();
     expect(downloadPhoto).toHaveBeenCalledTimes(1 + ERROR_RETRY_DELAYS_MS.length);
@@ -404,7 +411,7 @@ describe('usePhotoImage recovers without a remount', () => {
     readCachedImage.mockClear();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      await vi.advanceTimersByTimeAsync(PAST_EVERY_RETRY_MS);
     });
     await settle();
 

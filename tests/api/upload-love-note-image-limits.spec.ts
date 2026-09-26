@@ -287,9 +287,9 @@ test.describe('Love note image upload limits', () => {
       await page.goto('http://localhost:5173/');
 
       const result = await page.evaluate(
-        async ({ url, token }) => {
+        async ({ url, token, magic }) => {
           const bytes = new Uint8Array(4096);
-          bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+          bytes.set(magic);
           const blob = new Blob([bytes], { type: 'image/png' });
 
           // playwright-utils deviation: the browser's own fetch of a Blob is what is measured; apiRequest runs in Node and frames the body itself.
@@ -304,7 +304,8 @@ test.describe('Love note image upload limits', () => {
 
           return { status: response.status, body: await response.text() };
         },
-        { url: functionUrl, token: authToken }
+        // PNG_MAGIC is a Node Buffer; the page is handed its bytes as a plain array.
+        { url: functionUrl, token: authToken, magic: Array.from(PNG_MAGIC) }
       );
       // Registered for cleanup before any assertion can throw: a failure after
       // a 200 would otherwise leak the object into this worker's prefix.

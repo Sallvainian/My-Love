@@ -24,6 +24,11 @@ import { moodSyncService } from '../../../api/moodSyncService';
 import { PartnerMoodView } from '../PartnerMoodView';
 
 const PARTNER_DISPLAY_NAME = 'Harper';
+/**
+ * How many partner moods the view asks for: the inline `fetchPartnerMoods(30)`
+ * in src/components/PartnerMoodView/PartnerMoodView.tsx.
+ */
+const PARTNER_MOOD_LIMIT = 30;
 
 function mood(overrides: Partial<MoodEntry>): MoodEntry {
   return {
@@ -163,7 +168,9 @@ describe('PartnerMoodView on the kit', () => {
     render(<PartnerMoodView />);
 
     // The saved copy is read offline too.
-    await waitFor(() => expect(state.fetchPartnerMoods).toHaveBeenCalledWith(30));
+    await waitFor(() =>
+      expect(state.fetchPartnerMoods).toHaveBeenCalledWith(PARTNER_MOOD_LIMIT)
+    );
     expect(screen.getByTestId('realtime-connection-status')).toHaveTextContent(/^Offline$/);
     expect(screen.getByTestId('partner-mood-refresh-button')).toBeDisabled();
     expect(screen.getAllByTestId('partner-mood-card').length).toBeGreaterThan(0);

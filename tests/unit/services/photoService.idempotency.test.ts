@@ -17,6 +17,7 @@
 import { create, type StateCreator } from 'zustand';
 import { createPhotosSlice, type PhotosSlice } from '@/stores/slices/photosSlice';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { CHECK_VIOLATION_CODE } from '../../support/check-constraint-envelopes';
 
 interface PhotoRow {
   id: string;
@@ -31,6 +32,10 @@ interface PhotoRow {
 }
 
 const USER_ID = '00000000-0000-4000-8000-0000000000c0';
+// The 1GB free tier: src/services/photoService.ts STORAGE_QUOTA (module-private).
+const STORAGE_QUOTA_BYTES = 1024 * 1024 * 1024;
+// The other SQLSTATE the photos insert can fail with; check_violation is CHECK_VIOLATION_CODE.
+const NOT_NULL_VIOLATION = '23502'; // not_null_violation
 
 const backend = {
   errorCode: '',
@@ -166,15 +171,15 @@ describe('photoService upload idempotency', () => {
     // Quota check runs before every upload and hits storage.list()
     vi.spyOn(photoService, 'checkStorageQuota').mockResolvedValue({
       used: 0,
-      quota: 1_073_741_824,
+      quota: STORAGE_QUOTA_BYTES,
       percent: 0,
       warning: 'none',
     });
   });
 
   it.each([
-    ['23514', 'Some values are not allowed - check length and format limits'],
-    ['23502', 'Upload failed - no photo returned'],
+    [CHECK_VIOLATION_CODE, 'Some values are not allowed - check length and format limits'],
+    [NOT_NULL_VIOLATION, 'Upload failed - no photo returned'],
   ])('routes %s through the real service into the store result', async (code, expected) => {
     type Store = PhotosSlice & { userId: string; error: string | null };
     const store = create<Store>()(createPhotosSlice as unknown as StateCreator<Store>);
@@ -194,7 +199,7 @@ describe('photoService upload idempotency', () => {
   it('keeps the service null contract and CHECK rollback safety for a committed row', async () => {
     const input = uploadInput({ idempotencyKey: 'committed-check' });
     await photoService.uploadPhoto(input);
-    backend.errorCode = '23514';
+    backend.errorCode = CHECK_VIOLATION_CODE;
     backend.failNextInsert = true;
     const callback = vi.fn();
     await expect(photoService.uploadPhoto(input, callback)).resolves.toBeNull();

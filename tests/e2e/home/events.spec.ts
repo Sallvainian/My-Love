@@ -33,6 +33,7 @@ import {
   resolveOwnPair,
   seedEvent,
 } from '../../support/helpers/events';
+import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
 import { PAST_EVENTS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 
@@ -478,12 +479,11 @@ test.describe(
         url: '**/rest/v1/events*',
         fulfillResponse: {
           status: 503,
-          body: {
+          body: createDatabaseErrorEnvelope({
             message: 'Injected events load failure',
             details: '',
             hint: '',
-            code: 'XX000',
-          },
+          }),
         },
       });
 

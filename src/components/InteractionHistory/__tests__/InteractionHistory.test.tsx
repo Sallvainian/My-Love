@@ -9,6 +9,11 @@ const storeMocks = vi.hoisted(() => ({
 }));
 
 const USER_ID = 'USER-A-ID';
+/**
+ * How many interactions the sheet asks for when it opens: the inline
+ * `loadInteractionHistory(100)` in src/components/InteractionHistory/InteractionHistory.tsx.
+ */
+const HISTORY_PAGE_SIZE = 100;
 
 vi.mock('../../../stores/useAppStore', () => ({
   useAppStore: (selector?: (state: { userId: string }) => unknown) =>
@@ -36,7 +41,7 @@ describe('InteractionHistory loading state', () => {
 
     render(<InteractionHistory isOpen onClose={() => {}} />);
 
-    expect(storeMocks.loadInteractionHistory).toHaveBeenCalledWith(100);
+    expect(storeMocks.loadInteractionHistory).toHaveBeenCalledWith(HISTORY_PAGE_SIZE);
     expect(screen.getByTestId('interaction-recent-1')).toBeInTheDocument();
     expect(screen.queryByText('Loading interactions...')).not.toBeInTheDocument();
   });

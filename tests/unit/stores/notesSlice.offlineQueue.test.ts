@@ -17,6 +17,12 @@ const A = 'USER-A-ID';
 const PARTNER = 'PARTNER-ID';
 const B = 'USER-B-ID';
 const FRIENDLY_CHECK = 'Some values are not allowed - check length and format limits';
+/**
+ * Postgres SQLSTATE insufficient_privilege: an RLS refusal, a rejection rather
+ * than a transient failure (src/api/errorHandlers.ts `handleSupabaseError`
+ * errorMessages['42501'], function-local).
+ */
+const INSUFFICIENT_PRIVILEGE = '42501';
 
 interface Row {
   id: string;
@@ -190,7 +196,12 @@ vi.mock('../../../src/services/imageCompressionService', () => ({
 import { getPartnerId, lookupPartnerId } from '../../../src/api/supabaseClient';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
-import { enqueueNote, listQueuedNotes, removeQueuedNote } from '../../../src/services/noteQueue';
+import {
+  enqueueNote,
+  listQueuedNotes,
+  removeQueuedNote,
+  type QueuedNote,
+} from '../../../src/services/noteQueue';
 import {
   createNotesSlice,
   IMAGE_NOTE_NEEDS_CONNECTION,
@@ -275,6 +286,53 @@ function stubWebLocks() {
 }
 
 const contents = (store: Store) => store.getState().notes.map((n) => n.content);
+
+/** A queue row: A's text note to PARTNER, not yet sent and not refused. */
+function queued(id: string, content: string, overrides: Partial<QueuedNote> = {}): QueuedNote {
+  return {
+    id,
+    userId: A,
+    toUserId: PARTNER,
+    content,
+    createdAt: '2026-09-24T09:00:00.000Z',
+    failed: false,
+    ...overrides,
+  };
+}
+
+/** A row the server already holds for A's note to PARTNER, sent under `idempotency_key`. */
+function serverRow(fields: Pick<Row, 'id' | 'content' | 'idempotency_key' | 'created_at'>): Row {
+  return { from_user_id: A, to_user_id: PARTNER, image_url: null, ...fields };
+}
+
+/** The one confirmed row in A's saved love-notes copy, from before this session. */
+const SAVED_COPY_ROW = {
+  id: 'saved-1',
+  from_user_id: PARTNER,
+  to_user_id: A,
+  content: 'saved',
+  created_at: '2026-09-20T10:00:00.000000+00:00',
+  image_url: null,
+};
+
+/** A's note to PARTNER shown failed under its `tempId`, no longer sending. */
+function failedNote(
+  tempId: string,
+  content: string,
+  overrides: Partial<LoveNote> = {}
+): LoveNote {
+  return {
+    id: tempId,
+    tempId,
+    from_user_id: A,
+    to_user_id: PARTNER,
+    content,
+    created_at: '2026-09-24T09:00:00.000Z',
+    sending: false,
+    error: true,
+    ...overrides,
+  };
+}
 const queuedIds = async (userId = A) => (await listQueuedNotes(userId)).map((row) => row.id);
 
 async function clearStores() {
@@ -416,16 +474,7 @@ describe('notesSlice offline send queue', () => {
   });
 
   it('reload while queued: the notes show pending after the saved thread, even with no server answer', async () => {
-    await writeLocalCopy(A, LOVE_NOTES_COPY_KIND, [
-      {
-        id: 'saved-1',
-        from_user_id: PARTNER,
-        to_user_id: A,
-        content: 'saved',
-        created_at: '2026-09-20T10:00:00.000000+00:00',
-        image_url: null,
-      },
-    ]);
+    await writeLocalCopy(A, LOVE_NOTES_COPY_KIND, [SAVED_COPY_ROW]);
     const before = createTestStore();
     await sendThreeOffline(before);
 
@@ -448,23 +497,15 @@ describe('notesSlice offline send queue', () => {
     setOnline(false);
     await store.getState().sendNote('on screen');
     // A row committed elsewhere (another tab) whose queue row is still here.
-    await enqueueNote({
-      id: 'temp-committed',
-      userId: A,
-      toUserId: PARTNER,
-      content: 'committed',
-      createdAt: '2026-09-24T09:00:00.000Z',
-      failed: false,
-    });
-    server.rows.push({
-      id: 'server-99',
-      from_user_id: A,
-      to_user_id: PARTNER,
-      content: 'committed',
-      image_url: null,
-      idempotency_key: 'temp-committed',
-      created_at: '2026-09-24T09:00:00.000000+00:00',
-    });
+    await enqueueNote(queued('temp-committed', 'committed'));
+    server.rows.push(
+      serverRow({
+        id: 'server-99',
+        content: 'committed',
+        idempotency_key: 'temp-committed',
+        created_at: '2026-09-24T09:00:00.000000+00:00',
+      })
+    );
 
     // Back online for the read: a known-offline load sends no request.
     setOnline(true);
@@ -497,8 +538,8 @@ describe('notesSlice offline send queue', () => {
     server.upserts = 0;
     sendEphemeralBroadcast.mockClear();
     // Two queued rows, then both tabs drain together.
-    await enqueueNote({ id: 'temp-x', userId: A, toUserId: PARTNER, content: 'x', createdAt: '2026-09-24T09:00:00.000Z', failed: false });
-    await enqueueNote({ id: 'temp-y', userId: A, toUserId: PARTNER, content: 'y', createdAt: '2026-09-24T09:00:01.000Z', failed: false });
+    await enqueueNote(queued('temp-x', 'x'));
+    await enqueueNote(queued('temp-y', 'y', { createdAt: '2026-09-24T09:00:01.000Z' }));
     const tab2 = createTestStore();
 
     await Promise.all([tab1.getState().drainQueuedNotes(), tab2.getState().drainQueuedNotes()]);
@@ -511,7 +552,7 @@ describe('notesSlice offline send queue', () => {
     // its note waits rather than showing "Sending..." that nothing does.
     const reply = deferred();
     server.outcomes = [{ hold: reply.promise }];
-    await enqueueNote({ id: 'temp-z', userId: A, toUserId: PARTNER, content: 'z', createdAt: '2026-09-24T09:00:02.000Z', failed: false });
+    await enqueueNote(queued('temp-z', 'z', { createdAt: '2026-09-24T09:00:02.000Z' }));
     const tab1Run = tab1.getState().drainQueuedNotes();
     await vi.waitFor(() => expect(server.upserts).toBe(3));
 
@@ -659,15 +700,14 @@ describe('notesSlice offline send queue', () => {
     const key = store.getState().notes[0].tempId!;
 
     // Another tab of the same account sends it and deletes the row.
-    server.rows.push({
-      id: 'server-9',
-      from_user_id: A,
-      to_user_id: PARTNER,
-      content: 'sent elsewhere',
-      image_url: null,
-      idempotency_key: key,
-      created_at: '2026-09-24T12:00:09.000000+00:00',
-    });
+    server.rows.push(
+      serverRow({
+        id: 'server-9',
+        content: 'sent elsewhere',
+        idempotency_key: key,
+        created_at: '2026-09-24T12:00:09.000000+00:00',
+      })
+    );
     await removeQueuedNote(key);
 
     setOnline(true);
@@ -815,7 +855,7 @@ describe('notesSlice offline send queue', () => {
 
   it('removing a failed queued note deletes its row', async () => {
     const store = createTestStore();
-    server.outcomes = [{ reject: '42501' }];
+    server.outcomes = [{ reject: INSUFFICIENT_PRIVILEGE }];
     await store.getState().sendNote('refused');
     await store.getState().drainQueuedNotes();
     const tempId = store.getState().notes[0].tempId!;
@@ -1129,28 +1169,9 @@ describe('notesSlice offline send queue', () => {
     /** A queued text note shown failed, with its row marked failed. */
     async function failedQueuedNote(store: Store, tempId = 'temp-failed'): Promise<string> {
       const createdAt = '2026-09-24T09:00:00.000Z';
-      await enqueueNote({
-        id: tempId,
-        userId: A,
-        toUserId: PARTNER,
-        content: 'refused',
-        createdAt,
-        failed: true,
-      });
+      await enqueueNote(queued(tempId, 'refused', { createdAt, failed: true }));
       store.setState({
-        notes: [
-          {
-            id: tempId,
-            tempId,
-            from_user_id: A,
-            to_user_id: PARTNER,
-            content: 'refused',
-            created_at: createdAt,
-            sending: false,
-            error: true,
-            queued: true,
-          },
-        ],
+        notes: [failedNote(tempId, 'refused', { created_at: createdAt, queued: true })],
       });
       return tempId;
     }
@@ -1265,18 +1286,7 @@ describe('notesSlice offline send queue', () => {
     it('a Retry failure after the session changed writes no banner', async () => {
       const store = createTestStore();
       store.setState({
-        notes: [
-          {
-            id: 'temp-pic',
-            tempId: 'temp-pic',
-            from_user_id: A,
-            to_user_id: PARTNER,
-            content: 'pic',
-            created_at: '2026-09-24T09:00:00.000Z',
-            sending: false,
-            error: true,
-          },
-        ],
+        notes: [failedNote('temp-pic', 'pic')],
         notesError: null,
       });
       vi.mocked(getPartnerId).mockImplementationOnce(async () => {
@@ -1530,17 +1540,8 @@ describe('notesSlice offline send queue', () => {
     });
 
     it('a drain before the thread is loaded does not write the copy', async () => {
-      await writeLocalCopy(A, LOVE_NOTES_COPY_KIND, [
-        {
-          id: 'saved-1',
-          from_user_id: PARTNER,
-          to_user_id: A,
-          content: 'saved',
-          created_at: '2026-09-20T10:00:00.000000+00:00',
-          image_url: null,
-        },
-      ]);
-      await enqueueNote({ id: 'temp-q', userId: A, toUserId: PARTNER, content: 'queued', createdAt: '2026-09-24T09:00:00.000Z', failed: false });
+      await writeLocalCopy(A, LOVE_NOTES_COPY_KIND, [SAVED_COPY_ROW]);
+      await enqueueNote(queued('temp-q', 'queued'));
       const store = createTestStore();
 
       await store.getState().drainQueuedNotes();

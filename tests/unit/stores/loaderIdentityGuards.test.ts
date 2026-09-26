@@ -183,6 +183,7 @@ import type {
   PhotoWithUrls,
   SupabasePhoto,
 } from '../../../src/services/photoService';
+import type { CoupleEvent } from '../../../src/services/eventsService';
 
 const A = 'USER-A-ID';
 const C = 'USER-C-ID';
@@ -286,6 +287,41 @@ function aGalleryRow(): PhotoWithUrls {
   return { ...aPhoto(), signedUrl: null, isOwn: true };
 }
 
+/**
+ * A `checkStorageQuota` answer. The slice reads only `percent` and `warning`, so
+ * `used`/`quota` follow from the percentage. `warning` is passed, never derived:
+ * some cases pair a percentage with a warning it would not produce, on purpose.
+ */
+function storageQuota(percent: number, warning: 'none' | 'approaching' | 'critical') {
+  return { used: percent * 10, quota: 1_000, percent, warning };
+}
+
+/**
+ * A complete CoupleEvent, A's private one unless overridden. `createdAt` is
+ * left out unless a case passes it, as the rows here always did.
+ */
+function coupleEvent(
+  overrides: Partial<CoupleEvent> = {}
+): Omit<CoupleEvent, 'createdAt'> & Partial<Pick<CoupleEvent, 'createdAt'>> {
+  return {
+    id: 'a-event',
+    userId: A,
+    label: 'A-PRIVATE-EVENT-LABEL',
+    date: new Date(2026, 9, 31),
+    description: null,
+    icon: 'calendar',
+    ...overrides,
+  };
+}
+
+/**
+ * C's event as a deliberately partial stub: the cases using it only check that
+ * C's list is kept or replaced, and nothing sorts it.
+ */
+function cEventStub() {
+  return { id: 'c-event', label: 'C-OWN-EVENT-LABEL' };
+}
+
 /** Hand the store to USER-C mid-flight, seeding whatever C already had on screen. */
 function switchToUserC(cOwnState: Record<string, unknown> = {}): void {
   useAppStore.setState({
@@ -324,7 +360,7 @@ describe('loader identity guards', () => {
     getStoredMessage.mockResolvedValue(undefined);
     // uploadPhoto awaits the quota twice; unless a case says otherwise it is
     // quiet, so neither the reject nor the warning branch is what is measured.
-    checkStorageQuota.mockResolvedValue({ used: 0, quota: 1_000, percent: 0, warning: 'none' });
+    checkStorageQuota.mockResolvedValue(storageQuota(0, 'none'));
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     readLocalCopy.mockResolvedValue(null);
     writeLocalCopy.mockResolvedValue(undefined);
@@ -1331,7 +1367,7 @@ describe('loader identity guards', () => {
       const inFlight = useAppStore.getState().uploadPhoto(uploadInput());
       switchToUserC({ photos: [cPhoto()], error: null });
 
-      quota.settle({ used: 97, quota: 100, percent: 97, warning: 'critical' });
+      quota.settle(storageQuota(97, 'critical'));
 
       await expect(inFlight).resolves.toEqual({
         success: false,
@@ -1352,7 +1388,7 @@ describe('loader identity guards', () => {
       switchToUserC({ photos: [cPhoto()], storageWarning: null });
 
       // Between 80 and 95: A's account is filling up, C's is not.
-      quota.settle({ used: 850, quota: 1_000, percent: 85, warning: 'approaching' });
+      quota.settle(storageQuota(85, 'approaching'));
       // The warning is written, or not, before the upload starts.
       await vi.waitFor(() => expect(uploadPhotoService).toHaveBeenCalled());
 
@@ -1368,7 +1404,7 @@ describe('loader identity guards', () => {
       // would leave this branch untested.
       const after = deferred<unknown>();
       checkStorageQuota
-        .mockResolvedValueOnce({ used: 0, quota: 1_000, percent: 0, warning: 'none' })
+        .mockResolvedValueOnce(storageQuota(0, 'none'))
         .mockReturnValueOnce(after.promise);
       uploadPhotoService.mockResolvedValue(aPhoto());
 
@@ -1380,7 +1416,7 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().photos).toHaveLength(1);
       switchToUserC({ photos: [cPhoto()], storageWarning: null });
 
-      after.settle({ used: 850, quota: 1_000, percent: 85, warning: 'approaching' });
+      after.settle(storageQuota(85, 'approaching'));
       await inFlight;
 
       expect(useAppStore.getState().storageWarning).toBeNull();
@@ -1821,15 +1857,7 @@ describe('loader identity guards', () => {
   });
 
   describe('loadEvents', () => {
-    const aEvent = {
-      id: 'a-event',
-      userId: A,
-      label: 'A-PRIVATE-EVENT-LABEL',
-      date: new Date(2026, 9, 31),
-      createdAt: new Date(2026, 0, 1),
-      description: null,
-      icon: 'calendar',
-    };
+    const aEvent = coupleEvent({ createdAt: new Date(2026, 0, 1) });
 
     it.each(['success', 'failure'])(
       'discards old-session %s after the same user signs back in without a successor load',
@@ -1951,12 +1979,12 @@ describe('loader identity guards', () => {
       getEvents.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().loadEvents();
-      switchToUserC({ events: [{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }] });
+      switchToUserC({ events: [cEventStub()] });
 
       pending.settle([{ id: 'a-event', label: 'A-PRIVATE-EVENT-LABEL' }]);
       await inFlight;
 
-      expect(useAppStore.getState().events).toEqual([{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }]);
+      expect(useAppStore.getState().events).toEqual([cEventStub()]);
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-EVENT-LABEL');
     });
 
@@ -1973,7 +2001,7 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().eventsIsLoading).toBe(true);
 
       switchToUserC({
-        events: [{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }],
+        events: [cEventStub()],
         eventsError: null,
         eventsIsLoading: true,
       });
@@ -1984,7 +2012,7 @@ describe('loader identity guards', () => {
       // The error must not land on the account that did not make the request,
       // and C's own list must stay intact.
       expect(useAppStore.getState().eventsError).toBeNull();
-      expect(useAppStore.getState().events).toEqual([{ id: 'c-event', label: 'C-OWN-EVENT-LABEL' }]);
+      expect(useAppStore.getState().events).toEqual([cEventStub()]);
     });
   });
 
@@ -2001,14 +2029,12 @@ describe('loader identity guards', () => {
       // `.date.getTime()`, so a `{ id, label }` stub throws inside the set()
       // updater — which the catch swallows, making this test pass with the
       // guard deleted. Verified: with a stub it does not discriminate.
-      const cOwnEvent = {
+      const cOwnEvent = coupleEvent({
         id: 'c-event',
         userId: C,
         label: 'C-OWN-EVENT-LABEL',
         date: new Date(2026, 11, 25),
-        description: null,
-        icon: 'calendar',
-      };
+      });
 
       const inFlight = useAppStore.getState().addEvent({
         label: 'A-PRIVATE-EVENT-LABEL',
@@ -2016,14 +2042,7 @@ describe('loader identity guards', () => {
       });
       switchToUserC({ events: [cOwnEvent] });
 
-      pending.settle({
-        id: 'a-event',
-        userId: A,
-        label: 'A-PRIVATE-EVENT-LABEL',
-        date: new Date(2026, 9, 31),
-        description: null,
-        icon: 'calendar',
-      });
+      pending.settle(coupleEvent());
       await inFlight;
 
       expect(useAppStore.getState().events).toEqual([cOwnEvent]);
@@ -2055,14 +2074,7 @@ describe('loader identity guards', () => {
       const inFlight = useAppStore.getState().editEvent('a-event', { label: 'renamed' });
       switchToUserC({ events: [{ id: 'a-event', label: 'C-OWN-EVENT-LABEL' }] });
 
-      pending.settle({
-        id: 'a-event',
-        userId: A,
-        label: 'A-PRIVATE-EVENT-LABEL',
-        date: new Date(2026, 9, 31),
-        description: null,
-        icon: 'calendar',
-      });
+      pending.settle(coupleEvent());
       await inFlight;
 
       // Same id in both accounts: without the guard the map() would overwrite
@@ -2258,12 +2270,7 @@ describe('loader identity guards', () => {
     });
 
     it('uploadPhoto still rejects on a full quota', async () => {
-      checkStorageQuota.mockResolvedValueOnce({
-        used: 97,
-        quota: 100,
-        percent: 97,
-        warning: 'critical',
-      });
+      checkStorageQuota.mockResolvedValueOnce(storageQuota(97, 'critical'));
 
       await expect(useAppStore.getState().uploadPhoto(uploadInput())).resolves.toEqual({
         success: false,
@@ -2280,8 +2287,8 @@ describe('loader identity guards', () => {
     // the other still satisfying the assertion.
     it('uploadPhoto still warns when storage is already near the limit before the upload', async () => {
       checkStorageQuota
-        .mockResolvedValueOnce({ used: 850, quota: 1_000, percent: 85, warning: 'approaching' })
-        .mockResolvedValueOnce({ used: 860, quota: 1_000, percent: 86, warning: 'none' });
+        .mockResolvedValueOnce(storageQuota(85, 'approaching'))
+        .mockResolvedValueOnce(storageQuota(86, 'none'));
       uploadPhotoService.mockResolvedValue(aPhoto());
 
       await useAppStore.getState().uploadPhoto(uploadInput());
@@ -2295,8 +2302,8 @@ describe('loader identity guards', () => {
       // Below the threshold beforehand, so only the post-upload check can fire
       // — the branch that catches "this photo is what filled you up".
       checkStorageQuota
-        .mockResolvedValueOnce({ used: 100, quota: 1_000, percent: 10, warning: 'none' })
-        .mockResolvedValueOnce({ used: 870, quota: 1_000, percent: 87, warning: 'approaching' });
+        .mockResolvedValueOnce(storageQuota(10, 'none'))
+        .mockResolvedValueOnce(storageQuota(87, 'approaching'));
       uploadPhotoService.mockResolvedValue(aPhoto());
 
       await useAppStore.getState().uploadPhoto(uploadInput());

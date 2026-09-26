@@ -403,6 +403,10 @@ describe('PokeKissInterface on the kit', () => {
     // The 30-minute cooldown is measured from `Date.now()` and re-read by a 1s
     // interval, so both are faked; nothing in these cases waits on a timer.
     const T = new Date(2026, 8, 25, 12, 0, 0).getTime();
+    // src/components/PokeKissInterface/PokeKissInterface.tsx RATE_LIMIT_MS (module-private).
+    const COOLDOWN_MS = 30 * 60 * 1000;
+    const ONE_MINUTE_MS = 60_000;
+    const ONE_SECOND_MS = 1_000;
 
     beforeEach(() => {
       vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
@@ -414,11 +418,12 @@ describe('PokeKissInterface on the kit', () => {
     });
 
     it('disables a tile in cooldown and shows the remaining m:ss under its label', () => {
-      localStorage.setItem('lastPokeTime', String(T - 60_000));
+      localStorage.setItem('lastPokeTime', String(T - ONE_MINUTE_MS));
 
       render(<PokeKissInterface />);
 
       expect(screen.getByTestId('poke-button')).toBeDisabled();
+      // The 30-minute cooldown less the minute already gone.
       expect(screen.getByTestId('poke-cooldown')).toHaveTextContent(/^29:00$/);
       expect(screen.getByTestId('kiss-button')).toBeEnabled();
       expect(screen.queryByTestId('kiss-cooldown')).not.toBeInTheDocument();
@@ -429,7 +434,7 @@ describe('PokeKissInterface on the kit', () => {
     });
 
     it('re-enables a tile exactly 30 minutes after the last send', () => {
-      localStorage.setItem('lastPokeTime', String(T - 1_800_000));
+      localStorage.setItem('lastPokeTime', String(T - COOLDOWN_MS));
 
       render(<PokeKissInterface />);
 
@@ -438,7 +443,7 @@ describe('PokeKissInterface on the kit', () => {
     });
 
     it('keeps a tile disabled one second before the cooldown ends', () => {
-      localStorage.setItem('lastPokeTime', String(T - 1_799_000));
+      localStorage.setItem('lastPokeTime', String(T - (COOLDOWN_MS - ONE_SECOND_MS)));
 
       render(<PokeKissInterface />);
 
@@ -447,7 +452,7 @@ describe('PokeKissInterface on the kit', () => {
     });
 
     it('re-enables the tile when the countdown ticks through its last second', () => {
-      localStorage.setItem('lastPokeTime', String(T - 1_799_000));
+      localStorage.setItem('lastPokeTime', String(T - (COOLDOWN_MS - ONE_SECOND_MS)));
 
       render(<PokeKissInterface />);
       expect(screen.getByTestId('poke-button')).toBeDisabled();

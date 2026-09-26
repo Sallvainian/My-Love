@@ -32,6 +32,13 @@ import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
 
 const START = new Date(2025, 9, 4, 18, 0, 0).toISOString();
+/** A linked couple with no start date or wedding date saved yet. */
+const LINKED = {
+  status: 'linked',
+  partnerId: 'p',
+  relationshipStart: null,
+  weddingDate: null,
+} as const;
 const realSetRelationshipStart = useAppStore.getState().setRelationshipStart;
 
 describe('Settings — Together since', () => {
@@ -58,9 +65,7 @@ describe('Settings — Together since', () => {
   });
 
   it('linked but not set yet: "Not set yet" and empty inputs', () => {
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
-    });
+    useAppStore.setState({ coupleSettings: LINKED });
     render(<Settings />);
 
     expect(screen.getByTestId('settings-together-since-value')).toHaveTextContent('Not set yet');
@@ -68,9 +73,7 @@ describe('Settings — Together since', () => {
   });
 
   it('pre-fills the saved date and time in local time', () => {
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: START, weddingDate: null },
-    });
+    useAppStore.setState({ coupleSettings: { ...LINKED, relationshipStart: START } });
     render(<Settings />);
 
     expect(screen.getByTestId('settings-together-since-date')).toHaveValue('2025-10-04');
@@ -79,9 +82,7 @@ describe('Settings — Together since', () => {
 
   it('saves the local date and time as one instant', async () => {
     const user = userEvent.setup();
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
-    });
+    useAppStore.setState({ coupleSettings: LINKED });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setRelationshipStart: save });
     render(<Settings />);
@@ -96,9 +97,7 @@ describe('Settings — Together since', () => {
 
   it('shows why a save was refused, and sends nothing without a date', async () => {
     const user = userEvent.setup();
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: START, weddingDate: null },
-    });
+    useAppStore.setState({ coupleSettings: { ...LINKED, relationshipStart: START } });
     const save = vi.fn(async () => {
       throw new AccountDataError(
         'offline',
@@ -134,9 +133,7 @@ describe('Settings — Together since', () => {
 
     /** Enters a start and saves it; returns the save spy. */
     async function submitStart(user: UserEvent, date: string, time?: string) {
-      useAppStore.setState({
-        coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
-      });
+      useAppStore.setState({ coupleSettings: LINKED });
       const save = vi.fn(async () => {});
       useAppStore.setState({ setRelationshipStart: save });
       render(<Settings />);

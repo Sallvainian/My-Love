@@ -38,6 +38,7 @@ vi.mock('../../../src/services/localCopy', () => ({
 }));
 
 import type { Interaction, SupabaseInteractionRecord } from '../../../src/api/interactionService';
+import { createInteractionRecord } from '../../support/factories/interaction-record-ownership';
 import {
   createInteractionsSlice,
   INTERACTIONS_COPY_KIND,
@@ -83,16 +84,17 @@ function saved(i: Interaction) {
   };
 }
 
+const INCOMING_AT = '2026-09-21T08:00:00.000Z';
+
+/** A server row, by default an unviewed poke from PARTNER to USER_A. */
 function record(id: string, overrides: Partial<SupabaseInteractionRecord> = {}) {
-  return {
+  return createInteractionRecord({
     id,
-    type: 'poke',
     from_user_id: PARTNER,
     to_user_id: USER_A,
-    viewed: false,
-    created_at: '2026-09-21T08:00:00.000Z',
+    created_at: INCOMING_AT,
     ...overrides,
-  } as SupabaseInteractionRecord;
+  });
 }
 
 const key = (userId: string) => `${userId}|${INTERACTIONS_COPY_KIND}`;
@@ -445,7 +447,7 @@ describe('interactionsSlice local copy', () => {
       store.getState().addIncomingInteraction(record('rt-1'));
 
       const expected = [
-        interaction('rt-1', { createdAt: new Date('2026-09-21T08:00:00.000Z') }),
+        interaction('rt-1', { createdAt: new Date(INCOMING_AT) }),
         interaction('earlier', { viewed: true }),
       ];
       await vi.waitFor(() => expect(savedCopies.get(key(USER_A))).toEqual(expected.map(saved)));

@@ -28,6 +28,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const BROADCAST_TIMEOUT_MS = 15_000; // src/api/ephemeralBroadcast.ts BROADCAST_TIMEOUT_MS (module-private)
+
 interface FakeChannel {
   topic: string;
   /** 'closed' | 'leaving', mirroring CHANNEL_STATES for the registry's purposes */
@@ -348,7 +350,7 @@ describe('sendEphemeralBroadcast', () => {
     await settle();
     await send;
 
-    expect(sendTimeouts).toEqual([15_000]);
+    expect(sendTimeouts).toEqual([BROADCAST_TIMEOUT_MS]);
   });
 
   it('rejects, without a public fallback, when the session is gone mid-send', async () => {
@@ -582,7 +584,8 @@ describe('sendEphemeralBroadcast', () => {
       const stuck = broadcast(TOPIC, 'new_mood', { id: 'mood-1' });
       const assertion = expect(stuck).rejects.toThrow(/aborted due to timeout/);
 
-      await vi.advanceTimersByTimeAsync(16_000);
+      // Just past the send timeout, so the abort has fired.
+      await vi.advanceTimersByTimeAsync(BROADCAST_TIMEOUT_MS + 1_000);
       // The teardown's leave still needs acking for the promise to settle.
       while (leaveQueue.length > 0) leaveQueue.shift()!();
       await vi.advanceTimersByTimeAsync(0);

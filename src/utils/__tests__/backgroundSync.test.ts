@@ -37,6 +37,11 @@ function getMutableWindow(): MutableWindow {
   return global.window as MutableWindow;
 }
 
+/** The message the service worker posts once a background sync has run. */
+function syncCompleted(successCount: number, failCount: number): MessageEvent {
+  return { data: { type: 'BACKGROUND_SYNC_COMPLETED', successCount, failCount } } as MessageEvent;
+}
+
 /** A promise the test settles by hand, at the point it chooses. */
 function deferred<T>() {
   let resolve: (value: T) => void = () => {};
@@ -196,13 +201,7 @@ describe('backgroundSync utilities', () => {
       const messageHandler = addEventListenerCalls[0][1] as (event: MessageEvent) => void;
 
       // Simulate a BACKGROUND_SYNC_COMPLETED message
-      const mockEvent = {
-        data: {
-          type: 'BACKGROUND_SYNC_COMPLETED',
-          successCount: 3,
-          failCount: 0,
-        },
-      } as MessageEvent;
+      const mockEvent = syncCompleted(3, 0);
 
       messageHandler(mockEvent);
 
@@ -275,13 +274,7 @@ describe('backgroundSync utilities', () => {
         event: MessageEvent
       ) => void;
 
-      const mockEvent = {
-        data: {
-          type: 'BACKGROUND_SYNC_COMPLETED',
-          successCount: 1,
-          failCount: 0,
-        },
-      } as MessageEvent;
+      const mockEvent = syncCompleted(1, 0);
 
       messageHandler(mockEvent);
 
@@ -361,13 +354,7 @@ describe('backgroundSync utilities', () => {
           event: MessageEvent
         ) => void;
 
-        const complexEvent = {
-          data: {
-            type: 'BACKGROUND_SYNC_COMPLETED',
-            successCount: 5,
-            failCount: 1,
-          },
-        } as MessageEvent;
+        const complexEvent = syncCompleted(5, 1);
 
         messageHandler(complexEvent);
 

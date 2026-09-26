@@ -97,6 +97,17 @@ function anonClient(): SupabaseClient {
   });
 }
 
+/**
+ * A love-note `new_message` broadcast body, `{ message: { id, content } }`.
+ *
+ * `content` is left off entirely when not given, rather than sent as
+ * `undefined`, so the body on the wire and the exact `toEqual` lists of what a
+ * subscriber received both keep the shape they are written with.
+ */
+function notePayload(id: string, content?: string): { message: { id: string; content?: string } } {
+  return { message: content === undefined ? { id } : { id, content } };
+}
+
 interface Subscription {
   channel: RealtimeChannel;
   statuses: string[];
@@ -196,7 +207,7 @@ test.describe('Couple broadcast authorization', () => {
 
       await log.step('The partner sends to both topics over the private REST endpoint');
       expect(
-        await senderNotes.httpSend('new_message', { message: { id: 'note-1', content: 'hi' } })
+        await senderNotes.httpSend('new_message', notePayload('note-1', 'hi'))
       ).toEqual({ success: true });
       expect(await senderMoods.httpSend('new_mood', { id: 'mood-1', mood_type: 'happy' })).toEqual({
         success: true,
@@ -233,7 +244,7 @@ test.describe('Couple broadcast authorization', () => {
       await waitForStatus(poll, rejoined, 'victim love-notes after reconnect', 'subscribed');
 
       expect(
-        await senderNotes.httpSend('new_message', { message: { id: 'note-2', content: 'again' } })
+        await senderNotes.httpSend('new_message', notePayload('note-2', 'again'))
       ).toEqual({ success: true });
 
       await poll(
@@ -313,7 +324,7 @@ test.describe('Couple broadcast authorization', () => {
       await log.step('The forger is denied at the REST endpoint the app sends over');
       const forged = forger.channel(`love-notes:${victimId}`, { config: { private: true } });
       await expect(
-        forged.httpSend('new_message', { message: { id: 'forged-1', content: 'forged' } })
+        forged.httpSend('new_message', notePayload('forged-1', 'forged'))
       ).rejects.toThrow(/Unauthorized/);
 
       // The SDK's `send()` reaches the same endpoint but reports 'ok' whatever
@@ -323,7 +334,7 @@ test.describe('Couple broadcast authorization', () => {
       const legacyResult = await forged.send({
         type: 'broadcast',
         event: 'new_message',
-        payload: { message: { id: 'forged-2', content: 'forged' } },
+        payload: notePayload('forged-2', 'forged'),
       });
       expect(legacyResult, 'the SDK send() no longer reports ok on a denied forge').toBe('ok');
       await forger.removeChannel(forged);
@@ -335,7 +346,7 @@ test.describe('Couple broadcast authorization', () => {
       await log.step('Only the partner note that follows the forgeries reaches the victim');
       const senderNotes = partner.channel(`love-notes:${victimId}`, { config: { private: true } });
       expect(
-        await senderNotes.httpSend('new_message', { message: { id: 'real-1', content: 'real' } })
+        await senderNotes.httpSend('new_message', notePayload('real-1', 'real'))
       ).toEqual({ success: true });
 
       await poll(
@@ -344,7 +355,7 @@ test.describe('Couple broadcast authorization', () => {
         { timeout: 15000, interval: 100, log: 'Waiting for the legitimate note' }
       );
       expect(notes.received, 'the victim received a forged note').toEqual([
-        { message: { id: 'real-1', content: 'real' } },
+        notePayload('real-1', 'real'),
       ]);
     } catch (error) {
       failures.push(error);
@@ -447,7 +458,7 @@ test.describe('Couple broadcast authorization', () => {
 
       await log.step('Reading: a privately-sent broadcast does not reach the public subscriber');
       expect(
-        await sender.httpSend('new_message', { message: { id: 'private-1', content: 'private' } })
+        await sender.httpSend('new_message', notePayload('private-1', 'private'))
       ).toEqual({ success: true });
 
       await poll(
@@ -465,9 +476,7 @@ test.describe('Couple broadcast authorization', () => {
         config: { private: false },
       });
       expect(
-        await publicSender.httpSend('new_message', {
-          message: { id: 'public-sentinel', content: 'sentinel' },
-        })
+        await publicSender.httpSend('new_message', notePayload('public-sentinel', 'sentinel'))
       ).toEqual({ success: true });
       await poll(
         async () => eavesdrop.received.length,
@@ -475,7 +484,7 @@ test.describe('Couple broadcast authorization', () => {
         { timeout: 15000, interval: 100, log: 'Waiting for the public sentinel' }
       );
       expect(eavesdrop.received, 'a public subscriber received a private broadcast').toEqual([
-        { message: { id: 'public-sentinel', content: 'sentinel' } },
+        notePayload('public-sentinel', 'sentinel'),
       ]);
 
       // The other half of CAP-2/CAP-3, and the one that matters more: not just
@@ -487,7 +496,7 @@ test.describe('Couple broadcast authorization', () => {
       const publicSend = await eavesdrop.channel.send({
         type: 'broadcast',
         event: 'new_message',
-        payload: { message: { id: 'injected-ws', content: 'injected' } },
+        payload: notePayload('injected-ws', 'injected'),
       });
       expect(publicSend, 'the anon public websocket send no longer reports ok').toBe('ok');
 
@@ -509,7 +518,7 @@ test.describe('Couple broadcast authorization', () => {
             {
               topic: `love-notes:${victimId}`,
               event: 'new_message',
-              payload: { message: { id: 'injected-rest', content: 'injected' } },
+              payload: notePayload('injected-rest', 'injected'),
               private: true,
             },
           ],
@@ -525,9 +534,7 @@ test.describe('Couple broadcast authorization', () => {
       // injected message would arrive ahead of it, given in-order delivery
       // (see "Sentinel assumption" in the header).
       expect(
-        await sender.httpSend('new_message', {
-          message: { id: 'private-sentinel', content: 'sentinel' },
-        })
+        await sender.httpSend('new_message', notePayload('private-sentinel', 'sentinel'))
       ).toEqual({ success: true });
       await poll(
         async () => listener.received.length,
@@ -539,8 +546,8 @@ test.describe('Couple broadcast authorization', () => {
       // separate delivery path, not the sender being told "no", which is
       // exactly why this has to be asserted on the RECEIVER.
       expect(listener.received, 'a public sender injected into a private subscriber').toEqual([
-        { message: { id: 'private-1', content: 'private' } },
-        { message: { id: 'private-sentinel', content: 'sentinel' } },
+        notePayload('private-1', 'private'),
+        notePayload('private-sentinel', 'sentinel'),
       ]);
     } catch (error) {
       failure = error;
@@ -596,7 +603,7 @@ test.describe('Couple broadcast authorization', () => {
 
       await log.step('Sending to its OWN partner is allowed');
       const own = sender.channel(`love-notes:${outsiderB.userId}`, { config: { private: true } });
-      expect(await own.httpSend('new_message', { message: { id: 'ok-1' } })).toEqual({
+      expect(await own.httpSend('new_message', notePayload('ok-1'))).toEqual({
         success: true,
       });
       await sender.removeChannel(own);
@@ -604,7 +611,7 @@ test.describe('Couple broadcast authorization', () => {
       await log.step("Sending to a third party's topic is not");
       const stranger = sender.channel(`love-notes:${victimId}`, { config: { private: true } });
       await expect(
-        stranger.httpSend('new_message', { message: { id: 'forged-3' } })
+        stranger.httpSend('new_message', notePayload('forged-3'))
       ).rejects.toThrow(/Unauthorized/);
       await sender.removeChannel(stranger);
 

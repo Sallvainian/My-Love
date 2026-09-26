@@ -13,6 +13,10 @@ import App from '../../src/App';
 import { eventsService, type CoupleEvent } from '../../src/services/eventsService';
 import type { EventLoadResult } from '../../src/stores/slices/eventsSlice';
 import { useAppStore } from '../../src/stores/useAppStore';
+import {
+  createAuthBootstrapEvent,
+  createAuthBootstrapSession,
+} from '../support/factories/auth-bootstrap-notification-order';
 
 const auth = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -135,24 +139,12 @@ const success: EventLoadResult = { status: 'success' };
 const failure: EventLoadResult = { status: 'failure', error: 'Prior request failed' };
 
 function session(accessToken = 'initial-token', userId = USER_ID): Session {
-  return {
-    access_token: accessToken,
-    refresh_token: 'refresh-token',
-    token_type: 'bearer',
-    expires_in: 3600,
-    user: {
-      id: userId,
-      email: 'home@example.com',
-      app_metadata: {},
-      // Empty on purpose. The setup gate used to be `!user_metadata.display_name`
-      // and every test here rendered the app only because this object carried a
-      // name. It now comes from the profile row, so these sessions carry none
-      // and the `profile` mock below is what decides.
-      user_metadata: {},
-      aud: 'authenticated',
-      created_at: '2026-09-01T00:00:00Z',
-    },
-  };
+  // No display name on purpose (`displayName: null` leaves user_metadata empty).
+  // The setup gate used to be `!user_metadata.display_name` and every test here
+  // rendered the app only because the session carried a name. It now comes from
+  // the profile row, so these sessions carry none and the `profile` mock below
+  // is what decides.
+  return createAuthBootstrapSession({ userId, accessToken, email: 'home@example.com', displayName: null });
 }
 
 function deferred<T>() {
@@ -173,12 +165,7 @@ const NOW = new Date('2026-09-15T16:00:00.000Z');
 /** An upcoming event, a week after the pinned NOW. */
 function event(label: string): CoupleEvent {
   return {
-    id: label,
-    userId: USER_ID,
-    label,
-    date: new Date(2026, 8, 22),
-    description: null,
-    icon: 'calendar',
+    ...createAuthBootstrapEvent({ userId: USER_ID, label, id: label, date: new Date(2026, 8, 22) }),
     createdAt: NOW,
   };
 }

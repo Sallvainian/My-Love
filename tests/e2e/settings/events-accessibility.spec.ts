@@ -72,6 +72,7 @@ import {
 import { openSettingsFromHome } from '../../support/helpers/settings-screen';
 import { log } from '@seontechnologies/playwright-utils';
 import type { Page } from '@playwright/test';
+import type { TypedSupabaseClient } from '../../support/factories';
 
 /**
  * Deliberately unlike any fixed Home testid — `Wedding` slugifies to
@@ -79,6 +80,20 @@ import type { Page } from '@playwright/test';
  * row this spec creates.
  */
 const A11Y_LABEL = 'Settings A11y E2E';
+
+/**
+ * Seed the one upcoming row these scans run over: labelled, described and
+ * iconed, so every field of the row and of the edit form is populated.
+ */
+async function seedA11yEvent(supabaseAdmin: TypedSupabaseClient, userId: string) {
+  await seedEvent(supabaseAdmin, {
+    userId,
+    label: A11Y_LABEL,
+    eventDate: isoDateDaysFromNow(30),
+    description: 'Seeded by the accessibility test',
+    icon: 'calendar',
+  });
+}
 
 /** The list row carrying a given label. Row testids key on the event's uuid. */
 function rowFor(page: Page, label: string) {
@@ -106,13 +121,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       // the date line and the two icon-only controls (`event-edit-<id>`,
       // `event-delete-<id>`, EventsSettings.tsx:360,369) into the scan. The
       // empty state would scan almost nothing.
-      await seedEvent(supabaseAdmin, {
-        userId,
-        label: A11Y_LABEL,
-        eventDate: isoDateDaysFromNow(30),
-        description: 'Seeded by the accessibility test',
-        icon: 'calendar',
-      });
+      await seedA11yEvent(supabaseAdmin, userId);
 
       // emulateMedia reducedMotion is set here, and it costs nothing — but
       // EventsSettings does not map that preference to zero-duration motion:
@@ -153,13 +162,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       // A row is seeded so the form can be opened in its EDIT shape: pre-filled
       // label, date and description, plus the icon radio group — the widest
       // version of this dialog, and the one review found four issues on.
-      await seedEvent(supabaseAdmin, {
-        userId,
-        label: A11Y_LABEL,
-        eventDate: isoDateDaysFromNow(30),
-        description: 'Seeded by the accessibility test',
-        icon: 'calendar',
-      });
+      await seedA11yEvent(supabaseAdmin, userId);
 
       // Same caveat as above: this does not zero these dialogs' animations.
       await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -207,13 +210,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
     async ({ page, supabaseAdmin, recurse, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
-      await seedEvent(supabaseAdmin, {
-        userId,
-        label: A11Y_LABEL,
-        eventDate: isoDateDaysFromNow(30),
-        description: 'Seeded by the accessibility test',
-        icon: 'calendar',
-      });
+      await seedA11yEvent(supabaseAdmin, userId);
 
       // Same caveat again — see DE.5-E2E-001a.
       await page.emulateMedia({ reducedMotion: 'reduce' });

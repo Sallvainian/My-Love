@@ -13,33 +13,25 @@
  * after the upgrade still knows whose saved data to delete.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { persistedBlob, SEEDED_SETTINGS, STORAGE_KEY } from '../helpers/persistedBlob';
 
-const STORAGE_KEY = 'my-love-storage';
 const VAULT_KEY = 'my-love-anniversary-vault';
 const OLD_OWNER_KEY = 'my-love-anniversary-owner';
 const OWNER_KEY = 'my-love-account-owner';
 
 const SECRET_LABEL = 'PREVIOUS-ACCOUNT-ANNIVERSARY';
 
+/** A pre-move build's settings, still holding the account's anniversaries. */
 const SETTINGS_WITH_ANNIVERSARIES = {
-  notificationTime: '09:00',
+  ...SEEDED_SETTINGS,
   relationship: {
-    startDate: '2020-01-01',
-    partnerName: 'A',
+    ...SEEDED_SETTINGS.relationship,
     anniversaries: [{ id: 1, date: '2020-02-14', label: SECRET_LABEL, serverId: 'srv-1' }],
   },
-  notifications: { enabled: true, time: '09:00' },
 };
 
 function oldBlob(): string {
-  return JSON.stringify({
-    version: 0,
-    state: {
-      isOnboarded: true,
-      settings: SETTINGS_WITH_ANNIVERSARIES,
-      messageHistory: { shownMessages: [['2026-07-26', 3]], currentIndex: 7 },
-    },
-  });
+  return persistedBlob({ settings: SETTINGS_WITH_ANNIVERSARIES });
 }
 
 async function loadStore() {

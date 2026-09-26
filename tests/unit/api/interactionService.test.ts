@@ -22,6 +22,7 @@ import {
   RLS_DENIED,
   type FakePostgrestError,
 } from './fakeInteractionsBackend';
+import { createInteractionRecord } from '../../support/factories/interaction-record-ownership';
 
 // UUID-shaped: the service validates the partner id it derives before inserting.
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -143,14 +144,11 @@ describe('interactionService', () => {
   });
 
   describe('subscribeInteractions', () => {
-    const incomingRecord = {
+    const incomingRecord = createInteractionRecord({
       id: 'incoming-1',
-      type: 'poke',
       from_user_id: PARTNER_ID,
       to_user_id: USER_ID,
-      viewed: false,
-      created_at: '2026-08-20T12:00:00.000Z',
-    };
+    });
 
     it('propagates healthy, failed, timed-out, and recovered statuses', async () => {
       const onStatusChange = vi.fn();

@@ -55,6 +55,14 @@ const committed: LoveNote = {
   created_at: '2026-08-17T10:00:00.000Z',
 };
 
+/** `committed` before it has a server row: its id is still its tempId. */
+const unsent = (flags: Partial<LoveNote>): LoveNote => ({
+  ...committed,
+  id: 'temp-1-abc',
+  tempId: 'temp-1-abc',
+  ...flags,
+});
+
 function renderBubble(
   message: LoveNote,
   onRequestRemove?: (n: LoveNote) => void,
@@ -97,20 +105,20 @@ describe('remove control on a message bubble', () => {
   });
 
   it('does not offer removal while a message is still sending', () => {
-    renderBubble({ ...committed, id: 'temp-1-abc', tempId: 'temp-1-abc', sending: true }, vi.fn());
+    renderBubble(unsent({ sending: true }), vi.fn());
 
     expect(screen.queryByTestId('note-remove-button')).toBeNull();
   });
 
   it('does not offer removal while a queued message waits to send', () => {
-    renderBubble({ ...committed, id: 'temp-1-abc', tempId: 'temp-1-abc', queued: true }, vi.fn());
+    renderBubble(unsent({ queued: true }), vi.fn());
 
     expect(screen.queryByTestId('note-remove-button')).toBeNull();
   });
 
   it('offers removal on a failed send, handing over the note with its temp id', async () => {
     const user = userEvent.setup();
-    const failed = { ...committed, id: 'temp-1-abc', tempId: 'temp-1-abc', error: true };
+    const failed = unsent({ error: true });
     const onRequestRemove = vi.fn();
     renderBubble(failed, onRequestRemove);
 
@@ -154,7 +162,7 @@ describe('remove confirmation dialog', () => {
   it('says a failed note failed to send, not that the partner keeps a copy', () => {
     render(
       <NoteRemoveConfirmation
-        note={{ ...committed, id: 'temp-1-abc', tempId: 'temp-1-abc', error: true }}
+        note={unsent({ error: true })}
         onClose={vi.fn()}
         onConfirmRemove={vi.fn()}
         fallbackFocusRef={inertFallback}

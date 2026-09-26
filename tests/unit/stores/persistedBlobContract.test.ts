@@ -27,44 +27,22 @@
  * invariant keeps holding as the allowlist grows.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-
-const STORAGE_KEY = 'my-love-storage';
-
-/** Shaped to pass `SettingsSchema` — the adapter drops `settings` when it does not. */
-const PERSISTED_SETTINGS = {
-  relationship: { anniversaries: [] },
-};
+import {
+  PERSISTED_EVENT,
+  PERSISTED_MESSAGE_HISTORY,
+  persistedBlob,
+  STORAGE_KEY,
+} from '../helpers/persistedBlob';
 
 /**
- * `currentIndex: 7` is the sentinel the serialization counters match on.
+ * `currentIndex: 7` (`PERSISTED_MESSAGE_HISTORY` in the helper) is the sentinel
+ * the serialization counters match on.
  *
  * It has to be something no other blob in the process carries, because the
  * counters below filter every `JSON.stringify` call in the run down to the ones
  * that touched THIS blob.
  */
-const SENTINEL_INDEX = 7;
-
-function persistedBlob(extra: Record<string, unknown> = {}): string {
-  return JSON.stringify({
-    version: 0,
-    state: {
-      isOnboarded: true,
-      settings: PERSISTED_SETTINGS,
-      messageHistory: { shownMessages: [['2026-07-26', 3]], currentIndex: SENTINEL_INDEX },
-      ...extra,
-    },
-  });
-}
-
-const PERSISTED_EVENT = {
-  id: 'event-1',
-  userId: 'user-A',
-  label: 'PRIVATE-EVENT-LABEL',
-  date: '2026-09-12T00:00:00.000Z',
-  createdAt: '2026-01-01T00:00:00.000Z',
-  description: 'PRIVATE-EVENT-DESCRIPTION',
-  icon: 'plane',
-};
+const SENTINEL_INDEX = PERSISTED_MESSAGE_HISTORY.currentIndex;
 
 /** True for the parsed blob this file seeded, and for nothing else in the run. */
 function isSeededBlob(value: unknown): boolean {

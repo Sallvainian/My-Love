@@ -24,8 +24,13 @@
  * covers the disk, in both directions.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-const STORAGE_KEY = 'my-love-storage';
+import {
+  PERSISTED_EVENT,
+  PERSISTED_MOOD,
+  PERSISTED_SETTINGS,
+  persistedBlob,
+  STORAGE_KEY,
+} from '../helpers/persistedBlob';
 
 /** One event in memory, shaped the way `eventsService` returns them. */
 const IN_MEMORY_EVENT = {
@@ -37,56 +42,6 @@ const IN_MEMORY_EVENT = {
   description: 'PRIVATE-EVENT-DESCRIPTION',
   icon: 'plane' as const,
 };
-
-/**
- * The same event as it would come back off disk: JSON has no Date, so both
- * timestamps rehydrate as strings — which is why `EventCountdown` calling
- * `date.getFullYear()` on one of these would throw.
- */
-const PERSISTED_EVENT = {
-  id: 'event-1',
-  userId: 'user-A',
-  label: 'PRIVATE-EVENT-LABEL',
-  date: '2026-09-12T00:00:00.000Z',
-  createdAt: '2026-01-01T00:00:00.000Z',
-  description: 'PRIVATE-EVENT-DESCRIPTION',
-  icon: 'plane',
-};
-
-/** A mood as it would come back off disk, for the both-keys-at-once case. */
-const PERSISTED_MOOD = {
-  id: 1,
-  userId: 'user-A',
-  mood: 'sad',
-  moods: ['sad'],
-  note: 'a private note',
-  date: '2026-07-26',
-  timestamp: '2026-07-26T06:00:00.000Z',
-  synced: true,
-};
-
-/**
- * Settings shaped to pass `SettingsSchema` — the adapter drops the key outright
- * when it does not, which would hide whether the strip preserved it.
- */
-const PERSISTED_SETTINGS = {
-  relationship: {
-    anniversaries: [],
-  },
-};
-
-/** A persisted blob shaped like the real one, plus whatever a case seeds into it. */
-function persistedBlob(extra: Record<string, unknown> = {}): string {
-  return JSON.stringify({
-    version: 0,
-    state: {
-      isOnboarded: true,
-      settings: PERSISTED_SETTINGS,
-      messageHistory: { shownMessages: [['2026-07-26', 3]], currentIndex: 7 },
-      ...extra,
-    },
-  });
-}
 
 /**
  * Seed the key and import the store fresh so its adapter runs on the way in.

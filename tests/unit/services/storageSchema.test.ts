@@ -45,6 +45,15 @@ const ALL_STORES = [
   'note-queue',
 ] as const;
 
+/** One fixed creation time, so no row carries the live clock. */
+const CREATED_AT = '2026-01-01T00:00:00.000Z';
+
+/** A bundled `messages` row; `overrides` turn it into any other row. */
+function message<T extends Partial<Message>>(text: string, overrides: T = {} as T): Omit<Message, 'id'> & T {
+  const base: Omit<Message, 'id'> = { text, category: 'reason', isCustom: false, createdAt: new Date(CREATED_AT) };
+  return { ...base, ...overrides };
+}
+
 /** Every service instance built in a test, so its connection can be closed */
 const openServices: Array<{ db: IDBPDatabase<MyLoveDBSchema> | null }> = [];
 
@@ -188,13 +197,9 @@ describe('storageService schema', () => {
     // under test here. The migration cases below are what cover that.
     const storageService = await freshStorageService();
     await storageService.init();
-    const messageId = await storageService.addMessage({
-      text: 'keep me',
-      category: 'affirmation',
-      isFavorite: false,
-      isCustom: false,
-      createdAt: new Date(),
-    });
+    const messageId = await storageService.addMessage(
+      message('keep me', { category: 'affirmation', isFavorite: false })
+    );
 
     const reopened = await freshStorageService();
     await reopened.init();
@@ -214,9 +219,16 @@ describe('storageService schema', () => {
       },
     });
     const raw: Message[] = [
-      { id: 1, text: 'daily', category: 'reason', isCustom: false, isFavorite: true, createdAt: new Date() },
-      { id: 2, text: 'owned', category: 'custom', isCustom: true, userId: 'owner-a', serverId: 'server-owned', isFavorite: true, createdAt: new Date() },
-      { id: 3, text: 'ownerless', category: 'custom', isCustom: true, isFavorite: true, createdAt: new Date() },
+      message('daily', { id: 1, isFavorite: true }),
+      message('owned', {
+        id: 2,
+        category: 'custom',
+        isCustom: true,
+        userId: 'owner-a',
+        serverId: 'server-owned',
+        isFavorite: true,
+      }),
+      message('ownerless', { id: 3, category: 'custom', isCustom: true, isFavorite: true }),
     ];
     for (const row of raw) await legacy.put('messages', row);
     await legacy.put('sw-auth', {
@@ -294,21 +306,16 @@ describe('storageService schema', () => {
     async function seedStore() {
       const storageService = await freshStorageService();
       await storageService.init();
-      const dailyId = await storageService.addMessage({
-        text: 'BUNDLED-DAILY',
-        category: 'reason',
-        isCustom: false,
-        isFavorite: true,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      });
-      const strayId = await storageService.addMessage({
-        text: 'STRAY-CUSTOM',
-        category: 'custom',
-        isCustom: true,
-        userId: A,
-        serverId: 'server-a',
-        createdAt: new Date('2026-08-03T06:00:00.000Z'),
-      });
+      const dailyId = await storageService.addMessage(message('BUNDLED-DAILY', { isFavorite: true }));
+      const strayId = await storageService.addMessage(
+        message('STRAY-CUSTOM', {
+          category: 'custom',
+          isCustom: true,
+          userId: A,
+          serverId: 'server-a',
+          createdAt: new Date('2026-08-03T06:00:00.000Z'),
+        })
+      );
       return { storageService, dailyId, strayId };
     }
 
@@ -339,18 +346,15 @@ describe('storageService schema', () => {
 
   describe('toggleFavorite writes the server, then returns the changed copy', () => {
     const A = '00000000-0000-4000-8000-00000000000a';
-    const createdAt = new Date('2026-01-01T00:00:00.000Z');
-    const bundled: Message = { id: 3, text: 'BUNDLED-DAILY', category: 'reason', isCustom: false, createdAt };
-    const custom: Message = {
+    const bundled: Message = message('BUNDLED-DAILY', { id: 3 });
+    const custom: Message = message('A-CUSTOM', {
       id: 400,
-      text: 'A-CUSTOM',
       category: 'custom',
       isCustom: true,
       userId: A,
       serverId: 'server-a',
       isFavorite: false,
-      createdAt,
-    };
+    });
     const copy = (): StoredMessageData => ({ custom: [custom], bundledFavoriteIds: [], nextCustomId: 401 });
 
     /**

@@ -51,7 +51,7 @@ vi.mock('../../../src/services/coupleSettingsService', async (importOriginal) =>
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
-import { COUPLE_SETTINGS_COPY_KIND } from '../../../src/stores/slices/settingsSlice';
+import { COUPLE_SETTINGS_COPY_KIND, type CoupleSettings } from '../../../src/stores/slices/settingsSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 
 const A = 'USER-A-ID';
@@ -61,7 +61,15 @@ const P = 'PARTNER-ID';
 const SAVED_START = '2025-10-04T22:00:00.000Z';
 const SERVER_START = '2025-10-19T13:30:00.000Z';
 
-const SAVED = { status: 'linked', partnerId: P, relationshipStart: SAVED_START, weddingDate: null } as const;
+/** The linked couple-settings state, as the store shows it and the copy saves it. */
+function linked(relationshipStart: string | null, weddingDate: string | null = null): CoupleSettings {
+  return { status: 'linked', partnerId: P, relationshipStart, weddingDate };
+}
+
+/** `lookupPartnerId`'s answer for a linked account. */
+const LINKED_LOOKUP = { status: 'linked', partnerId: P } as const;
+
+const SAVED = linked(SAVED_START);
 
 function deferred<T>() {
   let settle: (value: T) => void = () => {};
@@ -124,12 +132,12 @@ describe('couple settings on the local copy', () => {
   // Matrix: "Partner edits" — the other phone sees it after start/reconnect.
   it('online: replaces the copy with the server date and saves it', async () => {
     await writeLocalCopy(A, COUPLE_SETTINGS_COPY_KIND, SAVED);
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     fetchCoupleSettings.mockResolvedValue({ relationshipStart: SERVER_START, weddingDate: null });
 
     await state().loadCoupleSettings();
 
-    const expected = { status: 'linked', partnerId: P, relationshipStart: SERVER_START, weddingDate: null };
+    const expected = linked(SERVER_START);
     expect(fetchCoupleSettings).toHaveBeenCalledWith(A, P);
     expect(state().coupleSettings).toEqual(expected);
     expect(await readLocalCopy(A, COUPLE_SETTINGS_COPY_KIND)).toEqual(expected);
@@ -137,12 +145,12 @@ describe('couple settings on the local copy', () => {
 
   // Matrix: "Not set yet — Linked, no row".
   it('linked with no row: a linked state with no start date, saved as such', async () => {
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     fetchCoupleSettings.mockResolvedValue({ relationshipStart: null, weddingDate: null });
 
     await state().loadCoupleSettings();
 
-    const expected = { status: 'linked', partnerId: P, relationshipStart: null, weddingDate: null };
+    const expected = linked(null);
     expect(state().coupleSettings).toEqual(expected);
     expect(await readLocalCopy(A, COUPLE_SETTINGS_COPY_KIND)).toEqual(expected);
   });
@@ -174,7 +182,7 @@ describe('couple settings on the local copy', () => {
   // Matrix: "Lookup fails — … or read fails".
   it('a failed server read keeps the shown copy and leaves it untouched', async () => {
     await writeLocalCopy(A, COUPLE_SETTINGS_COPY_KIND, SAVED);
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     fetchCoupleSettings.mockRejectedValue(new AccountDataError('transport', 'boom'));
 
     await state().loadCoupleSettings();
@@ -194,12 +202,12 @@ describe('couple settings on the local copy', () => {
 
   // Matrix: "Partner edits — B saves a new date online".
   it('a confirmed save updates state and the copy', async () => {
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     saveStartDate.mockResolvedValue({ relationshipStart: SERVER_START, weddingDate: null });
 
     await state().setRelationshipStart(SERVER_START);
 
-    const expected = { status: 'linked', partnerId: P, relationshipStart: SERVER_START, weddingDate: null };
+    const expected = linked(SERVER_START);
     expect(saveStartDate).toHaveBeenCalledWith(A, P, SERVER_START);
     expect(state().coupleSettings).toEqual(expected);
     expect(await readLocalCopy(A, COUPLE_SETTINGS_COPY_KIND)).toEqual(expected);
@@ -209,7 +217,7 @@ describe('couple settings on the local copy', () => {
   it('a failed save throws and leaves state and copy unchanged', async () => {
     await writeLocalCopy(A, COUPLE_SETTINGS_COPY_KIND, SAVED);
     useAppStore.setState({ coupleSettings: SAVED });
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     saveStartDate.mockRejectedValue(new AccountDataError('transport', 'save failed'));
 
     await expect(state().setRelationshipStart(SERVER_START)).rejects.toThrow('save failed');
@@ -255,7 +263,7 @@ describe('couple settings on the local copy', () => {
 
   // Matrix: "Sign-out — A out, B in".
   it("sign-out: A's copy is deleted and B never sees A's date", async () => {
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     fetchCoupleSettings.mockResolvedValue({ relationshipStart: SERVER_START, weddingDate: null });
     await state().loadCoupleSettings();
     expect(state().coupleSettings).not.toBeNull();
@@ -274,7 +282,7 @@ describe('couple settings on the local copy', () => {
 
   it('a load that lands after sign-out writes neither state nor copy', async () => {
     let settle: (value: unknown) => void = () => {};
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     fetchCoupleSettings.mockReturnValue(
       new Promise((resolve) => {
         settle = resolve;
@@ -298,7 +306,7 @@ describe('couple settings on the local copy', () => {
   it('a copy read that lands after a confirmed save does not replace it', async () => {
     const read = deferred<unknown>();
     copyRead.hook = () => read.promise;
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     fetchCoupleSettings.mockRejectedValue(new AccountDataError('transport', '500'));
 
     const refresh = state().loadCoupleSettings();
@@ -307,12 +315,7 @@ describe('couple settings on the local copy', () => {
     read.settle(SAVED);
     await refresh;
 
-    expect(state().coupleSettings).toEqual({
-      status: 'linked',
-      partnerId: P,
-      relationshipStart: SERVER_START,
-      weddingDate: null,
-    });
+    expect(state().coupleSettings).toEqual(linked(SERVER_START));
   });
 
   it('a copy read that lands after a server answer does not replace it', async () => {
@@ -321,19 +324,14 @@ describe('couple settings on the local copy', () => {
     const slowRefresh = state().loadCoupleSettings();
     // A second refresh, reading no copy, gets the server answer first.
     copyRead.hook = async () => null;
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     fetchCoupleSettings.mockResolvedValueOnce({ relationshipStart: SERVER_START, weddingDate: null });
     await state().loadCoupleSettings();
     fetchCoupleSettings.mockRejectedValue(new AccountDataError('transport', '500'));
     read.settle(SAVED);
     await slowRefresh;
 
-    expect(state().coupleSettings).toEqual({
-      status: 'linked',
-      partnerId: P,
-      relationshipStart: SERVER_START,
-      weddingDate: null,
-    });
+    expect(state().coupleSettings).toEqual(linked(SERVER_START));
   });
 
   // Accepting a link refreshes the couple copy, which still said "unlinked".
@@ -346,12 +344,12 @@ describe('couple settings on the local copy', () => {
       partner: { id: P, email: 'p@example.test', displayName: 'P', connectedAt: null, birthday: null },
     });
     partner.getPendingRequests.mockResolvedValue({ sent: [], received: [] });
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     fetchCoupleSettings.mockResolvedValue({ relationshipStart: SERVER_START, weddingDate: null });
 
     await state().acceptPartnerRequest('request-1');
 
-    const expected = { status: 'linked', partnerId: P, relationshipStart: SERVER_START, weddingDate: null };
+    const expected = linked(SERVER_START);
     expect(partner.acceptPartnerRequest).toHaveBeenCalledWith('request-1');
     expect(state().coupleSettings).toEqual(expected);
     expect(await readLocalCopy(A, COUPLE_SETTINGS_COPY_KIND)).toEqual(expected);
@@ -371,9 +369,7 @@ describe('message history limit from the couple start', () => {
   const NOW = new Date('2026-09-15T16:00:00.000Z');
 
   function startedAt(relationshipStart: string) {
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: P, relationshipStart, weddingDate: null },
-    });
+    useAppStore.setState({ coupleSettings: linked(relationshipStart) });
   }
 
   beforeEach(() => {

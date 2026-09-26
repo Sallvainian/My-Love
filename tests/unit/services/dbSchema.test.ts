@@ -40,6 +40,28 @@ function deleteDatabase(): Promise<void> {
   });
 }
 
+/** A bundled `messages` row as every pre-v15 version wrote it. */
+function legacyMessage(text: string) {
+  return { text, category: 'reason', isCustom: false, createdAt: new Date('2026-01-01T00:00:00.000Z') };
+}
+
+/** A `moods` row as the pre-v12 versions wrote it, stamped at the start of its day. */
+function legacyMood(note: string, { date = '2026-09-01', synced = true }: { date?: string; synced?: boolean } = {}) {
+  return {
+    userId: 'USER-A',
+    date,
+    mood: 'happy',
+    note,
+    timestamp: new Date(`${date}T00:00:00.000Z`),
+    synced,
+  };
+}
+
+/** The service worker's single `sw-auth` token row. */
+function swAuthRow(accessToken: string, userId = 'USER-A') {
+  return { id: 'current', accessToken, refreshToken: 'r', expiresAt: 1, userId };
+}
+
 describe('dbSchema', () => {
   const openDbs: Array<{ close: () => void }> = [];
 
@@ -112,12 +134,7 @@ describe('dbSchema', () => {
         },
       });
       const seedTx = dbV4.transaction('messages', 'readwrite');
-      await seedTx.objectStore('messages').add({
-        text: 'written before v8',
-        category: 'reason',
-        isCustom: false,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      });
+      await seedTx.objectStore('messages').add(legacyMessage('written before v8'));
       await seedTx.done;
       expect(
         dbV4.transaction('messages', 'readonly').objectStore('messages').indexNames.contains(
@@ -201,28 +218,10 @@ describe('dbSchema', () => {
         ],
         'readwrite'
       );
-      await tx.objectStore('messages').add({
-        text: 'WRITTEN-AT-V7',
-        category: 'reason',
-        isCustom: false,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      });
+      await tx.objectStore('messages').add(legacyMessage('WRITTEN-AT-V7'));
       await tx.objectStore('photos').add({ caption: 'PHOTO-AT-V7' });
-      await tx.objectStore('moods').add({
-        userId: 'USER-A',
-        date: '2026-08-01',
-        mood: 'happy',
-        note: 'MOOD-AT-V7',
-        timestamp: new Date('2026-08-01T00:00:00.000Z'),
-        synced: true,
-      });
-      await tx.objectStore('sw-auth').add({
-        id: 'current',
-        accessToken: 'TOKEN-AT-V7',
-        refreshToken: 'r',
-        expiresAt: 1,
-        userId: 'USER-A',
-      });
+      await tx.objectStore('moods').add(legacyMood('MOOD-AT-V7', { date: '2026-08-01' }));
+      await tx.objectStore('sw-auth').add(swAuthRow('TOKEN-AT-V7'));
       await tx.objectStore('scripture-sessions').add({
         id: 'session-v7',
         userId: 'USER-A',
@@ -407,29 +406,11 @@ describe('dbSchema', () => {
         ],
         'readwrite'
       );
-      await tx.objectStore('messages').add({
-        text: 'WRITTEN-AT-V9',
-        category: 'reason',
-        isCustom: false,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      });
+      await tx.objectStore('messages').add(legacyMessage('WRITTEN-AT-V9'));
       await tx.objectStore('message-favorites').add({ messageId: 1, userId: 'USER-A' });
       await tx.objectStore('photos').add({ caption: 'PHOTO-AT-V9' });
-      await tx.objectStore('moods').add({
-        userId: 'USER-A',
-        date: '2026-09-01',
-        mood: 'happy',
-        note: 'MOOD-AT-V9',
-        timestamp: new Date('2026-09-01T00:00:00.000Z'),
-        synced: true,
-      });
-      await tx.objectStore('sw-auth').add({
-        id: 'current',
-        accessToken: 'TOKEN-AT-V9',
-        refreshToken: 'r',
-        expiresAt: 1,
-        userId: 'USER-A',
-      });
+      await tx.objectStore('moods').add(legacyMood('MOOD-AT-V9'));
+      await tx.objectStore('sw-auth').add(swAuthRow('TOKEN-AT-V9'));
       await tx.objectStore('scripture-sessions').add({
         id: 'session-v9',
         userId: 'USER-A',
@@ -534,29 +515,11 @@ describe('dbSchema', () => {
 
       const stores = ['messages', 'message-favorites', 'moods', 'sw-auth'];
       const tx = db.transaction(withPhotos ? [...stores, 'photos'] : stores, 'readwrite');
-      await tx.objectStore('messages').add({
-        text: 'WRITTEN-AT-V10',
-        category: 'reason',
-        isCustom: false,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      });
+      await tx.objectStore('messages').add(legacyMessage('WRITTEN-AT-V10'));
       await tx.objectStore('message-favorites').add({ messageId: 1, userId: 'USER-A' });
       if (withPhotos) await tx.objectStore('photos').add({ caption: 'PHOTO-AT-V10' });
-      await tx.objectStore('moods').add({
-        userId: 'USER-A',
-        date: '2026-09-01',
-        mood: 'happy',
-        note: 'MOOD-AT-V10',
-        timestamp: new Date('2026-09-01T00:00:00.000Z'),
-        synced: true,
-      });
-      await tx.objectStore('sw-auth').add({
-        id: 'current',
-        accessToken: 'TOKEN-AT-V10',
-        refreshToken: 'r',
-        expiresAt: 1,
-        userId: 'USER-A',
-      });
+      await tx.objectStore('moods').add(legacyMood('MOOD-AT-V10'));
+      await tx.objectStore('sw-auth').add(swAuthRow('TOKEN-AT-V10'));
       await tx.done;
       db.close();
     }
@@ -610,14 +573,7 @@ describe('dbSchema', () => {
           database.createObjectStore('sw-auth', { keyPath: 'id' });
         },
       });
-      await db.add('moods', {
-        userId: 'USER-A',
-        date: '2026-09-01',
-        mood: 'happy',
-        note: 'MOOD-AT-V11',
-        timestamp: new Date('2026-09-01T00:00:00.000Z'),
-        synced: false,
-      });
+      await db.add('moods', legacyMood('MOOD-AT-V11', { synced: false }));
       db.close();
     }
 
@@ -863,7 +819,7 @@ describe('dbSchema', () => {
 
       const createdAt = new Date('2026-01-01T00:00:00.000Z');
       const rows: LegacyRow[] = [
-        ...BUNDLED.map((text) => ({ text, category: 'reason', isCustom: false, createdAt })),
+        ...BUNDLED.map((text) => legacyMessage(text)),
         { text: 'A-ONE', category: 'custom', isCustom: true, userId: A, serverId: 'srv-a1', active: true, createdAt },
         { text: 'B-ONE', category: 'custom', isCustom: true, userId: B, serverId: 'srv-b1', active: true, createdAt },
         { text: 'A-TWO', category: 'custom', isCustom: true, userId: A, serverId: 'srv-a2', active: false, createdAt },
@@ -874,13 +830,7 @@ describe('dbSchema', () => {
       ];
       for (const row of rows) await db.add('messages', row as never);
       if (options.token) {
-        await db.put('sw-auth', {
-          id: 'current',
-          accessToken: 'a',
-          refreshToken: 'r',
-          expiresAt: 1,
-          userId: options.token,
-        } as never);
+        await db.put('sw-auth', swAuthRow('a', options.token) as never);
       }
       for (const favorite of options.favorites ?? []) {
         await db.put('message-favorites' as never, favorite as never);

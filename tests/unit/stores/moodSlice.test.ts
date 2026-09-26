@@ -48,7 +48,7 @@ import { moodApi } from '@/api/moodApi';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '@/services/localCopy';
 
 // Import Zustand store factory
-import { createMoodSlice, type MoodSlice } from '@/stores/slices/moodSlice';
+import { createMoodSlice, MOOD_HISTORY_PAGE_SIZE, type MoodSlice } from '@/stores/slices/moodSlice';
 
 const mockedMoodService = vi.mocked(moodService);
 const mockedMoodSyncService = vi.mocked(moodSyncService);
@@ -98,6 +98,13 @@ function makeMoodEntry(overrides: Partial<MoodEntry> = {}): MoodEntry {
   };
 }
 
+type SyncBatch = Awaited<ReturnType<typeof moodSyncService.syncPendingMoods>>;
+
+/** A `moodSyncService.syncPendingMoods` batch result; every count defaults to 0. */
+function syncResult(counts: Partial<SyncBatch> = {}): SyncBatch {
+  return { synced: 0, failed: 0, deferred: 0, errors: [], ...counts };
+}
+
 describe('moodSlice', () => {
   beforeEach(() => {
     vi.setSystemTime(NOW);
@@ -142,12 +149,7 @@ describe('moodSlice', () => {
       const entry = makeMoodEntry();
       mockedMoodService.saveForDate.mockResolvedValue(entry);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([entry]);
-      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
-        synced: 1,
-        failed: 0,
-        deferred: 0,
-        errors: [],
-      });
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue(syncResult({ synced: 1 }));
       // addMoodEntry syncs, and the sync path reloads from IndexedDB — where
       // the entry it just created really would be.
       mockedMoodService.getAllForUser.mockResolvedValue([entry]);
@@ -174,12 +176,7 @@ describe('moodSlice', () => {
       const updated = makeMoodEntry({ id: 5, mood: 'sad', moods: ['sad'] });
       mockedMoodService.saveForDate.mockResolvedValue(updated);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
-      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
-        synced: 0,
-        failed: 0,
-        deferred: 0,
-        errors: [],
-      });
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue(syncResult());
       mockedMoodService.getAll.mockResolvedValue([updated]);
 
       await get().addMoodEntry(['sad']);
@@ -312,12 +309,7 @@ describe('moodSlice', () => {
 
   describe('syncPendingMoods', () => {
     it('sets isSyncing during sync and clears after', async () => {
-      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
-        synced: 1,
-        failed: 0,
-        deferred: 0,
-        errors: [],
-      });
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue(syncResult({ synced: 1 }));
       mockedMoodService.getAll.mockResolvedValue([]);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
       mockedGetPartnerId.mockResolvedValue(null);
@@ -330,12 +322,7 @@ describe('moodSlice', () => {
     });
 
     it('returns synced/failed counts', async () => {
-      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
-        synced: 3,
-        failed: 1,
-        deferred: 0,
-        errors: [],
-      });
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue(syncResult({ synced: 3, failed: 1 }));
       mockedMoodService.getAll.mockResolvedValue([]);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
       mockedGetPartnerId.mockResolvedValue(null);
@@ -359,8 +346,8 @@ describe('moodSlice', () => {
       // purpose. Without a second pass the newer value sits unsynced until some
       // unrelated trigger fires, and the partner sees the stale mood meanwhile.
       mockedMoodSyncService.syncPendingMoods
-        .mockResolvedValueOnce({ synced: 0, failed: 0, deferred: 1, errors: [] })
-        .mockResolvedValueOnce({ synced: 1, failed: 0, deferred: 0, errors: [] });
+        .mockResolvedValueOnce(syncResult({ deferred: 1 }))
+        .mockResolvedValueOnce(syncResult({ synced: 1 }));
       mockedMoodService.getAll.mockResolvedValue([]);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
       mockedGetPartnerId.mockResolvedValue(null);
@@ -373,12 +360,7 @@ describe('moodSlice', () => {
     });
 
     it('runs no second pass when nothing was deferred', async () => {
-      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
-        synced: 1,
-        failed: 0,
-        deferred: 0,
-        errors: [],
-      });
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue(syncResult({ synced: 1 }));
       mockedMoodService.getAll.mockResolvedValue([]);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
       mockedGetPartnerId.mockResolvedValue(null);
@@ -392,12 +374,7 @@ describe('moodSlice', () => {
     it('stops at two passes even if the second also defers', async () => {
       // Bounded on purpose: a user typing continuously would otherwise keep
       // producing deferrals and spin this loop for as long as they type.
-      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
-        synced: 0,
-        failed: 0,
-        deferred: 1,
-        errors: [],
-      });
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue(syncResult({ deferred: 1 }));
       mockedMoodService.getAll.mockResolvedValue([]);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
       mockedGetPartnerId.mockResolvedValue(null);
@@ -503,14 +480,14 @@ describe('moodSlice', () => {
       });
 
       it('leaves the replacement account’s sync status untouched on success', async () => {
-        const pending = gate<{ synced: number; failed: number; deferred: number; errors: [] }>();
+        const pending = gate<SyncBatch>();
         mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
 
         const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
         const inFlight = get().syncPendingMoods();
 
         set({ userId: 'USER-B', authSessionVersion: 2, syncStatus: { ...SUCCESSOR_STATUS } });
-        pending.settle({ synced: 3, failed: 0, deferred: 0, errors: [] });
+        pending.settle(syncResult({ synced: 3 }));
         const result = await inFlight;
 
         expect(get().syncStatus).toEqual(SUCCESSOR_STATUS);
@@ -519,14 +496,14 @@ describe('moodSlice', () => {
       });
 
       it('launches no loaders on the replacement account’s behalf', async () => {
-        const pending = gate<{ synced: number; failed: number; deferred: number; errors: [] }>();
+        const pending = gate<SyncBatch>();
         mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
 
         const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
         const inFlight = get().syncPendingMoods();
 
         set({ userId: 'USER-B', authSessionVersion: 2, syncStatus: { ...SUCCESSOR_STATUS } });
-        pending.settle({ synced: 1, failed: 0, deferred: 0, errors: [] });
+        pending.settle(syncResult({ synced: 1 }));
         await inFlight;
 
         // Skipping only the `set` is not enough: these reload B's moods and
@@ -580,14 +557,14 @@ describe('moodSlice', () => {
       it('discards the batch when the same account signs back in', async () => {
         // The version-only half of the guard. `userId` is USER-A on both sides,
         // so an id-only compare lets this stale completion straight through.
-        const pending = gate<{ synced: number; failed: number; deferred: number; errors: [] }>();
+        const pending = gate<SyncBatch>();
         mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
 
         const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
         const inFlight = get().syncPendingMoods();
 
         set({ userId: 'USER-A', authSessionVersion: 2, syncStatus: { ...SUCCESSOR_STATUS } });
-        pending.settle({ synced: 2, failed: 0, deferred: 0, errors: [] });
+        pending.settle(syncResult({ synced: 2 }));
         await inFlight;
 
         expect(get().syncStatus).toEqual(SUCCESSOR_STATUS);
@@ -597,12 +574,7 @@ describe('moodSlice', () => {
       it('still completes normally for an uninterrupted session', async () => {
         // The control. Without it the guard could simply discard everything and
         // every assertion above would still pass.
-        mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
-          synced: 1,
-          failed: 0,
-          deferred: 0,
-          errors: [],
-        });
+        mockedMoodSyncService.syncPendingMoods.mockResolvedValue(syncResult({ synced: 1 }));
 
         const { get } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
         await get().syncPendingMoods();
@@ -715,12 +687,12 @@ describe('moodSlice', () => {
       const call = mockedRegisterLocalCopy.mock.calls.find(([kind]) => kind === 'mood-history');
       expect(call).toBeDefined();
       await call![1]();
-      expect(mockedMoodApi.getMoodHistory).toHaveBeenCalledWith(USER, 0, 500);
+      expect(mockedMoodApi.getMoodHistory).toHaveBeenCalledWith(USER, 0, MOOD_HISTORY_PAGE_SIZE);
       expect(get().moods).toEqual([]);
     });
 
     it('pages 500 at a time until a short page', async () => {
-      const full = Array.from({ length: 500 }, (_, i) =>
+      const full = Array.from({ length: MOOD_HISTORY_PAGE_SIZE }, (_, i) =>
         serverRow({ id: `p1-${i}`, created_at: new Date(Date.UTC(2025, 0, 1) + i * 86_400_000).toISOString() })
       );
       mockedMoodApi.getMoodHistory
@@ -732,10 +704,22 @@ describe('moodSlice', () => {
       await get().loadMoodHistoryFromServer();
 
       expect(mockedMoodApi.getMoodHistory).toHaveBeenCalledTimes(2);
-      expect(mockedMoodApi.getMoodHistory).toHaveBeenNthCalledWith(1, USER, 0, 500);
-      expect(mockedMoodApi.getMoodHistory).toHaveBeenNthCalledWith(2, USER, 500, 500);
+      expect(mockedMoodApi.getMoodHistory).toHaveBeenNthCalledWith(
+        1,
+        USER,
+        0,
+        MOOD_HISTORY_PAGE_SIZE
+      );
+      expect(mockedMoodApi.getMoodHistory).toHaveBeenNthCalledWith(
+        2,
+        USER,
+        MOOD_HISTORY_PAGE_SIZE,
+        MOOD_HISTORY_PAGE_SIZE
+      );
+      // Every row sits on its own local date, so the newest-per-date pass keeps
+      // them all: the full first page plus the one-row short page.
       const [, entries] = mockedMoodService.mergeServerMoods.mock.calls[0];
-      expect(entries.length).toBeGreaterThan(400);
+      expect(entries).toHaveLength(MOOD_HISTORY_PAGE_SIZE + 1);
     });
 
     it('maps rows like partner moods, keeps the newest per date and skips a null created_at', async () => {
@@ -816,7 +800,9 @@ describe('moodSlice', () => {
     });
 
     it('changes nothing when a later page fails', async () => {
-      const full = Array.from({ length: 500 }, (_, i) => serverRow({ id: `p1-${i}` }));
+      const full = Array.from({ length: MOOD_HISTORY_PAGE_SIZE }, (_, i) =>
+        serverRow({ id: `p1-${i}` })
+      );
       mockedMoodApi.getMoodHistory
         .mockResolvedValueOnce(full)
         .mockRejectedValueOnce(new Error('server error'));

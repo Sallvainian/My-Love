@@ -182,6 +182,15 @@ function row(id: string, overrides: Partial<Row> = {}): Row {
   };
 }
 
+/** A note held on this device under its `tempId`, not yet confirmed by the server. */
+function pendingNote(tempId: string, overrides: Partial<LoveNote> = {}): LoveNote {
+  return { ...row(tempId), id: tempId, tempId, ...overrides };
+}
+
+/** USER_A's note the server rejected: shown failed, no longer sending. */
+const failedOwnNote = (tempId: string) =>
+  pendingNote(tempId, { from_user_id: USER_A, to_user_id: PARTNER, error: true, sending: false });
+
 const key = (userId: string) => `${userId}|${LOVE_NOTES_COPY_KIND}`;
 const savedIds = (userId = USER_A) =>
   (savedCopies.get(key(userId)) as { id: string }[] | undefined)?.map((n) => n.id);
@@ -417,15 +426,7 @@ describe('notesSlice love-notes local copy', () => {
     it('a refresh keeps notes still sending or failed, which have no server row yet', async () => {
       server.rows = [row('1')];
       const store = createTestStore();
-      const failed: LoveNote = {
-        ...row('temp-x'),
-        id: 'temp-x',
-        tempId: 'temp-x',
-        from_user_id: USER_A,
-        to_user_id: PARTNER,
-        error: true,
-        sending: false,
-      };
+      const failed = failedOwnNote('temp-x');
       store.setState({ notes: [failed] });
 
       await store.getState().fetchNotes();
@@ -438,15 +439,7 @@ describe('notesSlice love-notes local copy', () => {
       // The insert committed but its reply was lost, so the note shows failed.
       server.rows = [row('1'), row('2', { idempotency_key: 'temp-x', from_user_id: USER_A, to_user_id: PARTNER })];
       const store = createTestStore();
-      const failed: LoveNote = {
-        ...row('temp-x'),
-        id: 'temp-x',
-        tempId: 'temp-x',
-        from_user_id: USER_A,
-        to_user_id: PARTNER,
-        error: true,
-        sending: false,
-      };
+      const failed = failedOwnNote('temp-x');
       store.setState({ notes: [failed] });
 
       await store.getState().fetchNotes();
@@ -459,20 +452,11 @@ describe('notesSlice love-notes local copy', () => {
       const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
       server.rows = [row('2', { idempotency_key: 'temp-done' })];
       const store = createTestStore();
-      const kept: LoveNote = {
-        ...row('temp-kept'),
-        id: 'temp-kept',
-        tempId: 'temp-kept',
-        error: true,
-        imagePreviewUrl: 'blob:kept-preview',
-      };
-      const replaced: LoveNote = {
-        ...row('temp-done'),
-        id: 'temp-done',
-        tempId: 'temp-done',
+      const kept = pendingNote('temp-kept', { error: true, imagePreviewUrl: 'blob:kept-preview' });
+      const replaced = pendingNote('temp-done', {
         sending: true,
         imagePreviewUrl: 'blob:replaced-preview',
-      };
+      });
       store.setState({ notes: [replaced, kept] });
 
       await store.getState().fetchNotes();
@@ -553,15 +537,7 @@ describe('notesSlice love-notes local copy', () => {
       const store = createTestStore();
       await store.getState().fetchNotes(2);
       await store.getState().fetchOlderNotes(2);
-      const failed: LoveNote = {
-        ...row('temp-x'),
-        id: 'temp-x',
-        tempId: 'temp-x',
-        from_user_id: USER_A,
-        to_user_id: PARTNER,
-        error: true,
-        sending: false,
-      };
+      const failed = failedOwnNote('temp-x');
       store.setState({ notes: [...store.getState().notes, failed] });
 
       server.rows.push(row('7'));

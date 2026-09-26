@@ -113,6 +113,18 @@ function currentEvents(): CoupleEvent[] {
 const ok: EventWriteResult = { success: true };
 const loadOk: EventLoadResult = { status: 'success' };
 
+type EventWriteFailure = Extract<EventWriteResult, { success: false }>;
+
+/** A refused write, as the slice resolves it. */
+function writeFailure(code: EventWriteFailure['code'], error: string): EventWriteFailure {
+  return { success: false, code, error };
+}
+
+/** A save whose response could not be read: it may or may not have landed. */
+const UNREADABLE = writeFailure('invalid-response', 'Unreadable response');
+/** A write against a row that is gone or no longer the caller's. */
+const STALE = writeFailure('not-found', 'Stale row');
+
 function setStore(overrides: Partial<AppState> = {}) {
   let created = 0;
 
@@ -301,11 +313,9 @@ describe('EventsSettings form focus', () => {
     // cannot be done inside the await: setIsSaving(false) has not rendered yet,
     // so Save still carries `disabled` and focusing it is a no-op.
     setStore({
-      addEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'offline' as const,
-        error: 'You are offline. Events need a connection to save.',
-      })),
+      addEvent: vi.fn(async () =>
+        writeFailure('offline', 'You are offline. Events need a connection to save.')
+      ),
     });
 
     await renderSection();
@@ -353,9 +363,7 @@ describe('EventsSettings form focus', () => {
     const user = userEvent.setup();
     let finishRefresh!: () => void;
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
-    const uncertain = vi.fn<() => Promise<EventWriteResult>>(async () => ({
-      success: false, code: 'invalid-response', error: 'Unreadable response',
-    }));
+    const uncertain = vi.fn<() => Promise<EventWriteResult>>(async () => UNREADABLE);
     setStore({
       events: initialEvents(),
       loadEvents,
@@ -411,11 +419,7 @@ describe('EventsSettings form focus', () => {
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
-      editEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Stale row',
-      })),
+      editEvent: vi.fn(async () => STALE),
     });
     await renderSection();
     loadEvents.mockClear();
@@ -535,11 +539,9 @@ describe('EventsSettings delete dialog focus', () => {
     const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
-      removeEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Event not found or not yours to delete',
-      })),
+      removeEvent: vi.fn(async () =>
+        writeFailure('not-found', 'Event not found or not yours to delete')
+      ),
     });
     await renderSection();
 
@@ -560,11 +562,7 @@ describe('EventsSettings delete dialog focus', () => {
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
-      removeEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Stale row',
-      })),
+      removeEvent: vi.fn(async () => STALE),
     });
     await renderSection();
     loadEvents.mockClear();

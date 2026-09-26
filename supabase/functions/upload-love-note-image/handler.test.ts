@@ -24,7 +24,7 @@
  * network: `handler.ts` deliberately imports no remote module.
  */
 
-import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertMatch, assertStringIncludes } from 'jsr:@std/assert@1';
 
 import { CONFIG, handleUpload, type UploadDeps } from './handler.ts';
 
@@ -646,7 +646,8 @@ Deno.test('the rate limiter still refuses the eleventh upload in a window', asyn
   );
 
   assertEquals(response.status, 429);
-  assertEquals(response.headers.get('Retry-After'), '60');
+  assertEquals(response.headers.get('Retry-After'), String(CONFIG.RATE_LIMIT_WINDOW_MS / 1000));
+  assertMatch(response.headers.get('Retry-After') ?? '', /^\d+$/, 'Retry-After is whole seconds');
   assertEquals((await response.json()).error, 'Rate limit exceeded');
   assertEquals(counts.pulls, 0, 'a throttled request must not read its body');
   assertEquals(client.uploadCalls.length, CONFIG.RATE_LIMIT_MAX_UPLOADS);

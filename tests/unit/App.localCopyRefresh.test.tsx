@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../src/App';
 import { eventsService } from '../../src/services/eventsService';
 import { useAppStore } from '../../src/stores/useAppStore';
+import { createAuthBootstrapSession } from '../support/factories/auth-bootstrap-notification-order';
 
 const localCopy = vi.hoisted(() => ({
   refreshLocalCopies: vi.fn(async () => {}),
@@ -130,20 +131,7 @@ const USER_ID = 'local-copy-user';
 const OTHER_USER_ID = 'other-local-copy-user';
 
 function session(userId = USER_ID): Session {
-  return {
-    access_token: 'token',
-    refresh_token: 'refresh-token',
-    token_type: 'bearer',
-    expires_in: 3600,
-    user: {
-      id: userId,
-      email: 'copy@example.com',
-      app_metadata: {},
-      user_metadata: {},
-      aud: 'authenticated',
-      created_at: '2026-09-01T00:00:00Z',
-    },
-  };
+  return createAuthBootstrapSession({ userId, accessToken: 'token', email: 'copy@example.com', displayName: null });
 }
 
 const initialState = useAppStore.getInitialState();

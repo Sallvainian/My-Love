@@ -27,8 +27,12 @@
  */
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../support/merged-fixtures';
+import type { Database } from '../../src/types/database.types';
 import type { TypedSupabaseClient } from '../support/factories';
+import { createCheckWritePayload } from '../support/factories/check-write-payloads';
 import { resolveWorkerPairIds } from '../support/factories/events';
+
+type PhotoInsert = Database['public']['Tables']['photos']['Insert'];
 
 type PhotoRow = { id: string; created_at: string };
 
@@ -99,21 +103,20 @@ test.describe('The photo list keyset paging', () => {
   let prefix: string;
 
   test.beforeEach(async ({ supabaseAdmin, supabaseAsUser }) => {
-    const { userId } = await resolveWorkerPairIds(supabaseAdmin);
+    const { userId, partnerId } = await resolveWorkerPairIds(supabaseAdmin);
     prefix = `${userId}/keyset-paging-`;
     await supabaseAdmin.from('photos').delete().like('storage_path', `${prefix}%`);
 
     const { error } = await supabaseAsUser.from('photos').insert(
-      CREATED_AT.map((createdAt) => ({
-        user_id: userId,
-        storage_path: `${prefix}${randomUUID()}.jpg`,
-        filename: 'keyset.jpg',
-        mime_type: 'image/jpeg',
-        file_size: 1,
-        width: 1,
-        height: 1,
-        created_at: createdAt,
-      }))
+      CREATED_AT.map(
+        (createdAt) =>
+          createCheckWritePayload('photos', userId, partnerId, {
+            storage_path: `${prefix}${randomUUID()}.jpg`,
+            filename: 'keyset.jpg',
+            file_size: 1,
+            created_at: createdAt,
+          } satisfies Partial<PhotoInsert>) as PhotoInsert
+      )
     );
     if (error) throw new Error(`seed failed: ${error.message}`);
   });

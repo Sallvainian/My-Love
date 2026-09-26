@@ -32,6 +32,9 @@ vi.mock('motion/react', () => ({
 
 const EMOJI = /\p{Extended_Pictographic}/u;
 
+/** A linked couple with no start date; each test spreads in the dates it needs. */
+const LINKED = { status: 'linked', partnerId: 'partner', relationshipStart: null } as const;
+
 /** The icon tile is the card's first child. */
 function tileOf(card: HTMLElement): HTMLElement {
   return card.firstElementChild as HTMLElement;
@@ -133,8 +136,7 @@ describe('Countdown cards on an ordinary day', () => {
     vi.setSystemTime(new Date(2026, 9, 6, 21, 5, 7));
     useAppStore.setState({
       coupleSettings: {
-        status: 'linked',
-        partnerId: 'partner',
+        ...LINKED,
         relationshipStart: new Date(2025, 9, 4, 18, 0, 0).toISOString(),
         weddingDate: null,
       },
@@ -277,12 +279,7 @@ describe('Together for, from the couple start date', () => {
 
   it('shows the Settings placeholder for a linked couple with no start date yet', () => {
     useAppStore.setState({
-      coupleSettings: {
-        status: 'linked',
-        partnerId: 'partner',
-        relationshipStart: null,
-        weddingDate: null,
-      },
+      coupleSettings: { ...LINKED, weddingDate: null },
     });
 
     render(<TimeTogether />);
@@ -393,7 +390,8 @@ describe("Home's birthday and wedding cards", () => {
     connectedAt: null,
     birthday: '2000-03-18',
   };
-  const LINKED = { status: 'linked', partnerId: 'partner', relationshipStart: null } as const;
+  /** Your own profile: a chosen name and a birthday. */
+  const SAM = { displayName: 'Sam', birthday: '1999-08-14' };
 
   afterEach(() => {
     useAppStore.setState({ ownProfile: null, partner: null, coupleSettings: null });
@@ -401,7 +399,7 @@ describe("Home's birthday and wedding cards", () => {
 
   it('linked: both birthday cards side by side, labelled with display names, then the wedding', () => {
     useAppStore.setState({
-      ownProfile: { displayName: 'Sam', birthday: '1999-08-14' },
+      ownProfile: SAM,
       partner: PARTNER,
       coupleSettings: { ...LINKED, weddingDate: '2026-06-12' },
     });
@@ -423,7 +421,7 @@ describe("Home's birthday and wedding cards", () => {
 
   it('with no chosen names: "You turn N" and "Partner turns N"', () => {
     useAppStore.setState({
-      ownProfile: { displayName: null, birthday: '1999-08-14' },
+      ownProfile: { ...SAM, displayName: null },
       partner: { ...PARTNER, displayName: 'Partner' },
       coupleSettings: { ...LINKED, weddingDate: null },
     });
@@ -436,7 +434,7 @@ describe("Home's birthday and wedding cards", () => {
 
   it('linked with no wedding date: "Date TBD"; unset birthdays stay in place', () => {
     useAppStore.setState({
-      ownProfile: { displayName: 'Sam', birthday: null },
+      ownProfile: { ...SAM, birthday: null },
       partner: { ...PARTNER, birthday: null },
       coupleSettings: { ...LINKED, weddingDate: null },
     });
@@ -454,7 +452,7 @@ describe("Home's birthday and wedding cards", () => {
 
   it('unlinked: your card only, full width, and no partner or wedding card', () => {
     useAppStore.setState({
-      ownProfile: { displayName: 'Sam', birthday: '1999-08-14' },
+      ownProfile: SAM,
       partner: null,
       coupleSettings: { status: 'unlinked' },
     });
@@ -476,12 +474,12 @@ describe("Home's birthday and wedding cards", () => {
 
   // Matrix: "Display name changed" — the label follows the store, no reload.
   it("relabels your card when your display name changes", () => {
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: '1999-08-14' } });
+    useAppStore.setState({ ownProfile: { ...SAM, displayName: null } });
     render(<BirthdayWeddingCards />);
     expect(screen.getByTestId('birthday-countdown-self')).toHaveTextContent('You turn 27');
 
     act(() => {
-      useAppStore.setState({ ownProfile: { displayName: 'Sam', birthday: '1999-08-14' } });
+      useAppStore.setState({ ownProfile: SAM });
     });
 
     expect(screen.getByTestId('birthday-countdown-self')).toHaveTextContent('Sam turns 27');

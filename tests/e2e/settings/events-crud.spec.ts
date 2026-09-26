@@ -28,6 +28,7 @@ import {
   resolveOwnPair,
   seedEvent,
 } from '../../support/helpers/events';
+import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
 import { EVENTS_WRITE, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { openSettingsFromHome, reloadSettings } from '../../support/helpers/settings-screen';
@@ -471,12 +472,11 @@ test.describe(
         url: '**/rest/v1/events*',
         fulfillResponse: {
           status: 500,
-          body: {
+          body: createDatabaseErrorEnvelope({
             message: 'Injected create failure',
             details: '',
             hint: '',
-            code: 'XX000',
-          },
+          }),
         },
       });
 

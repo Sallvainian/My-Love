@@ -42,6 +42,18 @@ const KIT_PARTNER = {
   dark: 'rgb(167, 139, 250)', // #a78bfa
 } as const;
 
+/**
+ * Kit countdown value type, as computed: `text-[22px] font-bold tabular-nums`
+ * in src/components/RelationshipTimers/CountdownCard.tsx.
+ */
+const KIT_COUNTDOWN_VALUE = { size: '22px', weight: '700', numeric: 'tabular-nums' } as const;
+
+/**
+ * Kit daily-message type, as computed: `font-lora text-[21px] font-medium italic`
+ * in src/components/DailyMessage/DailyMessage.tsx.
+ */
+const DAILY_MESSAGE_TYPE = { style: 'italic', weight: '500', size: '21px' } as const;
+
 const COUNTDOWN_CARDS = [
   'time-together',
   'birthday-countdown-self',
@@ -116,7 +128,7 @@ test.describe('Home on the style kit', () => {
             numeric: style.fontVariantNumeric,
           };
         });
-        expect(valueStyle, testId).toEqual({ size: '22px', weight: '700', numeric: 'tabular-nums' });
+        expect(valueStyle, testId).toEqual(KIT_COUNTDOWN_VALUE);
       }
 
       // The daily message sits on the same kit card.
@@ -164,19 +176,24 @@ test.describe('Home on the style kit', () => {
         };
       });
       expect(type.family).toMatch(/^"?Lora"?/);
-      expect(type.style).toBe('italic');
-      expect(type.weight).toBe('500');
-      expect(type.size).toBe('21px');
+      expect(type.style).toBe(DAILY_MESSAGE_TYPE.style);
+      expect(type.weight).toBe(DAILY_MESSAGE_TYPE.weight);
+      expect(type.size).toBe(DAILY_MESSAGE_TYPE.size);
 
       // An italic 500 face must actually load: a computed family names Lora
       // even when no Lora face exists, so the loaded faces are checked too.
-      const loraFaces = await page.evaluate(async () =>
-        (await document.fonts.load('italic 500 21px Lora')).map((face) => ({
-          style: face.style,
-          weight: face.weight,
-        }))
+      const loraFaces = await page.evaluate(
+        async (font) =>
+          (await document.fonts.load(font)).map((face) => ({
+            style: face.style,
+            weight: face.weight,
+          })),
+        `${DAILY_MESSAGE_TYPE.style} ${DAILY_MESSAGE_TYPE.weight} ${DAILY_MESSAGE_TYPE.size} Lora`
       );
-      expect(loraFaces).toContainEqual({ style: 'italic', weight: '500' });
+      expect(loraFaces).toContainEqual({
+        style: DAILY_MESSAGE_TYPE.style,
+        weight: DAILY_MESSAGE_TYPE.weight,
+      });
 
       // Bundled or user-authored text may carry emoji; Home's own chrome may
       // not. User-authored: the message text, stored events' labels and

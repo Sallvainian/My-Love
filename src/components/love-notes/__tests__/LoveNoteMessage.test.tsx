@@ -11,6 +11,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import type { Dispatch, HTMLAttributes, ReactNode, SetStateAction } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { IMAGE_STORAGE } from '../../../config/images';
 import type { LoveNote } from '../../../types/models';
 import { formatFullTimestamp } from '../../../utils/dateUtils';
 import { LoveNoteMessage } from '../LoveNoteMessage';
@@ -117,6 +118,11 @@ describe('LoveNoteMessage', () => {
     content: 'Hello love!',
     created_at: '2024-01-15T10:30:00Z',
   };
+  /** baseMessage carrying a stored picture at `path`. */
+  const withImage = (
+    path = 'user-123/image.jpg',
+    overrides: Partial<LoveNote> = {}
+  ): LoveNote => ({ ...baseMessage, image_url: path, ...overrides });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -128,7 +134,7 @@ describe('LoveNoteMessage', () => {
     mockDownloadLoveNoteImage.mockRejectedValue(new Error('Failed to download image'));
     mockGetSignedImageUrl.mockResolvedValue({
       url: 'https://storage.example.com/signed-image.jpg',
-      expiresAt: Date.now() + 3600000,
+      expiresAt: Date.now() + IMAGE_STORAGE.SIGNED_URL_EXPIRY_SECONDS * 1000,
     });
   });
 
@@ -227,10 +233,7 @@ describe('LoveNoteMessage', () => {
 
   describe('Image Message Rendering', () => {
     it('should fetch signed URL for server image', async () => {
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/1705315800000-uuid.jpg',
-      };
+      const messageWithImage = withImage('user-123/1705315800000-uuid.jpg');
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -240,10 +243,7 @@ describe('LoveNoteMessage', () => {
     });
 
     it('should display image after loading signed URL', async () => {
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -277,10 +277,7 @@ describe('LoveNoteMessage', () => {
       const signedUrl = deferred<{ url: string; expiresAt: number }>();
       mockGetSignedImageUrl.mockReturnValue(signedUrl.promise);
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -305,10 +302,7 @@ describe('LoveNoteMessage', () => {
     it('should show error state when image fails to load', async () => {
       mockGetSignedImageUrl.mockRejectedValue(new Error('Not found'));
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/missing.jpg',
-      };
+      const messageWithImage = withImage('user-123/missing.jpg');
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -333,7 +327,7 @@ describe('LoveNoteMessage', () => {
   describe('Image cache (offline)', () => {
     const USER = 'user-123';
     const PATH = 'partner-456/1705315800000-uuid.jpg';
-    const imageMessage: LoveNote = { ...baseMessage, image_url: PATH };
+    const imageMessage = withImage(PATH);
     let createObjectURL: ReturnType<typeof vi.fn>;
     let revokeObjectURL: ReturnType<typeof vi.fn>;
     const originalCreate = URL.createObjectURL;
@@ -509,10 +503,7 @@ describe('LoveNoteMessage', () => {
   describe('Full Screen Image Viewer', () => {
     it('should open full-screen viewer when image is clicked', async () => {
       const user = userEvent.setup();
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -529,10 +520,7 @@ describe('LoveNoteMessage', () => {
 
     it('should close full-screen viewer when clicked', async () => {
       const user = userEvent.setup();
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -557,10 +545,7 @@ describe('LoveNoteMessage', () => {
     it('should not open viewer when image has error', async () => {
       mockGetSignedImageUrl.mockRejectedValue(new Error('Not found'));
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/missing.jpg',
-      };
+      const messageWithImage = withImage('user-123/missing.jpg');
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -691,11 +676,7 @@ describe('LoveNoteMessage', () => {
 
   describe('Message with Both Text and Image', () => {
     it('should render both text and image', async () => {
-      const messageWithBoth: LoveNote = {
-        ...baseMessage,
-        content: 'Check out this photo!',
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithBoth = withImage(undefined, { content: 'Check out this photo!' });
 
       render(<LoveNoteMessage message={messageWithBoth} isOwnMessage={true} senderName="You" />);
 
@@ -710,11 +691,7 @@ describe('LoveNoteMessage', () => {
     });
 
     it('should render image-only message without text bubble', async () => {
-      const imageOnlyMessage: LoveNote = {
-        ...baseMessage,
-        content: '',
-        image_url: 'user-123/image.jpg',
-      };
+      const imageOnlyMessage = withImage(undefined, { content: '' });
 
       render(<LoveNoteMessage message={imageOnlyMessage} isOwnMessage={true} senderName="You" />);
 
@@ -740,10 +717,7 @@ describe('LoveNoteMessage', () => {
     });
 
     it('should have accessible image button', async () => {
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -764,10 +738,7 @@ describe('LoveNoteMessage', () => {
       // Keep console output quiet; the setter spy is what detects late updates
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       const { unmount } = render(
         <LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />
@@ -798,15 +769,12 @@ describe('LoveNoteMessage', () => {
       // First call succeeds to load the image
       mockGetSignedImageUrl.mockResolvedValueOnce({
         url: 'https://storage.example.com/signed.jpg',
-        expiresAt: Date.now() + 3600000,
+        expiresAt: Date.now() + IMAGE_STORAGE.SIGNED_URL_EXPIRY_SECONDS * 1000,
       });
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       const { unmount } = render(
         <LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />
@@ -851,10 +819,7 @@ describe('LoveNoteMessage', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       const { unmount } = render(
         <LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />

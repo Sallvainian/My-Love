@@ -23,6 +23,7 @@ import { resolveOwnPair } from '../../support/helpers/events';
 import { INTERACTIONS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
+import { createInteractionInsert } from '../../support/factories/interaction-record-ownership';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -67,7 +68,7 @@ async function seedPartnerPoke(supabaseAdmin: TypedSupabaseClient): Promise<stri
   const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
   const { data, error } = await supabaseAdmin
     .from('interactions')
-    .insert({ type: 'poke', from_user_id: partnerId, to_user_id: userId, viewed: false })
+    .insert(createInteractionInsert({ type: 'poke', from_user_id: partnerId, to_user_id: userId }))
     .select('id')
     .single();
   expect(error).toBeNull();
