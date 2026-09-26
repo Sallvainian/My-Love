@@ -74,7 +74,6 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  vi.restoreAllMocks();
 });
 
 describe('kit dialog class strings', () => {

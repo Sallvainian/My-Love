@@ -24,6 +24,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
+    // Puts every `vi.spyOn` back before each test, so a spy a file forgets to
+    // restore cannot leak into the next test.
+    restoreMocks: true,
     setupFiles: ['./tests/setup.ts'],
     // Pinned to a NEGATIVE-offset zone, and load-bearing rather than cosmetic.
     //

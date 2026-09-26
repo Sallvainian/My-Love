@@ -7,7 +7,7 @@
  * - the read applies the seed rule, so an unchosen name is `null`;
  * - offline, and an unreadable date, fail before any request.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Result = { data: unknown; error: unknown };
 
@@ -66,10 +66,6 @@ beforeEach(() => {
   results.length = 0;
   session.user = { id: 'SELF-ID', email: 'self@example.test' };
   setOnline(true);
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
 });
 
 describe('fetchOwnProfile', () => {

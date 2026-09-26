@@ -74,7 +74,6 @@ describe('Settings: Download photos over mobile data', () => {
   afterEach(() => {
     cleanup();
     setConnection(undefined);
-    vi.restoreAllMocks();
   });
 
   it('is an off switch labelled with the Wi-Fi helper when the phone reports its connection', async () => {

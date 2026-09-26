@@ -13,7 +13,7 @@
  * The Supabase client is a recording fake: every chained call is logged, and
  * awaiting the chain yields the result queued for that request.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Result = { data: unknown; error: unknown };
 
@@ -98,10 +98,6 @@ beforeEach(() => {
   calls.length = 0;
   results.length = 0;
   setOnline(true);
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
 });
 
 describe('offline writes fail before any request', () => {

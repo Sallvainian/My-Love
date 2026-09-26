@@ -3,7 +3,7 @@
  * Story 5.2: AC-5.2.2 - Device vibrates on successful mood save
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   isVibrationSupported,
   triggerErrorHaptic,
@@ -29,10 +29,6 @@ describe('haptics utility', () => {
         vibrateMock as (pattern: Iterable<number>) => boolean
       );
     }
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   describe('isVibrationSupported', () => {

@@ -4,7 +4,7 @@
  * Runs against fake-indexeddb through the real `openMyLoveDB`, so the store,
  * its `id` key and its by-user index are the ones dbSchema creates.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import {
@@ -42,10 +42,6 @@ async function clearQueue(): Promise<void> {
 describe('noteQueue', () => {
   beforeEach(async () => {
     await clearQueue();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it('keeps an enqueued note as plain data under its account', async () => {
