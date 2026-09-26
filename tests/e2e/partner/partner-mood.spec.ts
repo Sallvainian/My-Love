@@ -18,7 +18,7 @@ test.describe('Partner Mood View', () => {
   }) => {
     // GIVEN: User navigates to /partner
     // loadPartner queries /rest/v1/users (2x: own record then partner record)
-    // loadPendingRequests queries /rest/v1/partner_requests
+    // loadPendingRequests calls the get_my_pending_partner_requests RPC
     //
     // Pinned to the `select=partner*` query rather than any /rest/v1/users hit:
     // App's display-name gate reads `select=display_name` from the same table at
@@ -28,7 +28,8 @@ test.describe('Partner Mood View', () => {
       url: '**/rest/v1/users?select=partner*',
     });
     const requestsCall = interceptNetworkCall({
-      url: '**/rest/v1/partner_requests**',
+      method: 'POST',
+      url: '**/rest/v1/rpc/get_my_pending_partner_requests',
     });
 
     await page.goto('/partner');
@@ -73,7 +74,8 @@ test.describe('Partner Mood View', () => {
 
     const requests = fulfillOn({
       page,
-      url: '**/rest/v1/partner_requests**',
+      method: 'POST',
+      url: '**/rest/v1/rpc/get_my_pending_partner_requests',
       fulfillResponse: {
         status: 200,
         body: [],

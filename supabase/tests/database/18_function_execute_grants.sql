@@ -26,7 +26,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(18);
+select plan(20);
 
 create or replace function tests.create_test_user(test_email text default 'test@example.com')
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -111,7 +111,7 @@ select is(
       and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
       and has_function_privilege('authenticated', p.oid, 'EXECUTE')
   ),
-  'accept_partner_request, decline_partner_request, get_my_partner_id',
+  'accept_partner_request, decline_partner_request, find_partner_by_email, get_my_partner_id, get_my_pending_partner_requests',
   'FN-GRANT-008: authenticated holds EXECUTE on exactly the app RPCs'
 );
 
@@ -131,6 +131,19 @@ select ok(
 select ok(
   has_function_privilege('authenticated', 'public.decline_partner_request(uuid)', 'EXECUTE'),
   'FN-GRANT-006: decline_partner_request is executable by authenticated'
+);
+
+-- 20260926000000 revokes PUBLIC and anon, so this explicit grant is what the
+-- Partner tab's search rides on.
+select ok(
+  has_function_privilege('authenticated', 'public.find_partner_by_email(text)', 'EXECUTE'),
+  'FN-GRANT-010: find_partner_by_email is executable by authenticated'
+);
+
+-- 20260926010000, same shape: the Partner tab's request lists ride on it.
+select ok(
+  has_function_privilege('authenticated', 'public.get_my_pending_partner_requests()', 'EXECUTE'),
+  'FN-GRANT-011: get_my_pending_partner_requests is executable by authenticated'
 );
 
 -- ============================================

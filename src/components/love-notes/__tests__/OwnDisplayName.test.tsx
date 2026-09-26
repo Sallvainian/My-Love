@@ -10,7 +10,7 @@
  * keeps the email-prefix fallback for a profile that still carries only the
  * trigger's seed.
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -48,6 +48,7 @@ const storeState = {
   navigateHome: vi.fn(),
   userId: 'user-a',
   removeNote: vi.fn(),
+  partner: null as { id: string } | null,
 };
 vi.mock('../../../stores/useAppStore', () => ({
   useAppStore: (selector: (state: typeof storeState) => unknown) => selector(storeState),
@@ -188,5 +189,32 @@ describe('own display name in the chat', () => {
       await waitFor(() => expect(screen.getByTestId('own-name').textContent).toBe('person'));
       expect(screen.getByTestId('partner-name').textContent).toBe('Partner');
     });
+  });
+});
+
+describe('partner name after a link made while the chat is open', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storeState.partner = null;
+    api.getOwnDisplayName.mockResolvedValue('Jessie');
+    api.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
+  });
+
+  it('re-reads the partner name when the store learns of a partner', async () => {
+    // Unlinked at mount: no partner name to read.
+    api.getPartnerDisplayName.mockResolvedValue(null);
+    const { rerender } = render(<LoveNotes />);
+    await waitFor(() => expect(api.getPartnerDisplayName).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('partner-name').textContent).toBe('Partner');
+
+    api.getPartnerDisplayName.mockResolvedValue('Harper');
+    storeState.partner = { id: 'partner-b' };
+    await act(async () => rerender(<LoveNotes />));
+
+    await waitFor(() => expect(screen.getByTestId('partner-name').textContent).toBe('Harper'));
   });
 });

@@ -61,7 +61,7 @@ vi.mock('../../../src/api/partnerService', () => ({
   partnerService: {
     getPartner: () => getPartner(),
     getPendingRequests: () => getPendingRequests(),
-    searchUsers: (query: string) => searchUsers(query),
+    searchUsers: (email: string) => searchUsers(email),
   },
 }));
 
@@ -371,66 +371,136 @@ describe('loader identity guards', () => {
   });
 
   describe('searchUsers', () => {
+    const EMAIL = 'alex@example.test';
+    const hit = (displayName: string) => ({
+      status: 'found' as const,
+      user: { id: 'USER-E-ID', email: EMAIL, displayName },
+    });
+
     it('discards search hits — they name third parties — when the account changed', async () => {
-      const pending = deferred<unknown[]>();
+      const pending = deferred<unknown>();
       searchUsers.mockReturnValue(pending.promise);
 
-      const inFlight = useAppStore.getState().searchUsers('alex');
-      switchToUserC({ searchResults: [] });
+      const inFlight = useAppStore.getState().searchUsers(EMAIL);
+      switchToUserC({ searchResult: null });
 
-      pending.settle([{ id: 'USER-E-ID', displayName: 'SEARCH-HIT-DISPLAY-NAME' }]);
+      pending.settle(hit('SEARCH-HIT-DISPLAY-NAME'));
       await inFlight;
 
-      expect(useAppStore.getState().searchResults).toEqual([]);
+      expect(useAppStore.getState().searchResult).toBeNull();
       expect(JSON.stringify(useAppStore.getState())).not.toContain('SEARCH-HIT-DISPLAY-NAME');
     });
 
-    it('still releases isSearching when it discards', async () => {
-      const pending = deferred<unknown[]>();
+    it('discards a "taken" answer too when the account changed', async () => {
+      const pending = deferred<unknown>();
       searchUsers.mockReturnValue(pending.promise);
 
-      const inFlight = useAppStore.getState().searchUsers('alex');
+      const inFlight = useAppStore.getState().searchUsers(EMAIL);
+      switchToUserC({ searchResult: null });
+
+      pending.settle({ status: 'taken' });
+      await inFlight;
+
+      expect(useAppStore.getState().searchResult).toBeNull();
+    });
+
+    it('still releases isSearching when it discards', async () => {
+      const pending = deferred<unknown>();
+      searchUsers.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().searchUsers(EMAIL);
       expect(useAppStore.getState().isSearching).toBe(true);
 
       switchToUserC();
-      pending.settle([]);
+      pending.settle({ status: 'missing' });
       await inFlight;
 
-      // Stuck true suppresses both the results branch and the no-results branch
-      // of PartnerMoodView's connect UI.
+      // Stuck true suppresses every answer branch of PartnerMoodView's connect UI.
       expect(useAppStore.getState().isSearching).toBe(false);
     });
 
-    it("does not clear the new account's search results when the old search fails", async () => {
-      const pending = deferred<unknown[]>();
+    it("does not clear the new account's search answer when the old search fails", async () => {
+      const pending = deferred<unknown>();
       searchUsers.mockReturnValue(pending.promise);
 
-      const inFlight = useAppStore.getState().searchUsers('alex');
-      switchToUserC({ searchResults: [{ id: 'USER-F-ID', displayName: 'C-OWN-SEARCH-HIT' }] });
+      const inFlight = useAppStore.getState().searchUsers(EMAIL);
+      const own = hit('C-OWN-SEARCH-HIT');
+      switchToUserC({ searchResult: own });
 
       pending.fail(new Error('A-REQUEST-FAILURE'));
       await inFlight;
 
-      expect(useAppStore.getState().searchResults).toEqual([
-        { id: 'USER-F-ID', displayName: 'C-OWN-SEARCH-HIT' },
-      ]);
+      expect(useAppStore.getState().searchResult).toEqual(own);
       expect(useAppStore.getState().isSearching).toBe(false);
     });
 
     it('discards search hits when the SAME account signs back in mid-flight', async () => {
-      const pending = deferred<unknown[]>();
+      const pending = deferred<unknown>();
       searchUsers.mockReturnValue(pending.promise);
 
-      const inFlight = useAppStore.getState().searchUsers('alex');
+      const inFlight = useAppStore.getState().searchUsers(EMAIL);
       useAppStore.getState().clearAuth();
       useAppStore.getState().setAuthUser(A);
 
-      pending.settle([{ id: 'USER-E-ID', displayName: 'DEAD-SESSION-HIT' }]);
+      pending.settle(hit('DEAD-SESSION-HIT'));
       await inFlight;
 
       expect(useAppStore.getState().userId).toBe(A);
-      expect(useAppStore.getState().searchResults).toEqual([]);
+      expect(useAppStore.getState().searchResult).toBeNull();
       expect(useAppStore.getState().isSearching).toBe(false);
+    });
+
+    it('keeps the answer for the account that asked', async () => {
+      searchUsers.mockResolvedValue(hit('OWN-HIT'));
+
+      await useAppStore.getState().searchUsers(EMAIL);
+
+      expect(searchUsers).toHaveBeenCalledWith(EMAIL);
+      expect(useAppStore.getState().searchResult).toEqual(hit('OWN-HIT'));
+      expect(useAppStore.getState().isSearching).toBe(false);
+    });
+
+    it('drops an older answer that lands after a newer search', async () => {
+      const older = deferred<unknown>();
+      const newer = deferred<unknown>();
+      searchUsers.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+
+      const first = useAppStore.getState().searchUsers('old@example.test');
+      const second = useAppStore.getState().searchUsers(EMAIL);
+
+      newer.settle({ status: 'missing' });
+      await second;
+      older.settle(hit('STALE-HIT'));
+      await first;
+
+      expect(useAppStore.getState().searchResult).toEqual({ status: 'missing' });
+      expect(useAppStore.getState().isSearching).toBe(false);
+    });
+
+    it('drops an answer that lands after clearSearch', async () => {
+      const pending = deferred<unknown>();
+      searchUsers.mockReturnValue(pending.promise);
+
+      const inFlight = useAppStore.getState().searchUsers(EMAIL);
+      useAppStore.getState().clearSearch();
+
+      pending.settle(hit('CLEARED-HIT'));
+      await inFlight;
+
+      expect(useAppStore.getState().searchResult).toBeNull();
+      expect(useAppStore.getState().isSearching).toBe(false);
+    });
+
+    it('turns a thrown search into an error answer, never "missing"', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      searchUsers.mockRejectedValue(new Error('network down'));
+
+      await useAppStore.getState().searchUsers(EMAIL);
+
+      expect(useAppStore.getState().searchResult).toEqual({
+        status: 'error',
+        reason: 'network down',
+      });
     });
   });
 

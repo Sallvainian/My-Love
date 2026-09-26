@@ -530,7 +530,26 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: undefined
       }
+      find_partner_by_email: {
+        Args: { p_email: string }
+        Returns: {
+          display_name: string
+          id: string
+          is_taken: boolean
+        }[]
+      }
       get_my_partner_id: { Args: never; Returns: string }
+      get_my_pending_partner_requests: {
+        Args: never
+        Returns: {
+          created_at: string
+          from_user_id: string
+          id: string
+          other_display_name: string
+          other_email: string
+          to_user_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

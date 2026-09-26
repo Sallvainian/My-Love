@@ -329,3 +329,21 @@ describe('mood broadcast producer/receiver round trip', () => {
     expect(parsed?.updated_at).toBe(parsed?.created_at);
   });
 });
+
+describe('moodSyncService.announcePartnerLinked', () => {
+  beforeEach(() => {
+    sentBroadcasts.length = 0;
+  });
+
+  it("sends the partner-linked event, empty, on the new partner's own mood topic", async () => {
+    const partnerId = fakeUuid(910002);
+
+    await moodSyncService.announcePartnerLinked(partnerId);
+
+    // The one topic an unlinked account already listens on, and the one
+    // couple_broadcast_partner_can_send lets its new partner publish to.
+    expect(sentBroadcasts).toEqual([
+      { topic: `mood-updates:${partnerId}`, event: 'partner_linked', payload: {} },
+    ]);
+  });
+});

@@ -3,6 +3,7 @@ import { LazyMotion, domAnimation } from 'motion/react';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../../../src/App';
+import { moodSyncService } from '../../../src/api/moodSyncService';
 import { supabase } from '../../../src/api/supabaseClient';
 import { NOTES_CONFIG } from '../../../src/config/images';
 import { anniversariesService } from '../../../src/services/anniversariesService';
@@ -95,6 +96,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
   const originalOnAuthStateChange = supabase.auth.onAuthStateChange;
   const originalGetEventsPage = eventsService.getEventsPage;
   const originalFetchAnniversaries = anniversariesService.fetchAnniversaries;
+  const originalSubscribeMoodUpdates = moodSyncService.subscribeMoodUpdates;
   const previousWelcome = localStorage.getItem('lastWelcomeView');
   type LookupResult = Awaited<ReturnType<typeof supabase.auth.getSession>>;
   type AuthCallback = (event: AuthChangeEvent, session: Session | null) => void | Promise<void>;
@@ -159,6 +161,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       supabase.auth.onAuthStateChange = originalOnAuthStateChange;
       eventsService.getEventsPage = originalGetEventsPage;
       anniversariesService.fetchAnniversaries = originalFetchAnniversaries;
+      moodSyncService.subscribeMoodUpdates = originalSubscribeMoodUpdates;
       restoreCoupleSettingsRefresher?.();
       useAppStore.setState(originalState, true);
       if (previousWelcome === null) localStorage.removeItem('lastWelcomeView');
@@ -200,6 +203,12 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     // supabase.auth.getSession — the very call this harness counts and defers
     // — and with `initialIdentity` it runs before the bootstrap lookup.
     anniversariesService.fetchAnniversaries = async () => [];
+    // App's partner-link listener (usePartnerLinkListener) subscribes to the
+    // account's mood topic while the store holds no partner, which it always
+    // does here (the partner refresher below is a no-op). That subscribe reads
+    // the session -- the very call this harness counts and defers -- and looks
+    // the partner up with the fake token, which PostgREST answers with 401.
+    moodSyncService.subscribeMoodUpdates = async () => () => {};
     // Same reason for the couple-settings refresher, one step earlier: its
     // partner lookup (`lookupPartnerId`) calls supabase.auth.getSession
     // directly — and for the partner, profile, mood-history, interactions,

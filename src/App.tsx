@@ -26,6 +26,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { refreshLocalCopies, refreshLocalCopy } from './services/localCopy';
+import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
 import { PROFILE_COPY_KIND } from './stores/slices/settingsSlice';
 import { stripBasePath } from './utils/basePath';
@@ -411,6 +412,12 @@ function App() {
     if (!authUserId) return;
     void refreshLocalCopies();
   }, [authUserId, authSessionVersion]);
+
+  // A sent partner request accepted while this device is on any screen. Called
+  // after the refresh above on purpose: that effect starts the partner load in
+  // the same commit, and the listener waits for its answer instead of opening a
+  // channel a linked account does not need.
+  usePartnerLinkListener();
 
   // Story 6.4: Task 2 - Network state detection with auto-sync on reconnect (AC #2)
   useEffect(() => {

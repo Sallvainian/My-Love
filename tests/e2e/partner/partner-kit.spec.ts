@@ -108,8 +108,8 @@ async function openConnectedPartner(page: Page, colorScheme: Scheme) {
   });
   const requests = fulfillOn({
     page,
-    method: 'GET',
-    url: '**/rest/v1/partner_requests**',
+    method: 'POST',
+    url: '**/rest/v1/rpc/get_my_pending_partner_requests',
     fulfillResponse: { status: 200, body: [] },
     timeout: 15000,
   });
@@ -236,8 +236,8 @@ test.describe('Partner on the style kit', () => {
     });
     const requests = fulfillOn({
       page,
-      method: 'GET',
-      url: '**/rest/v1/partner_requests**',
+      method: 'POST',
+      url: '**/rest/v1/rpc/get_my_pending_partner_requests',
       fulfillResponse: { status: 200, body: [] },
       timeout: 15000,
     });
@@ -249,7 +249,7 @@ test.describe('Partner on the style kit', () => {
 
     const view = page.getByTestId('partner-mood-view');
     await expect(view).toBeVisible();
-    await expect(page.getByLabel('Search by email or display name')).toBeVisible();
+    await expect(page.getByLabel("Your partner's email")).toBeVisible();
     await expect(view).toHaveCSS('background-color', KIT_PAGE.dark);
     await expect(page.getByTestId('partner-search-card')).toHaveCSS(
       'background-color',

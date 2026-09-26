@@ -92,6 +92,7 @@ describe('useRealtimeMessages', () => {
     // drops unconsumed *Once queues, so a test's override cannot reach the next.
     vi.resetAllMocks();
     mockStoreState.userId = USER_ID;
+    mockStoreState.partner = null;
     mocks.order.length = 0;
     mocks.getPartnerId.mockResolvedValue(PARTNER_ID);
     mocks.removeChannel.mockResolvedValue('ok');
@@ -207,6 +208,78 @@ describe('useRealtimeMessages', () => {
 
       expect(mockStoreState.addNote).not.toHaveBeenCalled();
       expect(onNewMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a partner linked while the chat is open', () => {
+    async function mountUnlinked() {
+      const { supabase } = await import('../../api/supabaseClient');
+      let broadcastCallback: ((payload: unknown) => void) | null = null;
+      const mockChannel = {
+        on: vi.fn((type, options, callback) => {
+          if (type === 'broadcast' && options.event === 'new_message') broadcastCallback = callback;
+          return mockChannel;
+        }),
+        subscribe: vi.fn((callback) => {
+          callback?.('SUBSCRIBED');
+          return { unsubscribe: vi.fn() };
+        }),
+      };
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
+      // Unlinked at mount: the store has no partner and the lookup says so.
+      mockStoreState.partner = null;
+      mocks.getPartnerId.mockResolvedValue(null);
+      const hook = renderHook(() => useRealtimeMessages());
+      await waitFor(() => expect(broadcastCallback).not.toBeNull());
+      // The first join's own lookups (before the join, and on its SUBSCRIBED).
+      await waitFor(() => expect(mocks.getPartnerId).toHaveBeenCalledTimes(2));
+      await act(async () => {});
+      const emit = (payload: unknown) => act(() => broadcastCallback?.(payload));
+      return { ...hook, emit };
+    }
+
+    it('drops the new partner\'s notes until the store learns of the link, then delivers them', async () => {
+      const { rerender, emit } = await mountUnlinked();
+
+      // Linked on the server, but nothing has told this chat yet.
+      mocks.getPartnerId.mockResolvedValue(PARTNER_ID);
+      await emit({ payload: { message: validNote({ id: '55555555-5555-4555-8555-555555555551' }) } });
+      expect(mockStoreState.addNote).not.toHaveBeenCalled();
+
+      // The store's partner changes (the accept here, or the partner-linked
+      // broadcast on the sender): the snapshot is re-taken without a re-join.
+      mockStoreState.partner = { id: PARTNER_ID };
+      rerender();
+      await waitFor(() => expect(mocks.getPartnerId).toHaveBeenCalledTimes(3));
+      await act(async () => {});
+
+      await emit({ payload: { message: validNote() } });
+      expect(mockStoreState.addNote).toHaveBeenCalledWith(validNote());
+    });
+
+    it('does not re-read when the store settles on the partner the join already resolved', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const mockChannel = {
+        on: vi.fn().mockReturnThis(),
+        subscribe: vi.fn((callback) => {
+          callback?.('SUBSCRIBED');
+          return { unsubscribe: vi.fn() };
+        }),
+      };
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+      mockStoreState.partner = null;
+      const { rerender } = renderHook(() => useRealtimeMessages());
+      await waitFor(() => expect(mockChannel.subscribe).toHaveBeenCalled());
+      await act(async () => {});
+      const lookups = mocks.getPartnerId.mock.calls.length;
+
+      // The saved partner lands in the store after the join resolved the same one.
+      mockStoreState.partner = { id: PARTNER_ID };
+      rerender();
+      await act(async () => {});
+
+      expect(mocks.getPartnerId).toHaveBeenCalledTimes(lookups);
     });
   });
 });

@@ -4,7 +4,7 @@
  * Manages partner relationships, connection requests, and user search.
  *
  * Features:
- * - Search for users by display name or email
+ * - Look up a partner by the exact email they sign in with
  * - Send/accept/decline partner requests
  * - Get current partner information
  * - Get pending requests
@@ -20,8 +20,34 @@ import { isSeedFallbackName, sessionMismatch, supabase } from './supabaseClient'
 
 export interface UserSearchResult {
   id: string;
+  /** The address the caller typed, trimmed; the server never returns it. */
   email: string;
-  displayName: string;
+  /** The account's chosen name, or `null` while it still carries the seed. */
+  displayName: string | null;
+}
+
+/**
+ * The answer to an exact-email partner search, with every case kept apart.
+ *
+ * `missing` covers both "no account uses that email" and "that is your own
+ * email" — the server answers the two identically. `taken` is an account that
+ * already has a partner; the server returns nothing else about it. `error` is
+ * a failed request, never "no account".
+ */
+export type PartnerSearchResult =
+  | { status: 'found'; user: UserSearchResult }
+  | { status: 'taken' }
+  | { status: 'missing' }
+  | { status: 'error'; reason: string };
+
+/**
+ * True when `query`, trimmed, has the shape of an email address — the same
+ * shape the sign-in form requires (LoginScreen), so every address someone signs
+ * in with passes. A guard against sending an address still being typed, not
+ * validation: the server matches exactly anyway.
+ */
+export function looksLikeEmail(query: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query.trim());
 }
 
 export interface PartnerInfo {
@@ -45,10 +71,13 @@ export interface PartnerRequest {
   id: string;
   from_user_id: string;
   to_user_id: string;
-  from_user_email: string | null;
-  from_user_display_name: string | null;
-  to_user_email: string | null;
-  to_user_display_name: string | null;
+  /**
+   * The other person's chosen name — the recipient on a sent request, the
+   * sender on a received one — or `null` while their profile carries the seed.
+   */
+  other_display_name: string | null;
+  /** The other person's sign-in email. */
+  other_email: string | null;
   status: 'pending' | 'accepted' | 'declined';
   created_at: string;
 }
@@ -145,54 +174,48 @@ class PartnerService {
   }
 
   /**
-   * Search for users by display name or email
-   * Uses RLS-protected users table instead of auth admin API
+   * Look up the account that signs in with `email`, matched exactly and
+   * case-insensitively after trimming — no partial or name match.
    *
-   * @param query - Search query (matches display name or email)
-   * @param limit - Maximum number of results (default: 10)
-   * @returns List of matching users
+   * Goes through the `find_partner_by_email` RPC: the users SELECT policy hides
+   * every row but the caller's own and their partner's, so a direct query
+   * cannot see an unlinked account at all.
+   *
+   * @param email - The address the partner signs in with
    */
-  async searchUsers(query: string, limit: number = 10): Promise<UserSearchResult[]> {
+  async searchUsers(email: string): Promise<PartnerSearchResult> {
+    const trimmed = email.trim();
+    // No account can use an address without this shape, so nothing to ask.
+    if (!looksLikeEmail(trimmed)) return { status: 'missing' };
+
     try {
-      if (!query || query.trim().length < 2) {
-        return [];
-      }
-
-      const { data: currentUser } = await supabase.auth.getUser();
-      if (!currentUser?.user) {
-        throw new Error('Not authenticated');
-      }
-
-      const searchLower = query.toLowerCase().trim();
-
-      // Query users table directly (RLS policy allows authenticated users to search)
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, email, display_name')
-        .neq('id', currentUser.user.id) // Exclude current user
-        .or(`email.ilike.%${searchLower}%,display_name.ilike.%${searchLower}%`)
-        .limit(limit);
+      const { data, error } = await supabase.rpc('find_partner_by_email', { p_email: trimmed });
 
       if (error) {
         console.error('[PartnerService] Error searching users:', error);
-        return [];
+        return { status: 'error', reason: error.message };
       }
 
-      if (!data || data.length === 0) {
-        return [];
-      }
+      const row = data?.[0];
+      if (!row) return { status: 'missing' };
+      if (row.is_taken) return { status: 'taken' };
+      // The generated type says non-null; the column is null only when taken.
+      if (!row.id) return { status: 'error', reason: 'Search result without an id' };
 
-      // Map to UserSearchResult
-      const results: UserSearchResult[] = data.map((user) => ({
-        id: user.id,
-        email: user.email || '',
-        displayName: user.display_name || user.email || 'Unknown',
-      }));
-
-      return results;
+      return {
+        status: 'found',
+        user: {
+          id: row.id,
+          email: trimmed,
+          // A profile that never chose a name carries the email or 'Unknown'.
+          displayName: isSeedFallbackName(row.display_name, trimmed)
+            ? null
+            : (row.display_name?.trim() ?? null),
+        },
+      };
     } catch (error) {
       console.error('[PartnerService] Error in searchUsers:', error);
-      return [];
+      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
     }
   }
 
@@ -264,6 +287,11 @@ class PartnerService {
   /**
    * Get all pending partner requests (sent and received)
    *
+   * Goes through the `get_my_pending_partner_requests` RPC, which names the
+   * other person: the users SELECT policy hides every unlinked account from the
+   * caller, and a pending request is always between two unlinked people, so a
+   * direct `users` read answered nothing and every row showed "Unknown User".
+   *
    * @returns Object with sent and received requests
    */
   async getPendingRequests(): Promise<{
@@ -276,59 +304,27 @@ class PartnerService {
         throw new Error('Not authenticated');
       }
 
-      // Get all pending requests involving current user
-      const { data, error } = await supabase
-        .from('partner_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .or(`from_user_id.eq.${currentUser.user.id},to_user_id.eq.${currentUser.user.id}`);
+      const { data, error } = await supabase.rpc('get_my_pending_partner_requests');
 
       if (error) {
         console.error('[PartnerService] Error fetching pending requests:', error);
         return { sent: [], received: [] };
       }
 
-      if (!data || data.length === 0) {
-        return { sent: [], received: [] };
-      }
-
-      // Get user info for all involved users from users table (RLS-protected)
-      const userIds = Array.from(
-        new Set<string>(data.flatMap((req) => [req.from_user_id, req.to_user_id]))
-      );
-
-      // Fetch user data from users table (no admin API needed)
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('id, email, display_name')
-        .in('id', userIds);
-
-      const userMap = new Map(
-        usersData?.map((user) => [
-          user.id,
-          {
-            email: user.email,
-            displayName: user.display_name || user.email || 'Unknown',
-          },
-        ]) || []
-      );
-
-      // Enrich requests with user info
-      const enrichedRequests: PartnerRequest[] = data.map((request) => ({
-        id: request.id,
-        from_user_id: request.from_user_id,
-        to_user_id: request.to_user_id,
-        from_user_email: userMap.get(request.from_user_id)?.email || null,
-        from_user_display_name: userMap.get(request.from_user_id)?.displayName || null,
-        to_user_email: userMap.get(request.to_user_id)?.email || null,
-        to_user_display_name: userMap.get(request.to_user_id)?.displayName || null,
-        status: request.status as 'pending' | 'accepted' | 'declined',
-        created_at: request.created_at,
+      // The generated type says non-null; both columns are null when the other
+      // profile has no chosen name or no email.
+      const requests: PartnerRequest[] = (data ?? []).map((row) => ({
+        id: row.id,
+        from_user_id: row.from_user_id,
+        to_user_id: row.to_user_id,
+        other_display_name: row.other_display_name ?? null,
+        other_email: row.other_email ?? null,
+        status: 'pending',
+        created_at: row.created_at,
       }));
 
-      // Separate sent and received
-      const sent = enrichedRequests.filter((req) => req.from_user_id === currentUser.user.id);
-      const received = enrichedRequests.filter((req) => req.to_user_id === currentUser.user.id);
+      const sent = requests.filter((req) => req.from_user_id === currentUser.user.id);
+      const received = requests.filter((req) => req.to_user_id === currentUser.user.id);
 
       return { sent, received };
     } catch (error) {

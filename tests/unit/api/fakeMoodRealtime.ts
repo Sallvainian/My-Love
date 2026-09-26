@@ -32,7 +32,10 @@ export interface FakeChannel {
   topic: string;
   /** 'closed' | 'joined' | 'leaving', mirroring CHANNEL_STATES */
   state: string;
+  /** `new_mood` handlers. */
   broadcastHandlers: BroadcastHandler[];
+  /** Handlers for every other broadcast event, by event name. */
+  eventHandlers: Map<string, BroadcastHandler[]>;
   statusHandlers: StatusHandler[];
   on: ReturnType<typeof vi.fn>;
   subscribe: ReturnType<typeof vi.fn>;
@@ -169,9 +172,17 @@ export function fakeChannel(topic: string, config?: unknown): FakeChannel {
     topic,
     state: 'closed',
     broadcastHandlers: [],
+    eventHandlers: new Map(),
     statusHandlers: [],
-    on: vi.fn((_event: string, _filter: unknown, handler: BroadcastHandler) => {
-      chan.broadcastHandlers.push(handler);
+    // realtime-js dispatches a broadcast only to the handlers registered for
+    // its event, so the fake keeps them apart too.
+    on: vi.fn((_type: string, filter: { event?: string } | undefined, handler: BroadcastHandler) => {
+      const event = filter?.event ?? 'new_mood';
+      if (event === 'new_mood') {
+        chan.broadcastHandlers.push(handler);
+      } else {
+        chan.eventHandlers.set(event, [...(chan.eventHandlers.get(event) ?? []), handler]);
+      }
       return chan;
     }),
     // RealtimeChannel.js:127 gates the whole join — and therefore the
@@ -290,6 +301,15 @@ export function emitMood(
     })
   );
   return id;
+}
+
+/** Deliver a broadcast of any other event to everything attached to the channel. */
+export function emitEvent(
+  chan: FakeChannel,
+  event: string,
+  payload: Record<string, unknown> = {}
+): void {
+  (chan.eventHandlers.get(event) ?? []).forEach((handler) => handler({ payload }));
 }
 
 /** Report a subscription status to everything attached to the channel */

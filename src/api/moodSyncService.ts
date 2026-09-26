@@ -43,7 +43,21 @@ export type SupabaseMoodRecord = SupabaseMood;
 interface MoodSubscriber {
   onMood: (mood: SupabaseMoodRecord) => void;
   onStatus?: (status: string) => void;
+  /** Someone just accepted this account's partner request; see PARTNER_LINKED_EVENT. */
+  onPartnerLinked?: () => void;
 }
+
+/**
+ * Sent on `mood-updates:<senderId>` by the account that just accepted
+ * `senderId`'s partner request, so the sender's open Partner tab re-reads its
+ * partner instead of showing "Connect" until a reload.
+ *
+ * It rides the sender's own mood topic because that is the one channel an
+ * unlinked account already listens on, and `couple_broadcast_partner_can_send`
+ * lets exactly the new partner publish there the moment the link exists. The
+ * payload is empty and trusted for nothing: it only prompts a server re-read.
+ */
+export const PARTNER_LINKED_EVENT = 'partner_linked';
 
 /**
  * A broadcast channel plus every consumer currently attached to it.
@@ -641,6 +655,17 @@ class MoodSyncService {
         // handler, and that mutates the set being iterated.
         Array.from(entry.subscribers).forEach((s) => s.onMood(mood));
       })
+      .on('broadcast', { event: PARTNER_LINKED_EVENT }, () => {
+        logger.debug('[MoodSyncService] Received a partner-linked broadcast');
+        // The snapshot this channel checks moods against was taken while the
+        // account was unlinked, so it is null and every mood from the new
+        // partner would be dropped. Re-take it; a failed lookup keeps the old
+        // value, as on a re-join.
+        void this.refreshChannelIdentity(entry).catch((error) => {
+          logger.debug('[MoodSyncService] Partner snapshot refresh failed:', error);
+        });
+        Array.from(entry.subscribers).forEach((s) => s.onPartnerLinked?.());
+      })
       .subscribe((status) => {
         this.handleMoodChannelStatus(topic, entry, status);
       });
@@ -800,7 +825,8 @@ class MoodSyncService {
    */
   async subscribeMoodUpdates(
     callback: (mood: SupabaseMoodRecord) => void,
-    onStatusChange?: (status: string) => void
+    onStatusChange?: (status: string) => void,
+    onPartnerLinked?: () => void
   ): Promise<() => void> {
     // Get current user ID - we subscribe to OUR OWN channel
     const {
@@ -830,7 +856,7 @@ class MoodSyncService {
     // anon key and the SELECT policy denies it.
     await supabase.realtime.setAuth();
 
-    const subscriber: MoodSubscriber = { onMood: callback, onStatus: onStatusChange };
+    const subscriber: MoodSubscriber = { onMood: callback, onStatus: onStatusChange, onPartnerLinked };
 
     let entry = this.moodChannels.get(topic);
 
@@ -951,6 +977,33 @@ class MoodSyncService {
 
       logger.debug('[MoodSyncService] Unsubscribed from mood broadcasts');
     };
+  }
+
+  /**
+   * Tell the account whose partner request this device just accepted that the
+   * link exists (PARTNER_LINKED_EVENT). Nothing else would: their open Partner
+   * tab only re-reads its partner on mount, start or reconnect.
+   *
+   * @param partnerId - The new partner: the request's sender
+   * @throws when the broadcast is refused or fails; the caller decides
+   */
+  async announcePartnerLinked(partnerId: string): Promise<void> {
+    await sendEphemeralBroadcast(`mood-updates:${partnerId}`, PARTNER_LINKED_EVENT, {});
+  }
+
+  /**
+   * Re-take the partner snapshot on every open mood channel. For the device
+   * that just accepted a request: its channel joined while it was unlinked, so
+   * the snapshot is null and nothing else would re-arm it until a re-join.
+   */
+  async refreshPartnerSnapshots(): Promise<void> {
+    await Promise.all(
+      Array.from(this.moodChannels.values()).map((entry) =>
+        this.refreshChannelIdentity(entry).catch((error) => {
+          logger.debug('[MoodSyncService] Partner snapshot refresh failed:', error);
+        })
+      )
+    );
   }
 
   /**

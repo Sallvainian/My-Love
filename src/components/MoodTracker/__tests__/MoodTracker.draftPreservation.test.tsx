@@ -90,7 +90,7 @@ vi.mock('../../../hooks/useAuth', () => ({
 }));
 
 vi.mock('../../../api/supabaseClient', () => ({
-  getPartnerId: vi.fn().mockResolvedValue(null),
+  lookupPartnerId: vi.fn().mockResolvedValue({ status: 'unlinked' }),
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
 }));
 
