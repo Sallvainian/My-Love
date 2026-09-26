@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runDeferred } from '../../support/fixtures/cleanup';
+import { runDeferred, type Deferred } from '../../support/fixtures/cleanup';
 
 describe('runDeferred', () => {
   it('runs the deferred functions newest first', async () => {
@@ -38,5 +38,33 @@ describe('runDeferred', () => {
       expect.objectContaining({ message: 'Cleanup "b" failed: two' }),
       expect.objectContaining({ message: 'Cleanup "a" failed: one' }),
     ]);
+  });
+
+  it('runs a function deferred while teardown is running', async () => {
+    const order: string[] = [];
+    const deferred: Deferred[] = [{ label: 'first', fn: () => order.push('first') }];
+    deferred.push({
+      label: 'second',
+      fn: () => {
+        order.push('second');
+        // What a timed-out body that is still running does: defer once more.
+        deferred.push({ label: 'late', fn: () => order.push('late') });
+      },
+    });
+    await runDeferred(deferred);
+    expect(order).toEqual(['second', 'late', 'first']);
+  });
+
+  it('reports a function that hangs under its label and still runs the next', async () => {
+    const order: string[] = [];
+    const run = runDeferred(
+      [
+        { label: 'first', fn: () => order.push('first') },
+        { label: 'hangs', fn: () => new Promise(() => {}) },
+      ],
+      20
+    );
+    await expect(run).rejects.toThrow('Cleanup "hangs" failed: did not finish within 20ms');
+    expect(order).toEqual(['first']);
   });
 });
