@@ -530,6 +530,14 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: undefined
       }
+      find_partner_by_email: {
+        Args: { p_email: string }
+        Returns: {
+          display_name: string
+          id: string
+          is_taken: boolean
+        }[]
+      }
       get_my_partner_id: { Args: never; Returns: string }
     }
     Enums: {
