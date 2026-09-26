@@ -23,6 +23,23 @@ const EMAIL = 'Person@Example.com';
 
 let singleResult: { data: unknown; error: unknown };
 let sessionResult: { data: { session: unknown }; error: unknown };
+/** Runs as the profile read is answered, so a test can end the session mid-read. */
+let onRead: (() => void) | null = null;
+
+/**
+ * The profile read. RLS hides every users row from a request sent without a
+ * session, so a read answered after a sign-out sees no row: `.single()` turns
+ * that into PGRST116 (a 406 on the wire), `.maybeSingle()` into a null row.
+ */
+async function answerRead(kind: 'single' | 'maybeSingle') {
+  onRead?.();
+  if (!sessionResult.data.session) {
+    return kind === 'single'
+      ? { data: null, error: { code: 'PGRST116', message: 'no rows' } }
+      : { data: null, error: null };
+  }
+  return singleResult;
+}
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
@@ -34,7 +51,8 @@ vi.mock('@supabase/supabase-js', () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: async () => singleResult,
+          single: () => answerRead('single'),
+          maybeSingle: () => answerRead('maybeSingle'),
         }),
       }),
     }),
@@ -62,6 +80,7 @@ describe('own display name contract', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     sessionResult = signedIn;
+    onRead = null;
   });
 
   describe('the seed fallbacks all read as "no name chosen"', () => {
@@ -163,12 +182,36 @@ describe('own display name contract', () => {
       });
     });
 
-    // PGRST116 is "no row", which is not a failure: the profile simply is not
-    // there to have a name. DisplayNameSetup fails closed on the write side by
-    // checking that its UPDATE matched a row.
-    it('treats a missing profile row as unset', async () => {
-      singleResult = { data: null, error: { code: 'PGRST116', message: 'no rows' } };
+    // No row while the session holds is not a failure: the profile simply is
+    // not there to have a name. DisplayNameSetup fails closed on the write side
+    // by checking that its UPDATE matched a row.
+    it('treats a missing profile row as unset while the session holds', async () => {
+      singleResult = { data: null, error: null };
       await expect(lookup()).resolves.toEqual({ status: 'unset' });
+    });
+  });
+
+  // A sign-out landing while the read is in flight: the read goes out without
+  // a session, RLS hides the row, and the empty answer says nothing about
+  // whether the account chose a name -- `unset` would open the setup modal.
+  describe('the session changing during the read', () => {
+    it('answers error, not unset, when the session ends', async () => {
+      singleResult = profileRow('Jessie');
+      onRead = () => {
+        sessionResult = { data: { session: null }, error: null };
+      };
+      await expect(lookup()).resolves.toMatchObject({ status: 'error' });
+    });
+
+    it('answers error when another account signs in', async () => {
+      singleResult = profileRow('Jessie');
+      onRead = () => {
+        sessionResult = {
+          data: { session: { user: { id: '33333333-3333-4333-8333-333333333333' } } },
+          error: null,
+        };
+      };
+      await expect(lookup()).resolves.toMatchObject({ status: 'error' });
     });
   });
 

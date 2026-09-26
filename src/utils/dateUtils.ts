@@ -56,13 +56,7 @@ export function isJustNow(timestamp: string): boolean {
  */
 export function formatMessageTimestamp(dateInput: string | Date): string {
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-  const now = new Date();
-
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dateDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-  const diffTime = today.getTime() - dateDay.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = calendarDaysBetween(new Date(), date);
 
   if (diffDays === 0) return formatTime(date);
   if (diffDays === 1) return 'Yesterday';
@@ -195,17 +189,31 @@ export function formatRelativeDate(isoString: string): string {
   return relativeFormatter.format(-years, 'year');
 }
 
+// ─── Calendar-day Difference ─────────────────────────────────────────
+
+/**
+ * Whole local calendar days from `earlier` to `later` (negative when `later`
+ * is the earlier date).
+ *
+ * Elapsed milliseconds divided by 24h miscounts around DST, where a local day
+ * is 23 or 25 hours long: across spring-forward, local midnight to local
+ * midnight is one hour short of a whole number of days, and flooring it drops
+ * a day. The UTC stamps of the two dates' local components are always a whole
+ * number of days apart.
+ */
+export function calendarDaysBetween(later: Date, earlier: Date): number {
+  return Math.round(
+    (Date.UTC(later.getFullYear(), later.getMonth(), later.getDate()) -
+      Date.UTC(earlier.getFullYear(), earlier.getMonth(), earlier.getDate())) /
+      86400000
+  );
+}
+
 // ─── Internal Helpers ────────────────────────────────────────────────
 
 /**
- * Get days since a past date
+ * Get calendar days since a past date
  */
 function getDaysSince(pastDate: Date): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const past = new Date(pastDate);
-  past.setHours(0, 0, 0, 0);
-
-  const diff = today.getTime() - past.getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
+  return calendarDaysBetween(new Date(), pastDate);
 }

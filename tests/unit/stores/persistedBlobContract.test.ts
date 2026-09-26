@@ -26,7 +26,7 @@
  * would agree with itself forever. Deriving from `partialize` means the
  * invariant keeps holding as the allowlist grows.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   PERSISTED_EVENT,
   PERSISTED_MESSAGE_HISTORY,
@@ -103,10 +103,6 @@ describe('persisted-blob adapter contract', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.resetModules();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   describe('exactly one serialization, and only when something changed', () => {

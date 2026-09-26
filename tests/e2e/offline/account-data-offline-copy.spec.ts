@@ -317,6 +317,7 @@ test.describe('Account data from the local copy', () => {
           abortedCustomReads += 1;
         }
       };
+      // playwright-utils deviation: counts the custom-message reads the route above aborts; interceptNetworkCall's observe mode throws on a request that gets no response, so it cannot observe an aborted one.
       page.on('requestfailed', countAbortedCustomRead);
       await page.goto('/admin');
       await recurseUntil(async () => abortedCustomReads, (v) => { expect(v).toBeGreaterThan(0); });

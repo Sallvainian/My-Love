@@ -127,7 +127,7 @@ describe('MessageInput', () => {
       expect(imageButton).toBeInTheDocument();
     });
 
-    it('should have hidden file input with correct accept types', () => {
+    it('lets the picker choose only JPEG, PNG and WebP images', () => {
       render(<MessageInput />);
 
       const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;

@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAuthBootstrapSession } from '../../../../tests/support/factories/auth-bootstrap-notification-order';
 import { signIn, signOut } from '../actionService';
 import { onAuthStateChange } from '../sessionService';
@@ -122,12 +122,6 @@ describe('auth session/action services', () => {
         };
       }
     );
-  });
-
-  // Restores the console.error spies below even when a test's assertion throws
-  // before it gets to the end; an inline mockRestore would be skipped then.
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it('stores SW auth token on successful sign-in', async () => {

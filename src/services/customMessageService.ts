@@ -310,9 +310,6 @@ export const customMessageService = {
     exportData: CustomMessagesExport
   ): { toCreate: CreateMessageInput[]; skipped: number } {
     const file = validated(() => CustomMessagesExportSchema.parse(exportData));
-    if (file.version !== '1.0') {
-      throw new Error(`Unsupported export version: ${file.version}`);
-    }
     const seen = new Set(existing.map((m) => m.text.trim().toLowerCase()));
     const toCreate: CreateMessageInput[] = [];
     let skipped = 0;

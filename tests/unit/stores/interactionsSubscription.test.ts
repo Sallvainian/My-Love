@@ -7,9 +7,10 @@ const resolvePartnerId = vi.hoisted(() => vi.fn<() => Promise<string | null>>())
 const sendPoke = vi.hoisted(() => vi.fn());
 const sendKiss = vi.hoisted(() => vi.fn());
 /**
- * Every partner lookup the slice started, as the promise it was handed. The
- * slice attaches its own `.then` the moment the lookup returns, so a test that
- * awaits the latest one resumes only after the slice has acted on the answer.
+ * Every partner lookup the slice started, as the promise it was handed, so a
+ * test can confirm a re-join started its own lookup. Awaiting one is not a
+ * wait for the slice: its handler may take further awaits, and the test would
+ * then resume first. `flushMacrotask` waits for all of it.
  */
 const partnerLookups = vi.hoisted((): Array<Promise<unknown>> => []);
 
@@ -67,6 +68,11 @@ interface CapturedSubscription {
 }
 
 const subscriptions: CapturedSubscription[] = [];
+
+/** Every pending microtask, however many awaits deep, runs before a macrotask. */
+function flushMacrotask(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 function createTestStore() {
   const createSlices: AppStateCreator<TestStore> = (...args) => ({
@@ -418,10 +424,9 @@ describe('interactionsSlice subscription bridge', () => {
     // Wi-Fi blips; the channel rejoins and the `users` read fails outright.
     resolvePartnerId.mockRejectedValue(new Error('network down'));
     subscription.reportStatus('SUBSCRIBED');
-    // The subscribe's lookup, then this re-join's: missing the second would
-    // leave `at(-1)` an already-settled promise.
+    // The subscribe's lookup, then this re-join's.
     expect(partnerLookups).toHaveLength(2);
-    await partnerLookups.at(-1);
+    await flushMacrotask();
 
     subscription.reportInteraction(interaction('after-the-blip'));
     expect(store.getState().interactions.map(({ id }) => id)).toEqual([
@@ -466,10 +471,9 @@ describe('interactionsSlice subscription bridge', () => {
 
     resolvePartnerId.mockResolvedValue(null);
     subscription.reportStatus('SUBSCRIBED');
-    // The subscribe's lookup, then this re-join's: missing the second would
-    // leave `at(-1)` an already-settled promise.
+    // The subscribe's lookup, then this re-join's.
     expect(partnerLookups).toHaveLength(2);
-    await partnerLookups.at(-1);
+    await flushMacrotask();
 
     subscription.reportInteraction(interaction('after-the-unlink'));
     expect(store.getState().interactions.map(({ id }) => id)).toEqual(['while-linked']);
@@ -532,10 +536,9 @@ describe('interactionsSlice subscription bridge', () => {
 
     store.getState().clearAuth();
     releaseRefresh!(OTHER_USER_ID);
-    // The subscribe's lookup, then this re-join's: missing the second would
-    // leave `at(-1)` an already-settled promise.
+    // The subscribe's lookup, then this re-join's.
     expect(partnerLookups).toHaveLength(2);
-    await partnerLookups.at(-1);
+    await flushMacrotask();
 
     // Restoring it here would re-arm addIncomingInteraction for the couple that
     // just signed out.

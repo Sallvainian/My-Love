@@ -173,8 +173,12 @@ describe('AnniversarySettings writes', () => {
     expect(screen.getByTestId('anniversaries-subtitle').textContent).toBe(
       'Special dates · none yet'
     );
-    expect(screen.queryByText(/No anniversaries yet/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Anniversary Countdowns/)).not.toBeInTheDocument();
+    // The subtitle is the only paragraph and the group title the only heading:
+    // no empty-state block and no screen-level title.
+    expect(screen.getAllByRole('paragraph')).toEqual([
+      screen.getByTestId('anniversaries-subtitle'),
+    ]);
+    expect(screen.getAllByRole('heading')).toHaveLength(1);
   });
 
   it('drops "none yet" from the subtitle once there is an anniversary', () => {

@@ -39,25 +39,50 @@ const PARTNER_EMAIL = 'Partner@Example.com';
 
 let singleResults: Array<{ data: unknown; error: unknown }> = [];
 let singleCalls = 0;
-let userResult: { data: { user: unknown }; error?: unknown };
+/** Whose session the client holds; `null` is signed out. */
+let sessionUserId: string | null;
+let sessionError: { message: string } | null;
+/** Runs as each users read is answered, so a test can sign out mid-read. */
+let onRead: ((call: number) => void) | null;
+
+/**
+ * One users read. RLS hides every users row from a request sent without a
+ * session, so a read answered after a sign-out sees no row: `.single()` turns
+ * that into PGRST116, `.maybeSingle()` into a null row.
+ */
+async function answerRead(kind: 'single' | 'maybeSingle') {
+  const call = singleCalls;
+  singleCalls += 1;
+  onRead?.(call);
+  const result = singleResults[call] ?? singleResults.at(-1);
+  if (result === undefined) throw new Error('no stubbed result');
+  if (sessionUserId === null) {
+    return kind === 'single'
+      ? { data: null, error: { code: 'PGRST116', message: 'no rows' } }
+      : { data: null, error: null };
+  }
+  return result;
+}
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     auth: {
-      getUser: async () => userResult,
-      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () =>
+        sessionUserId
+          ? { data: { user: { id: sessionUserId, email: OWN_EMAIL } }, error: sessionError }
+          : { data: { user: null }, error: sessionError },
+      getSession: async () => ({
+        data: { session: sessionUserId ? { user: { id: sessionUserId } } : null },
+        error: sessionError,
+      }),
       // `supabaseClient` installs listeners at import time.
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
     },
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: async () => {
-            const result = singleResults[singleCalls] ?? singleResults.at(-1);
-            singleCalls += 1;
-            if (result === undefined) throw new Error('no stubbed result');
-            return result;
-          },
+          single: () => answerRead('single'),
+          maybeSingle: () => answerRead('maybeSingle'),
         }),
       }),
     }),
@@ -80,8 +105,16 @@ function partnerRow(display_name: unknown, email: unknown = PARTNER_EMAIL): void
 
 async function partner() {
   const { partnerService } = await import('@/api/partnerService');
-  const result = await partnerService.getPartner();
+  const result = await partnerService.getPartner(USER_ID);
   return result.status === 'linked' ? result.partner : null;
+}
+
+function resetHarness(): void {
+  singleResults = [];
+  singleCalls = 0;
+  sessionUserId = USER_ID;
+  sessionError = null;
+  onRead = null;
 }
 
 describe('partnerService.getPartner display name', () => {
@@ -89,9 +122,7 @@ describe('partnerService.getPartner display name', () => {
     vi.resetModules();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    singleResults = [];
-    singleCalls = 0;
-    userResult = { data: { user: { id: USER_ID, email: OWN_EMAIL } } };
+    resetHarness();
   });
 
   describe('a row carrying only what the trigger seeded', () => {
@@ -159,14 +190,12 @@ describe('partnerService.getPartner classification', () => {
     vi.resetModules();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    singleResults = [];
-    singleCalls = 0;
-    userResult = { data: { user: { id: USER_ID, email: OWN_EMAIL } } };
+    resetHarness();
   });
 
   async function status() {
     const { partnerService } = await import('@/api/partnerService');
-    return (await partnerService.getPartner()).status;
+    return (await partnerService.getPartner(USER_ID)).status;
   }
 
   it('answers linked with the partner when both reads succeed', async () => {
@@ -181,8 +210,8 @@ describe('partnerService.getPartner classification', () => {
     await expect(status()).resolves.toBe('unlinked');
   });
 
-  it('answers unlinked when the user row does not exist yet (PGRST116)', async () => {
-    singleResults = [{ data: null, error: { code: 'PGRST116', message: 'no rows' } }];
+  it('answers unlinked when the signed-in user has no users row yet', async () => {
+    singleResults = [{ data: null, error: null }];
 
     await expect(status()).resolves.toBe('unlinked');
   });
@@ -193,20 +222,58 @@ describe('partnerService.getPartner classification', () => {
     await expect(status()).resolves.toBe('error');
   });
 
-  it('answers error when getUser fails', async () => {
-    userResult = { data: { user: null }, error: { message: 'Failed to fetch' } };
+  it('answers error when the session read fails', async () => {
+    sessionError = { message: 'Failed to fetch' };
 
     await expect(status()).resolves.toBe('error');
   });
 
   it('answers error when there is no signed-in user', async () => {
-    userResult = { data: { user: null } };
+    sessionUserId = null;
+
+    await expect(status()).resolves.toBe('error');
+  });
+
+  it('answers error when a different account holds the session', async () => {
+    partnerRow('Alex');
+    sessionUserId = PARTNER_ID;
 
     await expect(status()).resolves.toBe('error');
   });
 
   it('answers error when the partner-row read fails', async () => {
     singleResults = [linked, { data: null, error: { code: '500', message: 'server down' } }];
+
+    await expect(status()).resolves.toBe('error');
+  });
+
+  // DW-264: a sign-out that lands while a read is in flight. The rest of the
+  // lookup goes out without a session, RLS hides the row, and the empty answer
+  // is about the signed-out request -- not evidence that the account is
+  // unlinked, which the slice would save to the account's local copy.
+  it('answers error, not unlinked, when the session ends during the user-row read', async () => {
+    partnerRow('Alex');
+    onRead = (call) => {
+      if (call === 0) sessionUserId = null;
+    };
+
+    await expect(status()).resolves.toBe('error');
+  });
+
+  it('answers error when the session ends during the partner-row read', async () => {
+    partnerRow('Alex');
+    onRead = (call) => {
+      if (call === 1) sessionUserId = null;
+    };
+
+    await expect(status()).resolves.toBe('error');
+  });
+
+  it('answers error when another account signs in during the user-row read', async () => {
+    partnerRow('Alex');
+    onRead = (call) => {
+      if (call === 0) sessionUserId = PARTNER_ID;
+    };
 
     await expect(status()).resolves.toBe('error');
   });

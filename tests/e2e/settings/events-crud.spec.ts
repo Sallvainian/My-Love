@@ -31,7 +31,11 @@ import {
 import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
 import { EVENTS_WRITE, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
-import { openSettingsFromHome, reloadSettings } from '../../support/helpers/settings-screen';
+import {
+  openSettingsFromHome,
+  reloadSettings,
+  returnToSettings,
+} from '../../support/helpers/settings-screen';
 import { formatDateLong } from '../../../src/utils/dateUtils';
 import type { Locator, Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
@@ -215,11 +219,13 @@ test.describe('Managing events from Settings', () => {
     await addEventFromSettings(page, interceptNetworkCall, added);
 
     // Premise for the old card's absence below: Home rendered it first.
+    const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await navigateTo(page, 'home');
+    expect((await homeRead).status).toBe(200);
     await expect(page.getByTestId('event-countdown-settings-trip-e2e')).toBeVisible();
 
     // ── Edit ───────────────────────────────────────────────────────────────
-    await navigateTo(page, 'settings');
+    await returnToSettings(page, interceptNetworkCall);
     const rowToEdit = rowFor(page, ADDED_LABEL);
     await expect(rowToEdit).toBeVisible();
     await rowToEdit.locator('[data-testid^="event-edit-"]').click();

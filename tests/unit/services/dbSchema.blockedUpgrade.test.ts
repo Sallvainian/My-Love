@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { openDB } from 'idb';
-import { within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 import { DB_NAME, DB_VERSION, openMyLoveDB } from '../../../src/services/dbSchema';
@@ -44,7 +44,7 @@ describe('dbSchema', () => {
     // The prompt tests stub `confirm` and `location`; a `location` stub left in
     // place makes the next `supabaseClient` import throw `Invalid URL`.
     vi.unstubAllGlobals();
-    document.querySelector('[role="dialog"]')?.remove();
+    for (const dialog of screen.queryAllByRole('dialog')) dialog.remove();
   });
 
   describe('blocked upgrade prompt', () => {
@@ -67,17 +67,11 @@ describe('dbSchema', () => {
     }
 
     function getBlockedDialog(): HTMLElement | null {
-      return document.querySelector('[role="dialog"]');
+      return screen.queryByRole('dialog', { name: RELOAD_MESSAGE });
     }
 
     async function waitForBlockedDialog(): Promise<HTMLElement> {
-      return vi.waitFor(() => {
-        const dialog = getBlockedDialog();
-        expect(dialog).not.toBeNull();
-        expect(dialog?.textContent).toContain(RELOAD_MESSAGE);
-        if (!dialog) throw new Error('blocked dialog missing');
-        return dialog;
-      });
+      return screen.findByRole('dialog', { name: RELOAD_MESSAGE });
     }
 
     async function clickDialogButton(dialog: HTMLElement, name: 'Reload' | 'Not now'): Promise<void> {
@@ -131,7 +125,7 @@ describe('dbSchema', () => {
 
       const openings = [openMyLoveDB(), openMyLoveDB(), openMyLoveDB()];
       const dialog = await waitForBlockedDialog();
-      expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
       expect(confirm).not.toHaveBeenCalled();
 
       // Observe the openings before the click: the dismiss rejects them
@@ -163,7 +157,7 @@ describe('dbSchema', () => {
 
       const openings = [openMyLoveDB(), openMyLoveDB(), openMyLoveDB()];
       const dialog = await waitForBlockedDialog();
-      expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
       expect(confirm).not.toHaveBeenCalled();
 
       await clickDialogButton(dialog, 'Reload');
@@ -209,7 +203,7 @@ describe('dbSchema', () => {
       openDbs.push(next);
 
       expect(confirm).not.toHaveBeenCalled();
-      expect(document.querySelector('[role="dialog"]')).toBeNull();
+      expect(screen.queryByRole('dialog')).toBeNull();
     });
 
     it('does not treat a closed service wrapper as already initialized', async () => {
@@ -242,7 +236,7 @@ describe('dbSchema', () => {
       );
       openDbs.push(next);
       expect(confirm).not.toHaveBeenCalled();
-      expect(document.querySelector('[role="dialog"]')).toBeNull();
+      expect(screen.queryByRole('dialog')).toBeNull();
 
       for (const { service, handle } of holders) {
         expect(handle.db).toBeNull();

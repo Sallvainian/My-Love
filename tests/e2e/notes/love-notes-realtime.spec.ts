@@ -141,13 +141,16 @@ test.describe('Love notes realtime delivery', () => {
         const isThreadRead = (request: Request) =>
           request.method() === 'GET' &&
           new URL(request.url()).pathname.endsWith('/rest/v1/love_notes_visible');
+        // playwright-utils deviation: counts every thread read the receiver starts, to know when none is in flight; interceptNetworkCall's observe mode latches onto the first matching request only.
         partnerPage.on('request', (request) => {
           if (isThreadRead(request)) threadReadsStarted += 1;
         });
         const settleThreadRead = (request: Request) => {
           if (isThreadRead(request)) threadReadsSettled += 1;
         };
+        // playwright-utils deviation: settles every thread read that answers against the count above; interceptNetworkCall's observe mode latches onto the first matching request only.
         partnerPage.on('requestfinished', settleThreadRead);
+        // playwright-utils deviation: settles every thread read that fails, too; interceptNetworkCall's observe mode throws on a request that gets no response rather than reporting it.
         partnerPage.on('requestfailed', settleThreadRead);
         // A page in a second context: the fixture is bound to `page`.
         const threadRead = interceptNetworkCall({

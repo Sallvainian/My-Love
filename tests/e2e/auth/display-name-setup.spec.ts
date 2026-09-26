@@ -122,7 +122,7 @@ test.describe('Display Name Setup', () => {
       await page.getByTestId('submit-button').click();
       const signInName = await signInGate;
       expect(signInName.status).toBe(200);
-      expect(signInName.responseJson).toEqual({ display_name: account.email });
+      expect(signInName.responseJson).toEqual([{ display_name: account.email }]);
 
       // THEN: Display name setup modal is shown, and the app is not.
       await expect(page.getByTestId('display-name-setup')).toBeVisible();
@@ -138,7 +138,7 @@ test.describe('Display Name Setup', () => {
       await page.reload();
       const coldName = await coldGate;
       expect(coldName.status).toBe(200);
-      expect(coldName.responseJson).toEqual({ display_name: account.email });
+      expect(coldName.responseJson).toEqual([{ display_name: account.email }]);
       await expect(page.getByTestId('display-name-setup')).toBeVisible();
       await expect(page.getByTestId('app-container')).toHaveCount(0);
     } catch (error) {
@@ -170,6 +170,7 @@ test.describe('Display Name Setup', () => {
     // nothing else. A metadata write is a non-GET to /auth/v1/user; a session
     // refresh is a refresh_token grant.
     const authWrites: string[] = [];
+    // playwright-utils deviation: collects every auth-user write and refresh-token grant for the whole test so it can assert there were none; interceptNetworkCall's observe mode resolves on one matching request and cannot prove an absence.
     page.on('request', (request) => {
       const url = request.url();
       const method = request.method();
@@ -191,7 +192,7 @@ test.describe('Display Name Setup', () => {
       await page.getByTestId('submit-button').click();
       const signInName = await signInGate;
       expect(signInName.status).toBe(200);
-      expect(signInName.responseJson).toEqual({ display_name: account.email });
+      expect(signInName.responseJson).toEqual([{ display_name: account.email }]);
       await expect(page.getByTestId('display-name-setup')).toBeVisible();
 
       // WHEN: User enters display name and submits.
@@ -213,7 +214,7 @@ test.describe('Display Name Setup', () => {
       await page.reload();
       const reloadName = await reloadGate;
       expect(reloadName.status).toBe(200);
-      expect(reloadName.responseJson).toEqual({ display_name: chosenName });
+      expect(reloadName.responseJson).toEqual([{ display_name: chosenName }]);
       await expect(page.getByTestId('app-container')).toBeVisible();
       await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
     } catch (error) {

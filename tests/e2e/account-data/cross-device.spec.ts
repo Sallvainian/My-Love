@@ -111,8 +111,6 @@ test.describe('Account data follows the account, not the browser', () => {
       const favorite = page.getByTestId('message-favorite-button');
       await expect(favorite).toHaveAccessibleName('Add to favorites');
       expect((await refreshed).status).toBe(200);
-      const favoriteText = (await page.getByTestId('message-text').textContent())?.trim();
-      expect(favoriteText).toBeTruthy();
 
       const favoriteSaved = interceptNetworkCall({
         method: 'POST',
@@ -121,6 +119,9 @@ test.describe('Account data follows the account, not the browser', () => {
       await favorite.click();
       expect((await favoriteSaved).status).toBe(201);
       await expect(favorite).toHaveAccessibleName('Remove from favorites');
+      // Read only now, so the text is the message the button above favorited.
+      const favoriteText = (await page.getByTestId('message-text').textContent())?.trim();
+      expect(favoriteText).toBeTruthy();
 
       const fresh = await signInFresh(second, email);
 

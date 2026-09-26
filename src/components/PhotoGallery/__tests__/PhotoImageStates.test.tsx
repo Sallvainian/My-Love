@@ -225,11 +225,8 @@ describe('PhotoViewer on a live list', () => {
       <PhotoViewer photos={[photo(0), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
     );
 
-    const confirm = screen.queryByRole('button', { name: 'Delete' });
-    if (confirm) {
-      await user.click(confirm);
-    }
-
+    // The refresh alone closes it: no Delete is left to press.
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     expect(deletePhotoMock).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
     // The viewer itself keeps its fallback: the photo now at that index.

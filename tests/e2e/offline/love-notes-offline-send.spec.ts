@@ -145,12 +145,18 @@ test.describe('Love-note text sent offline', () => {
       for (const content of contents) {
         await expect(noteBubble(page, content)).toContainText('Waiting to send');
       }
-      const shownOrder = await page
-        .getByTestId('love-note-message')
-        .filter({ hasText: stamp })
-        .allTextContents();
-      expect(shownOrder.map((text) => contents.findIndex((c) => text.includes(c)))).toEqual([0, 1, 2]);
-      expect(await queuedContents(page)).toEqual(contents);
+      await recurseUntil(
+        () => page.getByTestId('love-note-message').filter({ hasText: stamp }).allTextContents(),
+        (shownOrder) => {
+          expect(shownOrder.map((text) => contents.findIndex((c) => text.includes(c)))).toEqual([0, 1, 2]);
+        }
+      );
+      await recurseUntil(
+        () => queuedContents(page),
+        (queued) => {
+          expect(queued).toEqual(contents);
+        }
+      );
       const composedAt = (await queuedRows(page)).map((row) => row.createdAt);
 
       // WHEN: the app reloads with no love-notes server answer, then goes offline.
@@ -171,7 +177,12 @@ test.describe('Love-note text sent offline', () => {
       for (const content of contents) {
         await expect(noteBubble(page, content)).toContainText('Waiting to send');
       }
-      expect(await queuedContents(page)).toEqual(contents);
+      await recurseUntil(
+        () => queuedContents(page),
+        (queued) => {
+          expect(queued).toEqual(contents);
+        }
+      );
       expect(await sentRows(supabaseAdmin, stamp)).toEqual([]);
 
       // WHEN: the connection returns.

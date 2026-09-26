@@ -33,6 +33,9 @@ const BASE_REPORTERS = [
 const SHARD_MEASUREMENT_RUN_ID = '35056348791';
 const HISTORICAL_BASELINE_RUN_ID = '32279178457';
 
+// Each re-import of playwright.config.ts takes 0.6-0.95 s and hit the 5 s default under shuffled full-suite load.
+const CONFIG_IMPORT_TIMEOUT_MS = 20_000;
+
 describe('Playwright shard reporting', () => {
   it.each([
     [undefined, BASE_REPORTERS],
@@ -48,7 +51,7 @@ describe('Playwright shard reporting', () => {
     );
 
     expect(config.reporter).toEqual(expectedReporters);
-  });
+  }, CONFIG_IMPORT_TIMEOUT_MS);
 
   const readWorkflow = () => readFileSync('.github/workflows/test.yml', 'utf8');
   /** The body of one top-level job in test.yml, or '' when it is missing. */
@@ -111,5 +114,5 @@ describe('Playwright shard reporting', () => {
     expect(source).not.toContain('scripture specs sort');
     expect(config.workers).toBe(2);
     expect(source).toContain('workers: process.env.CI ? 2');
-  });
+  }, CONFIG_IMPORT_TIMEOUT_MS);
 });

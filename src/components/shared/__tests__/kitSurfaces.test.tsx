@@ -96,7 +96,6 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  vi.restoreAllMocks();
 });
 
 describe('SyncToast on the kit', () => {

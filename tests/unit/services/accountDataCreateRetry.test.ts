@@ -13,7 +13,7 @@
  * enforces the unique key, so "exactly one row" is read back from its table
  * rather than inferred from call arguments.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Row = Record<string, unknown>;
 type Outcome = 'ok' | 'lose-response' | 'stall';
@@ -121,10 +121,6 @@ beforeEach(() => {
   fake.reset();
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
   vi.spyOn(console, 'error').mockImplementation(() => {});
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
 });
 
 describe.each(creates)('%s create', (table, create) => {

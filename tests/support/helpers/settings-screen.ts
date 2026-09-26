@@ -46,6 +46,23 @@ export async function openSettingsFromHome(
   const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
   await page.goto('/');
   expect((await homeRead).status).toBe(200);
+  await returnToSettings(page, interceptNetworkCall);
+}
+
+/**
+ * Leave Home for Settings by the gear and return once Settings' own events
+ * load has settled, so a row control clicked next acts on the rows that load
+ * settled on rather than racing its mount GET.
+ *
+ * Call it only after Home's own events read has answered — await an arm set
+ * before the navigation to Home. The store settle below then follows that
+ * read, and only after it is the Settings arm registered: Home and Settings
+ * send identical GETs, so an arm registered earlier can latch onto Home's.
+ */
+export async function returnToSettings(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn
+): Promise<void> {
   await recurseUntil(
     () =>
       page.evaluate(() => {

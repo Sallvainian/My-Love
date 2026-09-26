@@ -8,7 +8,7 @@
  * - a save is an upsert on the pair (last write wins) and an offline one fails
  *   with an `offline` code before any request is made.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Result = { data: unknown; error: unknown };
 
@@ -57,10 +57,6 @@ beforeEach(() => {
   calls.length = 0;
   results.length = 0;
   setOnline(true);
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
 });
 
 describe('couplePair', () => {

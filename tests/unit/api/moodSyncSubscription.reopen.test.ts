@@ -92,8 +92,6 @@ describe('subscribeMoodUpdates channel ownership', () => {
       await vi.advanceTimersByTimeAsync(delayMs);
       while (leaveQueue.length > 0) ackNextLeave();
       await vi.advanceTimersByTimeAsync(socket.windowMs + 20);
-      await Promise.resolve();
-      await Promise.resolve();
     }
 
     it('re-arms a join when reopen setAuth rejects after the row is swapped', async () => {
@@ -214,8 +212,6 @@ describe('subscribeMoodUpdates channel ownership', () => {
       getPartnerId.mockResolvedValue(null);
       emitStatus(constructedChannels[1], 'SUBSCRIBED');
       await vi.advanceTimersByTimeAsync(0);
-      await Promise.resolve();
-      await Promise.resolve();
 
       emitMood(constructedChannels[1], 'after-unlink');
       expect(onMood).not.toHaveBeenCalled();

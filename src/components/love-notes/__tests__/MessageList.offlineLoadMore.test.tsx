@@ -80,7 +80,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.restoreAllMocks();
 });
 
 describe('MessageList load-more across a reconnect', () => {

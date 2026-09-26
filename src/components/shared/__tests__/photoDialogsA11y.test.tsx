@@ -103,7 +103,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  vi.restoreAllMocks();
 });
 
 describe('DW-180: the upload modal is a dialog', () => {
