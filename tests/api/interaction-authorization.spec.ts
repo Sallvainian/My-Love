@@ -27,6 +27,7 @@ import type { SupabaseInteractionRecord } from '../../src/api/interactionService
 import { createOutsiderClient } from '../support/helpers/rls-security';
 import { resolveOwnPair } from '../support/helpers/events';
 import { test, expect } from '../support/merged-fixtures';
+import { throwCollected } from '../support/helpers/collected-failures';
 
 /** PostgREST maps SQLSTATE 42501 — RLS denial and privilege denial alike — to 403. */
 const DENIED_HTTP_STATUS = 403;
@@ -48,9 +49,6 @@ test.describe('Interaction authorization boundary', () => {
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const outsider = await createOutsiderClient(supabaseAdmin, 'interaction-insert-outsider');
-    const { data: outsiderSession } = await outsider.client.auth.getSession();
-    const outsiderToken = outsiderSession.session?.access_token;
-    expect(outsiderToken, 'the outsider account must hold a session').toBeTruthy();
 
     const acceptedIds = [randomUUID(), randomUUID()];
     const refusedIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
@@ -66,6 +64,12 @@ test.describe('Interaction authorization boundary', () => {
       });
 
     try {
+      // Inside the try: a failed session check must still reach the outsider's
+      // deletion below, rather than leak the throwaway account.
+      const { data: outsiderSession } = await outsider.client.auth.getSession();
+      const outsiderToken = outsiderSession.session?.access_token;
+      expect(outsiderToken, 'the outsider account must hold a session').toBeTruthy();
+
       await log.step('A linked partner can send both interaction types');
       for (const [index, type] of (['poke', 'kiss'] as const).entries()) {
         const { status } = await send(authToken, {
@@ -121,15 +125,20 @@ test.describe('Interaction authorization boundary', () => {
         headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
       });
       expect(status).toBe(204);
+    } catch (error) {
+      failures.push(error);
+    }
+
+    // Separate from the row DELETE, so a failed row cleanup cannot skip the
+    // account deletion.
+    try {
       const { error: cleanupError } = await outsider.cleanup();
       expect(cleanupError).toBeNull();
     } catch (error) {
       failures.push(error);
     }
 
-    if (failures.length > 0) {
-      throw new AggregateError(failures, 'Interaction insert-boundary assertion or cleanup failed');
-    }
+    throwCollected(failures, 'Interaction insert-boundary assertion or cleanup failed');
   });
 
   test('[P0] a received interaction is viewed-only for its recipient', async ({
@@ -140,9 +149,6 @@ test.describe('Interaction authorization boundary', () => {
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const outsider = await createOutsiderClient(supabaseAdmin, 'interaction-update-outsider');
-    const { data: outsiderSession } = await outsider.client.auth.getSession();
-    const outsiderToken = outsiderSession.session?.access_token;
-    expect(outsiderToken, 'the outsider account must hold a session').toBeTruthy();
 
     // Two legitimate rows: one to mark viewed, one kept unviewed so the combined
     // patch below can be shown to change nothing at all.
@@ -173,6 +179,12 @@ test.describe('Interaction authorization boundary', () => {
     };
 
     try {
+      // Inside the try: a failed session check must still reach the outsider's
+      // deletion below, rather than leak the throwaway account.
+      const { data: outsiderSession } = await outsider.client.auth.getSession();
+      const outsiderToken = outsiderSession.session?.access_token;
+      expect(outsiderToken, 'the outsider account must hold a session').toBeTruthy();
+
       await log.step('The linked sender creates two interactions');
       for (const id of [viewedRowId, untouchedRowId]) {
         const { status } = await apiRequest({
@@ -284,14 +296,19 @@ test.describe('Interaction authorization boundary', () => {
         headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
       });
       expect(status).toBe(204);
+    } catch (error) {
+      failures.push(error);
+    }
+
+    // Separate from the row DELETE, so a failed row cleanup cannot skip the
+    // account deletion.
+    try {
       const { error: cleanupError } = await outsider.cleanup();
       expect(cleanupError).toBeNull();
     } catch (error) {
       failures.push(error);
     }
 
-    if (failures.length > 0) {
-      throw new AggregateError(failures, 'Interaction immutability assertion or cleanup failed');
-    }
+    throwCollected(failures, 'Interaction immutability assertion or cleanup failed');
   });
 });

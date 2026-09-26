@@ -1,5 +1,5 @@
 import type { Session, User } from '@supabase/supabase-js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { signIn, signOut } from '../actionService';
 import { onAuthStateChange } from '../sessionService';
 
@@ -119,6 +119,12 @@ describe('auth session/action services', () => {
         };
       }
     );
+  });
+
+  // Restores the console.error spies below even when a test's assertion throws
+  // before it gets to the end; an inline mockRestore would be skipped then.
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('stores SW auth token on successful sign-in', async () => {
@@ -295,7 +301,6 @@ describe('auth session/action services', () => {
       error
     );
     expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
-    errorLog.mockRestore();
   });
 
   it.each(TOKEN_CASES)(
@@ -314,7 +319,6 @@ describe('auth session/action services', () => {
 
       await vi.waitFor(() => expect(errorLog).toHaveBeenCalledWith(message, error));
       expect(listener).toHaveBeenCalledTimes(1);
-      errorLog.mockRestore();
     }
   );
 
@@ -359,7 +363,6 @@ describe('auth session/action services', () => {
 
       expect(errorLog).not.toHaveBeenCalled();
       expect(listener).toHaveBeenCalledTimes(1);
-      errorLog.mockRestore();
     }
   );
 
@@ -374,7 +377,6 @@ describe('auth session/action services', () => {
 
       await vi.waitFor(() => expect(errorLog).toHaveBeenCalledWith(tokenCase.message, tokenError));
       expect(listener).toHaveBeenCalledTimes(1);
-      errorLog.mockRestore();
     }
   );
 });

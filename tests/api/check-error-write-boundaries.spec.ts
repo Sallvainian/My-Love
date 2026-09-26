@@ -13,6 +13,7 @@
  */
 import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../support/merged-fixtures';
+import { throwCollected } from '../support/helpers/collected-failures';
 import { getWorkerPairEmails } from '../support/auth/worker-pool';
 import { checkViolation, type PostgrestErrorEnvelope } from '../support/check-constraint-envelopes';
 import {
@@ -49,6 +50,7 @@ test.describe('DW-38 CHECK write boundaries', () => {
           : { to_user_id: own.body.id };
       const payload = createCheckWritePayload(scenario.table, own.body.id, partner.body[0].id, overrides);
       const query = scenario.conflict ? `?on_conflict=${scenario.conflict}` : '';
+      const failures: unknown[] = [];
 
       try {
         await log.step(`Reject an invalid ${scenario.table} write with the production conflict policy`);
@@ -78,7 +80,13 @@ test.describe('DW-38 CHECK write boundaries', () => {
         });
         expect(read.status).toBe(200);
         expect(read.body).toEqual([]);
-      } finally {
+      } catch (error) {
+        failures.push(error);
+      }
+
+      // Collected rather than asserted in a `finally`, so a cleanup failure is
+      // reported beside the test's own error instead of replacing it.
+      try {
         // Some tables lack authenticated DELETE. Admin is used only for this
         // test-generated UUID, including when a regression accepts the write.
         const cleanup = await apiRequest({
@@ -87,7 +95,11 @@ test.describe('DW-38 CHECK write boundaries', () => {
           headers: { apikey: adminKey, Authorization: `Bearer ${adminKey}` },
         });
         expect(cleanup.status).toBe(204);
+      } catch (error) {
+        failures.push(error);
       }
+
+      throwCollected(failures, `DW-38 ${scenario.table} assertion or cleanup failed`);
     });
   }
 
@@ -101,6 +113,8 @@ test.describe('DW-38 CHECK write boundaries', () => {
     const payload = createCheckWritePayload('photos', own.body.id, own.body.id, {
       caption: 'x'.repeat(500),
     });
+    const failures: unknown[] = [];
+
     try {
       await log.step('Accept photo metadata at the caption limit');
       const created = await apiRequest<{ id: string; caption: string }[]>({
@@ -119,7 +133,13 @@ test.describe('DW-38 CHECK write boundaries', () => {
       });
       expect(read.status).toBe(200);
       expect(read.body).toEqual([{ id: payload.id, caption: payload.caption }]);
-    } finally {
+    } catch (error) {
+      failures.push(error);
+    }
+
+    // Collected rather than asserted in a `finally`, so a cleanup failure is
+    // reported beside the test's own error instead of replacing it.
+    try {
       // Metadata has no FK to storage.objects; this test creates no blob.
       const cleanup = await apiRequest({
         method: 'DELETE',
@@ -127,6 +147,10 @@ test.describe('DW-38 CHECK write boundaries', () => {
         headers,
       });
       expect(cleanup.status).toBe(204);
+    } catch (error) {
+      failures.push(error);
     }
+
+    throwCollected(failures, 'DW-38 caption-limit assertion or cleanup failed');
   });
 });

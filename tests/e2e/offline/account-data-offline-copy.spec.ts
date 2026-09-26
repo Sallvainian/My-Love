@@ -131,11 +131,14 @@ test.describe('Account data from the local copy', () => {
     expect((await startRead).status).toBe(200);
     const userId = await signedInUserId(page);
     const label = `Offline anniversary ${testInfo.workerIndex}-${Date.now()}`;
-    const clear = async () => {
+    // Hard before the test, so it never runs on leftover rows; soft in the
+    // teardown, so the test's own error stands.
+    const clear = async ({ soft }: { soft: boolean }) => {
       const { error } = await supabaseAdmin.from('anniversaries').delete().eq('user_id', userId);
-      expect(error).toBeNull();
+      const message = 'clearing anniversaries for this worker account';
+      (soft ? expect.soft(error, message) : expect(error, message)).toBeNull();
     };
-    await clear();
+    await clear({ soft: false });
     const { error: insertError } = await supabaseAdmin
       .from('anniversaries')
       .insert({ user_id: userId, event_date: '2024-02-14', label });
@@ -168,7 +171,7 @@ test.describe('Account data from the local copy', () => {
     } finally {
       await page.context().setOffline(false);
       await page.unroute('**/rest/v1/anniversaries**');
-      await clear();
+      await clear({ soft: true });
     }
   });
 
@@ -186,13 +189,16 @@ test.describe('Account data from the local copy', () => {
     const userId = await signedInUserId(page);
     // This worker account's own rows only: a custom message could win today's
     // rotation, and a leftover favorite would open on "Remove from favorites".
-    const clear = async () => {
+    // Hard before the test, so it never runs on leftover rows; soft in the
+    // teardown, so every table is attempted and the test's own error stands.
+    const clear = async ({ soft }: { soft: boolean }) => {
       for (const table of ['message_favorites', 'custom_messages'] as const) {
         const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
-        expect(error).toBeNull();
+        const message = `clearing ${table} for this worker account`;
+        (soft ? expect.soft(error, message) : expect(error, message)).toBeNull();
       }
     };
-    await clear();
+    await clear({ soft: false });
 
     try {
       // GIVEN: today's bundled message, not a favorite, after a settled refresh.
@@ -224,7 +230,7 @@ test.describe('Account data from the local copy', () => {
       await expect(favorite).toHaveAccessibleName('Remove from favorites');
     } finally {
       await page.context().setOffline(false);
-      await clear();
+      await clear({ soft: true });
     }
   });
 
@@ -241,13 +247,16 @@ test.describe('Account data from the local copy', () => {
     await page.goto('/');
     const userId = await signedInUserId(page);
     const custom = `Offline custom ${testInfo.workerIndex}-${Date.now()}`;
-    const clear = async () => {
+    // Hard before the test, so it never runs on leftover rows; soft in the
+    // teardown, so every table is attempted and the test's own error stands.
+    const clear = async ({ soft }: { soft: boolean }) => {
       for (const table of ['message_favorites', 'custom_messages'] as const) {
         const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
-        expect(error).toBeNull();
+        const message = `clearing ${table} for this worker account`;
+        (soft ? expect.soft(error, message) : expect(error, message)).toBeNull();
       }
     };
-    await clear();
+    await clear({ soft: false });
     const { error: insertError } = await supabaseAdmin
       .from('custom_messages')
       .insert({ user_id: userId, text: custom, category: 'custom' });
@@ -302,7 +311,7 @@ test.describe('Account data from the local copy', () => {
       await page.context().setOffline(false);
       await page.unroute('**/rest/v1/custom_messages**');
       await page.unroute('**/rest/v1/message_favorites**');
-      await clear();
+      await clear({ soft: true });
     }
   });
 });

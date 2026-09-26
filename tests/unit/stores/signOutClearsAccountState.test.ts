@@ -17,7 +17,7 @@
  * `!partner` branch, which paints `sentRequests`, `receivedRequests` and
  * `searchResults`.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
@@ -252,6 +252,14 @@ describe('clearAuth on sign-out', () => {
   afterEach(async () => {
     await Promise.allSettled(pendingReloads.splice(0));
     localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
+    // happy-dom serves `onLine` from the Navigator prototype, so deleting the
+    // own property a test defined restores the real value — even when that
+    // test's assertions threw before it could restore it inline.
+    Reflect.deleteProperty(navigator, 'onLine');
+    // Runs after the reloads settle, so none of them writes into a cleared
+    // store; and here rather than inline, so a failed assertion cannot leave
+    // one test's seeded rows for the next.
+    await clearDevice();
   });
 
   it('clears the identity', () => {
@@ -567,8 +575,6 @@ describe('clearAuth on sign-out', () => {
     // Whether the device has a network does not — resetting it to true would
     // put the badge on "Online" while the phone is in a tunnel.
     expect(syncStatus.isOnline).toBe(false);
-
-    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   });
 
   it('revokes the preview URLs of the notes it is about to drop', () => {
@@ -776,7 +782,6 @@ describe('clearAuth on sign-out', () => {
     useAppStore.getState().clearAuth();
 
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
-    await clearDevice();
   });
 
   it("deletes the outgoing account's saved data on a direct account switch", async () => {
@@ -785,7 +790,6 @@ describe('clearAuth on sign-out', () => {
     useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
 
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
-    await clearDevice();
   });
 
   it('records the signed-in account as the device owner, and clears it on sign-out', () => {
@@ -816,7 +820,6 @@ describe('clearAuth on sign-out', () => {
     expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBeNull();
     expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
-    await clearDevice();
   });
 
   it('deletes a previous owner\'s leftover data when a different account signs in fresh', async () => {
@@ -837,7 +840,6 @@ describe('clearAuth on sign-out', () => {
     expect(deleteAccountCopies).toHaveBeenCalledExactlyOnceWith(SECRETS.userId);
     expect(deleteAccountImages).toHaveBeenCalledExactlyOnceWith(SECRETS.userId);
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
-    await clearDevice();
   });
 
   it("a fresh boot of the recorded owner's own session deletes nothing", async () => {
@@ -866,7 +868,6 @@ describe('clearAuth on sign-out', () => {
     } finally {
       db.close();
     }
-    await clearDevice();
   });
 
   it('signedOutState() and this test agree on which fields exist', () => {

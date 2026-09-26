@@ -117,7 +117,10 @@ function validNote(overrides: Record<string, unknown> = {}) {
 
 describe('useRealtimeMessages', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks, not clearAllMocks: it also restores each vi.fn(impl)
+    // factory default — `supabase.channel` and the `useAppStore` selector — and
+    // drops unconsumed *Once queues, so a test's override cannot reach the next.
+    vi.resetAllMocks();
     mockStoreState.userId = USER_ID;
     mocks.order.length = 0;
     mocks.getPartnerId.mockResolvedValue(PARTNER_ID);

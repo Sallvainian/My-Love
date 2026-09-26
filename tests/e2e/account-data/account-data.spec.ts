@@ -105,6 +105,24 @@ async function signIn(page: Page, email: string) {
 test.describe('Account data through the real browser and local services', () => {
   test.setTimeout(90_000);
 
+  /**
+   * This worker pair's account ids, recorded by the favorites test once it has
+   * resolved them. The test ends with user1's favorite still on the server, so
+   * `test.afterEach` clears the pair's favorites again — here rather than at
+   * the end of the body, so a failure or a timeout mid-test clears them too.
+   */
+  let favoriteOwners: string[] | null = null;
+
+  test.afterEach(async ({ supabaseAdmin }) => {
+    if (!favoriteOwners) return;
+    const owners = favoriteOwners;
+    favoriteOwners = null;
+    const { error } = await supabaseAdmin.from('message_favorites').delete().in('user_id', owners);
+    // Soft, so a teardown failure is recorded beside the test's own error
+    // rather than replacing it.
+    expect.soft(error, "Teardown must clear this worker pair's favorites").toBeNull();
+  });
+
   test('[P1] favorites survive reload and stay separate across A/B/A and same-account re-login', async ({
     page,
     supabaseAdmin,
@@ -118,8 +136,9 @@ test.describe('Account data through the real browser and local services', () => 
       .from('users').select('id').in('email', [pair.user1Email, pair.user2Email]);
     expect(accountsError).toBeNull();
     expect(accounts).toHaveLength(2);
+    favoriteOwners = (accounts ?? []).map((account) => account.id);
     const cleared = await supabaseAdmin.from('message_favorites').delete()
-      .in('user_id', (accounts ?? []).map((account) => account.id));
+      .in('user_id', favoriteOwners);
     expect(cleared.error).toBeNull();
     const favoritesRead = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
     await page.goto('/');
@@ -273,10 +292,12 @@ test.describe('Account data through the real browser and local services', () => 
       expect(persisted.data).toEqual({ mood_type: 'happy', mood_types: ['happy'], note: seeded.note });
     } finally {
       // Stop this page's retries before deleting only the row this test created.
-      await page.close();
+      // A close that rejects, and a failed delete, are recorded without
+      // replacing the error the test was already failing on.
+      await page.close().catch(() => {});
       const cleanup = await supabaseAdmin.from('moods').delete()
         .eq('user_id', seeded.owner).eq('created_at', seeded.timestamp);
-      expect(cleanup.error).toBeNull();
+      expect.soft(cleanup.error, 'Teardown must delete the mood row this test created').toBeNull();
     }
   });
 });

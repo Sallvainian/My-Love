@@ -56,14 +56,35 @@ async function listOwnPrefix(
   return (data ?? []).map((object) => object.name);
 }
 
+/**
+ * The `storagePath` in a response body, or null when the body is not JSON or
+ * names none. Never throws, so it can run before any assertion.
+ */
+function storagePathOf(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as { storagePath?: unknown };
+    return typeof parsed.storagePath === 'string' ? parsed.storagePath : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Teardown: remove the objects a test created. It runs from `finally`, so a
+ * failure is recorded with `expect.soft` rather than thrown — a throw there
+ * would replace the test's own error and skip the steps after it.
+ */
 async function removeObjects(
   supabaseAdmin: TypedSupabaseClient,
   paths: string[]
 ): Promise<void> {
   if (paths.length === 0) return;
-  const { error } = await supabaseAdmin.storage.from(BUCKET).remove(paths);
-  if (error) {
-    throw new Error(`Failed to clean up ${paths.join(', ')}: ${error.message}`);
+  const what = `Failed to clean up ${paths.join(', ')}`;
+  try {
+    const { error } = await supabaseAdmin.storage.from(BUCKET).remove(paths);
+    expect.soft(error, what).toBeNull();
+  } catch (error) {
+    expect.soft(error, what).toBeUndefined();
   }
 }
 
@@ -270,6 +291,10 @@ test.describe('Love note image upload limits', () => {
         },
         { url: functionUrl, token: authToken }
       );
+      // Registered for cleanup before any assertion can throw: a failure after
+      // a 200 would otherwise leak the object into this worker's prefix.
+      const storagePath = storagePathOf(result.body);
+      if (storagePath) created.push(storagePath);
 
       await log.step(`browser Blob upload answered ${result.status}`);
       expect(
@@ -281,10 +306,11 @@ test.describe('Love note image upload limits', () => {
       const parsed = JSON.parse(result.body) as { storagePath: string; size: number };
       expect(parsed.size).toBe(4096);
       expect(parsed.storagePath.startsWith(`${userId}/`)).toBe(true);
-      created.push(parsed.storagePath);
     } finally {
-      await context.close();
+      // Objects first: a context that fails to close must not skip their
+      // removal, and the removal records rather than throws, so the close runs.
       await removeObjects(supabaseAdmin, created);
+      await context.close().catch(() => {});
     }
   });
 });

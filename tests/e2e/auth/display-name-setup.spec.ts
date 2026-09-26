@@ -27,6 +27,7 @@ import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 import { test, expect } from '../../support/merged-fixtures';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { deleteSentNote } from '../../support/helpers/love-notes';
 import { navigateTo } from '../../support/helpers/navigation';
 import { LOVE_NOTES_READ, LOVE_NOTE_SEND, gateNameRead } from '../../support/helpers/reads';
 
@@ -296,6 +297,26 @@ test.describe('Display Name Edit', () => {
     expect(stored, "this worker's pool display name must be restored").toBe(originalName);
   });
 
+  /**
+   * The note the test sends into this worker pair's shared thread, recorded
+   * before the send click, and whether its POST answered 2xx.
+   *
+   * A hook of its own rather than a step in the restore above: Playwright runs
+   * every `afterEach` even when an earlier one throws, so a failed name restore
+   * cannot skip the note delete, and a test that failed before renaming still
+   * has its note deleted.
+   */
+  let sentNote: string | null = null;
+  let committed = false;
+
+  test.afterEach(async ({ supabaseAdmin }) => {
+    const content = sentNote;
+    const wasCommitted = committed;
+    sentNote = null;
+    committed = false;
+    if (content) await deleteSentNote(supabaseAdmin, content, wasCommitted);
+  });
+
   test('[P1] should change the display name in Settings and show it in the chat', async ({
     page,
     supabaseAdmin,
@@ -367,15 +388,18 @@ test.describe('Display Name Edit', () => {
 
     const uniqueMessage = `Display name edit E2E ${Date.now()}`;
     await page.getByLabel(/love note message input/i).fill(uniqueMessage);
+    sentNote = uniqueMessage;
     // The reload below must not cut the send short, or the re-fetch it checks
     // could legitimately miss the note.
     const noteSaved = interceptNetworkCall({ method: 'POST', url: LOVE_NOTE_SEND });
     await page.getByLabel(/send message/i).click();
-    expect((await noteSaved).status).toBe(201);
+    const { status: sendStatus } = await noteSaved;
+    committed = sendStatus >= 200 && sendStatus < 300;
+    expect(sendStatus).toBe(201);
 
-    const sentNote = page.getByTestId('love-note-message').filter({ hasText: uniqueMessage });
-    await expect(sentNote).toBeVisible();
-    await expect(sentNote).toContainText(newName);
+    const sentMessage = page.getByTestId('love-note-message').filter({ hasText: uniqueMessage });
+    await expect(sentMessage).toBeVisible();
+    await expect(sentMessage).toContainText(newName);
 
     // AND it is still there after a reload. The assertion above sees the
     // OPTIMISTIC render, which a send that fails server-side also produces; only

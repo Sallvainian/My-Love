@@ -102,7 +102,11 @@ vi.stubGlobal('import', {
 
 describe('loveNoteImageService', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks, not clearAllMocks: it also puts every vi.fn(impl) factory
+    // default back (validateImageFile, getSession, compressImage, storage.from,
+    // crypto.randomUUID) and drops unconsumed *Once queues, so one test's
+    // override cannot reach the next.
+    vi.resetAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-15T10:30:00Z'));
   });
@@ -179,9 +183,7 @@ describe('loveNoteImageService', () => {
 
     it('should throw error when not authenticated', async () => {
       const { supabase } = await import('../../api/supabaseClient');
-      const { imageCompressionService } = await import('../imageCompressionService');
 
-      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse(null));
 
       const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
@@ -191,9 +193,7 @@ describe('loveNoteImageService', () => {
 
     it('should throw error on rate limit exceeded (429)', async () => {
       const { supabase } = await import('../../api/supabaseClient');
-      const { imageCompressionService } = await import('../imageCompressionService');
 
-      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
       mockFetch.mockResolvedValue({
@@ -215,9 +215,7 @@ describe('loveNoteImageService', () => {
 
     it('should throw error on file too large (413)', async () => {
       const { supabase } = await import('../../api/supabaseClient');
-      const { imageCompressionService } = await import('../imageCompressionService');
 
-      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
       mockFetch.mockResolvedValue({
@@ -239,9 +237,7 @@ describe('loveNoteImageService', () => {
 
     it('should throw error on invalid file type (415)', async () => {
       const { supabase } = await import('../../api/supabaseClient');
-      const { imageCompressionService } = await import('../imageCompressionService');
 
-      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
       mockFetch.mockResolvedValue({
@@ -263,9 +259,7 @@ describe('loveNoteImageService', () => {
 
     it('should map a missing Content-Length refusal (411) rather than surface protocol text', async () => {
       const { supabase } = await import('../../api/supabaseClient');
-      const { imageCompressionService } = await import('../imageCompressionService');
 
-      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
       mockFetch.mockResolvedValue({
@@ -287,9 +281,7 @@ describe('loveNoteImageService', () => {
 
     it('should map a truncated-body refusal (400) rather than surface protocol text', async () => {
       const { supabase } = await import('../../api/supabaseClient');
-      const { imageCompressionService } = await import('../imageCompressionService');
 
-      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
       vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
       mockFetch.mockResolvedValue({

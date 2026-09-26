@@ -114,10 +114,11 @@ test.describe('Love-note text sent offline', () => {
     const stamp = `E2E-QUEUE-${Date.now()}`;
     const contents = [`${stamp} one`, `${stamp} two`, `${stamp} three`];
     let routed = false;
+    // Resolved before the `try`, so the teardown below reuses it rather than
+    // resolving again where a throw would skip the delete.
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
 
     try {
-      const { partnerId } = await resolveOwnPair(supabaseAdmin);
-
       // GIVEN: signed in on the Notes screen with the partner loaded, then offline.
       const partnerRead = interceptNetworkCall({ method: 'GET', url: partnerRecordRead(partnerId) });
       await page.goto('/notes');
@@ -203,12 +204,23 @@ test.describe('Love-note text sent offline', () => {
         await expect(noteBubble(page, content)).not.toContainText('Waiting to send');
       }
     } finally {
-      if (routed) await page.unroute(isNotesRest);
-      await page.context().setOffline(false);
-      // TEARDOWN (4): delete exactly the rows this run sent.
+      // Guarded, so neither can skip the delete below or replace the test's error.
+      if (routed) await page.unroute(isNotesRest).catch(() => {});
+      await page.context().setOffline(false).catch(() => {});
+      // TEARDOWN (4): delete exactly the rows this run sent. The ids are read
+      // here with a soft check rather than through `sentRows`, whose hard
+      // assertion would throw out of this `finally` and replace the test's own
+      // error.
+      const { data: sent, error: sentError } = await supabaseAdmin
+        .from('love_notes')
+        .select('id')
+        .eq('from_user_id', userId)
+        .eq('to_user_id', partnerId)
+        .like('content', `%${stamp}%`);
+      expect.soft(sentError, 'Teardown must find the notes this test sent').toBeNull();
       await deleteNotes(
         supabaseAdmin,
-        (await sentRows(supabaseAdmin, stamp)).map((row) => row.id)
+        (sent ?? []).map((row) => row.id)
       );
     }
   });

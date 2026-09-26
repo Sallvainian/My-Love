@@ -62,6 +62,7 @@
 import { log } from '@seontechnologies/playwright-utils';
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test } from '../support/merged-fixtures';
+import { throwCollected } from '../support/helpers/collected-failures';
 import { resolveOwnPair } from '../support/helpers/events';
 import { createOutsiderClient, createUserClient } from '../support/helpers/rls-security';
 import type { TypedSupabaseClient } from '../support/factories';
@@ -258,7 +259,7 @@ test.describe('Couple broadcast authorization', () => {
     const client = outsider.client as unknown as SupabaseClient;
     const poll = recurse as unknown as Poll;
 
-    let failure: unknown;
+    const failures: unknown[] = [];
 
     try {
       await client.realtime.setAuth();
@@ -270,12 +271,25 @@ test.describe('Couple broadcast authorization', () => {
       await waitForStatus(poll, notes, 'outsider love-notes join', 'denied');
       await waitForStatus(poll, moods, 'outsider mood-updates join', 'denied');
     } catch (error) {
-      failure = error;
+      failures.push(error);
     }
 
-    await client.removeAllChannels();
-    await outsider.cleanup();
-    if (failure !== undefined) throw failure;
+    // Each teardown step in its own collected try: a failed channel removal must
+    // not skip the account deletion, and neither may replace the test's error.
+    try {
+      await client.removeAllChannels();
+    } catch (error) {
+      failures.push(error);
+    }
+    try {
+      const { error: cleanupError } = await outsider.cleanup();
+      expect(cleanupError, `failed to delete the throwaway account: ${cleanupError?.message}`)
+        .toBeNull();
+    } catch (error) {
+      failures.push(error);
+    }
+
+    throwCollected(failures, 'Outsider join-denial assertion or cleanup failed');
   });
 
   test('[P0] a non-partner send never reaches the victim, and legitimate delivery still works', async ({
@@ -289,7 +303,7 @@ test.describe('Couple broadcast authorization', () => {
     const forger = outsider.client as unknown as SupabaseClient;
     const poll = recurse as unknown as Poll;
 
-    let failure: unknown;
+    const failures: unknown[] = [];
     const notes = join(victim, `love-notes:${victimId}`, 'new_message', { private: true });
 
     try {
@@ -333,16 +347,29 @@ test.describe('Couple broadcast authorization', () => {
         { message: { id: 'real-1', content: 'real' } },
       ]);
     } catch (error) {
-      failure = error;
+      failures.push(error);
     }
 
-    await Promise.all([
-      victim.removeAllChannels(),
-      partner.removeAllChannels(),
-      forger.removeAllChannels(),
-    ]);
-    await outsider.cleanup();
-    if (failure !== undefined) throw failure;
+    // Each teardown step in its own collected try: a failed channel removal must
+    // not skip the account deletion, and neither may replace the test's error.
+    try {
+      await Promise.all([
+        victim.removeAllChannels(),
+        partner.removeAllChannels(),
+        forger.removeAllChannels(),
+      ]);
+    } catch (error) {
+      failures.push(error);
+    }
+    try {
+      const { error: cleanupError } = await outsider.cleanup();
+      expect(cleanupError, `failed to delete the throwaway account: ${cleanupError?.message}`)
+        .toBeNull();
+    } catch (error) {
+      failures.push(error);
+    }
+
+    throwCollected(failures, 'Forged-send denial assertion or cleanup failed');
   });
 
   test('[P0] an anonymous client cannot join either victim topic privately', async ({
@@ -536,10 +563,15 @@ test.describe('Couple broadcast authorization', () => {
     // account is never linked or unlinked: those rows are shared.
     const { userId: victimId } = await resolveOwnPair(supabaseAdmin);
     const outsiderA = await createOutsiderClient(supabaseAdmin, 'broadcast-linked-a');
-    const outsiderB = await createOutsiderClient(supabaseAdmin, 'broadcast-linked-b');
+    // Only the accounts that exist: B is created inside the try, so a failure
+    // creating it still reaches A's deletion below.
+    const accounts = [outsiderA];
+    const failures: unknown[] = [];
 
-    let failure: unknown;
     try {
+      const outsiderB = await createOutsiderClient(supabaseAdmin, 'broadcast-linked-b');
+      accounts.push(outsiderB);
+
       const { error: linkError } = await supabaseAdmin
         .from('users')
         .upsert([
@@ -579,13 +611,28 @@ test.describe('Couple broadcast authorization', () => {
       ).rejects.toThrow(/Unauthorized/);
       await sender.removeChannel(strangerMood);
     } catch (error) {
-      failure = error;
+      failures.push(error);
     }
 
-    await (outsiderA.client as unknown as SupabaseClient).removeAllChannels();
-    await (outsiderB.client as unknown as SupabaseClient).removeAllChannels();
-    await outsiderA.cleanup();
-    await outsiderB.cleanup();
-    if (failure !== undefined) throw failure;
+    // Each teardown step in its own collected try: a failed channel removal must
+    // not skip an account deletion, and none may replace the test's error.
+    for (const account of accounts) {
+      try {
+        await (account.client as unknown as SupabaseClient).removeAllChannels();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    for (const account of accounts) {
+      try {
+        const { error: cleanupError } = await account.cleanup();
+        expect(cleanupError, `failed to delete a throwaway account: ${cleanupError?.message}`)
+          .toBeNull();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+
+    throwCollected(failures, 'Partnered third-party denial or cleanup failed');
   });
 });

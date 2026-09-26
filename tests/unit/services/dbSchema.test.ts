@@ -23,15 +23,6 @@ import { storeAuthToken } from '../../../src/sw-db';
 import type { Message } from '../../../src/types';
 import { getDailyMessage } from '../../../src/utils/messageRotation';
 
-// Mock import.meta.env.DEV to suppress console logs during tests
-vi.stubGlobal('import', {
-  meta: {
-    env: {
-      DEV: false,
-    },
-  },
-});
-
 /**
  * Delete the database and wait for it — deleteDatabase is a request, not a call.
  * A blocked delete means a connection leaked from an earlier case; failing here
@@ -70,6 +61,9 @@ describe('dbSchema', () => {
     }
     openDbs.length = 0;
     vi.restoreAllMocks();
+    // The prompt tests stub `confirm` and `location`; a `location` stub left in
+    // place makes the next `supabaseClient` import throw `Invalid URL`.
+    vi.unstubAllGlobals();
     document.querySelector('[role="dialog"]')?.remove();
   });
 
@@ -1087,7 +1081,7 @@ describe('dbSchema', () => {
     it('shows a reload confirm and rejects the open when dismissed', async () => {
       await holdLowerVersion();
       const confirm = vi.fn();
-      window.confirm = confirm;
+      vi.stubGlobal('confirm', confirm);
 
       const opening = openMyLoveDB();
       const dialog = await waitForBlockedDialog();
@@ -1102,7 +1096,7 @@ describe('dbSchema', () => {
     it('shows a reload confirm and reloads when accepted', async () => {
       await holdLowerVersion();
       const confirm = vi.fn();
-      window.confirm = confirm;
+      vi.stubGlobal('confirm', confirm);
       const reload = vi.fn();
       vi.stubGlobal('location', { reload });
 
@@ -1124,7 +1118,7 @@ describe('dbSchema', () => {
     it('prompts once for concurrent opens and rejects them all on dismiss', async () => {
       await holdLowerVersion();
       const confirm = vi.fn();
-      window.confirm = confirm;
+      vi.stubGlobal('confirm', confirm);
 
       const openings = [openMyLoveDB(), openMyLoveDB(), openMyLoveDB()];
       const dialog = await waitForBlockedDialog();
@@ -1151,7 +1145,7 @@ describe('dbSchema', () => {
     it('reloads once when concurrent opens accept the blocked confirm', async () => {
       await holdLowerVersion();
       const confirm = vi.fn();
-      window.confirm = confirm;
+      vi.stubGlobal('confirm', confirm);
       const reload = vi.fn();
       vi.stubGlobal('location', { reload });
 
@@ -1172,7 +1166,7 @@ describe('dbSchema', () => {
     it('shows a reload confirm when page-side storeAuthToken is blocked', async () => {
       await holdLowerVersion();
       const confirm = vi.fn();
-      window.confirm = confirm;
+      vi.stubGlobal('confirm', confirm);
 
       const storing = storeAuthToken({
         accessToken: 'access',
@@ -1207,7 +1201,7 @@ describe('dbSchema', () => {
       const holder = await openMyLoveDB();
       openDbs.push(holder);
       const confirm = vi.fn().mockReturnValue(false);
-      window.confirm = confirm;
+      vi.stubGlobal('confirm', confirm);
 
       const next = await withinTimeout(openDB(DB_NAME, DB_VERSION + 1), 'open DB_VERSION+1');
       openDbs.push(next);
@@ -1238,7 +1232,7 @@ describe('dbSchema', () => {
       }
 
       const confirm = vi.fn().mockReturnValue(false);
-      window.confirm = confirm;
+      vi.stubGlobal('confirm', confirm);
 
       const next = await withinTimeout(
         openDB(DB_NAME, DB_VERSION + 1),

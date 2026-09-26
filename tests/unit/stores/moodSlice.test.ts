@@ -495,6 +495,13 @@ describe('moodSlice', () => {
         mockedGetPartnerId.mockResolvedValue(null);
       });
 
+      // Cleanup in afterEach, not inline: the lock-held case below installs a
+      // gated lock fake, and an assertion failure there would otherwise leak it
+      // into every later describe.
+      afterEach(() => {
+        Reflect.deleteProperty(navigator, 'locks');
+      });
+
       it('leaves the replacement account’s sync status untouched on success', async () => {
         const pending = gate<{ synced: number; failed: number; deferred: number; errors: [] }>();
         mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
@@ -568,8 +575,6 @@ describe('moodSlice', () => {
 
         expect(get().syncStatus).toEqual(SUCCESSOR_STATUS);
         expect(result).toEqual({ synced: 0, failed: 0, skipped: true });
-
-        Reflect.deleteProperty(navigator, 'locks');
       });
 
       it('discards the batch when the same account signs back in', async () => {

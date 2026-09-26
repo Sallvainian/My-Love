@@ -51,13 +51,16 @@ test.describe('Account data follows the account, not the browser', () => {
     if (accountError || !account) throw new Error(`No user row for this worker account: ${accountError?.message}`);
     const userId = account.id;
     // This worker account's own rows only: start clean so a re-run is valid.
-    const clear = async () => {
+    // Hard before the test, so it never runs on leftover rows; soft in the
+    // teardown, so every table is attempted and the test's own error stands.
+    const clear = async ({ soft }: { soft: boolean }) => {
       for (const table of ACCOUNT_TABLES) {
         const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
-        expect(error).toBeNull();
+        const message = `clearing ${table} for this worker account`;
+        (soft ? expect.soft(error, message) : expect(error, message)).toBeNull();
       }
     };
-    await clear();
+    await clear({ soft: false });
 
     const stamp = `${testInfo.workerIndex}-${Date.now()}`;
     const customText = `Cross-device custom message ${stamp}`;
@@ -154,9 +157,10 @@ test.describe('Account data follows the account, not the browser', () => {
       ]);
       await expect(fresh.getByText(anniversaryLabel)).toBeVisible();
     } finally {
-      await second.close();
-      await page.close();
-      await clear();
+      // A close that rejects must not skip the clear below.
+      await second.close().catch(() => {});
+      await page.close().catch(() => {});
+      await clear({ soft: true });
     }
   });
 });

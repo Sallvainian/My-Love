@@ -64,6 +64,10 @@ describe('isOnline / isOffline', () => {
   afterEach(() => {
     if (original) {
       Object.defineProperty(navigator, 'onLine', original);
+    } else {
+      // happy-dom serves `onLine` from the Navigator prototype, so `original`
+      // is undefined; deleting the test's own property restores the real one.
+      Reflect.deleteProperty(navigator, 'onLine');
     }
   });
 
@@ -99,6 +103,10 @@ describe('withOfflineCheck', () => {
   afterEach(() => {
     if (original) {
       Object.defineProperty(navigator, 'onLine', original);
+    } else {
+      // happy-dom serves `onLine` from the Navigator prototype, so `original`
+      // is undefined; deleting the test's own property restores the real one.
+      Reflect.deleteProperty(navigator, 'onLine');
     }
   });
 
@@ -137,6 +145,10 @@ describe('safeOfflineOperation', () => {
   afterEach(() => {
     if (original) {
       Object.defineProperty(navigator, 'onLine', original);
+    } else {
+      // happy-dom serves `onLine` from the Navigator prototype, so `original`
+      // is undefined; deleting the test's own property restores the real one.
+      Reflect.deleteProperty(navigator, 'onLine');
     }
   });
 
