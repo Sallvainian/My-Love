@@ -20,6 +20,7 @@ import {
   seedEvent,
 } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -87,6 +88,7 @@ test.describe('Events from the local copy', () => {
   test('events loaded once online are listed offline on Home and in Settings', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -100,7 +102,11 @@ test.describe('Events from the local copy', () => {
     try {
       // GIVEN: Home loads online, which saves the copy. Settings is lazy and
       // dev mode has no service worker, so its module is loaded while online.
+      const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
       await page.goto('/');
+      const upcoming = await upcomingRead;
+      expect(upcoming.status).toBe(200);
+      expect(upcoming.responseJson).toEqual([expect.objectContaining({ id: eventId, label: LABEL })]);
       await expect(page.getByTestId(HOME_CARD)).toBeVisible();
       await expect.poll(() => savedEventLabels(page)).toEqual([LABEL]);
       await navigateTo(page, 'settings');

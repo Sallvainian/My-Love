@@ -21,6 +21,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { partnerRecordRead } from '../../support/helpers/reads';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -108,6 +109,7 @@ test.describe('Love-note text sent offline', () => {
   test('three notes sent offline survive a reload and reach the partner once each, in order', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const stamp = `E2E-QUEUE-${Date.now()}`;
     const contents = [`${stamp} one`, `${stamp} two`, `${stamp} three`];
@@ -117,7 +119,9 @@ test.describe('Love-note text sent offline', () => {
       const { partnerId } = await resolveOwnPair(supabaseAdmin);
 
       // GIVEN: signed in on the Notes screen with the partner loaded, then offline.
+      const partnerRead = interceptNetworkCall({ method: 'GET', url: partnerRecordRead(partnerId) });
       await page.goto('/notes');
+      expect((await partnerRead).status).toBe(200);
       await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
       await expect
         .poll(() => page.evaluate(() => window.__APP_STORE__?.getState().partner?.id ?? null))

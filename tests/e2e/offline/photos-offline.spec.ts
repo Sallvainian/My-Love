@@ -23,6 +23,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { PHOTOS_LIST_READ } from '../../support/helpers/reads';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -213,6 +214,7 @@ test.describe('Photos offline', () => {
   test('after one online session every photo is listed and every image shows offline', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     let seeded: SeededPhoto[] = [];
 
@@ -222,7 +224,13 @@ test.describe('Photos offline', () => {
 
       // GIVEN: the gallery loads online; the list is saved and the fill caches
       // every image.
+      const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
       await page.goto('/photos');
+      const list = await listRead;
+      expect(list.status).toBe(200);
+      expect(list.responseJson).toEqual(
+        expect.arrayContaining(seeded.map((photo) => expect.objectContaining({ id: photo.id })))
+      );
       for (const photo of seeded) {
         await expect(tile(page, photo.caption)).toBeVisible();
       }
@@ -267,6 +275,7 @@ test.describe('Photos offline', () => {
   test('with storage refused, the oldest image is left out and shows a placeholder offline', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // Refuse a third distinct image-cache entry, as a full browser would: the
     // write throws a QuotaExceededError. Deletes free a slot.
@@ -310,7 +319,13 @@ test.describe('Photos offline', () => {
       });
 
       // GIVEN: the gallery loads online while storage holds only two images.
+      const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
       await page.goto('/photos');
+      const list = await listRead;
+      expect(list.status).toBe(200);
+      expect(list.responseJson).toEqual(
+        expect.arrayContaining(seeded.map((photo) => expect.objectContaining({ id: photo.id })))
+      );
       for (const photo of seeded) {
         await expect(tile(page, photo.caption)).toBeVisible();
       }

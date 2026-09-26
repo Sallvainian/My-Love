@@ -8,7 +8,9 @@
  * data may be out of date rather than promising a sync.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import { partnerRecordRead } from '../../support/helpers/reads';
 import type { Page } from '@playwright/test';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -49,14 +51,21 @@ test.describe('Partner profile offline', () => {
   test('a linked user sees the saved partner offline, never the Connect UI', async ({
     page,
     context,
+    supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // GIVEN: the partner view loaded online, which saves the partner copy.
+    const { partnerId } = await resolveOwnPair(supabaseAdmin);
+    const partnerRead = interceptNetworkCall({ method: 'GET', url: partnerRecordRead(partnerId) });
     await page.goto('/partner');
-    const heading = page.getByTestId('partner-mood-view').getByRole('heading', { level: 1 });
-    await expect(page.getByTestId('partner-mood-refresh-button')).toBeVisible();
-    const partnerName = (await heading.textContent())?.trim() ?? '';
+    const partnerRecord = await partnerRead;
+    expect(partnerRecord.status).toBe(200);
+    const partnerName = ((partnerRecord.responseJson as { display_name: string | null } | null)
+      ?.display_name ?? '').trim();
     expect(partnerName).not.toBe('');
-    expect(partnerName).not.toBe('Connect with Your Partner');
+    const heading = page.getByTestId('partner-mood-view').getByRole('heading', { level: 1 });
+    await expect(heading).toHaveText(partnerName);
+    await expect(page.getByTestId('partner-mood-refresh-button')).toBeVisible();
     await expect.poll(() => partnerCopySaved(page)).toBe(true);
 
     try {

@@ -6,15 +6,31 @@
  *
  * Test IDs: 4.4-E2E-001, 4.4-E2E-002
  */
+import type { Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { PHOTOS_LIST_READ } from '../../support/helpers/reads';
+
+/**
+ * Open the gallery and return once its list has loaded. The loading skeleton
+ * also carries `photo-gallery`, so only the grid or the empty state counts.
+ */
+async function openGallery(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
+  const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
+  await page.goto('/photos');
+  expect((await listRead).status).toBe(200);
+  await expect(
+    page.getByTestId('photo-gallery-grid').or(page.getByTestId('photo-gallery-empty-state'))
+  ).toBeVisible();
+}
 
 test.describe('Photo Upload', () => {
-  test('[P0] 4.4-E2E-001 should open upload modal when upload button clicked', async ({ page }) => {
+  test('[P0] 4.4-E2E-001 should open upload modal when upload button clicked', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
     // GIVEN: User is on photo gallery
-    await page.goto('/photos');
-    await expect(
-      page.getByTestId('photo-gallery').or(page.getByTestId('photo-gallery-empty-state'))
-    ).toBeVisible();
+    await openGallery(page, interceptNetworkCall);
 
     // WHEN: User clicks upload button (FAB or empty-state button — .or() handles both)
     const uploadButton = page
@@ -28,12 +44,12 @@ test.describe('Photo Upload', () => {
     await expect(page.getByTestId('photo-upload-select-button')).toBeVisible();
   });
 
-  test('[P0] 4.4-E2E-002 should accept image file for upload', async ({ page }) => {
+  test('[P0] 4.4-E2E-002 should accept image file for upload', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
     // GIVEN: User has upload modal open
-    await page.goto('/photos');
-    await expect(
-      page.getByTestId('photo-gallery').or(page.getByTestId('photo-gallery-empty-state'))
-    ).toBeVisible();
+    await openGallery(page, interceptNetworkCall);
 
     // Open the upload modal
     const uploadButton = page
@@ -84,11 +100,11 @@ test.describe('Photo Upload', () => {
     await expect(page.getByTestId('photo-upload-cancel')).toBeVisible();
   });
 
-  test('[P1] DW-206-E2E-001 tapping outside the upload modal closes it', async ({ page }) => {
-    await page.goto('/photos');
-    await expect(
-      page.getByTestId('photo-gallery').or(page.getByTestId('photo-gallery-empty-state'))
-    ).toBeVisible();
+  test('[P1] DW-206-E2E-001 tapping outside the upload modal closes it', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    await openGallery(page, interceptNetworkCall);
     await page
       .getByTestId('photo-gallery-upload-fab')
       .or(page.getByTestId('photo-gallery-empty-upload-button'))

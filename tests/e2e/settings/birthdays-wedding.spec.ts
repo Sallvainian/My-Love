@@ -14,6 +14,7 @@
 import type { BrowserContext } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
+import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import type { TypedSupabaseClient } from '../../support/factories';
 import {
@@ -22,6 +23,12 @@ import {
   isoDateDaysFromNow,
   resolveOwnPair,
 } from '../../support/helpers/events';
+import {
+  COUPLE_SETTINGS_READ,
+  OWN_PROFILE_READ,
+  PARTNER_RECORD_READ,
+  SECOND_CONTEXT_READ_TIMEOUT,
+} from '../../support/helpers/reads';
 
 async function resetPair(
   supabaseAdmin: TypedSupabaseClient,
@@ -55,6 +62,7 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     authOptions,
     partnerUserIdentifier,
     partnerAuthToken,
+    interceptNetworkCall,
   }) => {
     // Side effect: writes the partner identity's storage-state file.
     expect(partnerAuthToken).not.toBe('');
@@ -70,7 +78,11 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     try {
       await log.step('With nothing set, the partner card says so and the wedding is TBD');
       await page.clock.install({ time: anchor });
+      const homeReads = [COUPLE_SETTINGS_READ, PARTNER_RECORD_READ, OWN_PROFILE_READ].map((url) =>
+        interceptNetworkCall({ method: 'GET', url })
+      );
       await page.goto('/');
+      for (const { status } of await Promise.all(homeReads)) expect(status).toBe(200);
       await expect(page.getByTestId('birthday-countdown-partner')).toContainText('Not set yet');
       await expect(page.getByTestId('birthday-countdown-self')).toContainText(
         'Set it in Settings'
@@ -84,7 +96,11 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       });
       await partnerContext.clock.install({ time: anchor });
       const partnerPage = await partnerContext.newPage();
+      const partnerReads = [COUPLE_SETTINGS_READ, OWN_PROFILE_READ].map((url) =>
+        observeOn({ page: partnerPage, method: 'GET', url, timeout: SECOND_CONTEXT_READ_TIMEOUT })
+      );
       await partnerPage.goto('/settings');
+      for (const { status } of await Promise.all(partnerReads)) expect(status).toBe(200);
       await expect(partnerPage.getByTestId('settings-birthday-value')).toHaveText('Not set yet');
       await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
 
@@ -115,7 +131,11 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       await expect(partnerPage.getByTestId('settings-wedding-error')).toHaveCount(0);
 
       await log.step('This Home shows both after a reload');
+      const reloadReads = [COUPLE_SETTINGS_READ, PARTNER_RECORD_READ].map((url) =>
+        interceptNetworkCall({ method: 'GET', url })
+      );
       await page.reload();
+      for (const { status } of await Promise.all(reloadReads)) expect(status).toBe(200);
       await expect
         .poll(() => page.evaluate(() => window.__APP_STORE__?.getState().partner?.birthday))
         .toBe(birthday);
@@ -165,7 +185,11 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       expect((await cleared).ok()).toBe(true);
       await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
 
+      // The saved copy still holds the wedding date, so the card reads '39 days'
+      // until this reload's own couple read has answered.
+      const clearedRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
       await page.reload();
+      expect((await clearedRead).status).toBe(200);
       await expect(page.getByTestId('event-countdown-wedding').locator('h3 + div')).toHaveText(
         'Date TBD'
       );

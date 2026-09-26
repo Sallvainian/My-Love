@@ -57,6 +57,7 @@ import {
   localDateFromIso,
   resolveOwnPair,
 } from '../../support/helpers/events';
+import { openSettingsFromHome, reloadSettings } from '../../support/helpers/settings-screen';
 import { formatDateLong } from '../../../src/utils/dateUtils';
 import { log } from '@seontechnologies/playwright-utils';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
@@ -144,13 +145,6 @@ async function submitNewEvent(
   await expect(rowFor(page, label)).toBeVisible();
 }
 
-/** Open Settings from a cold start, with the welcome splash already dismissed. */
-async function openSettings(page: Page): Promise<void> {
-  await page.goto('/');
-  await navigateTo(page, 'settings');
-  await expect(page.getByTestId('settings-view')).toBeVisible();
-}
-
 test.beforeEach(async ({ page }) => {
   // Dismiss the welcome splash, matching the Home and Settings specs.
   await page.addInitScript(() => {
@@ -176,7 +170,7 @@ test.describe('An event survives the round trip through the server', () => {
     const isoDate = isoDateDaysFromNow(30);
 
     // GIVEN / WHEN: an event created through the Settings form with icon `ring`
-    await openSettings(page);
+    await openSettingsFromHome(page, interceptNetworkCall);
     await openAddEventForm(page, { label: ICON_LABEL, isoDate });
     await pickEventIcon(page, 'ring');
     await submitNewEvent(page, interceptNetworkCall, ICON_LABEL);
@@ -184,11 +178,12 @@ test.describe('An event survives the round trip through the server', () => {
     // WHEN: the page is reloaded, so the list can only come from the server
     await log.step('Reload /settings so the list comes back from the server');
     await page.waitForURL('**/settings');
-    // The reload is what makes this a real round trip: `events` is not
-    // persisted, so after it the list can only have come from
-    // `eventsService.getEvents` and its row→CoupleEvent mapping.
-    await page.reload();
-    await expect(page.getByTestId('settings-view')).toBeVisible();
+    // The reload is what makes this a real round trip. `addEvent` also wrote
+    // the saved copy (`saveEventsCopy` in `eventsSlice.ts`), which renders
+    // first after a reload, so the row is read only once the reload's own
+    // server read has settled and replaced it — then it can only have come
+    // from `eventsService.getEventsPage` and its row→CoupleEvent mapping.
+    await reloadSettings(page, interceptNetworkCall);
 
     const row = rowFor(page, ICON_LABEL);
     await expect(row).toBeVisible();
@@ -238,7 +233,7 @@ test.describe('An event survives the round trip through the server', () => {
     const soonDate = isoDateDaysFromNow(10, anchor);
     const midDate = isoDateDaysFromNow(25, anchor);
 
-    await openSettings(page);
+    await openSettingsFromHome(page, interceptNetworkCall);
 
     // Created deliberately out of chronological order: late, then soon, then
     // mid. Creation order and `created_at` order therefore both disagree with
@@ -257,8 +252,7 @@ test.describe('An event survives the round trip through the server', () => {
     // After the reload the sequence is whatever `getEvents` returned:
     // `.order('event_date').order('created_at')` in Postgres, with no JS
     // comparator in the service (`eventsService.ts:255-268`).
-    await page.reload();
-    await expect(page.getByTestId('settings-view')).toBeVisible();
+    await reloadSettings(page, interceptNetworkCall);
     await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(3);
 
     // Both assertions are ordered, element-by-element — the labels say which
@@ -288,7 +282,7 @@ test.describe('Clearing an optional field', () => {
 
     const isoDate = isoDateDaysFromNow(18);
 
-    await openSettings(page);
+    await openSettingsFromHome(page, interceptNetworkCall);
     await openAddEventForm(page, { label: DESCRIPTION_LABEL, isoDate });
     await fillEventDescription(page, DESCRIPTION_TEXT);
     await submitNewEvent(page, interceptNetworkCall, DESCRIPTION_LABEL);

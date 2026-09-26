@@ -20,11 +20,24 @@
  * in a light kit colour (`bg-ink`, `bg-good`) still fails.
  *
  * Photos may be the empty state on the test account; either state is a valid
- * screen.
+ * screen. A screen is swept only once the read that carries its data has
+ * answered and a loaded state is on screen: never a skeleton, a spinner or an
+ * error state.
  */
 import { test, expect } from '../../support/merged-fixtures';
 import type { Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
+import type { TypedSupabaseClient } from '../../support/factories';
+import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo, type NavDestination } from '../../support/helpers/navigation';
+import {
+  LOVE_NOTES_READ,
+  PHOTOS_LIST_READ,
+  UPCOMING_EVENTS_READ,
+  partnerLatestMoodRead,
+  partnerMoodListRead,
+} from '../../support/helpers/reads';
+import { homeEventsSettled, openSettingsFromHome } from '../../support/helpers/settings-screen';
 
 type Scheme = 'light' | 'dark';
 
@@ -33,57 +46,92 @@ const PAGE_GROUND: Record<Scheme, string> = {
   dark: 'rgb(11, 14, 20)', // #0b0e14
 };
 
+/** The read that carries a screen's data, and the step that sends it. */
+interface ScreenRead {
+  /** The read's glob; a function when it names this worker's partner. */
+  url: string | ((partnerId: string) => string);
+  /** Armed before the step that sends it: the cold start (`goto`), or the
+   * dock click (`dock`) for a read the screen's mount always sends after the
+   * click. App's start-up refresh may send a read of the same rows too, and
+   * that one may be the one that answers. */
+  armBefore: 'goto' | 'dock';
+}
+
 interface Screen {
   view: NavDestination;
-  /** Resolves once the view has rendered past its first loading frame. */
+  /** Absent for Settings, whose read shares Home's URL and is ordered by
+   * `openSettingsFromHome`. */
+  read?: ScreenRead;
+  /** Resolves once the view shows a loaded state, never a loading or error one. */
   ready: (page: Page) => Promise<void>;
 }
 
 const SIGNED_IN_SCREENS: Screen[] = [
   {
     view: 'home',
+    read: { url: UPCOMING_EVENTS_READ, armBefore: 'goto' },
     ready: async (page) => {
       await expect(page.getByTestId('time-together')).toBeVisible();
       await expect(page.getByTestId('message-text')).toBeVisible();
+      await expect(homeEventsSettled(page)).toBeVisible();
     },
   },
   {
     view: 'mood',
+    read: { url: partnerLatestMoodRead, armBefore: 'dock' },
     ready: async (page) => {
       await expect(page.getByTestId('mood-tracker')).toBeVisible();
       await expect(page.getByTestId('mood-button-happy')).toBeVisible();
+      await expect(
+        page.getByTestId('partner-mood-display').or(page.getByTestId('no-mood-logged-state'))
+      ).toBeVisible();
     },
   },
   {
     view: 'notes',
+    read: { url: LOVE_NOTES_READ, armBefore: 'goto' },
     ready: async (page) => {
       await expect(page.getByTestId('notes-partner-row')).toBeVisible();
       await expect(page.getByLabel(/love note message input/i)).toBeVisible();
+      await expect(
+        page.getByTestId('virtualized-list').or(page.getByText('No messages to show'))
+      ).toBeVisible();
     },
   },
   {
     view: 'photos',
+    read: { url: PHOTOS_LIST_READ, armBefore: 'goto' },
     ready: async (page) => {
-      // Past the skeleton: the grid, the empty state or the error state.
+      // Past the skeleton, which also carries `photo-gallery`: the grid or the
+      // empty state. The error state is not a screen this sweep accepts.
       await expect(
-        page
-          .getByTestId('photo-gallery-grid')
-          .or(page.getByTestId('photo-gallery-empty-state'))
-          .or(page.getByTestId('photo-gallery-error-state'))
+        page.getByTestId('photo-gallery-grid').or(page.getByTestId('photo-gallery-empty-state'))
       ).toBeVisible();
     },
   },
   {
     view: 'partner',
+    read: { url: partnerMoodListRead, armBefore: 'dock' },
     ready: async (page) => {
       await expect(page.getByTestId('partner-mood-view')).toBeVisible();
+      // A mood card (both the latest and the older ones carry the testid) or,
+      // with no moods, the empty state.
+      await expect(
+        page
+          .getByTestId('partner-mood-card')
+          .or(page.getByTestId('partner-mood-empty-state'))
+          .first()
+      ).toBeVisible();
     },
   },
   {
     view: 'settings',
     ready: async (page) => {
       await expect(page.getByTestId('settings-view')).toBeVisible();
-      await expect(page.getByTestId('events-settings-loading')).toHaveCount(0);
+      await expect(
+        page.getByTestId('events-settings-list').or(page.getByTestId('events-settings-empty'))
+      ).toBeVisible();
+      await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
     },
   },
 ];
@@ -200,14 +248,42 @@ async function assertNoLightSurfaces(page: Page, name: string): Promise<void> {
   ).toEqual([]);
 }
 
-/** Opens a signed-in screen at phone size in the given OS theme and waits for it. */
-async function openSignedInScreen(page: Page, screen: Screen, colorScheme: Scheme): Promise<void> {
+/**
+ * Opens a signed-in screen at phone size in the given OS theme and waits for
+ * it: the screen's own read is armed before the step that sends it and
+ * awaited before the readiness check.
+ */
+async function openSignedInScreen(
+  page: Page,
+  screen: Screen,
+  colorScheme: Scheme,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  supabaseAdmin: TypedSupabaseClient
+): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme });
+
+  if (!screen.read) {
+    await openSettingsFromHome(page, interceptNetworkCall);
+    await expect(page.getByTestId('nav-dock')).toBeVisible();
+    await screen.ready(page);
+    return;
+  }
+
+  const { url, armBefore } = screen.read;
+  const readUrl =
+    typeof url === 'string' ? url : url((await resolveOwnPair(supabaseAdmin)).partnerId);
+  const arm = () => interceptNetworkCall({ method: 'GET', url: readUrl });
+
+  const coldRead = armBefore === 'goto' ? arm() : null;
   await page.goto('/');
   await expect(page.getByTestId('nav-dock')).toBeVisible();
 
+  const mountRead = armBefore === 'dock' ? arm() : null;
   if (screen.view !== 'home') await navigateTo(page, screen.view);
+  const read = coldRead ?? mountRead;
+  if (!read) throw new Error(`[theme-sweep] ${screen.view} has no armed read`);
+  expect((await read).status, `${screen.view} data read`).toBe(200);
   await screen.ready(page);
 }
 
@@ -228,13 +304,21 @@ test.describe('Theme sweep, signed in', () => {
   });
 
   for (const screen of SIGNED_IN_SCREENS) {
-    test(`[P1] ${screen.view} stays on the kit in light`, async ({ page }) => {
-      await openSignedInScreen(page, screen, 'light');
+    test(`[P1] ${screen.view} stays on the kit in light`, async ({
+      page,
+      interceptNetworkCall,
+      supabaseAdmin,
+    }) => {
+      await openSignedInScreen(page, screen, 'light', interceptNetworkCall, supabaseAdmin);
       await sweep(page, screen.view, 'light');
     });
 
-    test(`[P1] ${screen.view} stays on the kit in dark`, async ({ page }) => {
-      await openSignedInScreen(page, screen, 'dark');
+    test(`[P1] ${screen.view} stays on the kit in dark`, async ({
+      page,
+      interceptNetworkCall,
+      supabaseAdmin,
+    }) => {
+      await openSignedInScreen(page, screen, 'dark', interceptNetworkCall, supabaseAdmin);
       await sweep(page, screen.view, 'dark');
       await assertNoLightSurfaces(page, screen.view);
     });

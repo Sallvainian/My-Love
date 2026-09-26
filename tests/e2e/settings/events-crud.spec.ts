@@ -28,6 +28,8 @@ import {
   resolveOwnPair,
   seedEvent,
 } from '../../support/helpers/events';
+import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { openSettingsFromHome, reloadSettings } from '../../support/helpers/settings-screen';
 import { formatDateLong } from '../../../src/utils/dateUtils';
 import type { Locator, Page } from '@playwright/test';
 
@@ -101,6 +103,7 @@ test.describe('Managing events from Settings', () => {
   test('[P0] adds, shows on Home, edits, deletes, and lands on the empty state', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     // Self-healing against stray rows from a previously failed run, for either
@@ -111,9 +114,7 @@ test.describe('Managing events from Settings', () => {
     const addedDate = isoDateDaysFromNow(30, anchor);
     const editedDate = isoDateDaysFromNow(45, anchor);
 
-    await page.goto('/');
-    await navigateTo(page, 'settings');
-    await expect(page.getByTestId('settings-view')).toBeVisible();
+    await openSettingsFromHome(page, interceptNetworkCall);
 
     // The section loads from its own mount effect — Home was never the source.
     await expect(page.getByTestId('events-settings-empty')).toBeVisible();
@@ -223,6 +224,7 @@ test.describe('Managing events from Settings', () => {
   test('[P0] loads the list on a direct reload of /settings, without visiting Home', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // App's loadEvents() effect is gated on Home and the `events` local-copy
     // refresher skips Settings, so without the section's own mount effect a
@@ -241,15 +243,14 @@ test.describe('Managing events from Settings', () => {
       icon: 'calendar',
     });
 
-    await page.goto('/');
-    await navigateTo(page, 'settings');
+    await openSettingsFromHome(page, interceptNetworkCall);
     await page.waitForURL('**/settings');
 
     // The reload is what removes Home from the picture entirely: the app boots
-    // straight onto Settings and never renders the Home view.
-    await page.reload();
-
-    await expect(page.getByTestId('settings-view')).toBeVisible();
+    // straight onto Settings and never renders the Home view. The first visit
+    // saved a copy that renders before the server answers, so the row is read
+    // only after the reload's own read has settled.
+    await reloadSettings(page, interceptNetworkCall);
     const row = rowFor(page, 'Settings Deeplink E2E');
     await expect(row).toBeVisible();
     await expect(row).toContainText(longForm(seededDate));
@@ -259,6 +260,7 @@ test.describe('Managing events from Settings', () => {
   test('[P0] keeps a successful edit when Settings mount returns an older snapshot', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -286,7 +288,9 @@ test.describe('Managing events from Settings', () => {
 
     // Home first populates the real Zustand slice, giving Settings an editable
     // row while its own mount GET is held below.
+    const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await homeRead).status).toBe(200);
     await expect(page.getByTestId('event-countdown-settings-snapshot-before-edit-e2e')).toBeVisible();
 
     let markSnapshotsCaptured: () => void = () => {};
@@ -372,6 +376,7 @@ test.describe('Managing events from Settings', () => {
   test('[P0] lists a past event with its controls, where Home hides it', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // Auto-hide is Home's rule alone: Settings is the only place a mistyped
     // year can be seen and corrected, so a past event must be listed AND
@@ -403,7 +408,9 @@ test.describe('Managing events from Settings', () => {
       }),
     ]);
 
+    const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await homeRead).status).toBe(200);
 
     // The witness proves this load landed, so the absence below is a real
     // absence rather than an assertion that beat the fetch.
@@ -419,7 +426,11 @@ test.describe('Managing events from Settings', () => {
     await expect(row.locator('[data-testid^="event-delete-"]')).toBeVisible();
   });
 
-  test("[P0] offers no Edit or Delete on a partner's event", async ({ page, supabaseAdmin }) => {
+  test("[P0] offers no Edit or Delete on a partner's event", async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
     // RLS filters a non-creator's write to zero rows, which the service turns
     // into "not yours to edit" — the row is read-only rather than a control
     // that can only ever fail.
@@ -434,8 +445,7 @@ test.describe('Managing events from Settings', () => {
       icon: 'ring',
     });
 
-    await page.goto('/');
-    await navigateTo(page, 'settings');
+    await openSettingsFromHome(page, interceptNetworkCall);
 
     const row = rowFor(page, 'Settings Partner E2E');
     await expect(row).toBeVisible();
@@ -459,8 +469,7 @@ test.describe(
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-      await page.goto('/');
-      await navigateTo(page, 'settings');
+      await openSettingsFromHome(page, interceptNetworkCall);
       await expect(page.getByTestId('events-settings-empty')).toBeVisible();
 
       // Registered before the form is even opened, so the route is in place

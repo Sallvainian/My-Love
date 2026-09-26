@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import type { AppState } from '../../../src/stores/types';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { clockAnchor } from '../../support/helpers/events';
+import { FAVORITES_READ } from '../../support/helpers/reads';
 import { test, expect } from '../../support/merged-fixtures';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
@@ -104,7 +105,11 @@ async function signIn(page: Page, email: string) {
 test.describe('Account data through the real browser and local services', () => {
   test.setTimeout(90_000);
 
-  test('[P1] favorites survive reload and stay separate across A/B/A and same-account re-login', async ({ page, supabaseAdmin }) => {
+  test('[P1] favorites survive reload and stay separate across A/B/A and same-account re-login', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
     const pair = getWorkerPairEmails();
     if (!pair) throw new Error('This test requires its worker-owned account pair');
     // Favorites are server rows now and outlive a run: start this worker
@@ -116,7 +121,11 @@ test.describe('Account data through the real browser and local services', () => 
     const cleared = await supabaseAdmin.from('message_favorites').delete()
       .in('user_id', (accounts ?? []).map((account) => account.id));
     expect(cleared.error).toBeNull();
+    const favoritesRead = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
     await page.goto('/');
+    const firstRead = await favoritesRead;
+    expect(firstRead.status).toBe(200);
+    expect(firstRead.responseJson).toEqual([]);
     const favorite = page.getByTestId('message-favorite-button');
     await expect(favorite).toHaveAccessibleName('Add to favorites');
     const original = await snapshot(page);
@@ -128,9 +137,13 @@ test.describe('Account data through the real browser and local services', () => 
     await expect.poll(async () => (await snapshot(page)).favoriteIds).toContain(original.currentId);
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
 
+    const reloadRead = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
     await page.reload();
+    const reloaded = await reloadRead;
+    expect(reloaded.status).toBe(200);
+    expect(reloaded.responseJson).toHaveLength(1);
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
-    expect((await snapshot(page)).currentFavorite).toBe(true);
+    await expect.poll(async () => (await snapshot(page)).currentFavorite).toBe(true);
     await signOut(page);
     await signIn(page, pair.user2Email);
     await expect.poll(async () => (await snapshot(page)).userId).not.toBe(original.userId);

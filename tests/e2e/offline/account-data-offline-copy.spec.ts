@@ -12,9 +12,10 @@
  *
  * Every server row touched here belongs to this worker's own account.
  */
-import type { Page } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
+import { ANNIVERSARIES_READ } from '../../support/helpers/reads';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -121,8 +122,13 @@ test.describe('Account data from the local copy', () => {
   test('an anniversary from one online session is shown when the server cannot be reached', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }, testInfo) => {
+    // Awaited here so the cold start's own anniversaries read, sent before the
+    // row exists, cannot be the one the Settings visit below waits on.
+    const startRead = interceptNetworkCall({ method: 'GET', url: ANNIVERSARIES_READ });
     await page.goto('/');
+    expect((await startRead).status).toBe(200);
     const userId = await signedInUserId(page);
     const label = `Offline anniversary ${testInfo.workerIndex}-${Date.now()}`;
     const clear = async () => {
@@ -137,7 +143,11 @@ test.describe('Account data from the local copy', () => {
 
     try {
       // GIVEN: one online session loads the anniversary, which saves the copy.
+      const settingsRead = interceptNetworkCall({ method: 'GET', url: ANNIVERSARIES_READ });
       await page.goto('/settings');
+      const loaded = await settingsRead;
+      expect(loaded.status).toBe(200);
+      expect(loaded.responseJson).toEqual([expect.objectContaining({ label })]);
       await expect(page.getByText(label)).toBeVisible();
       await expect.poll(() => savedAnniversaryLabels(page)).toEqual([label]);
 
@@ -270,9 +280,21 @@ test.describe('Account data from the local copy', () => {
       // THEN: the favorite is still shown — from the copy.
       await expect(favorite).toHaveAccessibleName('Remove from favorites');
 
-      // …and so is the custom message, in the editor.
+      // …and so is the custom message, in the editor. The read is still
+      // aborted, so it cannot be awaited. Counted from just before the goto:
+      // the cold start's message-data refresh asked the server for the custom
+      // messages and was refused, so the row can only come from the copy.
       await goOffline(page, false);
+      let abortedCustomReads = 0;
+      const countAbortedCustomRead = (request: Request) => {
+        if (request.method() === 'GET' && request.url().includes('/rest/v1/custom_messages')) {
+          abortedCustomReads += 1;
+        }
+      };
+      page.on('requestfailed', countAbortedCustomRead);
       await page.goto('/admin');
+      await expect.poll(() => abortedCustomReads).toBeGreaterThan(0);
+      page.off('requestfailed', countAbortedCustomRead);
       await expect(page.getByTestId('admin-message-row').filter({ hasText: custom })).toBeVisible();
       await goOffline(page, true);
       await expect(page.getByTestId('admin-message-row').filter({ hasText: custom })).toBeVisible();

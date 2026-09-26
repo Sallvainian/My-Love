@@ -20,6 +20,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { INTERACTIONS_READ } from '../../support/helpers/reads';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -89,13 +90,20 @@ test.describe('Poke and kiss history from the local copy', () => {
   test('history loaded online is listed offline after a reload, with the badge', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const pokeId = await seedPartnerPoke(supabaseAdmin);
 
     try {
       // GIVEN: the app starts online; the start refresh loads the history and
       // saves the copy before the sheet is ever opened.
+      const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
       await page.goto('/partner');
+      const history = await historyRead;
+      expect(history.status).toBe(200);
+      expect(history.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: pokeId })])
+      );
       await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
       await expect
         .poll(async () => (await savedInteractionIds(page))?.includes(pokeId) ?? false)
@@ -132,12 +140,15 @@ test.describe('Poke and kiss history from the local copy', () => {
   test('a poke sent while offline appears after reconnect without a reload', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     let pokeId: string | null = null;
 
     try {
       // GIVEN: signed in on the partner screen, history loaded, then offline.
+      const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
       await page.goto('/partner');
+      expect((await historyRead).status).toBe(200);
       await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
       await expect.poll(() => savedInteractionIds(page)).not.toBeNull();
       await goOffline(page, true);

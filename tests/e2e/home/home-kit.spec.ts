@@ -11,6 +11,14 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import type { Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
+import {
+  COUPLE_SETTINGS_READ,
+  OWN_PROFILE_READ,
+  PARTNER_RECORD_READ,
+  UPCOMING_EVENTS_READ,
+} from '../../support/helpers/reads';
+import { homeEventsSettled } from '../../support/helpers/settings-screen';
 
 const KIT_CARD = {
   light: 'rgb(255, 255, 255)', // #ffffff
@@ -41,10 +49,26 @@ const COUNTDOWN_CARDS = [
   'event-countdown-wedding',
 ] as const;
 
-async function openHome(page: Page, colorScheme: 'light' | 'dark') {
+/** Open Home and return once the reads behind its cards have answered — the
+ * wedding card's couple settings, both birthdays' profile and partner record,
+ * and the events — and the events column shows a loaded state: a stored
+ * event's card or the empty placeholder, never the error or a gap. */
+async function openHome(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  colorScheme: 'light' | 'dark'
+) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme });
+  const homeReads = [
+    UPCOMING_EVENTS_READ,
+    COUPLE_SETTINGS_READ,
+    OWN_PROFILE_READ,
+    PARTNER_RECORD_READ,
+  ].map((url) => interceptNetworkCall({ method: 'GET', url }));
   await page.goto('/');
+  for (const { status } of await Promise.all(homeReads)) expect(status).toBe(200);
+  await expect(homeEventsSettled(page)).toBeVisible();
   await expect(page.getByTestId('time-together')).toBeVisible();
   await expect(page.getByTestId('message-text')).toBeVisible();
 }
@@ -60,8 +84,9 @@ test.describe('Home on the style kit', () => {
   for (const colorScheme of ['light', 'dark'] as const) {
     test(`[P1] should render the countdown cards on one kit card and value style in ${colorScheme}`, async ({
       page,
+      interceptNetworkCall,
     }) => {
-      await openHome(page, colorScheme);
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       for (const testId of COUNTDOWN_CARDS) {
         const card = page.getByTestId(testId);
@@ -125,8 +150,9 @@ test.describe('Home on the style kit', () => {
 
     test(`[P1] should render the daily message in Lora italic with no emoji chrome in ${colorScheme}`, async ({
       page,
+      interceptNetworkCall,
     }) => {
-      await openHome(page, colorScheme);
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       const type = await page.getByTestId('message-text').evaluate((el) => {
         const style = getComputedStyle(el);
@@ -155,7 +181,11 @@ test.describe('Home on the style kit', () => {
       // Bundled or user-authored text may carry emoji; Home's own chrome may
       // not. User-authored: the message text, stored events' labels and
       // descriptions (every event card but the static wedding), and the
-      // anniversary list.
+      // anniversary list. Both birthday cards come from server reads that
+      // `openHome` awaited; they are on screen before the one-shot read below
+      // takes its copy.
+      await expect(page.getByTestId('birthday-countdown-self')).toBeVisible();
+      await expect(page.getByTestId('birthday-countdown-partner')).toBeVisible();
       const chromeText = await page.evaluate(() => {
         const main = document.getElementById('main-content');
         if (!main) return null;
@@ -179,8 +209,9 @@ test.describe('Home on the style kit', () => {
 
   test('[P1] should show Upcoming with an Add event button that opens Settings', async ({
     page,
+    interceptNetworkCall,
   }) => {
-    await openHome(page, 'light');
+    await openHome(page, interceptNetworkCall, 'light');
 
     await expect(page.getByText('Upcoming', { exact: true })).toBeVisible();
     const addButton = page.getByRole('button', { name: 'Add event' });
@@ -191,8 +222,11 @@ test.describe('Home on the style kit', () => {
     await expect(page).toHaveURL(/\/settings$/);
   });
 
-  test('[P1] should not render the welcome button on Home', async ({ page }) => {
-    await openHome(page, 'light');
+  test('[P1] should not render the welcome button on Home', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    await openHome(page, interceptNetworkCall, 'light');
 
     await expect(page.getByLabel('View welcome message again')).toHaveCount(0);
   });

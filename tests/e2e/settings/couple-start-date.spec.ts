@@ -13,8 +13,10 @@
 import type { BrowserContext, Page } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
+import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { COUPLE_SETTINGS_READ, SECOND_CONTEXT_READ_TIMEOUT } from '../../support/helpers/reads';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -48,6 +50,7 @@ test.describe('Couple start date shared by both partners', () => {
     authOptions,
     partnerUserIdentifier,
     partnerAuthToken,
+    interceptNetworkCall,
   }) => {
     // Side effect: writes the partner identity's storage-state file.
     expect(partnerAuthToken).not.toBe('');
@@ -69,7 +72,9 @@ test.describe('Couple start date shared by both partners', () => {
     let partnerContext: BrowserContext | undefined;
     try {
       await log.step('With no row yet, Home shows the placeholder');
+      const homeRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
       await page.goto('/');
+      expect((await homeRead).status).toBe(200);
       await expect(page.getByTestId('time-together')).toContainText(
         'Set your start date in Settings'
       );
@@ -80,7 +85,14 @@ test.describe('Couple start date shared by both partners', () => {
         baseURL,
       });
       const partnerPage = await partnerContext.newPage();
+      const partnerRead = observeOn({
+        page: partnerPage,
+        method: 'GET',
+        url: COUPLE_SETTINGS_READ,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
       await partnerPage.goto('/settings');
+      expect((await partnerRead).status).toBe(200);
       await expect(partnerPage.getByTestId('settings-together-since-value')).toHaveText(
         'Not set yet'
       );
@@ -104,13 +116,19 @@ test.describe('Couple start date shared by both partners', () => {
       await expect(partnerPage.getByTestId('settings-together-since-error')).toHaveCount(0);
 
       await log.step('This partner sees the same date after a reload');
+      const reloadRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
       await page.reload();
+      expect((await reloadRead).status).toBe(200);
       await expect.poll(() => storeStart(page)).toBe(targetIso);
       const card = page.getByTestId('time-together');
       await expect(card).toContainText('12 days');
       await expect(card).not.toContainText('Set your start date in Settings');
 
+      // The saved copy already holds targetIso, so the inputs are read only
+      // after this visit's own couple read has answered.
+      const settingsRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
       await page.goto('/settings');
+      expect((await settingsRead).status).toBe(200);
       const own = await localInputsOf(page, targetIso);
       await expect(page.getByTestId('settings-together-since-date')).toHaveValue(own.date);
       await expect(page.getByTestId('settings-together-since-time')).toHaveValue(own.time);

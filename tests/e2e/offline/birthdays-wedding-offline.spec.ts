@@ -21,6 +21,11 @@ import {
   resolveOwnPair,
 } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import {
+  COUPLE_SETTINGS_READ,
+  OWN_PROFILE_READ,
+  PARTNER_RECORD_READ,
+} from '../../support/helpers/reads';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -101,6 +106,7 @@ test.describe('Birthdays and wedding date from the local copy', () => {
   test('the cards from one online session show when the server cannot be reached', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const ids = await resolveOwnPair(supabaseAdmin);
     // The day counts below are measured from the page clock, pinned to the
@@ -114,7 +120,22 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     try {
       // GIVEN: one online session loads all three, which saves the copies.
       await page.clock.install({ time: anchor });
+      const profileRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
+      const partnerRead = interceptNetworkCall({ method: 'GET', url: PARTNER_RECORD_READ });
+      const coupleRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
       await page.goto('/');
+      const [profile, partnerRecord, couple] = await Promise.all([
+        profileRead,
+        partnerRead,
+        coupleRead,
+      ]);
+      expect(profile.status).toBe(200);
+      // `maybeSingle` reads come back as a one-row array; `single` as the row.
+      expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
+      expect(partnerRecord.status).toBe(200);
+      expect(partnerRecord.responseJson).toMatchObject({ id: ids.partnerId, birthday: partner });
+      expect(couple.status).toBe(200);
+      expect(couple.responseJson).toEqual([expect.objectContaining({ wedding_date: wedding })]);
       await expect.poll(() => savedCopy(page, 'profile')).toMatchObject({ birthday: own });
       await expect
         .poll(() => savedCopy(page, 'partner'))
@@ -156,13 +177,18 @@ test.describe('Birthdays and wedding date from the local copy', () => {
   test('an offline birthday edit is refused with a needs-a-connection message and changes nothing', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const ids = await resolveOwnPair(supabaseAdmin);
     const own = isoBirthdayDaysFromNow(20, 29, clockAnchorAvoidingLeapDay([20]));
     await setValues(supabaseAdmin, ids, { own, partner: null, wedding: null });
 
     try {
+      const profileRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
       await page.goto('/');
+      const profile = await profileRead;
+      expect(profile.status).toBe(200);
+      expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
       await navigateTo(page, 'settings');
       const dateInput = page.getByTestId('settings-birthday-date');
       await expect(dateInput).toHaveValue(own);
@@ -176,7 +202,7 @@ test.describe('Birthdays and wedding date from the local copy', () => {
       expect(
         await page.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday)
       ).toBe(own);
-      expect(await savedCopy(page, 'profile')).toMatchObject({ birthday: own });
+      await expect.poll(() => savedCopy(page, 'profile')).toMatchObject({ birthday: own });
       const { data, error } = await supabaseAdmin
         .from('users')
         .select('birthday')

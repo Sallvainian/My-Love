@@ -1,7 +1,13 @@
 import type { Page } from '@playwright/test';
+import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { AppState } from '../../../src/stores/types';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { test, expect } from '../../support/merged-fixtures';
+import {
+  ANNIVERSARIES_READ,
+  CUSTOM_MESSAGES_READ,
+  SECOND_CONTEXT_READ_TIMEOUT,
+} from '../../support/helpers/reads';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 // Anniversaries, favorites and custom messages now live in Supabase, with the
@@ -122,10 +128,30 @@ test.describe('Account data follows the account, not the browser', () => {
 
       await expect.poll(() => favoritedTexts(fresh)).toContain(favoriteText);
 
+      const customRead = interceptNetworkCall({
+        page: fresh,
+        method: 'GET',
+        url: CUSTOM_MESSAGES_READ,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
       await fresh.goto('/admin');
+      const customRows = await customRead;
+      expect(customRows.status).toBe(200);
+      expect(customRows.responseJson).toEqual([expect.objectContaining({ text: customText })]);
       await expect(fresh.getByTestId('message-row-text').filter({ hasText: customText })).toBeVisible();
 
+      const anniversaryRead = interceptNetworkCall({
+        page: fresh,
+        method: 'GET',
+        url: ANNIVERSARIES_READ,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
       await fresh.goto('/settings');
+      const anniversaryRows = await anniversaryRead;
+      expect(anniversaryRows.status).toBe(200);
+      expect(anniversaryRows.responseJson).toEqual([
+        expect.objectContaining({ label: anniversaryLabel }),
+      ]);
       await expect(fresh.getByText(anniversaryLabel)).toBeVisible();
     } finally {
       await second.close();

@@ -1,18 +1,22 @@
 /** Real Settings pagination, including dates saved beyond its initial history window. */
 import type { Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { eventDateFrom } from '../../support/factories/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { reloadSettings, settingsEventsLoaded } from '../../support/helpers/settings-screen';
 
 const history = (size: number) => Array.from({ length: size }, (_, index) => ({
   dayOffset: -(index + 1),
   label: `Paged history ${String(index + 1).padStart(2, '0')}`,
 }));
 
-async function openSettings(page: Page) {
+async function openSettings(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
+  const settingsRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
   await page.goto('/settings');
   await expect(page.getByTestId('settings-view')).toBeVisible();
-  await expect(page.getByTestId('events-settings-load-region')).toHaveAttribute('aria-busy', 'false');
+  await settingsEventsLoaded(page, settingsRead);
 }
 
 async function loadHistory(page: Page, expectedCount: number) {
@@ -58,6 +62,7 @@ test.beforeEach(async ({ page }) => {
 test('[P0] loads and edits omitted history, then finds the saved deep date after reload', async ({
   page,
   coupleEvents,
+  interceptNetworkCall,
 }) => {
   const seeded = await coupleEvents.seed([
     ...history(51),
@@ -65,7 +70,7 @@ test('[P0] loads and edits omitted history, then finds the saved deep date after
   ]);
   const oldest = seeded[50];
   const correctedDate = eventDateFrom(coupleEvents.anchor, -500);
-  await openSettings(page);
+  await openSettings(page, interceptNetworkCall);
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(51);
   await expect(page.getByTestId(`event-row-${oldest.id}`)).toHaveCount(0);
   await expect(page.getByTestId('events-settings-history-notice')).toBeVisible();
@@ -78,7 +83,7 @@ test('[P0] loads and edits omitted history, then finds the saved deep date after
   await page.getByTestId('events-form-date').fill(correctedDate);
   await submitEvent(page, 'PATCH', 'Corrected deep history');
 
-  await page.reload();
+  await reloadSettings(page, interceptNetworkCall);
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(51);
   await expect(page.getByTestId(`event-row-${oldest.id}`)).toHaveCount(0);
   await loadHistory(page, 52);
@@ -96,17 +101,18 @@ test('[P0] loads and edits omitted history, then finds the saved deep date after
 test('[P0] adds a deep-past date and can load and edit it again after each reload', async ({
   page,
   coupleEvents,
+  interceptNetworkCall,
 }) => {
   await coupleEvents.seed(history(51));
   const savedDate = eventDateFrom(coupleEvents.anchor, -1000);
-  await openSettings(page);
+  await openSettings(page, interceptNetworkCall);
   await page.getByTestId('events-settings-add').click();
   await page.getByTestId('events-form-label').fill('New deep-past event');
   await page.getByTestId('events-form-date').fill(savedDate);
   await page.getByTestId('events-form-description').fill('Saved outside the first page');
   const id = await submitEvent(page, 'POST', 'New deep-past event');
 
-  await page.reload();
+  await reloadSettings(page, interceptNetworkCall);
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(50);
   await expect(page.getByTestId(`event-row-${id}`)).toHaveCount(0);
   await loadHistory(page, 52);
@@ -117,7 +123,7 @@ test('[P0] adds a deep-past date and can load and edit it again after each reloa
   await page.getByTestId('events-form-label').fill('Deep-past event edited');
   await submitEvent(page, 'PATCH', 'Deep-past event edited');
 
-  await page.reload();
+  await reloadSettings(page, interceptNetworkCall);
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(50);
   await loadHistory(page, 52);
   await page.getByTestId(`event-edit-${id}`).click();
@@ -129,9 +135,13 @@ for (const { size, rows, empty } of [
   { size: 0, rows: 0, empty: 1 },
   { size: 50, rows: 50, empty: 0 },
 ]) {
-  test(`[P1] ${size} past rows do not advertise another page`, async ({ page, coupleEvents }) => {
+  test(`[P1] ${size} past rows do not advertise another page`, async ({
+    page,
+    coupleEvents,
+    interceptNetworkCall,
+  }) => {
     await coupleEvents.seed(history(size));
-    await openSettings(page);
+    await openSettings(page, interceptNetworkCall);
     await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(rows);
     await expect(page.getByTestId('events-settings-empty')).toHaveCount(empty);
     await expect(page.getByTestId('events-settings-load-more')).toHaveCount(0);
@@ -142,6 +152,7 @@ for (const { size, rows, empty } of [
 test('[P1] tied dates and microseconds stay ordered through repeated pages and Home keeps six nearest cards', async ({
   page,
   coupleEvents,
+  interceptNetworkCall,
 }) => {
   // Each window spans three pages. Most timestamps form tied pairs; singleton
   // ends put pairs across both 50-row boundaries. Every instant is in the
@@ -156,7 +167,7 @@ test('[P1] tied dates and microseconds stay ordered through repeated pages and H
   const expected = seeded.map((row, index) => ({ ...row, createdAt: specs[index].createdAt }))
     .sort((a, b) => a.eventDate.localeCompare(b.eventDate) ||
       a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-  await openSettings(page);
+  await openSettings(page, interceptNetworkCall);
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(100);
   await loadHistory(page, 200);
   await expect(page.getByTestId('events-settings-load-more')).toBeEnabled();
@@ -194,9 +205,10 @@ test('[P1] tied dates and microseconds stay ordered through repeated pages and H
 test('[P1] restores Chromium keyboard focus to history retry and then Add after the final page', async ({
   page,
   coupleEvents,
+  interceptNetworkCall,
 }) => {
   await coupleEvents.seed(history(51));
-  await openSettings(page);
+  await openSettings(page, interceptNetworkCall);
   let releaseFailure!: () => void;
   const failureGate = new Promise<void>((resolve) => { releaseFailure = resolve; });
   let shouldFail = true;

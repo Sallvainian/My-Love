@@ -28,11 +28,13 @@
  * is taken from that context.
  */
 import { randomUUID } from 'node:crypto';
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Page, Request } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
+import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { LOVE_NOTES_READ } from '../../support/helpers/reads';
 
 /**
  * The receiving page's own hook reporting its join.
@@ -66,11 +68,12 @@ const BROADCAST_PATH = '/realtime/v1/api/broadcast/';
 test.describe('Love notes realtime delivery', () => {
   // Every wait below is bounded on its own so that the wait which fails is the
   // one the report names. Their sequential worst case is 30s join (which
-  // contains the partner goto) + 30s networkidle + 30s sender goto + 15s input
-  // + 30s broadcast + 15s delivery = 150s, so `playwright.config.ts:119`'s 60s
-  // default would expire first and replace the real failure with a generic
-  // test-timeout message. Raised to contain them, not because the test is slow:
-  // it completes in under 3s, and this bound is only ever reached on a hang.
+  // contains the partner goto) + 30s thread read + 30s sender goto + 15s input
+  // + 15s settle + 30s broadcast + 15s delivery = 165s, so
+  // `playwright.config.ts:119`'s 60s default would expire first and replace
+  // the real failure with a generic test-timeout message. Raised to contain
+  // them, not because the test is slow: it completes in under 3s, and this
+  // bound is only ever reached on a hang.
   test.describe.configure({ timeout: 180_000 });
 
   test(
@@ -128,6 +131,31 @@ test.describe('Love notes realtime delivery', () => {
         });
         const partnerPage: Page = await partnerContext.newPage();
 
+        // The partner's thread reads, counted from before its goto: the notes
+        // screen reads the thread on mount, and the love-notes refresher reads
+        // it again on every signed-in start. Delivery below is only proved live
+        // if every one of them has settled before the send and none starts after.
+        let threadReadsStarted = 0;
+        let threadReadsSettled = 0;
+        const isThreadRead = (request: Request) =>
+          request.method() === 'GET' &&
+          new URL(request.url()).pathname.endsWith('/rest/v1/love_notes_visible');
+        partnerPage.on('request', (request) => {
+          if (isThreadRead(request)) threadReadsStarted += 1;
+        });
+        const settleThreadRead = (request: Request) => {
+          if (isThreadRead(request)) threadReadsSettled += 1;
+        };
+        partnerPage.on('requestfinished', settleThreadRead);
+        partnerPage.on('requestfailed', settleThreadRead);
+        // A page in a second context: the fixture is bound to `page`.
+        const threadRead = interceptNetworkCall({
+          page: partnerPage,
+          method: 'GET',
+          url: LOVE_NOTES_READ,
+          timeout: 30_000,
+        });
+
         // Registered BEFORE the navigation that causes the log. Registering it
         // after would race the join and could miss it entirely, which would read
         // as "the partner never subscribed" on a perfectly healthy run.
@@ -149,12 +177,14 @@ test.describe('Love notes realtime delivery', () => {
             { cause }
           );
         }
-        await partnerPage.waitForLoadState('networkidle');
+        expect((await threadRead).status).toBe(200);
 
         // This page is not touched again until the assertion: no reload, no
-        // second goto, no refetch. `useLoveNotes.ts:126-130` is the only other
-        // read of notes there and it has already run, so anything that appears
-        // from here on can only have arrived over the broadcast.
+        // second goto, no manual refetch. Its thread reads — the screen's own
+        // mount read and the love-notes refresher's — must all have settled
+        // just before the send, and the count is checked again after delivery,
+        // so anything that appears from here on can only have arrived over the
+        // broadcast.
 
         await log.step('Send a unique note from the sender through the real UI');
         await page.goto('/notes');
@@ -174,6 +204,15 @@ test.describe('Love notes realtime delivery', () => {
           // surfaced. 30s leaves the app's bound to fire first and be seen.
           { timeout: 30_000 }
         );
+        // Checked here, after the whole sender setup, so every start-up thread
+        // read on the partner's page has had that time to start and settle.
+        await expect
+          .poll(() => threadReadsStarted - threadReadsSettled, {
+            message: "every one of the partner's thread reads has settled",
+            timeout: 15_000,
+          })
+          .toBe(0);
+        const threadReadsBeforeSend = threadReadsStarted;
         await page.getByLabel(/send message/i).click();
 
         await log.step('The private INSERT policy admits the app own client send');
@@ -199,6 +238,9 @@ test.describe('Love notes realtime delivery', () => {
 
         await log.step('The note reaches the partner live, with no reload and no re-navigation');
         await expect(partnerPage.getByTestId('love-note-message').getByText(noteText)).toBeVisible();
+        expect(threadReadsStarted, 'no thread read may deliver the note instead').toBe(
+          threadReadsBeforeSend
+        );
       } finally {
         // A close that rejects must not become the failure the report shows
         // instead of the real one.

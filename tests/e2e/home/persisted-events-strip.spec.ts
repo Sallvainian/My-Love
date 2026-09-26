@@ -45,8 +45,10 @@
  *
  * No deviation. `test` comes from the merged fixtures; the one eventually
  * consistent wait uses `recurse` rather than a bare `expect.poll` or a
- * `waitForTimeout`; nothing here observes or stubs an application endpoint, so
- * `interceptNetworkCall` has no call site to own.
+ * `waitForTimeout`. `interceptNetworkCall` observes Home's upcoming events read,
+ * armed before each `goto` and awaited before the first assertion, so every
+ * card and absence below is read against a load that has answered. Nothing is
+ * stubbed.
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
@@ -59,11 +61,13 @@ import {
   stalePersistedMood,
 } from '../../support/helpers/persisted-blob';
 import { clockAnchor } from '../../support/helpers/events';
+import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 
 test.describe('stale persisted events never rehydrate', () => {
   test('[P0] a device carrying a previous couple\'s events blob shows none of it, and Home still renders', async ({
     page,
     coupleEvents,
+    interceptNetworkCall,
   }) => {
     // A real row for this worker's own couple, so "Home rendered" is proved by
     // a card that IS on screen rather than only by the absence of one that is
@@ -76,7 +80,9 @@ test.describe('stale persisted events never rehydrate', () => {
     const stale = stalePersistedEvent();
     await seedPersistedBlob(page, { events: [stale] });
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     // The real card renders — so the events render path ran to completion.
     const realCard = page.getByTestId(eventCardTestId(real.label));
@@ -100,13 +106,16 @@ test.describe('stale persisted events never rehydrate', () => {
   test('[P1] stripping the stale key leaves the rest of the persisted blob working', async ({
     page,
     coupleEvents,
+    interceptNetworkCall,
   }) => {
     // No real rows: this case is about the surrounding keys, and an empty
     // events column keeps the assertions below about nothing else.
     await coupleEvents.clear();
     await seedPersistedBlob(page, { events: [stalePersistedEvent()] });
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     await expect(page.getByTestId('time-together')).toBeVisible();
 

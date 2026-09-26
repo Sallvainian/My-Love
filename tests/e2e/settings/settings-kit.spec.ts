@@ -11,7 +11,8 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import type { Page } from '@playwright/test';
-import { navigateTo } from '../../support/helpers/navigation';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
+import { openSettingsFromHome } from '../../support/helpers/settings-screen';
 
 const KIT_CARD = {
   light: 'rgb(255, 255, 255)', // #ffffff
@@ -23,12 +24,14 @@ const KIT_DANGER = {
   dark: 'rgb(248, 113, 113)', // #f87171
 } as const;
 
-async function openSettings(page: Page, colorScheme: 'light' | 'dark') {
+async function openSettings(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  colorScheme: 'light' | 'dark'
+) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme });
-  await page.goto('/');
-  await navigateTo(page, 'settings');
-  await expect(page.getByTestId('settings-view')).toBeVisible();
+  await openSettingsFromHome(page, interceptNetworkCall);
 }
 
 test.describe('Settings on the style kit', () => {
@@ -42,8 +45,9 @@ test.describe('Settings on the style kit', () => {
   for (const colorScheme of ['light', 'dark'] as const) {
     test(`[P1] should render grouped kit cards and a quiet Sign out in ${colorScheme}`, async ({
       page,
+      interceptNetworkCall,
     }) => {
-      await openSettings(page, colorScheme);
+      await openSettings(page, interceptNetworkCall, colorScheme);
       const view = page.getByTestId('settings-view');
 
       // One heading per countdown group; the old inner titles are gone.
@@ -72,8 +76,13 @@ test.describe('Settings on the style kit', () => {
       await expect(signOut).toHaveText('Sign out');
 
       // No horizontal page scroll at phone width, measured once the events
-      // list has settled so its final rows are what is measured.
-      await expect(page.getByTestId('events-settings-loading')).toHaveCount(0);
+      // list has settled so its final rows are what is measured. The loading
+      // slot is also gone on the error state, so only a loaded state passes,
+      // and the load-error banner a failed load shows above rows is absent.
+      await expect(
+        page.getByTestId('events-settings-list').or(page.getByTestId('events-settings-empty'))
+      ).toBeVisible();
+      await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
       const widths = await page.evaluate(() => ({
         scroll: document.documentElement.scrollWidth,
         client: document.documentElement.clientWidth,
@@ -84,8 +93,9 @@ test.describe('Settings on the style kit', () => {
 
   test('[P1] should replay the welcome message from About and return to Settings', async ({
     page,
+    interceptNetworkCall,
   }) => {
-    await openSettings(page, 'light');
+    await openSettings(page, interceptNetworkCall, 'light');
     const before = await page.evaluate(() => localStorage.getItem('lastWelcomeView'));
 
     await page.getByTestId('settings-replay-welcome').click();

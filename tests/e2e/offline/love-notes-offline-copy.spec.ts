@@ -22,6 +22,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { LOVE_NOTES_READ } from '../../support/helpers/reads';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -153,6 +154,7 @@ test.describe('Love notes from the local copy', () => {
   test('a thread loaded online is listed offline after a reload, image included', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const stamp = Date.now();
     const textContent = `E2E offline text ${stamp}`;
@@ -167,7 +169,13 @@ test.describe('Love notes from the local copy', () => {
       const path = imagePath;
 
       // GIVEN: the thread loads online; showing the image caches it.
+      const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
       await page.goto('/notes');
+      const thread = await threadRead;
+      expect(thread.status).toBe(200);
+      expect(thread.responseJson).toEqual(
+        expect.arrayContaining(noteIds.map((id) => expect.objectContaining({ id })))
+      );
       await expect(noteBubble(page, textContent)).toBeVisible();
       await expect(noteBubble(page, imageContent).locator('img')).toBeVisible();
       await expect
@@ -216,13 +224,16 @@ test.describe('Love notes from the local copy', () => {
   test('a note written while offline appears after reconnect without a reload', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const content = `E2E reconnect note ${Date.now()}`;
     let noteId: string | null = null;
 
     try {
       // GIVEN: signed in on the Notes screen, thread loaded, then offline.
+      const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
       await page.goto('/notes');
+      expect((await threadRead).status).toBe(200);
       await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
       await expect.poll(() => savedNoteIds(page)).not.toBeNull();
       await goOffline(page, true);

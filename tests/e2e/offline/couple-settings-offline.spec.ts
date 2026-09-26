@@ -14,6 +14,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import { COUPLE_SETTINGS_READ } from '../../support/helpers/reads';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -103,6 +104,7 @@ test.describe('Couple start date from the local copy', () => {
   test('the start date from one online session is shown when the server cannot be reached', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const pair = orderedPair(userId, partnerId);
@@ -114,7 +116,9 @@ test.describe('Couple start date from the local copy', () => {
 
     try {
       // GIVEN: one online session loads the date, which saves the copy.
+      const coupleRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
       await page.goto('/');
+      expect((await coupleRead).status).toBe(200);
       await expect.poll(() => storeStart(page)).toBe(startIso);
       await expect
         .poll(() => savedCoupleCopy(page))
@@ -155,6 +159,7 @@ test.describe('Couple start date from the local copy', () => {
   test('an offline edit is refused with a needs-a-connection message and changes nothing', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const pair = orderedPair(userId, partnerId);
@@ -164,7 +169,9 @@ test.describe('Couple start date from the local copy', () => {
     await setPairStart(supabaseAdmin, pair, startIso);
 
     try {
+      const coupleRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
       await page.goto('/settings');
+      expect((await coupleRead).status).toBe(200);
       await expect.poll(() => storeStart(page)).toBe(startIso);
       const dateInput = page.getByTestId('settings-together-since-date');
       await expect(dateInput).toHaveValue(await localDateOf(page, startIso));
@@ -178,7 +185,7 @@ test.describe('Couple start date from the local copy', () => {
       );
       // Store, copy and server all still hold the saved date.
       expect(await storeStart(page)).toBe(startIso);
-      expect(await savedCoupleCopy(page)).toEqual({
+      await expect.poll(() => savedCoupleCopy(page)).toEqual({
         status: 'linked',
         partnerId,
         relationshipStart: startIso,

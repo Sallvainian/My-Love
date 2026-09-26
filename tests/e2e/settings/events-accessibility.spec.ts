@@ -62,7 +62,6 @@
  * should stay armed, and a 4xx/5xx during an accessibility run is real signal.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { navigateTo } from '../../support/helpers/navigation';
 import {
   clearOwnPairEvents,
   clearPairEvents,
@@ -70,6 +69,7 @@ import {
   resolveOwnPair,
   seedEvent,
 } from '../../support/helpers/events';
+import { openSettingsFromHome } from '../../support/helpers/settings-screen';
 import { log } from '@seontechnologies/playwright-utils';
 import type { Page } from '@playwright/test';
 
@@ -99,7 +99,7 @@ test.afterEach(async ({ supabaseAdmin }) => {
 test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
   test(
     '[P1] DE.5-E2E-001a the settled events section has no axe violations',
-    async ({ page, supabaseAdmin }) => {
+    async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
       // Seeded rather than left empty: a row brings the list, the row heading,
@@ -124,9 +124,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
 
       await log.step('Open Settings and let the events section settle');
-      await page.goto('/');
-      await navigateTo(page, 'settings');
-      await expect(page.getByTestId('settings-view')).toBeVisible();
+      await openSettingsFromHome(page, interceptNetworkCall);
 
       const row = rowFor(page, A11Y_LABEL);
       await expect(row).toBeVisible();
@@ -149,7 +147,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
 
   test(
     '[P1] DE.5-E2E-001b the open add/edit form dialog has no axe violations',
-    async ({ page, supabaseAdmin, recurse }) => {
+    async ({ page, supabaseAdmin, recurse, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
       // A row is seeded so the form can be opened in its EDIT shape: pre-filled
@@ -167,8 +165,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
 
       await log.step('Open the edit form for the seeded row');
-      await page.goto('/');
-      await navigateTo(page, 'settings');
+      await openSettingsFromHome(page, interceptNetworkCall);
 
       const row = rowFor(page, A11Y_LABEL);
       await expect(row).toBeVisible();
@@ -207,7 +204,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
 
   test(
     '[P1] DE.5-E2E-001c the open delete confirmation has no axe violations',
-    async ({ page, supabaseAdmin, recurse }) => {
+    async ({ page, supabaseAdmin, recurse, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
       await seedEvent(supabaseAdmin, {
@@ -222,8 +219,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
 
       await log.step('Open the delete confirmation for the seeded row');
-      await page.goto('/');
-      await navigateTo(page, 'settings');
+      await openSettingsFromHome(page, interceptNetworkCall);
 
       const row = rowFor(page, A11Y_LABEL);
       await expect(row).toBeVisible();
@@ -259,7 +255,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
 
   test(
     '[P1] DE.5-E2E-001d the empty events section has no axe violations',
-    async ({ page, supabaseAdmin }) => {
+    async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       // Intentionally do not seed a row: this renders the empty-state Add
       // action that the three original scans never exercised.
@@ -268,8 +264,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
 
       await log.step('Open Settings with an empty events section');
-      await page.goto('/');
-      await navigateTo(page, 'settings');
+      await openSettingsFromHome(page, interceptNetworkCall);
 
       const eventsSection = page.getByTestId('events-settings');
       await expect(eventsSection).toBeVisible();

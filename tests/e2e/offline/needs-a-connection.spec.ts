@@ -34,9 +34,17 @@
  * are also aborted, so a regressed guard cannot insert one.
  */
 import type { Page, Request } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import {
+  INTERACTIONS_READ,
+  LOVE_NOTES_READ,
+  PHOTOS_LIST_READ,
+  gateNameRead,
+  partnerRecordRead,
+} from '../../support/helpers/reads';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -112,13 +120,20 @@ async function pairPhotoIds(supabaseAdmin: TypedSupabaseClient): Promise<string[
 }
 
 test.describe('Photos offline', () => {
-  test('upload is refused before anything is sent', async ({ page, supabaseAdmin }) => {
+  test('upload is refused before anything is sent', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
     const before = await pairPhotoIds(supabaseAdmin);
 
     try {
+      const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
       await page.goto('/photos');
+      expect((await listRead).status).toBe(200);
+      // The loading skeleton also carries `photo-gallery`; only these two are loaded.
       await expect(
-        page.getByTestId('photo-gallery').or(page.getByTestId('photo-gallery-empty-state'))
+        page.getByTestId('photo-gallery-grid').or(page.getByTestId('photo-gallery-empty-state'))
       ).toBeVisible();
       await page
         .getByTestId('photo-gallery-upload-fab')
@@ -145,7 +160,11 @@ test.describe('Photos offline', () => {
     }
   });
 
-  test('delete is refused and the confirmation stays open', async ({ page, supabaseAdmin }) => {
+  test('delete is refused and the confirmation stays open', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const stamp = Date.now();
     const path = `${userId}/e2e-needs-connection-${stamp}.png`;
@@ -174,7 +193,14 @@ test.describe('Photos offline', () => {
       expect(error).toBeNull();
       photoId = data!.id;
 
+      const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
       await page.goto('/photos');
+      const list = await listRead;
+      expect(list.status).toBe(200);
+      expect(list.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: photoId })])
+      );
+      await expect(page.getByTestId('photo-gallery-grid')).toBeVisible();
       await page
         .getByTestId('photo-gallery-grid')
         .getByRole('button', { name: caption, exact: true })
@@ -220,6 +246,7 @@ test.describe('Display name offline', () => {
   test('a name change is refused inline and the profile row is unchanged', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const readName = async () => {
@@ -232,13 +259,19 @@ test.describe('Display name offline', () => {
       return data?.display_name ?? null;
     };
     const original = await readName();
+    expect(original, "premise: this worker's pool account has a name").toBeTruthy();
 
     try {
       await page.goto('/');
+      // Settings' mount reads the name; the app's own gate read of the same
+      // URL may answer first, with the same name.
+      const nameRead = interceptNetworkCall({ method: 'GET', url: gateNameRead(userId) });
       await navigateTo(page, 'settings');
+      expect((await nameRead).status).toBe(200);
       const nameRow = page.getByTestId('settings-display-name');
       await expect(nameRow).toBeVisible();
-      await expect(nameRow).not.toHaveText('Loading...');
+      // The saved name is the only text a finished read can show.
+      await expect(nameRow).toHaveText(original!.trim());
       await page.getByTestId('settings-display-name-edit').click();
       await expect(page.getByTestId('display-name-setup')).toBeVisible();
       await page.getByLabel('Display Name').fill(`E2E ${Date.now().toString().slice(-8)}`);
@@ -372,6 +405,7 @@ test.describe('Poke and kiss badge offline', () => {
     test(`a ${type} plays but is not marked seen, and the badge stays`, async ({
       page,
       supabaseAdmin,
+      interceptNetworkCall,
     }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       let interactionId: string | null = null;
@@ -385,7 +419,13 @@ test.describe('Poke and kiss badge offline', () => {
         expect(error).toBeNull();
         interactionId = data!.id;
 
+        const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
         await page.goto('/partner');
+        const history = await historyRead;
+        expect(history.status).toBe(200);
+        expect(history.responseJson).toEqual(
+          expect.arrayContaining([expect.objectContaining({ id: interactionId, viewed: false })])
+        );
         const badge = page.getByTestId('notification-badge');
         await expect(badge).toBeVisible();
 
@@ -436,13 +476,27 @@ function notesBanner(page: Page, text: string) {
   return page.getByRole('alert').filter({ hasText: text });
 }
 
-async function openNotesWithPartner(page: Page, supabaseAdmin: TypedSupabaseClient) {
+/**
+ * Open Notes once the partner record and the thread have both been read, and
+ * return the thread read so a caller can check a seeded note is in it.
+ */
+async function openNotesWithPartner(
+  page: Page,
+  supabaseAdmin: TypedSupabaseClient,
+  interceptNetworkCall: InterceptNetworkCallFn
+) {
   const { partnerId } = await resolveOwnPair(supabaseAdmin);
+  const partnerRead = interceptNetworkCall({ method: 'GET', url: partnerRecordRead(partnerId) });
+  const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
   await page.goto('/notes');
+  const [partner, thread] = await Promise.all([partnerRead, threadRead]);
+  expect(partner.status).toBe(200);
+  expect(thread.status).toBe(200);
   await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => window.__APP_STORE__?.getState().partner?.id ?? null))
     .toBe(partnerId);
+  return thread;
 }
 
 async function attachPicture(page: Page) {
@@ -464,10 +518,11 @@ test.describe('Love notes offline', () => {
   test('a picture note is refused with one message, and the composer keeps text and picture', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const text = `E2E-PIC-OFFLINE-${Date.now()}`;
     try {
-      await openNotesWithPartner(page, supabaseAdmin);
+      await openNotesWithPartner(page, supabaseAdmin, interceptNetworkCall);
       await goOffline(page, true);
       await attachPicture(page);
       const input = page.getByLabel('Love note message input');
@@ -496,10 +551,11 @@ test.describe('Love notes offline', () => {
   test('Retry on a failed picture note is refused, and the note stays failed', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const text = `E2E-PIC-RETRY-${Date.now()}`;
     try {
-      await openNotesWithPartner(page, supabaseAdmin);
+      await openNotesWithPartner(page, supabaseAdmin, interceptNetworkCall);
 
       // GIVEN: a picture note that failed online — its upload never arrives.
       await page.route(UPLOAD_FUNCTION, (route) => route.abort());
@@ -533,6 +589,7 @@ test.describe('Love notes offline', () => {
   test('removing a note is refused in the dialog, and the note never leaves the list', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const content = `E2E-REMOVE-OFFLINE-${Date.now()}`;
@@ -547,7 +604,10 @@ test.describe('Love notes offline', () => {
       expect(error).toBeNull();
       noteId = data!.id;
 
-      await openNotesWithPartner(page, supabaseAdmin);
+      const thread = await openNotesWithPartner(page, supabaseAdmin, interceptNetworkCall);
+      expect(thread.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: noteId })])
+      );
       const bubble = noteBubble(page, content);
       await expect(bubble).toBeVisible();
 

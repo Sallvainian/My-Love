@@ -37,11 +37,13 @@
  * uuid.
  */
 import { randomUUID } from 'node:crypto';
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Page, Request } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
+import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { partnerMoodListRead } from '../../support/helpers/reads';
 
 /**
  * The receiving page's own view reporting its join.
@@ -132,6 +134,36 @@ test.describe('Partner mood realtime delivery', () => {
         });
         const partnerPage: Page = await partnerContext.newPage();
 
+        // The receiver's reads of the sender's moods, tracked from before its
+        // goto: the view's mount read and the start refresh both send one, and
+        // a read still in flight at the send could land the mood without the
+        // broadcast. The receiver's partner is this test's sender.
+        const senderMoodsRead = partnerMoodListRead(userId);
+        const isSenderMoodsRead = (request: Request) => {
+          if (request.method() !== 'GET') return false;
+          const url = new URL(request.url());
+          return (
+            url.pathname.endsWith('/rest/v1/moods') &&
+            url.searchParams.get('user_id') === `eq.${userId}`
+          );
+        };
+        let senderMoodReadsInFlight = 0;
+        partnerPage.on('request', (request) => {
+          if (isSenderMoodsRead(request)) senderMoodReadsInFlight += 1;
+        });
+        const settleSenderMoodsRead = (request: Request) => {
+          if (isSenderMoodsRead(request)) senderMoodReadsInFlight -= 1;
+        };
+        partnerPage.on('requestfinished', settleSenderMoodsRead);
+        partnerPage.on('requestfailed', settleSenderMoodsRead);
+        // A page in a second context: the fixture is bound to `page`.
+        const moodListRead = interceptNetworkCall({
+          page: partnerPage,
+          method: 'GET',
+          url: senderMoodsRead,
+          timeout: 30_000,
+        });
+
         // Registered BEFORE the navigation that causes the log. Registering it
         // after would race the join and could miss it entirely, which would read
         // as "the partner never subscribed" on a perfectly healthy run.
@@ -149,7 +181,7 @@ test.describe('Partner mood realtime delivery', () => {
             { cause }
           );
         }
-        await partnerPage.waitForLoadState('networkidle');
+        expect((await moodListRead).status).toBe(200);
 
         // This page is not touched again until the assertions: no reload, no
         // second goto, no manual refresh. Its refresh button
@@ -174,6 +206,18 @@ test.describe('Partner mood realtime delivery', () => {
           // (`src/api/ephemeralBroadcast.ts:77`), so a slow send would expire
           // both bounds in the same instant and the report would not say which.
           { timeout: 30_000 }
+        );
+        // Checked here, after the whole sender setup, so the receiver's start-up
+        // reads — including the one its mood sync sends only once its own sync
+        // has finished — have had that time to start and settle.
+        await expect
+          .poll(() => senderMoodReadsInFlight, {
+            message: "none of the receiver's reads of the sender's moods is in flight",
+          })
+          .toBe(0);
+        await expect(partnerPage.getByTestId('partner-mood-refresh-button')).toHaveAttribute(
+          'aria-busy',
+          'false'
         );
         await page.getByTestId('mood-submit-button').click();
 

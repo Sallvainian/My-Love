@@ -43,7 +43,6 @@
  * unlinked, no password reset, no shared row nulled.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { navigateTo } from '../../support/helpers/navigation';
 import {
   clearOwnPairEvents,
   clearPairEvents,
@@ -51,6 +50,7 @@ import {
   resolveOwnPair,
   seedEvent,
 } from '../../support/helpers/events';
+import { openSettingsFromHome } from '../../support/helpers/settings-screen';
 import { log } from '@seontechnologies/playwright-utils';
 import type { Page } from '@playwright/test';
 
@@ -116,8 +116,7 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
       });
 
       await log.step('Open Settings on a row this account owns');
-      await page.goto('/');
-      await navigateTo(page, 'settings');
+      await openSettingsFromHome(page, interceptNetworkCall);
 
       const row = rowFor(page, EDIT_LABEL);
       await expect(row).toBeVisible();
@@ -174,8 +173,7 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
       });
 
       await log.step('Open Settings on a row this account owns');
-      await page.goto('/');
-      await navigateTo(page, 'settings');
+      await openSettingsFromHome(page, interceptNetworkCall);
 
       const row = rowFor(page, DELETE_LABEL);
       await expect(row).toBeVisible();
@@ -221,13 +219,12 @@ test.describe('Saving an event while offline (DE.5-E2E-003)', () => {
   // signal about the app during the offline window, not about this test.
   test(
     '[P3] DE.5-E2E-003 an offline save surfaces the service offline message in the form',
-    async ({ page, supabaseAdmin }) => {
+    async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
 
       await log.step('Open the add form while still online');
-      await page.goto('/');
-      await navigateTo(page, 'settings');
+      await openSettingsFromHome(page, interceptNetworkCall);
       await expect(page.getByTestId('events-settings-empty')).toBeVisible();
 
       await page.getByTestId('events-settings-empty-add').click();

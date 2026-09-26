@@ -48,7 +48,7 @@
  * the broader seed/date surface used by the activated event suites.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { navigateTo } from '../../support/helpers/navigation';
+import { openSettingsFromHome } from '../../support/helpers/settings-screen';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import type { TypedSupabaseClient } from '../../support/factories';
 import {
@@ -140,8 +140,7 @@ test.describe(
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-      await page.goto('/');
-      await navigateTo(page, 'settings');
+      await openSettingsFromHome(page, interceptNetworkCall);
       await expect(page.getByTestId('events-settings-empty')).toBeVisible();
 
       // Registered before the form is opened, so the route is in place long

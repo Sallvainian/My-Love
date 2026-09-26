@@ -33,6 +33,7 @@ import {
   resolveOwnPair,
   seedEvent,
 } from '../../support/helpers/events';
+import { PAST_EVENTS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 
 test.afterEach(async ({ supabaseAdmin }) => {
   await clearOwnPairEvents(supabaseAdmin);
@@ -49,6 +50,7 @@ test.describe('Home dashboard reads events from the store', () => {
   test('[P0] shows own and partner future events, hides a past one, and leaves other cards unchanged', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
 
@@ -88,7 +90,9 @@ test.describe('Home dashboard reads events from the store', () => {
       }
     );
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     const futureCard = page.getByTestId('event-countdown-future-meetup-e2e');
     await expect(futureCard).toBeVisible();
@@ -112,11 +116,9 @@ test.describe('Home dashboard reads events from the store', () => {
     // Soonest-first, straight from the store: own event is +14d, partner's is
     // +21d. `events` is rendered in store order with no re-sort, so a
     // regression that re-sorts or reverses shows up here.
-    const eventLabels = await page
-      .getByTestId(/^event-countdown-(future|partner)-meetup-e2e$/)
-      .locator('h3')
-      .allTextContents();
-    expect(eventLabels).toEqual(['Future Meetup E2E', 'Partner Meetup E2E']);
+    await expect(
+      page.getByTestId(/^event-countdown-(future|partner)-meetup-e2e$/).locator('h3')
+    ).toHaveText(['Future Meetup E2E', 'Partner Meetup E2E']);
 
     // CAP-4: TimeTogether, both BirthdayCountdown cards and the Wedding
     // EventCountdown render unchanged alongside the events.
@@ -137,6 +139,7 @@ test.describe('Home dashboard reads events from the store', () => {
   test('[P0] shows the empty-state placeholder for an account with zero events', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
 
@@ -145,7 +148,9 @@ test.describe('Home dashboard reads events from the store', () => {
     // visible to the account, and Home's SELECT reads own + partner.
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
     await expect(page.getByText('Event passed')).toHaveCount(0);
@@ -199,6 +204,7 @@ test.describe('Home dashboard reads events from the store', () => {
   test('[P0] shows the placeholder when every stored event has already passed', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -224,7 +230,12 @@ test.describe('Home dashboard reads events from the store', () => {
       icon: 'calendar',
     });
 
+    const pastRead = interceptNetworkCall({ method: 'GET', url: PAST_EVENTS_READ });
     await page.goto('/');
+    // Both past rows reached the store, so their absence below is the filter's.
+    const past = await pastRead;
+    expect(past.status).toBe(200);
+    expect(past.responseJson).toHaveLength(2);
 
     await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
     await expect(page.getByText('Old Meetup E2E')).toHaveCount(0);
@@ -235,6 +246,7 @@ test.describe('Home dashboard reads events from the store', () => {
   test('[P0] renders an event dated today, with a null description', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -256,7 +268,9 @@ test.describe('Home dashboard reads events from the store', () => {
     });
 
     await page.clock.install({ time: anchor });
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     const card = page.getByTestId('event-countdown-today-meetup-e2e');
     await expect(card).toBeVisible();
@@ -264,7 +278,7 @@ test.describe('Home dashboard reads events from the store', () => {
     await expect(card.getByText('Today!')).toBeVisible();
 
     // No description paragraph is rendered next to the label for a null value.
-    expect(await card.locator('h3 ~ p').count()).toBe(0);
+    await expect(card.locator('h3 ~ p')).toHaveCount(0);
 
     await expect(page.getByTestId('events-empty-placeholder')).toHaveCount(0);
   });
@@ -272,6 +286,7 @@ test.describe('Home dashboard reads events from the store', () => {
   test('[P0] caps the events column at six cards, keeping the soonest', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -343,15 +358,13 @@ test.describe('Home dashboard reads events from the store', () => {
       icon: 'calendar',
     });
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     await expect(page.getByTestId('event-countdown-first-meetup-e2e')).toBeVisible();
 
-    const cardLabels = await page
-      .getByTestId(/^event-countdown-\w+-meetup-e2e$/)
-      .locator('h3')
-      .allTextContents();
-    expect(cardLabels).toEqual([
+    await expect(page.getByTestId(/^event-countdown-\w+-meetup-e2e$/).locator('h3')).toHaveText([
       'First Meetup E2E',
       'Second Meetup E2E',
       'Third Meetup E2E',
@@ -374,6 +387,7 @@ test.describe('Home dashboard reads events from the store', () => {
   test('[P0] a background reload never blanks a card already on screen', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -386,7 +400,9 @@ test.describe('Home dashboard reads events from the store', () => {
       icon: 'calendar',
     });
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     const card = page.getByTestId('event-countdown-reload-meetup-e2e');
     await expect(card).toBeVisible();

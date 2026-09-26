@@ -22,6 +22,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import { ownMoodHistoryRead, partnerMoodListRead } from '../../support/helpers/reads';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -144,6 +145,7 @@ test.describe('Mood history and partner moods offline', () => {
   test('a device with an empty moods store shows earlier server moods in the calendar', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const anchor = clockAnchor();
@@ -169,7 +171,13 @@ test.describe('Mood history and partner moods offline', () => {
       // GIVEN: signed in, then the moods store is emptied — a fresh device.
       // The clock survives the reload below, so both loads share one month.
       await page.clock.install({ time: anchor });
+      const startBackfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
       await page.goto('/');
+      const started = await startBackfill;
+      expect(started.status).toBe(200);
+      expect(started.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: moodId })])
+      );
       await expect.poll(() => page.evaluate(() => window.__APP_STORE__?.getState().userId ?? null)).toBe(userId);
       // This load's own start backfill must land first, or it could merge after
       // the clear below.
@@ -180,16 +188,25 @@ test.describe('Mood history and partner moods offline', () => {
       expect(await ownMoodRows(page)).toEqual([]);
 
       // WHEN: the app starts again.
+      const reloadBackfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
       await page.reload();
+      const reloaded = await reloadBackfill;
+      expect(reloaded.status).toBe(200);
+      expect(reloaded.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: moodId })])
+      );
       await navigateTo(page, 'mood');
       await page.getByTestId('mood-tab-history').click();
       await expect(page.getByTestId('mood-calendar')).toBeVisible();
-      const header = await page.getByTestId('calendar-month-header').textContent();
+      // The anchor's month, which the installed clock makes "this month".
+      const monthOnScreen =
+        `${anchor.toLocaleString('en-US', { month: 'long' })} ${anchor.getFullYear()}`;
+      await expect(page.getByTestId('calendar-month-header')).toHaveText(monthOnScreen);
 
       // THEN: the server mood fills the store and shows on the calendar, in the
       // month on screen, without navigating.
       await expect(page.getByTestId(`calendar-day-${dateKey}`)).toHaveAttribute('data-has-mood', 'true');
-      await expect(page.getByTestId('calendar-month-header')).toHaveText(header ?? '');
+      await expect(page.getByTestId('calendar-month-header')).toHaveText(monthOnScreen);
       await expect
         .poll(async () => (await ownMoodRows(page)).find((row) => row.date === dateKey)?.synced ?? null)
         .toBe(true);
@@ -202,6 +219,7 @@ test.describe('Mood history and partner moods offline', () => {
   test('partner moods loaded online are listed offline after a reload', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { partnerId } = await resolveOwnPair(supabaseAdmin);
     const note = `partner-copy-e2e-${randomUUID()}`;
@@ -223,7 +241,13 @@ test.describe('Mood history and partner moods offline', () => {
 
     try {
       // GIVEN: the Partner screen loaded online, which saves the copy.
+      const partnerRead = interceptNetworkCall({ method: 'GET', url: partnerMoodListRead(partnerId) });
       await page.goto('/partner');
+      const partnerMoods = await partnerRead;
+      expect(partnerMoods.status).toBe(200);
+      expect(partnerMoods.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ note })])
+      );
       await expect(seededCard).toBeVisible();
       await expect.poll(async () => (await savedPartnerNotes(page))?.includes(note) ?? false).toBe(true);
 
