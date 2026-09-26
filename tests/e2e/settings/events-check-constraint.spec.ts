@@ -39,9 +39,10 @@
  * here the 4xx is the subject.
  *
  * The client-side mirror itself is not re-asserted here: it is owned by
- * `src/components/Settings/__tests__/EventsSettings.test.tsx:404`, which rejects
- * a 101-character label at component level. Re-testing it through a browser
- * would be the same claim, slower and more brittle.
+ * `src/components/Settings/__tests__/EventsSettings.validation.test.tsx`
+ * ('rejects a 101-character label, naming the 100-character limit'), at
+ * component level. Re-testing it through a browser would be the same claim,
+ * slower and more brittle.
  *
  * User-id resolution and event clearing stay self-contained because this
  * constraint-only case predates the shared lifecycle helper and does not need

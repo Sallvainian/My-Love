@@ -2,7 +2,7 @@
  * DW-113's third half: the part a person actually sees.
  *
  * The hook now reports a feed status and `useLoveNotes` passes it through, and
- * both of those are covered — `useRealtimeMessages.test.ts` pins the
+ * both of those are covered — `useRealtimeMessages.closes.test.ts` pins the
  * transitions. What nothing asserted is the render: whether the notice appears
  * at all, what it says, and whether it stays out of the way when the feed is
  * healthy. A regression that deleted the `<span>`, inverted the ternary, or

@@ -21,8 +21,8 @@
  * longer goes out offline (DW-222), so those screens also assert that none does.
  *
  * Not covered here, by the spec's decision, and covered by unit tests instead
- * (tests/unit/stores/notesSlice.offlineQueue.test.ts and
- * notesSlice.localCopy.test.ts):
+ * (tests/unit/stores/notesSlice.offlineQueue.test.ts,
+ * notesSlice.localCopy.test.ts and notesSlice.localCopyWrites.test.ts):
  * - the no-partner love-notes row: pool users are always linked, and the
  *   partner loads from the saved copy, so "no partner loaded" is unreachable;
  * - older notes offline: it needs a thread longer than one page.

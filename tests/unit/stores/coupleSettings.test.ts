@@ -302,7 +302,7 @@ describe('couple settings on the local copy', () => {
   });
 
   // The late-copy-read freshness guard (same shape as the anniversaries cases
-  // in accountDataSlices.test.ts).
+  // in accountDataSlices.anniversaries.test.ts).
   it('a copy read that lands after a confirmed save does not replace it', async () => {
     const read = deferred<unknown>();
     copyRead.hook = () => read.promise;

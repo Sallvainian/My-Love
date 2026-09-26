@@ -233,7 +233,7 @@ function seedSignedInSession(): void {
 /**
  * Every switch to a new user starts a fire-and-forget IndexedDB reload of the
  * rotation pool (`reloadRotationPool` in authSlice.ts). Nothing here asserts on
- * it -- loaderIdentityGuards.test.ts does -- but left running it can log after
+ * it -- loaderIdentityGuards.*.test.ts does -- but left running it can log after
  * the file's worker has closed, which Vitest reports as an unhandled
  * EnvironmentTeardownError and fails the whole run on. So each reload is
  * recorded and every test waits for its own to settle.

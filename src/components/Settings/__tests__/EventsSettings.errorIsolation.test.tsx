@@ -40,10 +40,10 @@
  * DW-26 and the online flag in the Settings load effect for DW-27. These active
  * tests preserve both fixes without weakening the original red assertions.
  *
- * HARNESS: duplicated from `EventsSettings.test.tsx:20-180` rather than
- * extracted. That is the house pattern here — `EventsSettings.test.tsx` and
- * `EventsSettings.focus.test.tsx` duplicate the same way, and the story's review
- * pass explicitly dismissed extracting it.
+ * HARNESS: duplicated rather than imported — from the helpers in
+ * `eventsSettingsKit.tsx` and the mocks at the top of `EventsSettings.test.tsx`.
+ * `EventsSettings.focus.test.tsx` duplicates it the same way, and the story's
+ * review pass explicitly dismissed extracting it.
  */
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

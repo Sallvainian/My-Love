@@ -36,7 +36,8 @@
  *
  * The Supabase client is faked per file — `tests/setup.ts` installs no Supabase
  * mock — with a builder that rejects whatever it is handed. Same idiom as
- * `tests/unit/services/eventsService.test.ts:173` and `./interactionService.test.ts:35`.
+ * `eventsQuery` in `tests/unit/services/fakeEventsBackend.ts` and
+ * `./interactionService.test.ts:35`.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 

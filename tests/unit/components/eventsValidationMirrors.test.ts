@@ -2,7 +2,8 @@
  * DE.5-UNIT-001 [P1], risk R-007: form declarations mirror the shared contract.
  * The pgTAP companion compares that contract with every installed events CHECK
  * after all migrations. Ordinary unit tests need no database. Actual submission
- * boundaries are covered in EventsSettings.test.tsx, independently of constants.
+ * boundaries are covered in EventsSettings.validation.test.tsx, independently
+ * of constants.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

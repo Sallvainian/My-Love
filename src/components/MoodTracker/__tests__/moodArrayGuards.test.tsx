@@ -470,8 +470,9 @@ describe('MoodTracker moods guard', () => {
 });
 
 /**
- * Standalone store built from the slice, the way `tests/unit/stores/moodSlice.test.ts`
- * builds one — `fetchPartnerMoods` is an action, not a render.
+ * Standalone store built from the slice, the way `createTestStore` in
+ * `tests/unit/stores/moodSliceFixture.ts` builds one — `fetchPartnerMoods` is
+ * an action, not a render.
  */
 function createTestStore() {
   const stateRef = { current: null as (MoodSlice & Record<string, unknown>) | null };
@@ -499,7 +500,9 @@ describe('moodSlice.fetchPartnerMoods mood_types guard', () => {
     mockedGetPartnerId.mockResolvedValue(PARTNER_ID);
   });
 
-  // Matching `tests/unit/stores/moodSlice.test.ts:84-86`, plus the `onLine`
+  // Matching the `describe('moodSlice')` `afterEach` in
+  // `tests/unit/stores/moodSlice.test.ts` (repeated in each
+  // `moodSlice.*.test.ts`), plus the `onLine`
   // redefinition this describe makes — it is a plain data property, so
   // `restoreAllMocks` does not undo it and it would leak into anything appended
   // after this describe.
