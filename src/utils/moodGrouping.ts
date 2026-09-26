@@ -57,8 +57,9 @@ export function groupMoodsByDate(moods: SupabaseMood[]): MoodGroup[] {
  * @example
  * ```typescript
  * getDateLabel(new Date()); // 'Today'
- * getDateLabel(new Date(2024, 10, 14)); // 'Yesterday' on 15 Nov 2024
- * getDateLabel(new Date(2024, 10, 15)); // 'Nov 15'
+ * // on 15 Nov 2024:
+ * getDateLabel(new Date(2024, 10, 14)); // 'Yesterday'
+ * getDateLabel(new Date(2024, 10, 10)); // 'Nov 10'
  * ```
  */
 function getDateLabel(date: Date): string {
