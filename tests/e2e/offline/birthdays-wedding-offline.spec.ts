@@ -131,10 +131,12 @@ test.describe('Birthdays and wedding date from the local copy', () => {
         coupleRead,
       ]);
       expect(profile.status).toBe(200);
-      // `maybeSingle` reads come back as a one-row array; `single` as the row.
+      // `maybeSingle` reads come back as a one-row array.
       expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
       expect(partnerRecord.status).toBe(200);
-      expect(partnerRecord.responseJson).toMatchObject({ id: ids.partnerId, birthday: partner });
+      expect(partnerRecord.responseJson).toEqual([
+        expect.objectContaining({ id: ids.partnerId, birthday: partner }),
+      ]);
       expect(couple.status).toBe(200);
       expect(couple.responseJson).toEqual([expect.objectContaining({ wedding_date: wedding })]);
       await recurseUntil(

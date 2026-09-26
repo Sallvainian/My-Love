@@ -61,8 +61,9 @@ test.describe('Partner profile offline', () => {
     await page.goto('/partner');
     const partnerRecord = await partnerRead;
     expect(partnerRecord.status).toBe(200);
-    const partnerName = ((partnerRecord.responseJson as { display_name: string | null } | null)
-      ?.display_name ?? '').trim();
+    // A `maybeSingle` read: PostgREST answers with a one-row array.
+    const partnerName = ((partnerRecord.responseJson as { display_name: string | null }[] | null)
+      ?.[0]?.display_name ?? '').trim();
     expect(partnerName).not.toBe('');
     const heading = page.getByTestId('partner-mood-view').getByRole('heading', { level: 1 });
     await expect(heading).toHaveText(partnerName);
