@@ -14,7 +14,8 @@
  * Story 2.3: Real-time message reception
  */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { PARTNER_NOT_CONFIGURED } from '../stores/slices/notesSlice';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
 import { useRealtimeMessages, type NoteFeedStatus } from './useRealtimeMessages';
@@ -133,6 +134,21 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
       fetchNotes();
     }
   }, [autoFetch, fetchNotes]);
+
+  // A chat opened before the link answered "Partner not configured" and had
+  // nothing to try again: the fetch above runs on mount only. When the store
+  // learns of a partner (this device accepted, or the sender heard the
+  // partner-linked broadcast), load the thread. Gated on that error so an
+  // ordinary start, where the saved partner lands after the mount fetch, does
+  // not load twice.
+  const storePartnerId = useAppStore((state) => state.partner?.id ?? null);
+  const seenStorePartnerRef = useRef(storePartnerId);
+  useEffect(() => {
+    if (seenStorePartnerRef.current === storePartnerId) return;
+    seenStorePartnerRef.current = storePartnerId;
+    if (!autoFetch || !storePartnerId || error !== PARTNER_NOT_CONFIGURED) return;
+    fetchNotes();
+  }, [autoFetch, storePartnerId, error, fetchNotes]);
 
   // Cleanup preview URLs on unmount to prevent memory leaks
   useEffect(() => {

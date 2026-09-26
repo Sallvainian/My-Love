@@ -129,7 +129,7 @@ export interface NotesSlice {
 const { PAGE_SIZE: NOTES_PAGE_SIZE, RATE_LIMIT_MAX_MESSAGES, RATE_LIMIT_WINDOW_MS } = NOTES_CONFIG;
 
 /** The error an unlinked account sees; a conclusive answer, not a failed read. */
-const PARTNER_NOT_CONFIGURED = 'Partner not configured';
+export const PARTNER_NOT_CONFIGURED = 'Partner not configured';
 
 /** The refusal for a note with a picture while the device is offline. */
 export const IMAGE_NOTE_NEEDS_CONNECTION = offlineMessage('Notes with a picture', 'send');

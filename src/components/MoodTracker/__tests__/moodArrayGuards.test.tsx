@@ -84,10 +84,19 @@ vi.mock('../../../hooks/useAuth', () => ({
 
 // `getPartnerId` resolving null keeps the real `PartnerMoodDisplay` unmounted
 // inside `MoodTracker`, so its own describe below is the only thing rendering it.
-vi.mock('../../../api/supabaseClient', () => ({
-  getPartnerId: vi.fn(),
-  supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
-}));
+vi.mock('../../../api/supabaseClient', () => {
+  // MoodTracker reads `lookupPartnerId`; each test sets the partner through
+  // this one stub, which it answers as `linked` or `unlinked`.
+  const getPartnerId = vi.fn();
+  return {
+    getPartnerId,
+    lookupPartnerId: async () => {
+      const partnerId = await getPartnerId();
+      return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
+    },
+    supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
+  };
+});
 
 vi.mock('../../../utils/backgroundSync', () => ({
   registerBackgroundSync: vi.fn(),

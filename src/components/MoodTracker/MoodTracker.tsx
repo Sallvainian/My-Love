@@ -1,7 +1,7 @@
 import { AnimatePresence, m as motion } from 'motion/react';
 import { CircleCheckBig, Cloud, CloudOff, Plus, RefreshCw, WifiOff } from 'lucide-react';
 import { useEffect, useState, type SubmitEvent } from 'react';
-import { getPartnerId } from '../../api/supabaseClient';
+import { lookupPartnerId } from '../../api/supabaseClient';
 import { CHALLENGING_MOODS, MOOD_DISPLAY, POSITIVE_MOODS } from '../../constants/moodDisplay';
 import { useAuth } from '../../hooks/useAuth';
 import { useAppStore } from '../../stores/useAppStore';
@@ -101,23 +101,27 @@ export function MoodTracker() {
     updateSyncStatus();
   }, [loadMoods, updateSyncStatus]);
 
-  // Load partner ID for partner mood display (Story 5.3) - only once on mount
+  // Load the partner ID for the partner mood display (Story 5.3): on mount, and
+  // again when the store's partner changes. Mount-only left a partner linked
+  // while this screen was open (this device accepted, or the sender heard the
+  // partner-linked broadcast) invisible here until a remount. Only a conclusive
+  // answer is kept: a failed read must not blank a partner already shown.
+  const storePartnerId = useAppStore((s) => s.partner?.id ?? null);
   useEffect(() => {
     let mounted = true;
 
     async function loadPartnerId() {
-      const id = await getPartnerId();
-      if (mounted) {
-        setPartnerId(id);
-      }
+      const lookup = await lookupPartnerId();
+      if (!mounted || lookup.status === 'error') return;
+      setPartnerId(lookup.status === 'linked' ? lookup.partnerId : null);
     }
 
-    loadPartnerId();
+    void loadPartnerId();
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [storePartnerId]);
 
   // Seed the form from today's saved entry (AC-5). This used to be an effect keyed on
   // `moods`, which cost a second commit every time it fired — the store outlives this view,

@@ -170,6 +170,11 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
    */
   const partnerIdRef = useRef<string | null>(null);
   /**
+   * The live effect run's `refreshPartnerSnapshot`, or null between runs. Lets
+   * a partner change in the store re-take the snapshot without re-joining.
+   */
+  const refreshSnapshotRef = useRef<(() => void) | null>(null);
+  /**
    * The last status a channel actually reported, tagged with the account it was
    * reported for.
    *
@@ -203,6 +208,10 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
   }, []);
   const addNote = useAppStore((state) => state.addNote);
   const userId = useAppStore((state) => state.userId);
+  // The partner the store holds, from a successful server read or the saved
+  // copy. Only a trigger here: the snapshot itself is always re-read below.
+  const storePartnerId = useAppStore((state) => state.partner?.id ?? null);
+  const seenStorePartnerRef = useRef(storePartnerId);
 
   const handleNewMessage = useCallback(
     (raw: unknown, currentUserId: string) => {
@@ -322,6 +331,8 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
           partnerIdRef.current = previous;
         });
     };
+
+    refreshSnapshotRef.current = refreshPartnerSnapshot;
 
     const handleStatus = (status: string, err?: Error, source?: RealtimeChannel) => {
       logger.info('[useRealtimeMessages] Subscription status:', status, err || '');
@@ -626,6 +637,9 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       cancelled = true;
       subscriptionActive = false;
       partnerIdRef.current = null;
+      if (refreshSnapshotRef.current === refreshPartnerSnapshot) {
+        refreshSnapshotRef.current = null;
+      }
 
       // Clear any pending retry timeout
       if (retryTimeoutRef.current) {
@@ -648,6 +662,22 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     // `setReport` is `useCallback`-stable with an empty dependency list, so
     // listing it satisfies the exhaustive-deps rule without adding a re-run.
   }, [enabled, userId, handleNewMessage, setReport]);
+
+  // A partner linked (or unlinked) while this channel is up. The snapshot is
+  // otherwise re-taken only on a re-join, and a healthy socket reports
+  // SUBSCRIBED once -- so a chat opened before the link dropped every note from
+  // the new partner until the view was remounted. The store's partner changes
+  // when this device accepts a request, and when the sender hears the
+  // partner-linked broadcast (usePartnerLinkListener). Only a CHANGE after
+  // mount counts -- the first join resolves its own snapshot -- and not when
+  // the snapshot already agrees, so an ordinary start costs no second read and
+  // no window with the snapshot cleared.
+  useEffect(() => {
+    if (seenStorePartnerRef.current === storePartnerId) return;
+    seenStorePartnerRef.current = storePartnerId;
+    if (storePartnerId === partnerIdRef.current) return;
+    refreshSnapshotRef.current?.();
+  }, [storePartnerId]);
 
   // Derived, not stored: `idle` and `connecting` are facts about the props and
   // about whether anything has reported yet, so deriving them here keeps the

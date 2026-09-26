@@ -138,6 +138,27 @@ export function LoveNotes(): ReactElement {
     fetchUserInfo();
   }, []);
 
+  // A partner linked while this chat is open: the mount read above answered
+  // no partner, so the row would say "Partner" until a remount.
+  const storePartnerId = useAppStore((state) => state.partner?.id ?? null);
+  const seenStorePartnerRef = useRef(storePartnerId);
+  useEffect(() => {
+    if (seenStorePartnerRef.current === storePartnerId) return;
+    seenStorePartnerRef.current = storePartnerId;
+    if (!storePartnerId) return;
+    let current = true;
+    void getPartnerDisplayName()
+      .then((name) => {
+        if (current && name) setPartnerName(name);
+      })
+      .catch((err: unknown) => {
+        console.error('[LoveNotes] Failed to fetch the partner name:', err);
+      });
+    return () => {
+      current = false;
+    };
+  }, [storePartnerId]);
+
   // The avatar's initial: the partner's name, or "P" while it is unknown
   // (getPartnerDisplayName answered null, or has not answered yet). The first
   // code point, not UTF-16 unit, so a name opening with an emoji is not split.
