@@ -104,7 +104,13 @@ test.describe('Login Flow', () => {
     // account still needs the display-name setup screen. A chosen name keeps
     // that modal shut, which is what "redirected to the app" means here.
     // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-    await page.route('**/rest/v1/users?select=display_name**', serve({ display_name: 'Test User' }));
+    await page.route('**/rest/v1/users?select=display_name**', serve([{ display_name: 'Test User' }]));
+
+    // Same reason, for the partner lookups: loadPartner's own-row read and the
+    // couple-settings refresher's lookupPartnerId both select partner_id. No
+    // row reads as unlinked.
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/users?select=partner_id**', serve([]));
 
     // Same reason, for the mirror refresh App runs after sign-in: the
     // anniversary and message mirrors, the mood history, the poke/kiss

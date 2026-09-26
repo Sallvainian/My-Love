@@ -33,13 +33,13 @@ export const test = base.extend<{ authBootstrap: AuthBootstrap }>({
       await use({
         mount: async (options) => {
           const { profileDisplayName = 'Bootstrap User', ...harnessOptions } = options ?? {};
-          // `.single()` asks for a bare object rather than an array.
+          // An array, as PostgREST answers; `.maybeSingle()` unwraps its one row.
           // playwright-utils deviation: the stub must be in place before the harness goto and answer every display-name read; interceptNetworkCall registers its route inside a test.step the caller cannot await, and this fixture extends the bare @playwright/test base, which has no interceptNetworkCall fixture.
           await page.route('**/rest/v1/users?select=display_name*', (route) =>
             route.fulfill({
               status: 200,
               contentType: 'application/json',
-              body: JSON.stringify({ display_name: profileDisplayName }),
+              body: JSON.stringify([{ display_name: profileDisplayName }]),
             })
           );
           const url = new URL('/tests/support/harnesses/auth-bootstrap-notification-order.html', baseURL);

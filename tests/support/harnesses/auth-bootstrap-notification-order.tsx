@@ -15,6 +15,7 @@ import {
 import { MOOD_HISTORY_KIND } from '../../../src/stores/slices/moodSlice';
 import { INTERACTIONS_COPY_KIND } from '../../../src/stores/slices/interactionsSlice';
 import { LOVE_NOTES_COPY_KIND } from '../../../src/stores/slices/notesSlice';
+import { PARTNER_COPY_KIND } from '../../../src/stores/slices/partnerSlice';
 import { PHOTOS_COPY_KIND } from '../../../src/stores/slices/photosSlice';
 import { formatDateISO } from '../../../src/utils/dateUtils';
 import { useAppStore } from '../../../src/stores/useAppStore';
@@ -201,8 +202,8 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     anniversariesService.fetchAnniversaries = async () => [];
     // Same reason for the couple-settings refresher, one step earlier: its
     // partner lookup (`lookupPartnerId`) calls supabase.auth.getSession
-    // directly — and for the profile, mood-history, interactions, love-notes
-    // and photos refreshers, whose reads do too (and whose fake-token requests
+    // directly — and for the partner, profile, mood-history, interactions,
+    // love-notes and photos refreshers, whose reads do too (and whose fake-token requests
     // PostgREST answers with 401).
     // Replaced with no-ops for the harness's lifetime; dispose puts the
     // store's own refreshers back.
@@ -212,6 +213,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     const unregisterInteractionsNoop = registerLocalCopy(INTERACTIONS_COPY_KIND, async () => {});
     const unregisterLoveNotesNoop = registerLocalCopy(LOVE_NOTES_COPY_KIND, async () => {});
     const unregisterPhotosNoop = registerLocalCopy(PHOTOS_COPY_KIND, async () => {});
+    const unregisterPartnerNoop = registerLocalCopy(PARTNER_COPY_KIND, async () => {});
     restoreCoupleSettingsRefresher = () => {
       unregisterNoop();
       unregisterProfileNoop();
@@ -219,7 +221,9 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       unregisterInteractionsNoop();
       unregisterLoveNotesNoop();
       unregisterPhotosNoop();
+      unregisterPartnerNoop();
       registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => useAppStore.getState().loadCoupleSettings());
+      registerLocalCopy(PARTNER_COPY_KIND, () => useAppStore.getState().loadPartner());
       registerLocalCopy(PROFILE_COPY_KIND, () => useAppStore.getState().loadOwnProfile());
       registerLocalCopy(MOOD_HISTORY_KIND, () => useAppStore.getState().loadMoodHistoryFromServer());
       registerLocalCopy(INTERACTIONS_COPY_KIND, async () => {
