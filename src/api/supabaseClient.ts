@@ -286,6 +286,22 @@ export const resolveSignedInUserForDelivery = async (): Promise<SessionLookup> =
 };
 
 /**
+ * Why the session no longer belongs to `userId`, or null while it still does.
+ *
+ * For a lookup to call after each read it awaited. A sign-out landing mid-read
+ * sends the request without a session, RLS hides the row, and the empty answer
+ * is about that signed-out request -- not evidence that `userId` has no row, no
+ * partner or no name. Any answer read while this returns a reason is an error.
+ */
+export const sessionMismatch = async (userId: string): Promise<string | null> => {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) return error.message;
+  const sessionUserId = data.session?.user?.id ?? null;
+  if (sessionUserId === userId) return null;
+  return sessionUserId ? 'Signed-in account changed' : 'Not authenticated';
+};
+
+/**
  * Get partner user ID
  * Queries the users table to get the partner_id for the current user.
  * Uses the proper partner_id column that stores the established partner relationship.
@@ -308,9 +324,11 @@ export type PartnerLookup =
  * subsequent broadcast, and `SUBSCRIBED` fires once on a healthy socket, so
  * nothing re-arms it.
  *
- * `unlinked` is deliberately returned for PGRST116 and for a missing
- * `partner_id`: neither is a failure, and retrying either would only delay a
- * correct answer.
+ * `unlinked` is deliberately returned for a missing row and for a missing
+ * `partner_id` while the session is still the one the lookup started with:
+ * neither is a failure, and retrying either would only delay a correct answer.
+ * A read answered after the session ended or changed is an `error` instead --
+ * RLS hid the row from that request, which says nothing about the linkage.
  *
  * Known offline, it answers `error` marked `offline: true` without sending
  * the query: the request could only fail, and every caller
@@ -342,19 +360,22 @@ export const lookupPartnerId = async (): Promise<PartnerLookup> => {
       .from('users')
       .select('partner_id')
       .eq('id', currentUserId)
-      .single();
+      .maybeSingle();
+
+    const mismatch = await sessionMismatch(currentUserId);
+    if (mismatch) return { status: 'error', reason: mismatch };
 
     if (error) {
-      // PGRST116 = no rows found (user doesn't have users table record yet)
-      if (error.code === 'PGRST116') {
-        console.warn('[Supabase] User has no users table record yet');
-        return { status: 'unlinked' };
-      }
       console.error('[Supabase] Failed to get partner ID:', error);
       return { status: 'error', reason: error.message };
     }
 
-    const partnerId = data?.partner_id ?? null;
+    if (!data) {
+      console.warn('[Supabase] User has no users table record yet');
+      return { status: 'unlinked' };
+    }
+
+    const partnerId = data.partner_id ?? null;
     return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
   } catch (error) {
     console.error('[Supabase] Error getting partner ID:', error);
@@ -470,14 +491,21 @@ export const getPartnerDisplayName = async (): Promise<string | null> => {
     // email, not the caller's. It is readable -- the SELECT policy returns own
     // + partner rows (`20260205000001_fix_users_rls_recursion.sql:28-37`), and
     // `partnerService` already selects it; only UPDATE was narrowed.
+    // `.maybeSingle()`: a sign-out landing mid-lookup sends this without a
+    // session and RLS hides the row -- a 200 with no row, not a 406.
     const { data, error } = await supabase
       .from('users')
       .select('display_name, email')
       .eq('id', partnerId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('[Supabase] Failed to get partner display name:', error);
+      return null;
+    }
+
+    if (!data) {
+      logger.debug('[Supabase] Partner row not visible, cannot get partner display name');
       return null;
     }
 
@@ -531,10 +559,13 @@ export type OwnDisplayNameLookup =
  * trigger's own seed — where it genuinely does mean "no name chosen". Existing
  * customer rows are still never edited.
  *
- * PGRST116 (no row) also reads as `unset`. It should be unreachable -- the
- * trigger creates the row inside the same statement that creates the auth user
- * -- and the setup write fails closed if the row really is missing, because it
- * checks that its UPDATE matched something.
+ * No row also reads as `unset` while the session is still the one the lookup
+ * started with. It should be unreachable -- the trigger creates the row inside
+ * the same statement that creates the auth user -- and the setup write fails
+ * closed if the row really is missing, because it checks that its UPDATE
+ * matched something. A read answered after the session ended or changed is an
+ * `error` instead: RLS hid the row from that request, and `unset` would open
+ * the setup modal over an account that may well have a name.
  */
 export const lookupOwnDisplayName = async (): Promise<OwnDisplayNameLookup> => {
   try {
@@ -554,15 +585,19 @@ export const lookupOwnDisplayName = async (): Promise<OwnDisplayNameLookup> => {
       .from('users')
       .select('display_name')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
+
+    const mismatch = await sessionMismatch(user.id);
+    if (mismatch) return { status: 'error', reason: mismatch };
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        console.warn('[Supabase] User has no users table record yet');
-        return { status: 'unset' };
-      }
       console.error('[Supabase] Failed to get own display name:', error);
       return { status: 'error', reason: error.message };
+    }
+
+    if (!data) {
+      console.warn('[Supabase] User has no users table record yet');
+      return { status: 'unset' };
     }
 
     // The shared predicate, not a second copy of the rule -- see

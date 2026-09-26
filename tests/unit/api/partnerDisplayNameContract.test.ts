@@ -41,6 +41,30 @@ let singleCalls = 0;
 let sessionResult: { data: { session: unknown }; error: unknown };
 /** Every `.select()` argument, in order, so the added `email` column is pinned. */
 let selectedColumns: string[] = [];
+/** How each read asked for its row, in order. */
+let readKinds: Array<'single' | 'maybeSingle'> = [];
+/** Runs as each users read is answered, so a test can end the session mid-read. */
+let onRead: ((call: number) => void) | null = null;
+
+/**
+ * One users read. RLS hides every users row from a request sent without a
+ * session, so a read answered after a sign-out sees no row: `.single()` turns
+ * that into PGRST116 (a 406 on the wire), `.maybeSingle()` into a null row.
+ */
+async function answerRead(kind: 'single' | 'maybeSingle') {
+  const call = singleCalls;
+  singleCalls += 1;
+  readKinds.push(kind);
+  onRead?.(call);
+  const result = singleResults[call] ?? singleResults.at(-1);
+  if (result === undefined) throw new Error('no stubbed result');
+  if (!sessionResult.data.session) {
+    return kind === 'single'
+      ? { data: null, error: { code: 'PGRST116', message: 'no rows' } }
+      : { data: null, error: null };
+  }
+  return result;
+}
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
@@ -54,12 +78,8 @@ vi.mock('@supabase/supabase-js', () => ({
         selectedColumns.push(columns);
         return {
           eq: () => ({
-            single: async () => {
-              const result = singleResults[singleCalls] ?? singleResults.at(-1);
-              singleCalls += 1;
-              if (result === undefined) throw new Error('no stubbed result');
-              return result;
-            },
+            single: () => answerRead('single'),
+            maybeSingle: () => answerRead('maybeSingle'),
           }),
         };
       },
@@ -96,6 +116,8 @@ describe('partner display name contract', () => {
     singleResults = [];
     singleCalls = 0;
     selectedColumns = [];
+    readKinds = [];
+    onRead = null;
     sessionResult = signedIn;
   });
 
@@ -207,6 +229,26 @@ describe('partner display name contract', () => {
           throw new Error('storage unavailable');
         },
         error: null,
+      };
+      await expect(partnerName()).resolves.toBeNull();
+    });
+  });
+
+  // A sign-out landing while the partner-row read is in flight: RLS hides the
+  // row from the session-less request. `.single()` put that on the wire as a
+  // 406, which the e2e network monitor counts as a failure; `.maybeSingle()`
+  // answers 200 with no row.
+  describe('a row hidden by a sign-out mid-lookup', () => {
+    it('asks for each row with maybeSingle, so a hidden row is not a 406', async () => {
+      partnerRow('Jessie');
+      await partnerName();
+      expect(readKinds).toEqual(['maybeSingle', 'maybeSingle']);
+    });
+
+    it('answers null when the session ends during the partner-row read', async () => {
+      partnerRow('Jessie');
+      onRead = (call) => {
+        if (call === 1) sessionResult = { data: { session: null }, error: null };
       };
       await expect(partnerName()).resolves.toBeNull();
     });

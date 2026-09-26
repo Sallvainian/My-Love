@@ -16,7 +16,7 @@ import { logger } from '../utils/logger';
 import { handleSupabaseError, isPostgrestError, logSupabaseError } from './errorHandlers';
 import { requireOnline } from '../services/accountDataError';
 import { toDateOnlyOrNull } from '../services/eventsService';
-import { isSeedFallbackName, supabase } from './supabaseClient';
+import { isSeedFallbackName, sessionMismatch, supabase } from './supabaseClient';
 
 export interface UserSearchResult {
   id: string;
@@ -69,17 +69,8 @@ class PartnerService {
    * — so any read answered while the session is not `userId`'s is an `error`.
    */
   async getPartner(userId: string): Promise<PartnerResult> {
-    // Why the session is not `userId`'s, or null while it still is.
-    const sessionMismatch = async (): Promise<string | null> => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) return error.message;
-      const sessionUserId = data.session?.user?.id ?? null;
-      if (sessionUserId === userId) return null;
-      return sessionUserId ? 'Signed-in account changed' : 'Not authenticated';
-    };
-
     try {
-      const before = await sessionMismatch();
+      const before = await sessionMismatch(userId);
       if (before) return { status: 'error', reason: before };
 
       // Get user record with partner_id
@@ -89,7 +80,7 @@ class PartnerService {
         .eq('id', userId)
         .maybeSingle();
 
-      const afterUser = await sessionMismatch();
+      const afterUser = await sessionMismatch(userId);
       if (afterUser) return { status: 'error', reason: afterUser };
 
       if (error) {
@@ -110,7 +101,7 @@ class PartnerService {
         .eq('id', userRecord.partner_id)
         .maybeSingle();
 
-      const afterPartner = await sessionMismatch();
+      const afterPartner = await sessionMismatch(userId);
       if (afterPartner) return { status: 'error', reason: afterPartner };
 
       if (partnerError || !partnerRecord) {
