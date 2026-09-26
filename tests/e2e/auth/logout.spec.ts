@@ -12,6 +12,7 @@
 import type { Page, Route } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 /**
  * What one account has saved on the device — its local copies, and the custom
@@ -153,14 +154,16 @@ test.describe('Logout Flow', () => {
     });
 
     // The seed has to have landed, or the assertion is vacuous again.
-    await expect
-      .poll(() =>
+    await recurseUntil(
+      () =>
         page.evaluate(() => {
           const state = window.__APP_STORE__?.getState();
           return state ? state.notes.length + state.events.length : 0;
-        })
-      )
-      .toBeGreaterThan(0);
+        }),
+      (v) => {
+        expect(v).toBeGreaterThan(0);
+      }
+    );
 
     // WHEN: User signs out from Settings — the app's only sign-out since the
     // nav-level one was retired
@@ -175,8 +178,8 @@ test.describe('Logout Flow', () => {
     // photos and countdown dates to the next account on a shared device.
     // Consolidating sign-out into Settings must not change that, and only a
     // reading of the live store proves it did not.
-    await expect
-      .poll(() =>
+    await recurseUntil(
+      () =>
         page.evaluate(() => {
           const state = window.__APP_STORE__?.getState();
           if (!state) return null;
@@ -189,17 +192,19 @@ test.describe('Logout Flow', () => {
             events: state.events.length,
             partner: state.partner,
           };
-        })
-      )
-      .toEqual({
-        userId: null,
-        isAuthenticated: false,
-        notes: 0,
-        photos: 0,
-        moods: 0,
-        events: 0,
-        partner: null,
-      });
+        }),
+      (v) => {
+        expect(v).toEqual({
+          userId: null,
+          isAuthenticated: false,
+          notes: 0,
+          photos: 0,
+          moods: 0,
+          events: 0,
+          partner: null,
+        });
+      }
+    );
   });
 
   test("[P1] deletes the outgoing account's saved anniversaries, custom messages and favorites from the device", async ({
@@ -224,25 +229,31 @@ test.describe('Logout Flow', () => {
       route.request().method() === 'GET'
         ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) })
         : route.fallback();
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/anniversaries?*', serve([
       { id: 'srv-device', user_id: 'seed', event_date: '2024-02-14', label: LABEL, description: null,
         client_key: 'seed', created_at: at, updated_at: at },
     ]));
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/custom_messages?*', serve([
       { id: 'srv-device-custom', user_id: 'seed', text: CUSTOM, category: 'custom', active: true,
         is_favorite: true, tags: [], client_key: 'seed', created_at: at, updated_at: at },
     ]));
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/message_favorites?*', serve([]));
     await page.goto('/');
     await expect(page.getByTestId('nav-dock')).toBeVisible();
     const userId = await page.evaluate(() => window.__APP_STORE__!.getState().userId!);
 
-    await expect
-      .poll(async () => {
+    await recurseUntil(
+      async () => {
         const counts = await ownedRowCounts(page, userId, seed);
         return counts.seeded && counts.favorites > 0;
-      })
-      .toBe(true);
+      },
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
 
     // WHEN: the user signs out.
     await navigateTo(page, 'settings');
@@ -251,9 +262,12 @@ test.describe('Logout Flow', () => {
     await expect(page.getByTestId('login-screen')).toBeVisible({ timeout: 5000 });
 
     // THEN: none of it is readable from IndexedDB or localStorage any more.
-    await expect
-      .poll(() => ownedRowCounts(page, userId, seed))
-      .toEqual({ copies: 0, custom: 0, favorites: 0, seeded: false, strayCustom: 0 });
+    await recurseUntil(
+      () => ownedRowCounts(page, userId, seed),
+      (v) => {
+        expect(v).toEqual({ copies: 0, custom: 0, favorites: 0, seeded: false, strayCustom: 0 });
+      }
+    );
     const storage = await page.evaluate(() => JSON.stringify({ ...localStorage }));
     expect(storage).not.toContain(LABEL);
     expect(storage).not.toContain(CUSTOM);

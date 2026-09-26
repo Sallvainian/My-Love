@@ -22,6 +22,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { partnerRecordRead } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -124,9 +125,12 @@ test.describe('Love-note text sent offline', () => {
       await page.goto('/notes');
       expect((await partnerRead).status).toBe(200);
       await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
-      await expect
-        .poll(() => page.evaluate(() => window.__APP_STORE__?.getState().partner?.id ?? null))
-        .toBe(partnerId);
+      await recurseUntil(
+        () => page.evaluate(() => window.__APP_STORE__?.getState().partner?.id ?? null),
+        (v) => {
+          expect(v).toBe(partnerId);
+        }
+      );
       await goOffline(page, true);
 
       // WHEN: three notes are sent offline.
@@ -151,6 +155,7 @@ test.describe('Love-note text sent offline', () => {
 
       // WHEN: the app reloads with no love-notes server answer, then goes offline.
       let abortedCalls = 0;
+      // playwright-utils deviation: the route must be installed before the next navigation and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route(isNotesRest, (route) => {
         abortedCalls += 1;
         return route.abort();
@@ -159,7 +164,7 @@ test.describe('Love-note text sent offline', () => {
       await page.context().setOffline(false);
       await page.reload();
       await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
-      await expect.poll(() => abortedCalls).toBeGreaterThan(0);
+      await recurseUntil(async () => abortedCalls, (v) => { expect(v).toBeGreaterThan(0); });
       await goOffline(page, true);
 
       // THEN (2): the notes still show pending, from the queue.
@@ -176,9 +181,13 @@ test.describe('Love-note text sent offline', () => {
 
       // THEN (3): the partner's view holds exactly the three notes, in order,
       // and the sender's thread shows them confirmed without a reload.
-      await expect
-        .poll(async () => (await sentRows(supabaseAdmin, stamp)).length, { timeout: 15000 })
-        .toBe(3);
+      await recurseUntil(
+        async () => (await sentRows(supabaseAdmin, stamp)).length,
+        (v) => {
+          expect(v).toBe(3);
+        },
+        { timeout: 15000 }
+      );
       const rows = await sentRows(supabaseAdmin, stamp);
       expect(rows.map((row) => row.content)).toEqual(contents);
       // Each carries when it was written; created_at is the later delivery.
@@ -188,18 +197,20 @@ test.describe('Love-note text sent offline', () => {
       for (const row of rows) {
         expect(Date.parse(row.created_at)).toBeGreaterThan(Date.parse(row.written_at!));
       }
-      await expect.poll(() => queuedContents(page)).toEqual([]);
-      await expect
-        .poll(() =>
+      await recurseUntil(() => queuedContents(page), (v) => { expect(v).toEqual([]); });
+      await recurseUntil(
+        () =>
           page.evaluate(
             (ids) => {
               const notes = window.__APP_STORE__?.getState().notes ?? [];
               return ids.every((id) => notes.some((n) => n.id === id && !n.queued && !n.sending));
             },
             rows.map((row) => row.id)
-          )
-        )
-        .toBe(true);
+          ),
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
       for (const content of contents) {
         await expect(noteBubble(page, content)).not.toContainText('Waiting to send');
       }

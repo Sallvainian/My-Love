@@ -44,6 +44,7 @@ import { interceptNetworkCall } from '@seontechnologies/playwright-utils/interce
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { partnerMoodListRead } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 /**
  * The receiving page's own view reporting its join.
@@ -197,24 +198,27 @@ test.describe('Partner mood realtime delivery', () => {
         await page.getByTestId('mood-add-note-toggle').click();
         await page.getByTestId('mood-note-input').fill(moodNote);
 
-        const broadcast = page.waitForResponse(
-          (response) =>
-            response.request().method() === 'POST' &&
-            response.url().includes(expectedBroadcastPath),
-          // Explicit, and deliberately NOT the 15s `actionTimeout` this would
-          // otherwise inherit: that is exactly `BROADCAST_TIMEOUT_MS`
-          // (`src/api/ephemeralBroadcast.ts:77`), so a slow send would expire
-          // both bounds in the same instant and the report would not say which.
-          { timeout: 30_000 }
-        );
+        // The standalone form: the fixture drops `timeout`.
+        const broadcast = interceptNetworkCall({
+          page,
+          method: 'POST',
+          url: `**${expectedBroadcastPath}?*`,
+          // Bounds only the wait for the POST to be sent: the utility then awaits
+          // `request.response()` with no bound of its own. A send the app aborts
+          // at `BROADCAST_TIMEOUT_MS` (15s, `src/api/ephemeralBroadcast.ts:77`)
+          // therefore fails here as "No response received for the request", and
+          // only a send that never starts runs into these 30s.
+          timeout: 30_000,
+        });
         // Checked here, after the whole sender setup, so the receiver's start-up
         // reads — including the one its mood sync sends only once its own sync
         // has finished — have had that time to start and settle.
-        await expect
-          .poll(() => senderMoodReadsInFlight, {
-            message: "none of the receiver's reads of the sender's moods is in flight",
-          })
-          .toBe(0);
+        await recurseUntil(
+          async () => senderMoodReadsInFlight,
+          (v) => {
+            expect(v, "none of the receiver's reads of the sender's moods is in flight").toBe(0);
+          }
+        );
         await expect(partnerPage.getByTestId('partner-mood-refresh-button')).toHaveAttribute(
           'aria-busy',
           'false'
@@ -222,15 +226,16 @@ test.describe('Partner mood realtime delivery', () => {
         await page.getByTestId('mood-submit-button').click();
 
         await log.step('The private INSERT policy admits the app own client send');
-        const broadcastResponse = await broadcast;
+        const { status: broadcastStatus, request: broadcastRequest } = await broadcast;
         moodRowCommitted = true;
         // Asserted before the UI: the broadcast is fire-and-forget and
         // `moodSyncService.ts:232` swallows its rejection, so checking the
         // partner's screen first would report a refused send as a missing
         // element and point at the wrong layer.
-        expect(broadcastResponse.status()).toBe(202);
-        expect(broadcastResponse.url()).toContain(expectedBroadcastPath);
-        expect(new URL(broadcastResponse.url()).searchParams.get('private')).toBe('true');
+        expect(broadcastStatus).toBe(202);
+        const broadcastUrl = broadcastRequest!.url();
+        expect(broadcastUrl).toContain(expectedBroadcastPath);
+        expect(new URL(broadcastUrl).searchParams.get('private')).toBe('true');
 
         await log.step('The mood reaches the partner live, with no reload and no refresh');
         // The toast first, while it is still on screen: it auto-hides five

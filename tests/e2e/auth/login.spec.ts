@@ -7,6 +7,7 @@
 import type { Page, Route } from '@playwright/test';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { resolveWorkerPairIds } from '../../support/factories/events';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
@@ -84,25 +85,25 @@ test.describe('Login Flow', () => {
 
     // The reads below are defensive stubs: each may fire zero times or many,
     // so none is awaited. Every GET is answered; anything else falls through.
-    // playwright-utils deviation: interceptNetworkCall resolves on the first
-    // hit and never settles when a route is not hit, so it cannot serve a read
-    // that may fire any number of times.
     const serve = (body: unknown) => (route: Route) =>
       route.request().method() === 'GET'
         ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
         : route.fallback();
 
     // The user endpoint (called after auth state change).
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/auth/v1/user**', serve({ id: 'test-user-id', email: 'test@example.com' }));
 
     // The events fetch Home fires once auth settles — against the real API the
     // fake access token above earns it a 401, which the network-error monitor
     // turns into a test failure.
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/events**', serve([]));
 
     // Same reason, for the profile read App fires to decide whether this
     // account still needs the display-name setup screen. A chosen name keeps
     // that modal shut, which is what "redirected to the app" means here.
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/users?select=display_name**', serve({ display_name: 'Test User' }));
 
     // Same reason, for the mirror refresh App runs after sign-in: the
@@ -118,6 +119,7 @@ test.describe('Login Flow', () => {
       'love_notes_visible',
       'photos',
     ]) {
+      // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route(`**/rest/v1/${table}?**`, serve([]));
     }
 
@@ -155,7 +157,7 @@ test.describe('Login Flow', () => {
     // THEN: The app is open and the SDK has persisted this account's session.
     await expect(page.getByTestId('app-container')).toBeVisible();
     await expect(page.getByTestId('login-screen')).toHaveCount(0);
-    await expect.poll(() => storedSessionUserId(page)).toBe(userId);
+    await recurseUntil(() => storedSessionUserId(page), (v) => { expect(v).toBe(userId); });
 
     // WHEN: The page is reloaded
     await page.reload();
@@ -163,7 +165,7 @@ test.describe('Login Flow', () => {
     // THEN: The same session is restored without signing in again.
     await expect(page.getByTestId('app-container')).toBeVisible();
     await expect(page.getByTestId('login-screen')).toHaveCount(0);
-    await expect.poll(() => storedSessionUserId(page)).toBe(userId);
+    await recurseUntil(() => storedSessionUserId(page), (v) => { expect(v).toBe(userId); });
   });
 });
 

@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Browser, Page, TestInfo } from '@playwright/test';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import type {
   PersistenceEvidence,
@@ -292,6 +293,7 @@ async function runScenario(
   page.on('pageerror', () => { pageErrors += 1; });
   // No synthetic token may reach a server, including if an SDK implementation
   // changes. Count unexpected attempts without retaining headers or URLs.
+  // playwright-utils deviation: the route must be installed before the next navigation and count every request the page makes; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
   await page.route('**/*', async (route) => {
     if (new URL(route.request().url()).origin !== origin) {
       externalRequests += 1;
@@ -299,7 +301,12 @@ async function runScenario(
     } else await route.continue();
   });
   await page.goto(baseURL + '/tests/support/harnesses/auth-token-persistence.html');
-  await expect.poll(() => page.evaluate(() => !!window.__authTokenPersistence)).toBe(true);
+  await recurseUntil(
+    () => page.evaluate(() => !!window.__authTokenPersistence),
+    (v) => {
+      expect(v).toBe(true);
+    }
+  );
   const evidence = await page.evaluate((name) => window.__authTokenPersistence!.run(name), scenario);
   const document = {
     formatVersion: 1,

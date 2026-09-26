@@ -8,6 +8,7 @@
  * chrome. The kit colours are `--kit-*` variables that switch under
  * `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import type { Page } from '@playwright/test';
 
@@ -92,13 +93,15 @@ async function savedMoodCount(page: Page): Promise<number | null> {
  * scrollbar narrows clientWidth, and scrollWidth follows it.
  */
 async function expectNoHorizontalOverflow(page: Page) {
-  await expect
-    .poll(() =>
+  await recurseUntil(
+    () =>
       page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-      )
-    )
-    .toBe(0);
+      ),
+    (v) => {
+      expect(v).toBe(0);
+    }
+  );
 }
 
 test.describe('Mood on the style kit', () => {
@@ -194,7 +197,7 @@ test.describe('Mood on the style kit', () => {
       // it, and this test never submits. Assert that precondition at its source
       // rather than branching on the tile, so a late reload has nothing to seed
       // from.
-      await expect.poll(() => savedMoodCount(page)).toBe(0);
+      await recurseUntil(() => savedMoodCount(page), (v) => { expect(v).toBe(0); });
       const happy = page.getByTestId('mood-button-happy');
       await expect(happy).toHaveAttribute('aria-pressed', 'false');
 

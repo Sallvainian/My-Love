@@ -28,7 +28,8 @@ import {
   resolveOwnPair,
   seedEvent,
 } from '../../support/helpers/events';
-import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { EVENTS_WRITE, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { openSettingsFromHome, reloadSettings } from '../../support/helpers/settings-screen';
 import { formatDateLong } from '../../../src/utils/dateUtils';
 import type { Locator, Page } from '@playwright/test';
@@ -62,26 +63,26 @@ function rowFor(page: Page, label: string) {
  * the text can be up to a second behind the clock the expectation samples.
  */
 async function expectCardCountsDownTo(card: Locator, isoDate: string): Promise<void> {
-  await expect
-    .poll(
-      () =>
-        card.evaluate((element, iso) => {
-          const [year, month, day] = iso.split('-').map(Number);
-          const now = new Date();
-          const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          const target = new Date(year, month - 1, day);
-          const calendarDays = Math.round(
-            (target.getTime() - todayMidnight.getTime()) / 86400000
-          );
-          // Whole days left: the part of today already gone moves to the clock.
-          const intoToday = now.getTime() > todayMidnight.getTime() ? 1 : 0;
-          const days = calendarDays - intoToday;
-          const expected = `${days} ${days === 1 ? 'day' : 'days'}`;
-          return (element.textContent ?? '').includes(expected);
-        }, isoDate),
-      { message: `Home card should be counting down to ${isoDate}` }
-    )
-    .toBe(true);
+  await recurseUntil(
+    () =>
+      card.evaluate((element, iso) => {
+        const [year, month, day] = iso.split('-').map(Number);
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const target = new Date(year, month - 1, day);
+        const calendarDays = Math.round(
+          (target.getTime() - todayMidnight.getTime()) / 86400000
+        );
+        // Whole days left: the part of today already gone moves to the clock.
+        const intoToday = now.getTime() > todayMidnight.getTime() ? 1 : 0;
+        const days = calendarDays - intoToday;
+        const expected = `${days} ${days === 1 ? 'day' : 'days'}`;
+        return (element.textContent ?? '').includes(expected);
+      }, isoDate),
+    (v) => {
+      expect(v, `Home card should be counting down to ${isoDate}`).toBe(true);
+    }
+  );
 }
 
 function longForm(isoDate: string): string {
@@ -133,12 +134,9 @@ test.describe('Managing events from Settings', () => {
     await expect(page.getByTestId('events-form-icon-plane')).toBeChecked();
 
     // Layer 1 — the write reached the server.
-    const createResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes('/rest/v1/events') && response.request().method() === 'POST'
-    );
+    const createResponse = interceptNetworkCall({ method: 'POST', url: EVENTS_WRITE });
     await page.getByTestId('events-form-submit').click();
-    expect((await createResponse).status()).toBe(201);
+    expect((await createResponse).status).toBe(201);
 
     // Layer 2 and 3 — the store took it and the list shows it, with the form
     // closed behind it.
@@ -175,12 +173,9 @@ test.describe('Managing events from Settings', () => {
     await page.getByTestId('events-form-label').fill(EDITED_LABEL);
     await page.getByTestId('events-form-date').fill(editedDate);
 
-    const updateResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes('/rest/v1/events') && response.request().method() === 'PATCH'
-    );
+    const updateResponse = interceptNetworkCall({ method: 'PATCH', url: EVENTS_WRITE });
     await page.getByTestId('events-form-submit').click();
-    expect((await updateResponse).status()).toBe(200);
+    expect((await updateResponse).status).toBe(200);
 
     await expect(page.getByTestId('events-form')).toHaveCount(0);
     const editedRow = rowFor(page, EDITED_LABEL);
@@ -206,12 +201,9 @@ test.describe('Managing events from Settings', () => {
     await rowToDelete.locator('[data-testid^="event-delete-"]').click();
     await expect(page.getByTestId('events-delete-confirmation')).toBeVisible();
 
-    const deleteResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes('/rest/v1/events') && response.request().method() === 'DELETE'
-    );
+    const deleteResponse = interceptNetworkCall({ method: 'DELETE', url: EVENTS_WRITE });
     await page.getByTestId('events-delete-confirm').click();
-    expect((await deleteResponse).status()).toBe(200);
+    expect((await deleteResponse).status).toBe(200);
 
     await expect(page.getByTestId('events-delete-confirmation')).toHaveCount(0);
     await expect(rowFor(page, EDITED_LABEL)).toHaveCount(0);
@@ -304,6 +296,7 @@ test.describe('Managing events from Settings', () => {
       releaseSnapshots = resolve;
     });
 
+    // playwright-utils deviation: the route must be installed before the dock navigation to Settings and hold every mount read behind route.fetch until released; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/events*', async (route) => {
       if (route.request().method() !== 'GET') {
         await route.continue();
@@ -339,12 +332,9 @@ test.describe('Managing events from Settings', () => {
     await page.getByTestId('events-form-label').fill('Settings Snapshot After Edit E2E');
     await page.getByTestId('events-form-date').fill(editedDate);
 
-    const updateResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes('/rest/v1/events') && response.request().method() === 'PATCH'
-    );
+    const updateResponse = interceptNetworkCall({ method: 'PATCH', url: EVENTS_WRITE });
     await page.getByTestId('events-form-submit').click();
-    expect((await updateResponse).status()).toBe(200);
+    expect((await updateResponse).status).toBe(200);
 
     await expect(page.getByTestId('events-form')).toHaveCount(0);
     const editedRow = rowFor(page, 'Settings Snapshot After Edit E2E');

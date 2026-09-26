@@ -1,11 +1,13 @@
 /**
- * Read globs — one per server read a spec waits on before it asserts.
+ * Read globs — one per server read a spec waits on before it asserts, plus a
+ * few write globs (`LOVE_NOTE_SEND`, `*_SAVE`, `*_WRITE`).
  *
  * Import by this deep path: `tests/support/helpers` has no barrel.
  *
- * Each glob goes to `interceptNetworkCall({ method: 'GET', url })`, armed
- * before the `goto`, `reload` or dock click that sends the read and awaited
- * before the first step that depends on its data. The utility matches the
+ * Each read glob goes to `interceptNetworkCall({ method: 'GET', url })`, and
+ * each write glob to the same call with the write's own method. Either is
+ * armed before the `goto`, `reload`, dock click or save that sends the request
+ * and awaited before the first step that depends on it. The utility matches the
  * whole request URL with picomatch, so three rules shape every pattern here:
  *
  * - `*` never crosses a `/`, and PostgREST's query string has none, so one `*`
@@ -40,11 +42,25 @@ export const LOVE_NOTES_READ = '**/rest/v1/love_notes_visible?*';
  * Observe it with `method: 'POST'`; the thread view is only ever read. */
 export const LOVE_NOTE_SEND = '**/rest/v1/love_notes?*';
 
+/** A custom message's save: the POST into `custom_messages`
+ * (`customMessagesApi`). Observe it with `method: 'POST'`; the list is read
+ * through {@link CUSTOM_MESSAGES_READ}. */
+export const CUSTOM_MESSAGE_SAVE = '**/rest/v1/custom_messages*';
+
+/** An events write from the Settings form or list (`eventsService`): the POST
+ * insert, the PATCH update or the DELETE. Observe it with that `method`; the
+ * reads are {@link UPCOMING_EVENTS_READ} and {@link PAST_EVENTS_READ}. */
+export const EVENTS_WRITE = '**/rest/v1/events*';
+
 /** The interactions history (`interactionService`). */
 export const INTERACTIONS_READ = '**/rest/v1/interactions?*';
 
 /** The couple's settings row (`coupleSettingsService`). */
 export const COUPLE_SETTINGS_READ = '**/rest/v1/couple_settings*';
+
+/** A save of that row: the POST upsert into `couple_settings`. Observe it with
+ * `method: 'POST'`. */
+export const COUPLE_SETTINGS_SAVE = '**/rest/v1/couple_settings*';
 
 /** The account's anniversaries (`anniversariesService.fetchAnniversaries`). */
 export const ANNIVERSARIES_READ = '**/rest/v1/anniversaries*';

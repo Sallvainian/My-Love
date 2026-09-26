@@ -26,6 +26,7 @@ import {
   OWN_PROFILE_READ,
   PARTNER_RECORD_READ,
 } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -136,15 +137,27 @@ test.describe('Birthdays and wedding date from the local copy', () => {
       expect(partnerRecord.responseJson).toMatchObject({ id: ids.partnerId, birthday: partner });
       expect(couple.status).toBe(200);
       expect(couple.responseJson).toEqual([expect.objectContaining({ wedding_date: wedding })]);
-      await expect.poll(() => savedCopy(page, 'profile')).toMatchObject({ birthday: own });
-      await expect
-        .poll(() => savedCopy(page, 'partner'))
-        .toMatchObject({ status: 'linked', partner: { birthday: partner } });
-      await expect
-        .poll(() => savedCopy(page, 'couple-settings'))
-        .toMatchObject({ status: 'linked', weddingDate: wedding });
+      await recurseUntil(
+        () => savedCopy(page, 'profile'),
+        (v) => {
+          expect(v).toMatchObject({ birthday: own });
+        }
+      );
+      await recurseUntil(
+        () => savedCopy(page, 'partner'),
+        (v) => {
+          expect(v).toMatchObject({ status: 'linked', partner: { birthday: partner } });
+        }
+      );
+      await recurseUntil(
+        () => savedCopy(page, 'couple-settings'),
+        (v) => {
+          expect(v).toMatchObject({ status: 'linked', weddingDate: wedding });
+        }
+      );
 
       // WHEN: the app opens again with the server unreachable, then offline.
+      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route('**/rest/v1/**', (route) => route.abort());
       await page.reload();
       await expect(page.getByTestId('app-container')).toBeVisible();
@@ -202,7 +215,12 @@ test.describe('Birthdays and wedding date from the local copy', () => {
       expect(
         await page.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday)
       ).toBe(own);
-      await expect.poll(() => savedCopy(page, 'profile')).toMatchObject({ birthday: own });
+      await recurseUntil(
+        () => savedCopy(page, 'profile'),
+        (v) => {
+          expect(v).toMatchObject({ birthday: own });
+        }
+      );
       const { data, error } = await supabaseAdmin
         .from('users')
         .select('birthday')

@@ -400,6 +400,7 @@ test.describe('Couple broadcast authorization', () => {
   test('[P1] a PUBLIC join to a victim topic receives nothing that was sent privately', async ({
     recurse,
     supabaseAdmin,
+    apiRequest,
   }) => {
     // The measured answer to the rollout question. This stack has Realtime's
     // "Allow public access to channels" at its default — Enabled — so a bare
@@ -493,14 +494,17 @@ test.describe('Couple broadcast authorization', () => {
       // The bulk REST route, with nothing but the publishable key. Both headers
       // are required: without `Authorization` the route answers 500 before it
       // ever looks at the body, which would make this prove nothing.
-      const restResponse = await fetch(`${url}/realtime/v1/api/broadcast`, {
+      // No retry: a retried 5xx could send the injection twice.
+      const restResponse = await apiRequest({
         method: 'POST',
+        baseUrl: url,
+        path: '/realtime/v1/api/broadcast',
         headers: {
           apikey: anonKey,
           Authorization: `Bearer ${anonKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
+        body: {
           messages: [
             {
               topic: `love-notes:${victimId}`,
@@ -509,7 +513,8 @@ test.describe('Couple broadcast authorization', () => {
               private: true,
             },
           ],
-        }),
+        },
+        retryConfig: { maxRetries: 0 },
       });
       // 202, not the 500 a missing header gives: the route accepted the body,
       // so the non-delivery below is measured against a message it took.

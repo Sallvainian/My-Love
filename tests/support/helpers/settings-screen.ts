@@ -11,6 +11,7 @@ import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/
 import { expect } from '../merged-fixtures';
 import { navigateTo } from './navigation';
 import { UPCOMING_EVENTS_READ } from './reads';
+import { recurseUntil } from './recurse';
 
 /**
  * Wait until Settings' events load, whose upcoming read is `settingsRead`, has
@@ -45,14 +46,16 @@ export async function openSettingsFromHome(
   const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
   await page.goto('/');
   expect((await homeRead).status).toBe(200);
-  await expect
-    .poll(() =>
+  await recurseUntil(
+    () =>
       page.evaluate(() => {
         const state = window.__APP_STORE__!.getState();
         return !state.eventsIsLoading && state.eventsPagination !== null;
-      })
-    )
-    .toBe(true);
+      }),
+    (v) => {
+      expect(v).toBe(true);
+    }
+  );
 
   const settingsRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
   await navigateTo(page, 'settings');

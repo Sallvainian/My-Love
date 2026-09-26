@@ -23,6 +23,7 @@ import { test, expect } from '../../support/merged-fixtures';
 import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import { ownMoodHistoryRead, partnerMoodListRead } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -178,12 +179,20 @@ test.describe('Mood history and partner moods offline', () => {
       expect(started.responseJson).toEqual(
         expect.arrayContaining([expect.objectContaining({ id: moodId })])
       );
-      await expect.poll(() => page.evaluate(() => window.__APP_STORE__?.getState().userId ?? null)).toBe(userId);
+      await recurseUntil(
+        () => page.evaluate(() => window.__APP_STORE__?.getState().userId ?? null),
+        (v) => {
+          expect(v).toBe(userId);
+        }
+      );
       // This load's own start backfill must land first, or it could merge after
       // the clear below.
-      await expect
-        .poll(async () => (await ownMoodRows(page)).some((row) => row.date === dateKey))
-        .toBe(true);
+      await recurseUntil(
+        async () => (await ownMoodRows(page)).some((row) => row.date === dateKey),
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
       await clearMoodsStore(page);
       expect(await ownMoodRows(page)).toEqual([]);
 
@@ -207,9 +216,12 @@ test.describe('Mood history and partner moods offline', () => {
       // month on screen, without navigating.
       await expect(page.getByTestId(`calendar-day-${dateKey}`)).toHaveAttribute('data-has-mood', 'true');
       await expect(page.getByTestId('calendar-month-header')).toHaveText(monthOnScreen);
-      await expect
-        .poll(async () => (await ownMoodRows(page)).find((row) => row.date === dateKey)?.synced ?? null)
-        .toBe(true);
+      await recurseUntil(
+        async () => (await ownMoodRows(page)).find((row) => row.date === dateKey)?.synced ?? null,
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
     } finally {
       const { error } = await supabaseAdmin.from('moods').delete().eq('id', moodId);
       expect.soft(error).toBeNull();
@@ -249,10 +261,16 @@ test.describe('Mood history and partner moods offline', () => {
         expect.arrayContaining([expect.objectContaining({ note })])
       );
       await expect(seededCard).toBeVisible();
-      await expect.poll(async () => (await savedPartnerNotes(page))?.includes(note) ?? false).toBe(true);
+      await recurseUntil(
+        async () => (await savedPartnerNotes(page))?.includes(note) ?? false,
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
 
       // WHEN: the app reloads without a server answer and the device goes
       // offline, then the Partner screen is opened again with nothing in memory.
+      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route(MOODS_REST, (route) => route.abort());
       await page.reload();
       await expect(page.getByTestId('partner-mood-view')).toBeVisible();

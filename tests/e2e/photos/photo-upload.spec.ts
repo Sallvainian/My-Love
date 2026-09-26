@@ -10,6 +10,7 @@ import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { PHOTOS_LIST_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 /**
  * Open the gallery and return once its list has loaded. The loading skeleton
@@ -118,11 +119,12 @@ test.describe('Photo Upload', () => {
     // only once the overlay covers the corner.
     const box = (await modal.boundingBox())!;
     expect(box.y).toBeGreaterThan(8);
-    await expect
-      .poll(() =>
-        page.evaluate(() => document.elementFromPoint(4, 4)?.getAttribute('data-testid'))
-      )
-      .toBe('photo-upload-overlay');
+    await recurseUntil(
+      () => page.evaluate(() => document.elementFromPoint(4, 4)?.getAttribute('data-testid')),
+      (v) => {
+        expect(v).toBe('photo-upload-overlay');
+      }
+    );
     await page.mouse.click(4, 4);
 
     await expect(modal).toBeHidden();

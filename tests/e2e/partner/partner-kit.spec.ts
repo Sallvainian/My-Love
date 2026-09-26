@@ -14,6 +14,7 @@
  * three partner mood rows.
  */
 import { randomUUID } from 'node:crypto';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import { interceptNetworkCall as fulfillOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { Page } from '@playwright/test';
@@ -57,13 +58,15 @@ function partnerMoodRows() {
  * scrollbar narrows clientWidth, and scrollWidth follows it.
  */
 async function expectNoHorizontalOverflow(page: Page) {
-  await expect
-    .poll(() =>
+  await recurseUntil(
+    () =>
       page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-      )
-    )
-    .toBe(0);
+      ),
+    (v) => {
+      expect(v).toBe(0);
+    }
+  );
 }
 
 /** The Partner view's own text with user notes removed. */
@@ -182,12 +185,15 @@ test.describe('Partner on the style kit', () => {
       await expect(sheet).toBeVisible();
       await expect(sheet).toHaveCSS('background-color', KIT_CARD[colorScheme]);
       const viewportWidth = page.viewportSize()!.width;
-      await expect
-        .poll(async () => {
+      await recurseUntil(
+        async () => {
           const box = await sheet.boundingBox();
           return box !== null && box.x >= 0 && box.x + box.width <= viewportWidth;
-        })
-        .toBe(true);
+        },
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
       expect(await sheet.textContent()).not.toMatch(/\p{Extended_Pictographic}/u);
       await expectNoHorizontalOverflow(page);
     });

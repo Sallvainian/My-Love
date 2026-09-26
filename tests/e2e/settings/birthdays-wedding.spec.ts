@@ -25,10 +25,12 @@ import {
 } from '../../support/helpers/events';
 import {
   COUPLE_SETTINGS_READ,
+  COUPLE_SETTINGS_SAVE,
   OWN_PROFILE_READ,
   PARTNER_RECORD_READ,
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 async function resetPair(
   supabaseAdmin: TypedSupabaseClient,
@@ -49,6 +51,22 @@ async function resetPair(
     .eq('user_a', pair.user_a)
     .eq('user_b', pair.user_b);
   expect.soft(couple.error).toBeNull();
+}
+
+/** Whether the pair's couple_settings row exists: `resetPair` keeps one it finds. */
+async function pairRowExists(
+  supabaseAdmin: TypedSupabaseClient,
+  userId: string,
+  partnerId: string
+): Promise<boolean> {
+  const [user_a, user_b] = userId < partnerId ? [userId, partnerId] : [partnerId, userId];
+  const { data, error } = await supabaseAdmin
+    .from('couple_settings')
+    .select('user_a')
+    .eq('user_a', user_a)
+    .eq('user_b', user_b);
+  expect(error).toBeNull();
+  return (data ?? []).length > 0;
 }
 
 test.describe('Birthdays and wedding date shared by both partners', () => {
@@ -107,26 +125,34 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       // Ten days from now, thirty years ago: "turns 30" in "10 days".
       const birthday = isoBirthdayDaysFromNow(10, 30, anchor);
       await partnerPage.getByTestId('settings-birthday-date').fill(birthday);
-      const birthdaySaved = partnerPage.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/users') && response.request().method() === 'PATCH'
-      );
+      const birthdaySaved = observeOn({
+        page: partnerPage,
+        method: 'PATCH',
+        url: '**/rest/v1/users?*',
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
       await partnerPage.getByTestId('settings-birthday-save').click();
-      expect((await birthdaySaved).ok()).toBe(true);
-      await expect
-        .poll(() => partnerPage.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday))
-        .toBe(birthday);
+      expect((await birthdaySaved).status).toBe(200);
+      await recurseUntil(
+        () => partnerPage.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday),
+        (v) => {
+          expect(v).toBe(birthday);
+        }
+      );
       await expect(partnerPage.getByTestId('settings-birthday-error')).toHaveCount(0);
 
       const wedding = isoDateDaysFromNow(40, anchor);
       await partnerPage.getByTestId('settings-wedding-date').fill(wedding);
-      const weddingSaved = partnerPage.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/couple_settings') &&
-          response.request().method() === 'POST'
-      );
+      // The upsert answers 201 when it creates the pair's row, 200 when it updates it.
+      const weddingStatus = (await pairRowExists(supabaseAdmin, userId, partnerId)) ? 200 : 201;
+      const weddingSaved = observeOn({
+        page: partnerPage,
+        method: 'POST',
+        url: COUPLE_SETTINGS_SAVE,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
       await partnerPage.getByTestId('settings-wedding-save').click();
-      expect((await weddingSaved).ok()).toBe(true);
+      expect((await weddingSaved).status).toBe(weddingStatus);
       await expect(partnerPage.getByTestId('settings-wedding-clear')).toBeVisible();
       await expect(partnerPage.getByTestId('settings-wedding-error')).toHaveCount(0);
 
@@ -136,9 +162,12 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       );
       await page.reload();
       for (const { status } of await Promise.all(reloadReads)) expect(status).toBe(200);
-      await expect
-        .poll(() => page.evaluate(() => window.__APP_STORE__?.getState().partner?.birthday))
-        .toBe(birthday);
+      await recurseUntil(
+        () => page.evaluate(() => window.__APP_STORE__?.getState().partner?.birthday),
+        (v) => {
+          expect(v).toBe(birthday);
+        }
+      );
       const partnerName = await page.evaluate(
         () => window.__APP_STORE__?.getState().partner?.displayName
       );
@@ -155,7 +184,12 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       const partnerClock = partnerCard.locator('h3 ~ span');
       await expect(partnerClock).toHaveText(/^\d{2}h \d{2}m \d{2}s$/);
       const firstReading = await partnerClock.textContent();
-      await expect.poll(() => partnerClock.textContent()).not.toBe(firstReading);
+      await recurseUntil(
+        () => partnerClock.textContent(),
+        (v) => {
+          expect(v).not.toBe(firstReading);
+        }
+      );
 
       const box = async (locator: typeof partnerCard) => {
         const b = await locator.boundingBox();
@@ -176,13 +210,14 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       expect(fullClock.y).toBeLessThan(fullValue.y + fullValue.height);
 
       await log.step('The partner clears the wedding date; this Home reads "Date TBD" again');
-      const cleared = partnerPage.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/couple_settings') &&
-          response.request().method() === 'POST'
-      );
+      const cleared = observeOn({
+        page: partnerPage,
+        method: 'POST',
+        url: COUPLE_SETTINGS_SAVE,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
       await partnerPage.getByTestId('settings-wedding-clear').click();
-      expect((await cleared).ok()).toBe(true);
+      expect((await cleared).status).toBe(200);
       await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
 
       // The saved copy still holds the wedding date, so the card reads '39 days'

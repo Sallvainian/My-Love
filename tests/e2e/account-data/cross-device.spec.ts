@@ -1,13 +1,16 @@
 import type { Page } from '@playwright/test';
-import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call';
+import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { AppState } from '../../../src/stores/types';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { test, expect } from '../../support/merged-fixtures';
 import {
   ANNIVERSARIES_READ,
+  CUSTOM_MESSAGE_SAVE,
   CUSTOM_MESSAGES_READ,
+  FAVORITES_READ,
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 // Anniversaries, favorites and custom messages now live in Supabase, with the
@@ -17,14 +20,6 @@ import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 // goes through the UI.
 
 const ACCOUNT_TABLES = ['message_favorites', 'custom_messages', 'anniversaries'] as const;
-
-/** The favorites read of the mirror refresh App runs on every signed-in start. */
-function favoritesRefreshed(page: Page) {
-  return page.waitForResponse(
-    (response) =>
-      response.url().includes('/rest/v1/message_favorites') && response.request().method() === 'GET'
-  );
-}
 
 async function favoritedTexts(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
@@ -43,6 +38,7 @@ test.describe('Account data follows the account, not the browser', () => {
     page,
     browser,
     supabaseAdmin,
+    interceptNetworkCall,
   }, testInfo) => {
     const pair = getWorkerPairEmails();
     if (!pair) throw new Error('This test requires its worker-owned account pair');
@@ -80,43 +76,41 @@ test.describe('Account data follows the account, not the browser', () => {
 
     try {
       // ---- First context: make one of each through the UI ----
-      const refreshed = favoritesRefreshed(page);
+      // The favorites read of the mirror refresh App runs on every signed-in start.
+      const refreshed = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
       await page.goto('/');
       const favorite = page.getByTestId('message-favorite-button');
       await expect(favorite).toHaveAccessibleName('Add to favorites');
-      await refreshed;
+      expect((await refreshed).status).toBe(200);
       const favoriteText = (await page.getByTestId('message-text').textContent())?.trim();
       expect(favoriteText).toBeTruthy();
 
-      const favoriteSaved = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/message_favorites') && response.request().method() === 'POST'
-      );
+      const favoriteSaved = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/message_favorites*',
+      });
       await favorite.click();
-      expect((await favoriteSaved).ok()).toBe(true);
+      expect((await favoriteSaved).status).toBe(201);
       await expect(favorite).toHaveAccessibleName('Remove from favorites');
 
       await page.goto('/admin');
       await page.getByTestId('admin-create-button').click();
       await page.getByTestId('admin-create-form-text').fill(customText);
-      const customSaved = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/custom_messages') && response.request().method() === 'POST'
-      );
+      const customSaved = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });
       await page.getByTestId('admin-create-form-save').click();
-      expect((await customSaved).ok()).toBe(true);
+      expect((await customSaved).status).toBe(201);
       await expect(page.getByTestId('message-row-text').filter({ hasText: customText })).toBeVisible();
 
       await page.goto('/settings');
       await page.getByRole('button', { name: 'Add Anniversary' }).click();
       await page.locator('#anniversary-label').fill(anniversaryLabel);
       await page.locator('#anniversary-date').fill('2024-02-14');
-      const anniversarySaved = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/anniversaries') && response.request().method() === 'POST'
-      );
+      const anniversarySaved = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/anniversaries*',
+      });
       await page.getByRole('button', { name: 'Add', exact: true }).click();
-      expect((await anniversarySaved).ok()).toBe(true);
+      expect((await anniversarySaved).status).toBe(201);
       await expect(page.getByText(anniversaryLabel)).toBeVisible();
 
       // ---- Second context: same account, nothing local ----
@@ -124,14 +118,24 @@ test.describe('Account data follows the account, not the browser', () => {
       await fresh.goto('/');
       await fresh.getByLabel('Email', { exact: true }).fill(pair.user1Email);
       await fresh.getByTestId('password-input').fill(TEST_USER_PASSWORD);
-      const freshRefreshed = favoritesRefreshed(fresh);
+      const freshRefreshed = observeOn({
+        page: fresh,
+        method: 'GET',
+        url: FAVORITES_READ,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
       await fresh.getByTestId('submit-button').click();
       await expect(fresh.getByTestId('app-container')).toBeVisible();
-      await freshRefreshed;
+      expect((await freshRefreshed).status).toBe(200);
 
-      await expect.poll(() => favoritedTexts(fresh)).toContain(favoriteText);
+      await recurseUntil(
+        () => favoritedTexts(fresh),
+        (v) => {
+          expect(v).toContain(favoriteText);
+        }
+      );
 
-      const customRead = interceptNetworkCall({
+      const customRead = observeOn({
         page: fresh,
         method: 'GET',
         url: CUSTOM_MESSAGES_READ,
@@ -143,7 +147,7 @@ test.describe('Account data follows the account, not the browser', () => {
       expect(customRows.responseJson).toEqual([expect.objectContaining({ text: customText })]);
       await expect(fresh.getByTestId('message-row-text').filter({ hasText: customText })).toBeVisible();
 
-      const anniversaryRead = interceptNetworkCall({
+      const anniversaryRead = observeOn({
         page: fresh,
         method: 'GET',
         url: ANNIVERSARIES_READ,

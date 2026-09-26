@@ -39,12 +39,14 @@ import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
+  CUSTOM_MESSAGE_SAVE,
   INTERACTIONS_READ,
   LOVE_NOTES_READ,
   PHOTOS_LIST_READ,
   gateNameRead,
   partnerRecordRead,
 } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -321,9 +323,11 @@ test.describe('Partner requests offline', () => {
 
     // This browser only: an unlinked user with one pending incoming request.
     // The pool user stays linked in the database throughout.
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/users?select=partner_id*', (route) =>
       route.fulfill({ json: { partner_id: null, updated_at: '2026-01-01T00:00:00Z' } })
     );
+    // playwright-utils deviation: the route must be installed before the next navigation, answer every read and abort every write; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/partner_requests**', (route) =>
       route.request().method() === 'GET'
         ? route.fulfill({
@@ -343,6 +347,7 @@ test.describe('Partner requests offline', () => {
     );
     // The sender lookup behind the request list (`id=in.(…)`) and the search
     // results (`or=…`) share one select.
+    // playwright-utils deviation: matches either of two query shapes with a URL predicate, which one method + URL glob cannot express, and must be installed before the next navigation; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route(
       (url) =>
         url.pathname === '/rest/v1/users' &&
@@ -357,6 +362,7 @@ test.describe('Partner requests offline', () => {
         });
       }
     );
+    // playwright-utils deviation: the route must be installed before the next navigation and abort every accept and decline call; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route(/\/rest\/v1\/rpc\/(accept|decline)_partner_request/, (route) => route.abort());
 
     try {
@@ -493,9 +499,12 @@ async function openNotesWithPartner(
   expect(partner.status).toBe(200);
   expect(thread.status).toBe(200);
   await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
-  await expect
-    .poll(() => page.evaluate(() => window.__APP_STORE__?.getState().partner?.id ?? null))
-    .toBe(partnerId);
+  await recurseUntil(
+    () => page.evaluate(() => window.__APP_STORE__?.getState().partner?.id ?? null),
+    (v) => {
+      expect(v).toBe(partnerId);
+    }
+  );
   return thread;
 }
 
@@ -558,6 +567,7 @@ test.describe('Love notes offline', () => {
       await openNotesWithPartner(page, supabaseAdmin, interceptNetworkCall);
 
       // GIVEN: a picture note that failed online — its upload never arrives.
+      // playwright-utils deviation: the route must be installed before the send that calls the function and abort every upload attempt; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route(UPLOAD_FUNCTION, (route) => route.abort());
       await attachPicture(page);
       await page.getByLabel('Love note message input').fill(text);
@@ -657,6 +667,7 @@ test.describe('Custom messages editor offline', () => {
   test('shows the offline indicator, and create, edit, delete and import are refused', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const stamp = `E2E-CUSTOM-OFFLINE-${Date.now()}`;
@@ -677,12 +688,9 @@ test.describe('Custom messages editor offline', () => {
       await page.goto('/admin');
       await page.getByTestId('admin-create-button').click();
       await page.getByTestId('admin-create-form-text').fill(saved);
-      const created = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/custom_messages') && response.request().method() === 'POST'
-      );
+      const created = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });
       await page.getByTestId('admin-create-form-save').click();
-      expect((await created).ok()).toBe(true);
+      expect((await created).status).toBe(201);
       const row = page.getByTestId('admin-message-row').filter({ hasText: saved });
       await expect(row).toBeVisible();
       await expect(page.getByTestId('network-status-indicator')).toHaveCount(0);

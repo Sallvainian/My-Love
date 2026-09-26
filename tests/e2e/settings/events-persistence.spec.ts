@@ -57,6 +57,7 @@ import {
   localDateFromIso,
   resolveOwnPair,
 } from '../../support/helpers/events';
+import { EVENTS_WRITE } from '../../support/helpers/reads';
 import { openSettingsFromHome, reloadSettings } from '../../support/helpers/settings-screen';
 import { formatDateLong } from '../../../src/utils/dateUtils';
 import { log } from '@seontechnologies/playwright-utils';
@@ -124,16 +125,14 @@ async function fillEventDescription(page: Page, description: string): Promise<vo
  *
  * The POST is observed with `interceptNetworkCall` declared BEFORE the submit
  * click (network-first), so the create is confirmed at the wire before any DOM
- * assertion runs. `events-crud.spec.ts:185,227,258` uses `page.waitForResponse`
- * for this — a recorded pre-existing deviation; the same file does it the
- * correct way at :414-426, which is what this follows.
+ * assertion runs.
  */
 async function submitNewEvent(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn,
   label: string
 ): Promise<void> {
-  const createCall = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/events*' });
+  const createCall = interceptNetworkCall({ method: 'POST', url: EVENTS_WRITE });
   await page.getByTestId('events-form-submit').click();
 
   const { status } = await createCall;

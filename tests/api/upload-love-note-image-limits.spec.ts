@@ -32,6 +32,9 @@ const BUCKET = 'love-notes-images';
 /** Mirrors `CONFIG.MAX_FILE_SIZE_BYTES` in the function. */
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
+/** The function's JSON answer: the stored object on success, `error` on a refusal. */
+type UploadReply = { storagePath?: string; size?: number; error?: string; maxSize?: number };
+
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** A body the function's magic-byte check accepts, padded to `totalSize`. */
@@ -99,6 +102,7 @@ test.describe('Love note image upload limits', () => {
     const created: string[] = [];
 
     try {
+      // playwright-utils deviation: apiRequest returns no response headers, and this case asserts x-ratelimit-remaining.
       const response = await request.post(FUNCTION_PATH, {
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -132,7 +136,7 @@ test.describe('Love note image upload limits', () => {
   });
 
   test('[P0] a body at exactly the cap is accepted', async ({
-    request,
+    apiRequest,
     authToken,
     supabaseAdmin,
   }) => {
@@ -141,16 +145,18 @@ test.describe('Love note image upload limits', () => {
     const created: string[] = [];
 
     try {
-      const response = await request.post(FUNCTION_PATH, {
+      const { status, body } = await apiRequest<UploadReply>({
+        method: 'POST',
+        path: FUNCTION_PATH,
         headers: {
           Authorization: `Bearer ${authToken}`,
           'Content-Type': 'application/octet-stream',
         },
-        data: pngBody(MAX_FILE_SIZE_BYTES),
+        body: pngBody(MAX_FILE_SIZE_BYTES),
+        retryConfig: { maxRetries: 0 },
       });
 
-      expect(response.status(), 'the cap itself is inclusive').toBe(200);
-      const body = await response.json();
+      expect(status, 'the cap itself is inclusive').toBe(200);
       // Registered for cleanup before any assertion can throw: a failure after
       // a 200 would otherwise leak the object into this worker's prefix and
       // skew the before/after counts of every later case.
@@ -166,23 +172,25 @@ test.describe('Love note image upload limits', () => {
   });
 
   test('[P0] one byte past the cap is refused with 413 and writes nothing', async ({
-    request,
+    apiRequest,
     authToken,
     supabaseAdmin,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const before = await listOwnPrefix(supabaseAdmin, userId);
 
-    const response = await request.post(FUNCTION_PATH, {
+    const { status, body } = await apiRequest<UploadReply>({
+      method: 'POST',
+      path: FUNCTION_PATH,
       headers: {
         Authorization: `Bearer ${authToken}`,
         'Content-Type': 'application/octet-stream',
       },
-      data: pngBody(MAX_FILE_SIZE_BYTES + 1),
+      body: pngBody(MAX_FILE_SIZE_BYTES + 1),
+      retryConfig: { maxRetries: 0 },
     });
 
-    expect(response.status(), 'one byte past the cap is refused').toBe(413);
-    const body = await response.json();
+    expect(status, 'one byte past the cap is refused').toBe(413);
     expect(body.error).toBe('File too large');
     expect(body.maxSize).toBe(MAX_FILE_SIZE_BYTES);
 
@@ -191,7 +199,7 @@ test.describe('Love note image upload limits', () => {
   });
 
   test('[P0] multipart/form-data is refused with 415 and writes nothing', async ({
-    request,
+    apiRequest,
     authToken,
     supabaseAdmin,
   }) => {
@@ -212,35 +220,41 @@ test.describe('Love note image upload limits', () => {
       Buffer.from(`\r\n--${boundary}--\r\n`),
     ]);
 
-    const response = await request.post(FUNCTION_PATH, {
+    const { status, body } = await apiRequest<UploadReply>({
+      method: 'POST',
+      path: FUNCTION_PATH,
       headers: {
         Authorization: `Bearer ${authToken}`,
         'Content-Type': `multipart/form-data; boundary=${boundary}`,
       },
-      data: multipartBody,
+      body: multipartBody,
+      retryConfig: { maxRetries: 0 },
     });
 
-    expect(response.status(), 'the unused multipart format is rejected').toBe(415);
-    expect((await response.json()).error).toBe('Unsupported media type');
+    expect(status, 'the unused multipart format is rejected').toBe(415);
+    expect(body.error).toBe('Unsupported media type');
 
     const after = await listOwnPrefix(supabaseAdmin, userId);
     expect(after, 'a refused format writes no object').toEqual(before);
   });
 
   test('[P0] an unauthenticated request is refused with 401 and writes nothing', async ({
-    request,
+    apiRequest,
     supabaseAdmin,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const before = await listOwnPrefix(supabaseAdmin, userId);
 
-    const response = await request.post(FUNCTION_PATH, {
+    const { status, body } = await apiRequest<UploadReply>({
+      method: 'POST',
+      path: FUNCTION_PATH,
       headers: { 'Content-Type': 'application/octet-stream' },
-      data: pngBody(1024),
+      body: pngBody(1024),
+      retryConfig: { maxRetries: 0 },
     });
 
-    expect(response.status(), 'no bearer token, no upload').toBe(401);
-    expect((await response.json()).error).toBe('Missing authorization header');
+    expect(status, 'no bearer token, no upload').toBe(401);
+    expect(body.error).toBe('Missing authorization header');
 
     const after = await listOwnPrefix(supabaseAdmin, userId);
     expect(after).toEqual(before);
@@ -278,6 +292,7 @@ test.describe('Love note image upload limits', () => {
           bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
           const blob = new Blob([bytes], { type: 'image/png' });
 
+          // playwright-utils deviation: the browser's own fetch of a Blob is what is measured; apiRequest runs in Node and frames the body itself.
           const response = await fetch(url, {
             method: 'POST',
             headers: {

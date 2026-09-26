@@ -11,6 +11,7 @@ import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import { partnerRecordRead } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import type { Page } from '@playwright/test';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -66,7 +67,7 @@ test.describe('Partner profile offline', () => {
     const heading = page.getByTestId('partner-mood-view').getByRole('heading', { level: 1 });
     await expect(heading).toHaveText(partnerName);
     await expect(page.getByTestId('partner-mood-refresh-button')).toBeVisible();
-    await expect.poll(() => partnerCopySaved(page)).toBe(true);
+    await recurseUntil(() => partnerCopySaved(page), (v) => { expect(v).toBe(true); });
 
     try {
       // WHEN: the device goes offline and the user leaves the view.

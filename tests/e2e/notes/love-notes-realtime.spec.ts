@@ -35,6 +35,7 @@ import { interceptNetworkCall } from '@seontechnologies/playwright-utils/interce
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { LOVE_NOTES_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 /**
  * The receiving page's own hook reporting its join.
@@ -192,26 +193,27 @@ test.describe('Love notes realtime delivery', () => {
         await expect(messageInput).toBeVisible();
         await messageInput.fill(noteText);
 
-        const broadcast = page.waitForResponse(
-          (response) =>
-            response.request().method() === 'POST' &&
-            response.url().includes(expectedBroadcastPath),
-          // Explicit, and deliberately NOT the 15s `actionTimeout` this would
-          // otherwise inherit: that is exactly `BROADCAST_TIMEOUT_MS`
-          // (`src/api/ephemeralBroadcast.ts:77`), so a slow send would expire
-          // both bounds in the same instant and this wait would report a missing
-          // response while the app's own abort — the actual diagnosis — never
-          // surfaced. 30s leaves the app's bound to fire first and be seen.
-          { timeout: 30_000 }
-        );
+        // The standalone form: the fixture drops `timeout`.
+        const broadcast = interceptNetworkCall({
+          page,
+          method: 'POST',
+          url: `**${expectedBroadcastPath}?*`,
+          // Bounds only the wait for the POST to be sent: the utility then awaits
+          // `request.response()` with no bound of its own. A send the app aborts
+          // at `BROADCAST_TIMEOUT_MS` (15s, `src/api/ephemeralBroadcast.ts:77`)
+          // therefore fails here as "No response received for the request", and
+          // only a send that never starts runs into these 30s.
+          timeout: 30_000,
+        });
         // Checked here, after the whole sender setup, so every start-up thread
         // read on the partner's page has had that time to start and settle.
-        await expect
-          .poll(() => threadReadsStarted - threadReadsSettled, {
-            message: "every one of the partner's thread reads has settled",
-            timeout: 15_000,
-          })
-          .toBe(0);
+        await recurseUntil(
+          async () => threadReadsStarted - threadReadsSettled,
+          (v) => {
+            expect(v, "every one of the partner's thread reads has settled").toBe(0);
+          },
+          { timeout: 15_000 }
+        );
         const threadReadsBeforeSend = threadReadsStarted;
         await page.getByLabel(/send message/i).click();
 
@@ -220,21 +222,22 @@ test.describe('Love notes realtime delivery', () => {
         // `notesSlice.ts:567-571` swallows it as non-fatal, so checking the
         // partner's screen first would report a rejected broadcast as a missing
         // element and point at the wrong layer.
-        const broadcastResponse = await broadcast;
+        const { status: broadcastStatus, request: broadcastRequest } = await broadcast;
         noteRowCommitted = true;
-        expect(broadcastResponse.status()).toBe(202);
-        // Re-asserted rather than left to the predicate, so that loosening the
-        // predicate later cannot silently widen what the 202 is taken to prove.
+        expect(broadcastStatus).toBe(202);
+        const broadcastUrl = broadcastRequest!.url();
+        // Re-asserted rather than left to the glob, so that loosening the glob
+        // later cannot silently widen what the 202 is taken to prove.
         // Compared against the raw URL: `decodeURIComponent` throws a URIError on
         // any stray percent sequence in a query value, which would replace a real
         // result with a decoding failure.
-        expect(broadcastResponse.url()).toContain(expectedBroadcastPath);
+        expect(broadcastUrl).toContain(expectedBroadcastPath);
         // `private=true` is what makes this an authorization result rather than
         // merely a delivery one. Without it Realtime does not evaluate
         // `couple_broadcast_partner_can_send` at all, and the 202 would say
         // nothing about the policy this spec exists to exercise
         // (`RealtimeChannel.js:456-458`).
-        expect(new URL(broadcastResponse.url()).searchParams.get('private')).toBe('true');
+        expect(new URL(broadcastUrl).searchParams.get('private')).toBe('true');
 
         await log.step('The note reaches the partner live, with no reload and no re-navigation');
         await expect(partnerPage.getByTestId('love-note-message').getByText(noteText)).toBeVisible();

@@ -21,6 +21,7 @@ import {
 } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -108,7 +109,7 @@ test.describe('Events from the local copy', () => {
       expect(upcoming.status).toBe(200);
       expect(upcoming.responseJson).toEqual([expect.objectContaining({ id: eventId, label: LABEL })]);
       await expect(page.getByTestId(HOME_CARD)).toBeVisible();
-      await expect.poll(() => savedEventLabels(page)).toEqual([LABEL]);
+      await recurseUntil(() => savedEventLabels(page), (v) => { expect(v).toEqual([LABEL]); });
       await navigateTo(page, 'settings');
       await expect(settingsRow(page)).toBeVisible();
       await navigateTo(page, 'mood');
@@ -122,6 +123,7 @@ test.describe('Events from the local copy', () => {
       // AND: a reload that cannot reach the events table, then offline, shows
       // the saved copy alone — this session never had a server answer.
       await goOffline(page, false);
+      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route('**/rest/v1/events*', (route) => route.abort());
       // The reload stays on /settings, whose list comes from the copy.
       await page.reload();

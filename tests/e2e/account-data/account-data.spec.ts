@@ -3,6 +3,7 @@ import type { AppState } from '../../../src/stores/types';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { clockAnchor } from '../../support/helpers/events';
 import { FAVORITES_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
@@ -89,7 +90,7 @@ async function signOut(page: Page) {
   await navigate(page, 'settings');
   await page.getByTestId('settings-sign-out').click();
   await expect(page.getByTestId('login-screen')).toBeVisible();
-  await expect.poll(async () => (await snapshot(page)).userId).toBeNull();
+  await recurseUntil(async () => (await snapshot(page)).userId, (v) => { expect(v).toBeNull(); });
   expect((await snapshot(page)).favoriteIds).toEqual([]);
 }
 
@@ -152,8 +153,18 @@ test.describe('Account data through the real browser and local services', () => 
     expect(original.currentId).toBeTruthy();
 
     await favorite.click();
-    await expect.poll(() => savedFavoriteIds(page, original.userId!)).toContain(original.currentId);
-    await expect.poll(async () => (await snapshot(page)).favoriteIds).toContain(original.currentId);
+    await recurseUntil(
+      () => savedFavoriteIds(page, original.userId!),
+      (v) => {
+        expect(v).toContain(original.currentId);
+      }
+    );
+    await recurseUntil(
+      async () => (await snapshot(page)).favoriteIds,
+      (v) => {
+        expect(v).toContain(original.currentId);
+      }
+    );
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
 
     const reloadRead = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
@@ -162,24 +173,49 @@ test.describe('Account data through the real browser and local services', () => 
     expect(reloaded.status).toBe(200);
     expect(reloaded.responseJson).toHaveLength(1);
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
-    await expect.poll(async () => (await snapshot(page)).currentFavorite).toBe(true);
+    await recurseUntil(
+      async () => (await snapshot(page)).currentFavorite,
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
     await signOut(page);
     await signIn(page, pair.user2Email);
-    await expect.poll(async () => (await snapshot(page)).userId).not.toBe(original.userId);
-    await expect.poll(async () => (await snapshot(page)).currentId).toBe(original.currentId);
+    await recurseUntil(
+      async () => (await snapshot(page)).userId,
+      (v) => {
+        expect(v).not.toBe(original.userId);
+      }
+    );
+    await recurseUntil(
+      async () => (await snapshot(page)).currentId,
+      (v) => {
+        expect(v).toBe(original.currentId);
+      }
+    );
     await expect(favorite).toHaveAccessibleName('Add to favorites');
     expect((await snapshot(page)).favoriteIds).toEqual([]);
 
     // A's favorite left the device with A's session (CAP-7) — it stays on
     // the server — and B can add and remove the same daily favorite.
     const userB = (await snapshot(page)).userId!;
-    await expect.poll(() => savedFavoriteIds(page, original.userId!)).toBeNull();
+    await recurseUntil(
+      () => savedFavoriteIds(page, original.userId!),
+      (v) => {
+        expect(v).toBeNull();
+      }
+    );
     await favorite.click();
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
-    await expect.poll(() => savedFavoriteIds(page, userB)).toEqual([original.currentId]);
+    await recurseUntil(
+      () => savedFavoriteIds(page, userB),
+      (v) => {
+        expect(v).toEqual([original.currentId]);
+      }
+    );
     await favorite.click();
     await expect(favorite).toHaveAccessibleName('Add to favorites');
-    await expect.poll(() => savedFavoriteIds(page, userB)).toEqual([]);
+    await recurseUntil(() => savedFavoriteIds(page, userB), (v) => { expect(v).toEqual([]); });
 
     // A's sign-in refreshes the favorite back from the server.
     await signOut(page);
@@ -240,7 +276,7 @@ test.describe('Account data through the real browser and local services', () => 
     try {
       await navigate(page, 'mood');
       await expect(page.getByTestId('mood-tracker')).toBeVisible();
-      await expect.poll(async () => (await snapshot(page)).pending).toBe(1);
+      await recurseUntil(async () => (await snapshot(page)).pending, (v) => { expect(v).toBe(1); });
       expect((await snapshot(page)).moods).toEqual([]);
       expect(await localRows(page, 'moods')).toContainEqual(expect.objectContaining({
         id: seeded.id,
@@ -250,6 +286,7 @@ test.describe('Account data through the real browser and local services', () => 
       }));
       await expect(page.getByTestId('mood-submit-button')).toBeDisabled();
 
+      // playwright-utils deviation: matches on the request body (this seeded row's owner and timestamp), which a method + URL glob cannot express.
       const savedResponse = page.waitForResponse((response) => {
         const request = response.request();
         if (!response.url().includes('/rest/v1/moods') || request.method() !== 'POST') return false;
@@ -260,6 +297,7 @@ test.describe('Account data through the real browser and local services', () => 
       await page.getByTestId('mood-submit-button').click();
       const response = await savedResponse;
       expect(response.ok()).toBe(true);
+      // playwright-utils deviation: parses the response of the body-matched waitForResponse above, which interceptNetworkCall cannot replace.
       const body = await response.json();
       expect(body).toEqual(expect.objectContaining({
         user_id: seeded.owner,
@@ -268,25 +306,35 @@ test.describe('Account data through the real browser and local services', () => 
         note: seeded.note,
       }));
       const serverId = body.id as string;
-      await expect.poll(async () => (await snapshot(page)).moods).toContainEqual({
-        id: seeded.id,
-        mood: 'happy',
-        note: seeded.note,
-        synced: true,
-        supabaseId: serverId,
-      });
-      await expect.poll(() => localRows(page, 'moods')).toEqual([expect.objectContaining({
-        id: seeded.id,
-        userId: seeded.owner,
-        timestamp: seeded.timestamp,
-        moods: ['happy'],
-        note: seeded.note,
-        synced: true,
-        supabaseId: serverId,
-      })]);
+      await recurseUntil(
+        async () => (await snapshot(page)).moods,
+        (v) => {
+          expect(v).toContainEqual({
+            id: seeded.id,
+            mood: 'happy',
+            note: seeded.note,
+            synced: true,
+            supabaseId: serverId,
+          });
+        }
+      );
+      await recurseUntil(
+        () => localRows(page, 'moods'),
+        (v) => {
+          expect(v).toEqual([expect.objectContaining({
+            id: seeded.id,
+            userId: seeded.owner,
+            timestamp: seeded.timestamp,
+            moods: ['happy'],
+            note: seeded.note,
+            synced: true,
+            supabaseId: serverId,
+          })]);
+        }
+      );
       await expect(page.getByTestId('mood-success-toast')).toBeVisible();
       await expect(page.getByTestId('mood-note-input')).toHaveValue(seeded.note);
-      await expect.poll(async () => (await snapshot(page)).pending).toBe(0);
+      await recurseUntil(async () => (await snapshot(page)).pending, (v) => { expect(v).toBe(0); });
       const persisted = await supabaseAdmin.from('moods').select('mood_type,mood_types,note').eq('id', serverId).single();
       expect(persisted.error).toBeNull();
       expect(persisted.data).toEqual({ mood_type: 'happy', mood_types: ['happy'], note: seeded.note });

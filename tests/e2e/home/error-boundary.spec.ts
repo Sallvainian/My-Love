@@ -35,6 +35,7 @@ test.describe('Error Boundary', () => {
 
   test('[P0] shows the view error and keeps the dock when a view throws while loading', async ({ page }) => {
     // GIVEN: The Photos module evaluates to a thrown error.
+    // playwright-utils deviation: stubs an app JS module, not an API call, before the next navigation; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route(PHOTO_GALLERY_MODULE, (route) =>
       route.fulfill({
         status: 200,
@@ -58,6 +59,7 @@ test.describe('Error Boundary', () => {
 
   test('[P0] shows the offline fallback when a view module fails to load, and Go Home returns home', async ({ page }) => {
     // GIVEN: The request for the Photos module fails, as it does offline.
+    // playwright-utils deviation: aborts an app JS module, not an API call, before the next navigation; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route(PHOTO_GALLERY_MODULE, (route) => route.abort());
     await page.goto('/');
     await expect(page.getByTestId('nav-dock')).toBeVisible();

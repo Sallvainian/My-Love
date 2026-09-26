@@ -4,7 +4,8 @@ import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/
 import { test, expect } from '../../support/merged-fixtures';
 import { eventDateFrom } from '../../support/factories/events';
 import { navigateTo } from '../../support/helpers/navigation';
-import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { EVENTS_WRITE, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { reloadSettings, settingsEventsLoaded } from '../../support/helpers/settings-screen';
 
 const history = (size: number) => Array.from({ length: size }, (_, index) => ({
@@ -19,37 +20,50 @@ async function openSettings(page: Page, interceptNetworkCall: InterceptNetworkCa
   await settingsEventsLoaded(page, settingsRead);
 }
 
-async function loadHistory(page: Page, expectedCount: number) {
-  const response = page.waitForResponse((reply) => {
-    const url = new URL(reply.url());
-    return url.pathname.endsWith('/rest/v1/events') &&
-      reply.request().method() === 'GET' && url.searchParams.has('or');
-  });
+/** A load-more read: only it carries the `or=` cursor filter (`eventsService.getEventsPage`). */
+const HISTORY_PAGE_READ = '**/rest/v1/events?*&or=*';
+
+async function loadHistory(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  expectedCount: number
+) {
+  const response = interceptNetworkCall({ method: 'GET', url: HISTORY_PAGE_READ });
   await page.getByTestId('events-settings-load-more').click();
-  expect((await response).ok()).toBe(true);
-  await expect.poll(() => page.evaluate(() =>
-    window.__APP_STORE__!.getState().events.length
-  )).toBe(expectedCount);
+  expect((await response).status).toBe(200);
+  await recurseUntil(
+    () => page.evaluate(() => window.__APP_STORE__!.getState().events.length),
+    (v) => {
+      expect(v).toBe(expectedCount);
+    }
+  );
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(expectedCount);
 }
 
 /** The status PostgREST answers each write with: 201 for an insert, 200 for an update. */
 const SUCCESS_STATUS = { POST: 201, PATCH: 200 } as const;
 
-async function submitEvent(page: Page, method: keyof typeof SUCCESS_STATUS, label: string) {
-  const response = page.waitForResponse((reply) =>
-    new URL(reply.url()).pathname.endsWith('/rest/v1/events') &&
-    reply.request().method() === method
-  );
+async function submitEvent(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  method: keyof typeof SUCCESS_STATUS,
+  label: string
+) {
+  const response = interceptNetworkCall({ method, url: EVENTS_WRITE });
   await page.getByTestId('events-form-submit').click();
   const reply = await response;
-  expect(reply.status()).toBe(SUCCESS_STATUS[method]);
-  const body = await reply.json() as { id: string } | { id: string }[];
+  expect(reply.status).toBe(SUCCESS_STATUS[method]);
+  const body = reply.responseJson as { id: string } | { id: string }[];
   const saved = Array.isArray(body) ? body[0] : body;
   expect(saved.id).toBeTruthy();
-  await expect.poll(() => page.evaluate((id) =>
-    window.__APP_STORE__!.getState().events.find((event) => event.id === id)?.label,
-  saved.id)).toBe(label);
+  await recurseUntil(
+    () => page.evaluate((id) =>
+      window.__APP_STORE__!.getState().events.find((event) => event.id === id)?.label,
+    saved.id),
+    (v) => {
+      expect(v).toBe(label);
+    }
+  );
   await expect(page.getByTestId('events-form')).toHaveCount(0);
   await expect(page.getByTestId(`event-label-${saved.id}`)).toHaveText(label);
   return saved.id;
@@ -75,23 +89,23 @@ test('[P0] loads and edits omitted history, then finds the saved deep date after
   await expect(page.getByTestId(`event-row-${oldest.id}`)).toHaveCount(0);
   await expect(page.getByTestId('events-settings-history-notice')).toBeVisible();
 
-  await loadHistory(page, 52);
+  await loadHistory(page, interceptNetworkCall, 52);
   await expect(page.getByTestId('events-settings-load-more')).toHaveCount(0);
   await page.getByTestId(`event-edit-${oldest.id}`).click();
   await expect(page.getByTestId('events-form-date')).toHaveValue(oldest.eventDate);
   await page.getByTestId('events-form-label').fill('Corrected deep history');
   await page.getByTestId('events-form-date').fill(correctedDate);
-  await submitEvent(page, 'PATCH', 'Corrected deep history');
+  await submitEvent(page, interceptNetworkCall, 'PATCH', 'Corrected deep history');
 
   await reloadSettings(page, interceptNetworkCall);
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(51);
   await expect(page.getByTestId(`event-row-${oldest.id}`)).toHaveCount(0);
-  await loadHistory(page, 52);
+  await loadHistory(page, interceptNetworkCall, 52);
   await page.getByTestId(`event-edit-${oldest.id}`).click();
   await expect(page.getByTestId('events-form-label')).toHaveValue('Corrected deep history');
   await expect(page.getByTestId('events-form-date')).toHaveValue(correctedDate);
   await page.getByTestId('events-form-label').fill('Edited history again');
-  await submitEvent(page, 'PATCH', 'Edited history again');
+  await submitEvent(page, interceptNetworkCall, 'PATCH', 'Edited history again');
 
   await navigateTo(page, 'home');
   await expect(page.getByTestId('event-countdown-paging-upcoming-survivor')).toBeVisible();
@@ -110,22 +124,22 @@ test('[P0] adds a deep-past date and can load and edit it again after each reloa
   await page.getByTestId('events-form-label').fill('New deep-past event');
   await page.getByTestId('events-form-date').fill(savedDate);
   await page.getByTestId('events-form-description').fill('Saved outside the first page');
-  const id = await submitEvent(page, 'POST', 'New deep-past event');
+  const id = await submitEvent(page, interceptNetworkCall, 'POST', 'New deep-past event');
 
   await reloadSettings(page, interceptNetworkCall);
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(50);
   await expect(page.getByTestId(`event-row-${id}`)).toHaveCount(0);
-  await loadHistory(page, 52);
+  await loadHistory(page, interceptNetworkCall, 52);
   await page.getByTestId(`event-edit-${id}`).click();
   await expect(page.getByTestId('events-form-date')).toHaveValue(savedDate);
   await expect(page.getByTestId('events-form-description'))
     .toHaveValue('Saved outside the first page');
   await page.getByTestId('events-form-label').fill('Deep-past event edited');
-  await submitEvent(page, 'PATCH', 'Deep-past event edited');
+  await submitEvent(page, interceptNetworkCall, 'PATCH', 'Deep-past event edited');
 
   await reloadSettings(page, interceptNetworkCall);
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(50);
-  await loadHistory(page, 52);
+  await loadHistory(page, interceptNetworkCall, 52);
   await page.getByTestId(`event-edit-${id}`).click();
   await expect(page.getByTestId('events-form-label')).toHaveValue('Deep-past event edited');
   await expect(page.getByTestId('events-form-date')).toHaveValue(savedDate);
@@ -169,10 +183,10 @@ test('[P1] tied dates and microseconds stay ordered through repeated pages and H
       a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
   await openSettings(page, interceptNetworkCall);
   await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(100);
-  await loadHistory(page, 200);
+  await loadHistory(page, interceptNetworkCall, 200);
   await expect(page.getByTestId('events-settings-load-more')).toBeEnabled();
   await expect(page.getByTestId('events-settings-history-notice')).toBeVisible();
-  await loadHistory(page, 208);
+  await loadHistory(page, interceptNetworkCall, 208);
   await expect(page.getByTestId('events-settings-load-more')).toHaveCount(0);
   const actualIds = await page.locator('[data-testid^="event-row-"]')
     .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-testid')!.slice(10)));
@@ -184,17 +198,18 @@ test('[P1] tied dates and microseconds stay ordered through repeated pages and H
   await expect(page.getByTestId(`event-edit-${own.id}`)).toHaveCount(1);
   await expect(page.getByTestId(`event-edit-${partner.id}`)).toHaveCount(0);
 
-  const homeRead = page.waitForResponse((reply) => {
-    const url = new URL(reply.url());
-    return url.pathname.endsWith('/rest/v1/events') &&
-      reply.request().method() === 'GET' && !url.searchParams.has('or');
-  });
+  const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
   await navigateTo(page, 'home');
-  expect((await homeRead).ok()).toBe(true);
-  await expect.poll(() => page.evaluate(() => ({
-    loading: window.__APP_STORE__!.getState().eventsIsLoading,
-    count: window.__APP_STORE__!.getState().events.length,
-  }))).toEqual({ loading: false, count: 100 });
+  expect((await homeRead).status).toBe(200);
+  await recurseUntil(
+    () => page.evaluate(() => ({
+      loading: window.__APP_STORE__!.getState().eventsIsLoading,
+      count: window.__APP_STORE__!.getState().events.length,
+    })),
+    (v) => {
+      expect(v).toEqual({ loading: false, count: 100 });
+    }
+  );
   const cards = page.getByTestId(/^event-countdown-tied-paging-\d+$/);
   await expect(cards).toHaveCount(6);
   await expect(cards.locator('h3')).toHaveText(expected.filter((row) =>
@@ -212,6 +227,7 @@ test('[P1] restores Chromium keyboard focus to history retry and then Add after 
   let releaseFailure!: () => void;
   const failureGate = new Promise<void>((resolve) => { releaseFailure = resolve; });
   let shouldFail = true;
+  // playwright-utils deviation: the route must be installed before the load-more press sends the read, hold it on a gate, abort it and pass every other events request through; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
   await page.route('**/rest/v1/events*', async (route) => {
     const request = route.request();
     if (shouldFail && request.method() === 'GET' && new URL(request.url()).searchParams.has('or')) {
@@ -232,16 +248,21 @@ test('[P1] restores Chromium keyboard focus to history retry and then Add after 
   await expect(page.locator('body')).toBeFocused();
   releaseFailure();
   await failedRequest;
-  await expect.poll(() => page.evaluate(() => ({
-    loading: window.__APP_STORE__!.getState().eventsIsLoadingMore,
-    failed: Boolean(window.__APP_STORE__!.getState().eventsHistoryError),
-    count: window.__APP_STORE__!.getState().events.length,
-  }))).toEqual({ loading: false, failed: true, count: 50 });
+  await recurseUntil(
+    () => page.evaluate(() => ({
+      loading: window.__APP_STORE__!.getState().eventsIsLoadingMore,
+      failed: Boolean(window.__APP_STORE__!.getState().eventsHistoryError),
+      count: window.__APP_STORE__!.getState().events.length,
+    })),
+    (v) => {
+      expect(v).toEqual({ loading: false, failed: true, count: 50 });
+    }
+  );
   await expect(button).toHaveText('Retry loading history');
   await expect(button).toBeFocused();
 
   shouldFail = false;
-  await loadHistory(page, 51);
+  await loadHistory(page, interceptNetworkCall, 51);
   await expect(button).toHaveCount(0);
   await expect(page.getByTestId('events-settings-add')).toBeFocused();
 });

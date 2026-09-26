@@ -34,6 +34,7 @@ import {
   seedEvent,
 } from '../../support/helpers/events';
 import { PAST_EVENTS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 test.afterEach(async ({ supabaseAdmin }) => {
   await clearOwnPairEvents(supabaseAdmin);
@@ -180,6 +181,7 @@ test.describe('Home dashboard reads events from the store', () => {
     const fetchHeld = new Promise<void>((resolve) => {
       releaseFetch = resolve;
     });
+    // playwright-utils deviation: the route must be installed before the next navigation and hold every events read until released; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/events*', async (route) => {
       await fetchHeld;
       await route.continue();
@@ -416,6 +418,7 @@ test.describe('Home dashboard reads events from the store', () => {
     });
     let eventsRequests = 0;
 
+    // playwright-utils deviation: the route must be installed before the dock navigation back to Home and count and hold every events read; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/events*', async (route) => {
       eventsRequests += 1;
       await fetchHeld;
@@ -431,7 +434,7 @@ test.describe('Home dashboard reads events from the store', () => {
     // exercises the effect's `currentView` key, so without this the whole
     // "return to Home reloads events" behaviour could be deleted and every
     // test would still pass off the store's already-loaded data.
-    await expect.poll(() => eventsRequests).toBeGreaterThan(0);
+    await recurseUntil(async () => eventsRequests, (v) => { expect(v).toBeGreaterThan(0); });
 
     // While that response is still held, the card must not have blanked
     // (Design Notes: "A later background reload must never blank cards
@@ -495,6 +498,7 @@ test.describe(
       // recovery cannot pass after only one side of getEvents has responded.
       await page.unroute('**/rest/v1/events*');
       let successfulEventReads = 0;
+      // playwright-utils deviation: the route must be installed before the dock navigation back to Home and count every events read; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route('**/rest/v1/events*', async (route) => {
         if (route.request().method() === 'GET') {
           successfulEventReads += 1;
@@ -505,7 +509,9 @@ test.describe(
       await navigateTo(page, 'photos');
       await navigateTo(page, 'home');
 
-      await expect.poll(() => successfulEventReads).toBeGreaterThanOrEqual(2);
+      await recurseUntil(async () => successfulEventReads, (v) => {
+        expect(v).toBeGreaterThanOrEqual(2);
+      });
       await expect(page.getByTestId('events-load-error')).toHaveCount(0);
       await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
       await page.unroute('**/rest/v1/events*');

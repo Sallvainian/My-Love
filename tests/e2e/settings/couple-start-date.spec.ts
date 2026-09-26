@@ -16,7 +16,12 @@ import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-ses
 import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
-import { COUPLE_SETTINGS_READ, SECOND_CONTEXT_READ_TIMEOUT } from '../../support/helpers/reads';
+import {
+  COUPLE_SETTINGS_READ,
+  COUPLE_SETTINGS_SAVE,
+  SECOND_CONTEXT_READ_TIMEOUT,
+} from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -105,21 +110,22 @@ test.describe('Couple start date shared by both partners', () => {
       await partnerPage.getByTestId('settings-together-since-date').fill(inputs.date);
       await partnerPage.getByTestId('settings-together-since-time').fill(inputs.time);
 
-      const saved = partnerPage.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/couple_settings') &&
-          response.request().method() === 'POST'
-      );
+      const saved = observeOn({
+        page: partnerPage,
+        method: 'POST',
+        url: COUPLE_SETTINGS_SAVE,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
       await partnerPage.getByTestId('settings-together-since-save').click();
-      expect((await saved).ok()).toBe(true);
-      await expect.poll(() => storeStart(partnerPage)).toBe(targetIso);
+      expect((await saved).status).toBe(201);
+      await recurseUntil(() => storeStart(partnerPage), (v) => { expect(v).toBe(targetIso); });
       await expect(partnerPage.getByTestId('settings-together-since-error')).toHaveCount(0);
 
       await log.step('This partner sees the same date after a reload');
       const reloadRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
       await page.reload();
       expect((await reloadRead).status).toBe(200);
-      await expect.poll(() => storeStart(page)).toBe(targetIso);
+      await recurseUntil(() => storeStart(page), (v) => { expect(v).toBe(targetIso); });
       const card = page.getByTestId('time-together');
       await expect(card).toContainText('12 days');
       await expect(card).not.toContainText('Set your start date in Settings');

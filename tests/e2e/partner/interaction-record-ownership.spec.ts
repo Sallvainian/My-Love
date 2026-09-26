@@ -5,6 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { log } from '@seontechnologies/playwright-utils';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import { createInteractionRecord } from '../../support/factories/interaction-record-ownership';
 
@@ -258,7 +259,12 @@ test.describe('Interaction record ownership', () => {
       );
       await expect(badge).toHaveText('1');
       // The badge scales in from 0; measure it only once it is full size.
-      await expect.poll(async () => (await badge.boundingBox())?.height).toBe(20);
+      await recurseUntil(
+        async () => (await badge.boundingBox())?.height,
+        (v) => {
+          expect(v).toBe(20);
+        }
+      );
       const box = (await badge.boundingBox())!;
       const historyBox = (await history.boundingBox())!;
       const centreY = box.y + box.height / 2;
