@@ -20,17 +20,27 @@
  * run, so an inline arrow would drag focus back to the label field on every
  * render of the app around this section.
  */
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState } from '../../../stores/types';
-import { EventsSettings } from '../EventsSettings';
+import {
+  dateFromISO,
+  loadOk,
+  makeEvent,
+  ok,
+  OWN_USER_ID,
+  renderSection,
+  STALE,
+  UNREADABLE,
+  writeFailure,
+  type CoupleEvent,
+  type EventLoadResult,
+  type EventWriteResult,
+} from './eventsSettingsKit';
 
-type CoupleEvent = AppState['events'][number];
-type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
-type EventWriteResult = Awaited<ReturnType<AppState['addEvent']>>;
 type NewEventInput = Parameters<AppState['addEvent']>[0];
 type EventUpdateInput = Parameters<AppState['editEvent']>[1];
 
@@ -50,8 +60,6 @@ vi.mock('motion/react', () => ({
   },
   AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
-
-const OWN_USER_ID = 'user-own';
 
 /** A subscribable store double: `patch` notifies exactly as `set()` would. */
 const store = vi.hoisted(() => {
@@ -89,41 +97,9 @@ vi.mock('../../../stores/useAppStore', async () => {
   return { useAppStore: Object.assign(useAppStore, { getState: () => store.state }) };
 });
 
-function dateFromISO(iso: string): Date {
-  const [year, month, day] = iso.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function makeEvent(overrides: Partial<CoupleEvent> & Pick<CoupleEvent, 'id'>): CoupleEvent {
-  return {
-    userId: OWN_USER_ID,
-    label: 'An event',
-    date: new Date(2026, 8, 12),
-    createdAt: new Date(2026, 0, 1),
-    description: null,
-    icon: 'calendar',
-    ...overrides,
-  };
-}
-
 function currentEvents(): CoupleEvent[] {
   return (store.state.events ?? []) as CoupleEvent[];
 }
-
-const ok: EventWriteResult = { success: true };
-const loadOk: EventLoadResult = { status: 'success' };
-
-type EventWriteFailure = Extract<EventWriteResult, { success: false }>;
-
-/** A refused write, as the slice resolves it. */
-function writeFailure(code: EventWriteFailure['code'], error: string): EventWriteFailure {
-  return { success: false, code, error };
-}
-
-/** A save whose response could not be read: it may or may not have landed. */
-const UNREADABLE = writeFailure('invalid-response', 'Unreadable response');
-/** A write against a row that is gone or no longer the caller's. */
-const STALE = writeFailure('not-found', 'Stale row');
 
 function setStore(overrides: Partial<AppState> = {}) {
   let created = 0;
@@ -178,12 +154,6 @@ function setStore(overrides: Partial<AppState> = {}) {
     }),
     ...overrides,
   } as unknown as Record<string, unknown>);
-}
-
-async function renderSection() {
-  const utils = render(<EventsSettings />);
-  await act(async () => {});
-  return utils;
 }
 
 /** The trap captures document.activeElement when it arms; a real click focuses the opener first. */
