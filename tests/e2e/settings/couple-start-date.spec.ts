@@ -15,6 +15,7 @@ import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
 import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { closeContext } from '../../support/fixtures/cleanup';
 import { resolveOwnPair } from '../../support/helpers/events';
 import {
   COUPLE_SETTINGS_READ,
@@ -90,7 +91,7 @@ test.describe('Couple start date shared by both partners', () => {
       baseURL,
     });
     // Closed before the clear above runs: the partner's page can still be saving.
-    cleanup.defer('close the partner context', () => partnerContext.close());
+    cleanup.defer('close the partner context', () => closeContext(partnerContext));
     const partnerPage = await partnerContext.newPage();
     const partnerRead = observeOn({
       page: partnerPage,

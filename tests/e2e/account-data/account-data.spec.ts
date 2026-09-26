@@ -281,8 +281,9 @@ test.describe('Account data through the real browser and local services', () => 
     let committed = false;
     cleanup.defer('delete the synced mood row', async () => {
       // Close the page first: its sync retries could otherwise land a row after
-      // the delete.
-      await page.close();
+      // the delete. Its context, not just the page, so a failure's page
+      // snapshot is this page (see `closeContext`).
+      await page.context().close();
       // Only the row this test created, matched by its owner and timestamp.
       const { data, error } = await supabaseAdmin.from('moods').delete()
         .eq('user_id', seeded.owner).eq('created_at', seeded.timestamp).select('id');

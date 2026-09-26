@@ -33,6 +33,7 @@ import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
 import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { closeContext } from '../../support/fixtures/cleanup';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { LOVE_NOTES_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -120,8 +121,9 @@ test.describe('Love notes realtime delivery', () => {
       let noteRowCommitted = false;
       cleanup.defer('delete the note row this test created', async () => {
         // The sender's page first: its queued-note drain could otherwise send
-        // the note after the delete.
-        await page.close();
+        // the note after the delete. Its context, not just the page, so a
+        // failure's page snapshot is the sender's (see `closeContext`).
+        await page.context().close();
 
         // Keyed on this test's own uuid AND on this worker's own pair, so a
         // mis-resolved identity deletes nothing rather than another worker's
@@ -158,7 +160,7 @@ test.describe('Love notes realtime delivery', () => {
         // built without it resolves relative gotos against nothing.
         baseURL,
       });
-      cleanup.defer('close the partner context', () => partnerContext.close());
+      cleanup.defer('close the partner context', () => closeContext(partnerContext));
       const partnerPage: Page = await partnerContext.newPage();
 
       // The partner's thread reads, counted from before its goto: the notes

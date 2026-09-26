@@ -4,7 +4,7 @@ import type { AppState } from '../../../src/stores/types';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { test, expect } from '../../support/merged-fixtures';
-import type { Cleanup } from '../../support/fixtures/cleanup';
+import { closeContext, type Cleanup } from '../../support/fixtures/cleanup';
 import {
   ANNIVERSARIES_READ,
   CUSTOM_MESSAGE_SAVE,
@@ -63,8 +63,10 @@ function deferTeardown(
   clear: () => Promise<void>
 ) {
   cleanup.defer('clear the table', clear);
-  cleanup.defer('close the first page', () => page.close());
-  cleanup.defer('close the second context', () => second.close());
+  // The first context, not just its page, and the second one pages first, so
+  // a failure's page snapshot is the first page (see `closeContext`).
+  cleanup.defer('close the first context', () => page.context().close());
+  cleanup.defer('close the second context', () => closeContext(second));
 }
 
 // Nothing but the welcome-splash timestamp: no session, no mirrors.

@@ -20,7 +20,7 @@ import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-ses
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
-import type { Cleanup } from '../../support/fixtures/cleanup';
+import { closeContext, type Cleanup } from '../../support/fixtures/cleanup';
 import type { TypedSupabaseClient } from '../../support/factories';
 import {
   clockAnchorAvoidingLeapDay,
@@ -112,7 +112,7 @@ async function openPartnerSettings(
     storageState: getStorageStatePath({ ...authOptions, userIdentifier: partnerUserIdentifier }),
     baseURL,
   });
-  cleanup.defer('close the partner context', () => context.close());
+  cleanup.defer('close the partner context', () => closeContext(context));
   await context.clock.install({ time: anchor });
   const partnerPage = await context.newPage();
   const partnerReads = [COUPLE_SETTINGS_READ, OWN_PROFILE_READ].map((url) =>
