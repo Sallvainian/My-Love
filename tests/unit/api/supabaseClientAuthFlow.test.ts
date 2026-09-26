@@ -24,9 +24,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { createAuthBootstrapSession } from '../../support/factories/auth-bootstrap-notification-order';
 
-// `vitest.config.ts` defines VITE_SUPABASE_URL as the project URL, so the
-// SDK derives this storage key (`sb-${hostname.split('.')[0]}-auth-token`).
-const STORAGE_KEY = 'sb-xojempkrugifnaveqtqc-auth-token';
+// `vitest.config.ts` defines VITE_SUPABASE_URL as `https://unit-tests.invalid`,
+// so the SDK derives this storage key (`sb-${hostname.split('.')[0]}-auth-token`).
+const STORAGE_KEY = 'sb-unit-tests-auth-token';
 const APP_ORIGIN = 'http://localhost:3000';
 
 /**

@@ -11,7 +11,7 @@
  * - local ids stay stable across refreshes and are never reused;
  * - export and import carry no owner.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import type { CustomMessagesExport, Message } from '../../../src/types';
@@ -79,7 +79,11 @@ describe('customMessageService and the message-data copy', () => {
 
   describe('the copy is per account', () => {
     beforeEach(() => {
-      globalThis.indexedDB = new IDBFactory();
+      vi.stubGlobal('indexedDB', new IDBFactory());
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
     });
 
     it('never reads one account’s rows back for another', async () => {
@@ -283,8 +287,8 @@ describe('customMessageService and the message-data copy', () => {
 
     it('refuses an unsupported file', () => {
       const future = { ...exportFile([]), version: '2.0' } as unknown as CustomMessagesExport;
-      // The schema accepts only version "1.0", so it refuses the file before
-      // planImport's own version check is reached.
+      // The schema accepts only version "1.0"; its refusal is the only
+      // version check.
       expect(() => service.planImport([], future)).toThrow(/^Invalid version\. Please select a valid option\.$/);
     });
   });

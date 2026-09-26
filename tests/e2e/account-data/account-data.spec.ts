@@ -317,7 +317,7 @@ test.describe('Account data through the real browser and local services', () => 
     await page.getByTestId('mood-submit-button').click();
     const response = await savedResponse;
     committed = response.ok();
-    expect(response.ok()).toBe(true);
+    expect(response.status()).toBe(201);
     // playwright-utils deviation: parses the response of the body-matched waitForResponse above, which interceptNetworkCall cannot replace.
     const body = await response.json();
     expect(body).toEqual(expect.objectContaining({

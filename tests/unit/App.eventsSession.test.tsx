@@ -309,7 +309,7 @@ describe('Auth bootstrap notification ownership', () => {
     render(<App />);
 
     await act(async () => lookup.resolve(null));
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(screen.getByText('Sign in')).toBeInTheDocument();
     expect(useAppStore.getState()).toMatchObject({
       userId: null,
@@ -347,7 +347,7 @@ describe('Auth bootstrap notification ownership', () => {
       events: cachedEvents,
       eventsIsLoading: true,
     });
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
     expect(screen.queryByText('Sign in')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Cached current trip' })).toBeInTheDocument();
@@ -369,7 +369,7 @@ describe('Auth bootstrap notification ownership', () => {
     await act(async () => auth.listener!(null));
     const ownership = useAppStore.getState().authSessionVersion;
     expect(useAppStore.getState().userId).toBeNull();
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-loading-screen')).toBeInTheDocument();
 
     await act(async () => lookup.resolve(session('stale-token', OTHER_USER_ID)));
     expect(useAppStore.getState()).toMatchObject({
@@ -380,7 +380,7 @@ describe('Auth bootstrap notification ownership', () => {
     });
     expect(screen.getByText('Sign in')).toBeInTheDocument();
     expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(loadEvents).not.toHaveBeenCalled();
     expect(initializeApp).not.toHaveBeenCalled();
     expect(syncPendingMoods).not.toHaveBeenCalled();
@@ -402,7 +402,7 @@ describe('Auth bootstrap notification ownership', () => {
       authSessionVersion: ownership,
       events: [],
     });
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(screen.getByText('Sign in')).toBeInTheDocument();
     expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
     expect(loadEvents).toHaveBeenCalledTimes(1);
@@ -439,7 +439,7 @@ describe('Auth bootstrap notification ownership', () => {
       userEmail: 'updated@example.com',
       authSessionVersion: ownership,
     });
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(loadEvents).toHaveBeenCalledTimes(1);
     return { requests };
   }
@@ -474,7 +474,7 @@ describe('Auth bootstrap notification ownership', () => {
 
     await act(async () => lookup.reject(error));
     expect(reportError).toHaveBeenCalledWith('[App] Auth check failed:', error);
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     return { ownership };
   }
 
@@ -517,7 +517,7 @@ describe('Auth bootstrap notification ownership', () => {
       isAuthenticated: true,
       authSessionVersion: ownership,
     });
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
     expect(loadEvents).toHaveBeenCalledTimes(1);
     await act(async () => requests[0].resolve(success));

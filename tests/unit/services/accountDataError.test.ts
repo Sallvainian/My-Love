@@ -2,16 +2,12 @@
  * accountDataError — the one wording for an up-front offline refusal
  * (ticket 11, CAP-4): "You are offline. <what> need(s) a connection to <action>."
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AccountDataError,
   offlineMessage,
   requireOnline,
 } from '../../../src/services/accountDataError';
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe('offlineMessage', () => {
   it('builds the plural sentence, defaulting to "save"', () => {

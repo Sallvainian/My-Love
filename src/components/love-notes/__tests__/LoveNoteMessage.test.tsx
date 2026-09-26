@@ -243,7 +243,7 @@ describe('LoveNoteMessage', () => {
       });
     });
 
-    it('should display image after loading signed URL', async () => {
+    it('shows the stored picture once its link has loaded', async () => {
       const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
@@ -256,7 +256,7 @@ describe('LoveNoteMessage', () => {
       });
     });
 
-    it('should display optimistic preview URL directly', async () => {
+    it('shows a just-sent picture from its local preview without fetching a link', async () => {
       const messageWithPreview: LoveNote = {
         ...baseMessage,
         imagePreviewUrl: 'blob:http://localhost/preview-123',
@@ -456,7 +456,7 @@ describe('LoveNoteMessage', () => {
       // later. Switch only after that commit: a render still pending at the
       // switch reads the new session, re-runs the effect as it, and this mock
       // answers that second read with the same blob, which is then shown.
-      await waitFor(() => expect(document.querySelector('.animate-spin')).toBeInTheDocument());
+      await screen.findByTestId('love-note-image-loading');
 
       switchIdentity({ authSessionVersion: 2 });
       await act(async () => {

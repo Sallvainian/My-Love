@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PostgrestError } from '@supabase/supabase-js';
@@ -53,7 +53,6 @@ const raw = { code: '23514', message: 'raw constraint with incidental duplicate 
 
 describe('partner request CHECK presentation', () => {
   beforeEach(() => { cleanup(); backend.error = null; });
-  afterEach(() => { vi.restoreAllMocks(); });
 
   it.each(actions)('%s logs an independent raw CHECK diagnostic before mapping its message', async (method) => {
     const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -138,9 +137,6 @@ describe('partner requests offline (ticket 11)', () => {
     cleanup();
     backend.error = null;
     backend.requests = [];
-  });
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it.each(actions)(

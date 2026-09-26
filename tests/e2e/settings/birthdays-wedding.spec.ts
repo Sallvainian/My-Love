@@ -207,7 +207,7 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     await expect(partnerCard.locator('h3')).toHaveText(`${partnerName} turns 30`);
     // Whole days left plus a live clock to the day's local midnight, so ten
     // calendar days out reads "9 days" and the rest as hours.
-    await expect(partnerCard.locator('h3 + div')).toHaveText('9 days');
+    await expect(partnerCard.getByTestId('countdown-value')).toHaveText('9 days');
   });
 
   test('[P1] a wedding date the partner saves shows on this Home, and clearing it brings back Date TBD', async ({
@@ -270,7 +270,7 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     await page.reload();
     for (const { status } of await Promise.all(reloadReads)) expect(status).toBe(200);
     const weddingCard = page.getByTestId('event-countdown-wedding');
-    await expect(weddingCard.locator('h3 + div')).toHaveText('39 days');
+    await expect(weddingCard.getByTestId('countdown-value')).toHaveText('39 days');
 
     await log.step('The partner clears the wedding date; this Home reads "Date TBD" again');
     const cleared = observeOn({
@@ -288,9 +288,9 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     const clearedRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
     await page.reload();
     expect((await clearedRead).status).toBe(200);
-    await expect(page.getByTestId('event-countdown-wedding').locator('h3 + div')).toHaveText(
-      'Date TBD'
-    );
+    await expect(
+      page.getByTestId('event-countdown-wedding').getByTestId('countdown-value')
+    ).toHaveText('Date TBD');
   });
 
   test('[P1] each countdown card runs a live clock that fits the card at phone width', async ({
@@ -335,12 +335,12 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     const partnerCard = page.getByTestId('birthday-countdown-partner');
     const weddingCard = page.getByTestId('event-countdown-wedding');
     // Premise: both cards count down to a set date, so both carry a clock.
-    await expect(partnerCard.locator('h3 + div')).toHaveText('9 days');
-    await expect(weddingCard.locator('h3 + div')).toHaveText('39 days');
+    await expect(partnerCard.getByTestId('countdown-value')).toHaveText('9 days');
+    await expect(weddingCard.getByTestId('countdown-value')).toHaveText('39 days');
 
     await log.step('Each card runs a live clock that fits the card at phone width');
     await page.setViewportSize({ width: 390, height: 844 });
-    const partnerClock = partnerCard.locator('h3 ~ span');
+    const partnerClock = partnerCard.getByTestId('countdown-clock');
     await expect(partnerClock).toHaveText(/^\d{2}h \d{2}m \d{2}s$/);
     const firstReading = await partnerClock.textContent();
     await recurseUntil(
@@ -358,13 +358,13 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     // Half-width card: the clock takes its own line under the day count and
     // stays inside the card.
     const halfCard = await box(partnerCard);
-    const halfValue = await box(partnerCard.locator('h3 + div'));
+    const halfValue = await box(partnerCard.getByTestId('countdown-value'));
     const halfClock = await box(partnerClock);
     expect(halfClock.y).toBeGreaterThanOrEqual(halfValue.y + halfValue.height - 1);
     expect(halfClock.x + halfClock.width).toBeLessThanOrEqual(halfCard.x + halfCard.width);
     // Full-width card: the clock sits to the right of the day count, on its row.
-    const fullValue = await box(weddingCard.locator('h3 + div'));
-    const fullClock = await box(weddingCard.locator('h3 ~ span'));
+    const fullValue = await box(weddingCard.getByTestId('countdown-value'));
+    const fullClock = await box(weddingCard.getByTestId('countdown-clock'));
     expect(fullClock.x).toBeGreaterThan(fullValue.x + fullValue.width);
     expect(fullClock.y).toBeLessThan(fullValue.y + fullValue.height);
   });

@@ -65,7 +65,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  vi.restoreAllMocks();
 });
 
 describe('PhotoUpload offline', () => {

@@ -6,7 +6,7 @@
  * `bg-white` or Tailwind palette class), which is what makes it follow the OS
  * theme.
  */
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LoginScreen } from '../LoginScreen';
@@ -64,14 +64,14 @@ describe('LoginScreen on the kit', () => {
       'text-accent',
       'fill-current'
     );
-    expect(screen.getByText('My Love')).toHaveClass(
+    expect(screen.getByTestId('login-wordmark')).toHaveClass(
       'font-lora',
       'italic',
       'font-semibold',
       'text-[34px]',
       'text-ink'
     );
-    expect(screen.getByText('Welcome back — sign in to continue')).toHaveClass(
+    expect(screen.getByTestId('login-tagline')).toHaveClass(
       'text-[15px]',
       'text-muted'
     );
@@ -134,14 +134,19 @@ describe('LoginScreen on the kit', () => {
     expectOnKit(container.innerHTML);
   });
 
-  it('shows a validation error in the card on the kit failure surface, with a danger ring', () => {
+  it('shows a validation error in the card on the kit failure surface, with a danger ring', async () => {
+    const user = userEvent.setup();
     const { container } = render(<LoginScreen />);
 
-    fireEvent.submit(screen.getByTestId('login-form')); // raw submit: the submit button is disabled while a field is empty, so no click reaches the empty-fields check
+    // Natively a valid email, so the form submits, but the component's own
+    // check wants a dotted domain.
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'person@localhost');
+    await user.type(screen.getByLabelText('Password'), 'secret-pass');
+    await user.click(screen.getByTestId('submit-button'));
 
     const error = screen.getByTestId('login-error');
     expect(error).toHaveAttribute('role', 'alert');
-    expect(error).toHaveTextContent('Please enter both email and password');
+    expect(error).toHaveTextContent('Please enter a valid email address');
     expect(error).toHaveClass('bg-dtint', 'text-danger');
     expect(within(error).getByTestId('login-error-icon')).toBeInTheDocument();
     expect(screen.getByTestId('login-card')).toContainElement(error);

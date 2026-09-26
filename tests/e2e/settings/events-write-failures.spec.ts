@@ -98,7 +98,7 @@ test.afterEach(async ({ supabaseAdmin }) => {
  * exactly what RLS produces for a non-creator's write — the service reads
  * `data.length === 0`, not a status (eventsService.ts:412-414, 465-467). The
  * network-error-monitor fixture only fails a test on a 4xx/5xx
- * (`tests/support/merged-fixtures.ts:29-40`), so there is nothing here to opt
+ * (`tests/support/merged-fixtures.ts:31-41`), so there is nothing here to opt
  * out of, and leaving it armed keeps a genuine backend error visible.
  */
 test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', () => {

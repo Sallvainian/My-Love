@@ -103,12 +103,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
     setError(null);
     setNoticeDismissed(true);
 
-    // Client-side validation
-    if (!email || !password) {
-      setError('Please enter both email and password');
-      return;
-    }
-
+    // Client-side validation. An empty field never gets here: both inputs are
+    // required and the submit button is disabled until both are filled.
     if (!validateEmail(email)) {
       setError('Please enter a valid email address');
       return;

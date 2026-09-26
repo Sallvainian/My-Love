@@ -40,21 +40,16 @@
  * DW-26 and the online flag in the Settings load effect for DW-27. These active
  * tests preserve both fixes without weakening the original red assertions.
  *
- * HARNESS: duplicated rather than imported — from the helpers in
- * `eventsSettingsKit.tsx` and the mocks at the top of `EventsSettings.test.tsx`.
- * `EventsSettings.focus.test.tsx` duplicates it the same way, and the story's
- * review pass explicitly dismissed extracting it.
+ * HARNESS: the fixtures come from `eventsSettingsKit.tsx`; the store double,
+ * its `setStore` and the mocks stay local, because this suite's store is a
+ * plainer double than the kit's.
  */
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AppState } from '../../../stores/types';
 import { EventsSettings } from '../EventsSettings';
-
-type CoupleEvent = AppState['events'][number];
-type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
-type EventWriteResult = Awaited<ReturnType<AppState['addEvent']>>;
+import { loadOk, makeEvent, ok, OWN_USER_ID, type EventWriteResult } from './eventsSettingsKit';
 
 type DivProps = HTMLAttributes<HTMLDivElement> & {
   children?: ReactNode;
@@ -72,8 +67,6 @@ vi.mock('motion/react', () => ({
   },
   AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
-
-const OWN_USER_ID = 'user-own';
 
 /** A subscribable store double: `patch` notifies exactly as `set()` would. */
 const store = vi.hoisted(() => {
@@ -110,21 +103,6 @@ vi.mock('../../../stores/useAppStore', async () => {
   const useAppStore = () => useSyncExternalStore(store.subscribe, store.getSnapshot);
   return { useAppStore: Object.assign(useAppStore, { getState: () => store.state }) };
 });
-
-function makeEvent(overrides: Partial<CoupleEvent> & Pick<CoupleEvent, 'id'>): CoupleEvent {
-  return {
-    userId: OWN_USER_ID,
-    label: 'An event',
-    date: new Date(2026, 8, 12),
-    createdAt: new Date(2026, 0, 1),
-    description: null,
-    icon: 'calendar',
-    ...overrides,
-  };
-}
-
-const ok: EventWriteResult = { success: true };
-const loadOk: EventLoadResult = { status: 'success' };
 
 /**
  * `syncStatus` is in the base state because DW-27's fix reads the online flag

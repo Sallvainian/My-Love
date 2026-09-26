@@ -34,7 +34,6 @@ const networkMonitorFixture = base.extend(
     excludePatterns: [
       /analytics/,
       /supabase\.co\/rest\/v1\/rpc\/log/, // Exclude Supabase logging RPC
-      /\/rest\/v1\/users\?select=partner/, // Partner queries fail without partner data in test env
       /\/auth\/v1\/token/, // Background auth token refresh — 400 expected when refresh token is stale
       /\/auth\/v1\/user(?:\?|$)/, // Transient auth user probe failures (e.g. local 504) can be non-functional noise in E2E
     ],

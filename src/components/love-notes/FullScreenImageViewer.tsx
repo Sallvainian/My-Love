@@ -89,7 +89,8 @@ function FullScreenImageViewerComponent({
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-black/90"
             onClick={onClose}
-            aria-label="Close image viewer"
+            aria-hidden="true"
+            data-testid="fullscreen-image-backdrop"
           />
 
           {/* Close button */}

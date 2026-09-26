@@ -95,7 +95,7 @@ function deleteAccountData(userId: string): void {
  * It cannot catch a field that was never added — no test can know about state
  * nobody declared. That gap is real; the compensating control is that a loader
  * writing account data after an await needs an identity guard anyway, and those
- * are covered by `loaderIdentityGuards.test.ts`.
+ * are covered by `tests/unit/stores/loaderIdentityGuards.*.test.ts`.
  *
  * A FUNCTION, not a constant, for two reasons: `syncStatus.isOnline` is device
  * state rather than account state and has to be read at sign-out rather than at

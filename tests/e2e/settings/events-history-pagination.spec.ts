@@ -240,10 +240,14 @@ test.describe('Settings events history pagination', () => {
     const seeded = await coupleEvents.seed(specs);
     const expected = expectedOrder(seeded, specs);
     await pageThroughTiedHistory(page, interceptNetworkCall, specs.length);
-    const actualIds = await page.locator(ALL_ROWS)
-      .evaluateAll((rows, prefix) =>
-        rows.map((row) => row.getAttribute('data-testid')!.slice(prefix.length)), ROW_PREFIX);
-    expect(actualIds).toEqual(expected.map((row) => row.id));
+    await recurseUntil(
+      () => page.locator(ALL_ROWS)
+        .evaluateAll((rows, prefix) =>
+          rows.map((row) => row.getAttribute('data-testid')!.slice(prefix.length)), ROW_PREFIX),
+      (actualIds) => {
+        expect(actualIds).toEqual(expected.map((row) => row.id));
+      }
+    );
   });
 
   test('[P1] Settings shows Edit only on this account\'s own events', async ({
@@ -316,6 +320,7 @@ test.describe('Settings events history pagination', () => {
       await route.continue();
     });
     const button = page.getByTestId('events-settings-load-more');
+    // playwright-utils deviation: waits for the load-more read the route above aborts; interceptNetworkCall's observe mode throws on a request that gets no response instead of resolving on it.
     const failedRequest = page.waitForEvent('requestfailed', {
       predicate: (request) => new URL(request.url()).pathname.endsWith('/rest/v1/events'),
     });

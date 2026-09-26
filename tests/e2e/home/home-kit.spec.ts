@@ -119,8 +119,7 @@ test.describe('Home on the style kit', () => {
         expect(cardStyle.background, testId).toBe(KIT_CARD[colorScheme]);
         expect(cardStyle.borderWidths, testId).not.toContain('2px');
 
-        // The value is the element right after the <h3> label.
-        const valueStyle = await card.locator('h3 + div').evaluate((el) => {
+        const valueStyle = await card.getByTestId('countdown-value').evaluate((el) => {
           const style = getComputedStyle(el);
           return {
             size: style.fontSize,
@@ -156,7 +155,8 @@ test.describe('Home on the style kit', () => {
       const tileColor = (testId: string) =>
         page
           .getByTestId(testId)
-          .evaluate((el) => getComputedStyle(el.firstElementChild as Element).color);
+          .getByTestId('countdown-tile')
+          .evaluate((el) => getComputedStyle(el).color);
       expect(await tileColor('birthday-countdown-self')).toBe(KIT_ACCENT[colorScheme]);
       expect(await tileColor('birthday-countdown-partner')).toBe(KIT_PARTNER[colorScheme]);
     });
@@ -168,7 +168,9 @@ test.describe('Home on the style kit', () => {
       await openHome(page, interceptNetworkCall, colorScheme);
 
       // Dateless wedding: "Date TBD" as the value, in the kit muted colour.
-      const weddingValue = page.getByTestId('event-countdown-wedding').locator('h3 + div');
+      const weddingValue = page
+        .getByTestId('event-countdown-wedding')
+        .getByTestId('countdown-value');
       await expect(weddingValue).toHaveText('Date TBD');
       await expect(weddingValue).toHaveCSS('color', KIT_MUTED[colorScheme]);
       await expect(page.getByTestId('event-countdown-wedding')).not.toContainText('XX:XX:XX');

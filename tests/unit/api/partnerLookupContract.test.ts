@@ -29,10 +29,30 @@ const PAST_EVERY_BACKOFF_MS = LOOKUP_BACKOFF_MS.reduce((total, delay) => total +
  */
 const LONG_AFTER_EVERY_BACKOFF_MS = 5 * PAST_EVERY_BACKOFF_MS;
 
-/** Queue of answers the stubbed `.single()` returns, one per call. */
+/** Queue of answers the stubbed users read returns, one per call. */
 let singleResults: Array<{ data: unknown; error: unknown }> = [];
 let singleCalls = 0;
 let sessionResult: { data: { session: unknown }; error: unknown };
+/** Runs as each users read is answered, so a test can end the session mid-read. */
+let onRead: (() => void) | null = null;
+
+/**
+ * One users read. RLS hides every users row from a request sent without a
+ * session, so a read answered after a sign-out sees no row: `.single()` turns
+ * that into PGRST116 (a 406 on the wire), `.maybeSingle()` into a null row.
+ */
+async function answerRead(kind: 'single' | 'maybeSingle') {
+  const result = singleResults[singleCalls] ?? singleResults.at(-1);
+  singleCalls += 1;
+  onRead?.();
+  if (result === undefined) throw new Error('no stubbed result');
+  if (!sessionResult.data.session) {
+    return kind === 'single'
+      ? { data: null, error: { code: 'PGRST116', message: 'no rows' } }
+      : { data: null, error: null };
+  }
+  return result;
+}
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
@@ -44,12 +64,8 @@ vi.mock('@supabase/supabase-js', () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: async () => {
-            const result = singleResults[singleCalls] ?? singleResults.at(-1);
-            singleCalls += 1;
-            if (result === undefined) throw new Error('no stubbed result');
-            return result;
-          },
+          single: () => answerRead('single'),
+          maybeSingle: () => answerRead('maybeSingle'),
         }),
       }),
     }),
@@ -60,6 +76,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 const signedIn = { data: { session: { user: { id: USER_ID } } }, error: null };
+const signedOut = { data: { session: null }, error: null };
 
 /** A PostgREST transport failure: not PGRST116, so not an answer about linkage. */
 const transportError = {
@@ -76,6 +93,7 @@ describe('partner lookup contract', () => {
     singleResults = [];
     singleCalls = 0;
     sessionResult = signedIn;
+    onRead = null;
   });
 
   afterEach(() => {
@@ -98,8 +116,8 @@ describe('partner lookup contract', () => {
       await expect(lookupPartnerId()).resolves.toEqual({ status: 'unlinked' });
     });
 
-    it('reports a missing users row (PGRST116) as unlinked', async () => {
-      singleResults = [{ data: null, error: { code: 'PGRST116', message: 'no rows' } }];
+    it('reports a missing users row as unlinked while the session holds', async () => {
+      singleResults = [{ data: null, error: null }];
       const { lookupPartnerId } = await import('@/api/supabaseClient');
       await expect(lookupPartnerId()).resolves.toEqual({ status: 'unlinked' });
     });
@@ -111,6 +129,29 @@ describe('partner lookup contract', () => {
         status: 'error',
         reason: 'upstream request timeout',
       });
+    });
+  });
+
+  // A sign-out landing while the read is in flight: the read goes out without
+  // a session, RLS hides the row, and the empty answer is about the signed-out
+  // request -- not evidence that the account is unlinked.
+  describe('lookupPartnerId when the session changes during the read', () => {
+    it('answers error, not unlinked, when the session ends', async () => {
+      singleResults = [linked];
+      onRead = () => {
+        sessionResult = signedOut;
+      };
+      const { lookupPartnerId } = await import('@/api/supabaseClient');
+      await expect(lookupPartnerId()).resolves.toMatchObject({ status: 'error' });
+    });
+
+    it('answers error when another account signs in', async () => {
+      singleResults = [linked];
+      onRead = () => {
+        sessionResult = { data: { session: { user: { id: PARTNER_ID } } }, error: null };
+      };
+      const { lookupPartnerId } = await import('@/api/supabaseClient');
+      await expect(lookupPartnerId()).resolves.toMatchObject({ status: 'error' });
     });
   });
 

@@ -95,6 +95,7 @@ function watchSupabaseRequests(page: Page, { writesOnly = false } = {}) {
       seen.push(`${request.method()} ${url.pathname}${url.search}`);
     }
   };
+  // playwright-utils deviation: records every Supabase request after the tap, including ones the offline browser fails, so the test can assert there were none; interceptNetworkCall's observe mode waits for one match, throws on a failed one, and cannot prove an absence.
   page.on('request', listener);
   return {
     requests: seen,

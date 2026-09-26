@@ -13,7 +13,7 @@
  * These drive the REAL moodService and sw-db against fake-indexeddb, so the
  * single-transaction compare-and-set is exercised rather than described.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import 'fake-indexeddb/auto';
 import { moodService } from '@/services/moodService';
 import { moodSyncFingerprint } from '@/services/moodSyncPayload';
@@ -64,10 +64,6 @@ describe('stale mood sync must not discard an edit', () => {
     } catch {
       // Ignore if db not initialized yet
     }
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   describe('markAsSynced change detection', () => {

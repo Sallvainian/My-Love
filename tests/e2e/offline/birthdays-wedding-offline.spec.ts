@@ -136,10 +136,12 @@ test.describe('Birthdays and wedding date from the local copy', () => {
       coupleRead,
     ]);
     expect(profile.status).toBe(200);
-    // `maybeSingle` reads come back as a one-row array; `single` as the row.
+    // `maybeSingle` reads come back as a one-row array.
     expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
     expect(partnerRecord.status).toBe(200);
-    expect(partnerRecord.responseJson).toMatchObject({ id: ids.partnerId, birthday: partner });
+    expect(partnerRecord.responseJson).toEqual([
+      expect.objectContaining({ id: ids.partnerId, birthday: partner }),
+    ]);
     expect(couple.status).toBe(200);
     expect(couple.responseJson).toEqual([expect.objectContaining({ wedding_date: wedding })]);
     await recurseUntil(
@@ -173,18 +175,18 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     await expect(page.getByTestId('birthday-countdown-self').locator('h3')).toHaveText(
       /turns? 31$/
     );
-    await expect(page.getByTestId('birthday-countdown-self').locator('h3 + div')).toHaveText(
-      '4 days'
-    );
+    await expect(
+      page.getByTestId('birthday-countdown-self').getByTestId('countdown-value')
+    ).toHaveText('4 days');
     await expect(page.getByTestId('birthday-countdown-partner').locator('h3')).toContainText(
       'turns 30'
     );
-    await expect(page.getByTestId('birthday-countdown-partner').locator('h3 + div')).toHaveText(
-      '9 days'
-    );
-    await expect(page.getByTestId('event-countdown-wedding').locator('h3 + div')).toHaveText(
-      '39 days'
-    );
+    await expect(
+      page.getByTestId('birthday-countdown-partner').getByTestId('countdown-value')
+    ).toHaveText('9 days');
+    await expect(
+      page.getByTestId('event-countdown-wedding').getByTestId('countdown-value')
+    ).toHaveText('39 days');
   });
 
   test('[P1] an offline birthday edit is refused with a needs-a-connection message and changes nothing', async ({

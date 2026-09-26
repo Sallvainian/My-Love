@@ -11,10 +11,9 @@
  * swaps the tile to the solid fill. The card itself is always the plain kit
  * card.
  *
- * Structure is load-bearing for tests: the label is an `<h3>`, the value is the
- * `<div>` right after it (`h3 + div`), and the description is the only `<p>`
- * sibling after the label (`tests/e2e/home/events.spec.ts` counts `h3 ~ p`),
- * so the trailing figure is a `<span>`, not a paragraph.
+ * Tests find the label as the card's `<h3>`, and the value, the trailing figure
+ * and the description by their test ids (`countdown-value`, `countdown-clock`,
+ * `countdown-description`).
  *
  * The trailing figure (a countdown's live h/m/s) sits to the right of the value
  * on a full-width card and on its own line under the value on a half-width

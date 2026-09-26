@@ -8,6 +8,7 @@
  */
 
 import type { SupabaseMood } from '../api/validation/supabaseSchemas';
+import { calendarDaysBetween } from './dateUtils';
 
 export interface MoodGroup {
   date: Date;
@@ -63,16 +64,8 @@ export function groupMoodsByDate(moods: SupabaseMood[]): MoodGroup[] {
  * ```
  */
 function getDateLabel(date: Date): string {
-  const now = new Date();
-  // Whole calendar days between the two local dates. Elapsed milliseconds
-  // divided by 24h mislabels around DST, where a local day is 23 or 25 hours
-  // long; the UTC stamps of the local components are always a whole number of
-  // days apart.
-  const diffDays = Math.round(
-    (Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) -
-      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())) /
-      86400000
-  );
+  // Calendar days, not elapsed 24h blocks, so a DST day never shifts the label.
+  const diffDays = calendarDaysBetween(new Date(), date);
 
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';

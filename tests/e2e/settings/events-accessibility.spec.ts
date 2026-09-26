@@ -58,7 +58,7 @@
  * belong to other workers.
  *
  * No network is stubbed here, so no `skipNetworkMonitoring` annotation: the
- * merged fixtures' network-error-monitor (`tests/support/merged-fixtures.ts:29-40`)
+ * merged fixtures' network-error-monitor (`tests/support/merged-fixtures.ts:31-41`)
  * should stay armed, and a 4xx/5xx during an accessibility run is real signal.
  */
 import { test, expect } from '../../support/merged-fixtures';
@@ -156,7 +156,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
 
   test(
     '[P1] DE.5-E2E-001b the open add/edit form dialog has no axe violations',
-    async ({ page, supabaseAdmin, recurse, interceptNetworkCall }) => {
+    async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
       // A row is seeded so the form can be opened in its EDIT shape: pre-filled
@@ -178,22 +178,10 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       await expect(dialog).toBeVisible();
       await expect(page.getByTestId('events-form-label')).toHaveValue(A11Y_LABEL);
 
-      // Two animated layers, so two settles. The backdrop wrapper carries the
-      // testid and fades 0 -> 1 (EventsSettings.tsx:585-586). The panel inside
-      // it runs scale 0.9 / opacity 0 -> 1 (:598-599) and has no testid of its
-      // own, so it is reached as the wrapper's only element child from inside
-      // the evaluate. That child walk is a settle, never an assertion target —
-      // every assertion below addresses an element by its testid or its role.
+      // Two animated layers, so two settles: the backdrop wrapper fades 0 -> 1,
+      // and the panel inside it runs scale 0.9 / opacity 0 -> 1.
       await expect(dialog).toHaveCSS('opacity', '1');
-      await recurse(
-        () =>
-          dialog.evaluate((element) => {
-            const panel = element.firstElementChild;
-            return panel instanceof HTMLElement ? getComputedStyle(panel).opacity : '0';
-          }),
-        (opacity) => opacity === '1',
-        { timeout: 5000, interval: 100, log: 'settling the events form dialog' }
-      );
+      await expect(page.getByTestId('events-form-panel')).toHaveCSS('opacity', '1');
 
       await log.step('Scan the open form dialog');
       const AxeBuilder = (await import('@axe-core/playwright')).default;
@@ -207,7 +195,7 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
 
   test(
     '[P1] DE.5-E2E-001c the open delete confirmation has no axe violations',
-    async ({ page, supabaseAdmin, recurse, interceptNetworkCall }) => {
+    async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
       await seedA11yEvent(supabaseAdmin, userId);
@@ -228,17 +216,9 @@ test.describe('Settings events accessibility (DE.5-E2E-001)', () => {
       // seeded row survives into the afterEach teardown.
       await expect(page.getByTestId('events-delete-cancel')).toBeVisible();
 
-      // Wrapper at EventsSettings.tsx:932-933, panel at :945-946.
+      // The wrapper and its panel settle as in DE.5-E2E-001b.
       await expect(dialog).toHaveCSS('opacity', '1');
-      await recurse(
-        () =>
-          dialog.evaluate((element) => {
-            const panel = element.firstElementChild;
-            return panel instanceof HTMLElement ? getComputedStyle(panel).opacity : '0';
-          }),
-        (opacity) => opacity === '1',
-        { timeout: 5000, interval: 100, log: 'settling the delete confirmation dialog' }
-      );
+      await expect(page.getByTestId('events-delete-panel')).toHaveCSS('opacity', '1');
 
       await log.step('Scan the open delete confirmation');
       const AxeBuilder = (await import('@axe-core/playwright')).default;
