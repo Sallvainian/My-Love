@@ -153,7 +153,7 @@ describe('useNetworkStatus hook', () => {
   });
 
   describe('offline event handling', () => {
-    it('should immediately set isOnline to false on offline event', () => {
+    it('reports offline as soon as the browser goes offline', () => {
       setNetworkState(true);
       const { result } = renderHook(() => useNetworkStatus());
 

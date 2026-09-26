@@ -243,7 +243,7 @@ describe('LoveNoteMessage', () => {
       });
     });
 
-    it('should display image after loading signed URL', async () => {
+    it('shows the stored picture once its link has loaded', async () => {
       const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
@@ -256,7 +256,7 @@ describe('LoveNoteMessage', () => {
       });
     });
 
-    it('should display optimistic preview URL directly', async () => {
+    it('shows a just-sent picture from its local preview without fetching a link', async () => {
       const messageWithPreview: LoveNote = {
         ...baseMessage,
         imagePreviewUrl: 'blob:http://localhost/preview-123',
