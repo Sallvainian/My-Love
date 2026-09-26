@@ -20,7 +20,8 @@
  * of the contract: an unsaved draft survives the churn, and a saved entry still
  * seeds the form.
  */
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MoodEntry } from '../../../types';
@@ -128,15 +129,14 @@ describe('MoodTracker draft preservation across a background reload', () => {
     storeState.getMoodForDate.mockReturnValue(undefined);
   });
 
-  it('keeps an unsaved selection and note when the moods array is replaced', () => {
+  it('keeps an unsaved selection and note when the moods array is replaced', async () => {
+    const user = userEvent.setup();
     const { rerender } = render(<MoodTracker />);
 
-    fireEvent.click(screen.getByTestId('mood-button-happy'));
-    fireEvent.click(screen.getByTestId('mood-button-tired'));
-    fireEvent.click(screen.getByTestId('mood-add-note-toggle'));
-    fireEvent.change(screen.getByTestId('mood-note-input'), {
-      target: { value: 'A-DRAFT-NOTE-STILL-BEING-TYPED' },
-    });
+    await user.click(screen.getByTestId('mood-button-happy'));
+    await user.click(screen.getByTestId('mood-button-tired'));
+    await user.click(screen.getByTestId('mood-add-note-toggle'));
+    await user.type(screen.getByTestId('mood-note-input'), 'A-DRAFT-NOTE-STILL-BEING-TYPED');
 
     // The 5-minute interval fires. Nothing was synced and nothing is saved for
     // today, but `loadMoods` still replaces the array.

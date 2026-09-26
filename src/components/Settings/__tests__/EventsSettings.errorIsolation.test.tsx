@@ -45,7 +45,8 @@
  * `EventsSettings.focus.test.tsx` duplicate the same way, and the story's review
  * pass explicitly dismissed extracting it.
  */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState } from '../../../stores/types';
@@ -153,6 +154,7 @@ beforeEach(() => {
 
 describe('DE.5-COMP-002: a failed save cannot forge a failed load (DW-26)', () => {
   it('leaves no load notice when a save fails inside the first load flight window', async () => {
+    const user = userEvent.setup();
     // The header Add button renders before the load settles — that window is the
     // whole defect. A save that fails inside it writes the shared `eventsError`
     // key, and the load's own `.finally` then reads that key as its own verdict.
@@ -179,12 +181,10 @@ describe('DE.5-COMP-002: a failed save cannot forge a failed load (DW-26)', () =
 
     render(<EventsSettings />);
 
-    fireEvent.click(screen.getByTestId('events-settings-add'));
-    fireEvent.change(screen.getByTestId('events-form-label'), {
-      target: { value: 'Anniversary trip' },
-    });
-    fireEvent.change(screen.getByTestId('events-form-date'), { target: { value: '2026-12-24' } });
-    fireEvent.click(screen.getByTestId('events-form-submit'));
+    await user.click(screen.getByTestId('events-settings-add'));
+    await user.type(screen.getByTestId('events-form-label'), 'Anniversary trip');
+    await user.type(screen.getByTestId('events-form-date'), '2026-12-24');
+    await user.click(screen.getByTestId('events-form-submit'));
 
     // The save's own message belongs in the form, and it gets there today.
     await waitFor(() => {

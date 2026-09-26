@@ -10,6 +10,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { openDB, unwrap } from 'idb';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import {
   DB_NAME,
   DB_VERSION,
@@ -1045,6 +1047,11 @@ describe('dbSchema', () => {
   describe('blocked upgrade prompt', () => {
     const RELOAD_MESSAGE =
       'A database update is waiting. You must reload this page to finish the update.';
+    let user: UserEvent;
+
+    beforeEach(() => {
+      user = userEvent.setup();
+    });
 
     async function holdLowerVersion(): Promise<{ close: () => void }> {
       const holder = await openDB(DB_NAME, 9, {
@@ -1070,12 +1077,12 @@ describe('dbSchema', () => {
       });
     }
 
-    function clickDialogButton(dialog: HTMLElement, name: 'Reload' | 'Not now'): void {
+    async function clickDialogButton(dialog: HTMLElement, name: 'Reload' | 'Not now'): Promise<void> {
       const button = [...dialog.querySelectorAll('button')].find(
         (el) => el.textContent === name
       );
       expect(button).toBeDefined();
-      (button as HTMLButtonElement).click();
+      await user.click(button as HTMLButtonElement);
     }
 
     it('shows a reload confirm and rejects the open when dismissed', async () => {
@@ -1087,9 +1094,12 @@ describe('dbSchema', () => {
       const dialog = await waitForBlockedDialog();
       expect(confirm).not.toHaveBeenCalled();
 
-      clickDialogButton(dialog, 'Not now');
+      // Attach the rejection check before the click: the dismiss rejects the
+      // open mid-click, and an unobserved rejection fails the run.
+      const rejected = expect(opening).rejects.toThrow(/blocked/);
+      await clickDialogButton(dialog, 'Not now');
 
-      await expect(opening).rejects.toThrow(/blocked/);
+      await rejected;
       expect(getBlockedDialog()).toBeNull();
     });
 
@@ -1104,7 +1114,7 @@ describe('dbSchema', () => {
       const dialog = await waitForBlockedDialog();
       expect(confirm).not.toHaveBeenCalled();
 
-      clickDialogButton(dialog, 'Reload');
+      await clickDialogButton(dialog, 'Reload');
       expect(reload).toHaveBeenCalledTimes(1);
 
       // Reload is mocked, so the tab stays; close the holder so the pending
@@ -1125,9 +1135,12 @@ describe('dbSchema', () => {
       expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
       expect(confirm).not.toHaveBeenCalled();
 
-      clickDialogButton(dialog, 'Not now');
+      // Observe the openings before the click: the dismiss rejects them
+      // mid-click, and an unobserved rejection fails the run.
+      const settled = Promise.allSettled(openings);
+      await clickDialogButton(dialog, 'Not now');
 
-      const results = await Promise.allSettled(openings);
+      const results = await settled;
       expect(results.map((result) => result.status)).toEqual([
         'rejected',
         'rejected',
@@ -1154,7 +1167,7 @@ describe('dbSchema', () => {
       expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
       expect(confirm).not.toHaveBeenCalled();
 
-      clickDialogButton(dialog, 'Reload');
+      await clickDialogButton(dialog, 'Reload');
       expect(reload).toHaveBeenCalledTimes(1);
 
       for (const db of openDbs) db.close();
@@ -1177,9 +1190,11 @@ describe('dbSchema', () => {
       const dialog = await waitForBlockedDialog();
       expect(confirm).not.toHaveBeenCalled();
 
-      clickDialogButton(dialog, 'Not now');
+      // Attach the rejection check before the click, as above.
+      const rejected = expect(storing).rejects.toThrow(/blocked/);
+      await clickDialogButton(dialog, 'Not now');
 
-      await expect(storing).rejects.toThrow(/blocked/);
+      await rejected;
       expect(getBlockedDialog()).toBeNull();
     });
   });

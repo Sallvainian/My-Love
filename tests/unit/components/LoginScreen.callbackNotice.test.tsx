@@ -9,7 +9,8 @@
  * suppression case exercise the real `handleSubmit` and `handleGoogleSignIn`
  * rather than a stand-in.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AuthCallbackOutcome } from '../../../src/api/supabaseClient';
 import { LoginScreen } from '../../../src/components/LoginScreen/LoginScreen';
@@ -109,12 +110,11 @@ describe('LoginScreen callback notice', () => {
     actions.signIn.mockResolvedValue({ user: null, session: null, error: null });
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
 
+    const user = userEvent.setup();
     render(<LoginScreen callbackOutcome={null} />);
-    fireEvent.change(screen.getByLabelText(/email/i), {
-      target: { value: 'someone@example.com' },
-    });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
-    fireEvent.submit(screen.getByTestId('login-screen').querySelector('form') as HTMLFormElement);
+    await user.type(screen.getByLabelText(/email/i), 'someone@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByTestId('submit-button'));
 
     // The failure mode this guards is a button that stops its spinner and
     // leaves the screen exactly as it was, which reads as the app being broken.
@@ -138,30 +138,28 @@ describe('LoginScreen callback notice', () => {
     expect(screen.queryByTestId('login-notice')).toBeNull();
   });
 
-  it('clears the notice when a password sign-in attempt starts', () => {
+  it('clears the notice when a password sign-in attempt starts', async () => {
     // Left unresolved on purpose: the notice must go the moment the attempt
     // starts, not when its result arrives.
     actions.signIn.mockReturnValue(new Promise(() => {}));
+    const user = userEvent.setup();
     renderLogin('cancelled');
     expect(screen.getByTestId('login-notice')).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText('Email'), {
-      target: { value: 'someone@test.example.com' },
-    });
-    fireEvent.change(screen.getByTestId('password-input'), {
-      target: { value: 'a-password' },
-    });
-    fireEvent.click(screen.getByTestId('submit-button'));
+    await user.type(screen.getByLabelText('Email'), 'someone@test.example.com');
+    await user.type(screen.getByTestId('password-input'), 'a-password');
+    await user.click(screen.getByTestId('submit-button'));
 
     expect(screen.queryByTestId('login-notice')).toBeNull();
   });
 
-  it('clears the notice when a Google sign-in attempt starts', () => {
+  it('clears the notice when a Google sign-in attempt starts', async () => {
     actions.signInWithGoogle.mockReturnValue(new Promise(() => {}));
+    const user = userEvent.setup();
     renderLogin('needs-original-browser');
     expect(screen.getByTestId('login-notice')).toBeTruthy();
 
-    fireEvent.click(screen.getByTestId('google-signin-button'));
+    await user.click(screen.getByTestId('google-signin-button'));
 
     expect(screen.queryByTestId('login-notice')).toBeNull();
   });
@@ -174,13 +172,12 @@ describe('LoginScreen callback notice', () => {
       session: null,
       error: { message: 'Invalid login credentials' },
     });
+    const user = userEvent.setup();
     renderLogin('cancelled');
 
-    fireEvent.change(screen.getByLabelText('Email'), {
-      target: { value: 'someone@test.example.com' },
-    });
-    fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'a-password' } });
-    fireEvent.click(screen.getByTestId('submit-button'));
+    await user.type(screen.getByLabelText('Email'), 'someone@test.example.com');
+    await user.type(screen.getByTestId('password-input'), 'a-password');
+    await user.click(screen.getByTestId('submit-button'));
 
     expect(await screen.findByTestId('login-error')).toHaveTextContent('Invalid email or password');
     expect(screen.queryByTestId('login-notice')).toBeNull();

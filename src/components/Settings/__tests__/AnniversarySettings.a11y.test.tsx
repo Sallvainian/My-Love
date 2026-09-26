@@ -7,7 +7,9 @@
  * buttons say which anniversary they act on; and a dialog cannot be dismissed
  * while its write is in flight.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -61,17 +63,18 @@ afterEach(() => {
 });
 
 /**
- * fireEvent.click does not move focus the way a real click or Enter does.
  * A row opener is found by its verb alone ("Edit …", "Delete …", first row), so
  * these dialog tests do not depend on the row names DW-188 changes.
  */
-function openWith(name: 'Add Anniversary' | 'Edit' | 'Delete'): HTMLElement {
+async function openWith(
+  user: UserEvent,
+  name: 'Add Anniversary' | 'Edit' | 'Delete'
+): Promise<HTMLElement> {
   const opener =
     name === 'Add Anniversary'
       ? screen.getByRole('button', { name })
       : screen.getAllByRole('button', { name: new RegExp(`^${name} `) })[0];
-  opener.focus();
-  fireEvent.click(opener);
+  await user.click(opener);
   return opener;
 }
 
@@ -95,9 +98,10 @@ describe('DW-188: row buttons name their anniversary', () => {
 });
 
 describe('DW-184: dialog semantics and focus', () => {
-  it('the delete confirmation is a named modal dialog that starts on Cancel', () => {
+  it('the delete confirmation is a named modal dialog that starts on Cancel', async () => {
+    const user = userEvent.setup();
     render(<AnniversarySettings />);
-    openWith('Delete');
+    await openWith(user, 'Delete');
 
     const dialog = screen.getByRole('dialog', { name: 'Delete Anniversary?' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
@@ -105,12 +109,13 @@ describe('DW-184: dialog semantics and focus', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
   });
 
-  it('Escape closes the delete confirmation and focus returns to its opener', () => {
+  it('Escape closes the delete confirmation and focus returns to its opener', async () => {
+    const user = userEvent.setup();
     render(<AnniversarySettings />);
-    const opener = openWith('Delete');
+    const opener = await openWith(user, 'Delete');
     expect(screen.getByRole('dialog', { name: 'Delete Anniversary?' })).toBeInTheDocument();
 
-    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Delete Anniversary?' })).toBeNull();
@@ -118,38 +123,42 @@ describe('DW-184: dialog semantics and focus', () => {
     expect(opener).toHaveFocus();
   });
 
-  it('the edit form is a named modal dialog that starts on the label field', () => {
+  it('the edit form is a named modal dialog that starts on the label field', async () => {
+    const user = userEvent.setup();
     render(<AnniversarySettings />);
-    openWith('Edit');
+    await openWith(user, 'Edit');
 
     const dialog = screen.getByRole('dialog', { name: 'Edit Anniversary' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(screen.getByLabelText(/^Label/)).toHaveFocus();
   });
 
-  it('Escape closes the add form and focus returns to its opener', () => {
+  it('Escape closes the add form and focus returns to its opener', async () => {
+    const user = userEvent.setup();
     render(<AnniversarySettings />);
-    const opener = openWith('Add Anniversary');
+    const opener = await openWith(user, 'Add Anniversary');
     expect(screen.getByRole('dialog', { name: 'Add Anniversary' })).toBeInTheDocument();
 
-    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(opener).toHaveFocus();
   });
 
-  it('Tab from the last control wraps to the first inside the form', () => {
+  it('Tab from the last control wraps to the first inside the form', async () => {
+    const user = userEvent.setup();
     render(<AnniversarySettings />);
-    openWith('Add Anniversary');
+    await openWith(user, 'Add Anniversary');
 
     const submit = screen.getByRole('button', { name: 'Add' });
     submit.focus();
-    fireEvent.keyDown(submit, { key: 'Tab' });
+    await user.tab();
 
     expect(screen.getByRole('button', { name: 'Close form' })).toHaveFocus();
   });
 
   it('after a successful delete removes the opener, focus lands on Add Anniversary', async () => {
+    const user = userEvent.setup();
     removeAnniversary.mockImplementation(async (id: number) => {
       const settings = useAppStore.getState().settings!;
       useAppStore.setState({
@@ -163,9 +172,9 @@ describe('DW-184: dialog semantics and focus', () => {
       } as Partial<AppState>);
     });
     render(<AnniversarySettings />);
-    openWith('Delete');
+    await openWith(user, 'Delete');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(screen.queryByRole('button', { name: 'Delete First date' })).toBeNull();
@@ -178,11 +187,12 @@ describe('DW-184: dialog semantics and focus', () => {
 });
 
 describe('DW-187: form errors are linked and announced', () => {
-  it('an invalid field is marked invalid, described by its error, and the error is an alert', () => {
+  it('an invalid field is marked invalid, described by its error, and the error is an alert', async () => {
+    const user = userEvent.setup();
     render(<AnniversarySettings />);
-    openWith('Add Anniversary');
+    await openWith(user, 'Add Anniversary');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await user.click(screen.getByRole('button', { name: 'Add' }));
 
     const label = screen.getByLabelText(/^Label/);
     expect(label).toHaveAttribute('aria-invalid', 'true');
@@ -198,13 +208,14 @@ describe('DW-187: form errors are linked and announced', () => {
     );
   });
 
-  it('editing a field drops its error, leaving the other field’s in place', () => {
+  it('editing a field drops its error, leaving the other field’s in place', async () => {
+    const user = userEvent.setup();
     render(<AnniversarySettings />);
-    openWith('Add Anniversary');
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await openWith(user, 'Add Anniversary');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
 
     const label = screen.getByLabelText(/^Label/);
-    fireEvent.change(label, { target: { value: 'Moving day' } });
+    await user.type(label, 'Moving day');
 
     expect(label).toHaveAttribute('aria-invalid', 'false');
     expect(label).not.toHaveAttribute('aria-describedby');
@@ -212,16 +223,17 @@ describe('DW-187: form errors are linked and announced', () => {
     expect(screen.getByLabelText(/^Date/)).toHaveAttribute('aria-invalid', 'true');
 
     const date = screen.getByLabelText(/^Date/);
-    fireEvent.change(date, { target: { value: '2025-06-01' } });
+    await user.type(date, '2025-06-01');
 
     expect(date).toHaveAttribute('aria-invalid', 'false');
     expect(date).not.toHaveAttribute('aria-describedby');
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('a valid field is not marked invalid and has no description', () => {
+  it('a valid field is not marked invalid and has no description', async () => {
+    const user = userEvent.setup();
     render(<AnniversarySettings />);
-    openWith('Add Anniversary');
+    await openWith(user, 'Add Anniversary');
 
     const label = screen.getByLabelText(/^Label/);
     expect(label).toHaveAttribute('aria-invalid', 'false');
@@ -229,13 +241,14 @@ describe('DW-187: form errors are linked and announced', () => {
   });
 
   it('a failed save is announced as an alert', async () => {
+    const user = userEvent.setup();
     addAnniversary.mockRejectedValue(new Error('You are offline.'));
     render(<AnniversarySettings />);
-    openWith('Add Anniversary');
+    await openWith(user, 'Add Anniversary');
 
-    fireEvent.change(screen.getByLabelText(/^Label/), { target: { value: 'Moving day' } });
-    fireEvent.change(screen.getByLabelText(/^Date/), { target: { value: '2025-06-01' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await user.type(screen.getByLabelText(/^Label/), 'Moving day');
+    await user.type(screen.getByLabelText(/^Date/), '2025-06-01');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('You are offline.');
     // Focus goes to the re-enabled Save, as EventForm does.
@@ -243,11 +256,12 @@ describe('DW-187: form errors are linked and announced', () => {
   });
 
   it('a failed delete hands focus to Cancel', async () => {
+    const user = userEvent.setup();
     removeAnniversary.mockRejectedValue(new Error('You are offline.'));
     render(<AnniversarySettings />);
-    openWith('Delete');
+    await openWith(user, 'Delete');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('You are offline.');
     const cancel = screen.getByRole('button', { name: 'Cancel' });
@@ -259,17 +273,20 @@ describe('DW-187: form errors are linked and announced', () => {
 
 describe('DW-191: a dialog stays put while its write is pending', () => {
   it('the delete confirmation disables Cancel and ignores Escape and the backdrop', async () => {
+    const user = userEvent.setup();
     const pending = deferred();
     removeAnniversary.mockReturnValue(pending.promise);
     render(<AnniversarySettings />);
-    openWith('Delete');
+    await openWith(user, 'Delete');
 
     const dialog = screen.getByRole('dialog', { name: 'Delete Anniversary?' });
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
-    fireEvent.keyDown(dialog.firstElementChild!, { key: 'Escape' });
-    fireEvent.click(dialog);
+    // The write parked focus on the panel, where the trap listens for Escape.
+    expect(dialog.firstElementChild).toHaveFocus();
+    await user.keyboard('{Escape}');
+    await user.click(dialog);
     expect(screen.getByRole('dialog', { name: 'Delete Anniversary?' })).toBeInTheDocument();
 
     pending.resolve();
@@ -277,21 +294,24 @@ describe('DW-191: a dialog stays put while its write is pending', () => {
   });
 
   it('the form disables Cancel and Close and ignores Escape and the backdrop', async () => {
+    const user = userEvent.setup();
     const pending = deferred();
     addAnniversary.mockReturnValue(pending.promise);
     render(<AnniversarySettings />);
-    openWith('Add Anniversary');
+    await openWith(user, 'Add Anniversary');
 
     const dialog = screen.getByRole('dialog', { name: 'Add Anniversary' });
-    fireEvent.change(screen.getByLabelText(/^Label/), { target: { value: 'Moving day' } });
-    fireEvent.change(screen.getByLabelText(/^Date/), { target: { value: '2025-06-01' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await user.type(screen.getByLabelText(/^Label/), 'Moving day');
+    await user.type(screen.getByLabelText(/^Date/), '2025-06-01');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
 
     await waitFor(() => expect(addAnniversary).toHaveBeenCalled());
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Close form' })).toBeDisabled();
-    fireEvent.keyDown(dialog.firstElementChild!, { key: 'Escape' });
-    fireEvent.click(dialog);
+    // The write parked focus on the panel, where the trap listens for Escape.
+    expect(dialog.firstElementChild).toHaveFocus();
+    await user.keyboard('{Escape}');
+    await user.click(dialog);
     expect(screen.getByRole('dialog', { name: 'Add Anniversary' })).toBeInTheDocument();
 
     pending.resolve();

@@ -9,7 +9,8 @@
  * Pinned here so the shared hook these five components depend on can be changed
  * with evidence rather than assumption.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PhotoWithUrls } from '../../../services/photoService';
@@ -83,6 +84,7 @@ describe('PhotoViewer focus', () => {
   });
 
   it('closes on Escape from inside the viewer', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(
       <>
@@ -91,11 +93,11 @@ describe('PhotoViewer focus', () => {
       </>
     );
 
-    // Fire from where focus actually is, not from a node picked by the test.
+    // Press from where focus actually is, not from a node picked by the test.
     // useFocusTrap binds keydown to the container, so an event dispatched on the
     // container directly would pass whether or not focus could ever get there.
     await waitFor(() => expect(document.activeElement).not.toBe(document.body));
-    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     expect(onClose).toHaveBeenCalled();
   });
@@ -107,12 +109,13 @@ describe('PhotoViewer focus', () => {
       photo,
       { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
     ];
+    const user = userEvent.setup();
     render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByLabelText('Delete photo'));
     expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
 
-    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    await user.keyboard('{ArrowRight}');
 
     // Still on the first photo: the dialog's quoted caption and the image both
     // name photo-1.
@@ -123,9 +126,10 @@ describe('PhotoViewer focus', () => {
   it('moves focus into the delete confirmation when it opens', async () => {
     // Without this a keyboard user's focus stays on the trash button behind the
     // overlay, and the confirmation's own buttons are not reachable.
+    const user = userEvent.setup();
     render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByLabelText('Delete photo'));
 
     await waitFor(() => {
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }));
@@ -137,52 +141,56 @@ describe('PhotoViewer focus', () => {
     // not in the DOM tree -- so Escape bubbles to useFocusTrap's listener. It
     // must close the dialog and return focus to the trash button, not tear the
     // whole viewer down around an open confirmation.
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={onClose} />);
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByLabelText('Delete photo'));
     expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
 
-    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(screen.getByLabelText('Delete photo'));
 
     // A second Escape, with the confirmation gone, closes the viewer.
-    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('still closes on Escape after focus has fallen to <body>', () => {
+  it('still closes on Escape after focus has fallen to <body>', async () => {
     // A focused nav button disabling at either end of the gallery, or a focused
     // Retry button unmounting, sends focus to <body> in a real browser. <body>
     // is an ancestor of the container, so the trap's listener never sees the
     // key; the window-level fallback covers exactly that case.
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={onClose} />);
 
     (document.activeElement as HTMLElement | null)?.blur();
     expect(document.activeElement).toBe(document.body);
 
-    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('runs onClose exactly once per Escape when focus is inside the container', () => {
+  it('runs onClose exactly once per Escape when focus is inside the container', async () => {
     // The window fallback must stand down while the trap's listener can see the
     // key, or one Escape closes twice -- the double-call the fallback's guard
     // exists to prevent.
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={onClose} />);
 
-    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('deletes exactly one photo on a double-tap of Delete', async () => {
     // A re-entered handleDeleteConfirm would send a second delete while the
     // first is still in flight.
+    const user = userEvent.setup();
     deletePhotoMock.mockClear();
     let resolveDelete!: (deleted: boolean) => void;
     deletePhotoMock.mockReturnValue(new Promise<boolean>((r) => (resolveDelete = r)));
@@ -192,11 +200,10 @@ describe('PhotoViewer focus', () => {
     ];
     render(<PhotoViewer photos={two} selectedPhotoId="photo-2" onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByLabelText('Delete photo'));
     const deleteButton = await screen.findByRole('button', { name: 'Delete' });
     expect(deleteButton.querySelector('.animate-spin')).toBeNull();
-    fireEvent.click(deleteButton);
-    fireEvent.click(deleteButton);
+    await user.dblClick(deleteButton);
 
     expect(deletePhotoMock).toHaveBeenCalledTimes(1);
     // The spinner shows while the delete is held pending.
@@ -210,8 +217,11 @@ describe('PhotoViewer focus', () => {
     expect(deleteButton).toBeDisabled();
     const cancel = screen.getByRole('button', { name: 'Cancel' });
     expect(cancel).not.toBeDisabled();
-    fireEvent.click(cancel);
-    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await user.click(cancel);
+    // Pressed on Cancel, where the click left focus, so the trap's own
+    // Escape handler receives it.
+    expect(document.activeElement).toBe(cancel);
+    await user.keyboard('{Escape}');
     expect(screen.getByText('Delete Photo?')).toBeInTheDocument();
 
     resolveDelete(true);
@@ -229,10 +239,11 @@ describe('PhotoViewer focus', () => {
       photo,
       { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
     ];
+    const user = userEvent.setup();
     render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByLabelText('Delete photo'));
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
@@ -252,9 +263,10 @@ describe('PhotoViewer focus', () => {
       photo,
       { ...photo, id: 'photo-2', caption: 'second photo' } as unknown as PhotoWithUrls,
     ];
+    const user = userEvent.setup();
     render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByLabelText('Delete photo'));
     expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
 
     expect(screen.getByLabelText('Delete photo')).toBeDisabled();
@@ -264,7 +276,7 @@ describe('PhotoViewer focus', () => {
 
     // Dismissal re-enables them, and the effect-timed restore still lands on
     // the re-enabled trash button rather than no-opping against a disabled one.
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.getByLabelText('Next photo')).not.toBeDisabled();
     await waitFor(() => {
       expect(document.activeElement).toBe(screen.getByLabelText('Delete photo'));
@@ -304,14 +316,13 @@ describe('PhotoViewer failed delete', () => {
   it('keeps the confirmation open with an alert, and focus inside it', async () => {
     deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValue(false);
+    const user = userEvent.setup();
     render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
-    // A real click focuses the button it lands on; fireEvent does not, and
-    // would leave the auto-focused Cancel holding focus throughout.
-    const deleteButton = await screen.findByRole('button', { name: 'Delete' });
-    deleteButton.focus();
-    fireEvent.click(deleteButton);
+    await user.click(screen.getByLabelText('Delete photo'));
+    // The click focuses Delete, so focus leaves the auto-focused Cancel and
+    // the refocus below is the error effect's doing.
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
 
     const alert = await screen.findByTestId('photo-viewer-delete-error');
     expect(alert).toHaveAttribute('role', 'alert');
@@ -329,13 +340,14 @@ describe('PhotoViewer failed delete', () => {
   it('closes and clears the error when a retry succeeds', async () => {
     deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const user = userEvent.setup();
     render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByLabelText('Delete photo'));
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(await screen.findByTestId('photo-viewer-delete-error')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
@@ -349,19 +361,20 @@ describe('PhotoViewer failed delete', () => {
   it('clears the error when the confirmation is dismissed and reopened', async () => {
     deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValue(false);
+    const user = userEvent.setup();
     render(<PhotoViewer photos={two} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByLabelText('Delete photo'));
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(await screen.findByTestId('photo-viewer-delete-error')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
     await waitFor(() => {
       expect(document.activeElement).toBe(screen.getByLabelText('Delete photo'));
     });
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByLabelText('Delete photo'));
     expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
     expect(screen.queryByTestId('photo-viewer-delete-error')).not.toBeInTheDocument();
     deletePhotoMock.mockReset();
@@ -373,11 +386,12 @@ describe('PhotoViewer offline delete (ticket 11)', () => {
     deletePhotoMock.mockReset();
     deletePhotoMock.mockResolvedValue(true);
     const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const user = userEvent.setup();
     try {
       render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
-      fireEvent.click(screen.getByLabelText('Delete photo'));
-      fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+      await user.click(screen.getByLabelText('Delete photo'));
+      await user.click(await screen.findByRole('button', { name: 'Delete' }));
 
       const alert = await screen.findByTestId('photo-viewer-delete-error');
       expect(alert).toHaveTextContent('You are offline. Photos need a connection to delete.');

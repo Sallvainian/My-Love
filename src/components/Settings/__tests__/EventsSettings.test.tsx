@@ -19,6 +19,7 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { serializeAccountDataWrite } from '../../../services/accountDataQueue';
@@ -205,34 +206,51 @@ async function renderSection() {
   return utils;
 }
 
-function openAddForm() {
-  fireEvent.click(screen.getByTestId('events-settings-add'));
+async function openAddForm(user: UserEvent) {
+  await user.click(screen.getByTestId('events-settings-add'));
 }
 
-function fillForm({
-  label,
-  date,
-  description,
-}: {
-  label?: string;
-  date?: string;
-  description?: string;
-}) {
+/**
+ * Replace a text field's value as a user would: clear it, then paste the new
+ * text. Paste rather than type, because the fixtures run to 500 characters and
+ * carry emoji and combining marks that per-key typing would split.
+ */
+async function replaceText(user: UserEvent, field: HTMLElement, value: string) {
+  await user.clear(field);
+  if (value !== '') {
+    await user.paste(value);
+  }
+}
+
+async function fillForm(
+  user: UserEvent,
+  {
+    label,
+    date,
+    description,
+  }: {
+    label?: string;
+    date?: string;
+    description?: string;
+  }
+) {
   if (label !== undefined) {
-    fireEvent.change(screen.getByTestId('events-form-label'), { target: { value: label } });
+    await replaceText(user, screen.getByTestId('events-form-label'), label);
   }
   if (date !== undefined) {
-    fireEvent.change(screen.getByTestId('events-form-date'), { target: { value: date } });
+    const dateInput = screen.getByTestId('events-form-date');
+    await user.clear(dateInput);
+    if (date !== '') {
+      await user.type(dateInput, date);
+    }
   }
   if (description !== undefined) {
-    fireEvent.change(screen.getByTestId('events-form-description'), {
-      target: { value: description },
-    });
+    await replaceText(user, screen.getByTestId('events-form-description'), description);
   }
 }
 
-function submitForm() {
-  fireEvent.click(screen.getByTestId('events-form-submit'));
+async function submitForm(user: UserEvent) {
+  await user.click(screen.getByTestId('events-form-submit'));
 }
 
 function renderedLabels(): (string | null)[] {
@@ -379,9 +397,10 @@ describe('EventsSettings list states', () => {
   });
 
   it('opens the form from the empty state add control', async () => {
+    const user = userEvent.setup();
     await renderSection();
 
-    fireEvent.click(screen.getByTestId('events-settings-empty-add'));
+    await user.click(screen.getByTestId('events-settings-empty-add'));
 
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
   });
@@ -428,6 +447,7 @@ describe('EventsSettings list states', () => {
   });
 
   it('keeps the form write failure when its pending mount load succeeds', async () => {
+    const user = userEvent.setup();
     let finishLoad: () => void = () => {};
     setStore({
       eventsIsLoading: true,
@@ -448,9 +468,9 @@ describe('EventsSettings list states', () => {
     });
 
     render(<EventsSettings />);
-    openAddForm();
-    fillForm({ label: 'Unsaved trip', date: '2026-10-31' });
-    submitForm();
+    await openAddForm(user);
+    await fillForm(user, { label: 'Unsaved trip', date: '2026-10-31' });
+    await submitForm(user);
 
     await waitFor(() =>
       expect(screen.getByTestId('events-form-error')).toHaveTextContent(
@@ -542,6 +562,7 @@ describe('EventsSettings list states', () => {
   });
 
   it('shows the truthful empty state and moves focus to Add after a successful Retry', async () => {
+    const user = userEvent.setup();
     let finishRetry: () => void = () => {};
     const clearEventsError = vi.fn(() => store.patch({ eventsError: null }));
     const loadEvents = vi
@@ -563,8 +584,7 @@ describe('EventsSettings list states', () => {
 
     await renderSection();
     const retry = screen.getByTestId('events-settings-retry');
-    retry.focus();
-    fireEvent.click(retry);
+    await user.click(retry);
 
     await waitFor(() => expect(loadEvents).toHaveBeenCalledTimes(2));
     expect(clearEventsError).toHaveBeenCalledTimes(1);
@@ -588,6 +608,7 @@ describe('EventsSettings list states', () => {
   });
 
   it('moves focus back to Retry when an empty-state Retry fails again', async () => {
+    const user = userEvent.setup();
     let finishRetry: () => void = () => {};
     const loadEvents = vi
       .fn<() => Promise<EventLoadResult>>()
@@ -608,8 +629,7 @@ describe('EventsSettings list states', () => {
 
     await renderSection();
     const retry = screen.getByTestId('events-settings-retry');
-    retry.focus();
-    fireEvent.click(retry);
+    await user.click(retry);
 
     await waitFor(() => expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument());
     expect(screen.queryByTestId('events-settings-retry')).not.toBeInTheDocument();
@@ -626,6 +646,7 @@ describe('EventsSettings list states', () => {
   });
 
   it('keeps one retryable notice and the last-good list when Retry fails again', async () => {
+    const user = userEvent.setup();
     let finishRetry: () => void = () => {};
     const loadEvents = vi
       .fn<() => Promise<EventLoadResult>>()
@@ -649,11 +670,11 @@ describe('EventsSettings list states', () => {
 
     await renderSection();
     const retry = screen.getByTestId('events-settings-retry');
-    fireEvent.click(retry);
+    await user.click(retry);
 
     await waitFor(() => expect(retry).toBeDisabled());
     expect(retry).toHaveTextContent('Retrying…');
-    fireEvent.click(retry);
+    await user.click(retry);
     expect(loadEvents).toHaveBeenCalledTimes(2);
 
     await act(async () => {
@@ -669,11 +690,12 @@ describe('EventsSettings list states', () => {
 
 describe('EventsSettings validation', () => {
   it('rejects a blank label without issuing a request', async () => {
+    const user = userEvent.setup();
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fillForm({ label: '   ', date: '2026-09-12' });
-    submitForm();
+    await fillForm(user, { label: '   ', date: '2026-09-12' });
+    await submitForm(user);
 
     expect(screen.getByTestId('events-form-label-error')).toHaveTextContent('Label is required');
     expect(store.state.addEvent).not.toHaveBeenCalled();
@@ -681,13 +703,14 @@ describe('EventsSettings validation', () => {
   });
 
   it.each(['', '  '])('accepts a 100-character label with %j padding', async (padding) => {
+    const user = userEvent.setup();
     const label = 'x'.repeat(100);
     const description = 'At the label limit';
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fillForm({ label: `${padding}${label}${padding}`, date: '2026-09-12', description });
-    submitForm();
+    await fillForm(user, { label: `${padding}${label}${padding}`, date: '2026-09-12', description });
+    await submitForm(user);
 
     expect(screen.queryByTestId('events-form-label-error')).not.toBeInTheDocument();
     await waitFor(() => expect(store.state.addEvent).toHaveBeenCalledTimes(1));
@@ -706,13 +729,14 @@ describe('EventsSettings validation', () => {
   });
 
   it.each(['', '  '])('accepts a 500-character description with %j padding', async (padding) => {
+    const user = userEvent.setup();
     const label = 'At the description limit';
     const description = 'y'.repeat(500);
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fillForm({ label, date: '2026-09-12', description: `${padding}${description}${padding}` });
-    submitForm();
+    await fillForm(user, { label, date: '2026-09-12', description: `${padding}${description}${padding}` });
+    await submitForm(user);
 
     expect(screen.queryByTestId('events-form-description-error')).not.toBeInTheDocument();
     await waitFor(() => expect(store.state.addEvent).toHaveBeenCalledTimes(1));
@@ -731,11 +755,12 @@ describe('EventsSettings validation', () => {
   });
 
   it('rejects a 101-character label, naming the 100-character limit', async () => {
+    const user = userEvent.setup();
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fillForm({ label: 'x'.repeat(101), date: '2026-09-12' });
-    submitForm();
+    await fillForm(user, { label: 'x'.repeat(101), date: '2026-09-12' });
+    await submitForm(user);
 
     expect(screen.getByTestId('events-form-label-error')).toHaveTextContent(
       'Label must be 100 characters or fewer'
@@ -746,11 +771,12 @@ describe('EventsSettings validation', () => {
   });
 
   it('rejects a 501-character description, naming the 500-character limit', async () => {
+    const user = userEvent.setup();
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fillForm({ label: 'Fine', date: '2026-09-12', description: 'y'.repeat(501) });
-    submitForm();
+    await fillForm(user, { label: 'Fine', date: '2026-09-12', description: 'y'.repeat(501) });
+    await submitForm(user);
 
     expect(screen.getByTestId('events-form-description-error')).toHaveTextContent(
       'Description must be 500 characters or fewer'
@@ -761,24 +787,26 @@ describe('EventsSettings validation', () => {
   });
 
   it('rejects a missing date without issuing a request', async () => {
+    const user = userEvent.setup();
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fillForm({ label: 'Fine' });
-    submitForm();
+    await fillForm(user, { label: 'Fine' });
+    await submitForm(user);
 
     expect(screen.getByTestId('events-form-date-error')).toHaveTextContent('Date is required');
     expect(store.state.addEvent).not.toHaveBeenCalled();
   });
 
   it('announces each field error and points the input at it', async () => {
+    const user = userEvent.setup();
     // aria-invalid on its own tells a screen-reader user the field is wrong and
     // never says why, and an error that is only rendered — not announced —
     // reaches nobody who submitted with the keyboard.
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    submitForm();
+    await submitForm(user);
 
     const labelError = screen.getByTestId('events-form-label-error');
     const dateError = screen.getByTestId('events-form-date-error');
@@ -795,16 +823,17 @@ describe('EventsSettings validation', () => {
   });
 
   it('clears a field error as soon as that field is edited', async () => {
+    const user = userEvent.setup();
     // setErrors used to run only on submit, so a corrected label kept its red
     // border, its aria-invalid and its message until the user resubmitted.
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    submitForm();
+    await submitForm(user);
     expect(screen.getByTestId('events-form-label-error')).toBeInTheDocument();
     expect(screen.getByTestId('events-form-date-error')).toBeInTheDocument();
 
-    fillForm({ label: 'Now fine' });
+    await fillForm(user, { label: 'Now fine' });
 
     expect(screen.queryByTestId('events-form-label-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('events-form-label')).toHaveAttribute('aria-invalid', 'false');
@@ -869,17 +898,18 @@ describe.each([
         description: 'e\u0301'.repeat(250),
       },
     ])('saves a whitespace-padded $name without normalization', async ({ label, description }) => {
+      const user = userEvent.setup();
       setStore({ events: initialEvents() });
       await renderSection();
-      fireEvent.click(screen.getByTestId(opener));
+      await user.click(screen.getByTestId(opener));
 
-      fillForm({ label: `  ${label}  `, date: '2026-10-01', description: `  ${description}  ` });
-      fireEvent.click(screen.getByTestId('events-form-icon-plane'));
+      await fillForm(user, { label: `  ${label}  `, date: '2026-10-01', description: `  ${description}  ` });
+      await user.click(screen.getByTestId('events-form-icon-plane'));
       expect(screen.getByTestId('events-form-label')).toHaveValue(`  ${label}  `);
       expect(screen.getByTestId('events-form-description')).toHaveValue(`  ${description}  `);
       expect(screen.getByTestId('events-form-label')).not.toHaveAttribute('maxlength');
       expect(screen.getByTestId('events-form-description')).not.toHaveAttribute('maxlength');
-      submitForm();
+      await submitForm(user);
 
       expect(screen.queryByTestId('events-form-label-error')).not.toBeInTheDocument();
       expect(screen.queryByTestId('events-form-description-error')).not.toBeInTheDocument();
@@ -927,14 +957,15 @@ describe.each([
         error: 'Description must be 500 characters or fewer',
       },
     ])('rejects a $name without either write or changing events', async (fixture) => {
+      const user = userEvent.setup();
       const { field, label, description, error } = fixture;
       setStore({ events: initialEvents() });
       await renderSection();
-      fireEvent.click(screen.getByTestId(opener));
+      await user.click(screen.getByTestId(opener));
 
-      fillForm({ label, date: '2026-10-01', description });
+      await fillForm(user, { label, date: '2026-10-01', description });
       const eventsBeforeSubmission = structuredClone(currentEvents());
-      submitForm();
+      await submitForm(user);
 
       expect(screen.getByTestId(`events-form-${field}-error`)).toHaveTextContent(error);
       expect(screen.getAllByRole('alert')).toHaveLength(1);
@@ -952,12 +983,13 @@ describe.each([
 
 describe('EventsSettings add', () => {
   it('sends the trimmed label and the date input value verbatim, then closes', async () => {
+    const user = userEvent.setup();
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fillForm({ label: '  Harper visits  ', date: '2026-09-12', description: '  Two weeks  ' });
-    fireEvent.click(screen.getByTestId('events-form-icon-plane'));
-    submitForm();
+    await fillForm(user, { label: '  Harper visits  ', date: '2026-09-12', description: '  Two weeks  ' });
+    await user.click(screen.getByTestId('events-form-icon-plane'));
+    await submitForm(user);
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     expect(store.state.addEvent).toHaveBeenCalledWith({
@@ -969,11 +1001,12 @@ describe('EventsSettings add', () => {
   });
 
   it('defaults the icon to calendar and sends a null description when none was typed', async () => {
+    const user = userEvent.setup();
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fillForm({ label: 'Bare', date: '2026-09-12' });
-    submitForm();
+    await fillForm(user, { label: 'Bare', date: '2026-09-12' });
+    await submitForm(user);
 
     await waitFor(() => expect(store.state.addEvent).toHaveBeenCalled());
     expect(store.state.addEvent).toHaveBeenCalledWith({
@@ -985,6 +1018,7 @@ describe('EventsSettings add', () => {
   });
 
   it('drops the new row into date order rather than at the end', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [
         makeEvent({ id: 'a', label: 'January', date: new Date(2026, 0, 2) }),
@@ -995,15 +1029,16 @@ describe('EventsSettings add', () => {
     await renderSection();
     expect(renderedLabels()).toEqual(['January', 'June']);
 
-    openAddForm();
-    fillForm({ label: 'March', date: '2026-03-02' });
-    submitForm();
+    await openAddForm(user);
+    await fillForm(user, { label: 'March', date: '2026-03-02' });
+    await submitForm(user);
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     expect(renderedLabels()).toEqual(['January', 'March', 'June']);
   });
 
   it('keeps the form open and renders the write’s own message when the save is rejected', async () => {
+    const user = userEvent.setup();
     setStore({
       addEvent: vi.fn(async () => ({
         success: false as const,
@@ -1013,10 +1048,10 @@ describe('EventsSettings add', () => {
     });
 
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fillForm({ label: 'Doomed', date: '2026-09-12' });
-    submitForm();
+    await fillForm(user, { label: 'Doomed', date: '2026-09-12' });
+    await submitForm(user);
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -1032,6 +1067,7 @@ describe('EventsSettings add', () => {
   });
 
   it('keeps save retry available when the action unexpectedly rejects', async () => {
+    const user = userEvent.setup();
     setStore({
       addEvent: vi.fn(async () => {
         throw new Error('Unexpected save rejection');
@@ -1039,9 +1075,9 @@ describe('EventsSettings add', () => {
     });
 
     await renderSection();
-    openAddForm();
-    fillForm({ label: 'Still here', date: '2026-09-12' });
-    submitForm();
+    await openAddForm(user);
+    await fillForm(user, { label: 'Still here', date: '2026-09-12' });
+    await submitForm(user);
 
     await waitFor(() =>
       expect(screen.getByTestId('events-form-error')).toHaveTextContent(
@@ -1066,6 +1102,7 @@ describe('EventsSettings add', () => {
   ] as const)(
     'selects refresh from the %s code, not from otherwise identical prose',
     async (code, offersRefresh, expectedError) => {
+      const user = userEvent.setup();
       setStore({
         addEvent: vi.fn(async () => ({
           success: false as const,
@@ -1075,9 +1112,9 @@ describe('EventsSettings add', () => {
       });
 
       await renderSection();
-      openAddForm();
-      fillForm({ label: 'Doomed', date: '2026-09-12' });
-      submitForm();
+      await openAddForm(user);
+      await fillForm(user, { label: 'Doomed', date: '2026-09-12' });
+      await submitForm(user);
 
       await waitFor(() =>
         expect(screen.getByTestId('events-form-error').textContent).toBe(expectedError)
@@ -1090,6 +1127,7 @@ describe('EventsSettings add', () => {
   );
 
   it('disables submit while the write is open, so a double tap creates one row', async () => {
+    const user = userEvent.setup();
     // `public.events` carries no unique constraint and no idempotency key, so
     // the disabled control is the only double-submit guard there is.
     let releaseAdd: ((result: EventWriteResult) => void) | undefined;
@@ -1103,14 +1141,14 @@ describe('EventsSettings add', () => {
     });
 
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fillForm({ label: 'Once', date: '2026-09-12' });
-    submitForm();
+    await fillForm(user, { label: 'Once', date: '2026-09-12' });
+    await submitForm(user);
 
     await waitFor(() => expect(screen.getByTestId('events-form-submit')).toBeDisabled());
 
-    submitForm();
+    await submitForm(user);
     expect(store.state.addEvent).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -1122,6 +1160,7 @@ describe('EventsSettings add', () => {
 
 describe('EventsSettings edit', () => {
   it('pre-fills the form with the same calendar day the row shows', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [
         makeEvent({
@@ -1138,7 +1177,7 @@ describe('EventsSettings edit', () => {
 
     expect(screen.getByTestId('event-date-mine')).toHaveTextContent('September 12, 2026');
 
-    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    await user.click(screen.getByTestId('event-edit-mine'));
 
     expect(screen.getByTestId('events-form-label')).toHaveValue('Harper visits');
     // formatDateISO over local components — the row above and this field name
@@ -1149,6 +1188,7 @@ describe('EventsSettings edit', () => {
   });
 
   it('pre-fills from local date components, not from the UTC calendar day', async () => {
+    const user = userEvent.setup();
     // A local-midnight fixture cannot tell formatDateISO apart from the
     // forbidden toISOString().split('T')[0] anywhere west of UTC, and
     // vitest.config.ts pins TZ=America/New_York — so both idioms pass the test
@@ -1161,21 +1201,22 @@ describe('EventsSettings edit', () => {
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    await user.click(screen.getByTestId('event-edit-mine'));
 
     expect(screen.getByTestId('events-form-date')).toHaveValue('2026-09-12');
   });
 
   it('routes the save through editEvent with the row id', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine', label: 'Harper visits' })] as AppState['events'],
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    await user.click(screen.getByTestId('event-edit-mine'));
 
-    fillForm({ label: 'Harper arrives', date: '2026-10-01' });
-    submitForm();
+    await fillForm(user, { label: 'Harper arrives', date: '2026-10-01' });
+    await submitForm(user);
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     expect(store.state.editEvent).toHaveBeenCalledWith('mine', {
@@ -1188,6 +1229,7 @@ describe('EventsSettings edit', () => {
   });
 
   it('re-sorts the row when the edit moves its date past another', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [
         makeEvent({ id: 'a', label: 'January', date: new Date(2026, 0, 2) }),
@@ -1198,15 +1240,16 @@ describe('EventsSettings edit', () => {
     await renderSection();
     expect(renderedLabels()).toEqual(['January', 'June']);
 
-    fireEvent.click(screen.getByTestId('event-edit-a'));
-    fillForm({ date: '2026-12-02' });
-    submitForm();
+    await user.click(screen.getByTestId('event-edit-a'));
+    await fillForm(user, { date: '2026-12-02' });
+    await submitForm(user);
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     expect(renderedLabels()).toEqual(['June', 'January']);
   });
 
   it('keeps the edit form open with the returned message when the write is rejected', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       editEvent: vi.fn(async () => ({
@@ -1217,10 +1260,10 @@ describe('EventsSettings edit', () => {
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    await user.click(screen.getByTestId('event-edit-mine'));
 
-    fillForm({ label: 'Renamed', date: '2026-10-01' });
-    submitForm();
+    await fillForm(user, { label: 'Renamed', date: '2026-10-01' });
+    await submitForm(user);
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('Event not found or not yours to edit')
@@ -1229,6 +1272,7 @@ describe('EventsSettings edit', () => {
   });
 
   it('closes a stale edit and reloads the list when Refresh events is activated', async () => {
+    const user = userEvent.setup();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
@@ -1246,14 +1290,14 @@ describe('EventsSettings edit', () => {
       store.patch({ events: [], eventsError: null });
       return loadOk;
     });
-    fireEvent.click(screen.getByTestId('event-edit-mine'));
-    submitForm();
+    await user.click(screen.getByTestId('event-edit-mine'));
+    await submitForm(user);
 
     await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
     const refresh = screen.getByTestId('events-form-refresh');
     act(() => {
-      refresh.click();
-      refresh.click();
+      refresh.click(); // raw click: two clicks in one act() batch prove the ref guard before React commits
+      refresh.click(); // raw click: a user.dblClick re-renders between clicks and would stop proving it
     });
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
@@ -1264,6 +1308,7 @@ describe('EventsSettings edit', () => {
   });
 
   it('clears an existing load banner after a successful stale-row refresh', async () => {
+    const user = userEvent.setup();
     const loadEvents = vi
       .fn()
       .mockImplementationOnce(async () => {
@@ -1285,10 +1330,10 @@ describe('EventsSettings edit', () => {
     await renderSection();
     expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('event-edit-mine'));
-    submitForm();
+    await user.click(screen.getByTestId('event-edit-mine'));
+    await submitForm(user);
     await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId('events-form-refresh'));
+    await user.click(screen.getByTestId('events-form-refresh'));
 
     await waitFor(() =>
       expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument()
@@ -1297,6 +1342,7 @@ describe('EventsSettings edit', () => {
   });
 
   it('ignores an older stale mount outcome after a stale-row refresh fails', async () => {
+    const user = userEvent.setup();
     let finishMountLoad: (result: EventLoadResult) => void = () => {};
     const loadEvents = vi
       .fn<() => Promise<EventLoadResult>>()
@@ -1321,10 +1367,10 @@ describe('EventsSettings edit', () => {
     });
 
     render(<EventsSettings />);
-    fireEvent.click(screen.getByTestId('event-edit-mine'));
-    submitForm();
+    await user.click(screen.getByTestId('event-edit-mine'));
+    await submitForm(user);
     await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId('events-form-refresh'));
+    await user.click(screen.getByTestId('events-form-refresh'));
 
     await waitFor(() =>
       expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument()
@@ -1377,10 +1423,10 @@ describe.each([
     loadingDuringRetry,
     labelsDuringRetry,
   }) => {
-    function prepareForm() {
-      fireEvent.click(screen.getByTestId(opener));
-      fillForm({ label: 'Trip together', date: '2026-10-01', description: 'Two weeks away' });
-      fireEvent.click(screen.getByTestId('events-form-icon-plane'));
+    async function prepareForm(user: UserEvent) {
+      await user.click(screen.getByTestId(opener));
+      await fillForm(user, { label: 'Trip together', date: '2026-10-01', description: 'Two weeks away' });
+      await user.click(screen.getByTestId('events-form-icon-plane'));
     }
 
     function saveAction() {
@@ -1402,10 +1448,11 @@ describe.each([
       'The event was saved but its date could not be read',
       'An arbitrary returned message',
     ])('explains uncertainty and preserves the fields for invalid-response: %s', async (error) => {
+      const user = userEvent.setup();
       saveAction().mockResolvedValueOnce({ success: false, code: 'invalid-response', error });
       await renderSection();
-      prepareForm();
-      submitForm();
+      await prepareForm(user);
+      await submitForm(user);
 
       await waitFor(() => expect(screen.getByTestId('events-form-error')).toHaveTextContent(
         /may already have been saved/i
@@ -1422,6 +1469,7 @@ describe.each([
     });
 
     it('blocks a direct submit after an uncertain result before React commits the failure', async () => {
+      const user = userEvent.setup();
       let finishSave!: (result: EventWriteResult) => void;
       const pendingSave = new Promise<EventWriteResult>((resolve) => { finishSave = resolve; });
       const failure: EventWriteResult = {
@@ -1429,8 +1477,8 @@ describe.each([
       };
       saveAction().mockReturnValueOnce(pendingSave).mockResolvedValue(failure);
       await renderSection();
-      prepareForm();
-      submitForm();
+      await prepareForm(user);
+      await submitForm(user);
       const form = screen.getByTestId('events-form-label').closest('form')!;
 
       await act(async () => {
@@ -1439,7 +1487,7 @@ describe.each([
         // exposes the previous render's submit handler during this microtask.
         await Promise.resolve();
         expect(screen.queryByTestId('events-form-error')).not.toBeInTheDocument();
-        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); // raw submit: must land inside this microtask, before React commits the failure
       });
 
       expectWrites(1);
@@ -1454,26 +1502,27 @@ describe.each([
         success: false, code: 'invalid-response', error: 'Unreadable response',
       });
       await renderSection();
-      prepareForm();
-      submitForm();
+      await prepareForm(user);
+      await submitForm(user);
       await waitFor(() => expect(screen.getByTestId('events-form-error')).toBeInTheDocument());
       const form = screen.getByTestId('events-form-label').closest('form')!;
 
-      // A submit event bypasses the missing button, as an implicit submission can.
-      await act(async () => { fireEvent.submit(form); });
+      // A direct submit event still reaches the form after its button is gone.
+      await act(async () => { fireEvent.submit(form); }); // raw submit: the submit button is gone, so only a direct submit reaches the handler it must still guard
       expectWrites(1);
 
-      fillForm({ label: '', date: '', description: 'Changed after the response' });
-      fireEvent.click(screen.getByTestId('events-form-icon-ring'));
-      await act(async () => { fireEvent.submit(form); });
+      await fillForm(user, { label: '', date: '', description: 'Changed after the response' });
+      await user.click(screen.getByTestId('events-form-icon-ring'));
+      await act(async () => { fireEvent.submit(form); }); // raw submit: the submit button is gone, so only a direct submit reaches the handler it must still guard
       expect(screen.getByTestId('events-form-error')).toHaveTextContent(/may already have been saved/i);
       expect(screen.queryByTestId('events-form-label-error')).not.toBeInTheDocument();
       expect(screen.queryByTestId('events-form-date-error')).not.toBeInTheDocument();
 
-      fillForm({ label: 'Another label', date: '2026-11-01' });
-      screen.getByTestId('events-form-label').focus();
+      await fillForm(user, { label: 'Another label', date: '2026-11-01' });
+      await user.click(screen.getByTestId('events-form-label'));
       await user.keyboard('{Enter}');
-      await act(async () => { fireEvent.submit(form); });
+      // With no submit button and two blocking fields, Enter submits nothing, in a browser or in user-event.
+      await act(async () => { fireEvent.submit(form); }); // raw submit: Enter submitted nothing, so this re-checks the direct path now that the fields are valid
       expectWrites(1);
       expect(screen.getByTestId('events-form-error')).toHaveTextContent(/may already have been saved/i);
       expect(screen.getByRole('button', { name: 'Refresh events' })).toBeEnabled();
@@ -1490,6 +1539,7 @@ describe.each([
       ],
       [false, (): CoupleEvent[] => [], [], 'No events to display in this part of your history.'],
     ] as const)('reconciles with a read when the bounded refresh contains the saved row: %s', async (_hasSavedRow, refreshedEvents, labels, emptyText) => {
+      const user = userEvent.setup();
       const pending = deferredLoad();
       const loadEvents = vi.mocked(store.state.loadEvents as AppState['loadEvents']);
       saveAction().mockResolvedValueOnce({
@@ -1500,13 +1550,13 @@ describe.each([
         store.patch({ eventsIsLoading: true, eventsError: null });
         return pending.promise;
       });
-      prepareForm();
-      submitForm();
+      await prepareForm(user);
+      await submitForm(user);
       await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
       const refresh = screen.getByTestId('events-form-refresh');
       act(() => {
-        refresh.click();
-        refresh.click();
+        refresh.click(); // raw click: two clicks in one act() batch prove the ref guard before React commits
+        refresh.click(); // raw click: a user.dblClick re-renders between clicks and would stop proving it
       });
       expect(screen.queryByTestId('events-form')).not.toBeInTheDocument();
       expect(loadEvents).toHaveBeenCalledTimes(2);
@@ -1533,6 +1583,7 @@ describe.each([
     });
 
     it('keeps the form closed after refresh fails and recovers through the list Retry', async () => {
+      const user = userEvent.setup();
       const refresh = deferredLoad();
       const retry = deferredLoad();
       const loadEvents = vi.mocked(store.state.loadEvents as AppState['loadEvents']);
@@ -1547,10 +1598,10 @@ describe.each([
         store.patch({ eventsIsLoading: true, eventsError: null });
         return retry.promise;
       });
-      prepareForm();
-      submitForm();
+      await prepareForm(user);
+      await submitForm(user);
       await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
-      fireEvent.click(screen.getByTestId('events-form-refresh'));
+      await user.click(screen.getByTestId('events-form-refresh'));
       expect(screen.queryByTestId('events-form')).not.toBeInTheDocument();
       expect(loadEvents).toHaveBeenCalledTimes(2);
       await act(async () => {
@@ -1568,7 +1619,7 @@ describe.each([
 
       const retryButton = screen.getByRole('button', { name: 'Retry' });
       expect(retryButton).toBeEnabled();
-      fireEvent.click(retryButton);
+      await user.click(retryButton);
       expect(loadEvents).toHaveBeenCalledTimes(3);
       expect(Boolean(screen.queryByTestId('events-settings-loading'))).toBe(loadingDuringRetry);
       expect(regionLabels()).toEqual(labelsDuringRetry);
@@ -1590,11 +1641,12 @@ describe.each([
     });
 
     it.each(['offline', 'transport'] as const)('allows a deliberate %s retry with the entered fields', async (code) => {
+      const user = userEvent.setup();
       const error = `Returned ${code} message`;
       saveAction().mockResolvedValueOnce({ success: false, code, error });
       await renderSection();
-      prepareForm();
-      submitForm();
+      await prepareForm(user);
+      await submitForm(user);
       await waitFor(() => expect(screen.getByTestId('events-form-error')).toHaveTextContent(error));
       expect(screen.getByTestId('events-form-label')).toHaveValue('Trip together');
       expect(screen.getByTestId('events-form-date')).toHaveValue('2026-10-01');
@@ -1604,7 +1656,7 @@ describe.each([
       expect(screen.queryByTestId('events-form-refresh')).not.toBeInTheDocument();
       expectWrites(1);
 
-      submitForm();
+      await submitForm(user);
       await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
       const input = {
         label: 'Trip together', eventDate: '2026-10-01', description: 'Two weeks away', icon: 'plane',
@@ -1619,25 +1671,27 @@ describe.each([
 
 describe('EventsSettings delete', () => {
   it('asks for confirmation before deleting', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine', label: 'Harper visits' })] as AppState['events'],
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('event-delete-mine'));
 
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
     expect(store.state.removeEvent).not.toHaveBeenCalled();
   });
 
   it('removes the row and closes once the confirmation is accepted', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await user.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() =>
       expect(screen.queryByTestId('events-delete-confirmation')).not.toBeInTheDocument()
@@ -1649,19 +1703,21 @@ describe('EventsSettings delete', () => {
   });
 
   it('cancels without deleting', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
-    fireEvent.click(screen.getByTestId('events-delete-cancel'));
+    await user.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('events-delete-cancel'));
 
     expect(screen.queryByTestId('events-delete-confirmation')).not.toBeInTheDocument();
     expect(store.state.removeEvent).not.toHaveBeenCalled();
   });
 
   it('keeps the row and shows the returned message when the delete is rejected', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine', label: 'Harper visits' })] as AppState['events'],
       removeEvent: vi.fn(async () => ({
@@ -1672,8 +1728,8 @@ describe('EventsSettings delete', () => {
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await user.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('Event not found or not yours to delete')
@@ -1687,6 +1743,7 @@ describe('EventsSettings delete', () => {
   });
 
   it('keeps deliberate delete retry enabled for a transport-coded failure', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       removeEvent: vi.fn(async () => ({
@@ -1697,8 +1754,8 @@ describe('EventsSettings delete', () => {
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await user.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() => expect(screen.getByTestId('events-delete-error')).toBeInTheDocument());
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
@@ -1708,6 +1765,7 @@ describe('EventsSettings delete', () => {
   });
 
   it('keeps delete retry available when the action unexpectedly rejects', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       removeEvent: vi.fn(async () => {
@@ -1716,8 +1774,8 @@ describe('EventsSettings delete', () => {
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await user.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() =>
       expect(screen.getByTestId('events-delete-error')).toHaveTextContent(
@@ -1730,6 +1788,7 @@ describe('EventsSettings delete', () => {
   });
 
   it('closes a stale delete and reloads the list when Refresh events is activated', async () => {
+    const user = userEvent.setup();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
@@ -1747,14 +1806,14 @@ describe('EventsSettings delete', () => {
       store.patch({ eventsError: 'Manual refresh failed' });
       return { status: 'failure', error: 'Manual refresh failed' } as const;
     });
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await user.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() => expect(screen.getByTestId('events-delete-refresh')).toBeInTheDocument());
     const refresh = screen.getByTestId('events-delete-refresh');
     act(() => {
-      refresh.click();
-      refresh.click();
+      refresh.click(); // raw click: two clicks in one act() batch prove the ref guard before React commits
+      refresh.click(); // raw click: a user.dblClick re-renders between clicks and would stop proving it
     });
 
     await waitFor(() =>
@@ -1768,6 +1827,7 @@ describe('EventsSettings delete', () => {
   });
 
   it('disables the confirm control while the delete is open', async () => {
+    const user = userEvent.setup();
     let releaseRemove: ((result: EventWriteResult) => void) | undefined;
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
@@ -1780,12 +1840,12 @@ describe('EventsSettings delete', () => {
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await user.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() => expect(screen.getByTestId('events-delete-confirm')).toBeDisabled());
 
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await user.click(screen.getByTestId('events-delete-confirm'));
     expect(store.state.removeEvent).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -1824,8 +1884,9 @@ describe('EventsSettings accessible names and modal semantics', () => {
   });
 
   it('exposes the form as a modal dialog named by its heading', async () => {
+    const user = userEvent.setup();
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
     const dialog = screen.getByRole('dialog', { name: 'Add Event' });
     expect(dialog).toBe(screen.getByTestId('events-form'));
@@ -1833,10 +1894,11 @@ describe('EventsSettings accessible names and modal semantics', () => {
   });
 
   it('exposes the delete confirmation as a modal dialog named by its heading', async () => {
+    const user = userEvent.setup();
     setStore({ events: [makeEvent({ id: 'mine' })] as AppState['events'] });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('event-delete-mine'));
 
     const dialog = screen.getByRole('dialog', { name: 'Delete this event?' });
     expect(dialog).toBe(screen.getByTestId('events-delete-confirmation'));
@@ -1846,15 +1908,17 @@ describe('EventsSettings accessible names and modal semantics', () => {
 
 describe('EventsSettings dismissal guards', () => {
   it('closes the form on a backdrop click when nothing is in flight', async () => {
+    const user = userEvent.setup();
     await renderSection();
-    openAddForm();
+    await openAddForm(user);
 
-    fireEvent.click(screen.getByTestId('events-form'));
+    await user.click(screen.getByTestId('events-form'));
 
     expect(screen.queryByTestId('events-form')).not.toBeInTheDocument();
   });
 
   it('ignores Escape and a backdrop click while the save is in flight', async () => {
+    const user = userEvent.setup();
     // Both guards exist so a stray key or a mistimed tap cannot orphan a write
     // that is already on its way to a table with no idempotency key.
     let releaseAdd: ((result: EventWriteResult) => void) | undefined;
@@ -1868,9 +1932,9 @@ describe('EventsSettings dismissal guards', () => {
     });
 
     await renderSection();
-    openAddForm();
-    fillForm({ label: 'Held', date: '2026-09-12' });
-    submitForm();
+    await openAddForm(user);
+    await fillForm(user, { label: 'Held', date: '2026-09-12' });
+    await submitForm(user);
 
     await waitFor(() => expect(screen.getByTestId('events-form-submit')).toBeDisabled());
 
@@ -1885,10 +1949,10 @@ describe('EventsSettings dismissal guards', () => {
       screen.getByTestId('events-form').querySelector('[tabindex="-1"]')
     );
 
-    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('events-form'));
+    await user.click(screen.getByTestId('events-form'));
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
 
     await act(async () => {
@@ -1898,18 +1962,20 @@ describe('EventsSettings dismissal guards', () => {
   });
 
   it('closes the delete dialog on a backdrop click when nothing is in flight', async () => {
+    const user = userEvent.setup();
     setStore({ events: [makeEvent({ id: 'mine' })] as AppState['events'] });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('event-delete-mine'));
 
-    fireEvent.click(screen.getByTestId('events-delete-confirmation'));
+    await user.click(screen.getByTestId('events-delete-confirmation'));
 
     expect(screen.queryByTestId('events-delete-confirmation')).not.toBeInTheDocument();
     expect(store.state.removeEvent).not.toHaveBeenCalled();
   });
 
   it('ignores Escape and a backdrop click while the delete is in flight', async () => {
+    const user = userEvent.setup();
     let releaseRemove: ((result: EventWriteResult) => void) | undefined;
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
@@ -1922,8 +1988,8 @@ describe('EventsSettings dismissal guards', () => {
     });
 
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-delete-mine'));
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await user.click(screen.getByTestId('event-delete-mine'));
+    await user.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() => expect(screen.getByTestId('events-delete-confirm')).toBeDisabled());
 
@@ -1932,10 +1998,10 @@ describe('EventsSettings dismissal guards', () => {
       screen.getByTestId('events-delete-confirmation').querySelector('[tabindex="-1"]')
     );
 
-    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('events-delete-confirmation'));
+    await user.click(screen.getByTestId('events-delete-confirmation'));
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
 
     await act(async () => {
@@ -2084,6 +2150,7 @@ describe('EventsSettings authentication session ownership', () => {
     ['edit', 'events-form-submit', 'events-form-refresh'],
     ['delete', 'events-delete-confirm', 'events-delete-refresh'],
   ] as const)('does not settle the new session from a stale-row %s refresh', async (kind, confirm, refreshButton) => {
+    const user = userEvent.setup();
     const refresh = deferredLoad();
     const current = deferredLoad();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>()
@@ -2098,10 +2165,10 @@ describe('EventsSettings authentication session ownership', () => {
       removeEvent: vi.fn(async () => missing),
     });
     await renderSection();
-    fireEvent.click(screen.getByTestId(`event-${kind}-mine`));
-    fireEvent.click(screen.getByTestId(confirm));
+    await user.click(screen.getByTestId(`event-${kind}-mine`));
+    await user.click(screen.getByTestId(confirm));
     await waitFor(() => expect(screen.getByTestId(refreshButton)).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId(refreshButton));
+    await user.click(screen.getByTestId(refreshButton));
     expect(loadEvents).toHaveBeenCalledTimes(2);
     await act(async () => { reauthenticate(); });
     expect(loadEvents).toHaveBeenCalledTimes(3);
@@ -2114,6 +2181,7 @@ describe('EventsSettings authentication session ownership', () => {
   });
 
   it.each(oldOutcomes)('ignores old retry $status and focus while a new-session retry is pending', async (outcome) => {
+    const user = userEvent.setup();
     const oldRetry = deferredLoad();
     const newRetry = deferredLoad();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>()
@@ -2123,23 +2191,23 @@ describe('EventsSettings authentication session ownership', () => {
       .mockReturnValueOnce(newRetry.promise);
     setStore({ loadEvents });
     await renderSection();
-    fireEvent.click(screen.getByTestId('events-settings-retry'));
+    await user.click(screen.getByTestId('events-settings-retry'));
     await act(async () => { reauthenticate(); });
     const retry = screen.getByTestId('events-settings-retry');
     expect(retry).toBeEnabled();
-    fireEvent.click(retry);
+    await user.click(retry);
     expect(loadEvents).toHaveBeenCalledTimes(4);
     expect(retry).toBeDisabled();
 
     // Give the user somewhere meaningful to focus while the load is pending.
-    openAddForm();
+    await openAddForm(user);
     const input = screen.getByTestId('events-form-label');
-    input.focus();
+    await user.click(input);
     await act(async () => { oldRetry.resolve(outcome); });
     expect(input).toHaveFocus();
     expect(retry).toBeDisabled();
     expect(retry).toHaveTextContent('Retrying');
-    fireEvent.click(screen.getByTestId('events-form-close'));
+    await user.click(screen.getByTestId('events-form-close'));
     await act(async () => { newRetry.resolve(loadOk); });
     expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
     expect(screen.getByTestId('events-settings-add')).toHaveFocus();

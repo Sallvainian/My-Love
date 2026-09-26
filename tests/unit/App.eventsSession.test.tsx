@@ -5,7 +5,8 @@
  * store/auth actions, and control outcomes at that consumer boundary.
  */
 import type { Session } from '@supabase/supabase-js';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../src/App';
@@ -700,6 +701,7 @@ describe('Home event-load session ownership', () => {
 
   it('does not re-open setup when a read raised before the name was saved lands after', async () => {
     const firstRead = deferred<OwnDisplayNameResult>();
+    const user = userEvent.setup();
     controlHomeLoads();
     render(<App />);
 
@@ -716,9 +718,7 @@ describe('Home event-load session ownership', () => {
     const ownership = useAppStore.getState().authSessionVersion;
     await act(async () => auth.listener!(session('refreshed-token')));
 
-    await act(async () => {
-      fireEvent.click(screen.getByText('Set your display name'));
-    });
+    await user.click(screen.getByText('Set your display name'));
     expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
 
     await act(async () => staleRead.resolve({ status: 'unset' }));

@@ -6,7 +6,8 @@
  * no trap. These pin the contract — what the chrome does, not how it is styled
  * — so the markup can change without rewriting them.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ViewType } from '../../../stores/slices/navigationSlice';
 import { AppNavigation } from '../AppNavigation';
@@ -101,12 +102,13 @@ describe('AppNavigation', () => {
       }
     });
 
-    it.each(ALL_DESTINATIONS)('reports %s when its control is clicked', (view) => {
+    it.each(ALL_DESTINATIONS)('reports %s when its control is clicked', async (view) => {
+      const user = userEvent.setup();
       const { onViewChange } = renderNavigation({
         currentView: view === 'home' ? 'mood' : 'home',
       });
 
-      fireEvent.click(screen.getByTestId(`nav-${view}`));
+      await user.click(screen.getByTestId(`nav-${view}`));
 
       expect(onViewChange).toHaveBeenCalledTimes(1);
       expect(onViewChange).toHaveBeenCalledWith(view);
@@ -174,10 +176,11 @@ describe('AppNavigation', () => {
       expect(screen.getByTestId('nav-settings').textContent).toBe('');
     });
 
-    it('selects its view when the badge itself is tapped', () => {
+    it('selects its view when the badge itself is tapped', async () => {
+      const user = userEvent.setup();
       const { onViewChange } = renderNavigation({ badgeCounts: { notes: 2 } });
 
-      fireEvent.click(screen.getByTestId('nav-notes-badge'));
+      await user.click(screen.getByTestId('nav-notes-badge'));
 
       expect(onViewChange).toHaveBeenCalledTimes(1);
       expect(onViewChange).toHaveBeenCalledWith('notes');

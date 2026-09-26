@@ -6,7 +6,9 @@
  * rather than closing as if the change had been saved. The real store is
  * used; only the three write actions are stubbed.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,19 +60,24 @@ afterEach(() => {
   cleanup();
 });
 
-function fillForm(label: string, date: string) {
-  fireEvent.change(screen.getByLabelText(/^Label/), { target: { value: label } });
-  fireEvent.change(screen.getByLabelText(/^Date/), { target: { value: date } });
+async function fillForm(user: UserEvent, label: string, date: string) {
+  const labelField = screen.getByLabelText(/^Label/);
+  const dateField = screen.getByLabelText(/^Date/);
+  await user.clear(labelField);
+  await user.type(labelField, label);
+  await user.clear(dateField);
+  await user.type(dateField, date);
 }
 
 describe('AnniversarySettings writes', () => {
   it('editing calls updateAnniversary with the row’s id and the form data, then closes', async () => {
+    const user = userEvent.setup();
     updateAnniversary.mockResolvedValue(undefined);
     render(<AnniversarySettings />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit First date' }));
-    fillForm('First date, again', '2024-02-15');
-    fireEvent.click(screen.getByRole('button', { name: 'Update' }));
+    await user.click(screen.getByRole('button', { name: 'Edit First date' }));
+    await fillForm(user, 'First date, again', '2024-02-15');
+    await user.click(screen.getByRole('button', { name: 'Update' }));
 
     await waitFor(() =>
       expect(updateAnniversary).toHaveBeenCalledWith(7, {
@@ -84,12 +91,13 @@ describe('AnniversarySettings writes', () => {
   });
 
   it('a rejected add keeps the form open and shows why', async () => {
+    const user = userEvent.setup();
     addAnniversary.mockRejectedValue(new Error(OFFLINE));
     render(<AnniversarySettings />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Anniversary' }));
-    fillForm('Moving day', '2025-06-01');
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await user.click(screen.getByRole('button', { name: 'Add Anniversary' }));
+    await fillForm(user, 'Moving day', '2025-06-01');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(await screen.findByText(OFFLINE)).toBeInTheDocument();
     expect(addAnniversary).toHaveBeenCalledWith(
@@ -101,18 +109,19 @@ describe('AnniversarySettings writes', () => {
   });
 
   it('retrying the same add reuses its key; changing the form mints a new one', async () => {
+    const user = userEvent.setup();
     addAnniversary.mockRejectedValue(new Error(OFFLINE));
     render(<AnniversarySettings />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Anniversary' }));
-    fillForm('Moving day', '2025-06-01');
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await user.click(screen.getByRole('button', { name: 'Add Anniversary' }));
+    await fillForm(user, 'Moving day', '2025-06-01');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
     await screen.findByText(OFFLINE);
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await user.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(addAnniversary).toHaveBeenCalledTimes(2));
 
-    fillForm('Moving day!', '2025-06-01');
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await fillForm(user, 'Moving day!', '2025-06-01');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(addAnniversary).toHaveBeenCalledTimes(3));
 
     const keys = addAnniversary.mock.calls.map((call) => call[1]);
@@ -124,23 +133,25 @@ describe('AnniversarySettings writes', () => {
   });
 
   it('a rejected update keeps the form open and shows why', async () => {
+    const user = userEvent.setup();
     updateAnniversary.mockRejectedValue(new Error(OFFLINE));
     render(<AnniversarySettings />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit First date' }));
-    fillForm('Edited', '2024-02-14');
-    fireEvent.click(screen.getByRole('button', { name: 'Update' }));
+    await user.click(screen.getByRole('button', { name: 'Edit First date' }));
+    await fillForm(user, 'Edited', '2024-02-14');
+    await user.click(screen.getByRole('button', { name: 'Update' }));
 
     expect(await screen.findByText(OFFLINE)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Edit Anniversary' })).toBeInTheDocument();
   });
 
   it('a rejected delete keeps the dialog open with an alert', async () => {
+    const user = userEvent.setup();
     removeAnniversary.mockRejectedValue(new Error(OFFLINE));
     render(<AnniversarySettings />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete First date' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete First date' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(OFFLINE);

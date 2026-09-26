@@ -8,6 +8,7 @@
  */
 import type { Session } from '@supabase/supabase-js';
 import { act, cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../src/App';
@@ -208,7 +209,7 @@ describe('App refreshes the local copies', () => {
     await renderApp();
     localCopy.refreshLocalCopies.mockClear();
 
-    await act(async () => window.dispatchEvent(new Event('online')));
+    await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
 
     expect(localCopy.refreshLocalCopies).toHaveBeenCalledTimes(1);
   });
@@ -218,7 +219,7 @@ describe('App refreshes the local copies', () => {
     await renderApp();
     expect(screen.getByText('Sign in')).toBeInTheDocument();
 
-    await act(async () => window.dispatchEvent(new Event('online')));
+    await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
 
     expect(localCopy.refreshLocalCopies).not.toHaveBeenCalled();
   });
@@ -254,13 +255,14 @@ describe('App triggers the message-data refresh once the bundled rows are seeded
 describe('App refreshes the profile copy after the first-run name gate', () => {
   it('completing the display-name setup refreshes the profile copy', async () => {
     profile.lookupOwnDisplayName.mockResolvedValue({ status: 'unset' });
+    const user = userEvent.setup();
     await renderApp();
     // The gate is resolved from the auth listener, as on a real sign-in.
     await act(async () => auth.listener!(session()));
     const gate = await screen.findByText('Set your display name');
     localCopy.refreshLocalCopy.mockClear();
 
-    await act(async () => gate.click());
+    await user.click(gate);
 
     expect(localCopy.refreshLocalCopy).toHaveBeenCalledWith('profile');
   });
@@ -280,7 +282,7 @@ describe('App drains the love-note send queue', () => {
     await renderApp();
     drain().mockClear();
 
-    await act(async () => window.dispatchEvent(new Event('online')));
+    await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
 
     expect(drain()).toHaveBeenCalledTimes(1);
   });
@@ -310,7 +312,7 @@ describe('App drains the love-note send queue', () => {
       await renderApp();
       expect(screen.getByText('Sign in')).toBeInTheDocument();
 
-      await act(async () => window.dispatchEvent(new Event('online')));
+      await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
       await act(async () => {
         vi.advanceTimersByTime(5 * 60 * 1000);
       });

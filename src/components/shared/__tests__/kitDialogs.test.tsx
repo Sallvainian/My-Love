@@ -9,7 +9,8 @@
  * class list would be resolved by CSS order, not by string order, so each
  * dialog asserts it carries exactly one.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -91,7 +92,8 @@ describe('kit dialog class strings', () => {
 });
 
 describe('the delete dialogs scroll on a short screen', () => {
-  it('the anniversary delete panel', () => {
+  it('the anniversary delete panel', async () => {
+    const user = userEvent.setup();
     const settings = useAppStore.getState().settings!;
     useAppStore.setState({
       settings: {
@@ -104,7 +106,7 @@ describe('the delete dialogs scroll on a short screen', () => {
     } as Partial<AppState>);
     render(<AnniversarySettings />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete First date' }));
+    await user.click(screen.getByRole('button', { name: 'Delete First date' }));
 
     const panel = screen.getByRole('heading', { name: 'Delete Anniversary?' }).parentElement!;
     expect(panel).toHaveClass('max-h-full', 'overflow-y-auto', 'max-w-sm');

@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { domAnimation, LazyMotion } from 'motion/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { deleteDB } from 'idb';
@@ -120,9 +121,10 @@ describe('AdminPanel with the real local copy and store', () => {
     ['edit', 'admin-edit-form'],
     ['delete', 'admin-delete-dialog'],
   ] as const)('isolates A/B/A lists and removes the outgoing %s preview', async (dialog, previewTestId) => {
+    const user = userEvent.setup();
     panel();
     expect(screen.getAllByText('Account A message')).toHaveLength(1);
-    fireEvent.click(within(row('Account A message')).getByTestId(`message-row-${dialog}-button`));
+    await user.click(within(row('Account A message')).getByTestId(`message-row-${dialog}-button`));
     expect(screen.getByTestId(previewTestId)).toBeInTheDocument();
     await switchAccount(B);
     expect(screen.queryByText('Account A message')).toBeNull();
@@ -151,6 +153,7 @@ describe('AdminPanel with the real local copy and store', () => {
   });
 
   it('keeps deletion pending, prevents dismissal and duplicate submits, then closes after persisted success', async () => {
+    const user = userEvent.setup();
     panel();
     act(() => { useAppStore.setState({ currentMessage: useAppStore.getState().messages.find((message) => message.id === aId)! }); });
     const gate = deferred();
@@ -159,11 +162,11 @@ describe('AdminPanel with the real local copy and store', () => {
       await gate.promise;
       return realDelete(...args);
     });
-    fireEvent.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-cancel'));
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-backdrop'));
+    await user.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
+    await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
+    await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
+    await user.click(screen.getByTestId('admin-delete-dialog-cancel'));
+    await user.click(screen.getByTestId('admin-delete-dialog-backdrop'));
     // The server call follows a read of the saved copy, so it lands a moment later.
     await waitFor(() => expect(remove).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true');
@@ -178,27 +181,29 @@ describe('AdminPanel with the real local copy and store', () => {
   });
 
   it('reports failure accessibly, permits cancel, and retries a real delete', async () => {
+    const user = userEvent.setup();
     panel();
     const remove = vi.spyOn(customMessageService, 'deleteRemote').mockRejectedValueOnce(new Error('disk unavailable'));
-    fireEvent.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
+    await user.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
+    await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
     await screen.findByRole('alert');
     expect(screen.getByTestId('admin-delete-dialog-cancel')).toBeEnabled();
     expect(await diskRow(aId)).toBeDefined();
     expect(useAppStore.getState().customMessages.some((message) => message.id === aId)).toBe(true);
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
+    await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
     await waitFor(() => expect(screen.queryByTestId('admin-delete-dialog')).toBeNull());
     expect(remove).toHaveBeenCalledTimes(2);
     expect(await diskRow(aId)).toBeUndefined();
   });
 
   it('allows cancellation after a failed delete without removing the row', async () => {
+    const user = userEvent.setup();
     panel();
     vi.spyOn(customMessageService, 'deleteRemote').mockRejectedValueOnce(new Error('disk unavailable'));
-    fireEvent.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
+    await user.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
+    await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
     await screen.findByRole('alert');
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-cancel'));
+    await user.click(screen.getByTestId('admin-delete-dialog-cancel'));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(await diskRow(aId)).toMatchObject({
       id: 1000, text: 'Account A message', serverId: 'srv-account-a', userId: A, category: 'custom',
@@ -206,6 +211,7 @@ describe('AdminPanel with the real local copy and store', () => {
   });
 
   it('does not let an old completion close the new account’s dialog', async () => {
+    const user = userEvent.setup();
     panel();
     const gate = deferred();
     const realDelete = customMessageService.deleteRemote.bind(customMessageService);
@@ -213,10 +219,10 @@ describe('AdminPanel with the real local copy and store', () => {
       await gate.promise;
       return realDelete(...args);
     });
-    fireEvent.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
+    await user.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
+    await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
     await switchAccount(B);
-    fireEvent.click(within(row('Account B message')).getByTestId('message-row-delete-button'));
+    await user.click(within(row('Account B message')).getByTestId('message-row-delete-button'));
     await act(async () => { gate.resolve(); });
     await waitFor(async () => expect(await readMessageData(A)).toBeNull());
     expect(within(screen.getByRole('dialog')).getByText('Account B message')).toBeInTheDocument();
@@ -225,12 +231,13 @@ describe('AdminPanel with the real local copy and store', () => {
   });
 
   it('does not call success after a same-account session was replaced', async () => {
+    const user = userEvent.setup();
     const gate = deferred();
     vi.spyOn(customMessageService, 'deleteRemote').mockReturnValueOnce(gate.promise);
     const onConfirm = vi.fn();
     const preview: CustomMessage = { id: aId, text: 'Preview', category: 'custom', isCustom: true, active: true, createdAt: new Date().toISOString() };
     render(<LazyMotion features={domAnimation}><DeleteConfirmDialog message={preview} isOpen onConfirm={onConfirm} onCancel={() => {}} /></LazyMotion>);
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
+    await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
     act(() => { useAppStore.setState({ authSessionVersion: useAppStore.getState().authSessionVersion + 1 }); });
     await act(async () => { gate.resolve(); });
     expect(onConfirm).not.toHaveBeenCalled();
@@ -276,11 +283,12 @@ describe('AdminPanel offline (ticket 11)', () => {
   });
 
   it('create: the form shows the offline reason and keeps the text; nothing is added', async () => {
+    const user = userEvent.setup();
     panel();
     await refuseOffline();
-    fireEvent.click(screen.getByTestId('admin-create-button'));
-    fireEvent.change(screen.getByTestId('admin-create-form-text'), { target: { value: 'Not yet' } });
-    fireEvent.click(screen.getByTestId('admin-create-form-save'));
+    await user.click(screen.getByTestId('admin-create-button'));
+    await user.type(screen.getByTestId('admin-create-form-text'), 'Not yet');
+    await user.click(screen.getByTestId('admin-create-form-save'));
 
     expect(await screen.findByTestId('admin-create-form-error')).toHaveTextContent(OFFLINE);
     expect(screen.getByTestId('admin-create-form-text')).toHaveValue('Not yet');
@@ -291,11 +299,13 @@ describe('AdminPanel offline (ticket 11)', () => {
   });
 
   it('edit: the form shows the offline reason; the row is unchanged', async () => {
+    const user = userEvent.setup();
     panel();
     await refuseOffline();
-    fireEvent.click(within(row('Account A message')).getByTestId('message-row-edit-button'));
-    fireEvent.change(screen.getByTestId('admin-edit-form-text'), { target: { value: 'Changed' } });
-    fireEvent.click(screen.getByTestId('admin-edit-form-save'));
+    await user.click(within(row('Account A message')).getByTestId('message-row-edit-button'));
+    await user.clear(screen.getByTestId('admin-edit-form-text'));
+    await user.type(screen.getByTestId('admin-edit-form-text'), 'Changed');
+    await user.click(screen.getByTestId('admin-edit-form-save'));
 
     expect(await screen.findByTestId('admin-edit-form-error')).toHaveTextContent(OFFLINE);
     expect((await diskRow(aId))?.text).toBe('Account A message');
@@ -303,10 +313,11 @@ describe('AdminPanel offline (ticket 11)', () => {
   });
 
   it('delete: the dialog shows the offline reason; the row stays', async () => {
+    const user = userEvent.setup();
     panel();
     await refuseOffline();
-    fireEvent.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
-    fireEvent.click(screen.getByTestId('admin-delete-dialog-confirm'));
+    await user.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
+    await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(OFFLINE);
     expect(screen.getByTestId('admin-delete-dialog')).toBeInTheDocument();
@@ -315,6 +326,7 @@ describe('AdminPanel offline (ticket 11)', () => {
   });
 
   it('import: the alert gives the offline reason and does not blame the file', async () => {
+    const user = userEvent.setup();
     const alert = vi.fn();
     vi.stubGlobal('alert', alert);
     panel();
@@ -339,7 +351,7 @@ describe('AdminPanel offline (ticket 11)', () => {
       'messages.json',
       { type: 'application/json' }
     );
-    fireEvent.change(screen.getByTestId('import-file-input'), { target: { files: [file] } });
+    await user.upload(screen.getByTestId('import-file-input'), file);
 
     try {
       await waitFor(() => expect(alert).toHaveBeenCalledWith(OFFLINE));
@@ -366,6 +378,7 @@ describe('AdminPanel offline (ticket 11)', () => {
   ])(
     'import: an import that %s partway says how many were imported',
     async (_label, cause, reason) => {
+      const user = userEvent.setup();
       const alert = vi.fn();
       vi.stubGlobal('alert', alert);
       useAppStore.setState({
@@ -375,7 +388,7 @@ describe('AdminPanel offline (ticket 11)', () => {
       });
       panel();
       const file = new File(['{}'], 'messages.json', { type: 'application/json' });
-      fireEvent.change(screen.getByTestId('import-file-input'), { target: { files: [file] } });
+      await user.upload(screen.getByTestId('import-file-input'), file);
 
       try {
         await waitFor(() =>

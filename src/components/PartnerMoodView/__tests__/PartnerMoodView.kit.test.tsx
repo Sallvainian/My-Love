@@ -6,7 +6,8 @@
  * offline -> "Offline" subtitle, disabled refresh; the offline notice only when
  * no moods are listed (a saved copy is shown without it).
  */
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MoodEntry } from '../../../types';
 
@@ -260,12 +261,13 @@ describe('PartnerMoodView on the kit', () => {
     expect(state.loadPendingRequests).not.toHaveBeenCalled();
   });
 
-  it('online error card offers a retry that loads the partner again', () => {
+  it('online error card offers a retry that loads the partner again', async () => {
+    const user = userEvent.setup();
     state = makeState({ partner: null, partnerLoadError: true });
     render(<PartnerMoodView />);
     expect(state.loadPartner).toHaveBeenCalledTimes(1); // the mount load
 
-    fireEvent.click(screen.getByTestId('partner-load-retry'));
+    await user.click(screen.getByTestId('partner-load-retry'));
 
     expect(state.loadPartner).toHaveBeenCalledTimes(2);
   });

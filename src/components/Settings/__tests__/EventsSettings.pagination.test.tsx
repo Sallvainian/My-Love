@@ -1,5 +1,7 @@
 /** Explicit history paging, recoverable failures, and async view ownership. */
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import { StrictMode } from 'react';
 import type { Dispatch, HTMLAttributes, ReactNode, Ref, SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -147,10 +149,9 @@ async function renderSection(strict = false) {
   return view;
 }
 
-function activateHistory() {
+async function activateHistory(user: UserEvent) {
   const button = screen.getByTestId('events-settings-load-more');
-  button.focus();
-  fireEvent.click(button);
+  await user.click(button);
   return button;
 }
 
@@ -197,6 +198,7 @@ describe('EventsSettings explicit history', () => {
   });
 
   it('keeps loaded rows while busy, blocks duplicates, and makes a deep own row editable', async () => {
+    const user = userEvent.setup();
     const pending = deferredLoad();
     const loadMoreEvents = vi.fn(() => startPendingHistory(pending));
     setStore({ loadMoreEvents });
@@ -205,13 +207,13 @@ describe('EventsSettings explicit history', () => {
     expect(status).toHaveAttribute('role', 'status');
     expect(status).toHaveAttribute('aria-live', 'polite');
     expect(status).toHaveAttribute('aria-atomic', 'true');
-    const button = activateHistory();
+    const button = await activateHistory(user);
     expect(button).toHaveAccessibleName('Loading history…');
     expect(button).toBeDisabled();
     expect(status).toHaveTextContent('Loading history…');
     expect(screen.getByTestId('events-settings-load-region')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
-    fireEvent.click(button);
+    await user.click(button);
     expect(loadMoreEvents).toHaveBeenCalledTimes(1);
     // happy-dom refuses to blur disabled controls; reproduce Chromium's body
     // focus explicitly after the focused history control becomes disabled.
@@ -229,12 +231,13 @@ describe('EventsSettings explicit history', () => {
     expect(screen.getByTestId('events-settings-add')).toHaveFocus();
     expect(status).toHaveTextContent('3 events loaded. No more history to load.');
     expect(screen.queryByTestId('event-edit-partner')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Event deep' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Event deep' }));
     expect(screen.getByTestId('events-form-date')).toHaveValue('1999-12-31');
     expect(screen.getByTestId('events-form-description')).toHaveValue('Details deep');
   });
 
   it('keeps the same page retryable after failure without refreshing or hiding rows', async () => {
+    const user = userEvent.setup();
     const failedPage = deferredLoad();
     const retriedPage = deferredLoad();
     const loadEvents = vi.fn(async () => loadOk);
@@ -243,7 +246,7 @@ describe('EventsSettings explicit history', () => {
       .mockImplementationOnce(() => startPendingHistory(retriedPage));
     setStore({ loadEvents, loadMoreEvents });
     await renderSection();
-    activateHistory();
+    await activateHistory(user);
     document.body.focus();
     await settleHistory(failedPage, loadFailed);
 
@@ -255,7 +258,7 @@ describe('EventsSettings explicit history', () => {
     expect(screen.getByRole('button', { name: 'Retry loading history' })).toHaveFocus();
     expect(screen.getByTestId('events-settings-history-status')).toBeEmptyDOMElement();
 
-    const retry = activateHistory();
+    const retry = await activateHistory(user);
     expect(retry).toBeDisabled();
     document.body.focus();
     expect(screen.queryByTestId('events-settings-history-error')).not.toBeInTheDocument();
@@ -274,22 +277,24 @@ describe('EventsSettings explicit history', () => {
   });
 
   it('disables history while a full refresh is in flight', async () => {
+    const user = userEvent.setup();
     const loadMoreEvents = vi.fn(async () => loadOk);
     setStore({ eventsIsLoading: true, loadMoreEvents });
     await renderSection();
     expect(screen.getByTestId('events-settings-load-more')).toBeDisabled();
-    fireEvent.click(screen.getByTestId('events-settings-load-more'));
+    await user.click(screen.getByTestId('events-settings-load-more'));
     expect(loadMoreEvents).not.toHaveBeenCalled();
   });
 
   it('keeps focus in an edit form opened while the final history page loads', async () => {
+    const user = userEvent.setup();
     const pending = deferredLoad();
     setStore({ loadMoreEvents: vi.fn(() => startPendingHistory(pending)) });
     await renderSection();
-    activateHistory();
-    fireEvent.click(screen.getByTestId('event-edit-mine'));
+    await activateHistory(user);
+    await user.click(screen.getByTestId('event-edit-mine'));
     const input = screen.getByTestId('events-form-label');
-    input.focus();
+    expect(input).toHaveFocus();
     await settleHistory(pending, loadOk, { eventsPagination: pagination(false, false) });
     expect(input).toHaveFocus();
   });
@@ -298,17 +303,18 @@ describe('EventsSettings explicit history', () => {
     const pending = deferredLoad();
     setStore({ loadMoreEvents: vi.fn(() => startPendingHistory(pending)) });
     await renderSection();
-    fireEvent.click(screen.getByTestId('events-settings-load-more'));
+    fireEvent.click(screen.getByTestId('events-settings-load-more')); // raw click: the premise is an activation that never focuses the control, and user.click focuses it on mousedown
     expect(document.body).toHaveFocus();
     await settleHistory(pending, loadOk, { eventsPagination: pagination(false, false) });
     expect(document.body).toHaveFocus();
   });
 
   it('announces final exhaustion even when a sparse page adds no readable rows', async () => {
+    const user = userEvent.setup();
     const pending = deferredLoad();
     setStore({ events: [], loadMoreEvents: vi.fn(() => startPendingHistory(pending)) });
     await renderSection();
-    activateHistory();
+    await activateHistory(user);
     await settleHistory(pending, loadOk, { eventsPagination: pagination(false, false) });
     expect(screen.getByTestId('events-settings-history-status')).toHaveTextContent(
       '0 events loaded. No more history to load.'
@@ -316,17 +322,16 @@ describe('EventsSettings explicit history', () => {
   });
 
   it('preserves edit mode, draft values, and the save target when a refresh removes the paged row', async () => {
+    const user = userEvent.setup();
     const editEvent = vi.fn(async () => ({ success: true } as const));
     const addEvent = vi.fn(async () => ({ success: true } as const));
     setStore({ events: [makeEvent('deep'), makeEvent()], editEvent, addEvent });
     await renderSection();
-    fireEvent.click(screen.getByTestId('event-edit-deep'));
-    fireEvent.change(screen.getByTestId('events-form-label'), {
-      target: { value: 'Corrected old event' },
-    });
-    fireEvent.change(screen.getByTestId('events-form-date'), {
-      target: { value: '1999-12-31' },
-    });
+    await user.click(screen.getByTestId('event-edit-deep'));
+    await user.clear(screen.getByTestId('events-form-label'));
+    await user.type(screen.getByTestId('events-form-label'), 'Corrected old event');
+    await user.clear(screen.getByTestId('events-form-date'));
+    await user.type(screen.getByTestId('events-form-date'), '1999-12-31');
 
     await act(async () => {
       store.patch({ eventsIsLoading: true });
@@ -340,9 +345,7 @@ describe('EventsSettings explicit history', () => {
     expect(screen.getByTestId('events-form-label')).toHaveValue('Corrected old event');
     expect(screen.getByTestId('events-form-date')).toHaveValue('1999-12-31');
     expect(screen.getByTestId('events-form-description')).toHaveValue('Details deep');
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('events-form-submit'));
-    });
+    await user.click(screen.getByTestId('events-form-submit'));
     expect(editEvent).toHaveBeenCalledWith('deep', {
       label: 'Corrected old event',
       eventDate: '1999-12-31',
@@ -353,6 +356,7 @@ describe('EventsSettings explicit history', () => {
   });
 
   it('releases a superseded page before it settles and prevents it from releasing a newer page', async () => {
+    const user = userEvent.setup();
     const pending = deferredLoad();
     const currentPage = deferredLoad();
     const loadMoreEvents = vi.fn(() => startPendingHistory(pending))
@@ -360,7 +364,7 @@ describe('EventsSettings explicit history', () => {
       .mockImplementationOnce(() => startPendingHistory(currentPage));
     setStore({ loadMoreEvents });
     await renderSection();
-    const button = activateHistory();
+    const button = await activateHistory(user);
     await act(async () => {
       store.patch({ eventsIsLoading: true, eventsIsLoadingMore: false, eventsHistoryError: null });
     });
@@ -370,7 +374,7 @@ describe('EventsSettings explicit history', () => {
     // the current list ready for another page without waiting on that request.
     expect(button).toBeEnabled();
     expect(screen.getByTestId('events-settings-load-region')).toHaveAttribute('aria-busy', 'false');
-    activateHistory();
+    await activateHistory(user);
     stateSetterCalls.mockClear();
     const focus = vi.spyOn(HTMLElement.prototype, 'focus');
     try {
@@ -391,10 +395,11 @@ describe('EventsSettings explicit history', () => {
 
 describe('EventsSettings history ownership', () => {
   it.each([loadOk, loadFailed, loadStale])('ignores $status settlement after unmount', async (outcome) => {
+    const user = userEvent.setup();
     const pending = deferredLoad();
     setStore({ loadMoreEvents: vi.fn(() => startPendingHistory(pending)) });
     const view = await renderSection();
-    activateHistory();
+    await activateHistory(user);
     view.unmount();
     stateSetterCalls.mockClear();
     const focus = vi.spyOn(HTMLElement.prototype, 'focus');
@@ -408,6 +413,7 @@ describe('EventsSettings history ownership', () => {
   });
 
   it.each(['user-own', 'user-next'])('does not settle into a newer %s session or release its request', async (userId) => {
+    const user = userEvent.setup();
     const oldPage = deferredLoad();
     const currentPage = deferredLoad();
     const loadMoreEvents = vi.fn(() => startPendingHistory(oldPage))
@@ -415,7 +421,7 @@ describe('EventsSettings history ownership', () => {
       .mockImplementationOnce(() => startPendingHistory(currentPage));
     setStore({ loadMoreEvents });
     await renderSection();
-    activateHistory();
+    await activateHistory(user);
 
     await act(async () => {
       store.patch({
@@ -428,7 +434,7 @@ describe('EventsSettings history ownership', () => {
       });
     });
     expect(screen.getByTestId('events-settings-load-more')).toBeEnabled();
-    const currentButton = activateHistory();
+    const currentButton = await activateHistory(user);
     stateSetterCalls.mockClear();
     const focus = vi.spyOn(HTMLElement.prototype, 'focus');
     try {
@@ -449,10 +455,11 @@ describe('EventsSettings history ownership', () => {
   });
 
   it('settles history after StrictMode replays mount effects', async () => {
+    const user = userEvent.setup();
     const pending = deferredLoad();
     setStore({ loadMoreEvents: vi.fn(() => startPendingHistory(pending)) });
     await renderSection(true);
-    activateHistory();
+    await activateHistory(user);
     await settleHistory(pending, loadFailed);
     expect(screen.getByRole('button', { name: 'Retry loading history' })).toBeEnabled();
     expect(screen.getByTestId('events-settings-history-error')).toBeInTheDocument();

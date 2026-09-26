@@ -6,7 +6,8 @@
  * nothing happen. The input also kept the rejected file as its value, so
  * picking the same file again fired no change event.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -42,19 +43,6 @@ import { PhotoUpload } from '../PhotoUpload';
 
 const REJECTION = 'Unsupported file type. Please choose a JPEG, PNG or WebP image.';
 
-/**
- * Pick `file` in the hidden input. The value is a spy, as a file input's value
- * cannot be set from script: it reports the picked file and records resets.
- */
-function pick(input: HTMLInputElement, file: File, valueWrites: string[]) {
-  Object.defineProperty(input, 'value', {
-    configurable: true,
-    get: () => `C:\\fakepath\\${file.name}`,
-    set: (v: string) => valueWrites.push(v),
-  });
-  fireEvent.change(input, { target: { files: [file] } });
-}
-
 beforeEach(() => {
   URL.createObjectURL = vi.fn(() => 'blob:preview');
   URL.revokeObjectURL = vi.fn();
@@ -66,20 +54,33 @@ afterEach(() => {
 });
 
 describe('PhotoUpload: a rejected file (DW-202)', () => {
-  it('says why, clears the input for a re-pick, and clears the error on a valid file', () => {
+  it('says why, clears the input for a re-pick, and clears the error on a valid file', async () => {
+    // applyAccept off: the GIF must reach the validator, not be dropped by the
+    // input's accept list before any change fires.
+    const user = userEvent.setup({ applyAccept: false });
     render(<PhotoUpload isOpen onClose={vi.fn()} />);
     const input = screen.getByTestId('photo-upload-file-input') as HTMLInputElement;
-    const valueWrites: string[] = [];
+    const gif = new File(['x'], 'scan.gif', { type: 'image/gif' });
 
     validateImageFile.mockReturnValueOnce({ valid: false, error: REJECTION });
-    pick(input, new File(['x'], 'scan.gif', { type: 'image/gif' }), valueWrites);
+    await user.upload(input, gif);
 
     expect(screen.getByRole('alert')).toHaveTextContent(REJECTION);
     expect(screen.getByTestId('photo-upload-select-button')).toBeInTheDocument();
-    expect(valueWrites).toEqual(['']);
+    // user-event reports the picked file as the input's value until the
+    // component resets it.
+    expect(input.value).toBe('');
+    expect(input.files).toHaveLength(0);
+
+    // So picking the same file again fires a change: user-event, like a
+    // browser, fires none while the input still holds that file.
+    validateImageFile.mockReturnValueOnce({ valid: false, error: REJECTION });
+    await user.upload(input, gif);
+    expect(validateImageFile).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('alert')).toHaveTextContent(REJECTION);
 
     validateImageFile.mockReturnValueOnce({ valid: true });
-    pick(input, new File(['x'], 'beach.jpg', { type: 'image/jpeg' }), valueWrites);
+    await user.upload(input, new File(['x'], 'beach.jpg', { type: 'image/jpeg' }));
 
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByTestId('photo-upload-preview-image')).toBeInTheDocument();

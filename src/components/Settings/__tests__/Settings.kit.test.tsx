@@ -9,7 +9,8 @@
  * store (signed out, so neither loads anything) because the headings under
  * test are theirs.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import pkg from '../../../../package.json';
@@ -80,12 +81,13 @@ describe('Settings on the kit', () => {
   });
 
   it('replays the welcome message from About when a handler is passed', async () => {
+    const user = userEvent.setup();
     const onShowWelcome = vi.fn();
     await renderSettings({ onShowWelcome });
 
     const replay = screen.getByTestId('settings-replay-welcome');
     expect(replay).toHaveTextContent('Replay welcome message');
-    fireEvent.click(replay);
+    await user.click(replay);
     expect(onShowWelcome).toHaveBeenCalledTimes(1);
   });
 
@@ -103,6 +105,7 @@ describe('Settings on the kit', () => {
   });
 
   it('disables the Sign out row and says so while the sign-out is in flight', async () => {
+    const user = userEvent.setup();
     let release: (() => void) | undefined;
     backend.signOut.mockImplementation(
       () => new Promise<void>((resolve) => (release = resolve))
@@ -111,7 +114,7 @@ describe('Settings on the kit', () => {
 
     const signOut = screen.getByTestId('settings-sign-out');
     expect(signOut).toHaveTextContent('Sign out');
-    fireEvent.click(signOut);
+    await user.click(signOut);
 
     await waitFor(() => expect(signOut).toBeDisabled());
     expect(signOut).toHaveTextContent('Signing out…');
@@ -122,11 +125,12 @@ describe('Settings on the kit', () => {
   });
 
   it('shows a kit alert and re-enables the row when the sign-out fails', async () => {
+    const user = userEvent.setup();
     backend.signOut.mockRejectedValue(new Error('network down'));
     await renderSettings();
 
     const signOut = screen.getByTestId('settings-sign-out');
-    fireEvent.click(signOut);
+    await user.click(signOut);
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Failed to sign out. Please try again.');

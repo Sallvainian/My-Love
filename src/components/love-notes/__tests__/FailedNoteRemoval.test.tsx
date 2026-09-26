@@ -11,7 +11,9 @@
  * the note queue (on fake-indexeddb). Only Supabase, the hook's fetching and
  * realtime, and the composer are replaced.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { create, useStore, type StateCreator, type StoreApi } from 'zustand';
@@ -133,8 +135,8 @@ async function renderScreen() {
   await act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
 }
 
-async function openRemoval(text: string) {
-  fireEvent.click(within(bubbleWith(text)).getByTestId('note-remove-button'));
+async function openRemoval(user: UserEvent, text: string) {
+  await user.click(within(bubbleWith(text)).getByTestId('note-remove-button'));
   return screen.findByTestId('note-remove-confirmation');
 }
 
@@ -159,12 +161,13 @@ describe('deleting a note that failed to send', () => {
   });
 
   it('confirming removes the note from the screen and its row from the queue', async () => {
+    const user = userEvent.setup();
     await renderScreen();
 
-    const dialog = await openRemoval('this one was refused');
+    const dialog = await openRemoval(user, 'this one was refused');
     expect(within(dialog).getByText(/failed to send\. It will be deleted from this device/)).toBeInTheDocument();
 
-    fireEvent.click(within(dialog).getByTestId('note-remove-confirm'));
+    await user.click(within(dialog).getByTestId('note-remove-confirm'));
 
     await waitFor(() => expect(screen.queryByTestId('note-remove-confirmation')).toBeNull());
     expect(holder.store.getState().notes.map((note) => note.id)).toEqual([sent.id]);
@@ -175,10 +178,11 @@ describe('deleting a note that failed to send', () => {
   });
 
   it('cancelling keeps the note and its queue row', async () => {
+    const user = userEvent.setup();
     await renderScreen();
 
-    const dialog = await openRemoval('this one was refused');
-    fireEvent.click(within(dialog).getByText('Cancel'));
+    const dialog = await openRemoval(user, 'this one was refused');
+    await user.click(within(dialog).getByText('Cancel'));
 
     await waitFor(() => expect(screen.queryByTestId('note-remove-confirmation')).toBeNull());
     expect(holder.store.getState().notes.map((note) => note.id)).toEqual([sent.id, TEMP_ID]);
@@ -188,9 +192,10 @@ describe('deleting a note that failed to send', () => {
   });
 
   it('refuses the delete, keeping the note and its row, when it is sending again', async () => {
+    const user = userEvent.setup();
     await renderScreen();
 
-    const dialog = await openRemoval('this one was refused');
+    const dialog = await openRemoval(user, 'this one was refused');
     // A Retry from elsewhere (another tab's drain, a tap before the dialog)
     // puts it back on the wire while the dialog is open.
     act(() => {
@@ -201,7 +206,7 @@ describe('deleting a note that failed to send', () => {
       }));
     });
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    fireEvent.click(within(dialog).getByTestId('note-remove-confirm'));
+    await user.click(within(dialog).getByTestId('note-remove-confirm'));
 
     await waitFor(() =>
       expect(within(dialog).getByRole('alert')).toHaveTextContent('That message is sending again')
@@ -212,12 +217,13 @@ describe('deleting a note that failed to send', () => {
   });
 
   it('a sent note still goes through removeNote, leaving the failed one alone', async () => {
+    const user = userEvent.setup();
     await renderScreen();
 
-    const dialog = await openRemoval('this one arrived');
+    const dialog = await openRemoval(user, 'this one arrived');
     expect(within(dialog).getByText(/your partner keeps their copy/i)).toBeInTheDocument();
 
-    fireEvent.click(within(dialog).getByTestId('note-remove-confirm'));
+    await user.click(within(dialog).getByTestId('note-remove-confirm'));
 
     await waitFor(() => expect(screen.queryByTestId('note-remove-confirmation')).toBeNull());
     expect(holder.removalUpserts).toEqual([{ user_id: USER_ID, note_id: sent.id }]);

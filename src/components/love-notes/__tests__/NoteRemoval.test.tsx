@@ -12,7 +12,8 @@
  *    the partner, so a user who misreads it as "delete for both" cannot find out
  *    they were wrong and cannot undo it.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useRef, useState, type HTMLAttributes, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoveNote } from '../../../types/models';
@@ -72,23 +73,25 @@ function renderBubble(
 describe('remove control on a message bubble', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('offers removal on a message that has a server row', () => {
+  it('offers removal on a message that has a server row', async () => {
+    const user = userEvent.setup();
     const onRequestRemove = vi.fn();
     renderBubble(committed, onRequestRemove);
 
-    fireEvent.click(screen.getByTestId('note-remove-button'));
+    await user.click(screen.getByTestId('note-remove-button'));
 
     expect(onRequestRemove).toHaveBeenCalledWith(committed);
   });
 
-  it('offers removal on a message the partner sent, not just your own', () => {
+  it('offers removal on a message the partner sent, not just your own', async () => {
+    const user = userEvent.setup();
     const onRequestRemove = vi.fn();
     // Narrowing this to own messages only would be a plausible edit and would
     // silently drop half the feature — the spec is explicit that a user can
     // remove a message they received.
     renderBubble({ ...committed, from_user_id: 'user-b', to_user_id: 'user-a' }, onRequestRemove, false);
 
-    fireEvent.click(screen.getByTestId('note-remove-button'));
+    await user.click(screen.getByTestId('note-remove-button'));
 
     expect(onRequestRemove).toHaveBeenCalled();
   });
@@ -105,12 +108,13 @@ describe('remove control on a message bubble', () => {
     expect(screen.queryByTestId('note-remove-button')).toBeNull();
   });
 
-  it('offers removal on a failed send, handing over the note with its temp id', () => {
+  it('offers removal on a failed send, handing over the note with its temp id', async () => {
+    const user = userEvent.setup();
     const failed = { ...committed, id: 'temp-1-abc', tempId: 'temp-1-abc', error: true };
     const onRequestRemove = vi.fn();
     renderBubble(failed, onRequestRemove);
 
-    fireEvent.click(screen.getByTestId('note-remove-button'));
+    await user.click(screen.getByTestId('note-remove-button'));
 
     expect(onRequestRemove).toHaveBeenCalledWith(failed);
     // Retry stays exactly as it was.
@@ -165,7 +169,8 @@ describe('remove confirmation dialog', () => {
     expect(screen.getByText(/cannot undo/i)).toBeInTheDocument();
   });
 
-  it('leaves the message alone when cancelled', () => {
+  it('leaves the message alone when cancelled', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     const onConfirmRemove = vi.fn();
     render(
@@ -177,7 +182,7 @@ describe('remove confirmation dialog', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Cancel'));
+    await user.click(screen.getByText('Cancel'));
 
     expect(onConfirmRemove).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
@@ -214,6 +219,7 @@ describe('remove confirmation dialog', () => {
   });
 
   it('lands focus on the thread when the row that opened it is removed', async () => {
+    const user = userEvent.setup();
     // The success path. Confirming unmounts the row and the control that opened
     // this dialog with it, so restoring to the opener is a no-op and focus would
     // fall to <body> -- losing a keyboard user's place entirely.
@@ -245,11 +251,10 @@ describe('remove confirmation dialog', () => {
 
     render(<Harness />);
     const trigger = screen.getByTestId('trigger');
-    trigger.focus();
-    fireEvent.click(trigger);
+    await user.click(trigger);
 
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
-    fireEvent.click(screen.getByTestId('note-remove-confirm'));
+    await user.click(screen.getByTestId('note-remove-confirm'));
 
     // Gate on focus itself. onConfirmRemove drops the row and onClose closes the
     // dialog in two separate commits, and which lands first is not fixed -- so
@@ -260,6 +265,7 @@ describe('remove confirmation dialog', () => {
   });
 
   it('still lands focus when the removal empties the thread entirely', async () => {
+    const user = userEvent.setup();
     // Removing your last visible note is the case an earlier version got wrong.
     // It asked `opener.isConnected` at cleanup to decide whether the opener had
     // survived, but React runs cleanups against a DOM it has not finished
@@ -298,17 +304,17 @@ describe('remove confirmation dialog', () => {
 
     render(<Harness />);
     const trigger = screen.getByTestId('trigger');
-    trigger.focus();
-    fireEvent.click(trigger);
+    await user.click(trigger);
 
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
-    fireEvent.click(screen.getByTestId('note-remove-confirm'));
+    await user.click(screen.getByTestId('note-remove-confirm'));
 
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('thread')));
     expect(screen.getByTestId('empty-state')).toBeInTheDocument();
   });
 
   it('leaves the fallback alone when the user cancels, so the opener keeps focus', async () => {
+    const user = userEvent.setup();
     // The counterpart. Cancelling must NOT route through the fallback -- the
     // opener is still there and useFocusTrap restores it. If this ever lands on
     // the thread wrapper instead, the success flag is being set too eagerly.
@@ -334,17 +340,17 @@ describe('remove confirmation dialog', () => {
 
     render(<Harness />);
     const trigger = screen.getByTestId('trigger');
-    trigger.focus();
-    fireEvent.click(trigger);
+    await user.click(trigger);
 
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
-    fireEvent.click(screen.getByText('Cancel'));
+    await user.click(screen.getByText('Cancel'));
 
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('trigger')));
     expect(screen.queryByText('Cancel')).toBeNull();
   });
 
   it('closes on Escape and takes focus off the trash button behind the overlay', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     const onConfirmRemove = vi.fn();
     render(
@@ -359,15 +365,16 @@ describe('remove confirmation dialog', () => {
     // Cancel takes initial focus because this cannot be undone.
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
 
-    // useFocusTrap listens on the dialog container, so the event has to start
-    // where focus actually is and bubble — which is what a real keypress does.
-    fireEvent.keyDown(screen.getByText('Cancel'), { key: 'Escape' });
+    // useFocusTrap listens on the dialog container; the keypress starts where
+    // focus actually is (Cancel) and bubbles up to it.
+    await user.keyboard('{Escape}');
 
     expect(onClose).toHaveBeenCalled();
     expect(onConfirmRemove).not.toHaveBeenCalled();
   });
 
   it('does not yank focus back to Cancel when the parent re-renders', async () => {
+    const user = userEvent.setup();
     // LoveNotes passes `onClose={() => setNotePendingRemoval(null)}` — a fresh
     // arrow on every render — so any parent re-render while the dialog is open
     // (a realtime note arriving is enough) changes the identity useFocusTrap
@@ -378,7 +385,7 @@ describe('remove confirmation dialog', () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
 
     // the user tabs to the destructive button and pauses
-    screen.getByTestId('note-remove-confirm').focus();
+    await user.tab();
     expect(document.activeElement).toBe(screen.getByTestId('note-remove-confirm'));
 
     rerender(
@@ -389,6 +396,7 @@ describe('remove confirmation dialog', () => {
   });
 
   it('keeps focus inside the dialog while the removal is in flight', async () => {
+    const user = userEvent.setup();
     let release: (() => void) | undefined;
     const pending = new Promise<void>((resolve) => {
       release = () => resolve();
@@ -405,8 +413,7 @@ describe('remove confirmation dialog', () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
 
     const confirm = screen.getByTestId('note-remove-confirm');
-    confirm.focus();
-    fireEvent.click(confirm);
+    await user.click(confirm);
 
     // isRemoving is now true, which disables BOTH buttons. A real browser drops
     // focus to <body> when the focused element becomes disabled (verified in
@@ -421,6 +428,7 @@ describe('remove confirmation dialog', () => {
   });
 
   it('removes only on the confirming action, then closes', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     const onConfirmRemove = vi.fn(async () => undefined);
     render(
@@ -432,13 +440,14 @@ describe('remove confirmation dialog', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('note-remove-confirm'));
+    await user.click(screen.getByTestId('note-remove-confirm'));
 
     await waitFor(() => expect(onConfirmRemove).toHaveBeenCalledWith(committed.id));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   it('shows the actual reason rather than advice that cannot work', async () => {
+    const user = userEvent.setup();
     // removeNote throws user-facing messages, and some of them mean a retry can
     // never succeed — a note that has left the loaded window throws on every
     // attempt. A fixed "please try again" sent the user round a loop.
@@ -453,7 +462,7 @@ describe('remove confirmation dialog', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('note-remove-confirm'));
+    await user.click(screen.getByTestId('note-remove-confirm'));
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('That message is no longer loaded')
@@ -461,6 +470,7 @@ describe('remove confirmation dialog', () => {
   });
 
   it('keeps the dialog open and explains itself when the removal fails', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     const onConfirmRemove = vi.fn(async () => {
       throw new Error('nope');
@@ -474,7 +484,7 @@ describe('remove confirmation dialog', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('note-remove-confirm'));
+    await user.click(screen.getByTestId('note-remove-confirm'));
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(onClose).not.toHaveBeenCalled();
@@ -492,7 +502,8 @@ describe('the wiring from list to dialog', () => {
   // destructure, the rowProps object, MessageRow, and LoveNoteMessage — so
   // dropping it anywhere typechecks, leaves both other suites green, and removes
   // the feature. This is the only test that notices.
-  it('carries the request from a rendered row out to the caller', () => {
+  it('carries the request from a rendered row out to the caller', async () => {
+    const user = userEvent.setup();
     const onRequestRemove = vi.fn();
 
     render(
@@ -506,7 +517,7 @@ describe('the wiring from list to dialog', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('note-remove-button'));
+    await user.click(screen.getByTestId('note-remove-button'));
 
     expect(onRequestRemove).toHaveBeenCalledWith(committed);
   });

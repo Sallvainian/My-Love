@@ -3,7 +3,8 @@
  * off, saved in localStorage and read by the background photo fill. Its helper
  * text depends on whether the browser reports the connection type.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -104,16 +105,17 @@ describe('Settings: Download photos over mobile data', () => {
   });
 
   it('toggles and saves the choice on this device', async () => {
+    const user = userEvent.setup();
     setConnection(Object.assign(new EventTarget(), { type: 'cellular' }));
     await renderSettings();
     const row = screen.getByRole('switch', { name: 'Download photos over mobile data' });
 
-    fireEvent.click(row);
+    await user.click(row);
     expect(row).toHaveAttribute('aria-checked', 'true');
     expect(localStorage.getItem(PHOTOS_OVER_MOBILE_DATA_KEY)).toBe('true');
     expect(getPhotosOverMobileData()).toBe(true);
 
-    fireEvent.click(row);
+    await user.click(row);
     expect(row).toHaveAttribute('aria-checked', 'false');
     expect(localStorage.getItem(PHOTOS_OVER_MOBILE_DATA_KEY)).toBe('false');
     expect(getPhotosOverMobileData()).toBe(false);
@@ -129,12 +131,23 @@ describe('Settings: Download photos over mobile data', () => {
   });
 
   it('is a native button, so Enter and Space reach it from the keyboard', async () => {
+    const user = userEvent.setup();
     await renderSettings();
     const row = screen.getByRole('switch', { name: 'Download photos over mobile data' });
 
     expect(row.tagName).toBe('BUTTON');
     expect(row).toHaveAttribute('type', 'button');
-    row.focus();
+    // The click that focuses it also turns it on; the keys then flip it back and forth.
+    await user.click(row);
     expect(row).toHaveFocus();
+    expect(row).toHaveAttribute('aria-checked', 'true');
+
+    await user.keyboard('{Enter}');
+    expect(row).toHaveAttribute('aria-checked', 'false');
+    expect(getPhotosOverMobileData()).toBe(false);
+
+    await user.keyboard(' ');
+    expect(row).toHaveAttribute('aria-checked', 'true');
+    expect(getPhotosOverMobileData()).toBe(true);
   });
 });

@@ -7,6 +7,7 @@
  * follow the OS theme.
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createElement, forwardRef, type ComponentType, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -228,7 +229,8 @@ describe('ErrorBoundary fallback on the kit', () => {
 });
 
 describe('ViewErrorBoundary fallback on the kit', () => {
-  it('renders the view error on a kit card with primary Try Again and secondary Go Home', () => {
+  it('renders the view error on a kit card with primary Try Again and secondary Go Home', async () => {
+    const user = userEvent.setup();
     const onNavigateHome = vi.fn();
     const { container } = render(
       <ViewErrorBoundary viewName="photos" onNavigateHome={onNavigateHome}>
@@ -249,7 +251,7 @@ describe('ViewErrorBoundary fallback on the kit', () => {
     expect(screen.getByTestId('error-try-again')).toHaveClass('bg-fill');
     const goHome = screen.getByTestId('error-go-home');
     expect(goHome).toHaveClass('bg-tint', 'text-accent');
-    fireEvent.click(goHome);
+    await user.click(goHome);
     expect(onNavigateHome).toHaveBeenCalledTimes(1);
     expectOnKit(container.innerHTML);
   });
@@ -283,7 +285,8 @@ describe('ViewErrorBoundary fallback on the kit', () => {
 });
 
 describe('WelcomeSplash on the kit', () => {
-  it('renders a page ground, lucide heart rain, a kit card and a primary Continue', () => {
+  it('renders a page ground, lucide heart rain, a kit card and a primary Continue', async () => {
+    const user = userEvent.setup();
     const onContinue = vi.fn();
     const { container } = render(<WelcomeSplash onContinue={onContinue} />);
 
@@ -303,7 +306,7 @@ describe('WelcomeSplash on the kit', () => {
     const continueButton = screen.getByTestId('welcome-continue-button');
     expect(continueButton).toHaveClass('bg-fill', 'text-white', 'rounded-full');
     expect(continueButton.querySelector('svg')).not.toBeNull();
-    fireEvent.click(continueButton);
+    await user.click(continueButton);
     expect(onContinue).toHaveBeenCalledTimes(1);
     expectOnKit(container.innerHTML);
   });
@@ -339,7 +342,7 @@ describe('DisplayNameSetup on the kit', () => {
 
     expect(screen.getByTestId('display-name-cancel')).toHaveClass('bg-tint', 'text-accent');
     expect(screen.getByTestId('display-name-submit')).toHaveClass('bg-fill');
-    fireEvent.submit(container.querySelector('form')!);
+    fireEvent.submit(container.querySelector('form')!); // raw submit: happy-dom applies minLength to the prefilled 2-char name and blocks a click-driven submit (a browser would not, as the value was never user-edited), so the component's own length check never runs
 
     const error = screen.getByTestId('display-name-error');
     expect(error).toHaveAttribute('role', 'alert');

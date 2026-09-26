@@ -7,6 +7,7 @@
  * theme.
  */
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LoginScreen } from '../LoginScreen';
 
@@ -93,7 +94,7 @@ describe('LoginScreen on the kit', () => {
   it('shows a validation error in the card on the kit failure surface, with a danger ring', () => {
     const { container } = render(<LoginScreen />);
 
-    fireEvent.submit(container.querySelector('form')!);
+    fireEvent.submit(container.querySelector('form')!); // raw submit: the submit button is disabled while a field is empty, so no click reaches the empty-fields check
 
     const error = screen.getByTestId('login-error');
     expect(error).toHaveAttribute('role', 'alert');
@@ -117,15 +118,14 @@ describe('LoginScreen on the kit', () => {
   });
 
   it('keeps the mapped credential message and shows a lucide spinner while signing in', async () => {
+    const user = userEvent.setup();
     let settle!: (value: unknown) => void;
     actions.signIn.mockReturnValue(new Promise((resolve) => (settle = resolve)));
     const { container } = render(<LoginScreen />);
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
-      target: { value: 'person@example.com' },
-    });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong-pass' } });
-    fireEvent.click(screen.getByTestId('submit-button'));
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'person@example.com');
+    await user.type(screen.getByLabelText('Password'), 'wrong-pass');
+    await user.click(screen.getByTestId('submit-button'));
 
     const submit = screen.getByTestId('submit-button');
     expect(submit).toHaveTextContent('Signing in...');
@@ -144,14 +144,13 @@ describe('LoginScreen on the kit', () => {
   // DW-197: while the Google redirect is pending nothing else on the screen
   // may start a second, competing action.
   it('disables every other control while the Google redirect is pending', async () => {
+    const user = userEvent.setup();
     actions.signInWithGoogle.mockReturnValue(new Promise(() => {}));
     render(<LoginScreen />);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
-      target: { value: 'person@example.com' },
-    });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-pass' } });
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'person@example.com');
+    await user.type(screen.getByLabelText('Password'), 'secret-pass');
 
-    await act(async () => fireEvent.click(screen.getByTestId('google-signin-button')));
+    await user.click(screen.getByTestId('google-signin-button'));
 
     expect(screen.getByTestId('google-signin-button')).toHaveTextContent('Redirecting to Google...');
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeDisabled();
@@ -159,11 +158,12 @@ describe('LoginScreen on the kit', () => {
     expect(screen.getByTestId('submit-button')).toBeDisabled();
     const contact = screen.getByRole('button', { name: 'Contact admin' });
     expect(contact).toBeDisabled();
-    fireEvent.click(contact);
+    await user.click(contact);
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument();
   });
 
-  it('shows the callback notice on card2 in ink with an icon, and retires it on the next attempt', () => {
+  it('shows the callback notice on card2 in ink with an icon, and retires it on the next attempt', async () => {
+    const user = userEvent.setup();
     const { container } = render(<LoginScreen callbackOutcome="cancelled" />);
 
     const notice = screen.getByTestId('login-notice');
@@ -173,7 +173,13 @@ describe('LoginScreen on the kit', () => {
     expect(container.querySelector('.bg-card')).toContainElement(notice);
     expectOnKit(container.innerHTML);
 
-    fireEvent.submit(container.querySelector('form')!);
+    // Natively a valid email, but the component's own check wants a dotted
+    // domain: the attempt fails validation and still retires the notice.
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'person@localhost');
+    await user.type(screen.getByLabelText('Password'), 'secret-pass');
+    await user.click(screen.getByTestId('submit-button'));
+    expect(screen.getByTestId('login-error')).toHaveTextContent('Please enter a valid email address');
     expect(screen.queryByTestId('login-notice')).not.toBeInTheDocument();
+    expect(actions.signIn).not.toHaveBeenCalled();
   });
 });

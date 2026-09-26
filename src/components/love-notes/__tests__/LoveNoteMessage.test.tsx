@@ -8,6 +8,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { Dispatch, HTMLAttributes, ReactNode, SetStateAction } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoveNote } from '../../../types/models';
@@ -501,6 +502,7 @@ describe('LoveNoteMessage', () => {
 
   describe('Full Screen Image Viewer', () => {
     it('should open full-screen viewer when image is clicked', async () => {
+      const user = userEvent.setup();
       const messageWithImage: LoveNote = {
         ...baseMessage,
         image_url: 'user-123/image.jpg',
@@ -514,12 +516,13 @@ describe('LoveNoteMessage', () => {
 
       // Dynamic aria-label includes "View full size:" prefix
       const imageButton = screen.getByRole('button', { name: /view full size/i });
-      fireEvent.click(imageButton);
+      await user.click(imageButton);
 
       expect(screen.getByTestId('fullscreen-viewer')).toBeInTheDocument();
     });
 
     it('should close full-screen viewer when clicked', async () => {
+      const user = userEvent.setup();
       const messageWithImage: LoveNote = {
         ...baseMessage,
         image_url: 'user-123/image.jpg',
@@ -533,12 +536,12 @@ describe('LoveNoteMessage', () => {
 
       // Open viewer
       const imageButton = screen.getByRole('button', { name: /view full size/i });
-      fireEvent.click(imageButton);
+      await user.click(imageButton);
 
       expect(screen.getByTestId('fullscreen-viewer')).toBeInTheDocument();
 
       // Close viewer
-      fireEvent.click(screen.getByTestId('fullscreen-viewer'));
+      await user.click(screen.getByTestId('fullscreen-viewer'));
 
       await waitFor(() => {
         expect(screen.queryByTestId('fullscreen-viewer')).not.toBeInTheDocument();
@@ -655,7 +658,8 @@ describe('LoveNoteMessage', () => {
       expect(bubble).toHaveClass('outline-2', 'outline-offset-2', 'outline-danger');
     });
 
-    it('should call onRetry when retry button clicked', () => {
+    it('should call onRetry when retry button clicked', async () => {
+      const user = userEvent.setup();
       const onRetry = vi.fn();
       const failedMessage: LoveNote = {
         ...baseMessage,
@@ -673,7 +677,7 @@ describe('LoveNoteMessage', () => {
       );
 
       const retryButton = screen.getByRole('button', { name: /retry/i });
-      fireEvent.click(retryButton);
+      await user.click(retryButton);
 
       expect(onRetry).toHaveBeenCalledWith('temp-123');
     });
@@ -813,7 +817,7 @@ describe('LoveNoteMessage', () => {
 
       // Trigger image error (simulating 403 expired URL)
       const img = screen.getByRole('img', { name: /image from you/i });
-      fireEvent.error(img);
+      fireEvent.error(img); // raw error: an <img> load failure is a resource event, not a user action
 
       // The error handler bumps the retry count synchronously; only setter
       // calls after unmount count

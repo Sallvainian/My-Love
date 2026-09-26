@@ -7,7 +7,8 @@
  * skeleton in the grid's exact layout; load error card with retry; owner
  * badges. The gallery renders the store's list (`fakePhotoStore`).
  */
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PhotoWithUrls } from '../../../services/photoService';
@@ -68,6 +69,7 @@ afterEach(() => {
 
 describe('PhotoGallery grid', () => {
   it('renders the title, count subtitle and a header Upload pill that is not fixed', async () => {
+    const user = userEvent.setup();
     const onUploadClick = await renderGallery();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Photos' })).toBeTruthy();
@@ -80,7 +82,7 @@ describe('PhotoGallery grid', () => {
     expect(upload.className).not.toMatch(/\bfixed\b/);
     expect(upload.textContent).toBe('Upload');
 
-    fireEvent.click(upload);
+    await user.click(upload);
     expect(onUploadClick).toHaveBeenCalledTimes(1);
 
     const grid = screen.getByTestId('photo-gallery-grid');
@@ -182,6 +184,7 @@ describe('PhotoGallery owner badge', () => {
 
 describe('PhotoGallery empty', () => {
   it('shows the empty card and no header Upload', async () => {
+    const user = userEvent.setup();
     listPhotos.mockResolvedValue([]);
     const onUploadClick = await renderGallery();
 
@@ -196,7 +199,7 @@ describe('PhotoGallery empty', () => {
     const button = within(empty).getByTestId('photo-gallery-empty-upload-button');
     expect(button.textContent).toBe('Upload a photo');
     expect(button.className).toContain('bg-fill');
-    fireEvent.click(button);
+    await user.click(button);
     expect(onUploadClick).toHaveBeenCalledTimes(1);
   });
 });
@@ -229,6 +232,7 @@ describe('PhotoGallery loading', () => {
 
 describe('PhotoGallery load error', () => {
   it('shows the header and a kit error card with a working retry', async () => {
+    const user = userEvent.setup();
     listPhotos.mockRejectedValueOnce(new Error('Network down'));
     await renderGallery();
 
@@ -240,7 +244,7 @@ describe('PhotoGallery load error', () => {
     expect(alert.className).toContain('text-danger');
     expect(screen.queryByTestId('photo-gallery-upload-fab')).toBeNull();
 
-    fireEvent.click(within(errorState).getByTestId('photo-gallery-error-retry-button'));
+    await user.click(within(errorState).getByTestId('photo-gallery-error-retry-button'));
     await act(async () => {});
 
     expect(screen.queryByTestId('photo-gallery-error-state')).toBeNull();

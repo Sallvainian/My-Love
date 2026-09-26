@@ -4,6 +4,7 @@
  * list that changes while it is open.
  */
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PhotoImage, UsePhotoImageOptions } from '../../../hooks/usePhotoImage';
@@ -122,6 +123,7 @@ describe('PhotoGridItem image status', () => {
 
 describe('PhotoViewer image status', () => {
   it('error: "Failed to load photo"; Retry loads again and shows the image', async () => {
+    const user = userEvent.setup();
     // The shown photo errors until Retry raises the retry key.
     imageFor.mockImplementation((path, options) =>
       path === 'me/0.jpg' && (options?.retryKey ?? 0) === 0
@@ -133,9 +135,7 @@ describe('PhotoViewer image status', () => {
     expect(screen.getByText('Failed to load photo')).toBeInTheDocument();
     expect(screen.queryByAltText('cap-0')).toBeNull();
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    });
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(imageFor).toHaveBeenCalledWith('me/0.jpg', { retryKey: 1 });
     expect(screen.getByAltText('cap-0')).toHaveAttribute('src', 'blob:me/0.jpg');
@@ -186,10 +186,11 @@ describe('PhotoViewer on a live list', () => {
   });
 
   it('deletes the photo the dialog names even after the list changed', async () => {
+    const user = userEvent.setup();
     const { rerender } = render(
       <PhotoViewer photos={[photo(1), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
     );
-    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByLabelText('Delete photo'));
     rerender(
       <PhotoViewer
         photos={[photo(0), photo(1), photo(2)]}
@@ -198,14 +199,13 @@ describe('PhotoViewer on a live list', () => {
       />
     );
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    });
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(deletePhotoMock).toHaveBeenCalledWith('photo-1');
   });
 
   it('closes the confirmation without deleting when a refresh removes the photo it names', async () => {
+    const user = userEvent.setup();
     // The same account deleted photo-1 on another device; this device's
     // refresh drops it while its confirmation is up. The viewer falls back to
     // the photo now at that index (photo-2), which the user never confirmed.
@@ -216,7 +216,7 @@ describe('PhotoViewer on a live list', () => {
         onClose={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByLabelText('Delete photo'));
     expect(screen.getByText('Delete Photo?')).toBeInTheDocument();
 
     rerender(
@@ -225,9 +225,7 @@ describe('PhotoViewer on a live list', () => {
 
     const confirm = screen.queryByRole('button', { name: 'Delete' });
     if (confirm) {
-      await act(async () => {
-        fireEvent.click(confirm);
-      });
+      await user.click(confirm);
     }
 
     expect(deletePhotoMock).not.toHaveBeenCalled();
@@ -244,7 +242,7 @@ describe('PhotoViewer on a live list', () => {
         onClose={vi.fn()}
       />
     );
-    fireEvent.error(screen.getByAltText('cap-1'));
+    fireEvent.error(screen.getByAltText('cap-1')); // raw error: an image load failure is a resource event, not a user action
     expect(screen.getByText('Failed to load photo')).toBeInTheDocument();
 
     // Deleted on another device: the refresh drops photo-1 while it is open.
@@ -258,6 +256,7 @@ describe('PhotoViewer on a live list', () => {
   });
 
   it('finishes its own delete when the store drops the row before the delete resolves', async () => {
+    const user = userEvent.setup();
     // photosSlice.deletePhoto removes the row from the list and only then
     // resolves; the confirmation must not be closed underneath that request.
     let resolveDelete: (deleted: boolean) => void = () => {};
@@ -271,10 +270,8 @@ describe('PhotoViewer on a live list', () => {
         onClose={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByLabelText('Delete photo'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    });
+    await user.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
     rerender(
       <PhotoViewer photos={[photo(0), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
     );
@@ -291,6 +288,7 @@ describe('PhotoViewer on a live list', () => {
   });
 
   it('moves to the next photo once its own delete removes it from the list', async () => {
+    const user = userEvent.setup();
     const { rerender } = render(
       <PhotoViewer
         photos={[photo(0), photo(1), photo(2)]}
@@ -298,10 +296,8 @@ describe('PhotoViewer on a live list', () => {
         onClose={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByLabelText('Delete photo'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    });
+    await user.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
     rerender(
       <PhotoViewer photos={[photo(0), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
     );

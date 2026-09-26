@@ -7,7 +7,8 @@
  * Love Notes Images: Task 11 - Component tests
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImagePreview } from '../ImagePreview';
@@ -106,19 +107,21 @@ describe('ImagePreview', () => {
     expect(screen.queryByText('(large file)')).not.toBeInTheDocument();
   });
 
-  it('should call onRemove when remove button clicked', () => {
+  it('should call onRemove when remove button clicked', async () => {
+    const user = userEvent.setup();
     const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
     const onRemove = vi.fn();
 
     render(<ImagePreview file={mockFile} onRemove={onRemove} />);
 
     const removeButton = screen.getByRole('button', { name: /remove selected image/i });
-    fireEvent.click(removeButton);
+    await user.click(removeButton);
 
     expect(onRemove).toHaveBeenCalledTimes(1);
   });
 
-  it('should disable remove button when compressing', () => {
+  it('should disable remove button when compressing', async () => {
+    const user = userEvent.setup();
     const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
     const onRemove = vi.fn();
 
@@ -127,7 +130,7 @@ describe('ImagePreview', () => {
     const removeButton = screen.getByRole('button', { name: /remove selected image/i });
     expect(removeButton).toBeDisabled();
 
-    fireEvent.click(removeButton);
+    await user.click(removeButton);
     expect(onRemove).not.toHaveBeenCalled();
   });
 
