@@ -48,6 +48,14 @@ vi.mock('../../src/api/auth/actionService', () => ({
   signIn: vi.fn(),
   signInWithGoogle: vi.fn(),
 }));
+// Signing in starts App's unawaited refreshLocalCopies(), whose refreshers
+// run against the mocked client through fake-indexeddb and log their failures
+// after the last test, while the worker is closing. The notice never depends
+// on them; App.localCopyRefresh.test.tsx covers that wiring.
+vi.mock('../../src/services/localCopy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/localCopy')>()),
+  refreshLocalCopies: vi.fn(async () => {}),
+}));
 vi.mock('../../src/services/eventsService', () => {
   const eventsService = {
     getEvents: vi.fn(async () => []),
