@@ -28,6 +28,7 @@ import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 const PARTNER_SEARCH = '**/rest/v1/rpc/find_partner_by_email';
 const REQUEST_SEND = '**/rest/v1/partner_requests*';
+const PENDING_REQUESTS = '**/rest/v1/rpc/get_my_pending_partner_requests';
 const REQUEST_ACCEPT = '**/rest/v1/rpc/accept_partner_request';
 
 const MISSING = "No account uses that email — check it's the one they sign in with.";
@@ -193,11 +194,23 @@ test.describe('Connecting with a partner', () => {
     const results = page.getByTestId('partner-search-results');
     await expect(results).toContainText(b.name);
 
-    // ---- A sends the request ----
+    // ---- A sends the request, and A's sent list names B ----
     const sent = interceptNetworkCall({ method: 'POST', url: REQUEST_SEND });
+    const sentList = interceptNetworkCall({ method: 'POST', url: PENDING_REQUESTS });
     await page.getByTestId(`send-request-${b.userId}`).click();
     expect((await sent).status).toBe(201);
-    await expect(page.getByTestId('sent-requests-list')).toBeVisible();
+    const aPending = await sentList;
+    expect(aPending.status).toBe(200);
+    expect(aPending.responseJson).toEqual([
+      expect.objectContaining({
+        from_user_id: a.userId,
+        to_user_id: b.userId,
+        other_display_name: b.name,
+        other_email: b.email,
+      }),
+    ]);
+    await expect(page.getByTestId('sent-requests-list')).toContainText(b.name);
+    await expect(page.getByText('Unknown User')).toHaveCount(0);
     await expect(results).toHaveCount(0);
 
     const { data: request, error: requestError } = await supabaseAdmin
@@ -213,7 +226,26 @@ test.describe('Connecting with a partner', () => {
     const second = await newBareContext(browser, testInfo);
     cleanup.defer('close the second context', () => closeContext(second));
     const bPage = await second.newPage();
+    const receivedList = observeOn({
+      page: bPage,
+      method: 'POST',
+      url: PENDING_REQUESTS,
+      timeout: SECOND_CONTEXT_READ_TIMEOUT,
+    });
     await signInToPartnerTab(bPage, b);
+    const bPending = await receivedList;
+    expect(bPending.status).toBe(200);
+    expect(bPending.responseJson).toEqual([
+      expect.objectContaining({
+        id: request!.id,
+        from_user_id: a.userId,
+        other_display_name: a.name,
+        other_email: a.email,
+      }),
+    ]);
+    // B's received list names A.
+    await expect(bPage.getByTestId('received-requests-list')).toContainText(a.name);
+    await expect(bPage.getByText('Unknown User')).toHaveCount(0);
     const accept = bPage.getByTestId(`accept-request-${request!.id}`);
     await expect(accept).toBeVisible();
 

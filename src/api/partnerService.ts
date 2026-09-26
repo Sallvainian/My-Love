@@ -71,10 +71,13 @@ export interface PartnerRequest {
   id: string;
   from_user_id: string;
   to_user_id: string;
-  from_user_email: string | null;
-  from_user_display_name: string | null;
-  to_user_email: string | null;
-  to_user_display_name: string | null;
+  /**
+   * The other person's chosen name — the recipient on a sent request, the
+   * sender on a received one — or `null` while their profile carries the seed.
+   */
+  other_display_name: string | null;
+  /** The other person's sign-in email. */
+  other_email: string | null;
   status: 'pending' | 'accepted' | 'declined';
   created_at: string;
 }
@@ -284,6 +287,11 @@ class PartnerService {
   /**
    * Get all pending partner requests (sent and received)
    *
+   * Goes through the `get_my_pending_partner_requests` RPC, which names the
+   * other person: the users SELECT policy hides every unlinked account from the
+   * caller, and a pending request is always between two unlinked people, so a
+   * direct `users` read answered nothing and every row showed "Unknown User".
+   *
    * @returns Object with sent and received requests
    */
   async getPendingRequests(): Promise<{
@@ -296,59 +304,27 @@ class PartnerService {
         throw new Error('Not authenticated');
       }
 
-      // Get all pending requests involving current user
-      const { data, error } = await supabase
-        .from('partner_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .or(`from_user_id.eq.${currentUser.user.id},to_user_id.eq.${currentUser.user.id}`);
+      const { data, error } = await supabase.rpc('get_my_pending_partner_requests');
 
       if (error) {
         console.error('[PartnerService] Error fetching pending requests:', error);
         return { sent: [], received: [] };
       }
 
-      if (!data || data.length === 0) {
-        return { sent: [], received: [] };
-      }
-
-      // Get user info for all involved users from users table (RLS-protected)
-      const userIds = Array.from(
-        new Set<string>(data.flatMap((req) => [req.from_user_id, req.to_user_id]))
-      );
-
-      // Fetch user data from users table (no admin API needed)
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('id, email, display_name')
-        .in('id', userIds);
-
-      const userMap = new Map(
-        usersData?.map((user) => [
-          user.id,
-          {
-            email: user.email,
-            displayName: user.display_name || user.email || 'Unknown',
-          },
-        ]) || []
-      );
-
-      // Enrich requests with user info
-      const enrichedRequests: PartnerRequest[] = data.map((request) => ({
-        id: request.id,
-        from_user_id: request.from_user_id,
-        to_user_id: request.to_user_id,
-        from_user_email: userMap.get(request.from_user_id)?.email || null,
-        from_user_display_name: userMap.get(request.from_user_id)?.displayName || null,
-        to_user_email: userMap.get(request.to_user_id)?.email || null,
-        to_user_display_name: userMap.get(request.to_user_id)?.displayName || null,
-        status: request.status as 'pending' | 'accepted' | 'declined',
-        created_at: request.created_at,
+      // The generated type says non-null; both columns are null when the other
+      // profile has no chosen name or no email.
+      const requests: PartnerRequest[] = (data ?? []).map((row) => ({
+        id: row.id,
+        from_user_id: row.from_user_id,
+        to_user_id: row.to_user_id,
+        other_display_name: row.other_display_name ?? null,
+        other_email: row.other_email ?? null,
+        status: 'pending',
+        created_at: row.created_at,
       }));
 
-      // Separate sent and received
-      const sent = enrichedRequests.filter((req) => req.from_user_id === currentUser.user.id);
-      const received = enrichedRequests.filter((req) => req.to_user_id === currentUser.user.id);
+      const sent = requests.filter((req) => req.from_user_id === currentUser.user.id);
+      const received = requests.filter((req) => req.to_user_id === currentUser.user.id);
 
       return { sent, received };
     } catch (error) {

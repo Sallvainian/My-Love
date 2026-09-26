@@ -108,8 +108,8 @@ async function openConnectedPartner(page: Page, colorScheme: Scheme) {
   });
   const requests = fulfillOn({
     page,
-    method: 'GET',
-    url: '**/rest/v1/partner_requests**',
+    method: 'POST',
+    url: '**/rest/v1/rpc/get_my_pending_partner_requests',
     fulfillResponse: { status: 200, body: [] },
     timeout: 15000,
   });
@@ -236,8 +236,8 @@ test.describe('Partner on the style kit', () => {
     });
     const requests = fulfillOn({
       page,
-      method: 'GET',
-      url: '**/rest/v1/partner_requests**',
+      method: 'POST',
+      url: '**/rest/v1/rpc/get_my_pending_partner_requests',
       fulfillResponse: { status: 200, body: [] },
       timeout: 15000,
     });

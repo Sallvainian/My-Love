@@ -102,9 +102,18 @@ test.describe('DW-38 CHECK error presentation', () => {
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ page, authToken, interceptNetworkCall }) => {
       const data = createCheckErrorPathData();
-      const { friendlyCheck, checkError, targetId } = data;
+      const { friendlyCheck, checkError, targetId, email } = data;
       const userId = tokenUserId(authToken);
-      const { partnerRead, profiles, requests } = interceptPartnerReads(interceptNetworkCall, data, []);
+      const { partnerRead, requests } = interceptPartnerReads(interceptNetworkCall, data, []);
+      // The search answers the target as an unlinked account.
+      const search = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/rpc/find_partner_by_email',
+        fulfillResponse: {
+          status: 200,
+          body: [{ id: targetId, display_name: 'DW38 Partner', is_taken: false }],
+        },
+      });
       const write = interceptNetworkCall({
         method: 'POST',
         url: '**/rest/v1/partner_requests',
@@ -113,8 +122,9 @@ test.describe('DW-38 CHECK error presentation', () => {
       await page.goto('/partner');
       await Promise.all([partnerRead, requests]);
       await log.step('Attempt to send a partner request');
-      await page.getByLabel('Search by email or display name').fill('DW38');
-      await profiles;
+      await page.getByLabel("Your partner's email").fill(email);
+      await page.getByRole('button', { name: 'Find', exact: true }).click();
+      await search;
       await page.getByRole('button', { name: 'Send Request', exact: true }).click();
       const response = await write;
       expect(response.status).toBe(400);
@@ -146,8 +156,15 @@ test.describe('DW-38 CHECK error presentation', () => {
         const data = createCheckErrorPathData();
         const { friendlyCheck, checkError, targetId, requestId, createdAt } = data;
         const userId = tokenUserId(authToken);
-        const { partnerRead, profiles, requests } = interceptPartnerReads(interceptNetworkCall, data, [
-          { id: requestId, from_user_id: targetId, to_user_id: userId, status: 'pending', created_at: createdAt },
+        const { partnerRead, requests } = interceptPartnerReads(interceptNetworkCall, data, [
+          {
+            id: requestId,
+            from_user_id: targetId,
+            to_user_id: userId,
+            created_at: createdAt,
+            other_display_name: 'DW38 Partner',
+            other_email: data.email,
+          },
         ]);
         const write = interceptNetworkCall({
           method: 'POST',
@@ -157,7 +174,6 @@ test.describe('DW-38 CHECK error presentation', () => {
         await page.goto('/partner');
         await Promise.all([partnerRead, requests]);
         await log.step(`Attempt to ${action} a partner request`);
-        await profiles;
         await page.getByRole('button', { name: button, exact: true }).click();
         const response = await write;
         expect(response.status).toBe(400);
@@ -181,32 +197,24 @@ function tokenUserId(authToken: string): string {
 
 /**
  * Fakes only this browser's partner-screen reads; never unlinks worker-pool
- * users. `pendingRequests` is what the partner_requests read returns.
+ * users. `pendingRequests` is what the pending-requests RPC returns.
  */
 function interceptPartnerReads(
   interceptNetworkCall: InterceptNetworkCallFn,
-  { targetId, createdAt, email }: ReturnType<typeof createCheckErrorPathData>,
-  pendingRequests: Array<Record<string, string>>
+  { createdAt }: ReturnType<typeof createCheckErrorPathData>,
+  pendingRequests: Array<Record<string, string | null>>
 ) {
   const partnerRead = interceptNetworkCall({
     method: 'GET',
     url: '**/rest/v1/users?select=partner_id*',
     fulfillResponse: { status: 200, body: { partner_id: null, updated_at: createdAt } },
   });
-  const profiles = interceptNetworkCall({
-    method: 'GET',
-    url: '**/rest/v1/users?select=id*',
-    fulfillResponse: {
-      status: 200,
-      body: [{ id: targetId, email, display_name: 'DW38 Partner' }],
-    },
-  });
   const requests = interceptNetworkCall({
-    method: 'GET',
-    url: '**/rest/v1/partner_requests?**',
+    method: 'POST',
+    url: '**/rest/v1/rpc/get_my_pending_partner_requests',
     fulfillResponse: { status: 200, body: pendingRequests },
   });
-  return { partnerRead, profiles, requests };
+  return { partnerRead, requests };
 }
 
 /** The rejected store action rethrows unchanged; this banner is component-local state. */

@@ -556,7 +556,7 @@ export function PartnerMoodView() {
                     <div key={request.id} className="flex items-center gap-3 py-2.5">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[15px] font-medium text-ink">
-                          {request.to_user_display_name || request.to_user_email || 'Unknown User'}
+                          {request.other_display_name ?? request.other_email ?? 'Unknown User'}
                         </p>
                         <p className="text-[13px] text-muted">
                           Sent {new Date(request.created_at).toLocaleDateString()}
@@ -583,9 +583,7 @@ export function PartnerMoodView() {
                     <div key={request.id} className="flex items-center gap-3 py-2.5">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[15px] font-medium text-ink">
-                          {request.from_user_display_name ||
-                            request.from_user_email ||
-                            'Unknown User'}
+                          {request.other_display_name ?? request.other_email ?? 'Unknown User'}
                         </p>
                         <p className="text-[13px] text-muted">
                           Sent {new Date(request.created_at).toLocaleDateString()}

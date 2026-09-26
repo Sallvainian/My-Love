@@ -37,7 +37,7 @@ const state = {
   partnerMoods: [], partner: null, isLoadingPartner: false,
   syncStatus: { isOnline: true }, sentRequests: [], isSearching: false,
   searchResult: { status: 'found', user: { id: 'target', email: 'target@example.com', displayName: 'Target' } },
-  receivedRequests: [{ id: 'request', from_user_display_name: 'Sender', created_at: '2026-09-01' }],
+  receivedRequests: [{ id: 'request', other_display_name: 'Sender', other_email: null, created_at: '2026-09-01' }],
   fetchPartnerMoods: vi.fn(), loadPartner: vi.fn(), loadPendingRequests: vi.fn(),
   searchUsers: vi.fn(), clearSearch: vi.fn(),
   sendPartnerRequest: (id: string) => partnerService.sendPartnerRequest(id),

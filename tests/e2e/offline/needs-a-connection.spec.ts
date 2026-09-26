@@ -13,10 +13,11 @@
  * still fires the `request` event, so a leaked write shows up.
  *
  * Background reads still go out on some screens after the tap is armed — seen
- * in runs: other mount-time reads on Photos and Love Notes, and
- * `GET /rest/v1/partner_requests` (PartnerMoodView's pending-request effect) on
- * Partner. Tests on those screens narrow the count to writes (every method but
- * GET), and say so. The reads those writes would have made first are pinned by
+ * in runs: other mount-time reads on Photos and Love Notes, and background
+ * reads on Partner. Tests on those screens narrow the count to writes (every
+ * method but GET), and say so. PartnerMoodView's pending-request read is a POST
+ * (`rpc/get_my_pending_partner_requests`) but runs only while online, so it
+ * never lands inside an offline watch. The reads those writes would have made first are pinned by
  * unit tests. The partner lookup (`GET /rest/v1/users?select=partner_id`) no
  * longer goes out offline (DW-222), so those screens also assert that none does.
  *
@@ -327,36 +328,24 @@ test.describe('Partner requests offline', () => {
     await page.route('**/rest/v1/users?select=partner_id*', (route) =>
       route.fulfill({ json: { partner_id: null, updated_at: '2026-01-01T00:00:00Z' } })
     );
-    // playwright-utils deviation: the route must be installed before the next navigation, answer every read and abort every write; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-    await page.route('**/rest/v1/partner_requests**', (route) =>
-      route.request().method() === 'GET'
-        ? route.fulfill({
-            json: [
-              {
-                id: FAKE_REQUEST,
-                from_user_id: FAKE_SENDER,
-                to_user_id: userId,
-                status: 'pending',
-                created_at: '2026-09-01T00:00:00Z',
-                updated_at: '2026-09-01T00:00:00Z',
-              },
-            ],
-          })
-        : // A write here would be a regressed guard: never let it land.
-          route.abort()
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every read; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/rpc/get_my_pending_partner_requests', (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: FAKE_REQUEST,
+            from_user_id: FAKE_SENDER,
+            to_user_id: userId,
+            created_at: '2026-09-01T00:00:00Z',
+            other_display_name: 'Offline Sender',
+            other_email: 'sender@example.test',
+          },
+        ],
+      })
     );
-    // The sender lookup behind the request list (`id=in.(…)`).
-    // playwright-utils deviation: matches the query shape with a URL predicate, which one method + URL glob cannot express, and must be installed before the next navigation; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-    await page.route(
-      (url) =>
-        url.pathname === '/rest/v1/users' &&
-        (url.searchParams.get('select') ?? '').replace(/\s/g, '') === 'id,email,display_name' &&
-        (url.searchParams.get('id') ?? '').startsWith('in.'),
-      (route) =>
-        route.fulfill({
-          json: [{ id: FAKE_SENDER, email: 'sender@example.test', display_name: 'Offline Sender' }],
-        })
-    );
+    // playwright-utils deviation: the route must be installed before the next navigation and abort every write; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    // A write here would be a regressed guard: never let it land.
+    await page.route('**/rest/v1/partner_requests**', (route) => route.abort());
     // The partner search, answered with an unlinked account so a Send Request
     // button exists to press offline.
     // playwright-utils deviation: the route must be installed before the next navigation; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
@@ -432,7 +421,14 @@ test.describe('Poke and kiss badge offline', () => {
       );
 
       const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
+      // The pending-request read is a POST (an RPC), so it must have finished
+      // before the writes-only watch below is armed, or it would count as one.
+      const pendingRead = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/rpc/get_my_pending_partner_requests',
+      });
       await page.goto('/partner');
+      expect((await pendingRead).status).toBe(200);
       const history = await historyRead;
       expect(history.status).toBe(200);
       expect(history.responseJson).toEqual(
@@ -442,7 +438,7 @@ test.describe('Poke and kiss badge offline', () => {
       await expect(badge).toBeVisible();
 
       await goOffline(page, true);
-      // Writes only: the Partner screen's pending-request read can still go out.
+      // Writes only: other Partner-screen reads (GETs) can still go out.
       const watch = watchSupabaseRequests(page, { writesOnly: true });
       await badge.click();
       // The animation still plays offline; ending it asks to mark it seen.
