@@ -246,19 +246,31 @@ test.describe('PKCE code exchange', () => {
     const address = `pkce-signup-${Date.now()}@test.example.com`;
     const applicant = pkceClient();
 
-    // Deferred before signUp, and found by address: a signup that misbehaves or
-    // never answers may still have created the account.
+    // Deferred before signUp: a signup that misbehaves or never answers may
+    // still have created the account. Deleted by the id signUp returned; found
+    // by address only when there is none.
+    const signup: { userId?: string; succeeded: boolean } = { succeeded: false };
     cleanup.defer('delete the signup account', async () => {
-      // `listUsers()` pages at 50 by default and this scans one page, so a
-      // stack holding more accounts than that would leak the throwaway
-      // account precisely when signUp already misbehaved.
-      const { data: found, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-        perPage: 1000,
-      });
-      if (listError) throw listError;
-      const account = found.users.find((user) => user.email === address);
-      if (!account) return;
-      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(account.id);
+      let accountId = signup.userId;
+      if (!accountId) {
+        // `listUsers()` pages at 50 by default and this scans one page, so a
+        // stack holding more accounts than that would leak the throwaway
+        // account precisely when signUp already misbehaved.
+        const { data: found, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+          perPage: 1000,
+        });
+        if (listError) throw listError;
+        accountId = found.users.find((user) => user.email === address)?.id;
+      }
+      if (!accountId) {
+        if (signup.succeeded) {
+          throw new Error(
+            'signUp succeeded, but its account was found neither by id nor by address'
+          );
+        }
+        return;
+      }
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(accountId);
       if (deleteError) throw deleteError;
     });
 
@@ -266,6 +278,8 @@ test.describe('PKCE code exchange', () => {
       email: address,
       password: TEST_USER_PASSWORD,
     });
+    signup.userId = data.user?.id;
+    signup.succeeded = !error;
 
     const userId = data.user?.id;
     expect(error).toBeNull();
