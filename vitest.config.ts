@@ -13,7 +13,10 @@ export default defineConfig({
   define: {
     // Mirrors vite.config.ts, which this config does not extend.
     __APP_VERSION__: JSON.stringify(pkg.version),
-    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('https://xojempkrugifnaveqtqc.supabase.co'),
+    // Not the app's project: `.invalid` is reserved (RFC 2606) and never
+    // resolves, so a unit test that escapes its fetch stub fails instead of
+    // calling a real Supabase project.
+    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('https://unit-tests.invalid'),
     'import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY': JSON.stringify(
       'test-anon-key-for-unit-tests'
     ),

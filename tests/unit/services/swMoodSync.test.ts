@@ -32,7 +32,7 @@ const mockedGetAuthToken = vi.mocked(getAuthToken);
 const mockedGetPendingMoods = vi.mocked(getPendingMoods);
 const mockedMarkMoodSynced = vi.mocked(markMoodSynced);
 
-const MOODS_URL = 'https://xojempkrugifnaveqtqc.supabase.co/rest/v1/moods';
+const MOODS_URL = 'https://unit-tests.invalid/rest/v1/moods';
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const LOG_TIME = '2026-01-26T23:52:29.297Z';
 const SERVER_ROW_ID = '00000000-0000-4000-8000-0000000000aa';
