@@ -129,8 +129,9 @@ test.describe('Love-note text sent offline', () => {
     const { partnerId } = pair;
     cleanup.defer('delete the notes this run sent', async () => {
       // Stop the producer first: the queue's drain retry (`scheduleDrainRetry`
-      // in notesSlice.ts) can still send a note after a delete.
-      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      // in notesSlice.ts) can still send a note after a delete. Guarded: on a
+      // closed page `unrouteAll` throws, which would skip both deletes.
+      if (!page.isClosed()) await page.unrouteAll({ behavior: 'ignoreErrors' });
       await page.close();
       await deleteStampedNotes(supabaseAdmin, pair, stamp);
       // A POST already in flight when the page closed still commits, so look
