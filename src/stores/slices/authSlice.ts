@@ -78,7 +78,7 @@ function deleteAccountData(userId: string): void {
  * Clearing a subset is worse than clearing none, because absence is itself a
  * render condition. Clearing `partner` alone flipped PartnerMoodView into its
  * `!partner` branch, which paints `sentRequests`, `receivedRequests` and
- * `searchResults` — so closing one disclosure opened another in the same
+ * `searchResult` — so closing one disclosure opened another in the same
  * component. Every account-scoped field goes, together.
  *
  * The re-fetch that would normally correct stale data cannot be relied on: the
@@ -123,7 +123,7 @@ export function signedOutState() {
     sentRequests: [],
     receivedRequests: [],
     isLoadingRequests: false,
-    searchResults: [],
+    searchResult: null,
     isSearching: false,
 
     // notesSlice — the love-notes chat is the largest private disclosure here

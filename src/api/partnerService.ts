@@ -4,7 +4,7 @@
  * Manages partner relationships, connection requests, and user search.
  *
  * Features:
- * - Search for users by display name or email
+ * - Look up a partner by the exact email they sign in with
  * - Send/accept/decline partner requests
  * - Get current partner information
  * - Get pending requests
@@ -20,8 +20,34 @@ import { isSeedFallbackName, sessionMismatch, supabase } from './supabaseClient'
 
 export interface UserSearchResult {
   id: string;
+  /** The address the caller typed, trimmed; the server never returns it. */
   email: string;
-  displayName: string;
+  /** The account's chosen name, or `null` while it still carries the seed. */
+  displayName: string | null;
+}
+
+/**
+ * The answer to an exact-email partner search, with every case kept apart.
+ *
+ * `missing` covers both "no account uses that email" and "that is your own
+ * email" — the server answers the two identically. `taken` is an account that
+ * already has a partner; the server returns nothing else about it. `error` is
+ * a failed request, never "no account".
+ */
+export type PartnerSearchResult =
+  | { status: 'found'; user: UserSearchResult }
+  | { status: 'taken' }
+  | { status: 'missing' }
+  | { status: 'error'; reason: string };
+
+/**
+ * True when `query`, trimmed, has the shape of an email address — the same
+ * shape the sign-in form requires (LoginScreen), so every address someone signs
+ * in with passes. A guard against sending an address still being typed, not
+ * validation: the server matches exactly anyway.
+ */
+export function looksLikeEmail(query: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query.trim());
 }
 
 export interface PartnerInfo {
@@ -145,54 +171,48 @@ class PartnerService {
   }
 
   /**
-   * Search for users by display name or email
-   * Uses RLS-protected users table instead of auth admin API
+   * Look up the account that signs in with `email`, matched exactly and
+   * case-insensitively after trimming — no partial or name match.
    *
-   * @param query - Search query (matches display name or email)
-   * @param limit - Maximum number of results (default: 10)
-   * @returns List of matching users
+   * Goes through the `find_partner_by_email` RPC: the users SELECT policy hides
+   * every row but the caller's own and their partner's, so a direct query
+   * cannot see an unlinked account at all.
+   *
+   * @param email - The address the partner signs in with
    */
-  async searchUsers(query: string, limit: number = 10): Promise<UserSearchResult[]> {
+  async searchUsers(email: string): Promise<PartnerSearchResult> {
+    const trimmed = email.trim();
+    // No account can use an address without this shape, so nothing to ask.
+    if (!looksLikeEmail(trimmed)) return { status: 'missing' };
+
     try {
-      if (!query || query.trim().length < 2) {
-        return [];
-      }
-
-      const { data: currentUser } = await supabase.auth.getUser();
-      if (!currentUser?.user) {
-        throw new Error('Not authenticated');
-      }
-
-      const searchLower = query.toLowerCase().trim();
-
-      // Query users table directly (RLS policy allows authenticated users to search)
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, email, display_name')
-        .neq('id', currentUser.user.id) // Exclude current user
-        .or(`email.ilike.%${searchLower}%,display_name.ilike.%${searchLower}%`)
-        .limit(limit);
+      const { data, error } = await supabase.rpc('find_partner_by_email', { p_email: trimmed });
 
       if (error) {
         console.error('[PartnerService] Error searching users:', error);
-        return [];
+        return { status: 'error', reason: error.message };
       }
 
-      if (!data || data.length === 0) {
-        return [];
-      }
+      const row = data?.[0];
+      if (!row) return { status: 'missing' };
+      if (row.is_taken) return { status: 'taken' };
+      // The generated type says non-null; the column is null only when taken.
+      if (!row.id) return { status: 'error', reason: 'Search result without an id' };
 
-      // Map to UserSearchResult
-      const results: UserSearchResult[] = data.map((user) => ({
-        id: user.id,
-        email: user.email || '',
-        displayName: user.display_name || user.email || 'Unknown',
-      }));
-
-      return results;
+      return {
+        status: 'found',
+        user: {
+          id: row.id,
+          email: trimmed,
+          // A profile that never chose a name carries the email or 'Unknown'.
+          displayName: isSeedFallbackName(row.display_name, trimmed)
+            ? null
+            : (row.display_name?.trim() ?? null),
+        },
+      };
     } catch (error) {
       console.error('[PartnerService] Error in searchUsers:', error);
-      return [];
+      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
     }
   }
 
