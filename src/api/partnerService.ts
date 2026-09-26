@@ -392,20 +392,6 @@ class PartnerService {
       throw error;
     }
   }
-
-  /**
-   * Check if current user has a partner
-   *
-   * @returns true if linked, false if the server says unlinked
-   * @throws Error when the read failed — a failed read is not "no partner"
-   */
-  async hasPartner(userId: string): Promise<boolean> {
-    const result = await this.getPartner(userId);
-    if (result.status === 'error') {
-      throw new Error(`Could not determine partner: ${result.reason}`);
-    }
-    return result.status === 'linked';
-  }
 }
 
 export const partnerService = new PartnerService();
