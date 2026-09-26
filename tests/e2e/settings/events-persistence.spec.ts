@@ -57,8 +57,12 @@ import {
   localDateFromIso,
   resolveOwnPair,
 } from '../../support/helpers/events';
-import { EVENTS_WRITE } from '../../support/helpers/reads';
-import { openSettingsFromHome, reloadSettings } from '../../support/helpers/settings-screen';
+import { EVENTS_WRITE, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import {
+  openSettingsFromHome,
+  reloadSettings,
+  returnToSettings,
+} from '../../support/helpers/settings-screen';
 import { formatDateLong } from '../../../src/utils/dateUtils';
 import { log } from '@seontechnologies/playwright-utils';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
@@ -293,7 +297,9 @@ test.describe('Clearing an optional field', () => {
 
     // GIVEN: the description is on the row and on the Home card
     await log.step('The description is on the Home card too');
+    const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await navigateTo(page, 'home');
+    expect((await homeRead).status).toBe(200);
     const card = page.getByTestId(DESCRIPTION_CARD_TESTID);
     await expect(card).toBeVisible();
     await expect(card).toContainText(DESCRIPTION_TEXT);
@@ -301,7 +307,7 @@ test.describe('Clearing an optional field', () => {
     // WHEN: the user edits the event and clears the description
     // THEN: the PATCH carries an explicit null and the row drops the element
     await log.step('Edit the event and clear the description');
-    await navigateTo(page, 'settings');
+    await returnToSettings(page, interceptNetworkCall);
     const rowToEdit = rowFor(page, DESCRIPTION_LABEL);
     await expect(rowToEdit).toBeVisible();
     await rowToEdit.locator('[data-testid^="event-edit-"]').click();
