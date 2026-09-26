@@ -191,7 +191,11 @@ test.describe('Account data from the local copy', () => {
     interceptNetworkCall,
   }) => {
     const favoritesRead = () => interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
+    // Awaited here so the cold start's own favorites read cannot be the one the
+    // reload below waits on: the reload cancels it, and its response never comes.
+    const startRead = favoritesRead();
     await page.goto('/');
+    expect((await startRead).status).toBe(200);
     const userId = await signedInUserId(page);
     // This worker account's own rows only: a custom message could win today's
     // rotation, and a leftover favorite would open on "Remove from favorites".
@@ -246,7 +250,11 @@ test.describe('Account data from the local copy', () => {
     interceptNetworkCall,
   }, testInfo) => {
     const favoritesRead = () => interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
+    // Awaited here so the cold start's own favorites read cannot be the one the
+    // reload below waits on: the reload cancels it, and its response never comes.
+    const startRead = favoritesRead();
     await page.goto('/');
+    expect((await startRead).status).toBe(200);
     const userId = await signedInUserId(page);
     const custom = `Offline custom ${testInfo.workerIndex}-${Date.now()}`;
     // Hard before the test, so it never runs on leftover rows; soft in the
