@@ -21,9 +21,10 @@ vi.mock('@/api/supabaseClient', () => ({
         backend.requests.push('insert');
         return { error: backend.error };
       },
-      select: () => ({ eq: () => ({ single: async () => ({ data: { partner_id: null } }) }) }),
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { partner_id: null }, error: null }) }) }),
     }),
   },
+  sessionMismatch: async () => null,
 }));
 vi.mock('@/api/moodSyncService', () => ({ moodSyncService: {} }));
 vi.mock('@/components/PokeKissInterface', () => ({ PokeKissInterface: () => null }));
@@ -166,5 +167,36 @@ describe('partner requests offline (ticket 11)', () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     await partnerService[method]('target');
     expect(backend.requests).toEqual(expectedRequests);
+  });
+});
+
+// DW-292: the server, not the client, refuses linking someone who already has
+// a partner -- accept_partner_request raises this P0001. PostgREST hands it
+// back as a plain object, which the caller would otherwise show as the bare
+// "Failed to accept partner request".
+describe('accepting a request when one of the pair already has a partner', () => {
+  const refusal = { code: 'P0001', message: 'One or both users already have a partner', details: null, hint: null };
+  const explained = 'This request can no longer be accepted: one of you already has a partner.';
+
+  beforeEach(() => {
+    cleanup();
+    backend.error = null;
+  });
+
+  it('rejects with the explanation as an Error', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    backend.error = { ...refusal };
+    const result = await partnerService.acceptPartnerRequest('request').catch((failure: unknown) => failure);
+    expect(result).toBeInstanceOf(Error);
+    expect((result as Error).message).toBe(explained);
+  });
+
+  it('shows the explanation in the rendered caller', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    backend.error = { ...refusal };
+    const user = userEvent.setup();
+    render(<PartnerMoodView />);
+    await user.click(screen.getByRole('button', { name: 'Accept' }));
+    await vi.waitFor(() => expect(screen.getByTestId('partner-connection-error')).toHaveTextContent(explained));
   });
 });

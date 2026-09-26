@@ -53,6 +53,9 @@ export interface PartnerRequest {
   created_at: string;
 }
 
+/** What `accept_partner_request` raises when either user is already linked. */
+const ALREADY_PARTNERED = 'One or both users already have a partner';
+
 class PartnerService {
   /**
    * Get the partner of `userId`, the account the caller captured before asking.
@@ -196,8 +199,13 @@ class PartnerService {
   /**
    * Send a partner connection request to another user
    *
+   * Whether the target already has a partner is not checked here: the users
+   * SELECT policy hides every row but the caller's own and their partner's, so
+   * the client cannot see it. The server refuses that link when the request is
+   * accepted (`accept_partner_request`).
+   *
    * @param toUserId - ID of the user to send request to
-   * @throws Error if request fails or user already has a partner
+   * @throws Error if request fails or the caller already has a partner
    */
   async sendPartnerRequest(toUserId: string): Promise<void> {
     // Refused before `auth.getUser()` or any other request goes out.
@@ -207,27 +215,23 @@ class PartnerService {
       if (!currentUser?.user) {
         throw new Error('Not authenticated');
       }
+      const userId = currentUser.user.id;
 
       // Check if current user already has a partner
-      const { data: currentUserRecord } = await supabase
+      const { data: currentUserRecord, error: readError } = await supabase
         .from('users')
         .select('partner_id')
-        .eq('id', currentUser.user.id)
-        .single();
+        .eq('id', userId)
+        .maybeSingle();
+
+      // A read answered after a sign-out or account switch saw no row because
+      // RLS hid it, which is not "no partner".
+      const mismatch = await sessionMismatch(userId);
+      if (mismatch) throw new Error(mismatch);
+      if (readError) throw readError;
 
       if (currentUserRecord?.partner_id) {
         throw new Error('You already have a partner');
-      }
-
-      // Check if target user already has a partner
-      const { data: targetUserRecord } = await supabase
-        .from('users')
-        .select('partner_id')
-        .eq('id', toUserId)
-        .single();
-
-      if (targetUserRecord?.partner_id) {
-        throw new Error('This user already has a partner');
       }
 
       // Create partner request
@@ -353,6 +357,12 @@ class PartnerService {
           logSupabaseError('PartnerService.acceptPartnerRequest', error);
           error.message = handleSupabaseError(error).message;
         }
+        // The server's refusal to link someone who already has a partner.
+        if (error.code === 'P0001' && error.message === ALREADY_PARTNERED) {
+          throw new Error(
+            'This request can no longer be accepted: one of you already has a partner.'
+          );
+        }
         throw error;
       }
 
@@ -391,20 +401,6 @@ class PartnerService {
       console.error('[PartnerService] Error declining partner request:', error);
       throw error;
     }
-  }
-
-  /**
-   * Check if current user has a partner
-   *
-   * @returns true if linked, false if the server says unlinked
-   * @throws Error when the read failed — a failed read is not "no partner"
-   */
-  async hasPartner(userId: string): Promise<boolean> {
-    const result = await this.getPartner(userId);
-    if (result.status === 'error') {
-      throw new Error(`Could not determine partner: ${result.reason}`);
-    }
-    return result.status === 'linked';
   }
 }
 
