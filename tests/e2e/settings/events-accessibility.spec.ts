@@ -58,7 +58,7 @@
  * belong to other workers.
  *
  * No network is stubbed here, so no `skipNetworkMonitoring` annotation: the
- * merged fixtures' network-error-monitor (`tests/support/merged-fixtures.ts:29-40`)
+ * merged fixtures' network-error-monitor (`tests/support/merged-fixtures.ts:31-41`)
  * should stay armed, and a 4xx/5xx during an accessibility run is real signal.
  */
 import { test, expect } from '../../support/merged-fixtures';

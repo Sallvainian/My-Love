@@ -55,7 +55,7 @@
  * fix is supposed to observe. No 4xx/5xx is injected anywhere, so no
  * `skipNetworkMonitoring` annotation is needed: requests that fail while the
  * context is offline are aborted rather than answered, and the
- * network-error-monitor fixture (`tests/support/merged-fixtures.ts:29-40`)
+ * network-error-monitor fixture (`tests/support/merged-fixtures.ts:31-41`)
  * fails a test only on a 4xx/5xx response.
  *
  * Run:
