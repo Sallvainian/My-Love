@@ -98,73 +98,61 @@ test.describe('Display Name Setup', () => {
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     // GIVEN: An account signed up without a display name.
     const account = await createNamelessAccount(supabaseAdmin, 'nameless-shows');
-    const failures: unknown[] = [];
+    cleanup.defer('delete the dedicated account', account.cleanup);
 
-    try {
-      // Premise: the trigger seeded the profile with the email, which is the
-      // state the gate has to recognise as "no name chosen".
-      expect(await readProfileName(supabaseAdmin, account.userId)).toBe(account.email);
+    // Premise: the trigger seeded the profile with the email, which is the
+    // state the gate has to recognise as "no name chosen".
+    expect(await readProfileName(supabaseAdmin, account.userId)).toBe(account.email);
 
-      // WHEN: App loads after signing in.
-      // The worker storage state normally carries this
-      // (`tests/support/auth/supabase-auth-provider.ts:153`) and
-      // `authSessionEnabled: false` drops it, so the 60-minute welcome splash
-      // would otherwise stand between setup and the app.
-      await suppressWelcomeSplash(page);
-      await page.goto('/');
-      await expect(page.getByTestId('login-screen')).toBeVisible();
-      await page.getByRole('textbox', { name: 'Email' }).fill(account.email);
-      await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
-      const signInGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
-      await page.getByTestId('submit-button').click();
-      const signInName = await signInGate;
-      expect(signInName.status).toBe(200);
-      expect(signInName.responseJson).toEqual({ display_name: account.email });
+    // WHEN: App loads after signing in.
+    // The worker storage state normally carries this
+    // (`tests/support/auth/supabase-auth-provider.ts:153`) and
+    // `authSessionEnabled: false` drops it, so the 60-minute welcome splash
+    // would otherwise stand between setup and the app.
+    await suppressWelcomeSplash(page);
+    await page.goto('/');
+    await expect(page.getByTestId('login-screen')).toBeVisible();
+    await page.getByRole('textbox', { name: 'Email' }).fill(account.email);
+    await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+    const signInGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
+    await page.getByTestId('submit-button').click();
+    const signInName = await signInGate;
+    expect(signInName.status).toBe(200);
+    expect(signInName.responseJson).toEqual({ display_name: account.email });
 
-      // THEN: Display name setup modal is shown, and the app is not.
-      await expect(page.getByTestId('display-name-setup')).toBeVisible();
-      await expect(page.getByTestId('app-container')).toHaveCount(0);
+    // THEN: Display name setup modal is shown, and the app is not.
+    await expect(page.getByTestId('display-name-setup')).toBeVisible();
+    await expect(page.getByTestId('app-container')).toHaveCount(0);
 
-      // AND on a cold load, not just across the sign-in transition. This is the
-      // path the nameless account actually arrives by: `needsDisplayName` starts
-      // false, so the overlay here can only come from the gate having read the
-      // profile on load. Asserting it is *visible* rather than absent is what
-      // makes that observable — a `toHaveCount(0)` would pass whether or not the
-      // gate ever ran.
-      const coldGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
-      await page.reload();
-      const coldName = await coldGate;
-      expect(coldName.status).toBe(200);
-      expect(coldName.responseJson).toEqual({ display_name: account.email });
-      await expect(page.getByTestId('display-name-setup')).toBeVisible();
-      await expect(page.getByTestId('app-container')).toHaveCount(0);
-    } catch (error) {
-      failures.push(error);
-    }
-
-    try {
-      await account.cleanup();
-    } catch (error) {
-      failures.push(error);
-    }
-
-    if (failures.length > 0) {
-      throw new AggregateError(failures, 'Display name gate assertion or account cleanup failed');
-    }
+    // AND on a cold load, not just across the sign-in transition. This is the
+    // path the nameless account actually arrives by: `needsDisplayName` starts
+    // false, so the overlay here can only come from the gate having read the
+    // profile on load. Asserting it is *visible* rather than absent is what
+    // makes that observable — a `toHaveCount(0)` would pass whether or not the
+    // gate ever ran.
+    const coldGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
+    await page.reload();
+    const coldName = await coldGate;
+    expect(coldName.status).toBe(200);
+    expect(coldName.responseJson).toEqual({ display_name: account.email });
+    await expect(page.getByTestId('display-name-setup')).toBeVisible();
+    await expect(page.getByTestId('app-container')).toHaveCount(0);
   });
 
   test('[P0] should allow setting display name and proceed to app', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     // GIVEN: Display name setup modal is shown.
     const account = await createNamelessAccount(supabaseAdmin, 'nameless-sets');
+    cleanup.defer('delete the dedicated account', account.cleanup);
     const chosenName = 'Chosen In E2E';
-    const failures: unknown[] = [];
 
     // The whole point of the change is that saving a name is a profile write and
     // nothing else. A metadata write is a non-GET to /auth/v1/user; a session
@@ -181,54 +169,40 @@ test.describe('Display Name Setup', () => {
       }
     });
 
-    try {
-      await suppressWelcomeSplash(page);
-      await page.goto('/');
-      await expect(page.getByTestId('login-screen')).toBeVisible();
-      await page.getByRole('textbox', { name: 'Email' }).fill(account.email);
-      await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
-      const signInGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
-      await page.getByTestId('submit-button').click();
-      const signInName = await signInGate;
-      expect(signInName.status).toBe(200);
-      expect(signInName.responseJson).toEqual({ display_name: account.email });
-      await expect(page.getByTestId('display-name-setup')).toBeVisible();
+    await suppressWelcomeSplash(page);
+    await page.goto('/');
+    await expect(page.getByTestId('login-screen')).toBeVisible();
+    await page.getByRole('textbox', { name: 'Email' }).fill(account.email);
+    await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+    const signInGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
+    await page.getByTestId('submit-button').click();
+    const signInName = await signInGate;
+    expect(signInName.status).toBe(200);
+    expect(signInName.responseJson).toEqual({ display_name: account.email });
+    await expect(page.getByTestId('display-name-setup')).toBeVisible();
 
-      // WHEN: User enters display name and submits.
-      await page.getByLabel('Display Name').fill(chosenName);
-      await page.getByTestId('display-name-submit').click();
+    // WHEN: User enters display name and submits.
+    await page.getByLabel('Display Name').fill(chosenName);
+    await page.getByTestId('display-name-submit').click();
 
-      // THEN: Modal closes and main app is displayed.
-      await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
-      await expect(page.getByTestId('app-container')).toBeVisible();
+    // THEN: Modal closes and main app is displayed.
+    await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
+    await expect(page.getByTestId('app-container')).toBeVisible();
 
-      // The name went to the profile row, and only there.
-      expect(await readProfileName(supabaseAdmin, account.userId)).toBe(chosenName);
-      expect(authWrites, 'setup must not write auth metadata or refresh the session').toEqual([]);
+    // The name went to the profile row, and only there.
+    expect(await readProfileName(supabaseAdmin, account.userId)).toBe(chosenName);
+    expect(authWrites, 'setup must not write auth metadata or refresh the session').toEqual([]);
 
-      // And it survives a reload — which is the case the old trigger broke, and
-      // also what proves the gate is reading the saved name back rather than
-      // remembering a React state flag.
-      const reloadGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
-      await page.reload();
-      const reloadName = await reloadGate;
-      expect(reloadName.status).toBe(200);
-      expect(reloadName.responseJson).toEqual({ display_name: chosenName });
-      await expect(page.getByTestId('app-container')).toBeVisible();
-      await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
-    } catch (error) {
-      failures.push(error);
-    }
-
-    try {
-      await account.cleanup();
-    } catch (error) {
-      failures.push(error);
-    }
-
-    if (failures.length > 0) {
-      throw new AggregateError(failures, 'Display name setup assertion or account cleanup failed');
-    }
+    // And it survives a reload — which is the case the old trigger broke, and
+    // also what proves the gate is reading the saved name back rather than
+    // remembering a React state flag.
+    const reloadGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
+    await page.reload();
+    const reloadName = await reloadGate;
+    expect(reloadName.status).toBe(200);
+    expect(reloadName.responseJson).toEqual({ display_name: chosenName });
+    await expect(page.getByTestId('app-container')).toBeVisible();
+    await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
   });
 });
 
@@ -274,9 +248,10 @@ test.describe('Display Name Edit', () => {
     // Written twice if need be, and verified each time. A timeout aborts the
     // body without closing the page, so the app's own PATCH can still be in
     // flight and land AFTER this restore, putting the test's name back on the
-    // row. Re-reading and rewriting beats that write; closing the page first
-    // would beat it too, but would cost the failure screenshot and trace this
-    // suite records with `screenshot`/`trace: 'on'`.
+    // row. Re-reading and rewriting beats that write. Closing the page first
+    // would beat it too, and would cost no screenshot — Playwright takes that
+    // when the test function ends, before any `afterEach` — but it would drop
+    // the page snapshot in `error-context.md`, which is taken at context close.
     let stored: string | null = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const { error } = await supabaseAdmin
