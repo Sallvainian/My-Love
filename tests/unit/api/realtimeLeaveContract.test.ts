@@ -292,8 +292,9 @@ describe('the SDK leave/close contract the channel registries depend on', () => 
     // discriminate it — the 'error' branch is unreachable in this scenario, so
     // an SDK that DID reject on it would have left that version green.
     answer(leaveFrame as Frame, 'error');
-    await Promise.resolve();
-    await Promise.resolve();
+    // A macrotask, not a count of microtask hops: a negative assertion has to
+    // wait out whatever the frame set off, however many awaits deep.
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     await expect(leave).resolves.toBe('ok');
     expect(channel.state).toBe('closed');
