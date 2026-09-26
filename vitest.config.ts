@@ -42,6 +42,13 @@ export default defineConfig({
     env: {
       TZ: 'America/New_York',
     },
+    // The seed a `--sequence.shuffle` run orders files and tests by, from SEED
+    // (CI passes its run number) or 1, so a shuffled failure replays exactly.
+    // Read here rather than as `${SEED:-1}` in the npm script, which cmd.exe
+    // would pass through unexpanded.
+    sequence: {
+      seed: Number(process.env.SEED) || 1,
+    },
     reporters: ['default', 'junit'],
     outputFile: {
       junit: 'test-results/vitest-junit.xml',

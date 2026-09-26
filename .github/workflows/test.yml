@@ -227,6 +227,9 @@ jobs:
 
       - name: Run unit tests with coverage
         run: npm run test:unit:coverage
+        env:
+          # Shuffle seed: a new order each run, replayable with SEED=<run number>.
+          SEED: ${{ github.run_number }}
 
       - name: Upload coverage
         uses: actions/upload-artifact@v7

@@ -18,7 +18,7 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:unit:ui": "vitest --ui",
-    "test:unit:coverage": "vitest run --coverage",
+    "test:unit:coverage": "vitest run --coverage --sequence.shuffle",
     "test:smoke": "node scripts/smoke-tests.cjs",
     "test:e2e": "./scripts/test-with-cleanup.sh",
     "test:e2e:raw": "playwright test",

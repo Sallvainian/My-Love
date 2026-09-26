@@ -67,6 +67,13 @@ if [ "$SKIP_UNIT" = false ]; then
 
   npm run test:unit || { echo "❌ Unit tests failed"; exit 1; }
 
+  # CI runs the suite shuffled (test:unit:coverage, seeded with the run
+  # number). A fresh seed each local run, printed so a failure can be replayed.
+  SHUFFLE_SEED=${SEED:-$RANDOM}
+  echo "Running unit tests shuffled (SEED=$SHUFFLE_SEED)..."
+  SEED=$SHUFFLE_SEED npm run test:unit:coverage \
+    || { echo "❌ Shuffled unit tests failed (replay with SEED=$SHUFFLE_SEED)"; exit 1; }
+
   echo "✅ Unit tests passed"
   echo ""
 else
