@@ -90,6 +90,7 @@ function FullScreenImageViewerComponent({
             className="absolute inset-0 bg-black/90"
             onClick={onClose}
             aria-label="Close image viewer"
+            data-testid="fullscreen-image-backdrop"
           />
 
           {/* Close button */}

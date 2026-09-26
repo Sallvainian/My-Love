@@ -76,12 +76,7 @@ describe('FullScreenImageViewer', () => {
     const onClose = vi.fn();
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
-    // Get all elements with this label (overlay div and close button)
-    // The overlay div comes first in DOM order
-    const elements = screen.getAllByLabelText('Close image viewer');
-    const overlay = elements.find((el) => el.tagName !== 'BUTTON');
-    expect(overlay).toBeDefined();
-    await user.click(overlay!);
+    await user.click(screen.getByTestId('fullscreen-image-backdrop'));
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });

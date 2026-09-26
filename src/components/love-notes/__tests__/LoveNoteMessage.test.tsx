@@ -456,7 +456,7 @@ describe('LoveNoteMessage', () => {
       // later. Switch only after that commit: a render still pending at the
       // switch reads the new session, re-runs the effect as it, and this mock
       // answers that second read with the same blob, which is then shown.
-      await waitFor(() => expect(document.querySelector('.animate-spin')).toBeInTheDocument());
+      await screen.findByTestId('love-note-image-loading');
 
       switchIdentity({ authSessionVersion: 2 });
       await act(async () => {
