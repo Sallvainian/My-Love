@@ -15,6 +15,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../../support/merged-fixtures';
+import { interceptNetworkCall as fulfillOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { Page } from '@playwright/test';
 
 type Scheme = 'light' | 'dark';
@@ -85,11 +86,12 @@ test.describe('Partner on the style kit', () => {
   for (const colorScheme of ['light', 'dark'] as const satisfies readonly Scheme[]) {
     test(`[P1] should render the connected Partner view on the kit in ${colorScheme}`, async ({
       page,
-      interceptNetworkCall,
     }) => {
       // Only this browser's reads are faked; no worker-pool row is touched.
       // Each stub is awaited after the load that hits it, bounded by a timeout.
-      const partnerLink = interceptNetworkCall({
+      // Standalone, because the `interceptNetworkCall` fixture drops `timeout`.
+      const partnerLink = fulfillOn({
+        page,
         method: 'GET',
         url: '**/rest/v1/users?select=partner_id*',
         fulfillResponse: {
@@ -98,7 +100,8 @@ test.describe('Partner on the style kit', () => {
         },
         timeout: 15000,
       });
-      const partnerProfile = interceptNetworkCall({
+      const partnerProfile = fulfillOn({
+        page,
         method: 'GET',
         url: '**/rest/v1/users?select=id*',
         fulfillResponse: {
@@ -107,13 +110,15 @@ test.describe('Partner on the style kit', () => {
         },
         timeout: 15000,
       });
-      const requests = interceptNetworkCall({
+      const requests = fulfillOn({
+        page,
         method: 'GET',
         url: '**/rest/v1/partner_requests**',
         fulfillResponse: { status: 200, body: [] },
         timeout: 15000,
       });
-      const moods = interceptNetworkCall({
+      const moods = fulfillOn({
+        page,
         method: 'GET',
         url: '**/rest/v1/moods**',
         fulfillResponse: { status: 200, body: partnerMoodRows() },
@@ -188,13 +193,12 @@ test.describe('Partner on the style kit', () => {
     });
   }
 
-  test('[P1] should render the connect UI on the kit in dark', async ({
-    page,
-    interceptNetworkCall,
-  }) => {
+  test('[P1] should render the connect UI on the kit in dark', async ({ page }) => {
     // Fake only this browser's read of its own link; never unlink worker-pool users.
     // Each stub is awaited after the load that hits it, bounded by a timeout.
-    const partnerLink = interceptNetworkCall({
+    // Standalone, because the `interceptNetworkCall` fixture drops `timeout`.
+    const partnerLink = fulfillOn({
+      page,
       method: 'GET',
       url: '**/rest/v1/users?select=partner_id*',
       fulfillResponse: {
@@ -203,7 +207,8 @@ test.describe('Partner on the style kit', () => {
       },
       timeout: 15000,
     });
-    const requests = interceptNetworkCall({
+    const requests = fulfillOn({
+      page,
       method: 'GET',
       url: '**/rest/v1/partner_requests**',
       fulfillResponse: { status: 200, body: [] },
