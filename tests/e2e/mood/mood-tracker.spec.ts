@@ -45,7 +45,9 @@ test.describe('Mood Tracker', () => {
     await happyButton.click();
 
     // THEN: Mood is selected and visual feedback is shown
-    await expect(page.getByText(/Selected:.*Happy/i)).toBeVisible();
+    const selectedSummary = page.getByTestId('mood-selected-summary');
+    await expect(selectedSummary).toBeVisible();
+    await expect(selectedSummary).toHaveText(/Selected:.*Happy/i);
     await expect(page.getByTestId('mood-submit-button')).toBeEnabled();
   });
 

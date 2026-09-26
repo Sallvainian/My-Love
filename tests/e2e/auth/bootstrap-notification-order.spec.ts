@@ -3,9 +3,12 @@
  * The harness controls the local SDK promise/callback, not HTTP or GoTrue timing.
  * Unit coverage remains responsible for effect cleanup and remount permutations.
  */
+import type { Page } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import { createAuthBootstrapSession } from '../../support/factories/auth-bootstrap-notification-order';
 import { test, expect } from '../../support/merged-fixtures';
+
+const authLoader = (page: Page) => page.getByTestId('auth-loading-screen');
 
 test.describe('Auth bootstrap notification ownership in the browser', () => {
   // playwright-utils deviation: SDK ordering uses synthetic sessions in an isolated context; a cached live token would introduce unrelated notifications.
@@ -24,7 +27,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
       const stale = scenario.staleKind === 'null' ? null : createAuthBootstrapSession();
       await log.step('Mount with bootstrap pending, then deliver the newer SDK session');
       await authBootstrap.mount();
-      await expect(page.getByText('Loading...', { exact: true })).toBeVisible();
+      await expect(authLoader(page)).toBeVisible();
       await authBootstrap.notify('SIGNED_IN', current);
       const owned = await recurse(
         () => authBootstrap.snapshot(),
@@ -37,7 +40,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
 
       await log.step('Release the stale bootstrap snapshot and observe the completed auth render');
       await authBootstrap.resolveLookup(stale);
-      await expect(page.getByText('Loading...', { exact: true })).not.toBeVisible();
+      await expect(authLoader(page)).not.toBeVisible();
       await expect(page.getByTestId('app-container')).toBeVisible();
       await expect(page.getByTestId('login-screen')).not.toBeVisible();
       await expect(page.getByRole('heading', { name: 'Cached current trip', exact: true })).toBeVisible();
@@ -80,14 +83,14 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
   }) => {
     await log.step('Deliver a first and only sign-out notification while bootstrap waits');
     await authBootstrap.mount();
-    await expect(page.getByText('Loading...', { exact: true })).toBeVisible();
+    await expect(authLoader(page)).toBeVisible();
     await authBootstrap.notify('SIGNED_OUT', null);
     const signedOut = await authBootstrap.snapshot();
     expect(signedOut.userId).toBeNull();
 
     await log.step('Release a stale signed-in session and verify Login owns the result');
     await authBootstrap.resolveLookup(createAuthBootstrapSession());
-    await expect(page.getByText('Loading...', { exact: true })).not.toBeVisible();
+    await expect(authLoader(page)).not.toBeVisible();
     await expect(page.getByTestId('login-screen')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'My Love' })).toBeVisible();
     await expect(page.getByTestId('app-container')).not.toBeVisible();
@@ -122,12 +125,12 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
       initialIdentity: { userId: original.user.id, email: original.user.email },
       profileDisplayName: null,
     });
-    await expect(page.getByText('Loading...', { exact: true })).toBeVisible();
+    await expect(authLoader(page)).toBeVisible();
     const before = await authBootstrap.snapshot();
 
     await log.step('Resolve the old snapshot and synchronously deliver USER_UPDATED before continuation');
     await authBootstrap.resolveLookupThenNotify(original, 'USER_UPDATED', updated);
-    await expect(page.getByText('Loading...', { exact: true })).not.toBeVisible();
+    await expect(authLoader(page)).not.toBeVisible();
     await expect(page.getByTestId('display-name-setup')).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Display Name' })).toBeVisible();
     await expect(page.getByTestId('app-container')).not.toBeVisible();
@@ -159,7 +162,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
     });
     await log.step('Deliver a newer session before the SDK lookup fails');
     await authBootstrap.mount();
-    await expect(page.getByText('Loading...', { exact: true })).toBeVisible();
+    await expect(authLoader(page)).toBeVisible();
     await authBootstrap.notify('SIGNED_IN', current);
     const owned = await recurse(
       () => authBootstrap.snapshot(),
@@ -169,7 +172,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
 
     await log.step('Let real sessionService normalize the rejection to null');
     await authBootstrap.rejectLookup('Controlled bootstrap failure');
-    await expect(page.getByText('Loading...', { exact: true })).not.toBeVisible();
+    await expect(authLoader(page)).not.toBeVisible();
     await expect(page.getByTestId('app-container')).toBeVisible();
     expect(errors.some((message) =>
       message.includes('[AuthService] Unexpected error getting session:') &&
@@ -193,10 +196,10 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
     const initial = createAuthBootstrapSession();
     await log.step('Mount without a notification and release the initial authenticated session');
     await authBootstrap.mount();
-    await expect(page.getByText('Loading...', { exact: true })).toBeVisible();
+    await expect(authLoader(page)).toBeVisible();
     const before = await authBootstrap.snapshot();
     await authBootstrap.resolveLookup(initial);
-    await expect(page.getByText('Loading...', { exact: true })).not.toBeVisible();
+    await expect(authLoader(page)).not.toBeVisible();
     await expect(page.getByTestId('app-container')).toBeVisible();
     const after = await recurse(
       () => authBootstrap.snapshot(),
@@ -222,14 +225,14 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
     const previous = createAuthBootstrapSession();
     await log.step('Mount with a prior store identity and a pending initial lookup');
     await authBootstrap.mount({ initialIdentity: { userId: previous.user.id, email: previous.user.email } });
-    await expect(page.getByText('Loading...', { exact: true })).toBeVisible();
+    await expect(authLoader(page)).toBeVisible();
     await authBootstrap.seedEvents([{ userId: previous.user.id, label: 'Previous account trip' }]);
     const before = await authBootstrap.snapshot();
     expect(before.events).toHaveLength(1);
 
     await log.step('Accept the initial null session and show Login with cleared account state');
     await authBootstrap.resolveLookup(null);
-    await expect(page.getByText('Loading...', { exact: true })).not.toBeVisible();
+    await expect(authLoader(page)).not.toBeVisible();
     await expect(page.getByTestId('login-screen')).toBeVisible();
     await expect(page.getByTestId('app-container')).not.toBeVisible();
     expect(await authBootstrap.snapshot()).toMatchObject({

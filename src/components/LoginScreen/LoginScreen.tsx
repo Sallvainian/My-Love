@@ -192,18 +192,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
         <div className="flex flex-col items-center gap-1.5 text-center">
           <h1 className="flex items-center justify-center gap-2.75">
             <Heart
+              data-testid="login-heading-icon"
               className="h-6 w-6 shrink-0 fill-current text-accent"
               strokeWidth={0}
               aria-hidden="true"
             />
-            <span className="font-lora text-[34px] leading-none font-semibold text-ink italic">
+            <span
+              className="font-lora text-[34px] leading-none font-semibold text-ink italic"
+              data-testid="login-wordmark"
+            >
               My Love
             </span>
           </h1>
-          <p className="text-[15px] text-muted">Welcome back — sign in to continue</p>
+          <p className="text-[15px] text-muted" data-testid="login-tagline">
+            Welcome back — sign in to continue
+          </p>
         </div>
 
-        <div className="grid gap-3.5 rounded-[20px] border border-line bg-card p-5 shadow-card">
+        <div
+          className="grid gap-3.5 rounded-[20px] border border-line bg-card p-5 shadow-card"
+          data-testid="login-card"
+        >
           {callbackNotice && (
             <div
               className={`${NOTICE} flex items-start gap-2 text-sm text-ink`}
@@ -211,12 +220,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
               role="status"
               aria-live="polite"
             >
-              <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <Info
+                className="mt-0.5 h-4 w-4 shrink-0"
+                aria-hidden="true"
+                data-testid="login-notice-icon"
+              />
               <span>{callbackNotice}</span>
             </div>
           )}
 
-          <form className="grid gap-3.5" onSubmit={handleSubmit}>
+          <form className="grid gap-3.5" onSubmit={handleSubmit} data-testid="login-form">
             {error && (
               <div
                 className={`${FAILURE_BOX} flex items-start gap-2`}
@@ -224,7 +237,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
                 role="alert"
                 aria-live="polite"
               >
-                <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <CircleAlert
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                  aria-hidden="true"
+                  data-testid="login-error-icon"
+                />
                 <span>{error}</span>
               </div>
             )}
@@ -277,7 +294,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
             >
               {isLoading ? (
                 <>
-                  <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  <LoaderCircle
+                    className="h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                    data-testid="submit-button-spinner"
+                  />
                   Signing in...
                 </>
               ) : (
@@ -313,7 +334,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
           </button>
         </div>
 
-        <p className="text-center text-sm text-muted">
+        <p className="text-center text-sm text-muted" data-testid="login-footer">
           Need an account?{' '}
           <button
             type="button"

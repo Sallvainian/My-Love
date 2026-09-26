@@ -157,8 +157,9 @@ describe.each(creates)('%s create', (table, create) => {
     const nextSave = vi.fn(async () => 'saved');
     const queued = serializeAccountDataWrite(nextSave);
 
-    // Held while the create is pending: the queue is strict.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Held while the create is pending: the queue is strict. The create has
+    // reached the network once it consumed its planned stall.
+    await vi.waitFor(() => expect(fake.plan).toHaveLength(0));
     expect(nextSave).not.toHaveBeenCalled();
 
     controller.abort(); // what REQUEST_TIMEOUT_MS does to a stalled socket

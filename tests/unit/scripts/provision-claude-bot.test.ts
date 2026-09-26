@@ -130,6 +130,20 @@ function runScript(env: Record<string, string>): Promise<{ status: number | null
   });
 }
 
+/**
+ * The complete environment a provisioning run needs, pointed at the stub. The
+ * missing-key cases and the `VITE_SUPABASE_URL` fallback case build theirs
+ * inline, since which key is absent is the point of each.
+ */
+function botEnv(url: string, overrides: Record<string, string> = {}): Record<string, string> {
+  return {
+    SUPABASE_URL: url,
+    SUPABASE_SERVICE_KEY: SERVICE_KEY,
+    CLAUDE_BOT_PASSWORD: FAKE_PASSWORD,
+    ...overrides,
+  };
+}
+
 describe('scripts/provision-claude-bot.mjs', () => {
   let stub: { server: Server; url: string; seen: SeenRequest[] } | undefined;
 
@@ -159,11 +173,7 @@ describe('scripts/provision-claude-bot.mjs', () => {
 
   it('exits 1 with "user not found" and never attempts a password update', async () => {
     stub = await startStub({ users: [{ id: 'someone-else', email: 'other@test.example.com' }] });
-    const { status, output } = await runScript({
-      SUPABASE_URL: stub.url,
-      SUPABASE_SERVICE_KEY: SERVICE_KEY,
-      CLAUDE_BOT_PASSWORD: FAKE_PASSWORD,
-    });
+    const { status, output } = await runScript(botEnv(stub.url));
     expect(status).toBe(1);
     expect(output).toContain(`user not found: ${BOT_EMAIL}`);
     expect(output).not.toContain(FAKE_PASSWORD);
@@ -201,11 +211,7 @@ describe('scripts/provision-claude-bot.mjs', () => {
 
   it('exits 1 for an empty CLAUDE_BOT_PASSWORD instead of reporting a skip', async () => {
     stub = await startStub();
-    const { status, output } = await runScript({
-      SUPABASE_URL: stub.url,
-      SUPABASE_SERVICE_KEY: SERVICE_KEY,
-      CLAUDE_BOT_PASSWORD: '',
-    });
+    const { status, output } = await runScript(botEnv(stub.url, { CLAUDE_BOT_PASSWORD: '' }));
     expect(status).toBe(1);
     expect(output).toContain('CLAUDE_BOT_PASSWORD (set but empty)');
     expect(output).not.toContain('skipped');
@@ -218,11 +224,7 @@ describe('scripts/provision-claude-bot.mjs', () => {
       email: `filler-${i}@test.example.com`,
     }));
     stub = await startStub({ pages: { 1: filler, 2: [{ id: BOT_ID, email: BOT_EMAIL }] } });
-    const { status, output } = await runScript({
-      SUPABASE_URL: stub.url,
-      SUPABASE_SERVICE_KEY: SERVICE_KEY,
-      CLAUDE_BOT_PASSWORD: FAKE_PASSWORD,
-    });
+    const { status, output } = await runScript(botEnv(stub.url));
     expect(status).toBe(0);
     expect(output).toContain(`found user ${BOT_EMAIL} (${BOT_ID})`);
     expect(stub.seen.map((r) => `${r.method} ${r.url}`).slice(0, 3)).toEqual([
@@ -234,11 +236,7 @@ describe('scripts/provision-claude-bot.mjs', () => {
 
   it('warns that the password is rotated but sessions are not revoked when sign-in fails', async () => {
     stub = await startStub({ signInStatus: 403 });
-    const { status, output } = await runScript({
-      SUPABASE_URL: stub.url,
-      SUPABASE_SERVICE_KEY: SERVICE_KEY,
-      CLAUDE_BOT_PASSWORD: FAKE_PASSWORD,
-    });
+    const { status, output } = await runScript(botEnv(stub.url));
     expect(status).toBe(1);
     expect(output).toContain('update-password ok (HTTP 200)');
     expect(output).toContain(HALF_DONE_WARNING);
@@ -249,11 +247,7 @@ describe('scripts/provision-claude-bot.mjs', () => {
 
   it('warns that the password is rotated but sessions are not revoked when global sign-out fails', async () => {
     stub = await startStub({ signOutStatus: 500 });
-    const { status, output } = await runScript({
-      SUPABASE_URL: stub.url,
-      SUPABASE_SERVICE_KEY: SERVICE_KEY,
-      CLAUDE_BOT_PASSWORD: FAKE_PASSWORD,
-    });
+    const { status, output } = await runScript(botEnv(stub.url));
     expect(status).toBe(1);
     expect(output).toContain('sign-in with new password ok (HTTP 200)');
     expect(output).toContain(HALF_DONE_WARNING);
@@ -270,12 +264,7 @@ describe('scripts/provision-claude-bot.mjs', () => {
     // The sign-in must then carry the operator's value verbatim, not the default.
     const override = 'Rotation-Bot@test.example.com';
     stub = await startStub({ users: [{ id: BOT_ID, email: 'rotation-bot@TEST.example.com' }] });
-    const { status, output } = await runScript({
-      SUPABASE_URL: stub.url,
-      SUPABASE_SERVICE_KEY: SERVICE_KEY,
-      CLAUDE_BOT_PASSWORD: FAKE_PASSWORD,
-      CLAUDE_BOT_EMAIL: override,
-    });
+    const { status, output } = await runScript(botEnv(stub.url, { CLAUDE_BOT_EMAIL: override }));
     expect(status).toBe(0);
     expect(output).toContain(`found user ${override} (${BOT_ID})`);
     expect(output).not.toContain(BOT_EMAIL);
@@ -288,11 +277,7 @@ describe('scripts/provision-claude-bot.mjs', () => {
     // A 200 with no token is the one sign-in failure a status check misses;
     // without the guard the script would POST /logout with "Bearer undefined".
     stub = await startStub({ signInBody: { token_type: 'bearer' } });
-    const { status, output } = await runScript({
-      SUPABASE_URL: stub.url,
-      SUPABASE_SERVICE_KEY: SERVICE_KEY,
-      CLAUDE_BOT_PASSWORD: FAKE_PASSWORD,
-    });
+    const { status, output } = await runScript(botEnv(stub.url));
     expect(status).toBe(1);
     expect(output).toContain('update-password ok (HTTP 200)');
     expect(output).toContain(HALF_DONE_WARNING);
@@ -303,11 +288,7 @@ describe('scripts/provision-claude-bot.mjs', () => {
 
   it('exits 1 with the failing step and status when the Auth API rejects the update', async () => {
     stub = await startStub({ updateStatus: 500 });
-    const { status, output } = await runScript({
-      SUPABASE_URL: stub.url,
-      SUPABASE_SERVICE_KEY: SERVICE_KEY,
-      CLAUDE_BOT_PASSWORD: FAKE_PASSWORD,
-    });
+    const { status, output } = await runScript(botEnv(stub.url));
     expect(status).toBe(1);
     expect(output).toContain('step "update-password" failed with HTTP 500');
     expect(output).not.toContain(FAKE_PASSWORD);

@@ -1,6 +1,9 @@
 import type { Page } from '@playwright/test';
 import type { AppState } from '../../../src/stores/types';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
+import { clockAnchor } from '../../support/helpers/events';
+import { FAVORITES_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
@@ -87,7 +90,7 @@ async function signOut(page: Page) {
   await navigate(page, 'settings');
   await page.getByTestId('settings-sign-out').click();
   await expect(page.getByTestId('login-screen')).toBeVisible();
-  await expect.poll(async () => (await snapshot(page)).userId).toBeNull();
+  await recurseUntil(async () => (await snapshot(page)).userId, (v) => { expect(v).toBeNull(); });
   expect((await snapshot(page)).favoriteIds).toEqual([]);
 }
 
@@ -103,7 +106,29 @@ async function signIn(page: Page, email: string) {
 test.describe('Account data through the real browser and local services', () => {
   test.setTimeout(90_000);
 
-  test('[P1] favorites survive reload and stay separate across A/B/A and same-account re-login', async ({ page, supabaseAdmin }) => {
+  /**
+   * This worker pair's account ids, recorded by the favorites test once it has
+   * resolved them. The test ends with user1's favorite still on the server, so
+   * `test.afterEach` clears the pair's favorites again — here rather than at
+   * the end of the body, so a failure or a timeout mid-test clears them too.
+   */
+  let favoriteOwners: string[] | null = null;
+
+  test.afterEach(async ({ supabaseAdmin }) => {
+    if (!favoriteOwners) return;
+    const owners = favoriteOwners;
+    favoriteOwners = null;
+    const { error } = await supabaseAdmin.from('message_favorites').delete().in('user_id', owners);
+    // Soft, so a teardown failure is recorded beside the test's own error
+    // rather than replacing it.
+    expect.soft(error, "Teardown must clear this worker pair's favorites").toBeNull();
+  });
+
+  test('[P1] favorites survive reload and stay separate across A/B/A and same-account re-login', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
     const pair = getWorkerPairEmails();
     if (!pair) throw new Error('This test requires its worker-owned account pair');
     // Favorites are server rows now and outlive a run: start this worker
@@ -112,10 +137,15 @@ test.describe('Account data through the real browser and local services', () => 
       .from('users').select('id').in('email', [pair.user1Email, pair.user2Email]);
     expect(accountsError).toBeNull();
     expect(accounts).toHaveLength(2);
+    favoriteOwners = (accounts ?? []).map((account) => account.id);
     const cleared = await supabaseAdmin.from('message_favorites').delete()
-      .in('user_id', (accounts ?? []).map((account) => account.id));
+      .in('user_id', favoriteOwners);
     expect(cleared.error).toBeNull();
+    const favoritesRead = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
     await page.goto('/');
+    const firstRead = await favoritesRead;
+    expect(firstRead.status).toBe(200);
+    expect(firstRead.responseJson).toEqual([]);
     const favorite = page.getByTestId('message-favorite-button');
     await expect(favorite).toHaveAccessibleName('Add to favorites');
     const original = await snapshot(page);
@@ -123,30 +153,69 @@ test.describe('Account data through the real browser and local services', () => 
     expect(original.currentId).toBeTruthy();
 
     await favorite.click();
-    await expect.poll(() => savedFavoriteIds(page, original.userId!)).toContain(original.currentId);
-    await expect.poll(async () => (await snapshot(page)).favoriteIds).toContain(original.currentId);
+    await recurseUntil(
+      () => savedFavoriteIds(page, original.userId!),
+      (v) => {
+        expect(v).toContain(original.currentId);
+      }
+    );
+    await recurseUntil(
+      async () => (await snapshot(page)).favoriteIds,
+      (v) => {
+        expect(v).toContain(original.currentId);
+      }
+    );
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
 
+    const reloadRead = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
     await page.reload();
+    const reloaded = await reloadRead;
+    expect(reloaded.status).toBe(200);
+    expect(reloaded.responseJson).toHaveLength(1);
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
-    expect((await snapshot(page)).currentFavorite).toBe(true);
+    await recurseUntil(
+      async () => (await snapshot(page)).currentFavorite,
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
     await signOut(page);
     await signIn(page, pair.user2Email);
-    await expect.poll(async () => (await snapshot(page)).userId).not.toBe(original.userId);
-    await expect.poll(async () => (await snapshot(page)).currentId).toBe(original.currentId);
+    await recurseUntil(
+      async () => (await snapshot(page)).userId,
+      (v) => {
+        expect(v).not.toBe(original.userId);
+      }
+    );
+    await recurseUntil(
+      async () => (await snapshot(page)).currentId,
+      (v) => {
+        expect(v).toBe(original.currentId);
+      }
+    );
     await expect(favorite).toHaveAccessibleName('Add to favorites');
     expect((await snapshot(page)).favoriteIds).toEqual([]);
 
     // A's favorite left the device with A's session (CAP-7) — it stays on
     // the server — and B can add and remove the same daily favorite.
     const userB = (await snapshot(page)).userId!;
-    await expect.poll(() => savedFavoriteIds(page, original.userId!)).toBeNull();
+    await recurseUntil(
+      () => savedFavoriteIds(page, original.userId!),
+      (v) => {
+        expect(v).toBeNull();
+      }
+    );
     await favorite.click();
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
-    await expect.poll(() => savedFavoriteIds(page, userB)).toEqual([original.currentId]);
+    await recurseUntil(
+      () => savedFavoriteIds(page, userB),
+      (v) => {
+        expect(v).toEqual([original.currentId]);
+      }
+    );
     await favorite.click();
     await expect(favorite).toHaveAccessibleName('Add to favorites');
-    await expect.poll(() => savedFavoriteIds(page, userB)).toEqual([]);
+    await recurseUntil(() => savedFavoriteIds(page, userB), (v) => { expect(v).toEqual([]); });
 
     // A's sign-in refreshes the favorite back from the server.
     await signOut(page);
@@ -163,6 +232,9 @@ test.describe('Account data through the real browser and local services', () => 
   });
 
   test('[P1] repairs an invalid local mood through the form, preserving its row and syncing the result', async ({ page, supabaseAdmin }) => {
+    // The seeded row is dated by the page's clock and the form edits today's
+    // mood, so the clock is pinned: a real midnight cannot split the two.
+    await page.clock.install({ time: clockAnchor() });
     await page.goto('/');
     await expect(page.getByTestId('daily-message')).toBeVisible();
     const seeded = await page.evaluate(async () => {
@@ -204,7 +276,7 @@ test.describe('Account data through the real browser and local services', () => 
     try {
       await navigate(page, 'mood');
       await expect(page.getByTestId('mood-tracker')).toBeVisible();
-      await expect.poll(async () => (await snapshot(page)).pending).toBe(1);
+      await recurseUntil(async () => (await snapshot(page)).pending, (v) => { expect(v).toBe(1); });
       expect((await snapshot(page)).moods).toEqual([]);
       expect(await localRows(page, 'moods')).toContainEqual(expect.objectContaining({
         id: seeded.id,
@@ -214,6 +286,7 @@ test.describe('Account data through the real browser and local services', () => 
       }));
       await expect(page.getByTestId('mood-submit-button')).toBeDisabled();
 
+      // playwright-utils deviation: matches on the request body (this seeded row's owner and timestamp), which a method + URL glob cannot express.
       const savedResponse = page.waitForResponse((response) => {
         const request = response.request();
         if (!response.url().includes('/rest/v1/moods') || request.method() !== 'POST') return false;
@@ -224,6 +297,7 @@ test.describe('Account data through the real browser and local services', () => 
       await page.getByTestId('mood-submit-button').click();
       const response = await savedResponse;
       expect(response.ok()).toBe(true);
+      // playwright-utils deviation: parses the response of the body-matched waitForResponse above, which interceptNetworkCall cannot replace.
       const body = await response.json();
       expect(body).toEqual(expect.objectContaining({
         user_id: seeded.owner,
@@ -232,34 +306,46 @@ test.describe('Account data through the real browser and local services', () => 
         note: seeded.note,
       }));
       const serverId = body.id as string;
-      await expect.poll(async () => (await snapshot(page)).moods).toContainEqual({
-        id: seeded.id,
-        mood: 'happy',
-        note: seeded.note,
-        synced: true,
-        supabaseId: serverId,
-      });
-      await expect.poll(() => localRows(page, 'moods')).toEqual([expect.objectContaining({
-        id: seeded.id,
-        userId: seeded.owner,
-        timestamp: seeded.timestamp,
-        moods: ['happy'],
-        note: seeded.note,
-        synced: true,
-        supabaseId: serverId,
-      })]);
+      await recurseUntil(
+        async () => (await snapshot(page)).moods,
+        (v) => {
+          expect(v).toContainEqual({
+            id: seeded.id,
+            mood: 'happy',
+            note: seeded.note,
+            synced: true,
+            supabaseId: serverId,
+          });
+        }
+      );
+      await recurseUntil(
+        () => localRows(page, 'moods'),
+        (v) => {
+          expect(v).toEqual([expect.objectContaining({
+            id: seeded.id,
+            userId: seeded.owner,
+            timestamp: seeded.timestamp,
+            moods: ['happy'],
+            note: seeded.note,
+            synced: true,
+            supabaseId: serverId,
+          })]);
+        }
+      );
       await expect(page.getByTestId('mood-success-toast')).toBeVisible();
       await expect(page.getByTestId('mood-note-input')).toHaveValue(seeded.note);
-      await expect.poll(async () => (await snapshot(page)).pending).toBe(0);
+      await recurseUntil(async () => (await snapshot(page)).pending, (v) => { expect(v).toBe(0); });
       const persisted = await supabaseAdmin.from('moods').select('mood_type,mood_types,note').eq('id', serverId).single();
       expect(persisted.error).toBeNull();
       expect(persisted.data).toEqual({ mood_type: 'happy', mood_types: ['happy'], note: seeded.note });
     } finally {
       // Stop this page's retries before deleting only the row this test created.
-      await page.close();
+      // A close that rejects, and a failed delete, are recorded without
+      // replacing the error the test was already failing on.
+      await page.close().catch(() => {});
       const cleanup = await supabaseAdmin.from('moods').delete()
         .eq('user_id', seeded.owner).eq('created_at', seeded.timestamp);
-      expect(cleanup.error).toBeNull();
+      expect.soft(cleanup.error, 'Teardown must delete the mood row this test created').toBeNull();
     }
   });
 });

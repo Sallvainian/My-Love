@@ -7,8 +7,8 @@
  * `tests/unit/services/eventsService.test.ts` pins that the service BUILDS
  * that chain: its fake records every bound, ordering and range and asserts on
  * them. What the fake cannot say is whether the chain MEANS what the service
- * assumes, because its `.range()` is the test file's own
- * `found.slice(from, to + 1)`.
+ * assumes, because its `.range()` is the fake's own
+ * `found.slice(from, to + 1)` in `tests/unit/services/fakeEventsBackend.ts`.
  *
  * That gap is named in the story's own review log: "what remains unexercised
  * is the Supabase client's own `.range` implementation"

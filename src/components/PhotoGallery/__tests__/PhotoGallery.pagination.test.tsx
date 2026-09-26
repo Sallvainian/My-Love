@@ -12,7 +12,9 @@
  * DW-201: an upload (the store's newest row) shows at once, and scrolling the
  * album is never snapped back to its first 20 tiles.
  */
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PhotoWithUrls } from '../../../services/photoService';
@@ -103,13 +105,11 @@ async function renderGallery() {
   await act(async () => {});
 }
 
-async function openAndDelete(caption: string) {
-  fireEvent.click(within(screen.getByTestId('photo-gallery-grid')).getByLabelText(caption));
+async function openAndDelete(user: UserEvent, caption: string) {
+  await user.click(within(screen.getByTestId('photo-gallery-grid')).getByLabelText(caption));
   const overlay = screen.getByTestId('photo-viewer-overlay');
-  fireEvent.click(within(overlay).getByLabelText('Delete photo'));
-  await act(async () => {
-    fireEvent.click(within(overlay).getByRole('button', { name: 'Delete' }));
-  });
+  await user.click(within(overlay).getByLabelText('Delete photo'));
+  await user.click(within(overlay).getByRole('button', { name: 'Delete' }));
 }
 
 const originalObserver = window.IntersectionObserver;
@@ -128,10 +128,11 @@ afterEach(() => {
 
 describe('PhotoGallery: deleting from the viewer (DW-176)', () => {
   it('drops the photo from the grid and the count, and shows the next photo', async () => {
+    const user = userEvent.setup();
     listPhotos.mockResolvedValue(page(3));
     await renderGallery();
 
-    await openAndDelete('cap-1');
+    await openAndDelete(user, 'cap-1');
 
     expect(deletePhotoOnServer).toHaveBeenCalledWith('photo-1');
     const grid = screen.getByTestId('photo-gallery-grid');
@@ -145,10 +146,11 @@ describe('PhotoGallery: deleting from the viewer (DW-176)', () => {
   });
 
   it('steps back to the previous photo when the last one is deleted', async () => {
+    const user = userEvent.setup();
     listPhotos.mockResolvedValue(page(3));
     await renderGallery();
 
-    await openAndDelete('cap-2');
+    await openAndDelete(user, 'cap-2');
 
     const overlay = screen.getByTestId('photo-viewer-overlay');
     expect(within(overlay).getByAltText('cap-1')).toBeTruthy();
@@ -157,19 +159,21 @@ describe('PhotoGallery: deleting from the viewer (DW-176)', () => {
   });
 
   it('closes the viewer and shows the empty state when the only photo is deleted', async () => {
+    const user = userEvent.setup();
     listPhotos.mockResolvedValue(page(1));
     await renderGallery();
 
-    await openAndDelete('cap-0');
+    await openAndDelete(user, 'cap-0');
 
     expect(screen.queryByTestId('photo-viewer-overlay')).toBeNull();
     expect(screen.getByTestId('photo-gallery-empty-state')).toBeTruthy();
   });
 
   it('does not reopen the viewer on the next upload after a refresh empties the album', async () => {
+    const user = userEvent.setup();
     listPhotos.mockResolvedValue([photo(0)]);
     await renderGallery();
-    fireEvent.click(within(screen.getByTestId('photo-gallery-grid')).getByLabelText('cap-0'));
+    await user.click(within(screen.getByTestId('photo-gallery-grid')).getByLabelText('cap-0'));
     expect(screen.getByTestId('photo-viewer-overlay')).toBeTruthy();
 
     // Deleted on another device: a refresh empties the list while it is open.
@@ -187,11 +191,12 @@ describe('PhotoGallery: deleting from the viewer (DW-176)', () => {
   });
 
   it('keeps the photo in the grid and the viewer when the delete fails', async () => {
+    const user = userEvent.setup();
     deletePhotoOnServer.mockResolvedValue(false);
     listPhotos.mockResolvedValue(page(3));
     await renderGallery();
 
-    await openAndDelete('cap-1');
+    await openAndDelete(user, 'cap-1');
 
     const grid = screen.getByTestId('photo-gallery-grid');
     expect(within(grid).getByLabelText('cap-1')).toBeTruthy();
@@ -267,11 +272,12 @@ describe('PhotoGallery: the store\'s newest row (DW-201)', () => {
   });
 
   it('keeps the revealed tiles when the newest photo is deleted', async () => {
+    const user = userEvent.setup();
     listPhotos.mockResolvedValue(page(60));
     await renderGallery();
     await scrollToTrigger();
 
-    await openAndDelete('cap-0');
+    await openAndDelete(user, 'cap-0');
 
     expect(screen.getAllByTestId('photo-grid-item')).toHaveLength(40);
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe('59 photos');
@@ -280,10 +286,11 @@ describe('PhotoGallery: the store\'s newest row (DW-201)', () => {
 
 describe('PhotoViewer: "Photo N of M" (DW-181)', () => {
   it('is handed the whole album by the gallery, not just the revealed tiles', async () => {
+    const user = userEvent.setup();
     listPhotos.mockResolvedValue(page(25));
     await renderGallery();
 
-    fireEvent.click(screen.getByLabelText('cap-3'));
+    await user.click(screen.getByLabelText('cap-3'));
     const overlay = screen.getByTestId('photo-viewer-overlay');
     expect(within(overlay).getByText(/Photo 4 of 25 •/)).toBeTruthy();
   });

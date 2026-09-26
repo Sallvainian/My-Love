@@ -65,6 +65,16 @@ interface WirePostgrestError {
 const asPostgrestError = (wire: WirePostgrestError): PostgrestError =>
   ({ name: 'PostgrestError', ...wire }) as unknown as PostgrestError;
 
+/** Internal error (SQLSTATE `XX000`), a code the map in `src/api/errorHandlers.ts` does not list. */
+const UNMAPPED_CODE = 'XX000';
+
+/**
+ * An envelope carrying `UNMAPPED_CODE`. No default `message`: the
+ * missing-or-blank cases below rely on the key being absent when not passed.
+ */
+const unmapped = (fields: Partial<Omit<WirePostgrestError, 'code'>> = {}): PostgrestError =>
+  asPostgrestError({ code: UNMAPPED_CODE, details: null, hint: null, ...fields });
+
 const MISSING_OR_BLANK_MESSAGES: ReadonlyArray<[string, Pick<WirePostgrestError, 'message'>]> = [
   ['omitted', {}],
   ['undefined', { message: undefined }],
@@ -164,26 +174,16 @@ describe('handleSupabaseError', () => {
     // fallback must preserve meaningful messages and the exact prefix.
     it('falls back to "Database error: <message>"', () => {
       const err = handleSupabaseError(
-        asPostgrestError({
-          code: 'XX000',
-          message: 'Injected create failure',
-          details: '',
-          hint: '',
-        })
+        unmapped({ message: 'Injected create failure', details: '', hint: '' })
       );
 
       expect(err.message).toBe('Database error: Injected create failure');
-      expect(err.code).toBe('XX000');
+      expect(err.code).toBe(UNMAPPED_CODE);
     });
 
     it('keeps the context prefix on the fallback branch', () => {
       const err = handleSupabaseError(
-        asPostgrestError({
-          code: 'XX000',
-          message: 'Injected create failure',
-          details: '',
-          hint: '',
-        }),
+        unmapped({ message: 'Injected create failure', details: '', hint: '' }),
         'EventsService.createEvent'
       );
 
@@ -194,40 +194,33 @@ describe('handleSupabaseError', () => {
       [42, 'Database error: 42'],
       [0, 'Database error: 0'],
     ] as const)('preserves a numeric message of %s without throwing', (message, expected) => {
-      const err = handleSupabaseError(
-        asPostgrestError({ code: 'XX000', message, details: null, hint: null })
-      );
+      const err = handleSupabaseError(unmapped({ message }));
 
       expect(err.message).toBe(expected);
-      expect(err.code).toBe('XX000');
+      expect(err.code).toBe(UNMAPPED_CODE);
     });
 
-    it.each([undefined, 'EventsService.createEvent'])(
+    it.each([
+      [undefined, 'Database error:   Injected create failure \n'],
+      ['EventsService.createEvent', '[EventsService.createEvent] Database error:   Injected create failure \n'],
+    ])(
       'preserves surrounding whitespace in meaningful messages with context %s',
-      (context) => {
+      (context, expected) => {
         const err = handleSupabaseError(
-          asPostgrestError({
-            code: 'XX000',
-            message: '  Injected create failure \n',
-            details: null,
-            hint: null,
-          }),
+          unmapped({ message: '  Injected create failure \n' }),
           context
         );
 
-        const prefix = context ? '[EventsService.createEvent] ' : '';
-        expect(err.message).toBe(`${prefix}Database error:   Injected create failure \n`);
+        expect(err.message).toBe(expected);
       }
     );
 
     describe.each(MISSING_OR_BLANK_MESSAGES)('with a %s message', (_label, messageFields) => {
       it('uses a useful generic message for an unmapped code', () => {
-        const err = handleSupabaseError(
-          asPostgrestError({ code: 'XX000', ...messageFields, details: null, hint: null })
-        );
+        const err = handleSupabaseError(unmapped(messageFields));
 
         expect(err.message).toBe('Database error: An unknown database error occurred');
-        expect(err.code).toBe('XX000');
+        expect(err.code).toBe(UNMAPPED_CODE);
       });
 
       it('uses the same fallback when the code is omitted', () => {
@@ -241,8 +234,7 @@ describe('handleSupabaseError', () => {
 
       it('preserves context and diagnostics on the generic fallback', () => {
         const err = handleSupabaseError(
-          asPostgrestError({
-            code: 'XX000',
+          unmapped({
             ...messageFields,
             details: 'Original diagnostic details',
             hint: 'Original diagnostic hint',
@@ -253,7 +245,7 @@ describe('handleSupabaseError', () => {
         expect(err.message).toBe(
           '[EventsService.createEvent] Database error: An unknown database error occurred'
         );
-        expect(err.code).toBe('XX000');
+        expect(err.code).toBe(UNMAPPED_CODE);
         expect(err.details).toBe('Original diagnostic details');
         expect(err.hint).toBe('Original diagnostic hint');
         expect(err.name).toBe('SupabaseServiceError');

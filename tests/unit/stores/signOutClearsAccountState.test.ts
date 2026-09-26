@@ -17,16 +17,34 @@
  * `!partner` branch, which paints `sentRequests`, `receivedRequests` and
  * `searchResults`.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
   getPartnerId: vi.fn(),
 }));
 
+// Pass-through spies: the deletes still run for real against IndexedDB, and a
+// test can also see whether sign-in asked for one at all. `setAuthUser` starts
+// them synchronously (fire-and-forget), so a delete that was never requested
+// is known the moment it returns.
+vi.mock('../../../src/services/localCopy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/localCopy')>();
+  return { ...actual, deleteAccountCopies: vi.fn(actual.deleteAccountCopies) };
+});
+vi.mock('../../../src/services/imageCache', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/imageCache')>();
+  return { ...actual, deleteAccountImages: vi.fn(actual.deleteAccountImages) };
+});
+
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { ACCOUNT_OWNER_STORAGE_KEY, signedOutState } from '../../../src/stores/slices/authSlice';
-import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
+import { deleteAccountImages } from '../../../src/services/imageCache';
+import {
+  deleteAccountCopies,
+  readLocalCopy,
+  writeLocalCopy,
+} from '../../../src/services/localCopy';
 import { MESSAGE_DATA_COPY_KIND, openMyLoveDB } from '../../../src/services/dbSchema';
 
 const EXPECTED_RESET: Record<string, unknown> = {
@@ -91,6 +109,44 @@ const SECRETS = {
 /** A bundled daily message: shared by everyone, and must SURVIVE sign-out. */
 const SHARED_DAILY_TEXT = 'A-BUNDLED-DAILY-MESSAGE';
 
+/** The bundled daily row. A new object per call, so no two seeds share one. */
+function sharedDaily() {
+  return {
+    id: 1,
+    text: SHARED_DAILY_TEXT,
+    category: 'reason',
+    isCustom: false,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  };
+}
+
+/**
+ * The signed-in account's own custom row. A new object per call:
+ * `currentMessage` is a copy of the pool row, never a reference into it.
+ */
+function ownCustom() {
+  return {
+    id: 7,
+    text: SECRETS.customMessage,
+    category: 'custom',
+    isCustom: true,
+    userId: SECRETS.userId,
+    createdAt: new Date('2026-08-03T06:00:00.000Z'),
+  };
+}
+
+/** A love note from the signed-in account to its partner. */
+function accountNote(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'note-1',
+    from_user_id: SECRETS.userId,
+    to_user_id: 'USER-B-ID',
+    content: SECRETS.chatMessage,
+    created_at: '2026-08-03T06:00:00.000Z',
+    ...overrides,
+  };
+}
+
 function moodEntry(userId: string, note: string) {
   return {
     id: 1,
@@ -124,15 +180,7 @@ function seedSignedInSession(): void {
     receivedRequests: [{ id: 'req-2', fromEmail: SECRETS.requestedEmail }],
     searchResults: [{ id: 'USER-C-ID', displayName: SECRETS.searchHitName }],
 
-    notes: [
-      {
-        id: 'note-1',
-        from_user_id: SECRETS.userId,
-        to_user_id: 'USER-B-ID',
-        content: SECRETS.chatMessage,
-        created_at: '2026-08-03T06:00:00.000Z',
-      },
-    ],
+    notes: [accountNote()],
     sentMessageTimestamps: [1],
     // Which messages the previous account removed is theirs, not the next
     // signer-in's — and left behind it would filter their notes by stale ids.
@@ -157,33 +205,10 @@ function seedSignedInSession(): void {
     ],
     customMessagesLoaded: true,
     favoriteError: 'A favorite write failed',
-    messages: [
-      {
-        id: 1,
-        text: SHARED_DAILY_TEXT,
-        category: 'reason',
-        isCustom: false,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      },
-      {
-        id: 7,
-        text: SECRETS.customMessage,
-        category: 'custom',
-        isCustom: true,
-        userId: SECRETS.userId,
-        createdAt: new Date('2026-08-03T06:00:00.000Z'),
-      },
-    ],
+    messages: [sharedDaily(), ownCustom()],
     // DailyMessage renders `currentMessage.text` straight onto Home, and it is
     // a COPY of the row rather than a reference into `messages`.
-    currentMessage: {
-      id: 7,
-      text: SECRETS.customMessage,
-      category: 'custom',
-      isCustom: true,
-      userId: SECRETS.userId,
-      createdAt: new Date('2026-08-03T06:00:00.000Z'),
-    },
+    currentMessage: ownCustom(),
 
     interactions: [{ id: 'int-1', from_user_id: 'USER-B-ID', type: 'poke' }],
     unviewedCount: 3,
@@ -208,7 +233,7 @@ function seedSignedInSession(): void {
 /**
  * Every switch to a new user starts a fire-and-forget IndexedDB reload of the
  * rotation pool (`reloadRotationPool` in authSlice.ts). Nothing here asserts on
- * it -- loaderIdentityGuards.test.ts does -- but left running it can log after
+ * it -- loaderIdentityGuards.*.test.ts does -- but left running it can log after
  * the file's worker has closed, which Vitest reports as an unhandled
  * EnvironmentTeardownError and fails the whole run on. So each reload is
  * recorded and every test waits for its own to settle.
@@ -218,6 +243,8 @@ const pendingReloads: Promise<void>[] = [];
 
 describe('clearAuth on sign-out', () => {
   beforeEach(() => {
+    vi.mocked(deleteAccountCopies).mockClear();
+    vi.mocked(deleteAccountImages).mockClear();
     localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
     useAppStore.setState({
       loadMessages: () => {
@@ -232,6 +259,14 @@ describe('clearAuth on sign-out', () => {
   afterEach(async () => {
     await Promise.allSettled(pendingReloads.splice(0));
     localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
+    // happy-dom serves `onLine` from the Navigator prototype, so deleting the
+    // own property a test defined restores the real value — even when that
+    // test's assertions threw before it could restore it inline.
+    Reflect.deleteProperty(navigator, 'onLine');
+    // Runs after the reloads settle, so none of them writes into a cleared
+    // store; and here rather than inline, so a failed assertion cannot leave
+    // one test's seeded rows for the next.
+    await clearDevice();
   });
 
   it('clears the identity', () => {
@@ -420,13 +455,7 @@ describe('clearAuth on sign-out', () => {
     // The other half of the rule: a bundled row is not account state, and
     // nulling it would blank Home for the next account with nothing to
     // re-derive it before the next page load.
-    const shared = {
-      id: 1,
-      text: SHARED_DAILY_TEXT,
-      category: 'reason',
-      isCustom: false,
-      createdAt: new Date('2026-01-01T00:00:00.000Z'),
-    };
+    const shared = sharedDaily();
     useAppStore.setState({ currentMessage: shared } as unknown as Parameters<
       typeof useAppStore.setState
     >[0]);
@@ -547,8 +576,6 @@ describe('clearAuth on sign-out', () => {
     // Whether the device has a network does not — resetting it to true would
     // put the badge on "Online" while the phone is in a tunnel.
     expect(syncStatus.isOnline).toBe(false);
-
-    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   });
 
   it('revokes the preview URLs of the notes it is about to drop', () => {
@@ -562,14 +589,10 @@ describe('clearAuth on sign-out', () => {
 
     useAppStore.setState({
       notes: [
-        {
+        accountNote({
           id: 'note-failed',
-          from_user_id: SECRETS.userId,
-          to_user_id: 'USER-B-ID',
-          content: SECRETS.chatMessage,
-          created_at: '2026-08-03T06:00:00.000Z',
           imagePreviewUrl: 'blob:http://localhost/ORPHANED-BLOB',
-        },
+        }),
       ],
     } as unknown as Parameters<typeof useAppStore.setState>[0]);
 
@@ -590,14 +613,10 @@ describe('clearAuth on sign-out', () => {
     seedSignedInSession();
     useAppStore.setState({
       notes: [
-        {
+        accountNote({
           id: 'note-failed',
-          from_user_id: SECRETS.userId,
-          to_user_id: 'USER-B-ID',
-          content: SECRETS.chatMessage,
-          created_at: '2026-08-03T06:00:00.000Z',
           imagePreviewUrl: 'blob:http://localhost/SWITCH-ORPHANED-BLOB',
-        },
+        }),
       ],
     } as unknown as Parameters<typeof useAppStore.setState>[0]);
     expect(useAppStore.getState().notes.length).toBeGreaterThan(0);
@@ -657,9 +676,9 @@ describe('clearAuth on sign-out', () => {
         userId: 'OTHER-ACCOUNT', path: 'partner/pic.jpg', blob: 'OTHER-IMAGE' as never, savedAt: 1,
       });
       const at = new Date('2026-08-03T06:00:00.000Z');
-      const bundledId = await db.add('messages', {
-        text: SHARED_DAILY_TEXT, category: 'reason', isCustom: false, createdAt: at,
-      } as never);
+      // The id is IndexedDB's to assign.
+      const { id: _bundledId, ...bundledRow } = sharedDaily();
+      const bundledId = await db.add('messages', { ...bundledRow, createdAt: at } as never);
       const ownId = 900;
       const otherId = 901;
       const customRow = (id: number, userId: string, text: string, serverId: string) => ({
@@ -756,7 +775,6 @@ describe('clearAuth on sign-out', () => {
     useAppStore.getState().clearAuth();
 
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
-    await clearDevice();
   });
 
   it("deletes the outgoing account's saved data on a direct account switch", async () => {
@@ -765,7 +783,6 @@ describe('clearAuth on sign-out', () => {
     useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
 
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
-    await clearDevice();
   });
 
   it('records the signed-in account as the device owner, and clears it on sign-out', () => {
@@ -796,7 +813,6 @@ describe('clearAuth on sign-out', () => {
     expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBeNull();
     expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
-    await clearDevice();
   });
 
   it('deletes a previous owner\'s leftover data when a different account signs in fresh', async () => {
@@ -813,8 +829,10 @@ describe('clearAuth on sign-out', () => {
     useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
 
     expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBe('USER-B-ID');
+    // Requested synchronously, for the recorded owner only.
+    expect(deleteAccountCopies).toHaveBeenCalledExactlyOnceWith(SECRETS.userId);
+    expect(deleteAccountImages).toHaveBeenCalledExactlyOnceWith(SECRETS.userId);
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
-    await clearDevice();
   });
 
   it("a fresh boot of the recorded owner's own session deletes nothing", async () => {
@@ -828,8 +846,9 @@ describe('clearAuth on sign-out', () => {
 
     useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
 
-    // Let any stray queued delete run before asserting nothing went.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Sign-in starts any delete synchronously, so none was ever requested.
+    expect(deleteAccountCopies).not.toHaveBeenCalled();
+    expect(deleteAccountImages).not.toHaveBeenCalled();
     expect(await readLocalCopy(SECRETS.userId, 'anniversaries')).not.toBeNull();
     const db = await openMyLoveDB();
     try {
@@ -842,10 +861,9 @@ describe('clearAuth on sign-out', () => {
     } finally {
       db.close();
     }
-    await clearDevice();
   });
 
-  it('signedOutState() and this test agree on which fields exist', () => {
+  it('sign-out resets exactly the account fields this suite lists, so a newly added field cannot go unasserted', () => {
     // Catches drift in the other direction: a field ADDED to the source without
     // being added here would otherwise go unasserted forever.
     expect(Object.keys(signedOutState()).sort()).toEqual(Object.keys(EXPECTED_RESET).sort());

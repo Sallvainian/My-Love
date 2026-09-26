@@ -136,13 +136,14 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-partner text-base font-semibold text-card"
           aria-hidden="true"
+          data-testid="partner-mood-avatar"
         >
           {partnerName ? (
             // Array.from splits by code point, so a leading emoji or other
             // non-BMP character is not cut in half.
             Array.from(partnerName)[0].toUpperCase()
           ) : (
-            <User className="h-5 w-5" aria-hidden="true" />
+            <User className="h-5 w-5" aria-hidden="true" data-testid="partner-mood-avatar-icon" />
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -180,8 +181,9 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
             <span
               key={`${m}-${index}`}
               className={`flex h-8.5 items-center gap-1.5 rounded-full pr-3.5 pl-2.5 text-sm font-semibold ${MOOD_TONE.partner}`}
+              data-testid="partner-mood-chip"
             >
-              <Icon className="h-4.25 w-4.25" aria-hidden="true" />
+              <Icon className="h-4.25 w-4.25" aria-hidden="true" data-testid={`mood-icon-${m}`} />
               {label}
             </span>
           );

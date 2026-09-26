@@ -57,13 +57,22 @@ export function groupMoodsByDate(moods: SupabaseMood[]): MoodGroup[] {
  * @example
  * ```typescript
  * getDateLabel(new Date()); // 'Today'
- * getDateLabel(new Date(Date.now() - 86400000)); // 'Yesterday'
- * getDateLabel(new Date('2024-11-15')); // 'Nov 15'
+ * // on 15 Nov 2024:
+ * getDateLabel(new Date(2024, 10, 14)); // 'Yesterday'
+ * getDateLabel(new Date(2024, 10, 10)); // 'Nov 10'
  * ```
  */
 function getDateLabel(date: Date): string {
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
+  // Whole calendar days between the two local dates. Elapsed milliseconds
+  // divided by 24h mislabels around DST, where a local day is 23 or 25 hours
+  // long; the UTC stamps of the local components are always a whole number of
+  // days apart.
+  const diffDays = Math.round(
+    (Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) -
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())) /
+      86400000
+  );
 
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';

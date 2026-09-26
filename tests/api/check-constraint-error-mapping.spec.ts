@@ -42,6 +42,7 @@ import { getWorkerPairEmails } from '../support/auth/worker-pool';
 import { resolveOwnPair } from '../support/helpers/events';
 import { getUserAccessToken } from '../support/helpers/supabase';
 import type { TypedSupabaseClient } from '../support/factories';
+import { createCheckWritePayload } from '../support/factories/check-write-payloads';
 import {
   CHECK_VIOLATION_CODE,
   CHECK_VIOLATION_HTTP_STATUS,
@@ -71,6 +72,23 @@ const DISALLOWED_MIME = 'image/gif';
 
 /** `partner_requests_status_check` admits pending|accepted|declined. */
 const DISALLOWED_REQUEST_STATUS = 'rejected';
+
+/** Any valid `event_date`; no case here exercises the date. */
+const FAR_FUTURE_EVENT_DATE = '2030-01-01';
+
+/**
+ * An events insert body. The defaults are the `events_label_check` case's body
+ * (an over-long label); any other case overrides the label as well as the
+ * column its own CHECK is about.
+ */
+function eventBody(userId: string, overrides: Record<string, unknown> = {}) {
+  return {
+    user_id: userId,
+    label: OVER_LONG_LABEL,
+    event_date: FAR_FUTURE_EVENT_DATE,
+    ...overrides,
+  };
+}
 
 /**
  * Resolve this worker's own `public.users.id`.
@@ -131,11 +149,7 @@ test.describe('CHECK-constraint rejections over the wire', () => {
       constraint: 'events_label_check',
       context: 'EventsService.createEvent',
       priority: 'P0',
-      body: (userId: string) => ({
-        user_id: userId,
-        label: OVER_LONG_LABEL,
-        event_date: '2030-01-01',
-      }),
+      body: (userId: string) => eventBody(userId),
     },
     {
       table: 'interactions',
@@ -164,76 +178,52 @@ test.describe('CHECK-constraint rejections over the wire', () => {
       constraint: 'photos_caption_check',
       context: 'PhotoService.uploadPhoto',
       priority: 'P1',
-      body: (userId: string) => ({
-        user_id: userId,
-        storage_path: `${userId}/check-caption.jpg`,
-        filename: 'check-caption.jpg',
-        caption: OVER_LONG_CAPTION,
-        mime_type: 'image/jpeg',
-        file_size: 100,
-        width: 1,
-        height: 1,
-      }),
+      body: (userId: string, partnerId: string) =>
+        createCheckWritePayload('photos', userId, partnerId, { caption: OVER_LONG_CAPTION }),
     },
     {
       table: 'photos',
       constraint: 'valid_mime_type',
       context: 'PhotoService.uploadPhoto',
       priority: 'P1',
-      body: (userId: string) => ({
-        user_id: userId,
-        storage_path: `${userId}/check-mime.gif`,
-        filename: 'check-mime.gif',
-        caption: 'ok',
-        mime_type: DISALLOWED_MIME,
-        file_size: 100,
-        width: 1,
-        height: 1,
-      }),
+      body: (userId: string, partnerId: string) =>
+        createCheckWritePayload('photos', userId, partnerId, { mime_type: DISALLOWED_MIME }),
     },
     {
       table: 'love_notes',
       constraint: 'love_notes_content_check',
       context: 'NotesSlice.sendNote',
       priority: 'P1',
-      body: (userId: string, partnerId: string) => ({
-        from_user_id: userId,
-        to_user_id: partnerId,
-        content: OVER_LONG_NOTE_CONTENT,
-      }),
+      body: (userId: string, partnerId: string) =>
+        createCheckWritePayload('love_notes', userId, partnerId, {
+          content: OVER_LONG_NOTE_CONTENT,
+        }),
     },
     {
       table: 'love_notes',
       constraint: 'different_users',
       context: 'NotesSlice.sendNote',
       priority: 'P1',
-      body: (userId: string) => ({
-        from_user_id: userId,
-        to_user_id: userId,
-        content: 'ok',
-      }),
+      body: (userId: string, partnerId: string) =>
+        createCheckWritePayload('love_notes', userId, partnerId, { to_user_id: userId }),
     },
     {
       table: 'partner_requests',
       constraint: 'partner_requests_status_check',
       context: 'PartnerService.sendPartnerRequest',
       priority: 'P1',
-      body: (userId: string, partnerId: string) => ({
-        from_user_id: userId,
-        to_user_id: partnerId,
-        status: DISALLOWED_REQUEST_STATUS,
-      }),
+      body: (userId: string, partnerId: string) =>
+        createCheckWritePayload('partner_requests', userId, partnerId, {
+          status: DISALLOWED_REQUEST_STATUS,
+        }),
     },
     {
       table: 'partner_requests',
       constraint: 'no_self_requests',
       context: 'PartnerService.sendPartnerRequest',
       priority: 'P1',
-      body: (userId: string) => ({
-        from_user_id: userId,
-        to_user_id: userId,
-        status: 'pending',
-      }),
+      body: (userId: string, partnerId: string) =>
+        createCheckWritePayload('partner_requests', userId, partnerId, { to_user_id: userId }),
     },
   ] as const;
 
@@ -291,7 +281,7 @@ test.describe('CHECK-constraint rejections over the wire', () => {
       method: 'POST',
       path: '/rest/v1/events',
       headers: { Authorization: `Bearer ${userToken}` },
-      body: { user_id: userId, label: OVER_LONG_LABEL, event_date: '2030-01-01' },
+      body: eventBody(userId),
     });
 
     // Two separate claims, and the mapping depends on the second one.
@@ -325,12 +315,7 @@ test.describe('CHECK-constraint rejections over the wire', () => {
       method: 'POST',
       path: '/rest/v1/events',
       headers: { Authorization: `Bearer ${userToken}` },
-      body: {
-        user_id: userId,
-        label: probeLabel,
-        event_date: '2030-01-01',
-        icon: 'not-an-icon',
-      },
+      body: eventBody(userId, { label: probeLabel, icon: 'not-an-icon' }),
     });
 
     expect(status).toBe(CHECK_VIOLATION_HTTP_STATUS);

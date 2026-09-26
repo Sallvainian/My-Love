@@ -378,7 +378,7 @@ export async function handleUpload(req: Request, deps: UploadDeps): Promise<Resp
           message: 'Too many uploads. Please wait a minute.',
         },
         429,
-        { 'Retry-After': '60' }
+        { 'Retry-After': String(CONFIG.RATE_LIMIT_WINDOW_MS / 1000) }
       );
     }
 

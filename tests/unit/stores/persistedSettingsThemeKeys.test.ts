@@ -17,8 +17,7 @@
  * stripped on load and the blob still parses.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-const STORAGE_KEY = 'my-love-storage';
+import { persistedBlob, SEEDED_SETTINGS, STORAGE_KEY } from '../helpers/persistedBlob';
 
 /** Settings as the current build writes them, shaped to pass `SettingsSchema`. */
 const CURRENT_SETTINGS = {
@@ -29,13 +28,11 @@ const CURRENT_SETTINGS = {
 
 /** Settings as a build before the couple-settings move wrote them. */
 const PRE_COUPLE_SETTINGS = {
-  notificationTime: '21:30',
+  ...SEEDED_SETTINGS,
   relationship: {
+    ...SEEDED_SETTINGS.relationship,
     ...CURRENT_SETTINGS.relationship,
-    startDate: '2020-01-01',
-    partnerName: 'A',
   },
-  notifications: { enabled: false, time: '21:30' },
 };
 
 /**
@@ -50,16 +47,11 @@ const EXPECTED_SETTINGS = {
 
 /** A blob saved by a build that still had the theme system. */
 function legacyBlob(base: object = CURRENT_SETTINGS): string {
-  return JSON.stringify({
-    version: 0,
-    state: {
-      isOnboarded: true,
-      settings: {
-        ...base,
-        themeName: 'ocean',
-        customization: { accentColor: '#ff8888', fontFamily: 'serif' },
-      },
-      messageHistory: { shownMessages: [['2026-07-26', 3]], currentIndex: 7 },
+  return persistedBlob({
+    settings: {
+      ...base,
+      themeName: 'ocean',
+      customization: { accentColor: '#ff8888', fontFamily: 'serif' },
     },
   });
 }

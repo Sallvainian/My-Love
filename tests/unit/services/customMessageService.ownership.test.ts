@@ -161,15 +161,21 @@ describe('customMessageService and the message-data copy', () => {
   });
 
   describe('local ids', () => {
+    // The `minNewId` the store passes: one above the highest bundled id, 365 bundled
+    // messages today (src/stores/slices/messagesSlice.ts minNewCustomId, module-private).
+    const BUNDLED_ID_FLOOR = 366;
+    // A floor above the copy's `nextCustomId` (405), as a larger bundled set would give.
+    const BUNDLED_ID_FLOOR_ABOVE_COPY = 1000;
+
     it('gives a new row an id above every bundled id and every id handed out', () => {
       const base = copyWith([row(400, 'srv-a', 'a')], 405);
 
-      const aboveCopy = service.withCreatedRow(base, remote('srv-n', 'n'), A, 366);
+      const aboveCopy = service.withCreatedRow(base, remote('srv-n', 'n'), A, BUNDLED_ID_FLOOR);
       expect(aboveCopy.message).toMatchObject({ id: 405, userId: A, serverId: 'srv-n' });
       expect(aboveCopy.copy.nextCustomId).toBe(406);
 
-      const aboveBundled = service.withCreatedRow(base, remote('srv-n', 'n'), A, 1000);
-      expect(aboveBundled.message.id).toBe(1000);
+      const aboveBundled = service.withCreatedRow(base, remote('srv-n', 'n'), A, BUNDLED_ID_FLOOR_ABOVE_COPY);
+      expect(aboveBundled.message.id).toBe(BUNDLED_ID_FLOOR_ABOVE_COPY);
     });
 
     it('returns the existing row for a retried create instead of adding a copy', () => {
@@ -277,7 +283,9 @@ describe('customMessageService and the message-data copy', () => {
 
     it('refuses an unsupported file', () => {
       const future = { ...exportFile([]), version: '2.0' } as unknown as CustomMessagesExport;
-      expect(() => service.planImport([], future)).toThrow();
+      // The schema accepts only version "1.0", so it refuses the file before
+      // planImport's own version check is reached.
+      expect(() => service.planImport([], future)).toThrow(/^Invalid version\. Please select a valid option\.$/);
     });
   });
 });

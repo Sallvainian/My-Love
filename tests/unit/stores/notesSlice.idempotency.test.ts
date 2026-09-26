@@ -213,22 +213,48 @@ describe('notesSlice send idempotency', () => {
   const friendly = 'Some values are not allowed - check length and format limits';
   const checkError = { code: '23514', message: 'new row violates love_notes constraint', details: 'raw table', hint: '' };
 
-  it('shows CHECK failure for send and retry, then clears it on success with the same key and blob', async () => {
-    const store = createTestStore();
+  /** Sends a note with a picture whose row the server refuses with CHECK; returns the failed note. */
+  async function failCheckSend(store: ReturnType<typeof createTestStore>) {
     mockedUploadCompressedBlob.mockResolvedValue({ storagePath: `${USER_ID}/image.jpg`, compressedSize: 3 });
     backend.failNextWrite = true;
     backend.writeError = checkError;
     await expect(store.getState().sendNote('hello', new File(['abc'], 'image.jpg', { type: 'image/jpeg' }))).resolves.toBeUndefined();
-    const failed = store.getState().notes[0];
-    expect(failed.error).toBe(true);
-    expect(failed.imageBlob).toBeDefined();
-    expect(store.getState().notesError).toBe(friendly);
-    expect(mockedDeleteLoveNoteImage).toHaveBeenCalledWith(`${USER_ID}/image.jpg`);
+    return store.getState().notes[0];
+  }
+
+  /** Clears the banner, then retries the failed note into another CHECK refusal. */
+  async function failCheckRetry(store: ReturnType<typeof createTestStore>, failed: TestStore['notes'][number]) {
     store.setState({ notesError: null });
     backend.failNextWrite = true;
     await expect(store.getState().retryFailedMessage(failed.tempId!)).resolves.toBeUndefined();
+  }
+
+  it('a CHECK failure on send marks the note failed, keeps its image and shows the friendly banner', async () => {
+    const store = createTestStore();
+    const failed = await failCheckSend(store);
+    expect(failed.error).toBe(true);
+    expect(failed.imageBlob).toBeDefined();
+    expect(store.getState().notesError).toBe(friendly);
+  });
+
+  it('a CHECK failure on send deletes the uploaded image', async () => {
+    const store = createTestStore();
+    await failCheckSend(store);
+    expect(mockedDeleteLoveNoteImage).toHaveBeenCalledWith(`${USER_ID}/image.jpg`);
+  });
+
+  it('a CHECK failure on retry shows the banner again and keeps the same image blob', async () => {
+    const store = createTestStore();
+    const failed = await failCheckSend(store);
+    await failCheckRetry(store, failed);
     expect(store.getState().notesError).toBe(friendly);
     expect(store.getState().notes[0].imageBlob).toBe(failed.imageBlob);
+  });
+
+  it("a retry that lands clears the banner and stores one row under the note's tempId", async () => {
+    const store = createTestStore();
+    const failed = await failCheckSend(store);
+    await failCheckRetry(store, failed);
     backend.writeError = null;
     await store.getState().retryFailedMessage(failed.tempId!);
     expect(store.getState().notesError).toBeNull();
@@ -505,8 +531,10 @@ describe('notesSlice send idempotency', () => {
           answerLookup = resolve;
         })
       );
+      const lookupsBefore = mockedGetPartnerId.mock.calls.length;
       const retry = store.getState().retryFailedMessage(tempId);
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      // The retry is parked on that held lookup.
+      await vi.waitFor(() => expect(mockedGetPartnerId).toHaveBeenCalledTimes(lookupsBefore + 1));
       expect(store.getState().notes.find((n) => n.tempId === tempId)).toMatchObject({
         error: true,
         sending: false,

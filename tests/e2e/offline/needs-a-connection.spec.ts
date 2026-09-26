@@ -21,8 +21,8 @@
  * longer goes out offline (DW-222), so those screens also assert that none does.
  *
  * Not covered here, by the spec's decision, and covered by unit tests instead
- * (tests/unit/stores/notesSlice.offlineQueue.test.ts and
- * notesSlice.localCopy.test.ts):
+ * (tests/unit/stores/notesSlice.offlineQueue.test.ts,
+ * notesSlice.localCopy.test.ts and notesSlice.localCopyWrites.test.ts):
  * - the no-partner love-notes row: pool users are always linked, and the
  *   partner loads from the saved copy, so "no partner loaded" is unreachable;
  * - older notes offline: it needs a thread longer than one page.
@@ -33,11 +33,22 @@
  * `partner_requests` row is ever seeded, linked or unlinked, and their writes
  * are also aborted, so a regressed guard cannot insert one.
  */
-import type { Page, Request } from '@playwright/test';
+import type { Locator, Page, Request } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import {
+  CUSTOM_MESSAGE_SAVE,
+  INTERACTIONS_READ,
+  LOVE_NOTES_READ,
+  PHOTOS_LIST_READ,
+  gateNameRead,
+  partnerRecordRead,
+} from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
+import { createInteractionInsert } from '../../support/factories/interaction-record-ownership';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -112,13 +123,20 @@ async function pairPhotoIds(supabaseAdmin: TypedSupabaseClient): Promise<string[
 }
 
 test.describe('Photos offline', () => {
-  test('upload is refused before anything is sent', async ({ page, supabaseAdmin }) => {
+  test('[P1] upload is refused before anything is sent', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
     const before = await pairPhotoIds(supabaseAdmin);
 
     try {
+      const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
       await page.goto('/photos');
+      expect((await listRead).status).toBe(200);
+      // The loading skeleton also carries `photo-gallery`; only these two are loaded.
       await expect(
-        page.getByTestId('photo-gallery').or(page.getByTestId('photo-gallery-empty-state'))
+        page.getByTestId('photo-gallery-grid').or(page.getByTestId('photo-gallery-empty-state'))
       ).toBeVisible();
       await page
         .getByTestId('photo-gallery-upload-fab')
@@ -145,7 +163,11 @@ test.describe('Photos offline', () => {
     }
   });
 
-  test('delete is refused and the confirmation stays open', async ({ page, supabaseAdmin }) => {
+  test('[P1] delete is refused and the confirmation stays open', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const stamp = Date.now();
     const path = `${userId}/e2e-needs-connection-${stamp}.png`;
@@ -174,7 +196,14 @@ test.describe('Photos offline', () => {
       expect(error).toBeNull();
       photoId = data!.id;
 
+      const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
       await page.goto('/photos');
+      const list = await listRead;
+      expect(list.status).toBe(200);
+      expect(list.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: photoId })])
+      );
+      await expect(page.getByTestId('photo-gallery-grid')).toBeVisible();
       await page
         .getByTestId('photo-gallery-grid')
         .getByRole('button', { name: caption, exact: true })
@@ -217,9 +246,10 @@ test.describe('Photos offline', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Display name offline', () => {
-  test('a name change is refused inline and the profile row is unchanged', async ({
+  test('[P1] a name change is refused inline and the profile row is unchanged', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const readName = async () => {
@@ -232,13 +262,19 @@ test.describe('Display name offline', () => {
       return data?.display_name ?? null;
     };
     const original = await readName();
+    expect(original, "premise: this worker's pool account has a name").toBeTruthy();
 
     try {
       await page.goto('/');
+      // Settings' mount reads the name; the app's own gate read of the same
+      // URL may answer first, with the same name.
+      const nameRead = interceptNetworkCall({ method: 'GET', url: gateNameRead(userId) });
       await navigateTo(page, 'settings');
+      expect((await nameRead).status).toBe(200);
       const nameRow = page.getByTestId('settings-display-name');
       await expect(nameRow).toBeVisible();
-      await expect(nameRow).not.toHaveText('Loading...');
+      // The saved name is the only text a finished read can show.
+      await expect(nameRow).toHaveText(original!.trim());
       await page.getByTestId('settings-display-name-edit').click();
       await expect(page.getByTestId('display-name-setup')).toBeVisible();
       await page.getByLabel('Display Name').fill(`E2E ${Date.now().toString().slice(-8)}`);
@@ -279,7 +315,7 @@ async function ownRequestIds(supabaseAdmin: TypedSupabaseClient, userId: string)
 }
 
 test.describe('Partner requests offline', () => {
-  test('send, accept and decline are each refused before any request', async ({
+  test('[P1] send, accept and decline are each refused before any request', async ({
     page,
     supabaseAdmin,
   }) => {
@@ -288,9 +324,11 @@ test.describe('Partner requests offline', () => {
 
     // This browser only: an unlinked user with one pending incoming request.
     // The pool user stays linked in the database throughout.
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/users?select=partner_id*', (route) =>
       route.fulfill({ json: { partner_id: null, updated_at: '2026-01-01T00:00:00Z' } })
     );
+    // playwright-utils deviation: the route must be installed before the next navigation, answer every read and abort every write; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/partner_requests**', (route) =>
       route.request().method() === 'GET'
         ? route.fulfill({
@@ -310,6 +348,7 @@ test.describe('Partner requests offline', () => {
     );
     // The sender lookup behind the request list (`id=in.(…)`) and the search
     // results (`or=…`) share one select.
+    // playwright-utils deviation: matches either of two query shapes with a URL predicate, which one method + URL glob cannot express, and must be installed before the next navigation; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route(
       (url) =>
         url.pathname === '/rest/v1/users' &&
@@ -324,6 +363,7 @@ test.describe('Partner requests offline', () => {
         });
       }
     );
+    // playwright-utils deviation: the route must be installed before the next navigation and abort every accept and decline call; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route(/\/rest\/v1\/rpc\/(accept|decline)_partner_request/, (route) => route.abort());
 
     try {
@@ -369,9 +409,10 @@ test.describe('Poke and kiss badge offline', () => {
     ['poke', 'A poke'],
     ['kiss', 'A kiss'],
   ] as const) {
-    test(`a ${type} plays but is not marked seen, and the badge stays`, async ({
+    test(`[P1] a ${type} plays but is not marked seen, and the badge stays`, async ({
       page,
       supabaseAdmin,
+      interceptNetworkCall,
     }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       let interactionId: string | null = null;
@@ -379,13 +420,19 @@ test.describe('Poke and kiss badge offline', () => {
       try {
         const { data, error } = await supabaseAdmin
           .from('interactions')
-          .insert({ type, from_user_id: partnerId, to_user_id: userId, viewed: false })
+          .insert(createInteractionInsert({ type, from_user_id: partnerId, to_user_id: userId }))
           .select('id')
           .single();
         expect(error).toBeNull();
         interactionId = data!.id;
 
+        const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
         await page.goto('/partner');
+        const history = await historyRead;
+        expect(history.status).toBe(200);
+        expect(history.responseJson).toEqual(
+          expect.arrayContaining([expect.objectContaining({ id: interactionId, viewed: false })])
+        );
         const badge = page.getByTestId('notification-badge');
         await expect(badge).toBeVisible();
 
@@ -436,17 +483,34 @@ function notesBanner(page: Page, text: string) {
   return page.getByRole('alert').filter({ hasText: text });
 }
 
-async function openNotesWithPartner(page: Page, supabaseAdmin: TypedSupabaseClient) {
+/**
+ * Open Notes once the partner record and the thread have both been read, and
+ * return the thread read so a caller can check a seeded note is in it.
+ */
+async function openNotesWithPartner(
+  page: Page,
+  supabaseAdmin: TypedSupabaseClient,
+  interceptNetworkCall: InterceptNetworkCallFn
+) {
   const { partnerId } = await resolveOwnPair(supabaseAdmin);
+  const partnerRead = interceptNetworkCall({ method: 'GET', url: partnerRecordRead(partnerId) });
+  const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
   await page.goto('/notes');
+  const [partner, thread] = await Promise.all([partnerRead, threadRead]);
+  expect(partner.status).toBe(200);
+  expect(thread.status).toBe(200);
   await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
-  await expect
-    .poll(() => page.evaluate(() => window.__APP_STORE__?.getState().partner?.id ?? null))
-    .toBe(partnerId);
+  await recurseUntil(
+    () => page.evaluate(() => window.__APP_STORE__?.getState().partner?.id ?? null),
+    (v) => {
+      expect(v).toBe(partnerId);
+    }
+  );
+  return thread;
 }
 
 async function attachPicture(page: Page) {
-  await page.locator('input[type="file"][accept*="image/"]').setInputFiles(PNG_FILE);
+  await page.getByTestId('message-input-file').setInputFiles(PNG_FILE);
   await expect(page.getByAltText('Selected image preview')).toBeVisible();
 }
 
@@ -461,13 +525,14 @@ async function stampedNoteIds(supabaseAdmin: TypedSupabaseClient, stamp: string)
 }
 
 test.describe('Love notes offline', () => {
-  test('a picture note is refused with one message, and the composer keeps text and picture', async ({
+  test('[P1] a picture note is refused with one message, and the composer keeps text and picture', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const text = `E2E-PIC-OFFLINE-${Date.now()}`;
     try {
-      await openNotesWithPartner(page, supabaseAdmin);
+      await openNotesWithPartner(page, supabaseAdmin, interceptNetworkCall);
       await goOffline(page, true);
       await attachPicture(page);
       const input = page.getByLabel('Love note message input');
@@ -483,7 +548,9 @@ test.describe('Love notes offline', () => {
       watch.stop();
       expect(watch.requests).toEqual([]);
       expect(watch.partnerLookups).toEqual([]);
-      await expect(page.getByText('Failed to send. Try again.')).toHaveCount(0);
+      await expect(
+        page.getByRole('alert').filter({ hasText: 'Failed to send. Try again.' })
+      ).toHaveCount(0);
       await expect(input).toHaveValue(text);
       await expect(page.getByAltText('Selected image preview')).toBeVisible();
       await expect(noteBubble(page, text)).toHaveCount(0);
@@ -493,15 +560,17 @@ test.describe('Love notes offline', () => {
     }
   });
 
-  test('Retry on a failed picture note is refused, and the note stays failed', async ({
+  test('[P1] Retry on a failed picture note is refused, and the note stays failed', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const text = `E2E-PIC-RETRY-${Date.now()}`;
     try {
-      await openNotesWithPartner(page, supabaseAdmin);
+      await openNotesWithPartner(page, supabaseAdmin, interceptNetworkCall);
 
       // GIVEN: a picture note that failed online — its upload never arrives.
+      // playwright-utils deviation: the route must be installed before the send that calls the function and abort every upload attempt; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route(UPLOAD_FUNCTION, (route) => route.abort());
       await attachPicture(page);
       await page.getByLabel('Love note message input').fill(text);
@@ -530,9 +599,10 @@ test.describe('Love notes offline', () => {
     }
   });
 
-  test('removing a note is refused in the dialog, and the note never leaves the list', async ({
+  test('[P1] removing a note is refused in the dialog, and the note never leaves the list', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const content = `E2E-REMOVE-OFFLINE-${Date.now()}`;
@@ -547,7 +617,10 @@ test.describe('Love notes offline', () => {
       expect(error).toBeNull();
       noteId = data!.id;
 
-      await openNotesWithPartner(page, supabaseAdmin);
+      const thread = await openNotesWithPartner(page, supabaseAdmin, interceptNetworkCall);
+      expect(thread.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: noteId })])
+      );
       const bubble = noteBubble(page, content);
       await expect(bubble).toBeVisible();
 
@@ -593,69 +666,198 @@ test.describe('Love notes offline', () => {
 // Custom messages editor
 // ---------------------------------------------------------------------------
 
+const CUSTOM_REFUSAL = offline('Custom messages need a connection to save.');
+
+/** This worker's custom message texts carrying `stamp`, sorted. */
+async function stampedCustomTexts(
+  supabaseAdmin: TypedSupabaseClient,
+  userId: string,
+  stamp: string
+): Promise<string[]> {
+  const { data, error } = await supabaseAdmin
+    .from('custom_messages')
+    .select('text')
+    .eq('user_id', userId)
+    .like('text', `${stamp}%`);
+  expect(error).toBeNull();
+  return (data ?? []).map((row) => row.text).sort();
+}
+
+/**
+ * Save one custom message online, then take the editor offline and check it
+ * says so. Returns the saved message's row.
+ */
+async function openEditorOffline(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  saved: string
+) {
+  // GIVEN: one saved message, created online.
+  await page.goto('/admin');
+  await page.getByTestId('admin-create-button').click();
+  await page.getByTestId('admin-create-form-text').fill(saved);
+  const created = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });
+  await page.getByTestId('admin-create-form-save').click();
+  expect((await created).status).toBe(201);
+  const row = page.getByTestId('admin-message-row').filter({ hasText: saved });
+  await expect(row).toBeVisible();
+  await expect(page.getByTestId('network-status-indicator')).toHaveCount(0);
+
+  // WHEN: the device goes offline, the editor says so.
+  await goOffline(page, true);
+  await expect(page.getByTestId('network-status-indicator')).toHaveAttribute(
+    'data-status',
+    'offline'
+  );
+  return row;
+}
+
+/** Nothing went out, and only the saved message exists, unchanged. */
+async function expectNothingSaved(
+  page: Page,
+  watch: ReturnType<typeof watchSupabaseRequests>,
+  row: Locator,
+  stamp: string,
+  texts: () => Promise<string[]>,
+  saved: string
+) {
+  watch.stop();
+  expect(watch.requests).toEqual([]);
+  await expect(page.getByTestId('admin-message-row').filter({ hasText: stamp })).toHaveCount(1);
+  await expect(row).toBeVisible();
+  expect(await texts()).toEqual([saved]);
+}
+
+/** Delete this worker's custom messages carrying `stamp`. */
+async function deleteStampedCustomMessages(
+  supabaseAdmin: TypedSupabaseClient,
+  userId: string,
+  stamp: string
+) {
+  const { error } = await supabaseAdmin
+    .from('custom_messages')
+    .delete()
+    .eq('user_id', userId)
+    .like('text', `${stamp}%`);
+  expect.soft(error).toBeNull();
+}
+
 test.describe('Custom messages editor offline', () => {
-  test('shows the offline indicator, and create, edit, delete and import are refused', async ({
+  test('[P1] creating a custom message offline is refused and the typed text stays', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const stamp = `E2E-CUSTOM-OFFLINE-${Date.now()}`;
     const saved = `${stamp} saved`;
-    const refusal = offline('Custom messages need a connection to save.');
-    const stampedTexts = async () => {
-      const { data, error } = await supabaseAdmin
-        .from('custom_messages')
-        .select('text')
-        .eq('user_id', userId)
-        .like('text', `${stamp}%`);
-      expect(error).toBeNull();
-      return (data ?? []).map((row) => row.text).sort();
-    };
 
     try {
-      // GIVEN: one saved message, created online.
-      await page.goto('/admin');
-      await page.getByTestId('admin-create-button').click();
-      await page.getByTestId('admin-create-form-text').fill(saved);
-      const created = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/custom_messages') && response.request().method() === 'POST'
-      );
-      await page.getByTestId('admin-create-form-save').click();
-      expect((await created).ok()).toBe(true);
-      const row = page.getByTestId('admin-message-row').filter({ hasText: saved });
-      await expect(row).toBeVisible();
-      await expect(page.getByTestId('network-status-indicator')).toHaveCount(0);
-
-      // WHEN: the device goes offline, the editor says so.
-      await goOffline(page, true);
-      await expect(page.getByTestId('network-status-indicator')).toHaveAttribute(
-        'data-status',
-        'offline'
-      );
+      const row = await openEditorOffline(page, interceptNetworkCall, saved);
       const watch = watchSupabaseRequests(page);
 
       // Create: the form error, and the typed text stays.
       await page.getByTestId('admin-create-button').click();
       await page.getByTestId('admin-create-form-text').fill(`${stamp} new`);
       await page.getByTestId('admin-create-form-save').click();
-      await expect(page.getByTestId('admin-create-form-error')).toHaveText(refusal);
+      await expect(page.getByTestId('admin-create-form-error')).toHaveText(CUSTOM_REFUSAL);
       await expect(page.getByTestId('admin-create-form-text')).toHaveValue(`${stamp} new`);
       await page.getByTestId('admin-create-form-cancel').click();
+
+      await expectNothingSaved(
+        page,
+        watch,
+        row,
+        stamp,
+        () => stampedCustomTexts(supabaseAdmin, userId, stamp),
+        saved
+      );
+    } finally {
+      await page.context().setOffline(false);
+      await deleteStampedCustomMessages(supabaseAdmin, userId, stamp);
+    }
+  });
+
+  test('[P1] editing a custom message offline is refused', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId } = await resolveOwnPair(supabaseAdmin);
+    const stamp = `E2E-CUSTOM-OFFLINE-${Date.now()}`;
+    const saved = `${stamp} saved`;
+
+    try {
+      const row = await openEditorOffline(page, interceptNetworkCall, saved);
+      const watch = watchSupabaseRequests(page);
 
       // Edit: the form error.
       await row.getByTestId('message-row-edit-button').click();
       await page.getByTestId('admin-edit-form-text').fill(`${stamp} edited`);
       await page.getByTestId('admin-edit-form-save').click();
-      await expect(page.getByTestId('admin-edit-form-error')).toHaveText(refusal);
+      await expect(page.getByTestId('admin-edit-form-error')).toHaveText(CUSTOM_REFUSAL);
       await page.getByTestId('admin-edit-form-cancel').click();
+
+      await expectNothingSaved(
+        page,
+        watch,
+        row,
+        stamp,
+        () => stampedCustomTexts(supabaseAdmin, userId, stamp),
+        saved
+      );
+    } finally {
+      await page.context().setOffline(false);
+      await deleteStampedCustomMessages(supabaseAdmin, userId, stamp);
+    }
+  });
+
+  test('[P1] deleting a custom message offline is refused in the dialog', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId } = await resolveOwnPair(supabaseAdmin);
+    const stamp = `E2E-CUSTOM-OFFLINE-${Date.now()}`;
+    const saved = `${stamp} saved`;
+
+    try {
+      const row = await openEditorOffline(page, interceptNetworkCall, saved);
+      const watch = watchSupabaseRequests(page);
 
       // Delete: the dialog error.
       await row.getByTestId('message-row-delete-button').click();
       const dialog = page.getByTestId('admin-delete-dialog');
       await page.getByTestId('admin-delete-dialog-confirm').click();
-      await expect(dialog.getByRole('alert')).toHaveText(refusal);
+      await expect(dialog.getByRole('alert')).toHaveText(CUSTOM_REFUSAL);
       await page.getByTestId('admin-delete-dialog-cancel').click();
+
+      await expectNothingSaved(
+        page,
+        watch,
+        row,
+        stamp,
+        () => stampedCustomTexts(supabaseAdmin, userId, stamp),
+        saved
+      );
+    } finally {
+      await page.context().setOffline(false);
+      await deleteStampedCustomMessages(supabaseAdmin, userId, stamp);
+    }
+  });
+
+  test('[P1] importing custom messages offline is refused with an alert naming the connection', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId } = await resolveOwnPair(supabaseAdmin);
+    const stamp = `E2E-CUSTOM-OFFLINE-${Date.now()}`;
+    const saved = `${stamp} saved`;
+
+    try {
+      const row = await openEditorOffline(page, interceptNetworkCall, saved);
+      const watch = watchSupabaseRequests(page);
 
       // Import: the alert names the connection, not the file.
       const alertShown = page.waitForEvent('dialog');
@@ -680,23 +882,20 @@ test.describe('Custom messages editor offline', () => {
         ),
       });
       const alert = await alertShown;
-      expect(alert.message()).toBe(refusal);
+      expect(alert.message()).toBe(CUSTOM_REFUSAL);
       await alert.accept();
 
-      // THEN: nothing went out, and only the saved message exists, unchanged.
-      watch.stop();
-      expect(watch.requests).toEqual([]);
-      await expect(page.getByTestId('admin-message-row').filter({ hasText: stamp })).toHaveCount(1);
-      await expect(row).toBeVisible();
-      expect(await stampedTexts()).toEqual([saved]);
+      await expectNothingSaved(
+        page,
+        watch,
+        row,
+        stamp,
+        () => stampedCustomTexts(supabaseAdmin, userId, stamp),
+        saved
+      );
     } finally {
       await page.context().setOffline(false);
-      const { error } = await supabaseAdmin
-        .from('custom_messages')
-        .delete()
-        .eq('user_id', userId)
-        .like('text', `${stamp}%`);
-      expect.soft(error).toBeNull();
+      await deleteStampedCustomMessages(supabaseAdmin, userId, stamp);
     }
   });
 });

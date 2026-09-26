@@ -5,13 +5,18 @@
  * store/auth actions, and control outcomes at that consumer boundary.
  */
 import type { Session } from '@supabase/supabase-js';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../src/App';
 import { eventsService, type CoupleEvent } from '../../src/services/eventsService';
 import type { EventLoadResult } from '../../src/stores/slices/eventsSlice';
 import { useAppStore } from '../../src/stores/useAppStore';
+import {
+  createAuthBootstrapEvent,
+  createAuthBootstrapSession,
+} from '../support/factories/auth-bootstrap-notification-order';
 
 const auth = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -134,24 +139,12 @@ const success: EventLoadResult = { status: 'success' };
 const failure: EventLoadResult = { status: 'failure', error: 'Prior request failed' };
 
 function session(accessToken = 'initial-token', userId = USER_ID): Session {
-  return {
-    access_token: accessToken,
-    refresh_token: 'refresh-token',
-    token_type: 'bearer',
-    expires_in: 3600,
-    user: {
-      id: userId,
-      email: 'home@example.com',
-      app_metadata: {},
-      // Empty on purpose. The setup gate used to be `!user_metadata.display_name`
-      // and every test here rendered the app only because this object carried a
-      // name. It now comes from the profile row, so these sessions carry none
-      // and the `profile` mock below is what decides.
-      user_metadata: {},
-      aud: 'authenticated',
-      created_at: '2026-09-01T00:00:00Z',
-    },
-  };
+  // No display name on purpose (`displayName: null` leaves user_metadata empty).
+  // The setup gate used to be `!user_metadata.display_name` and every test here
+  // rendered the app only because the session carried a name. It now comes from
+  // the profile row, so these sessions carry none and the `profile` mock below
+  // is what decides.
+  return createAuthBootstrapSession({ userId, accessToken, email: 'home@example.com', displayName: null });
 }
 
 function deferred<T>() {
@@ -164,26 +157,26 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+// Pinned (noon EDT), so the welcome splash's "seen it recently" stamp below is
+// measured against a fixed clock rather than the live one. Only `Date` is
+// faked, so RTL's `waitFor` keeps its real timers.
+const NOW = new Date('2026-09-15T16:00:00.000Z');
+
+/** An upcoming event, a week after the pinned NOW. */
 function event(label: string): CoupleEvent {
-  const date = new Date();
-  date.setDate(date.getDate() + 7);
   return {
-    id: label,
-    userId: USER_ID,
-    label,
-    date,
-    description: null,
-    icon: 'calendar',
-    createdAt: new Date(),
+    ...createAuthBootstrapEvent({ userId: USER_ID, label, id: label, date: new Date(2026, 8, 22) }),
+    createdAt: NOW,
   };
 }
 
 const initialState = useAppStore.getInitialState();
 
 beforeEach(() => {
+  vi.setSystemTime(NOW);
   vi.clearAllMocks();
   localStorage.clear();
-  localStorage.setItem('lastWelcomeView', String(Date.now()));
+  localStorage.setItem('lastWelcomeView', String(NOW.getTime()));
   window.history.replaceState({}, '', '/');
   auth.getSession.mockResolvedValue(session());
   profile.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Home User' });
@@ -203,6 +196,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   localStorage.clear();
+  vi.useRealTimers();
 });
 
 async function renderHome() {
@@ -224,7 +218,7 @@ function expectKitPlaceholder(testId: 'events-empty-placeholder' | 'events-load-
   const placeholder = screen.getByTestId(testId);
   expect(placeholder).toHaveAttribute('role', 'status');
   expect(placeholder).toHaveClass('bg-card', 'border-line', 'shadow-card');
-  expect(placeholder.querySelector('p')).toHaveClass('text-muted');
+  expect(within(placeholder).getByTestId(`${testId}-message`)).toHaveClass('text-muted');
 }
 
 /** The production auth listener calls the real clearAuth/setAuthUser actions. */
@@ -262,26 +256,44 @@ function controlHomeLoads() {
 }
 
 describe('Auth bootstrap notification ownership', () => {
-  it('installs the initial authenticated session when no notification supersedes it', async () => {
+  /** Renders App with the initial session lookup still pending. */
+  function renderPendingLookup() {
     const lookup = deferred<Session | null>();
     auth.getSession.mockReturnValueOnce(lookup.promise);
     const { requests, loadEvents } = controlHomeLoads();
     const ownership = useAppStore.getState().authSessionVersion;
     render(<App />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    return { lookup, requests, loadEvents, ownership };
+  }
+
+  it('shows the kit heart, not an emoji, on the auth loader while the session lookup is pending', () => {
+    renderPendingLookup();
+
     // The auth loader's heart is a kit-accent lucide icon, not an emoji.
-    const loader = screen.getByText('Loading...').parentElement!;
-    expect(loader.querySelector('svg')).toHaveClass('text-accent');
+    const loader = screen.getByTestId('auth-loading-screen');
+    expect(loader).toBeInTheDocument();
+    expect(within(loader).getByTestId('auth-loading-icon')).toHaveClass('text-accent');
     expect(loader.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+
+  it('installs the initial authenticated session when no notification supersedes it', async () => {
+    const { lookup, ownership } = renderPendingLookup();
+    expect(screen.getByTestId('auth-loading-screen')).toBeInTheDocument();
 
     await act(async () => lookup.resolve(session()));
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
     expect(useAppStore.getState()).toMatchObject({
       userId: USER_ID,
       isAuthenticated: true,
       authSessionVersion: ownership + 1,
     });
+  });
+
+  it('loads Home events once for the installed session and shows the result', async () => {
+    const { lookup, requests, loadEvents } = renderPendingLookup();
+
+    await act(async () => lookup.resolve(session()));
     expect(loadEvents).toHaveBeenCalledTimes(1);
     await act(async () => requests[0].resolve(success));
     expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
@@ -398,7 +410,13 @@ describe('Auth bootstrap notification ownership', () => {
     expect(screen.getByText('Sign in')).toBeInTheDocument();
   });
 
-  it.each([true, false])('preserves same-user updates and display-name handling (has name: %s)', async (hasDisplayName) => {
+  // The session metadata is deliberately the OPPOSITE of what the profile says,
+  // so a regression that reads the gate back off the session fails both cases
+  // rather than passing one by luck.
+  async function sameUserUpdate(
+    metadata: Record<string, string>,
+    profileResult: { status: 'chosen'; displayName: string } | { status: 'unset' }
+  ) {
     const lookup = deferred<Session | null>();
     auth.getSession.mockReturnValueOnce(lookup.promise);
     const { requests, loadEvents } = controlHomeLoads();
@@ -407,13 +425,8 @@ describe('Auth bootstrap notification ownership', () => {
     const ownership = useAppStore.getState().authSessionVersion;
     const updated = session('updated-token');
     updated.user.email = 'updated@example.com';
-    // Deliberately the OPPOSITE of what the profile says, so a regression that
-    // reads the gate back off the session fails both halves of this case rather
-    // than passing one by luck.
-    updated.user.user_metadata = hasDisplayName ? {} : { display_name: 'Metadata Name' };
-    profile.lookupOwnDisplayName.mockResolvedValue(
-      hasDisplayName ? { status: 'chosen', displayName: 'Updated Name' } : { status: 'unset' }
-    );
+    updated.user.user_metadata = metadata;
+    profile.lookupOwnDisplayName.mockResolvedValue(profileResult);
 
     await act(async () => {
       // Even a notification delivered after resolution but before the awaited
@@ -428,43 +441,55 @@ describe('Auth bootstrap notification ownership', () => {
     });
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
     expect(loadEvents).toHaveBeenCalledTimes(1);
-    if (hasDisplayName) {
-      expect(screen.getByTestId('app-container')).toBeInTheDocument();
-      expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
-    } else {
-      expect(screen.getByText('Set your display name')).toBeInTheDocument();
-      expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
-    }
+    return { requests };
+  }
+
+  it('preserves same-user updates and display-name handling (has name: true)', async () => {
+    const { requests } = await sameUserUpdate({}, { status: 'chosen', displayName: 'Updated Name' });
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
     await act(async () => requests[0].resolve(success));
-    if (hasDisplayName) {
-      expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
-    }
+    expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
   });
 
-  it.each([true, false])('finishes a rejected lookup while preserving listener state (notified: %s)', async (notified) => {
+  it('preserves same-user updates and display-name handling (has name: false)', async () => {
+    const { requests } = await sameUserUpdate({ display_name: 'Metadata Name' }, { status: 'unset' });
+    expect(screen.getByText('Set your display name')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
+    await act(async () => requests[0].resolve(success));
+    expect(screen.getByText('Set your display name')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('events-empty-placeholder')).not.toBeInTheDocument();
+  });
+
+  async function rejectedLookup(beforeRejection: () => Promise<void>) {
     const lookup = deferred<Session | null>();
     const error = new Error('Initial lookup failed');
     const reportError = vi.spyOn(console, 'error').mockImplementation(() => {});
     auth.getSession.mockReturnValueOnce(lookup.promise);
     controlHomeLoads();
     render(<App />);
-    if (notified) {
-      await act(async () => auth.listener!(session('listener-token')));
-    }
+    await beforeRejection();
     const ownership = useAppStore.getState().authSessionVersion;
 
     await act(async () => lookup.reject(error));
     expect(reportError).toHaveBeenCalledWith('[App] Auth check failed:', error);
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
-    expect(useAppStore.getState()).toMatchObject({
-      userId: notified ? USER_ID : null,
-      authSessionVersion: ownership,
+    return { ownership };
+  }
+
+  it('finishes a rejected lookup while preserving listener state (notified: true)', async () => {
+    const { ownership } = await rejectedLookup(async () => {
+      await act(async () => auth.listener!(session('listener-token')));
     });
-    if (notified) {
-      expect(screen.getByTestId('app-container')).toBeInTheDocument();
-    } else {
-      expect(screen.getByText('Sign in')).toBeInTheDocument();
-    }
+    expect(useAppStore.getState()).toMatchObject({ userId: USER_ID, authSessionVersion: ownership });
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+  });
+
+  it('finishes a rejected lookup while preserving listener state (notified: false)', async () => {
+    const { ownership } = await rejectedLookup(async () => {});
+    expect(useAppStore.getState()).toMatchObject({ userId: null, authSessionVersion: ownership });
+    expect(screen.getByText('Sign in')).toBeInTheDocument();
   });
 
   it.each(['null', 'different-user', 'rejection'] as const)('ignores a cleaned-up effect when its lookup settles with %s', async (outcome) => {
@@ -508,12 +533,12 @@ describe('App data loader', () => {
     render(<App />);
     await act(async () => {});
     expect(useAppStore.getState()).toMatchObject({ userId: USER_ID, isAuthenticated: true });
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
 
     // Same kit mark as the auth loader: a kit-accent lucide icon, not an emoji.
-    const loader = screen.getByText('Loading your data...').parentElement!;
-    expect(loader.querySelector('svg')).toHaveClass('text-accent');
+    const loader = screen.getByTestId('app-data-loading-screen');
+    expect(within(loader).getByTestId('app-data-loading-icon')).toHaveClass('text-accent');
     expect(loader.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 });
@@ -681,13 +706,14 @@ describe('Home event-load session ownership', () => {
 
   it('does not re-open setup when a read raised before the name was saved lands after', async () => {
     const firstRead = deferred<OwnDisplayNameResult>();
+    const user = userEvent.setup();
     controlHomeLoads();
     render(<App />);
 
     profile.lookupOwnDisplayName.mockReturnValueOnce(firstRead.promise);
     await act(async () => auth.listener!(session()));
     await act(async () => firstRead.resolve({ status: 'unset' }));
-    expect(screen.getByText('Set your display name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Set your display name' })).toBeInTheDocument();
 
     // A token refresh while the modal is open raises a second read, which is
     // still in flight when the user submits their name. Auth never changes here,
@@ -697,14 +723,16 @@ describe('Home event-load session ownership', () => {
     const ownership = useAppStore.getState().authSessionVersion;
     await act(async () => auth.listener!(session('refreshed-token')));
 
-    await act(async () => {
-      fireEvent.click(screen.getByText('Set your display name'));
-    });
-    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Set your display name' }));
+    expect(
+      screen.queryByRole('button', { name: 'Set your display name' })
+    ).not.toBeInTheDocument();
 
     await act(async () => staleRead.resolve({ status: 'unset' }));
     expect(useAppStore.getState().authSessionVersion).toBe(ownership);
-    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Set your display name' })
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
   });
 

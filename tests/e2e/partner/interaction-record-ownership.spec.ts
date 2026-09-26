@@ -5,8 +5,30 @@
  */
 import { randomUUID } from 'node:crypto';
 import { log } from '@seontechnologies/playwright-utils';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import { createInteractionRecord } from '../../support/factories/interaction-record-ownership';
+import type { SupabaseInteractionRecord } from '../../../src/api/interactionService';
+
+/**
+ * A delivered record as the store keeps it: interactionService maps each
+ * snake_case column to its camelCase field, and a missing `viewed` becomes
+ * `false` (`record.viewed ?? false` in src/api/interactionService.ts).
+ */
+function mappedInteraction(
+  record: SupabaseInteractionRecord,
+  overrides: { viewed?: boolean } = {}
+) {
+  return {
+    id: record.id,
+    type: record.type,
+    fromUserId: record.from_user_id,
+    toUserId: record.to_user_id,
+    viewed: record.viewed ?? false,
+    createdAt: record.created_at,
+    ...overrides,
+  };
+}
 
 test.describe('Interaction record ownership', () => {
   // playwright-utils deviation: this browser integration drives real authSlice actions with local identities to retain stale callbacks; no authentication HTTP or HAR traffic exists.
@@ -70,14 +92,7 @@ test.describe('Interaction record ownership', () => {
       expect(currentSubscription).toBe(1);
       await interactionOwnership.dispatch(currentSubscription, current);
       const accepted = await interactionOwnership.snapshot();
-      expect(accepted.interactions).toEqual([{
-        id: current.id,
-        type: 'kiss',
-        fromUserId: current.from_user_id,
-        toUserId: userId,
-        viewed: false,
-        createdAt: current.created_at,
-      }]);
+      expect(accepted.interactions).toEqual([mappedInteraction(current)]);
       expect(accepted.unviewedCount).toBe(1);
       await interactionOwnership.dispatch(
         0,
@@ -142,14 +157,7 @@ test.describe('Interaction record ownership', () => {
       expect(accepted).toEqual({
         userId: userB,
         authSessionVersion: initial.authSessionVersion + 1,
-        interactions: [{
-          id: current.id,
-          type: 'poke',
-          fromUserId: userA,
-          toUserId: userB,
-          viewed: false,
-          createdAt: current.created_at,
-        }],
+        interactions: [mappedInteraction(current)],
         unviewedCount: 1,
         subscriptions: [
           { userId: userA, cleanupCalls: 0 },
@@ -201,15 +209,9 @@ test.describe('Interaction record ownership', () => {
       await log.step('Deliver a new record and its duplicate through the unchanged callback');
       await interactionOwnership.dispatch(0, fresh);
       const accepted = await interactionOwnership.snapshot();
+      // The record arrives with viewed: null, which the store maps to false.
       expect(accepted.interactions).toEqual([
-        {
-          id: fresh.id,
-          type: 'kiss',
-          fromUserId: fresh.from_user_id,
-          toUserId: userId,
-          viewed: false,
-          createdAt: '2026-09-12T03:00:00.000Z',
-        },
+        mappedInteraction(fresh, { viewed: false }),
         ...initial.interactions,
       ]);
       expect(accepted.unviewedCount).toBe(2);
@@ -223,17 +225,7 @@ test.describe('Interaction record ownership', () => {
       expect(await interactionOwnership.snapshot()).toEqual({
         userId,
         authSessionVersion: initial.authSessionVersion,
-        interactions: [
-          {
-            id: viewed.id,
-            type: 'poke',
-            fromUserId: viewed.from_user_id,
-            toUserId: userId,
-            viewed: true,
-            createdAt: viewed.created_at,
-          },
-          ...accepted.interactions,
-        ],
+        interactions: [mappedInteraction(viewed), ...accepted.interactions],
         unviewedCount: 2,
         subscriptions: [{ userId, cleanupCalls: 0 }],
       });
@@ -258,7 +250,12 @@ test.describe('Interaction record ownership', () => {
       );
       await expect(badge).toHaveText('1');
       // The badge scales in from 0; measure it only once it is full size.
-      await expect.poll(async () => (await badge.boundingBox())?.height).toBe(20);
+      await recurseUntil(
+        async () => (await badge.boundingBox())?.height,
+        (v) => {
+          expect(v).toBe(20);
+        }
+      );
       const box = (await badge.boundingBox())!;
       const historyBox = (await history.boundingBox())!;
       const centreY = box.y + box.height / 2;

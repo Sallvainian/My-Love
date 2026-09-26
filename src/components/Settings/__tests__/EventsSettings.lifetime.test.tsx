@@ -1,5 +1,7 @@
 /** Manual loads outlive Settings; their local continuations must not. */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import { StrictMode } from 'react';
 import type { Dispatch, HTMLAttributes, ReactNode, Ref, SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,7 +11,6 @@ import { EventsSettings } from '../EventsSettings';
 type CoupleEvent = AppState['events'][number];
 type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
 type EventWriteResult = Awaited<ReturnType<AppState['editEvent']>>;
-type RefreshKind = 'edit' | 'delete';
 
 const stateSetterCalls = vi.hoisted(() => vi.fn<(next: unknown) => void>());
 
@@ -140,14 +141,35 @@ async function renderSection(strict = false) {
   return view;
 }
 
-async function refreshStaleRow(kind: RefreshKind) {
-  const opener = screen.getByTestId(`event-${kind}-mine`);
-  opener.focus();
-  fireEvent.click(opener);
-  fireEvent.click(screen.getByTestId(kind === 'edit' ? 'events-form-submit' : 'events-delete-confirm'));
-  const refreshId = kind === 'edit' ? 'events-form-refresh' : 'events-delete-refresh';
-  await waitFor(() => expect(screen.getByTestId(refreshId)).toBeInTheDocument());
-  fireEvent.click(screen.getByTestId(refreshId));
+/** The stale-row paths: the row control, its dialog's write button, and its Refresh. */
+const STALE_ROW_REFRESHES = [
+  {
+    kind: 'edit',
+    opener: 'event-edit-mine',
+    confirm: 'events-form-submit',
+    refresh: 'events-form-refresh',
+  },
+  {
+    kind: 'delete',
+    opener: 'event-delete-mine',
+    confirm: 'events-delete-confirm',
+    refresh: 'events-delete-refresh',
+  },
+] as const;
+
+async function refreshStaleRow(user: UserEvent, {
+  opener,
+  confirm,
+  refresh,
+}: {
+  opener: string;
+  confirm: string;
+  refresh: string;
+}) {
+  await user.click(screen.getByTestId(opener));
+  await user.click(screen.getByTestId(confirm));
+  await waitFor(() => expect(screen.getByTestId(refresh)).toBeInTheDocument());
+  await user.click(screen.getByTestId(refresh));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(screen.getByTestId('events-settings-add')).toHaveFocus();
 }
@@ -158,14 +180,15 @@ beforeEach(() => {
 });
 
 describe('EventsSettings manual load lifetime', () => {
-  describe.each(['edit', 'delete'] as const)('stale-row %s refresh', (kind) => {
+  describe.each(STALE_ROW_REFRESHES)('stale-row $kind refresh', (row) => {
     it.each(outcomes)('ignores $status settlement after unmount', async (outcome) => {
+      const user = userEvent.setup();
       const pending = deferredLoad();
       const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
       setStore({ events: [makeEvent()], loadEvents });
       const view = await renderSection();
       loadEvents.mockImplementationOnce(() => startPendingLoad(pending));
-      await refreshStaleRow(kind);
+      await refreshStaleRow(user, row);
       expect(loadEvents).toHaveBeenCalledTimes(2);
       expect(store.state.eventsIsLoading).toBe(true);
 
@@ -185,12 +208,13 @@ describe('EventsSettings manual load lifetime', () => {
   });
 
   it.each(outcomes)('ignores retry $status, cleanup, and focus requests after unmount', async (outcome) => {
+    const user = userEvent.setup();
     const pending = deferredLoad();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadFailed);
     setStore({ loadEvents });
     const view = await renderSection();
     loadEvents.mockImplementationOnce(() => startPendingLoad(pending));
-    fireEvent.click(screen.getByTestId('events-settings-retry'));
+    await user.click(screen.getByTestId('events-settings-retry'));
     expect(loadEvents).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument();
 
@@ -208,7 +232,19 @@ describe('EventsSettings manual load lifetime', () => {
 });
 
 describe('EventsSettings mounted recovery after StrictMode effect replay', () => {
-  it.each(['edit', 'delete'] as const)('settles a successful stale-row %s refresh', async (kind) => {
+  it.each([
+    {
+      ...STALE_ROW_REFRESHES[0],
+      settledEvents: (): CoupleEvent[] => [makeEvent('current')],
+      expectedTestId: 'event-row-current',
+    },
+    {
+      ...STALE_ROW_REFRESHES[1],
+      settledEvents: (): CoupleEvent[] => [],
+      expectedTestId: 'events-settings-empty',
+    },
+  ])('settles a successful stale-row $kind refresh', async ({ settledEvents, expectedTestId, ...row }) => {
+    const user = userEvent.setup();
     const pending = deferredLoad();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadFailed);
     setStore({ events: [makeEvent()], loadEvents });
@@ -216,49 +252,55 @@ describe('EventsSettings mounted recovery after StrictMode effect replay', () =>
     expect(loadEvents).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
     loadEvents.mockImplementationOnce(() => startPendingLoad(pending));
-    await refreshStaleRow(kind);
+    await refreshStaleRow(user, row);
     expect(loadEvents).toHaveBeenCalledTimes(3);
     stateSetterCalls.mockClear();
 
-    await settleLoad(pending, loadOk, kind === 'edit' ? [makeEvent('current')] : []);
+    await settleLoad(pending, loadOk, settledEvents());
 
     expect(stateSetterCalls).toHaveBeenCalled();
     expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
-    expect(screen.getByTestId(kind === 'edit' ? 'event-row-current' : 'events-settings-empty'))
-      .toBeInTheDocument();
+    expect(screen.getByTestId(expectedTestId)).toBeInTheDocument();
     expect(screen.getByTestId('events-settings-add')).toHaveFocus();
   });
 
   it('restores Retry after repeated failures and focuses Add on eventual success', async () => {
+    const user = userEvent.setup();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadFailed);
     setStore({ loadEvents });
     await renderSection(true);
     expect(loadEvents).toHaveBeenCalledTimes(2);
 
-    for (const [index, outcome] of [loadFailed, loadFailed, loadOk].entries()) {
+    // Clicks the enabled Retry and settles the load it starts with `outcome`.
+    async function retryWith(outcome: EventLoadResult, expectedCalls: number) {
       const pending = deferredLoad();
       loadEvents.mockImplementationOnce(() => startPendingLoad(pending));
       const retry = screen.getByTestId('events-settings-retry');
       expect(retry).toBeEnabled();
-      retry.focus();
-      fireEvent.click(retry);
-      expect(loadEvents).toHaveBeenCalledTimes(3 + index);
+      await user.click(retry);
+      expect(loadEvents).toHaveBeenCalledTimes(expectedCalls);
       expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument();
       stateSetterCalls.mockClear();
 
       await settleLoad(pending, outcome);
 
       expect(stateSetterCalls).toHaveBeenCalled();
-      if (outcome.status === 'failure') {
-        expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
-        expect(screen.getByTestId('events-settings-retry')).toBeEnabled();
-        expect(screen.getByTestId('events-settings-retry')).toHaveFocus();
-      } else {
-        expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
-        expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
-        expect(screen.getByTestId('events-settings-add')).toHaveFocus();
-      }
     }
+
+    await retryWith(loadFailed, 3);
+    expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-retry')).toBeEnabled();
+    expect(screen.getByTestId('events-settings-retry')).toHaveFocus();
+
+    await retryWith(loadFailed, 4);
+    expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-retry')).toBeEnabled();
+    expect(screen.getByTestId('events-settings-retry')).toHaveFocus();
+
+    await retryWith(loadOk, 5);
+    expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-add')).toHaveFocus();
   });
 
   it('does not revive the cancelled first mount load after replay', async () => {
@@ -279,19 +321,20 @@ describe('EventsSettings mounted recovery after StrictMode effect replay', () =>
   });
 
   it('releases a stale retry without changing its notice or stealing focus', async () => {
+    const user = userEvent.setup();
     const pending = deferredLoad();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadFailed);
     setStore({ events: [makeEvent()], loadEvents });
     await renderSection(true);
     loadEvents.mockImplementationOnce(() => startPendingLoad(pending));
     const retry = screen.getByTestId('events-settings-retry');
-    fireEvent.click(retry);
+    await user.click(retry);
     expect(retry).toBeDisabled();
-    fireEvent.click(retry);
+    await user.click(retry);
     expect(loadEvents).toHaveBeenCalledTimes(3);
-    fireEvent.click(screen.getByTestId('events-settings-add'));
+    await user.click(screen.getByTestId('events-settings-add'));
     const input = screen.getByTestId('events-form-label');
-    input.focus();
+    expect(input).toHaveFocus();
 
     // A shared newer load has finished; this manual invocation was superseded.
     await act(async () => { store.patch({ eventsIsLoading: false }); });

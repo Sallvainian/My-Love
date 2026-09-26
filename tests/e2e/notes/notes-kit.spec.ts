@@ -10,6 +10,7 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import type { Locator, Page } from '@playwright/test';
+import { deleteSentNote } from '../../support/helpers/love-notes';
 
 type Scheme = 'light' | 'dark';
 
@@ -55,6 +56,23 @@ test.describe('Love Notes on the style kit', () => {
     await page.addInitScript(() => {
       localStorage.setItem('lastWelcomeView', Date.now().toString());
     });
+  });
+
+  /**
+   * The note the bubble test puts on the server, recorded before the send click,
+   * and whether its POST answered 2xx. Deleted from `test.afterEach`, not from
+   * the end of the test, so a failure or a timeout mid-test cannot leave it in
+   * this worker pair's shared thread.
+   */
+  let sentNote: string | null = null;
+  let committed = false;
+
+  test.afterEach(async ({ supabaseAdmin }) => {
+    const content = sentNote;
+    const wasCommitted = committed;
+    sentNote = null;
+    committed = false;
+    if (content) await deleteSentNote(supabaseAdmin, content, wasCommitted);
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {
@@ -137,6 +155,7 @@ test.describe('Love Notes on the style kit', () => {
 
       const uniqueMessage = `Kit note ${colorScheme} ${Date.now()}`;
       await page.getByLabel(/love note message input/i).fill(uniqueMessage);
+      sentNote = uniqueMessage;
 
       const sendCall = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/love_notes**' });
       await page.getByLabel(/send message/i).click();
@@ -144,10 +163,11 @@ test.describe('Love Notes on the style kit', () => {
       const message = page.getByTestId('love-note-message').filter({ hasText: uniqueMessage });
       await expect(message).toBeVisible();
       const { status } = await sendCall;
+      committed = status >= 200 && status < 300;
       expect(status).toBeLessThan(400);
 
       // The bubble is the element that directly wraps the text block.
-      const bubble = message.getByText(uniqueMessage).locator('xpath=../..');
+      const bubble = message.getByTestId('love-note-bubble');
       const bubbleFill = await background(bubble);
       const sendFill = await background(page.getByLabel(/send message/i));
       expect(bubbleFill).toBe(KIT_FILL);

@@ -7,14 +7,35 @@
  * Love Notes Images: Task 11 - Component tests (AC-7, AC-9)
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { HTMLAttributes, ReactNode } from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { Dispatch, HTMLAttributes, ReactNode, SetStateAction } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { IMAGE_STORAGE } from '../../../config/images';
 import type { LoveNote } from '../../../types/models';
 import { formatFullTimestamp } from '../../../utils/dateUtils';
 import { LoveNoteMessage } from '../LoveNoteMessage';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
+
+const stateSetterCalls = vi.hoisted(() => vi.fn<(next: unknown) => void>());
+
+vi.mock('react', async () => {
+  const actual = await vi.importActual<typeof import('react')>('react');
+  return {
+    ...actual,
+    // React 19 silently ignores unmounted updates. Observe the dispatch itself,
+    // forwarding to real state and preserving setter identity across renders.
+    useState<T,>(initial: T | (() => T)) {
+      const [value, setValue] = actual.useState(initial);
+      const observedSetter = actual.useCallback<Dispatch<SetStateAction<T>>>((next) => {
+        stateSetterCalls(next);
+        setValue(next);
+      }, [setValue]);
+      return [value, observedSetter];
+    },
+  };
+});
 
 interface FullScreenImageViewerMockProps {
   imageUrl: string | null | undefined;
@@ -78,6 +99,17 @@ vi.mock('../FullScreenImageViewer', () => ({
     ) : null,
 }));
 
+/** A promise the test settles by hand, at the point it chooses. */
+function deferred<T>() {
+  let resolve: (value: T) => void = () => {};
+  let reject: (error: Error) => void = () => {};
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('LoveNoteMessage', () => {
   const baseMessage: LoveNote = {
     id: 'msg-1',
@@ -86,6 +118,11 @@ describe('LoveNoteMessage', () => {
     content: 'Hello love!',
     created_at: '2024-01-15T10:30:00Z',
   };
+  /** baseMessage carrying a stored picture at `path`. */
+  const withImage = (
+    path = 'user-123/image.jpg',
+    overrides: Partial<LoveNote> = {}
+  ): LoveNote => ({ ...baseMessage, image_url: path, ...overrides });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -97,7 +134,7 @@ describe('LoveNoteMessage', () => {
     mockDownloadLoveNoteImage.mockRejectedValue(new Error('Failed to download image'));
     mockGetSignedImageUrl.mockResolvedValue({
       url: 'https://storage.example.com/signed-image.jpg',
-      expiresAt: Date.now() + 3600000,
+      expiresAt: Date.now() + IMAGE_STORAGE.SIGNED_URL_EXPIRY_SECONDS * 1000,
     });
   });
 
@@ -109,13 +146,13 @@ describe('LoveNoteMessage', () => {
     it('should render message content', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText('Hello love!')).toBeInTheDocument();
+      expect(screen.getByTestId('love-note-text')).toHaveTextContent('Hello love!');
     });
 
     it('should render sender name and timestamp', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText(/You/)).toBeInTheDocument();
+      expect(screen.getByTestId('love-note-caption')).toHaveTextContent(/^You · .+$/);
     });
 
     it('shows when a late-delivered note was written, not when it arrived', () => {
@@ -146,13 +183,13 @@ describe('LoveNoteMessage', () => {
       );
     });
 
-    it('should apply own message styling when isOwnMessage is true', () => {
+    it('shows your own note as a filled bubble on the right', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
       const messageContainer = screen.getByTestId('love-note-message');
       expect(messageContainer).toHaveClass('items-end');
-      expect(screen.queryByText('Sending...')).not.toBeInTheDocument();
-      const bubble = messageContainer.querySelector('.rounded-\\[20px\\]');
+      expect(screen.queryByTestId('love-note-status')).not.toBeInTheDocument();
+      const bubble = screen.getByTestId('love-note-bubble');
       // Own bubble: kit `fill` with white text and the 6px bottom-right tail,
       // no hairline (the fill is the edge).
       expect(bubble).toHaveClass('max-w-[78%]', 'rounded-br-md', 'bg-fill', 'text-white');
@@ -160,12 +197,12 @@ describe('LoveNoteMessage', () => {
       expect(bubble).not.toHaveClass('opacity-70');
     });
 
-    it('should apply partner message styling when isOwnMessage is false', () => {
+    it('shows a partner note as an outlined bubble on the left', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={false} senderName="Partner" />);
 
       const messageContainer = screen.getByTestId('love-note-message');
       expect(messageContainer).toHaveClass('items-start');
-      const bubble = messageContainer.querySelector('.rounded-\\[20px\\]');
+      const bubble = screen.getByTestId('love-note-bubble');
       // Partner bubble: kit `card` with an inset 1px `line` edge and the 6px
       // bottom-left tail.
       expect(bubble).toHaveClass(
@@ -189,17 +226,15 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={maliciousMessage} isOwnMessage={true} senderName="You" />);
 
       // Script tags should be stripped
-      expect(screen.queryByText('<script>')).not.toBeInTheDocument();
-      expect(screen.getByText('Hello')).toBeInTheDocument();
+      const text = screen.getByTestId('love-note-text');
+      expect(text).toHaveTextContent(/^Hello$/);
+      expect(text).not.toHaveTextContent('<script>');
     });
   });
 
   describe('Image Message Rendering', () => {
-    it('should fetch signed URL for server image', async () => {
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/1705315800000-uuid.jpg',
-      };
+    it('loads a stored picture by its storage path', async () => {
+      const messageWithImage = withImage('user-123/1705315800000-uuid.jpg');
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -209,10 +244,7 @@ describe('LoveNoteMessage', () => {
     });
 
     it('should display image after loading signed URL', async () => {
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -242,41 +274,46 @@ describe('LoveNoteMessage', () => {
     });
 
     it('should show loading spinner while fetching image URL', async () => {
-      // Make the signed URL promise never resolve immediately
-      mockGetSignedImageUrl.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ url: 'test' }), 100))
-      );
+      // The signed URL stays pending until the spinner has been seen
+      const signedUrl = deferred<{ url: string; expiresAt: number }>();
+      mockGetSignedImageUrl.mockReturnValue(signedUrl.promise);
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
-      // Should show loading state (spinner with animate-spin class)
+      // Should show the image loading placeholder while the URL is pending
       await waitFor(() => {
-        const loadingSpinner = document.querySelector('.animate-spin');
-        expect(loadingSpinner).toBeInTheDocument();
+        expect(screen.getByTestId('love-note-image-loading')).toBeInTheDocument();
       });
+
+      // Once the URL arrives, the image replaces the spinner
+      await act(async () => {
+        signedUrl.resolve({ url: 'https://storage.example.com/late.jpg', expiresAt: 0 });
+        await signedUrl.promise;
+      });
+      expect(screen.getByRole('img', { name: /image from you/i })).toHaveAttribute(
+        'src',
+        'https://storage.example.com/late.jpg'
+      );
+      expect(screen.queryByTestId('love-note-image-loading')).not.toBeInTheDocument();
     });
 
     it('should show error state when image fails to load', async () => {
       mockGetSignedImageUrl.mockRejectedValue(new Error('Not found'));
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/missing.jpg',
-      };
+      const messageWithImage = withImage('user-123/missing.jpg');
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to load image')).toBeInTheDocument();
+        expect(screen.getByTestId('love-note-image-error')).toHaveTextContent(
+          'Failed to load image'
+        );
       });
     });
 
-    it('should show uploading overlay when imageUploading is true', () => {
+    it('shows Uploading... over a picture that is still uploading', () => {
       const uploadingMessage: LoveNote = {
         ...baseMessage,
         imagePreviewUrl: 'blob:preview',
@@ -285,14 +322,14 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={uploadingMessage} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText('Uploading...')).toBeInTheDocument();
+      expect(screen.getByTestId('love-note-image-uploading')).toHaveTextContent('Uploading...');
     });
   });
 
   describe('Image cache (offline)', () => {
     const USER = 'user-123';
     const PATH = 'partner-456/1705315800000-uuid.jpg';
-    const imageMessage: LoveNote = { ...baseMessage, image_url: PATH };
+    const imageMessage = withImage(PATH);
     let createObjectURL: ReturnType<typeof vi.fn>;
     let revokeObjectURL: ReturnType<typeof vi.fn>;
     const originalCreate = URL.createObjectURL;
@@ -310,16 +347,6 @@ describe('LoveNoteMessage', () => {
       URL.createObjectURL = originalCreate;
       URL.revokeObjectURL = originalRevoke;
     });
-
-    function deferred<T>() {
-      let resolve: (value: T) => void = () => {};
-      const promise = new Promise<T>((res) => {
-        resolve = res;
-      });
-      return { promise, resolve };
-    }
-
-    const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 
     it('shows a cached image from the cache, with no download or signed URL', async () => {
       const blob = new Blob(['cached']);
@@ -375,7 +402,9 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to load image')).toBeInTheDocument();
+        expect(screen.getByTestId('love-note-image-error')).toHaveTextContent(
+          'Failed to load image'
+        );
       });
       expect(mockWriteCachedImage).not.toHaveBeenCalled();
     });
@@ -407,8 +436,11 @@ describe('LoveNoteMessage', () => {
       await waitFor(() => expect(mockDownloadLoveNoteImage).toHaveBeenCalled());
 
       switchIdentity({ userId: 'user-B', authSessionVersion: 2 });
-      download.resolve(new Blob(['A-IMAGE']));
-      await settle();
+      // Async act drains every continuation of the resolved download
+      await act(async () => {
+        download.resolve(new Blob(['A-IMAGE']));
+        await download.promise;
+      });
 
       expect(mockWriteCachedImage).not.toHaveBeenCalled();
       expect(createObjectURL).not.toHaveBeenCalled();
@@ -420,17 +452,25 @@ describe('LoveNoteMessage', () => {
       mockReadCachedImage.mockReturnValue(read.promise);
 
       render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
-      await waitFor(() => expect(mockReadCachedImage).toHaveBeenCalled());
+      // The read starts during render, but the loading state commits a task
+      // later. Switch only after that commit: a render still pending at the
+      // switch reads the new session, re-runs the effect as it, and this mock
+      // answers that second read with the same blob, which is then shown.
+      await waitFor(() => expect(document.querySelector('.animate-spin')).toBeInTheDocument());
 
       switchIdentity({ authSessionVersion: 2 });
-      read.resolve(new Blob(['A-IMAGE']));
-      await settle();
+      await act(async () => {
+        read.resolve(new Blob(['A-IMAGE']));
+        await read.promise;
+      });
 
+      // One read: only the first session's effect ran, so its drop is what's tested
+      expect(mockReadCachedImage).toHaveBeenCalledTimes(1);
       expect(createObjectURL).not.toHaveBeenCalled();
       expect(mockDownloadLoveNoteImage).not.toHaveBeenCalled();
     });
 
-    it('revokes the object URL on unmount', async () => {
+    it('releases the cached picture when the note unmounts', async () => {
       mockReadCachedImage.mockResolvedValue(new Blob(['cached']));
 
       const { unmount } = render(
@@ -451,7 +491,13 @@ describe('LoveNoteMessage', () => {
           senderName="You"
         />
       );
-      await settle();
+      // The preview is on screen, so the image effect has already run
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: /image from you/i })).toHaveAttribute(
+          'src',
+          'blob:http://localhost/preview-1'
+        );
+      });
 
       expect(mockReadCachedImage).not.toHaveBeenCalled();
       expect(mockWriteCachedImage).not.toHaveBeenCalled();
@@ -460,10 +506,8 @@ describe('LoveNoteMessage', () => {
 
   describe('Full Screen Image Viewer', () => {
     it('should open full-screen viewer when image is clicked', async () => {
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const user = userEvent.setup();
+      const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -473,16 +517,14 @@ describe('LoveNoteMessage', () => {
 
       // Dynamic aria-label includes "View full size:" prefix
       const imageButton = screen.getByRole('button', { name: /view full size/i });
-      fireEvent.click(imageButton);
+      await user.click(imageButton);
 
       expect(screen.getByTestId('fullscreen-viewer')).toBeInTheDocument();
     });
 
     it('should close full-screen viewer when clicked', async () => {
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const user = userEvent.setup();
+      const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -492,12 +534,12 @@ describe('LoveNoteMessage', () => {
 
       // Open viewer
       const imageButton = screen.getByRole('button', { name: /view full size/i });
-      fireEvent.click(imageButton);
+      await user.click(imageButton);
 
       expect(screen.getByTestId('fullscreen-viewer')).toBeInTheDocument();
 
       // Close viewer
-      fireEvent.click(screen.getByTestId('fullscreen-viewer'));
+      await user.click(screen.getByTestId('fullscreen-viewer'));
 
       await waitFor(() => {
         expect(screen.queryByTestId('fullscreen-viewer')).not.toBeInTheDocument();
@@ -507,15 +549,14 @@ describe('LoveNoteMessage', () => {
     it('should not open viewer when image has error', async () => {
       mockGetSignedImageUrl.mockRejectedValue(new Error('Not found'));
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/missing.jpg',
-      };
+      const messageWithImage = withImage('user-123/missing.jpg');
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to load image')).toBeInTheDocument();
+        expect(screen.getByTestId('love-note-image-error')).toHaveTextContent(
+          'Failed to load image'
+        );
       });
 
       // No image button should exist when there's an error
@@ -532,11 +573,12 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={sendingMessage} isOwnMessage={true} senderName="You" />);
 
-      const sending = screen.getByText('Sending...');
+      const sending = screen.getByTestId('love-note-status');
+      expect(sending).toHaveTextContent('Sending...');
       expect(sending).toBeInTheDocument();
       expect(sending).toHaveAttribute('aria-live', 'polite');
       expect(sending).toHaveClass('text-muted');
-      const bubble = screen.getByTestId('love-note-message').querySelector('.rounded-\\[20px\\]');
+      const bubble = screen.getByTestId('love-note-bubble');
       expect(bubble).toHaveClass('bg-fill', 'text-white');
       expect(bubble).not.toHaveClass('opacity-70');
     });
@@ -551,10 +593,11 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={queuedMessage} isOwnMessage={true} senderName="You" />);
 
-      const waiting = screen.getByText('Waiting to send');
+      const waiting = screen.getByTestId('love-note-status');
+      expect(waiting).toHaveTextContent('Waiting to send');
       expect(waiting).toHaveAttribute('aria-live', 'polite');
       expect(waiting).toHaveClass('text-muted');
-      expect(screen.queryByText('Sending...')).not.toBeInTheDocument();
+      expect(waiting).not.toHaveTextContent('Sending...');
       expect(screen.queryByRole('button', { name: 'Retry sending message' })).not.toBeInTheDocument();
     });
 
@@ -563,8 +606,9 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={sendingQueued} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText('Sending...')).toBeInTheDocument();
-      expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
+      const status = screen.getByTestId('love-note-status');
+      expect(status).toHaveTextContent('Sending...');
+      expect(status).not.toHaveTextContent('Waiting to send');
     });
 
     it('should show only Retry for a failed queued note', () => {
@@ -579,7 +623,7 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={failedQueued} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByRole('button', { name: 'Retry sending message' })).toBeInTheDocument();
-      expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('love-note-status')).not.toBeInTheDocument();
     });
 
     it('should not show sending indicator when image is uploading', () => {
@@ -593,8 +637,8 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={uploadingMessage} isOwnMessage={true} senderName="You" />);
 
       // Should show "Uploading..." not "Sending..."
-      expect(screen.getByText('Uploading...')).toBeInTheDocument();
-      expect(screen.queryByText('Sending...')).not.toBeInTheDocument();
+      expect(screen.getByTestId('love-note-image-uploading')).toHaveTextContent('Uploading...');
+      expect(screen.queryByTestId('love-note-status')).not.toBeInTheDocument();
     });
 
     it('should show error state with retry button', () => {
@@ -606,15 +650,16 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={failedMessage} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText(/Failed to send/)).toBeInTheDocument();
-      const retry = screen.getByRole('button', { name: /retry/i });
+      const retry = screen.getByRole('button', { name: 'Retry sending message' });
+      expect(retry).toHaveTextContent(/Failed to send/);
       expect(retry).toBeInTheDocument();
       expect(retry).toHaveClass('text-danger');
-      const bubble = screen.getByTestId('love-note-message').querySelector('.rounded-\\[20px\\]');
+      const bubble = screen.getByTestId('love-note-bubble');
       expect(bubble).toHaveClass('outline-2', 'outline-offset-2', 'outline-danger');
     });
 
-    it('should call onRetry when retry button clicked', () => {
+    it('retries the failed note by its temp id when Retry is tapped', async () => {
+      const user = userEvent.setup();
       const onRetry = vi.fn();
       const failedMessage: LoveNote = {
         ...baseMessage,
@@ -632,7 +677,7 @@ describe('LoveNoteMessage', () => {
       );
 
       const retryButton = screen.getByRole('button', { name: /retry/i });
-      fireEvent.click(retryButton);
+      await user.click(retryButton);
 
       expect(onRetry).toHaveBeenCalledWith('temp-123');
     });
@@ -640,15 +685,11 @@ describe('LoveNoteMessage', () => {
 
   describe('Message with Both Text and Image', () => {
     it('should render both text and image', async () => {
-      const messageWithBoth: LoveNote = {
-        ...baseMessage,
-        content: 'Check out this photo!',
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithBoth = withImage(undefined, { content: 'Check out this photo!' });
 
       render(<LoveNoteMessage message={messageWithBoth} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText('Check out this photo!')).toBeInTheDocument();
+      expect(screen.getByTestId('love-note-text')).toHaveTextContent('Check out this photo!');
 
       await waitFor(() => {
         // Alt text includes the message caption
@@ -659,11 +700,7 @@ describe('LoveNoteMessage', () => {
     });
 
     it('should render image-only message without text bubble', async () => {
-      const imageOnlyMessage: LoveNote = {
-        ...baseMessage,
-        content: '',
-        image_url: 'user-123/image.jpg',
-      };
+      const imageOnlyMessage = withImage(undefined, { content: '' });
 
       render(<LoveNoteMessage message={imageOnlyMessage} isOwnMessage={true} senderName="You" />);
 
@@ -672,18 +709,13 @@ describe('LoveNoteMessage', () => {
         expect(screen.getByRole('img', { name: /photo shared by you/i })).toBeInTheDocument();
       });
 
-      // Should have no text content
-      const messageBubbles = screen.queryAllByText(/./);
-      // Filter to just content paragraphs, not controls/timestamp
-      const contentParagraphs = messageBubbles.filter(
-        (el) => el.tagName === 'P' && el.classList.contains('text-base') && el.textContent === ''
-      );
-      expect(contentParagraphs).toHaveLength(0);
+      // No text bubble is rendered for an empty caption
+      expect(screen.queryByTestId('love-note-text')).not.toBeInTheDocument();
     });
   });
 
   describe('Accessibility', () => {
-    it('should have proper aria-label with sender and time', () => {
+    it('names the note by its sender and time for screen readers', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
       const messageContainer = screen.getByRole('listitem');
@@ -694,10 +726,7 @@ describe('LoveNoteMessage', () => {
     });
 
     it('should have accessible image button', async () => {
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
@@ -710,21 +739,15 @@ describe('LoveNoteMessage', () => {
   });
 
   describe('Memory Leak Prevention', () => {
-    it('should not update state after unmount during signed URL fetch', async () => {
+    it('ignores a signed URL that arrives after unmount', async () => {
       // Create a deferred promise we can control
-      let resolveSignedUrl: (value: { url: string; expiresAt: number }) => void;
-      const deferredPromise = new Promise<{ url: string; expiresAt: number }>((resolve) => {
-        resolveSignedUrl = resolve;
-      });
-      mockGetSignedImageUrl.mockReturnValue(deferredPromise);
+      const signedUrl = deferred<{ url: string; expiresAt: number }>();
+      mockGetSignedImageUrl.mockReturnValue(signedUrl.promise);
 
-      // Spy on console.error to detect React warnings about unmounted state updates
+      // Keep console output quiet; the setter spy is what detects late updates
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       const { unmount } = render(
         <LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />
@@ -733,43 +756,34 @@ describe('LoveNoteMessage', () => {
       // Verify the fetch was initiated
       expect(mockGetSignedImageUrl).toHaveBeenCalledWith('user-123/image.jpg');
 
-      // Unmount BEFORE the promise resolves
+      // Unmount BEFORE the promise resolves; only setter calls from here on count
+      stateSetterCalls.mockClear();
       unmount();
 
-      // Now resolve the promise after unmount
-      resolveSignedUrl!({
-        url: 'https://storage.example.com/signed.jpg',
-        expiresAt: Date.now() + 3600000,
+      // Now resolve the promise after unmount; async act drains every
+      // continuation, so a late update would already have been dispatched
+      await act(async () => {
+        signedUrl.resolve({ url: 'https://storage.example.com/signed.jpg', expiresAt: 0 });
+        await signedUrl.promise;
       });
 
-      // Wait a tick to allow any potential state updates to occur
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      // Should NOT have any React warnings about state updates on unmounted component
-      const reactWarnings = consoleErrorSpy.mock.calls.filter(
-        (call) =>
-          call[0]?.includes?.('unmounted') ||
-          call[0]?.includes?.('memory leak') ||
-          call[0]?.includes?.("Can't perform a React state update")
-      );
-      expect(reactWarnings).toHaveLength(0);
+      // React 19 no longer warns about unmounted updates, so observe the
+      // setters directly: the late resolve must not dispatch any state
+      expect(stateSetterCalls).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });
 
-    it('should not update state after unmount during error retry', async () => {
+    it('ignores a retried signed URL that arrives after unmount', async () => {
       // First call succeeds to load the image
       mockGetSignedImageUrl.mockResolvedValueOnce({
         url: 'https://storage.example.com/signed.jpg',
-        expiresAt: Date.now() + 3600000,
+        expiresAt: Date.now() + IMAGE_STORAGE.SIGNED_URL_EXPIRY_SECONDS * 1000,
       });
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       const { unmount } = render(
         <LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />
@@ -781,74 +795,61 @@ describe('LoveNoteMessage', () => {
       });
 
       // Set up a deferred promise for the retry attempt
-      let resolveRetry: (value: { url: string; expiresAt: number }) => void;
-      const retryPromise = new Promise<{ url: string; expiresAt: number }>((resolve) => {
-        resolveRetry = resolve;
-      });
-      mockGetSignedImageUrl.mockReturnValue(retryPromise);
+      const retry = deferred<{ url: string; expiresAt: number }>();
+      mockGetSignedImageUrl.mockReturnValue(retry.promise);
 
       // Trigger image error (simulating 403 expired URL)
       const img = screen.getByRole('img', { name: /image from you/i });
-      fireEvent.error(img);
+      fireEvent.error(img); // raw error: an <img> load failure is a resource event, not a user action
+
+      // The error handler bumps the retry count synchronously; only setter
+      // calls after unmount count
+      stateSetterCalls.mockClear();
 
       // Unmount during retry
       unmount();
 
       // Resolve retry after unmount
-      resolveRetry!({
-        url: 'https://storage.example.com/new-signed.jpg',
-        expiresAt: Date.now() + 3600000,
+      await act(async () => {
+        retry.resolve({ url: 'https://storage.example.com/new-signed.jpg', expiresAt: 0 });
+        await retry.promise;
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      // Verify no React warnings
-      const reactWarnings = consoleErrorSpy.mock.calls.filter(
-        (call) =>
-          call[0]?.includes?.('unmounted') ||
-          call[0]?.includes?.('memory leak') ||
-          call[0]?.includes?.("Can't perform a React state update")
-      );
-      expect(reactWarnings).toHaveLength(0);
+      // The late retry result must not dispatch any state
+      expect(stateSetterCalls).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });
 
-    it('should not update state after unmount when fetch fails', async () => {
+    it('logs but ignores a signed-URL failure that settles after unmount', async () => {
       // Create a deferred rejection
-      let rejectSignedUrl: (error: Error) => void;
-      const deferredPromise = new Promise<{ url: string; expiresAt: number }>((_, reject) => {
-        rejectSignedUrl = reject;
-      });
-      mockGetSignedImageUrl.mockReturnValue(deferredPromise);
+      const signedUrl = deferred<{ url: string; expiresAt: number }>();
+      mockGetSignedImageUrl.mockReturnValue(signedUrl.promise);
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const messageWithImage: LoveNote = {
-        ...baseMessage,
-        image_url: 'user-123/image.jpg',
-      };
+      const messageWithImage = withImage();
 
       const { unmount } = render(
         <LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />
       );
 
-      // Unmount before rejection
+      // Unmount before rejection; only setter calls from here on count
+      stateSetterCalls.mockClear();
       unmount();
 
       // Reject after unmount
-      rejectSignedUrl!(new Error('Network error'));
+      await act(async () => {
+        signedUrl.reject(new Error('Network error'));
+        await signedUrl.promise.catch(() => {});
+      });
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      // Filter for React state update warnings only
-      const reactWarnings = consoleErrorSpy.mock.calls.filter(
-        (call) =>
-          call[0]?.includes?.('unmounted') ||
-          call[0]?.includes?.('memory leak') ||
-          call[0]?.includes?.("Can't perform a React state update")
+      // The rejection is logged, and must not dispatch any state
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[LoveNoteMessage] Failed to get signed URL:',
+        expect.any(Error)
       );
-      expect(reactWarnings).toHaveLength(0);
+      expect(stateSetterCalls).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });

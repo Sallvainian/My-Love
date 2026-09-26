@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InteractionSubscriptionStatus } from '../../../api/interactionService';
 
 const storeMocks = vi.hoisted(() => ({
@@ -86,6 +86,7 @@ describe('PokeKissInterface interaction subscription', () => {
   });
 
   it('keeps the connection warning separate from transient action toasts', async () => {
+    const user = userEvent.setup();
     let reportStatus: ((status: InteractionSubscriptionStatus) => void) | undefined;
     storeMocks.subscribeToInteractions.mockImplementation(
       (onStatusChange: (status: InteractionSubscriptionStatus) => void) => {
@@ -98,7 +99,7 @@ describe('PokeKissInterface interaction subscription', () => {
     await waitFor(() => expect(reportStatus).toBeDefined());
     act(() => reportStatus?.('TIMED_OUT'));
 
-    fireEvent.click(screen.getByTestId('fart-button'));
+    await user.click(screen.getByTestId('fart-button'));
 
     expect(screen.getByTestId('toast-notification')).toHaveTextContent('Fart sent!');
     expect(screen.getByTestId('toast-notification')).not.toHaveAttribute('role');
@@ -145,10 +146,11 @@ describe('PokeKissInterface sending', () => {
   });
 
   it('asks the store to send, without naming a recipient', async () => {
+    const user = userEvent.setup();
     storeMocks.sendPoke.mockResolvedValue({ id: 'poke-1' });
 
     render(<PokeKissInterface />);
-    fireEvent.click(screen.getByTestId('poke-button'));
+    await user.click(screen.getByTestId('poke-button'));
 
     await waitFor(() =>
       expect(screen.getByTestId('toast-notification')).toHaveTextContent('Poke sent!')
@@ -165,10 +167,11 @@ describe('PokeKissInterface sending', () => {
   ] as const)(
     'reports a missing partner distinctly from a failed %s',
     async (_label, action, testId) => {
+      const user = userEvent.setup();
       storeMocks[action].mockRejectedValue(new NoPartnerError());
 
       render(<PokeKissInterface />);
-      fireEvent.click(screen.getByTestId(testId));
+      await user.click(screen.getByTestId(testId));
 
       await waitFor(() =>
         expect(screen.getByTestId('toast-notification')).toHaveTextContent(
@@ -179,10 +182,11 @@ describe('PokeKissInterface sending', () => {
   );
 
   it('still reports a real send failure as a failure', async () => {
+    const user = userEvent.setup();
     storeMocks.sendKiss.mockRejectedValue(new Error('network went away'));
 
     render(<PokeKissInterface />);
-    fireEvent.click(screen.getByTestId('kiss-button'));
+    await user.click(screen.getByTestId('kiss-button'));
 
     await waitFor(() =>
       expect(screen.getByTestId('toast-notification')).toHaveTextContent(
@@ -197,10 +201,11 @@ describe('PokeKissInterface sending', () => {
   ] as const)(
     'offline: a %s is refused with the offline sentence and never sent',
     async (_label, action, testId, subject) => {
+      const user = userEvent.setup();
       const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
       try {
         render(<PokeKissInterface />);
-        fireEvent.click(screen.getByTestId(testId));
+        await user.click(screen.getByTestId(testId));
 
         await waitFor(() =>
           expect(screen.getByTestId('toast-notification')).toHaveTextContent(
@@ -227,7 +232,9 @@ describe('PokeKissInterface on the kit', () => {
   it('renders the three action tiles and History without any click', () => {
     render(<PokeKissInterface />);
 
-    expect(screen.getByText('Send a little something')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Send a little something' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Poke' })).toHaveAttribute('data-testid', 'poke-button');
     expect(screen.getByRole('button', { name: 'Kiss' })).toHaveAttribute('data-testid', 'kiss-button');
     expect(screen.getByRole('button', { name: 'Fart' })).toHaveAttribute('data-testid', 'fart-button');
@@ -236,11 +243,12 @@ describe('PokeKissInterface on the kit', () => {
     expect(screen.queryByTestId('notification-badge')).not.toBeInTheDocument();
   });
 
-  it('opens the history sheet from the History button', () => {
+  it('opens the history sheet from the History button', async () => {
+    const user = userEvent.setup();
     render(<PokeKissInterface />);
     expect(screen.queryByTestId('interaction-history-modal')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('history-button'));
+    await user.click(screen.getByTestId('history-button'));
 
     expect(screen.getByTestId('interaction-history-modal')).toBeInTheDocument();
   });
@@ -265,6 +273,7 @@ describe('PokeKissInterface on the kit', () => {
   ] as const)(
     'offline: a %s still plays, is not marked seen, and the badge stays',
     async (type, subject) => {
+      const user = userEvent.setup();
       storeState.unviewedCount = 1;
       storeMocks.getUnviewedInteractions.mockReturnValue([
         { id: 'interaction-1', type, fromUserId: 'partner', toUserId: 'me', viewed: false, createdAt: new Date() },
@@ -272,9 +281,9 @@ describe('PokeKissInterface on the kit', () => {
       const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
       try {
         render(<PokeKissInterface />);
-        fireEvent.click(screen.getByTestId('notification-badge'));
+        await user.click(screen.getByTestId('notification-badge'));
         // The animation plays offline.
-        fireEvent.click(screen.getByTestId(`${type}-animation`));
+        await user.click(screen.getByTestId(`${type}-animation`));
 
         await waitFor(() =>
           expect(screen.getByTestId('toast-notification')).toHaveTextContent(
@@ -329,7 +338,7 @@ describe('PokeKissInterface on the kit', () => {
     expect(screen.queryByTestId('interaction-history-modal')).not.toBeInTheDocument();
   });
 
-  // The overlay is ended with fireEvent.click, which moves no focus -- the same
+  // The overlay is ended with a raw click event, which moves no focus -- the same
   // as a keyboard user waiting for the animation to finish on its own.
   it('moves focus to History when playing the last unviewed interaction removes the badge', async () => {
     withUnviewed(1);
@@ -343,7 +352,7 @@ describe('PokeKissInterface on the kit', () => {
     await user.tab();
     expect(screen.getByTestId('notification-badge')).toHaveFocus();
     await user.keyboard('{Enter}');
-    fireEvent.click(screen.getByTestId('poke-animation'));
+    fireEvent.click(screen.getByTestId('poke-animation')); // raw click: stands in for the animation ending on its own; user.click would move focus off the badge, which is the state under test
 
     await waitFor(() =>
       expect(screen.queryByTestId('notification-badge')).not.toBeInTheDocument()
@@ -363,7 +372,7 @@ describe('PokeKissInterface on the kit', () => {
     await user.tab();
     await user.tab();
     await user.keyboard('{Enter}');
-    fireEvent.click(screen.getByTestId('poke-animation'));
+    fireEvent.click(screen.getByTestId('poke-animation')); // raw click: stands in for the animation ending on its own; user.click would move focus off the badge, which is the state under test
 
     await waitFor(() =>
       expect(screen.getByTestId('notification-badge')).toHaveAttribute(
@@ -375,14 +384,15 @@ describe('PokeKissInterface on the kit', () => {
     expect(screen.getByTestId('history-button')).not.toHaveFocus();
   });
 
-  it('plays the unviewed interaction from the badge without opening history', () => {
+  it('plays the unviewed interaction from the badge without opening history', async () => {
     withUnviewed(2);
+    const user = userEvent.setup();
 
     render(<PokeKissInterface />);
     const badge = screen.getByTestId('notification-badge');
     expect(badge).toHaveTextContent('2');
 
-    fireEvent.click(badge);
+    await user.click(badge);
 
     expect(screen.getByTestId('poke-animation')).toBeInTheDocument();
     expect(screen.getByTestId('poke-animation').textContent).not.toMatch(
@@ -391,33 +401,88 @@ describe('PokeKissInterface on the kit', () => {
     expect(screen.queryByTestId('interaction-history-modal')).not.toBeInTheDocument();
   });
 
-  it('disables a tile in cooldown and shows the remaining m:ss under its label', () => {
-    localStorage.setItem('lastPokeTime', String(Date.now() - 60_000));
+  describe('cooldown against a pinned clock', () => {
+    // The 30-minute cooldown is measured from `Date.now()` and re-read by a 1s
+    // interval, so both are faked; nothing in these cases waits on a timer.
+    const T = new Date(2026, 8, 25, 12, 0, 0).getTime();
+    // src/components/PokeKissInterface/PokeKissInterface.tsx RATE_LIMIT_MS (module-private).
+    const COOLDOWN_MS = 30 * 60 * 1000;
+    const ONE_MINUTE_MS = 60_000;
+    const ONE_SECOND_MS = 1_000;
 
-    render(<PokeKissInterface />);
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+      vi.setSystemTime(T);
+    });
 
-    expect(screen.getByTestId('poke-button')).toBeDisabled();
-    expect(screen.getByTestId('poke-cooldown').textContent).toMatch(/^2[89]:\d{2}$/);
-    expect(screen.getByTestId('kiss-button')).toBeEnabled();
-    expect(screen.queryByTestId('kiss-cooldown')).not.toBeInTheDocument();
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('disables a tile in cooldown and shows the remaining m:ss under its label', () => {
+      localStorage.setItem('lastPokeTime', String(T - ONE_MINUTE_MS));
+
+      render(<PokeKissInterface />);
+
+      expect(screen.getByTestId('poke-button')).toBeDisabled();
+      // The 30-minute cooldown less the minute already gone.
+      expect(screen.getByTestId('poke-cooldown')).toHaveTextContent(/^29:00$/);
+      expect(screen.getByTestId('kiss-button')).toBeEnabled();
+      expect(screen.queryByTestId('kiss-cooldown')).not.toBeInTheDocument();
+
+      // The countdown ticks with the clock.
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.getByTestId('poke-cooldown')).toHaveTextContent(/^28:59$/);
+    });
+
+    it('re-enables a tile exactly 30 minutes after the last send', () => {
+      localStorage.setItem('lastPokeTime', String(T - COOLDOWN_MS));
+
+      render(<PokeKissInterface />);
+
+      expect(screen.getByTestId('poke-button')).toBeEnabled();
+      expect(screen.queryByTestId('poke-cooldown')).not.toBeInTheDocument();
+    });
+
+    it('keeps a tile disabled one second before the cooldown ends', () => {
+      localStorage.setItem('lastPokeTime', String(T - (COOLDOWN_MS - ONE_SECOND_MS)));
+
+      render(<PokeKissInterface />);
+
+      expect(screen.getByTestId('poke-button')).toBeDisabled();
+      expect(screen.getByTestId('poke-cooldown')).toHaveTextContent(/^0:01$/);
+    });
+
+    it('re-enables the tile when the countdown ticks through its last second', () => {
+      localStorage.setItem('lastPokeTime', String(T - (COOLDOWN_MS - ONE_SECOND_MS)));
+
+      render(<PokeKissInterface />);
+      expect(screen.getByTestId('poke-button')).toBeDisabled();
+
+      act(() => vi.advanceTimersByTime(1000));
+
+      expect(screen.getByTestId('poke-button')).toBeEnabled();
+      expect(screen.queryByTestId('poke-cooldown')).not.toBeInTheDocument();
+    });
   });
 
   it('sends toasts with no emoji', async () => {
+    const user = userEvent.setup();
     storeMocks.sendPoke.mockResolvedValue({ id: 'poke-1' });
     storeMocks.sendKiss.mockResolvedValue({ id: 'kiss-1' });
 
     render(<PokeKissInterface />);
     const toast = () => screen.getByTestId('toast-notification');
 
-    fireEvent.click(screen.getByTestId('poke-button'));
+    await user.click(screen.getByTestId('poke-button'));
     await waitFor(() => expect(toast()).toHaveTextContent('Poke sent!'));
     expect(toast().textContent).toBe('Poke sent!');
 
-    fireEvent.click(screen.getByTestId('kiss-button'));
+    await user.click(screen.getByTestId('kiss-button'));
     await waitFor(() => expect(toast()).toHaveTextContent('Kiss sent!'));
     expect(toast().textContent).toBe('Kiss sent!');
 
-    fireEvent.click(screen.getByTestId('fart-button'));
+    await user.click(screen.getByTestId('fart-button'));
     await waitFor(() => expect(toast()).toHaveTextContent('Fart sent!'));
     expect(toast().textContent).toBe('Fart sent!');
     expect(toast().textContent).not.toMatch(/\p{Extended_Pictographic}/u);

@@ -18,6 +18,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const PARTNER_ID = '22222222-2222-4222-8222-222222222222';
 
+const LOOKUP_BACKOFF_MS = [300, 600]; // src/api/supabaseClient.ts LOOKUP_BACKOFF_MS (module-private)
+
+/** Past the whole retry schedule (300 + 600 ms), with 100 ms to spare: 1000 ms. */
+const PAST_EVERY_BACKOFF_MS = LOOKUP_BACKOFF_MS.reduce((total, delay) => total + delay, 0) + 100;
+
+/**
+ * Five times that: long enough after the last attempt that a fourth one, had
+ * the bound slipped, would have run and been counted.
+ */
+const LONG_AFTER_EVERY_BACKOFF_MS = 5 * PAST_EVERY_BACKOFF_MS;
+
 /** Queue of answers the stubbed `.single()` returns, one per call. */
 let singleResults: Array<{ data: unknown; error: unknown }> = [];
 let singleCalls = 0;
@@ -110,7 +121,7 @@ describe('partner lookup contract', () => {
       const { resolvePartnerIdForDelivery } = await import('@/api/supabaseClient');
 
       const pending = resolvePartnerIdForDelivery();
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(PAST_EVERY_BACKOFF_MS);
 
       await expect(pending).resolves.toBe(PARTNER_ID);
       expect(singleCalls).toBe(2);
@@ -121,7 +132,7 @@ describe('partner lookup contract', () => {
       const { resolvePartnerIdForDelivery } = await import('@/api/supabaseClient');
 
       const pending = resolvePartnerIdForDelivery();
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(PAST_EVERY_BACKOFF_MS);
 
       await expect(pending).resolves.toBeNull();
       // The second stubbed answer is never reached: one call settled it.
@@ -133,7 +144,7 @@ describe('partner lookup contract', () => {
       const { resolvePartnerIdForDelivery } = await import('@/api/supabaseClient');
 
       const pending = resolvePartnerIdForDelivery();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(LONG_AFTER_EVERY_BACKOFF_MS);
 
       // Null, not a throw: callers keep their fail-closed drop.
       await expect(pending).resolves.toBeNull();
@@ -149,7 +160,7 @@ describe('partner lookup contract', () => {
       const { resolvePartnerIdForDelivery } = await import('@/api/supabaseClient');
 
       const pending = resolvePartnerIdForDelivery();
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(LONG_AFTER_EVERY_BACKOFF_MS);
 
       await expect(pending).resolves.toBeNull();
       // It retried rather than accepting the first answer, and never reached

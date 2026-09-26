@@ -110,11 +110,13 @@ export function NetworkStatusIndicator({
       {config.showBanner && (
         <div
           className="flex items-center justify-center gap-2 border-b border-line bg-card2 px-4 py-2 transition-all duration-300 ease-in-out"
+          data-testid="network-status-banner"
         >
           {/* Status dot */}
           <span
             className={`inline-block h-2 w-2 rounded-full ${config.dotColor} ${config.animate ? 'animate-pulse' : ''} `}
             aria-hidden="true"
+            data-testid="network-status-dot"
           />
 
           {/* Icon */}
@@ -122,10 +124,13 @@ export function NetworkStatusIndicator({
             size={16}
             className={`${config.textColor} ${config.animate ? 'animate-spin' : ''}`}
             aria-hidden="true"
+            data-testid="network-status-icon"
           />
 
           {/* Status text */}
-          <span className="text-sm font-medium text-ink">{config.label}</span>
+          <span className="text-sm font-medium text-ink" data-testid="network-status-label">
+            {config.label}
+          </span>
 
           {/* Description */}
           {config.description && (
@@ -140,8 +145,14 @@ export function NetworkStatusIndicator({
           <span
             className={`inline-block h-2 w-2 rounded-full ${config.dotColor}`}
             aria-hidden="true"
+            data-testid="network-status-dot"
           />
-          <IconComponent size={14} className={config.textColor} aria-hidden="true" />
+          <IconComponent
+            size={14}
+            className={config.textColor}
+            aria-hidden="true"
+            data-testid="network-status-icon"
+          />
         </div>
       )}
     </div>

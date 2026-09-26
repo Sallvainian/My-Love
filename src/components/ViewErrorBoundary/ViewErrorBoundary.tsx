@@ -36,8 +36,14 @@ function ViewErrorFallback({
       className="flex min-h-[60vh] items-center justify-center px-4"
       data-testid="view-error-boundary"
     >
-      <div className="w-full max-w-md rounded-[20px] border border-line bg-card p-5 text-center shadow-card">
-        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-tint text-accent">
+      <div
+        className="w-full max-w-md rounded-[20px] border border-line bg-card p-5 text-center shadow-card"
+        data-testid="view-error-card"
+      >
+        <div
+          className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-tint text-accent"
+          data-testid="view-error-icon"
+        >
           <Icon className="h-5 w-5" aria-hidden="true" />
         </div>
         <h2 className="mb-2 text-lg font-semibold text-ink">
@@ -49,7 +55,10 @@ function ViewErrorFallback({
             : 'Something went wrong while loading this view.'}
         </p>
         {error && !showOfflineMessage && (
-          <p className="mb-5 max-h-24 overflow-auto rounded-[14px] bg-card2 p-3 text-left font-mono text-sm wrap-break-word text-muted">
+          <p
+            className="mb-5 max-h-24 overflow-auto rounded-[14px] bg-card2 p-3 text-left font-mono text-sm wrap-break-word text-muted"
+            data-testid="view-error-message"
+          >
             {error.message}
           </p>
         )}

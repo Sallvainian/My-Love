@@ -1,5 +1,6 @@
-import type { Session, User } from '@supabase/supabase-js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Session } from '@supabase/supabase-js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAuthBootstrapSession } from '../../../../tests/support/factories/auth-bootstrap-notification-order';
 import { signIn, signOut } from '../actionService';
 import { onAuthStateChange } from '../sessionService';
 
@@ -63,15 +64,44 @@ function deferred() {
 }
 
 // Token persistence runs on the subscription's promise queue after the
-// callback returns. A macrotask lets every settled queue step run.
-const flushPersistence = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+// callback returns, so each test waits for the queue step it asserts on: a
+// positive `vi.waitFor` on its side effect, or the deferred it settled (the
+// queue's own continuation on that promise was registered first).
 
-const listenerSession = {
-  access_token: 'listener-access-token',
-  refresh_token: 'listener-refresh-token',
-  expires_at: 777,
-  user: { id: 'listener-user', email: 'listener@example.com' },
-} as Session;
+const listenerSession = createAuthBootstrapSession({
+  userId: 'listener-user',
+  email: 'listener@example.com',
+  displayName: null,
+  accessToken: 'listener-access-token',
+  refreshToken: 'listener-refresh-token',
+  expiresAt: 777,
+});
+
+/**
+ * Each auth transition with the token side effect it queues, the session the
+ * listener receives, and the sentence logged if that side effect rejects.
+ */
+const TOKEN_CASES = [
+  {
+    event: 'SIGNED_IN',
+    sideEffect: mockStoreAuthToken,
+    session: listenerSession,
+    message: '[AuthService] Failed to update stored auth token:',
+  },
+  {
+    event: 'TOKEN_REFRESHED',
+    sideEffect: mockStoreAuthToken,
+    session: listenerSession,
+    message: '[AuthService] Failed to update stored auth token:',
+  },
+  {
+    event: 'SIGNED_OUT',
+    sideEffect: mockClearAuthToken,
+    session: null,
+    message: '[AuthService] Failed to clear stored auth token:',
+  },
+];
+type TokenCase = (typeof TOKEN_CASES)[number];
 
 describe('auth session/action services', () => {
   beforeEach(() => {
@@ -94,20 +124,24 @@ describe('auth session/action services', () => {
     );
   });
 
+  // Restores the console.error spies below even when a test's assertion throws
+  // before it gets to the end; an inline mockRestore would be skipped then.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('stores SW auth token on successful sign-in', async () => {
-    const user = {
-      id: 'user-123',
+    const session = createAuthBootstrapSession({
+      userId: 'user-123',
       email: 'user@example.com',
-    } as unknown as User;
-    const session = {
-      access_token: 'access-token',
-      refresh_token: 'refresh-token',
-      expires_at: 12345,
-      user,
-    } as unknown as Session;
+      displayName: null,
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: 12345,
+    });
 
     mockSignInWithPassword.mockResolvedValue({
-      data: { user, session },
+      data: { user: session.user, session },
       error: null,
     });
 
@@ -132,17 +166,15 @@ describe('auth session/action services', () => {
     expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
   });
 
-  it('applies token side effects in onAuthStateChange for sign-in and sign-out events', async () => {
-    const user = {
-      id: 'user-456',
+  async function fireSignInThenSignOut() {
+    const session = createAuthBootstrapSession({
+      userId: 'user-456',
       email: 'auth@example.com',
-    } as unknown as User;
-    const session = {
-      access_token: 'new-access-token',
-      refresh_token: 'new-refresh-token',
-      expires_at: 777,
-      user,
-    } as unknown as Session;
+      displayName: null,
+      accessToken: 'new-access-token',
+      refreshToken: 'new-refresh-token',
+      expiresAt: 777,
+    });
 
     const listener = vi.fn();
     const unsubscribe = onAuthStateChange(listener);
@@ -153,7 +185,13 @@ describe('auth session/action services', () => {
 
     authStateCallback('SIGNED_IN', session);
     authStateCallback('SIGNED_OUT', null);
-    await flushPersistence();
+    await vi.waitFor(() => expect(mockClearAuthToken).toHaveBeenCalled());
+
+    return { session, listener, unsubscribe };
+  }
+
+  it('persists the token when onAuthStateChange reports a sign-in', async () => {
+    await fireSignInThenSignOut();
 
     expect(mockStoreAuthToken).toHaveBeenCalledWith({
       accessToken: 'new-access-token',
@@ -161,21 +199,33 @@ describe('auth session/action services', () => {
       expiresAt: 777,
       userId: 'user-456',
     });
+  });
+
+  it('clears the stored token when onAuthStateChange reports a sign-out', async () => {
+    await fireSignInThenSignOut();
+
     expect(mockClearAuthToken).toHaveBeenCalled();
+  });
+
+  it('delivers the sign-in session, then null for the sign-out, to the listener', async () => {
+    const { session, listener } = await fireSignInThenSignOut();
+
     expect(listener).toHaveBeenNthCalledWith(1, session);
     expect(listener).toHaveBeenNthCalledWith(2, null);
+  });
+
+  it('unsubscribe releases the Supabase auth subscription', async () => {
+    const { unsubscribe } = await fireSignInThenSignOut();
 
     unsubscribe();
     expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['SIGNED_IN', 'TOKEN_REFRESHED', 'SIGNED_OUT'])(
-    'delivers %s synchronously while token persistence is pending',
-    async (event) => {
+  it.each(TOKEN_CASES)(
+    'delivers $event synchronously while token persistence is pending',
+    async ({ event, sideEffect, session }) => {
       const pending = deferred();
-      const sideEffect = event === 'SIGNED_OUT' ? mockClearAuthToken : mockStoreAuthToken;
       sideEffect.mockReturnValue(pending.promise);
-      const session = event === 'SIGNED_OUT' ? null : listenerSession;
       const listener = vi.fn();
       onAuthStateChange(listener);
 
@@ -183,63 +233,66 @@ describe('auth session/action services', () => {
 
       expect(listener).toHaveBeenCalledExactlyOnceWith(session);
       expect(sideEffect).not.toHaveBeenCalled();
-      await flushPersistence();
-      expect(sideEffect).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(sideEffect).toHaveBeenCalledTimes(1));
       expect(listener.mock.invocationCallOrder[0]).toBeLessThan(
         sideEffect.mock.invocationCallOrder[0]!
       );
       pending.resolve();
-      await flushPersistence();
+      await pending.promise;
       expect(listener).toHaveBeenCalledTimes(1);
     }
   );
 
-  it.each(['SIGNED_IN', 'TOKEN_REFRESHED', 'SIGNED_OUT'])(
-    'returns undefined rather than a promise for %s',
-    (event) => {
+  it.each(TOKEN_CASES)(
+    'returns undefined rather than a promise for $event',
+    ({ event, session }) => {
       onAuthStateChange(vi.fn());
 
-      const result: unknown = authStateCallback!(
-        event,
-        event === 'SIGNED_OUT' ? null : listenerSession
-      );
+      const result: unknown = authStateCallback!(event, session);
 
       expect(result).toBeUndefined();
     }
   );
 
-  it.each(['SIGNED_IN', 'SIGNED_OUT'])(
-    'starts the next token write only after a delayed %s write settles',
-    async (firstEvent) => {
-      const pendingStore = deferred();
-      const pendingClear = deferred();
-      mockStoreAuthToken.mockReturnValue(pendingStore.promise);
-      mockClearAuthToken.mockReturnValue(pendingClear.promise);
+  it.each([
+    {
+      firstEvent: 'SIGNED_IN',
+      firstSession: listenerSession,
+      firstEffect: mockStoreAuthToken,
+      secondEvent: 'SIGNED_OUT',
+      secondSession: null,
+      secondEffect: mockClearAuthToken,
+    },
+    {
+      firstEvent: 'SIGNED_OUT',
+      firstSession: null,
+      firstEffect: mockClearAuthToken,
+      secondEvent: 'SIGNED_IN',
+      secondSession: listenerSession,
+      secondEffect: mockStoreAuthToken,
+    },
+  ])(
+    'starts the next token write only after a delayed $firstEvent write settles',
+    async ({ firstEvent, firstSession, firstEffect, secondEvent, secondSession, secondEffect }) => {
+      const firstStorage = deferred();
+      const secondStorage = deferred();
+      firstEffect.mockReturnValue(firstStorage.promise);
+      secondEffect.mockReturnValue(secondStorage.promise);
       const listener = vi.fn();
       onAuthStateChange(listener);
-      const firstSession = firstEvent === 'SIGNED_IN' ? listenerSession : null;
-      const secondSession = firstEvent === 'SIGNED_IN' ? null : listenerSession;
-      const secondEvent = firstEvent === 'SIGNED_IN' ? 'SIGNED_OUT' : 'SIGNED_IN';
-      const [firstEffect, secondEffect] =
-        firstEvent === 'SIGNED_IN'
-          ? [mockStoreAuthToken, mockClearAuthToken]
-          : [mockClearAuthToken, mockStoreAuthToken];
-      const firstStorage = firstEvent === 'SIGNED_IN' ? pendingStore : pendingClear;
-      const secondStorage = firstEvent === 'SIGNED_IN' ? pendingClear : pendingStore;
 
       authStateCallback!(firstEvent, firstSession);
       authStateCallback!(secondEvent, secondSession);
       expect(listener.mock.calls).toEqual([[firstSession], [secondSession]]);
 
       // Even if the second write could finish first, it must not start yet.
+      // Once the first has started, an unqueued second would have too.
       secondStorage.resolve();
-      await flushPersistence();
-      expect(firstEffect).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(firstEffect).toHaveBeenCalledTimes(1));
       expect(secondEffect).not.toHaveBeenCalled();
 
       firstStorage.resolve();
-      await flushPersistence();
-      expect(secondEffect).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(secondEffect).toHaveBeenCalledTimes(1));
       expect(firstEffect.mock.invocationCallOrder[0]).toBeLessThan(
         secondEffect.mock.invocationCallOrder[0]!
       );
@@ -254,28 +307,26 @@ describe('auth session/action services', () => {
 
     authStateCallback!('SIGNED_IN', listenerSession);
     authStateCallback!('SIGNED_OUT', null);
-    await flushPersistence();
+    // Once the store has started, an unqueued clear would have too.
+    await vi.waitFor(() => expect(mockStoreAuthToken).toHaveBeenCalledTimes(1));
     expect(mockClearAuthToken).not.toHaveBeenCalled();
 
     const error = new Error('Token storage unavailable');
     pendingStore.reject(error);
-    await flushPersistence();
+    await vi.waitFor(() => expect(mockClearAuthToken).toHaveBeenCalledTimes(1));
 
     expect(errorLog).toHaveBeenCalledWith(
       '[AuthService] Failed to update stored auth token:',
       error
     );
     expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
-    errorLog.mockRestore();
   });
 
-  it.each(['SIGNED_IN', 'TOKEN_REFRESHED', 'SIGNED_OUT'])(
-    'logs a rejected %s token side effect after delivering the auth transition',
-    async (event) => {
+  it.each(TOKEN_CASES)(
+    'logs a rejected $event token side effect after delivering the auth transition',
+    async ({ event, sideEffect, session, message }) => {
       const pending = deferred();
-      const sideEffect = event === 'SIGNED_OUT' ? mockClearAuthToken : mockStoreAuthToken;
       sideEffect.mockReturnValue(pending.promise);
-      const session = event === 'SIGNED_OUT' ? null : listenerSession;
       const listener = vi.fn();
       const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
       onAuthStateChange(listener);
@@ -284,71 +335,67 @@ describe('auth session/action services', () => {
       expect(listener).toHaveBeenCalledExactlyOnceWith(session);
       const error = new Error('Token storage unavailable');
       pending.reject(error);
-      await flushPersistence();
 
-      expect(errorLog).toHaveBeenCalledWith(
-        event === 'SIGNED_OUT'
-          ? '[AuthService] Failed to clear stored auth token:'
-          : '[AuthService] Failed to update stored auth token:',
-        error
-      );
+      await vi.waitFor(() => expect(errorLog).toHaveBeenCalledWith(message, error));
       expect(listener).toHaveBeenCalledTimes(1);
-      errorLog.mockRestore();
     }
   );
 
-  it.each([
-    ['SIGNED_IN', 'resolves'],
-    ['SIGNED_IN', 'rejects'],
-    ['TOKEN_REFRESHED', 'resolves'],
-    ['TOKEN_REFRESHED', 'rejects'],
-    ['SIGNED_OUT', 'resolves'],
-    ['SIGNED_OUT', 'rejects'],
-  ] as const)(
-    'rethrows a listener error synchronously and still queues %s token persistence that %s',
-    async (event, tokenOutcome) => {
-      const pending = deferred();
-      const sideEffect = event === 'SIGNED_OUT' ? mockClearAuthToken : mockStoreAuthToken;
-      sideEffect.mockReturnValue(pending.promise);
-      const session = event === 'SIGNED_OUT' ? null : listenerSession;
-      const listenerError = new Error('App listener failed');
-      const listener = vi.fn(() => {
-        throw listenerError;
-      });
+  /**
+   * Fires `event` at a listener that throws, and checks the throw reaches the
+   * caller synchronously while the token write is still queued behind it.
+   * Returns the pending write so each caller settles it its own way.
+   */
+  async function rethrowAndQueue({ event, sideEffect, session }: TokenCase) {
+    const pending = deferred();
+    sideEffect.mockReturnValue(pending.promise);
+    const listenerError = new Error('App listener failed');
+    const listener = vi.fn(() => {
+      throw listenerError;
+    });
+    onAuthStateChange(listener);
+
+    let thrown: unknown;
+    try {
+      authStateCallback!(event, session);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBe(listenerError);
+
+    expect(listener).toHaveBeenCalledExactlyOnceWith(session);
+    await vi.waitFor(() => expect(sideEffect).toHaveBeenCalledTimes(1));
+    expect(listener.mock.invocationCallOrder[0]).toBeLessThan(
+      sideEffect.mock.invocationCallOrder[0]!
+    );
+    return { pending, listener };
+  }
+
+  it.each(TOKEN_CASES)(
+    'rethrows a listener error synchronously and still queues $event token persistence that resolves',
+    async (tokenCase) => {
       const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
-      onAuthStateChange(listener);
+      const { pending, listener } = await rethrowAndQueue(tokenCase);
 
-      let thrown: unknown;
-      try {
-        authStateCallback!(event, session);
-      } catch (error) {
-        thrown = error;
-      }
-      expect(thrown).toBe(listenerError);
+      pending.resolve();
+      await pending.promise;
 
-      expect(listener).toHaveBeenCalledExactlyOnceWith(session);
-      await flushPersistence();
-      expect(sideEffect).toHaveBeenCalledTimes(1);
-      expect(listener.mock.invocationCallOrder[0]).toBeLessThan(
-        sideEffect.mock.invocationCallOrder[0]!
-      );
-      const tokenError = new Error('Token storage unavailable');
-      if (tokenOutcome === 'rejects') pending.reject(tokenError);
-      else pending.resolve();
-      await flushPersistence();
-
-      if (tokenOutcome === 'rejects') {
-        expect(errorLog).toHaveBeenCalledWith(
-          event === 'SIGNED_OUT'
-            ? '[AuthService] Failed to clear stored auth token:'
-            : '[AuthService] Failed to update stored auth token:',
-          tokenError
-        );
-      } else {
-        expect(errorLog).not.toHaveBeenCalled();
-      }
+      expect(errorLog).not.toHaveBeenCalled();
       expect(listener).toHaveBeenCalledTimes(1);
-      errorLog.mockRestore();
+    }
+  );
+
+  it.each(TOKEN_CASES)(
+    'rethrows a listener error synchronously and still queues $event token persistence that rejects',
+    async (tokenCase) => {
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { pending, listener } = await rethrowAndQueue(tokenCase);
+
+      const tokenError = new Error('Token storage unavailable');
+      pending.reject(tokenError);
+
+      await vi.waitFor(() => expect(errorLog).toHaveBeenCalledWith(tokenCase.message, tokenError));
+      expect(listener).toHaveBeenCalledTimes(1);
     }
   );
 });

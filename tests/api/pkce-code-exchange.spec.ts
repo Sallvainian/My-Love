@@ -12,9 +12,12 @@
  * sends all succeeded. The single send here keeps the spec inside the limit
  * even if a future stack does enforce it.
  */
+import type { APIRequestContext } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { log } from '@seontechnologies/playwright-utils';
+import { apiRequest } from '@seontechnologies/playwright-utils/api-request';
 import { test, expect } from '../support/merged-fixtures';
+import { recurseUntil } from '../support/helpers/recurse';
 import { TEST_USER_PASSWORD } from '../support/test-credentials';
 
 const MAILPIT_URL = process.env.MAILPIT_URL;
@@ -49,6 +52,7 @@ function pkceClient() {
     global: {
       fetch: (input: RequestInfo | URL, init?: RequestInit) => {
         if (String(input).includes('grant_type=pkce')) pkceGrantCalls += 1;
+        // playwright-utils deviation: the SDK's own fetch is what is measured; this wrapper counts the PKCE grant calls it sends.
         return fetch(input as RequestInfo, init);
       },
     },
@@ -57,46 +61,58 @@ function pkceClient() {
 }
 
 /** The sign-in link GoTrue mailed to `address`, once it arrives. */
-async function waitForVerifyLink(address: string): Promise<string> {
-  let link: string | undefined;
-  await expect
-    .poll(
-      async () => {
-        // Everything in here is inside the try: `expect.poll` evaluates the
-        // callback OUTSIDE its own retry guard, so a thrown fetch (the catcher
-        // still starting, a dropped connection) would abort the poll on the
-        // first tick instead of using the window and the message below.
-        try {
-          const search = await fetch(
-            `${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:${address}`)}`
-          );
-          if (!search.ok) return undefined;
-          const results = (await search.json()) as { messages?: Array<{ ID: string }> };
-          const id = results.messages?.[0]?.ID;
-          if (!id) return undefined;
-          const message = (await (
-            await fetch(`${MAILPIT_URL}/api/v1/message/${id}`)
-          ).json()) as { Text?: string; HTML?: string };
-          // `||`, not `??`: an HTML-only mail has an empty-string Text part,
-          // which is not nullish and would skip the HTML fallback.
-          const body = message.Text || message.HTML || '';
-          link = (body.match(/https?:\/\/[^\s"'<>)]+/g) ?? []).find((candidate) =>
-            candidate.includes('/auth/v1/verify')
-          );
-          return link;
-        } catch {
-          return undefined;
-        }
-      },
-      { message: `no /auth/v1/verify link mailed to ${address}`, timeout: 15_000 }
-    )
-    .toBeTruthy();
+async function waitForVerifyLink(request: APIRequestContext, address: string): Promise<string> {
+  const mailpit = <T>(path: string, params?: Record<string, string>) =>
+    apiRequest<T>({
+      request,
+      method: 'GET',
+      baseUrl: MAILPIT_URL,
+      path,
+      params,
+      retryConfig: { maxRetries: 0 },
+      // One report step per poll tick would bury the test's own steps.
+      testStep: false,
+    });
+  const readLink = async (): Promise<string | undefined> => {
+    // Everything in here is inside the try: `recurse` fails at once on a throw
+    // from its command, so a thrown request (the catcher still starting, a
+    // dropped connection) would abort the poll on the first tick instead of
+    // using the window and the message below.
+    try {
+      const search = await mailpit<{ messages?: Array<{ ID: string }> } | null>(
+        '/api/v1/search',
+        { query: `to:${address}` }
+      );
+      if (search.status !== 200) return undefined;
+      const id = search.body?.messages?.[0]?.ID;
+      if (!id) return undefined;
+      const message = await mailpit<{ Text?: string; HTML?: string } | null>(
+        `/api/v1/message/${id}`
+      );
+      // `||`, not `??`: an HTML-only mail has an empty-string Text part,
+      // which is not nullish and would skip the HTML fallback.
+      const body = message.body?.Text || message.body?.HTML || '';
+      return (body.match(/https?:\/\/[^\s"'<>)]+/g) ?? []).find((candidate) =>
+        candidate.includes('/auth/v1/verify')
+      );
+    } catch {
+      return undefined;
+    }
+  };
+  const link = await recurseUntil(
+    readLink,
+    (value) => {
+      expect(value, `no /auth/v1/verify link mailed to ${address}`).toBeTruthy();
+    },
+    { timeout: 15_000 }
+  );
   return link!;
 }
 
 test.describe('PKCE code exchange', () => {
   test('[P0] a code is exchanged only by the client that started the flow', async ({
     supabaseAdmin,
+    request,
   }) => {
     // Fail rather than skip in CI, and gate only this case. `MAILPIT_URL` is
     // published solely by `playwright.config.ts`'s `supabase status` parse,
@@ -158,7 +174,8 @@ test.describe('PKCE code exchange', () => {
 
       // When GoTrue mints a real auth code for that flow.
       await log.step('Follow the mailed verify link to obtain the auth code');
-      const verifyLink = await waitForVerifyLink(address);
+      const verifyLink = await waitForVerifyLink(request, address);
+      // playwright-utils deviation: apiRequest returns no response headers and cannot disable redirects, and the Location header of this redirect is the evidence.
       const verifyResponse = await fetch(verifyLink, { redirect: 'manual' });
       // Any redirect: GoTrue answers 303 on this CLI version, but the evidence
       // this case needs is what the Location carries, not which 3xx code
@@ -177,7 +194,11 @@ test.describe('PKCE code exchange', () => {
       const stranger = pkceClient();
       const strangerResult = await stranger.client.auth.exchangeCodeForSession(code!);
       expect(strangerResult.data.session).toBeNull();
-      expect(strangerResult.error).not.toBeNull();
+      expect(strangerResult.error).toMatchObject({
+        name: 'AuthPKCECodeVerifierMissingError',
+        code: 'pkce_code_verifier_not_found',
+        status: 400,
+      });
       expect(stranger.pkceGrantCalls(), 'refused locally, so the code is untouched').toBe(0);
 
       // And a client holding the wrong verifier is refused by the server itself.
@@ -195,7 +216,11 @@ test.describe('PKCE code exchange', () => {
       }
       const impostorResult = await impostor.client.auth.exchangeCodeForSession(code!);
       expect(impostorResult.data.session).toBeNull();
-      expect(impostorResult.error).not.toBeNull();
+      expect(impostorResult.error).toMatchObject({
+        name: 'AuthApiError',
+        status: 400,
+        code: 'bad_code_verifier',
+      });
       expect(impostor.pkceGrantCalls(), 'the server evaluated and rejected it').toBeGreaterThan(0);
 
       // While the initiating client completes the exchange for its own account.

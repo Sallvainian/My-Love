@@ -316,7 +316,7 @@ function LoveNoteMessageComponent({
             isOwnMessage ? 'flex-row-reverse' : ''
           }`}
         >
-          <span>
+          <span data-testid="love-note-caption">
             {senderName} · {formattedTime}
           </span>
           {canRemove && (
@@ -351,6 +351,7 @@ function LoveNoteMessageComponent({
             your own) for a `danger` outline outside the bubble, against the
             page, because on the pink `fill` a danger edge is invisible. */}
         <div
+          data-testid="love-note-bubble"
           className={`max-w-[78%] overflow-hidden rounded-[20px] ${
             isOwnMessage ? 'rounded-br-md bg-fill text-white' : 'rounded-bl-md bg-card text-ink'
           } ${
@@ -365,13 +366,19 @@ function LoveNoteMessageComponent({
           {hasImage && (
             <div className="relative">
               {imageLoading && (
-                <div className="flex h-48 w-full items-center justify-center bg-card2">
+                <div
+                  className="flex h-48 w-full items-center justify-center bg-card2"
+                  data-testid="love-note-image-loading"
+                >
                   <LoaderCircle className="animate-spin text-muted" size={24} />
                 </div>
               )}
 
               {imageError && (
-                <div className="flex h-32 w-full items-center justify-center bg-card2 text-sm text-muted">
+                <div
+                  className="flex h-32 w-full items-center justify-center bg-card2 text-sm text-muted"
+                  data-testid="love-note-image-error"
+                >
                   Failed to load image
                 </div>
               )}
@@ -395,7 +402,10 @@ function LoveNoteMessageComponent({
 
               {/* Image uploading overlay */}
               {isImageUploading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <div
+                  className="absolute inset-0 flex items-center justify-center bg-black/40"
+                  data-testid="love-note-image-uploading"
+                >
                   <div className="flex items-center gap-2 text-sm text-white">
                     <LoaderCircle className="animate-spin" size={16} />
                     <span>Uploading...</span>
@@ -408,19 +418,29 @@ function LoveNoteMessageComponent({
           {/* Text content (only if not empty) */}
           {sanitizedContent && (
             <div className="px-3.5 py-2.5">
-              <p className="text-[15px] leading-[1.4] wrap-break-word">{sanitizedContent}</p>
+              <p data-testid="love-note-text" className="text-[15px] leading-[1.4] wrap-break-word">
+                {sanitizedContent}
+              </p>
             </div>
           )}
         </div>
 
         {/* Status indicators */}
         {isSending && !isImageUploading && (
-          <span className="mt-1 px-1 text-xs text-muted" aria-live="polite">
+          <span
+            className="mt-1 px-1 text-xs text-muted"
+            aria-live="polite"
+            data-testid="love-note-status"
+          >
             Sending...
           </span>
         )}
         {isWaiting && (
-          <span className="mt-1 px-1 text-xs text-muted" aria-live="polite">
+          <span
+            className="mt-1 px-1 text-xs text-muted"
+            aria-live="polite"
+            data-testid="love-note-status"
+          >
             Waiting to send
           </span>
         )}

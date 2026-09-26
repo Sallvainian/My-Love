@@ -3,7 +3,9 @@
  * (spec-unified-data-storage story 3). The row reads `coupleSettings` from the
  * real store; the store action is spied so these cases are about the row.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const backend = vi.hoisted(() => ({
@@ -30,6 +32,13 @@ import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
 
 const START = new Date(2025, 9, 4, 18, 0, 0).toISOString();
+/** A linked couple with no start date or wedding date saved yet. */
+const LINKED = {
+  status: 'linked',
+  partnerId: 'p',
+  relationshipStart: null,
+  weddingDate: null,
+} as const;
 const realSetRelationshipStart = useAppStore.getState().setRelationshipStart;
 
 describe('Settings — Together since', () => {
@@ -56,9 +65,7 @@ describe('Settings — Together since', () => {
   });
 
   it('linked but not set yet: "Not set yet" and empty inputs', () => {
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
-    });
+    useAppStore.setState({ coupleSettings: LINKED });
     render(<Settings />);
 
     expect(screen.getByTestId('settings-together-since-value')).toHaveTextContent('Not set yet');
@@ -66,9 +73,7 @@ describe('Settings — Together since', () => {
   });
 
   it('pre-fills the saved date and time in local time', () => {
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: START, weddingDate: null },
-    });
+    useAppStore.setState({ coupleSettings: { ...LINKED, relationshipStart: START } });
     render(<Settings />);
 
     expect(screen.getByTestId('settings-together-since-date')).toHaveValue('2025-10-04');
@@ -76,29 +81,23 @@ describe('Settings — Together since', () => {
   });
 
   it('saves the local date and time as one instant', async () => {
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
-    });
+    const user = userEvent.setup();
+    useAppStore.setState({ coupleSettings: LINKED });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setRelationshipStart: save });
     render(<Settings />);
 
-    fireEvent.change(screen.getByTestId('settings-together-since-date'), {
-      target: { value: '2025-10-04' },
-    });
-    fireEvent.change(screen.getByTestId('settings-together-since-time'), {
-      target: { value: '18:00' },
-    });
-    fireEvent.click(screen.getByTestId('settings-together-since-save'));
+    await user.type(screen.getByTestId('settings-together-since-date'), '2025-10-04');
+    await user.type(screen.getByTestId('settings-together-since-time'), '18:00');
+    await user.click(screen.getByTestId('settings-together-since-save'));
 
     await waitFor(() => expect(save).toHaveBeenCalledWith(START));
     expect(screen.queryByTestId('settings-together-since-error')).toBeNull();
   });
 
   it('shows why a save was refused, and sends nothing without a date', async () => {
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: START, weddingDate: null },
-    });
+    const user = userEvent.setup();
+    useAppStore.setState({ coupleSettings: { ...LINKED, relationshipStart: START } });
     const save = vi.fn(async () => {
       throw new AccountDataError(
         'offline',
@@ -108,37 +107,79 @@ describe('Settings — Together since', () => {
     useAppStore.setState({ setRelationshipStart: save });
     render(<Settings />);
 
-    fireEvent.click(screen.getByTestId('settings-together-since-save'));
+    await user.click(screen.getByTestId('settings-together-since-save'));
     expect(await screen.findByTestId('settings-together-since-error')).toHaveTextContent(
       /need a connection/
     );
 
-    fireEvent.change(screen.getByTestId('settings-together-since-date'), { target: { value: '' } });
+    await user.clear(screen.getByTestId('settings-together-since-date'));
     save.mockClear();
-    fireEvent.click(screen.getByTestId('settings-together-since-save'));
+    await user.click(screen.getByTestId('settings-together-since-save'));
     expect(await screen.findByTestId('settings-together-since-error')).toHaveTextContent(
       /pick a date/i
     );
     expect(save).not.toHaveBeenCalled();
   });
 
-  it('refuses a start in the future and sends nothing', async () => {
-    useAppStore.setState({
-      coupleSettings: { status: 'linked', partnerId: 'p', relationshipStart: null, weddingDate: null },
+  describe('"in the past", against a pinned clock', () => {
+    // The form refuses a start later than `Date.now()`. Only `Date` is faked,
+    // so RTL's `waitFor` keeps its real timers. 12:00 EDT is 16:00Z.
+    beforeEach(() => {
+      vi.setSystemTime(new Date(2026, 8, 25, 12, 0, 0, 0));
     });
-    const save = vi.fn(async () => {});
-    useAppStore.setState({ setRelationshipStart: save });
-    render(<Settings />);
-
-    const nextYear = new Date().getFullYear() + 1;
-    fireEvent.change(screen.getByTestId('settings-together-since-date'), {
-      target: { value: `${nextYear}-01-01` },
+    afterEach(() => {
+      vi.useRealTimers();
     });
-    fireEvent.click(screen.getByTestId('settings-together-since-save'));
 
-    expect(await screen.findByTestId('settings-together-since-error')).toHaveTextContent(
-      /in the past/i
-    );
-    expect(save).not.toHaveBeenCalled();
+    /** Enters a start and saves it; returns the save spy. */
+    async function submitStart(user: UserEvent, date: string, time?: string) {
+      useAppStore.setState({ coupleSettings: LINKED });
+      const save = vi.fn(async () => {});
+      useAppStore.setState({ setRelationshipStart: save });
+      render(<Settings />);
+
+      await user.type(screen.getByTestId('settings-together-since-date'), date);
+      if (time !== undefined) {
+        await user.type(screen.getByTestId('settings-together-since-time'), time);
+      }
+      await user.click(screen.getByTestId('settings-together-since-save'));
+      return save;
+    }
+
+    it('refuses a start in the future and sends nothing', async () => {
+      const user = userEvent.setup();
+      const save = await submitStart(user, '2026-09-26');
+
+      expect(await screen.findByTestId('settings-together-since-error')).toHaveTextContent(
+        /in the past/i
+      );
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('refuses a start one minute from now, today', async () => {
+      const user = userEvent.setup();
+      const save = await submitStart(user, '2026-09-25', '12:01');
+
+      expect(await screen.findByTestId('settings-together-since-error')).toHaveTextContent(
+        /in the past/i
+      );
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('accepts a start at exactly now', async () => {
+      const user = userEvent.setup();
+      const save = await submitStart(user, '2026-09-25', '12:00');
+
+      await waitFor(() => expect(save).toHaveBeenCalledWith('2026-09-25T16:00:00.000Z'));
+      expect(screen.queryByTestId('settings-together-since-error')).toBeNull();
+    });
+
+    it('accepts today with no time, as local midnight', async () => {
+      const user = userEvent.setup();
+      const save = await submitStart(user, '2026-09-25');
+
+      await waitFor(() => expect(save).toHaveBeenCalledWith('2026-09-25T04:00:00.000Z'));
+      expect(screen.queryByTestId('settings-together-since-error')).toBeNull();
+    });
   });
 });

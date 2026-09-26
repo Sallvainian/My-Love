@@ -135,14 +135,14 @@ describe('useNetworkStatus hook', () => {
   });
 
   describe('event listener setup', () => {
-    it('should add online and offline event listeners on mount', () => {
+    it("listens for the browser's online and offline events once mounted", () => {
       renderHook(() => useNetworkStatus());
 
       expect(window.addEventListener).toHaveBeenCalledWith('online', expect.any(Function));
       expect(window.addEventListener).toHaveBeenCalledWith('offline', expect.any(Function));
     });
 
-    it('should remove event listeners on unmount', () => {
+    it('stops listening for online and offline events after unmount', () => {
       const { unmount } = renderHook(() => useNetworkStatus());
 
       unmount();
@@ -262,7 +262,7 @@ describe('useNetworkStatus hook', () => {
   });
 
   describe('rapid state changes', () => {
-    it('should handle rapid online/offline toggling', () => {
+    it('settles online after rapid offline/online toggling', () => {
       setNetworkState(true);
       const { result } = renderHook(() => useNetworkStatus());
 
@@ -288,7 +288,7 @@ describe('useNetworkStatus hook', () => {
       expect(result.current.isConnecting).toBe(false);
     });
 
-    it('should handle debounce cancellation on new online event', () => {
+    it('stays offline when an offline event cancels a pending online confirmation', () => {
       setNetworkState(false);
       const { result } = renderHook(() => useNetworkStatus());
 
@@ -318,7 +318,7 @@ describe('useNetworkStatus hook', () => {
   });
 
   describe('cleanup', () => {
-    it('should clear timeout on unmount', () => {
+    it('leaves no pending online confirmation behind after unmount', () => {
       setNetworkState(false);
       const { result, unmount } = renderHook(() => useNetworkStatus());
 
@@ -328,16 +328,14 @@ describe('useNetworkStatus hook', () => {
       });
 
       expect(result.current.isConnecting).toBe(true);
+      // The pending "connecting" debounce is the only timer.
+      expect(vi.getTimerCount()).toBe(1);
 
       // Unmount before debounce completes
       unmount();
 
-      // Advance past debounce - should not cause errors
-      act(() => {
-        vi.runAllTimers();
-      });
-
-      // Test passes if no errors thrown
+      // Unmount clears the debounce rather than leaving it to fire later.
+      expect(vi.getTimerCount()).toBe(0);
     });
   });
 });

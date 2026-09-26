@@ -11,6 +11,7 @@ import {
   registerBackgroundSync,
   setupServiceWorkerListener,
 } from '../backgroundSync';
+import { logger } from '../logger';
 
 // Mock Service Worker types
 interface MockServiceWorkerRegistration {
@@ -34,6 +35,20 @@ function getMutableNavigator(): MutableNavigator {
 
 function getMutableWindow(): MutableWindow {
   return global.window as MutableWindow;
+}
+
+/** The message the service worker posts once a background sync has run. */
+function syncCompleted(successCount: number, failCount: number): MessageEvent {
+  return { data: { type: 'BACKGROUND_SYNC_COMPLETED', successCount, failCount } } as MessageEvent;
+}
+
+/** A promise the test settles by hand, at the point it chooses. */
+function deferred<T>() {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
 }
 
 describe('backgroundSync utilities', () => {
@@ -133,7 +148,7 @@ describe('backgroundSync utilities', () => {
       expect(mockRegistration.sync.register).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle multiple sync tag registrations', async () => {
+    it('registers each tag it is given, in order', async () => {
       await registerBackgroundSync('tag1');
       await registerBackgroundSync('tag2');
 
@@ -157,7 +172,7 @@ describe('backgroundSync utilities', () => {
       await expect(registerBackgroundSync('test-tag')).resolves.not.toThrow();
     });
 
-    it('should handle registration errors gracefully', async () => {
+    it('logs and resolves when the sync registration fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockRegistration.sync.register.mockRejectedValueOnce(new Error('Registration failed'));
 
@@ -169,26 +184,10 @@ describe('backgroundSync utilities', () => {
 
       consoleSpy.mockRestore();
     });
-
-    it('should wait for service worker to be ready', async () => {
-      const delayedRegistration = {
-        sync: {
-          register: vi.fn().mockResolvedValue(undefined),
-        },
-      };
-
-      mockServiceWorker.ready = new Promise((resolve) => {
-        setTimeout(() => resolve(delayedRegistration), 100);
-      });
-
-      await registerBackgroundSync('delayed-tag');
-
-      expect(delayedRegistration.sync.register).toHaveBeenCalledWith('delayed-tag');
-    });
   });
 
   describe('setupServiceWorkerListener', () => {
-    it('should setup message listener and call callback on BACKGROUND_SYNC_COMPLETED', async () => {
+    it('runs the refresh when the worker reports a completed background sync', async () => {
       const mockCallback = vi.fn().mockResolvedValue(undefined);
 
       setupServiceWorkerListener(mockCallback);
@@ -202,13 +201,7 @@ describe('backgroundSync utilities', () => {
       const messageHandler = addEventListenerCalls[0][1] as (event: MessageEvent) => void;
 
       // Simulate a BACKGROUND_SYNC_COMPLETED message
-      const mockEvent = {
-        data: {
-          type: 'BACKGROUND_SYNC_COMPLETED',
-          successCount: 3,
-          failCount: 0,
-        },
-      } as MessageEvent;
+      const mockEvent = syncCompleted(3, 0);
 
       messageHandler(mockEvent);
 
@@ -239,7 +232,7 @@ describe('backgroundSync utilities', () => {
       expect(mockCallback).not.toHaveBeenCalled();
     });
 
-    it('should handle messages with no data gracefully', () => {
+    it('ignores a worker message with no data', () => {
       const mockCallback = vi.fn();
 
       setupServiceWorkerListener(mockCallback);
@@ -256,7 +249,7 @@ describe('backgroundSync utilities', () => {
       expect(mockCallback).not.toHaveBeenCalled();
     });
 
-    it('should return cleanup function that removes listener', () => {
+    it('stops listening for worker messages after cleanup', () => {
       const mockCallback = vi.fn();
 
       const cleanup = setupServiceWorkerListener(mockCallback);
@@ -271,7 +264,7 @@ describe('backgroundSync utilities', () => {
       );
     });
 
-    it('should handle callback errors gracefully', async () => {
+    it('logs when the post-sync refresh fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const mockCallback = vi.fn().mockRejectedValue(new Error('Refresh failed'));
 
@@ -281,13 +274,7 @@ describe('backgroundSync utilities', () => {
         event: MessageEvent
       ) => void;
 
-      const mockEvent = {
-        data: {
-          type: 'BACKGROUND_SYNC_COMPLETED',
-          successCount: 1,
-          failCount: 0,
-        },
-      } as MessageEvent;
+      const mockEvent = syncCompleted(1, 0);
 
       messageHandler(mockEvent);
 
@@ -302,7 +289,7 @@ describe('backgroundSync utilities', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should setup multiple listeners independently', () => {
+    it('registers one worker message listener per caller', () => {
       const callback1 = vi.fn();
       const callback2 = vi.fn();
 
@@ -312,7 +299,7 @@ describe('backgroundSync utilities', () => {
       expect(mockServiceWorker.addEventListener).toHaveBeenCalledTimes(2);
     });
 
-    it('should cleanup only the specific listener', () => {
+    it("cleanup removes only its own caller's listener", () => {
       const callback1 = vi.fn();
       const callback2 = vi.fn();
 
@@ -327,7 +314,7 @@ describe('backgroundSync utilities', () => {
   });
 
   describe('Edge cases and error scenarios', () => {
-    it('should handle concurrent sync registrations', async () => {
+    it('registers every tag requested concurrently', async () => {
       const promises = [
         registerBackgroundSync('tag1'),
         registerBackgroundSync('tag2'),
@@ -339,46 +326,49 @@ describe('backgroundSync utilities', () => {
       expect(mockRegistration.sync.register).toHaveBeenCalledTimes(3);
     });
 
-    it('should not resolve registerBackgroundSync when service worker never becomes ready', async () => {
-      // When navigator.serviceWorker.ready never resolves, registerBackgroundSync
-      // blocks indefinitely. This test verifies that sync.register is NOT called
-      // in that scenario (the function is still pending).
-      mockServiceWorker.ready = new Promise(() => {
-        // Intentionally never resolves — simulates a stuck service worker
-      });
+    it('waits for the service worker to become ready before registering', async () => {
+      const PENDING = Symbol('pending');
+      const ready = deferred<MockServiceWorkerRegistration>();
+      mockServiceWorker.ready = ready.promise;
 
-      // Start the registration (will hang on awaiting ready)
-      registerBackgroundSync('stuck-tag');
+      const run = registerBackgroundSync('stuck-tag');
 
-      // Give microtasks a chance to flush
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // sync.register should never be called because ready never resolved
+      // While `ready` is unsettled the registration is still pending and has
+      // registered nothing: an already-settled run would win this race.
+      expect(await Promise.race([run, Promise.resolve(PENDING)])).toBe(PENDING);
       expect(mockRegistration.sync.register).not.toHaveBeenCalled();
+
+      ready.resolve(mockRegistration);
+
+      await expect(run).resolves.toBeUndefined();
+      expect(mockRegistration.sync.register).toHaveBeenCalledWith('stuck-tag');
     });
 
-    it('should preserve message event data integrity', async () => {
-      const mockCallback = vi.fn().mockResolvedValue(undefined);
-      setupServiceWorkerListener(mockCallback);
+    it("logs the worker's sync counts unchanged and runs the refresh once", async () => {
+      const debug = vi.spyOn(logger, 'debug');
+      try {
+        const mockCallback = vi.fn().mockResolvedValue(undefined);
+        setupServiceWorkerListener(mockCallback);
 
-      const messageHandler = mockServiceWorker.addEventListener.mock.calls[0][1] as (
-        event: MessageEvent
-      ) => void;
+        const messageHandler = mockServiceWorker.addEventListener.mock.calls[0][1] as (
+          event: MessageEvent
+        ) => void;
 
-      const complexEvent = {
-        data: {
-          type: 'BACKGROUND_SYNC_COMPLETED',
-          successCount: 5,
-          failCount: 1,
-        },
-      } as MessageEvent;
+        const complexEvent = syncCompleted(5, 1);
 
-      messageHandler(complexEvent);
+        messageHandler(complexEvent);
 
-      // Wait for async callback
-      await vi.waitFor(() => {
-        expect(mockCallback).toHaveBeenCalled();
-      });
+        // The counts reach the log exactly as the worker sent them.
+        expect(debug).toHaveBeenCalledWith(
+          '[BackgroundSync] Service Worker completed background sync:',
+          { successCount: 5, failCount: 1 }
+        );
+        await vi.waitFor(() => {
+          expect(mockCallback).toHaveBeenCalledExactlyOnceWith();
+        });
+      } finally {
+        debug.mockRestore();
+      }
     });
   });
 });

@@ -93,7 +93,11 @@ describe('fetchOwnProfile', () => {
   it('throws on a failed read', async () => {
     results.push({ data: null, error: { message: 'boom', code: '500', details: '', hint: '' } });
 
-    await expect(profileService.fetchOwnProfile()).rejects.toBeInstanceOf(AccountDataError);
+    await expect(profileService.fetchOwnProfile()).rejects.toMatchObject({
+      name: 'AccountDataError',
+      code: 'transport',
+      message: '[ProfileService.fetchOwnProfile] Database error: boom',
+    });
   });
 });
 
@@ -113,9 +117,11 @@ describe('saveBirthday', () => {
   it('throws when no row was updated', async () => {
     results.push({ data: null, error: null });
 
-    await expect(profileService.saveBirthday('2000-05-20')).rejects.toBeInstanceOf(
-      AccountDataError
-    );
+    await expect(profileService.saveBirthday('2000-05-20')).rejects.toMatchObject({
+      name: 'AccountDataError',
+      code: 'invalid-response',
+      message: 'Your birthday was not saved',
+    });
   });
 
   it('refuses offline, and an unreadable date, before any request', async () => {

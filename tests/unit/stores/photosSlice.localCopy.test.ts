@@ -104,7 +104,13 @@ function setOnline(value: boolean) {
   Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+/**
+ * The copy read `loadPhotos` started, as the promise it awaits. The slice
+ * registers its own `await` on it first, so a test awaiting it next resumes
+ * only after the slice has acted on the saved copy and is waiting on the
+ * server read.
+ */
+const copyReadSettled = (call = 0) => readLocalCopy.mock.results[call].value as Promise<unknown>;
 
 function lastFillSession(): PhotoCacheSession {
   const call = requestPhotoImageFill.mock.calls.at(-1);
@@ -205,8 +211,7 @@ describe('photosSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadPhotos();
-      await flush();
-      expect(store.getState().photos).toEqual([shown(row(5))]);
+      await vi.waitFor(() => expect(store.getState().photos).toEqual([shown(row(5))]));
       expect(store.getState().photosLoaded).toBe(true);
 
       server.resolve([row(1), row(5)]);
@@ -298,7 +303,7 @@ describe('photosSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadPhotos();
-      await flush();
+      await copyReadSettled();
       await store.getState().uploadPhoto({} as never);
       // The server answered before the upload committed.
       server.resolve([row(1)]);
@@ -318,8 +323,9 @@ describe('photosSlice local copy', () => {
       const server = deferred<SupabasePhoto[]>();
       listAllPhotos.mockReturnValueOnce(server.promise);
       deletePhotoService.mockResolvedValue(true);
+      // Fresh in this session, so the load skips the copy and is already
+      // waiting on the server read when it returns.
       const inFlight = store.getState().loadPhotos();
-      await flush();
       await store.getState().deletePhoto('photo-0');
       server.resolve([row(0), row(1)]);
       await inFlight;
@@ -337,7 +343,8 @@ describe('photosSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadPhotos();
-      await flush();
+      await copyReadSettled();
+      expect(store.getState().photos).toEqual([shown(row(9))]);
       writeLocalCopy.mockClear();
       store.setState({ userId: USER_B, authSessionVersion: 2, photos: [] });
 
@@ -356,7 +363,7 @@ describe('photosSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadPhotos();
-      await flush();
+      await copyReadSettled();
       store.setState({ authSessionVersion: 2, photos: [] });
 
       server.resolve([row(0)]);
@@ -389,7 +396,7 @@ describe('photosSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadPhotos();
-      await flush();
+      await copyReadSettled();
       store.setState({ userId: USER_B, authSessionVersion: 2 });
       server.reject(new Error('A-FAILURE'));
       await inFlight;
@@ -452,7 +459,8 @@ describe('photosSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().uploadPhoto({} as never);
-      await flush();
+      // The upload request is out: only its answer lands after the switch.
+      await vi.waitFor(() => expect(uploadPhotoService).toHaveBeenCalledTimes(1));
       store.setState({ userId: USER_B, authSessionVersion: 2 });
       upload.resolve(row(0));
       await inFlight;

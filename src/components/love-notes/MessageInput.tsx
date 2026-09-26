@@ -253,6 +253,7 @@ export function MessageInput() {
           onChange={handleImageSelect}
           className="hidden"
           aria-hidden="true"
+          data-testid="message-input-file"
         />
 
         {/* Textarea */}
@@ -277,7 +278,12 @@ export function MessageInput() {
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fill text-white transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-page disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSending ? (
-            <LoaderCircle size={19} className="animate-spin" aria-hidden="true" />
+            <LoaderCircle
+              size={19}
+              className="animate-spin"
+              aria-hidden="true"
+              data-testid="message-input-send-spinner"
+            />
           ) : (
             <Send size={19} aria-hidden="true" />
           )}

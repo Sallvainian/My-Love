@@ -41,8 +41,8 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: (table: string) => builder(table) },
 }));
 
-import { AccountDataError } from '../../../src/services/accountDataError';
-import { anniversariesService } from '../../../src/services/anniversariesService';
+import { AccountDataError, REQUEST_TIMEOUT_MS } from '../../../src/services/accountDataError';
+import { anniversariesService, type AnniversaryInput } from '../../../src/services/anniversariesService';
 import { customMessagesApi, isMessageCategory } from '../../../src/services/customMessagesApi';
 import {
   bundledMessageKey,
@@ -75,6 +75,12 @@ const anniversaryRow = {
   updated_at: '2026-09-22T00:00:00.000Z',
 };
 
+const anniversaryInput = (overrides: Partial<AnniversaryInput> = {}): AnniversaryInput => ({
+  date: '2024-02-14',
+  label: 'x',
+  ...overrides,
+});
+
 const customRow = {
   id: 'cm-1',
   user_id: A,
@@ -100,8 +106,8 @@ afterEach(() => {
 
 describe('offline writes fail before any request', () => {
   it.each([
-    ['createAnniversary', () => anniversariesService.createAnniversary(A, { date: '2024-02-14', label: 'x' }, 'k-1')],
-    ['updateAnniversary', () => anniversariesService.updateAnniversary('ann-1', { date: '2024-02-14', label: 'x' })],
+    ['createAnniversary', () => anniversariesService.createAnniversary(A, anniversaryInput(), 'k-1')],
+    ['updateAnniversary', () => anniversariesService.updateAnniversary('ann-1', anniversaryInput())],
     ['deleteAnniversary', () => anniversariesService.deleteAnniversary('ann-1')],
     ['createCustomMessage', () =>
       customMessagesApi.createCustomMessage(A, { text: 'x', category: 'custom', active: true, tags: [] }, 'k-1')],
@@ -109,7 +115,7 @@ describe('offline writes fail before any request', () => {
     ['deleteCustomMessage', () => customMessagesApi.deleteCustomMessage('cm-1')],
     ['addFavorite', () => messageFavoritesApi.addFavorite(A, 'b:1')],
     ['removeFavorite', () => messageFavoritesApi.removeFavorite(A, 'b:1')],
-  ])('%s', async (_name, write) => {
+  ])('%s refuses offline with an AccountDataError before any request', async (_name, write) => {
     setOnline(false);
     const failure = await write().catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(AccountDataError);
@@ -128,7 +134,7 @@ describe('request bounds', () => {
 
   it.each([
     ['fetchAnniversaries', () => anniversariesService.fetchAnniversaries(A), { data: [], error: null }],
-    ['updateAnniversary', () => anniversariesService.updateAnniversary('ann-1', { date: '2024-02-14', label: 'x' }),
+    ['updateAnniversary', () => anniversariesService.updateAnniversary('ann-1', anniversaryInput()),
       { data: [anniversaryRow], error: null }],
     ['deleteAnniversary', () => anniversariesService.deleteAnniversary('ann-1'), { data: null, error: null }],
     ['fetchCustomMessages', () => customMessagesApi.fetchCustomMessages(A), { data: [], error: null }],
@@ -139,21 +145,25 @@ describe('request bounds', () => {
     ['addFavorite', () => messageFavoritesApi.addFavorite(A, 'b:1'), { data: null, error: null }],
     ['removeFavorite', () => messageFavoritesApi.removeFavorite(A, 'b:1'), { data: null, error: null }],
   ])('%s carries a timeout signal', async (_name, request, result) => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
     results.push(result as Result);
     await request();
-    expect(signalOf()).toBeInstanceOf(AbortSignal);
+    expect(timeout).toHaveBeenCalledExactlyOnceWith(REQUEST_TIMEOUT_MS);
+    expect(signalOf()).toBe(timeout.mock.results[0].value);
   });
 
   it.each([
-    ['createAnniversary', () => anniversariesService.createAnniversary(A, { date: '2024-02-14', label: 'x' }, 'k-1'),
+    ['createAnniversary', () => anniversariesService.createAnniversary(A, anniversaryInput(), 'k-1'),
       { data: anniversaryRow, error: null }],
     ['createCustomMessage', () =>
       customMessagesApi.createCustomMessage(A, { text: 'x', category: 'custom', active: true, tags: [] }, 'k-1'),
       { data: customRow, error: null }],
   ])('%s carries a timeout signal too — it is retry-safe', async (_name, request, result) => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
     results.push(result as Result);
     await request();
-    expect(signalOf()).toBeInstanceOf(AbortSignal);
+    expect(timeout).toHaveBeenCalledExactlyOnceWith(REQUEST_TIMEOUT_MS);
+    expect(signalOf()).toBe(timeout.mock.results[0].value);
   });
 });
 
@@ -173,7 +183,7 @@ describe('anniversariesService', () => {
 
     const created = await anniversariesService.createAnniversary(
       A,
-      { date: '2024-02-14', label: 'First date', description: 'dinner' },
+      anniversaryInput({ label: 'First date', description: 'dinner' }),
       'k-1'
     );
 
@@ -185,9 +195,9 @@ describe('anniversariesService', () => {
   });
 
   it('refuses a date the mirror schema could not read back', async () => {
-    await expect(anniversariesService.createAnniversary(A, { date: '2026-02-30', label: 'x' }, 'k-1')).rejects.toThrow(
-      'Not a valid calendar date'
-    );
+    await expect(
+      anniversariesService.createAnniversary(A, anniversaryInput({ date: '2026-02-30' }), 'k-1')
+    ).rejects.toThrow('Not a valid calendar date');
     expect(calls).toHaveLength(0);
   });
 
@@ -195,7 +205,7 @@ describe('anniversariesService', () => {
     results.push({ data: [], error: null });
 
     const failure = await anniversariesService
-      .updateAnniversary('ann-1', { date: '2024-02-14', label: 'x' })
+      .updateAnniversary('ann-1', anniversaryInput())
       .catch((error: unknown) => error);
 
     expect((failure as AccountDataError).code).toBe('not-found');

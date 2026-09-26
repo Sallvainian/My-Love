@@ -11,6 +11,14 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import type { Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
+import {
+  COUPLE_SETTINGS_READ,
+  OWN_PROFILE_READ,
+  PARTNER_RECORD_READ,
+  UPCOMING_EVENTS_READ,
+} from '../../support/helpers/reads';
+import { homeEventsSettled } from '../../support/helpers/settings-screen';
 
 const KIT_CARD = {
   light: 'rgb(255, 255, 255)', // #ffffff
@@ -34,6 +42,18 @@ const KIT_PARTNER = {
   dark: 'rgb(167, 139, 250)', // #a78bfa
 } as const;
 
+/**
+ * Kit countdown value type, as computed: `text-[22px] font-bold tabular-nums`
+ * in src/components/RelationshipTimers/CountdownCard.tsx.
+ */
+const KIT_COUNTDOWN_VALUE = { size: '22px', weight: '700', numeric: 'tabular-nums' } as const;
+
+/**
+ * Kit daily-message type, as computed: `font-lora text-[21px] font-medium italic`
+ * in src/components/DailyMessage/DailyMessage.tsx.
+ */
+const DAILY_MESSAGE_TYPE = { style: 'italic', weight: '500', size: '21px' } as const;
+
 const COUNTDOWN_CARDS = [
   'time-together',
   'birthday-countdown-self',
@@ -41,10 +61,26 @@ const COUNTDOWN_CARDS = [
   'event-countdown-wedding',
 ] as const;
 
-async function openHome(page: Page, colorScheme: 'light' | 'dark') {
+/** Open Home and return once the reads behind its cards have answered — the
+ * wedding card's couple settings, both birthdays' profile and partner record,
+ * and the events — and the events column shows a loaded state: a stored
+ * event's card or the empty placeholder, never the error or a gap. */
+async function openHome(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  colorScheme: 'light' | 'dark'
+) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme });
+  const homeReads = [
+    UPCOMING_EVENTS_READ,
+    COUPLE_SETTINGS_READ,
+    OWN_PROFILE_READ,
+    PARTNER_RECORD_READ,
+  ].map((url) => interceptNetworkCall({ method: 'GET', url }));
   await page.goto('/');
+  for (const { status } of await Promise.all(homeReads)) expect(status).toBe(200);
+  await expect(homeEventsSettled(page)).toBeVisible();
   await expect(page.getByTestId('time-together')).toBeVisible();
   await expect(page.getByTestId('message-text')).toBeVisible();
 }
@@ -60,8 +96,9 @@ test.describe('Home on the style kit', () => {
   for (const colorScheme of ['light', 'dark'] as const) {
     test(`[P1] should render the countdown cards on one kit card and value style in ${colorScheme}`, async ({
       page,
+      interceptNetworkCall,
     }) => {
-      await openHome(page, colorScheme);
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       for (const testId of COUNTDOWN_CARDS) {
         const card = page.getByTestId(testId);
@@ -91,14 +128,28 @@ test.describe('Home on the style kit', () => {
             numeric: style.fontVariantNumeric,
           };
         });
-        expect(valueStyle, testId).toEqual({ size: '22px', weight: '700', numeric: 'tabular-nums' });
+        expect(valueStyle, testId).toEqual(KIT_COUNTDOWN_VALUE);
       }
+    });
+
+    test(`[P1] should render the daily message on the kit card in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       // The daily message sits on the same kit card.
       await expect(page.getByTestId('message-card')).toHaveCSS(
         'background-color',
         KIT_CARD[colorScheme]
       );
+    });
+
+    test(`[P1] should tint your birthday tile accent and your partner's tile partner in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       // Tile tones: birthdays belong to accounts now, so your own card takes the
       // `you` (accent) tile and your partner's the `partner` tile on each device.
@@ -108,14 +159,30 @@ test.describe('Home on the style kit', () => {
           .evaluate((el) => getComputedStyle(el.firstElementChild as Element).color);
       expect(await tileColor('birthday-countdown-self')).toBe(KIT_ACCENT[colorScheme]);
       expect(await tileColor('birthday-countdown-partner')).toBe(KIT_PARTNER[colorScheme]);
+    });
+
+    test(`[P1] should show the dateless wedding as Date TBD in muted in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       // Dateless wedding: "Date TBD" as the value, in the kit muted colour.
       const weddingValue = page.getByTestId('event-countdown-wedding').locator('h3 + div');
       await expect(weddingValue).toHaveText('Date TBD');
       await expect(weddingValue).toHaveCSS('color', KIT_MUTED[colorScheme]);
       await expect(page.getByTestId('event-countdown-wedding')).not.toContainText('XX:XX:XX');
+    });
+
+    test(`[P1] should set the two birthday cards side by side at phone width in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       // Birthdays sit side by side at phone width.
+      await expect(page.getByTestId('birthday-countdown-self')).toBeVisible();
+      await expect(page.getByTestId('birthday-countdown-partner')).toBeVisible();
       const selfBox = await page.getByTestId('birthday-countdown-self').boundingBox();
       const partnerBox = await page.getByTestId('birthday-countdown-partner').boundingBox();
       if (!selfBox || !partnerBox) throw new Error('[home-kit.spec] expected birthday boxes');
@@ -125,8 +192,9 @@ test.describe('Home on the style kit', () => {
 
     test(`[P1] should render the daily message in Lora italic with no emoji chrome in ${colorScheme}`, async ({
       page,
+      interceptNetworkCall,
     }) => {
-      await openHome(page, colorScheme);
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       const type = await page.getByTestId('message-text').evaluate((el) => {
         const style = getComputedStyle(el);
@@ -138,24 +206,33 @@ test.describe('Home on the style kit', () => {
         };
       });
       expect(type.family).toMatch(/^"?Lora"?/);
-      expect(type.style).toBe('italic');
-      expect(type.weight).toBe('500');
-      expect(type.size).toBe('21px');
+      expect(type.style).toBe(DAILY_MESSAGE_TYPE.style);
+      expect(type.weight).toBe(DAILY_MESSAGE_TYPE.weight);
+      expect(type.size).toBe(DAILY_MESSAGE_TYPE.size);
 
       // An italic 500 face must actually load: a computed family names Lora
       // even when no Lora face exists, so the loaded faces are checked too.
-      const loraFaces = await page.evaluate(async () =>
-        (await document.fonts.load('italic 500 21px Lora')).map((face) => ({
-          style: face.style,
-          weight: face.weight,
-        }))
+      const loraFaces = await page.evaluate(
+        async (font) =>
+          (await document.fonts.load(font)).map((face) => ({
+            style: face.style,
+            weight: face.weight,
+          })),
+        `${DAILY_MESSAGE_TYPE.style} ${DAILY_MESSAGE_TYPE.weight} ${DAILY_MESSAGE_TYPE.size} Lora`
       );
-      expect(loraFaces).toContainEqual({ style: 'italic', weight: '500' });
+      expect(loraFaces).toContainEqual({
+        style: DAILY_MESSAGE_TYPE.style,
+        weight: DAILY_MESSAGE_TYPE.weight,
+      });
 
       // Bundled or user-authored text may carry emoji; Home's own chrome may
       // not. User-authored: the message text, stored events' labels and
       // descriptions (every event card but the static wedding), and the
-      // anniversary list.
+      // anniversary list. Both birthday cards come from server reads that
+      // `openHome` awaited; they are on screen before the one-shot read below
+      // takes its copy.
+      await expect(page.getByTestId('birthday-countdown-self')).toBeVisible();
+      await expect(page.getByTestId('birthday-countdown-partner')).toBeVisible();
       const chromeText = await page.evaluate(() => {
         const main = document.getElementById('main-content');
         if (!main) return null;
@@ -179,10 +256,13 @@ test.describe('Home on the style kit', () => {
 
   test('[P1] should show Upcoming with an Add event button that opens Settings', async ({
     page,
+    interceptNetworkCall,
   }) => {
-    await openHome(page, 'light');
+    await openHome(page, interceptNetworkCall, 'light');
 
-    await expect(page.getByText('Upcoming', { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Upcoming', exact: true })
+    ).toBeVisible();
     const addButton = page.getByRole('button', { name: 'Add event' });
     await expect(addButton).toBeVisible();
     await expect(addButton).toHaveAttribute('data-testid', 'home-add-event');
@@ -191,8 +271,11 @@ test.describe('Home on the style kit', () => {
     await expect(page).toHaveURL(/\/settings$/);
   });
 
-  test('[P1] should not render the welcome button on Home', async ({ page }) => {
-    await openHome(page, 'light');
+  test('[P1] should not render the welcome button on Home', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    await openHome(page, interceptNetworkCall, 'light');
 
     await expect(page.getByLabel('View welcome message again')).toHaveCount(0);
   });

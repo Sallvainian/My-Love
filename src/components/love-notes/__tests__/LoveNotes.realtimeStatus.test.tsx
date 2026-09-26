@@ -2,7 +2,7 @@
  * DW-113's third half: the part a person actually sees.
  *
  * The hook now reports a feed status and `useLoveNotes` passes it through, and
- * both of those are covered — `useRealtimeMessages.test.ts` pins the
+ * both of those are covered — `useRealtimeMessages.closes.test.ts` pins the
  * transitions. What nothing asserted is the render: whether the notice appears
  * at all, what it says, and whether it stays out of the way when the feed is
  * healthy. A regression that deleted the `<span>`, inverted the ternary, or
@@ -124,7 +124,7 @@ describe('LoveNotes realtime notice', () => {
       const row = screen.getByTestId(ROW);
       const line = within(row).getByText('Connected');
       expect(line).toHaveClass('text-muted');
-      expect(line.querySelector('.bg-good')).not.toBeNull();
+      expect(within(line).getByTestId('realtime-connection-status-dot')).toHaveClass('bg-good');
       // The feed status, not presence: there is no presence feature.
       expect(row).not.toHaveTextContent(/online/i);
       // Not a live region -- only the two unhealthy states are announced.
@@ -170,7 +170,7 @@ describe('LoveNotes realtime notice', () => {
     expect(notice).toHaveAttribute('aria-live', 'polite');
     // Kit `muted`, with a `muted` dot: still recovering, so not an alarm.
     expect(notice).toHaveClass('text-muted');
-    expect(notice.querySelector('.bg-muted')).not.toBeNull();
+    expect(within(notice).getByTestId('realtime-connection-status-dot')).toHaveClass('bg-muted');
     // It sits in the partner row, not a header of its own.
     expect(screen.getByTestId(ROW)).toContainElement(notice);
   });
@@ -186,7 +186,7 @@ describe('LoveNotes realtime notice', () => {
     expect(notice).toHaveClass('text-danger');
     expect(notice).toHaveAttribute('role', 'status');
     expect(notice).toHaveAttribute('aria-live', 'polite');
-    expect(notice.querySelector('.bg-danger')).not.toBeNull();
+    expect(within(notice).getByTestId('realtime-connection-status-dot')).toHaveClass('bg-danger');
   });
 
   it('gives the two visible states different text', async () => {

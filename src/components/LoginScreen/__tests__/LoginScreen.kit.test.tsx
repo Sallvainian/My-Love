@@ -6,7 +6,8 @@
  * `bg-white` or Tailwind palette class), which is what makes it follow the OS
  * theme.
  */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LoginScreen } from '../LoginScreen';
 
@@ -38,15 +39,31 @@ function expectOnKit(html: string) {
   expect(html).not.toMatch(/\bdark:/);
 }
 
+/** Submit valid-looking credentials against a sign-in that stays pending until `settle`. */
+async function startPendingSignIn(user: UserEvent) {
+  let settle!: (value: unknown) => void;
+  actions.signIn.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+  const { container } = render(<LoginScreen />);
+
+  await user.type(screen.getByRole('textbox', { name: 'Email' }), 'person@example.com');
+  await user.type(screen.getByLabelText('Password'), 'wrong-pass');
+  await user.click(screen.getByTestId('submit-button'));
+
+  return { container, settle };
+}
+
 describe('LoginScreen on the kit', () => {
-  it('renders the artboard: wordmark heading, subtitle, one kit card, footer', () => {
-    const { container } = render(<LoginScreen />);
+  it('paints the page and the wordmark heading on the kit', () => {
+    render(<LoginScreen />);
 
     const root = screen.getByTestId('login-screen');
     expect(root).toHaveClass('bg-page');
 
     const heading = screen.getByRole('heading', { level: 1, name: 'My Love' });
-    expect(heading.querySelector('svg')).toHaveClass('text-accent', 'fill-current');
+    expect(within(heading).getByTestId('login-heading-icon')).toHaveClass(
+      'text-accent',
+      'fill-current'
+    );
     expect(screen.getByText('My Love')).toHaveClass(
       'font-lora',
       'italic',
@@ -58,26 +75,48 @@ describe('LoginScreen on the kit', () => {
       'text-[15px]',
       'text-muted'
     );
+  });
 
-    const form = container.querySelector('form')!;
-    const card = form.parentElement!;
+  it('holds the form and the Google pill in one kit card', () => {
+    render(<LoginScreen />);
+
+    const card = screen.getByTestId('login-card');
+    expect(card).toContainElement(screen.getByTestId('login-form'));
     expect(card).toHaveClass('rounded-[20px]', 'border-line', 'bg-card', 'shadow-card', 'p-5');
     expect(card).toContainElement(screen.getByTestId('google-signin-button'));
+  });
+
+  it('renders Sign in as the pink primary', () => {
+    render(<LoginScreen />);
 
     const submit = screen.getByTestId('submit-button');
     expect(submit).toHaveTextContent('Sign in');
     expect(submit).toHaveClass('bg-fill', 'text-white', 'rounded-full', 'h-12');
+  });
+
+  it('renders Continue with Google as the neutral pill with no brand logo', () => {
+    render(<LoginScreen />);
 
     const google = screen.getByTestId('google-signin-button');
     expect(google).toHaveTextContent('Continue with Google');
     expect(google).toHaveClass('bg-card2', 'text-ink', 'rounded-full', 'h-12');
     // No multicolour logo: its brand hex has no kit token.
-    expect(google.querySelector('svg')).toBeNull();
+    expect(google.innerHTML).not.toMatch(/<svg\b/);
+  });
+
+  it('renders the OR divider and the Contact admin footer link', () => {
+    render(<LoginScreen />);
 
     expect(screen.getByText('OR')).toHaveClass('text-muted', 'text-xs', 'font-semibold');
     const contact = screen.getByRole('button', { name: 'Contact admin' });
     expect(contact).toHaveClass('text-accent', 'font-semibold');
-    expect(contact.parentElement).toHaveTextContent('Need an account? Contact admin');
+    const footer = screen.getByTestId('login-footer');
+    expect(footer).toContainElement(contact);
+    expect(footer).toHaveTextContent('Need an account? Contact admin');
+  });
+
+  it('renders both fields on the kit field surface, not invalid', () => {
+    render(<LoginScreen />);
 
     for (const field of [
       screen.getByRole('textbox', { name: 'Email' }),
@@ -86,21 +125,26 @@ describe('LoginScreen on the kit', () => {
       expect(field).toHaveClass('bg-field', 'h-12', 'rounded-[14px]', 'ring-line-strong');
       expect(field).toHaveAttribute('aria-invalid', 'false');
     }
+  });
 
+  it('leaves nothing off-kit in the rendered sign-in markup', () => {
+    const { container } = render(<LoginScreen />);
+
+    expect(screen.getByTestId('login-form')).toBeInTheDocument();
     expectOnKit(container.innerHTML);
   });
 
   it('shows a validation error in the card on the kit failure surface, with a danger ring', () => {
     const { container } = render(<LoginScreen />);
 
-    fireEvent.submit(container.querySelector('form')!);
+    fireEvent.submit(screen.getByTestId('login-form')); // raw submit: the submit button is disabled while a field is empty, so no click reaches the empty-fields check
 
     const error = screen.getByTestId('login-error');
     expect(error).toHaveAttribute('role', 'alert');
     expect(error).toHaveTextContent('Please enter both email and password');
     expect(error).toHaveClass('bg-dtint', 'text-danger');
-    expect(error.querySelector('svg')).not.toBeNull();
-    expect(container.querySelector('.bg-card')).toContainElement(error);
+    expect(within(error).getByTestId('login-error-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('login-card')).toContainElement(error);
 
     // The ring mirrors aria-invalid, as the deleted `.form-input[aria-invalid]`
     // rule did.
@@ -116,21 +160,19 @@ describe('LoginScreen on the kit', () => {
     expectOnKit(container.innerHTML);
   });
 
-  it('keeps the mapped credential message and shows a lucide spinner while signing in', async () => {
-    let settle!: (value: unknown) => void;
-    actions.signIn.mockReturnValue(new Promise((resolve) => (settle = resolve)));
-    const { container } = render(<LoginScreen />);
-
-    fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
-      target: { value: 'person@example.com' },
-    });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong-pass' } });
-    fireEvent.click(screen.getByTestId('submit-button'));
+  it('shows a lucide spinner and locks the email field while signing in', async () => {
+    const user = userEvent.setup();
+    await startPendingSignIn(user);
 
     const submit = screen.getByTestId('submit-button');
     expect(submit).toHaveTextContent('Signing in...');
-    expect(submit.querySelector('svg')).toHaveClass('animate-spin');
+    expect(within(submit).getByTestId('submit-button-spinner')).toHaveClass('animate-spin');
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeDisabled();
+  });
+
+  it('maps invalid credentials to the friendly message on the kit', async () => {
+    const user = userEvent.setup();
+    const { container, settle } = await startPendingSignIn(user);
 
     await act(async () =>
       settle({ error: { message: 'Invalid login credentials' }, session: null })
@@ -144,14 +186,13 @@ describe('LoginScreen on the kit', () => {
   // DW-197: while the Google redirect is pending nothing else on the screen
   // may start a second, competing action.
   it('disables every other control while the Google redirect is pending', async () => {
+    const user = userEvent.setup();
     actions.signInWithGoogle.mockReturnValue(new Promise(() => {}));
     render(<LoginScreen />);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
-      target: { value: 'person@example.com' },
-    });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-pass' } });
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'person@example.com');
+    await user.type(screen.getByLabelText('Password'), 'secret-pass');
 
-    await act(async () => fireEvent.click(screen.getByTestId('google-signin-button')));
+    await user.click(screen.getByTestId('google-signin-button'));
 
     expect(screen.getByTestId('google-signin-button')).toHaveTextContent('Redirecting to Google...');
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeDisabled();
@@ -159,21 +200,28 @@ describe('LoginScreen on the kit', () => {
     expect(screen.getByTestId('submit-button')).toBeDisabled();
     const contact = screen.getByRole('button', { name: 'Contact admin' });
     expect(contact).toBeDisabled();
-    fireEvent.click(contact);
+    await user.click(contact);
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument();
   });
 
-  it('shows the callback notice on card2 in ink with an icon, and retires it on the next attempt', () => {
+  it('shows the callback notice on card2 in ink with an icon, and retires it on the next attempt', async () => {
+    const user = userEvent.setup();
     const { container } = render(<LoginScreen callbackOutcome="cancelled" />);
 
     const notice = screen.getByTestId('login-notice');
     expect(notice).toHaveAttribute('role', 'status');
     expect(notice).toHaveClass('bg-card2', 'text-ink');
-    expect(notice.querySelector('svg')).not.toBeNull();
-    expect(container.querySelector('.bg-card')).toContainElement(notice);
+    expect(within(notice).getByTestId('login-notice-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('login-card')).toContainElement(notice);
     expectOnKit(container.innerHTML);
 
-    fireEvent.submit(container.querySelector('form')!);
+    // Natively a valid email, but the component's own check wants a dotted
+    // domain: the attempt fails validation and still retires the notice.
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'person@localhost');
+    await user.type(screen.getByLabelText('Password'), 'secret-pass');
+    await user.click(screen.getByTestId('submit-button'));
+    expect(screen.getByTestId('login-error')).toHaveTextContent('Please enter a valid email address');
     expect(screen.queryByTestId('login-notice')).not.toBeInTheDocument();
+    expect(actions.signIn).not.toHaveBeenCalled();
   });
 });

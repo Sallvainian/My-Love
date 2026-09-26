@@ -10,7 +10,8 @@
  * These pin the contract rather than the implementation, so the shared hook can
  * be changed again with something other than hope behind it.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { MoodEntry } from '../../../types';
@@ -46,8 +47,9 @@ function Harness({ open, onClose = vi.fn() }: { open: boolean; onClose?: () => v
 
 describe('MoodDetailModal focus', () => {
   it('moves focus into the dialog when it opens', async () => {
+    const user = userEvent.setup();
     const { rerender } = render(<Harness open={false} />);
-    screen.getByTestId('trigger').focus();
+    await user.click(screen.getByTestId('trigger'));
 
     rerender(<Harness open />);
 
@@ -57,8 +59,9 @@ describe('MoodDetailModal focus', () => {
   });
 
   it('returns focus to the trigger on close, as its AC states', async () => {
+    const user = userEvent.setup();
     const { rerender } = render(<Harness open={false} />);
-    screen.getByTestId('trigger').focus();
+    await user.click(screen.getByTestId('trigger'));
 
     rerender(<Harness open />);
     await waitFor(() =>
@@ -71,13 +74,14 @@ describe('MoodDetailModal focus', () => {
   });
 
   it('closes on Escape from inside the dialog', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<Harness open onClose={onClose} />);
 
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('modal-close-button'))
     );
-    fireEvent.keyDown(screen.getByTestId('modal-close-button'), { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     expect(onClose).toHaveBeenCalled();
   });

@@ -22,6 +22,7 @@ import { AuthError, isAuthImplicitGrantRedirectError } from '@supabase/supabase-
 import { loadConfigFromFile } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { createAuthBootstrapSession } from '../../support/factories/auth-bootstrap-notification-order';
 
 // `vitest.config.ts` defines VITE_SUPABASE_URL as the project URL, so the
 // SDK derives this storage key (`sb-${hostname.split('.')[0]}-auth-token`).
@@ -53,6 +54,11 @@ const HOSTILE_FRAGMENT =
 
 const VICTIM_USER_ID = '11111111-1111-4111-8111-111111111111';
 
+// Pinned to a whole second: GoTrue reads `Date.now()` to decide whether the
+// stored session is due a refresh, so its expiry is measured from this.
+const NOW = new Date('2026-09-15T16:00:00.000Z');
+const NOW_SEC = NOW.getTime() / 1000;
+
 function setUrl(url: string): void {
   (window as unknown as { happyDOM: { setURL: (u: string) => void } }).happyDOM.setURL(url);
 }
@@ -61,22 +67,31 @@ function setUrl(url: string): void {
 function seedVictimSession(): void {
   localStorage.setItem(
     STORAGE_KEY,
-    JSON.stringify({
-      access_token: 'victim.access.token',
-      refresh_token: 'victim-refresh-token',
-      expires_at: Math.floor(Date.now() / 1000) + 3600,
-      expires_in: 3600,
-      token_type: 'bearer',
-      user: {
-        id: VICTIM_USER_ID,
+    JSON.stringify(
+      createAuthBootstrapSession({
+        userId: VICTIM_USER_ID,
         email: 'victim@test.example.com',
-        aud: 'authenticated',
-        app_metadata: {},
-        user_metadata: {},
-        created_at: new Date().toISOString(),
-      },
-    })
+        displayName: null,
+        accessToken: 'victim.access.token',
+        refreshToken: 'victim-refresh-token',
+        expiresAt: NOW_SEC + 3600,
+      })
+    )
   );
+}
+
+/**
+ * GoTrue's 400 answer to a token grant it refuses. A new `Response` per call,
+ * because a body can be read only once.
+ */
+function invalidGrantResponse(description?: string): Response {
+  const body = description === undefined
+    ? { error: 'invalid_grant' }
+    : { error: 'invalid_grant', error_description: description };
+  return new Response(JSON.stringify(body), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 /** Import the module under test with the current URL and storage in place. */
@@ -99,6 +114,8 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
   let assignSpy: MockInstance<typeof window.location.assign> | null;
 
   beforeEach(() => {
+    // Only `Date` is faked; GoTrue's own timers stay real.
+    vi.setSystemTime(NOW);
     vi.resetModules();
     localStorage.clear();
     clients = [];
@@ -116,6 +133,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     // without this each leaves an auto-refresh ticker bound to the same storage
     // key -- and a stray refresh is exactly what would corrupt a fetch count.
     for (const client of clients) await client.auth.stopAutoRefresh();
+    vi.useRealTimers();
     fetchSpy.mockRestore();
     assignSpy?.mockRestore();
     assignSpy = null;
@@ -395,10 +413,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
 
     fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
       if (String(input).includes('grant_type=pkce')) {
-        return new Response(
-          JSON.stringify({ error: 'invalid_grant', error_description: 'Invalid code' }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
-        );
+        return invalidGrantResponse('Invalid code');
       }
       throw new Error(`unexpected request: ${String(input)}`);
     });
@@ -513,7 +528,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
         aud: 'authenticated',
         app_metadata: {},
         user_metadata: {},
-        created_at: new Date().toISOString(),
+        created_at: NOW.toISOString(),
       },
     };
     fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
@@ -583,10 +598,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
 
     fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
       if (String(input).includes('grant_type=pkce')) {
-        return new Response(
-          JSON.stringify({ error: 'invalid_grant', error_description: 'Invalid code' }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
-        );
+        return invalidGrantResponse('Invalid code');
       }
       throw new Error(`unexpected request: ${String(input)}`);
     });
@@ -615,12 +627,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
 
   it('leaves password sign-in on the password grant with no PKCE parameters', async () => {
     setUrl(`${APP_ORIGIN}/`);
-    fetchSpy.mockResolvedValue(
-      new Response(JSON.stringify({ error: 'invalid_grant' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    );
+    fetchSpy.mockResolvedValue(invalidGrantResponse());
 
     const { supabase } = await importAppClient();
     clients.push(supabase);

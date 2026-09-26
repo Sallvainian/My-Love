@@ -1,7 +1,17 @@
-import type { Page } from '@playwright/test';
+import type { Browser, BrowserContext, Page, TestInfo } from '@playwright/test';
+import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { AppState } from '../../../src/stores/types';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
+import type { TypedSupabaseClient } from '../../support/factories';
 import { test, expect } from '../../support/merged-fixtures';
+import {
+  ANNIVERSARIES_READ,
+  CUSTOM_MESSAGE_SAVE,
+  CUSTOM_MESSAGES_READ,
+  FAVORITES_READ,
+  SECOND_CONTEXT_READ_TIMEOUT,
+} from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 // Anniversaries, favorites and custom messages now live in Supabase, with the
@@ -10,15 +20,7 @@ import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 // came from the server. Store reads below are observation only; every write
 // goes through the UI.
 
-const ACCOUNT_TABLES = ['message_favorites', 'custom_messages', 'anniversaries'] as const;
-
-/** The favorites read of the mirror refresh App runs on every signed-in start. */
-function favoritesRefreshed(page: Page) {
-  return page.waitForResponse(
-    (response) =>
-      response.url().includes('/rest/v1/message_favorites') && response.request().method() === 'GET'
-  );
-}
+type AccountTable = 'message_favorites' | 'custom_messages' | 'anniversaries';
 
 async function favoritedTexts(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
@@ -30,107 +32,200 @@ async function favoritedTexts(page: Page): Promise<string[]> {
   });
 }
 
+async function resolveWorkerAccount(
+  supabaseAdmin: TypedSupabaseClient
+): Promise<{ email: string; userId: string }> {
+  const pair = getWorkerPairEmails();
+  if (!pair) throw new Error('This test requires its worker-owned account pair');
+  const { data: account, error: accountError } = await supabaseAdmin
+    .from('users').select('id').eq('email', pair.user1Email).single();
+  if (accountError || !account) throw new Error(`No user row for this worker account: ${accountError?.message}`);
+  return { email: pair.user1Email, userId: account.id };
+}
+
+// This worker account's own rows only, in the one table a test writes: start
+// clean so a re-run is valid. Hard before the test, so it never runs on
+// leftover rows; soft in the teardown, so the test's own error stands.
+async function clearTable(
+  supabaseAdmin: TypedSupabaseClient,
+  table: AccountTable,
+  userId: string,
+  { soft }: { soft: boolean }
+) {
+  const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
+  const message = `clearing ${table} for this worker account`;
+  (soft ? expect.soft(error, message) : expect(error, message)).toBeNull();
+}
+
+// Nothing but the welcome-splash timestamp: no session, no mirrors.
+async function newBareContext(browser: Browser, testInfo: TestInfo): Promise<BrowserContext> {
+  const baseURL = testInfo.project.use.baseURL ?? 'http://localhost:5173';
+  return browser.newContext({
+    baseURL,
+    storageState: {
+      cookies: [],
+      origins: [{
+        origin: new URL(baseURL).origin,
+        localStorage: [{ name: 'lastWelcomeView', value: String(Date.now()) }],
+      }],
+    },
+  });
+}
+
+// ---- Second context: same account, nothing local ----
+async function signInFresh(second: BrowserContext, email: string): Promise<Page> {
+  const fresh = await second.newPage();
+  await fresh.goto('/');
+  await fresh.getByLabel('Email', { exact: true }).fill(email);
+  await fresh.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+  const freshRefreshed = observeOn({
+    page: fresh,
+    method: 'GET',
+    url: FAVORITES_READ,
+    timeout: SECOND_CONTEXT_READ_TIMEOUT,
+  });
+  await fresh.getByTestId('submit-button').click();
+  await expect(fresh.getByTestId('app-container')).toBeVisible();
+  expect((await freshRefreshed).status).toBe(200);
+  return fresh;
+}
+
 test.describe('Account data follows the account, not the browser', () => {
   test.setTimeout(120_000);
 
-  test('[P1] a favorite, a custom message and an anniversary made in one context appear in a fresh one', async ({
+  test('[P1] a favorite made in one context appears in a fresh one', async ({
     page,
     browser,
     supabaseAdmin,
+    interceptNetworkCall,
   }, testInfo) => {
-    const pair = getWorkerPairEmails();
-    if (!pair) throw new Error('This test requires its worker-owned account pair');
-    const { data: account, error: accountError } = await supabaseAdmin
-      .from('users').select('id').eq('email', pair.user1Email).single();
-    if (accountError || !account) throw new Error(`No user row for this worker account: ${accountError?.message}`);
-    const userId = account.id;
-    // This worker account's own rows only: start clean so a re-run is valid.
-    const clear = async () => {
-      for (const table of ACCOUNT_TABLES) {
-        const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
-        expect(error).toBeNull();
-      }
-    };
-    await clear();
-
-    const stamp = `${testInfo.workerIndex}-${Date.now()}`;
-    const customText = `Cross-device custom message ${stamp}`;
-    const anniversaryLabel = `Cross-device anniversary ${stamp}`;
-    const baseURL = testInfo.project.use.baseURL ?? 'http://localhost:5173';
-    // Nothing but the welcome-splash timestamp: no session, no mirrors.
-    const second = await browser.newContext({
-      baseURL,
-      storageState: {
-        cookies: [],
-        origins: [{
-          origin: new URL(baseURL).origin,
-          localStorage: [{ name: 'lastWelcomeView', value: String(Date.now()) }],
-        }],
-      },
-    });
+    const { email, userId } = await resolveWorkerAccount(supabaseAdmin);
+    await clearTable(supabaseAdmin, 'message_favorites', userId, { soft: false });
+    const second = await newBareContext(browser, testInfo);
 
     try {
-      // ---- First context: make one of each through the UI ----
-      const refreshed = favoritesRefreshed(page);
+      // ---- First context: favorite through the UI ----
+      // The favorites read of the mirror refresh App runs on every signed-in start.
+      const refreshed = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
       await page.goto('/');
       const favorite = page.getByTestId('message-favorite-button');
       await expect(favorite).toHaveAccessibleName('Add to favorites');
-      await refreshed;
+      expect((await refreshed).status).toBe(200);
       const favoriteText = (await page.getByTestId('message-text').textContent())?.trim();
       expect(favoriteText).toBeTruthy();
 
-      const favoriteSaved = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/message_favorites') && response.request().method() === 'POST'
-      );
+      const favoriteSaved = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/message_favorites*',
+      });
       await favorite.click();
-      expect((await favoriteSaved).ok()).toBe(true);
+      expect((await favoriteSaved).status).toBe(201);
       await expect(favorite).toHaveAccessibleName('Remove from favorites');
 
+      const fresh = await signInFresh(second, email);
+
+      await recurseUntil(
+        () => favoritedTexts(fresh),
+        (v) => {
+          expect(v).toContain(favoriteText);
+        }
+      );
+    } finally {
+      // A close that rejects must not skip the clear below.
+      await second.close().catch(() => {});
+      await page.close().catch(() => {});
+      await clearTable(supabaseAdmin, 'message_favorites', userId, { soft: true });
+    }
+  });
+
+  test('[P1] a custom message made in one context appears in a fresh one', async ({
+    page,
+    browser,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }, testInfo) => {
+    const { email, userId } = await resolveWorkerAccount(supabaseAdmin);
+    await clearTable(supabaseAdmin, 'custom_messages', userId, { soft: false });
+    const customText = `Cross-device custom message ${testInfo.workerIndex}-${Date.now()}`;
+    const second = await newBareContext(browser, testInfo);
+
+    try {
+      // ---- First context: create through the UI ----
       await page.goto('/admin');
       await page.getByTestId('admin-create-button').click();
       await page.getByTestId('admin-create-form-text').fill(customText);
-      const customSaved = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/custom_messages') && response.request().method() === 'POST'
-      );
+      const customSaved = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });
       await page.getByTestId('admin-create-form-save').click();
-      expect((await customSaved).ok()).toBe(true);
+      expect((await customSaved).status).toBe(201);
       await expect(page.getByTestId('message-row-text').filter({ hasText: customText })).toBeVisible();
 
+      const fresh = await signInFresh(second, email);
+
+      const customRead = observeOn({
+        page: fresh,
+        method: 'GET',
+        url: CUSTOM_MESSAGES_READ,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
+      await fresh.goto('/admin');
+      const customRows = await customRead;
+      expect(customRows.status).toBe(200);
+      expect(customRows.responseJson).toEqual([expect.objectContaining({ text: customText })]);
+      await expect(fresh.getByTestId('message-row-text').filter({ hasText: customText })).toBeVisible();
+    } finally {
+      // A close that rejects must not skip the clear below.
+      await second.close().catch(() => {});
+      await page.close().catch(() => {});
+      await clearTable(supabaseAdmin, 'custom_messages', userId, { soft: true });
+    }
+  });
+
+  test('[P1] an anniversary made in one context appears in a fresh one', async ({
+    page,
+    browser,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }, testInfo) => {
+    const { email, userId } = await resolveWorkerAccount(supabaseAdmin);
+    await clearTable(supabaseAdmin, 'anniversaries', userId, { soft: false });
+    const anniversaryLabel = `Cross-device anniversary ${testInfo.workerIndex}-${Date.now()}`;
+    const second = await newBareContext(browser, testInfo);
+
+    try {
+      // ---- First context: add through the UI ----
       await page.goto('/settings');
       await page.getByRole('button', { name: 'Add Anniversary' }).click();
-      await page.locator('#anniversary-label').fill(anniversaryLabel);
-      await page.locator('#anniversary-date').fill('2024-02-14');
-      const anniversarySaved = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/anniversaries') && response.request().method() === 'POST'
-      );
+      const anniversaryForm = page.getByRole('dialog', { name: 'Add Anniversary' });
+      await anniversaryForm.getByLabel('Label').fill(anniversaryLabel);
+      await anniversaryForm.getByLabel('Date').fill('2024-02-14');
+      const anniversarySaved = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/anniversaries*',
+      });
       await page.getByRole('button', { name: 'Add', exact: true }).click();
-      expect((await anniversarySaved).ok()).toBe(true);
-      await expect(page.getByText(anniversaryLabel)).toBeVisible();
+      expect((await anniversarySaved).status).toBe(201);
+      await expect(page.getByRole('heading', { level: 4, name: anniversaryLabel })).toBeVisible();
 
-      // ---- Second context: same account, nothing local ----
-      const fresh = await second.newPage();
-      await fresh.goto('/');
-      await fresh.getByLabel('Email', { exact: true }).fill(pair.user1Email);
-      await fresh.getByTestId('password-input').fill(TEST_USER_PASSWORD);
-      const freshRefreshed = favoritesRefreshed(fresh);
-      await fresh.getByTestId('submit-button').click();
-      await expect(fresh.getByTestId('app-container')).toBeVisible();
-      await freshRefreshed;
+      const fresh = await signInFresh(second, email);
 
-      await expect.poll(() => favoritedTexts(fresh)).toContain(favoriteText);
-
-      await fresh.goto('/admin');
-      await expect(fresh.getByTestId('message-row-text').filter({ hasText: customText })).toBeVisible();
-
+      const anniversaryRead = observeOn({
+        page: fresh,
+        method: 'GET',
+        url: ANNIVERSARIES_READ,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
       await fresh.goto('/settings');
-      await expect(fresh.getByText(anniversaryLabel)).toBeVisible();
+      const anniversaryRows = await anniversaryRead;
+      expect(anniversaryRows.status).toBe(200);
+      expect(anniversaryRows.responseJson).toEqual([
+        expect.objectContaining({ label: anniversaryLabel }),
+      ]);
+      await expect(fresh.getByRole('heading', { level: 4, name: anniversaryLabel })).toBeVisible();
     } finally {
-      await second.close();
-      await page.close();
-      await clear();
+      // A close that rejects must not skip the clear below.
+      await second.close().catch(() => {});
+      await page.close().catch(() => {});
+      await clearTable(supabaseAdmin, 'anniversaries', userId, { soft: true });
     }
   });
 });

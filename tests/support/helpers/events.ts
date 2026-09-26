@@ -183,6 +183,61 @@ export function isoDateDaysFromNow(dayOffset: number, anchor: Date = new Date())
 }
 
 /**
+ * The instant to install as a page clock before seeding calendar-day fixtures:
+ * the latest LOCAL 12:00 at or before `now`.
+ *
+ * Noon sits 12 hours from both midnights, so a fixture derived from it cannot
+ * cross a day boundary however long the test runs, and the anchor is between
+ * 0 and 24 hours BEHIND real time — never ahead. A page clock ahead of the
+ * session's mint time makes supabase-js refresh the token, and that refresh
+ * re-renders the app on its own (`tests/e2e/home/events-read-window.spec.ts`
+ * header). Built from calendar components, never parsed from a string.
+ */
+export function clockAnchor(now: Date = new Date()): Date {
+  const anchor = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+  if (anchor > now) anchor.setDate(anchor.getDate() - 1);
+  return anchor;
+}
+
+function landsOnLeapDay(dayOffset: number, anchor: Date): boolean {
+  const date = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + dayOffset);
+  return date.getMonth() === 1 && date.getDate() === 29;
+}
+
+/**
+ * `clockAnchor(now)`, stepped back a day at a time while any of `dayOffsets`
+ * would land on 29 February — for birthday fixtures, whose year `yearsBack`
+ * moves usually has no 29 February.
+ *
+ * Moving the fixture date instead would change the day count a test asserts;
+ * moving the anchor keeps every offset's count exact. One step is not always
+ * enough: with adjacent offsets it moves the next offset onto 29 February, so
+ * the anchor keeps stepping until none lands there. It only ever moves back,
+ * so it stays behind real time.
+ */
+export function clockAnchorAvoidingLeapDay(dayOffsets: number[], now: Date = new Date()): Date {
+  const anchor = clockAnchor(now);
+  while (dayOffsets.some((dayOffset) => landsOnLeapDay(dayOffset, anchor))) {
+    anchor.setDate(anchor.getDate() - 1);
+  }
+  return anchor;
+}
+
+/**
+ * A birthday: the `"YYYY-MM-DD"` `dayOffset` days from the anchor's local day,
+ * `yearsBack` years earlier — so its next occurrence is exactly `dayOffset`
+ * days away and the person turns `yearsBack` on it. Throws on 29 February;
+ * build the anchor with `clockAnchorAvoidingLeapDay`.
+ */
+export function isoBirthdayDaysFromNow(dayOffset: number, yearsBack: number, anchor: Date): string {
+  if (landsOnLeapDay(dayOffset, anchor)) {
+    throw new Error('A 29 February birthday; build the anchor with clockAnchorAvoidingLeapDay');
+  }
+  const date = isoDateDaysFromNow(dayOffset, anchor);
+  return `${Number(date.slice(0, 4)) - yearsBack}${date.slice(4)}`;
+}
+
+/**
  * A `Date` at LOCAL midnight for a bare `"YYYY-MM-DD"`, ready for
  * `formatDateLong`.
  *

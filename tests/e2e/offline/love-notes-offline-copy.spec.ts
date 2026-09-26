@@ -22,6 +22,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { LOVE_NOTES_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -150,9 +152,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Love notes from the local copy', () => {
-  test('a thread loaded online is listed offline after a reload, image included', async ({
+  test('[P1] a thread loaded online is listed offline after a reload, image included', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const stamp = Date.now();
     const textContent = `E2E offline text ${stamp}`;
@@ -167,20 +170,30 @@ test.describe('Love notes from the local copy', () => {
       const path = imagePath;
 
       // GIVEN: the thread loads online; showing the image caches it.
+      const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
       await page.goto('/notes');
+      const thread = await threadRead;
+      expect(thread.status).toBe(200);
+      expect(thread.responseJson).toEqual(
+        expect.arrayContaining(noteIds.map((id) => expect.objectContaining({ id })))
+      );
       await expect(noteBubble(page, textContent)).toBeVisible();
       await expect(noteBubble(page, imageContent).locator('img')).toBeVisible();
-      await expect
-        .poll(async () => {
+      await recurseUntil(
+        async () => {
           const ids = (await savedNoteIds(page)) ?? [];
           return noteIds.every((id) => ids.includes(id));
-        })
-        .toBe(true);
-      await expect.poll(() => imageCached(page, path)).toBe(true);
+        },
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
+      await recurseUntil(() => imageCached(page, path), (v) => { expect(v).toBe(true); });
 
       // WHEN: the app reloads with neither the thread nor Storage answering,
       // and the device goes offline.
       let abortedReads = 0;
+      // playwright-utils deviation: the route must be installed before the next navigation and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route(NOTES_REST, (route) => {
         abortedReads += 1;
         return route.abort();
@@ -190,7 +203,7 @@ test.describe('Love notes from the local copy', () => {
       await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
       // The start read really hit the aborted route, so nothing after this
       // point can have come from the server.
-      await expect.poll(() => abortedReads).toBeGreaterThan(0);
+      await recurseUntil(async () => abortedReads, (v) => { expect(v).toBeGreaterThan(0); });
       await goOffline(page, true);
 
       // THEN: both saved notes are listed, the image decoded from the cache…
@@ -198,9 +211,12 @@ test.describe('Love notes from the local copy', () => {
       const image = noteBubble(page, imageContent).locator('img');
       await expect(image).toBeVisible();
       await expect(image).toHaveAttribute('src', /^blob:/);
-      await expect
-        .poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
-        .toBe(true);
+      await recurseUntil(
+        () => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
       await expect(noteBubble(page, imageContent).getByText('Failed to load image')).toHaveCount(0);
       // …and no error banner covers the saved thread.
       await expect(page.getByRole('button', { name: 'Dismiss' })).toHaveCount(0);
@@ -213,47 +229,53 @@ test.describe('Love notes from the local copy', () => {
     }
   });
 
-  test('a note written while offline appears after reconnect without a reload', async ({
+  test('[P1] a note written while offline appears after reconnect without a reload', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const content = `E2E reconnect note ${Date.now()}`;
     let noteId: string | null = null;
 
     try {
       // GIVEN: signed in on the Notes screen, thread loaded, then offline.
+      const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
       await page.goto('/notes');
+      expect((await threadRead).status).toBe(200);
       await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
-      await expect.poll(() => savedNoteIds(page)).not.toBeNull();
+      await recurseUntil(() => savedNoteIds(page), (v) => { expect(v).not.toBeNull(); });
       await goOffline(page, true);
 
       // WHEN: the partner writes while this device is offline, then it reconnects.
       noteId = await seedPartnerNote(supabaseAdmin, content);
       const id = noteId;
-      const refreshRead = page.waitForResponse(
-        (response) =>
-          response.request().method() === 'GET' &&
-          response.url().includes('/rest/v1/love_notes_visible')
-      );
+      const refreshRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
       await goOffline(page, false);
       // The reconnect itself re-reads the server (the kind's refresher), and
       // that read carries the note — the seed sends no broadcast, so this does
       // not rest on Realtime.
       const response = await refreshRead;
-      expect(response.ok()).toBe(true);
-      const rows = (await response.json()) as { id: string }[];
+      expect(response.status).toBe(200);
+      const rows = response.responseJson as { id: string }[];
       expect(rows.map((row) => row.id)).toContain(id);
 
       // THEN: the note is in state, the copy and the thread.
-      await expect
-        .poll(() =>
+      await recurseUntil(
+        () =>
           page.evaluate(
             (wanted) => window.__APP_STORE__?.getState().notes.some((n) => n.id === wanted) ?? false,
             id
-          )
-        )
-        .toBe(true);
-      await expect.poll(async () => (await savedNoteIds(page))?.includes(id) ?? false).toBe(true);
+          ),
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
+      await recurseUntil(
+        async () => (await savedNoteIds(page))?.includes(id) ?? false,
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
       await expect(noteBubble(page, content)).toBeVisible();
     } finally {
       await page.context().setOffline(false);

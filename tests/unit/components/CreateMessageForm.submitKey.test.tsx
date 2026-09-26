@@ -5,7 +5,9 @@
  * Changing the message mints a new key: reusing one across different content
  * would make the server return the first row and drop the edit.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -41,26 +43,29 @@ afterEach(() => {
   cleanup();
 });
 
-function type(text: string) {
-  fireEvent.change(screen.getByTestId('admin-create-form-text'), { target: { value: text } });
+async function type(user: UserEvent, text: string) {
+  const field = screen.getByTestId('admin-create-form-text');
+  await user.clear(field);
+  await user.type(field, text);
 }
 
-function save() {
-  fireEvent.click(screen.getByTestId('admin-create-form-save'));
+async function save(user: UserEvent) {
+  await user.click(screen.getByTestId('admin-create-form-save'));
 }
 
 describe('CreateMessageForm submit key', () => {
   it('reuses the key on a retry of the same message and mints a new one after an edit', async () => {
     createCustomMessage.mockRejectedValue(new Error('Network error'));
+    const user = userEvent.setup();
     render(<CreateMessageForm isOpen onClose={() => {}} />);
 
-    type('You make every day better');
-    save();
+    await type(user, 'You make every day better');
+    await save(user);
     await waitFor(() => expect(createCustomMessage).toHaveBeenCalledTimes(1));
-    save();
+    await save(user);
     await waitFor(() => expect(createCustomMessage).toHaveBeenCalledTimes(2));
-    type('You make every day brighter');
-    save();
+    await type(user, 'You make every day brighter');
+    await save(user);
     await waitFor(() => expect(createCustomMessage).toHaveBeenCalledTimes(3));
 
     const keys = createCustomMessage.mock.calls.map((call) => call[1]);
@@ -71,11 +76,12 @@ describe('CreateMessageForm submit key', () => {
 
   it('going back to an earlier version reuses that version’s key', async () => {
     createCustomMessage.mockRejectedValue(new Error('Network error'));
+    const user = userEvent.setup();
     render(<CreateMessageForm isOpen onClose={() => {}} />);
 
     for (const [index, text] of ['Version X', 'Version Y', 'Version X'].entries()) {
-      type(text);
-      save();
+      await type(user, text);
+      await save(user);
       await waitFor(() => expect(createCustomMessage).toHaveBeenCalledTimes(index + 1));
     }
 
@@ -88,13 +94,14 @@ describe('CreateMessageForm submit key', () => {
 
   it('starts a fresh key after a successful save', async () => {
     createCustomMessage.mockResolvedValue(undefined);
+    const user = userEvent.setup();
     render(<CreateMessageForm isOpen onClose={() => {}} />);
 
-    type('Same words');
-    save();
+    await type(user, 'Same words');
+    await save(user);
     await waitFor(() => expect(createCustomMessage).toHaveBeenCalledTimes(1));
-    type('Same words');
-    save();
+    await type(user, 'Same words');
+    await save(user);
     await waitFor(() => expect(createCustomMessage).toHaveBeenCalledTimes(2));
 
     const keys = createCustomMessage.mock.calls.map((call) => call[1]);

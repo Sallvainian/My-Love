@@ -20,8 +20,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
-import { resolveOwnPair } from '../../support/helpers/events';
+import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import { ownMoodHistoryRead, partnerMoodListRead } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -35,12 +37,13 @@ function localISO(date: Date): string {
 }
 
 /**
- * An earlier moment inside the current month, so the calendar shows it without
- * a month change: yesterday at noon, or just after midnight on the 1st.
- * Browser and runner share the machine's timezone (no `timezoneId` is set).
+ * An earlier moment inside the anchor's month, so the calendar shows it without
+ * a month change: the day before at noon, or just after midnight on the 1st.
+ * The caller installs `anchor` as the page clock, so the page's "this month" is
+ * the anchor's. Browser and runner share the machine's timezone (no
+ * `timezoneId` is set).
  */
-function earlierThisMonth(): Date {
-  const now = new Date();
+function earlierThisMonth(now: Date): Date {
   if (now.getDate() > 1) {
     return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12, 0, 0);
   }
@@ -140,12 +143,14 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Mood history and partner moods offline', () => {
-  test('a device with an empty moods store shows earlier server moods in the calendar', async ({
+  test('[P1] a device with an empty moods store shows earlier server moods in the calendar', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
-    const loggedAt = earlierThisMonth();
+    const anchor = clockAnchor();
+    const loggedAt = earlierThisMonth(anchor);
     const dateKey = localISO(loggedAt);
     const note = `backfill-e2e-${randomUUID()}`;
 
@@ -165,39 +170,68 @@ test.describe('Mood history and partner moods offline', () => {
 
     try {
       // GIVEN: signed in, then the moods store is emptied — a fresh device.
+      // The clock survives the reload below, so both loads share one month.
+      await page.clock.install({ time: anchor });
+      const startBackfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
       await page.goto('/');
-      await expect.poll(() => page.evaluate(() => window.__APP_STORE__?.getState().userId ?? null)).toBe(userId);
+      const started = await startBackfill;
+      expect(started.status).toBe(200);
+      expect(started.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: moodId })])
+      );
+      await recurseUntil(
+        () => page.evaluate(() => window.__APP_STORE__?.getState().userId ?? null),
+        (v) => {
+          expect(v).toBe(userId);
+        }
+      );
       // This load's own start backfill must land first, or it could merge after
       // the clear below.
-      await expect
-        .poll(async () => (await ownMoodRows(page)).some((row) => row.date === dateKey))
-        .toBe(true);
+      await recurseUntil(
+        async () => (await ownMoodRows(page)).some((row) => row.date === dateKey),
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
       await clearMoodsStore(page);
       expect(await ownMoodRows(page)).toEqual([]);
 
       // WHEN: the app starts again.
+      const reloadBackfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
       await page.reload();
+      const reloaded = await reloadBackfill;
+      expect(reloaded.status).toBe(200);
+      expect(reloaded.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: moodId })])
+      );
       await navigateTo(page, 'mood');
       await page.getByTestId('mood-tab-history').click();
       await expect(page.getByTestId('mood-calendar')).toBeVisible();
-      const header = await page.getByTestId('calendar-month-header').textContent();
+      // The anchor's month, which the installed clock makes "this month".
+      const monthOnScreen =
+        `${anchor.toLocaleString('en-US', { month: 'long' })} ${anchor.getFullYear()}`;
+      await expect(page.getByTestId('calendar-month-header')).toHaveText(monthOnScreen);
 
       // THEN: the server mood fills the store and shows on the calendar, in the
       // month on screen, without navigating.
       await expect(page.getByTestId(`calendar-day-${dateKey}`)).toHaveAttribute('data-has-mood', 'true');
-      await expect(page.getByTestId('calendar-month-header')).toHaveText(header ?? '');
-      await expect
-        .poll(async () => (await ownMoodRows(page)).find((row) => row.date === dateKey)?.synced ?? null)
-        .toBe(true);
+      await expect(page.getByTestId('calendar-month-header')).toHaveText(monthOnScreen);
+      await recurseUntil(
+        async () => (await ownMoodRows(page)).find((row) => row.date === dateKey)?.synced ?? null,
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
     } finally {
       const { error } = await supabaseAdmin.from('moods').delete().eq('id', moodId);
       expect.soft(error).toBeNull();
     }
   });
 
-  test('partner moods loaded online are listed offline after a reload', async ({
+  test('[P1] partner moods loaded online are listed offline after a reload', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { partnerId } = await resolveOwnPair(supabaseAdmin);
     const note = `partner-copy-e2e-${randomUUID()}`;
@@ -219,12 +253,24 @@ test.describe('Mood history and partner moods offline', () => {
 
     try {
       // GIVEN: the Partner screen loaded online, which saves the copy.
+      const partnerRead = interceptNetworkCall({ method: 'GET', url: partnerMoodListRead(partnerId) });
       await page.goto('/partner');
+      const partnerMoods = await partnerRead;
+      expect(partnerMoods.status).toBe(200);
+      expect(partnerMoods.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ note })])
+      );
       await expect(seededCard).toBeVisible();
-      await expect.poll(async () => (await savedPartnerNotes(page))?.includes(note) ?? false).toBe(true);
+      await recurseUntil(
+        async () => (await savedPartnerNotes(page))?.includes(note) ?? false,
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
 
       // WHEN: the app reloads without a server answer and the device goes
       // offline, then the Partner screen is opened again with nothing in memory.
+      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route(MOODS_REST, (route) => route.abort());
       await page.reload();
       await expect(page.getByTestId('partner-mood-view')).toBeVisible();

@@ -36,6 +36,9 @@ const MOODS_URL = 'https://xojempkrugifnaveqtqc.supabase.co/rest/v1/moods';
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const LOG_TIME = '2026-01-26T23:52:29.297Z';
 const SERVER_ROW_ID = '00000000-0000-4000-8000-0000000000aa';
+// Pinned: the worker skips a token that expires within 300 s of `Date.now()`.
+const NOW = new Date('2026-01-26T12:00:00.000Z');
+const NOW_SEC = NOW.getTime() / 1000; // 1769428800
 
 const globalScope = globalThis as unknown as Record<string, unknown>;
 const fetchMock = vi.fn();
@@ -83,11 +86,12 @@ function pendingMood(overrides: Partial<MoodEntry> = {}): MoodEntry {
 /**
  * Dispatch the Background Sync event sw.ts listens for and await its work.
  *
- * `swallow: false` surfaces the rejection instead of absorbing it — the browser
- * treats a rejected `waitUntil` as "retry this tag", so whether the work
- * rejects is itself behaviour worth asserting.
+ * A rejection surfaces rather than being absorbed — the browser treats a
+ * rejected `waitUntil` as "retry this tag", so whether the work rejects is
+ * itself behaviour worth asserting, and a worker that crashes must fail the
+ * test that fired it. A test that expects the rejection asserts it.
  */
-async function fireBackgroundSync({ swallow = true }: { swallow?: boolean } = {}): Promise<void> {
+async function fireBackgroundSync(): Promise<void> {
   const event = new Event('sync') as Event & {
     tag: string;
     waitUntil: (promise: Promise<unknown>) => void;
@@ -100,10 +104,6 @@ async function fireBackgroundSync({ swallow = true }: { swallow?: boolean } = {}
   };
 
   self.dispatchEvent(event);
-  if (swallow) {
-    await work.catch(() => undefined);
-    return;
-  }
   await work;
 }
 
@@ -129,7 +129,7 @@ describe('service worker mood background sync', () => {
       });
       mockedGetPendingMoods.mockResolvedValue([pendingMood()]);
 
-      await fireBackgroundSync();
+      await expect(fireBackgroundSync()).rejects.toThrow('mood sync lock held by another context');
 
       expect(fetchMock).not.toHaveBeenCalled();
       expect(mockedMarkMoodSynced).not.toHaveBeenCalled();
@@ -151,7 +151,7 @@ describe('service worker mood background sync', () => {
       });
       mockedGetPendingMoods.mockResolvedValue([pendingMood()]);
 
-      await expect(fireBackgroundSync({ swallow: false })).rejects.toThrow(/lock held/);
+      await expect(fireBackgroundSync()).rejects.toThrow(/lock held/);
     });
   });
 
@@ -164,7 +164,7 @@ describe('service worker mood background sync', () => {
       // Nothing landed cleanly, so this must reject: unlike the main thread the
       // worker has no second pass, and the newer value would otherwise sit
       // unsynced until an unrelated trigger fired.
-      await expect(fireBackgroundSync({ swallow: false })).rejects.toThrow(/1 deferred/);
+      await expect(fireBackgroundSync()).rejects.toThrow(/1 deferred/);
 
       // The write did land — the record is pending a newer value, not unwritten.
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -179,35 +179,61 @@ describe('service worker mood background sync', () => {
   });
 
   beforeEach(() => {
+    // Only `Date` is faked; the worker's own awaits need nothing else.
+    vi.setSystemTime(NOW);
     vi.clearAllMocks();
     mockedGetAuthToken.mockResolvedValue({
       id: 'current',
       userId: USER_ID,
       accessToken: 'test-access-token',
       refreshToken: 'test-refresh-token',
-      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      expiresAt: NOW_SEC + 3600,
     });
     mockedMarkMoodSynced.mockResolvedValue('cleared');
   });
 
   afterEach(() => {
     fetchMock.mockReset();
+    vi.useRealTimers();
   });
 
-  it('sends normalized values while retaining failure accounting for invalid siblings', async () => {
-    const invalid = pendingMood({ id: 2, mood: 'unknown', moods: [null] } as unknown as Partial<MoodEntry>);
-    const valid = pendingMood({ mood: 'loved', moods: ['sad', null, 'happy', 'sad'] } as unknown as Partial<MoodEntry>);
-    mockedGetPendingMoods.mockResolvedValue([invalid, valid]);
-    fetchMock.mockResolvedValue(jsonResponse(201, [{ id: SERVER_ROW_ID }]));
-    const postMessage = vi.fn();
-    vi.mocked((globalScope.clients as { matchAll: ReturnType<typeof vi.fn> }).matchAll).mockResolvedValueOnce([{ postMessage }] as unknown as WindowClient[]);
-    await fireBackgroundSync({ swallow: false });
-    expect(postMessage).toHaveBeenCalledWith({ type: 'BACKGROUND_SYNC_COMPLETED', successCount: 1, failCount: 1 });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchCall(0).body).toMatchObject({ user_id: USER_ID, mood_type: 'loved', mood_types: ['sad', 'happy', 'sad'] });
-    expect(mockedMarkMoodSynced).toHaveBeenCalledTimes(1);
-    expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, SERVER_ROW_ID, moodSyncFingerprint(valid));
-    expect(invalid.mood).toBe('unknown');
+  describe('a batch with one invalid sibling', () => {
+    /**
+     * Syncs one mood with no recognized value next to a valid one that needs
+     * normalizing, with one open client listening for the completion message.
+     */
+    async function syncMixedBatch() {
+      const invalid = pendingMood({ id: 2, mood: 'unknown', moods: [null] } as unknown as Partial<MoodEntry>);
+      const valid = pendingMood({ mood: 'loved', moods: ['sad', null, 'happy', 'sad'] } as unknown as Partial<MoodEntry>);
+      mockedGetPendingMoods.mockResolvedValue([invalid, valid]);
+      fetchMock.mockResolvedValue(jsonResponse(201, [{ id: SERVER_ROW_ID }]));
+      const postMessage = vi.fn();
+      vi.mocked((globalScope.clients as { matchAll: ReturnType<typeof vi.fn> }).matchAll).mockResolvedValueOnce([{ postMessage }] as unknown as WindowClient[]);
+      await fireBackgroundSync();
+      return { invalid, valid, postMessage };
+    }
+
+    it('reports one success and one failure to the open clients', async () => {
+      const { postMessage } = await syncMixedBatch();
+      expect(postMessage).toHaveBeenCalledWith({ type: 'BACKGROUND_SYNC_COMPLETED', successCount: 1, failCount: 1 });
+    });
+
+    it('sends only the valid mood, with normalized values', async () => {
+      await syncMixedBatch();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchCall(0).body).toMatchObject({ user_id: USER_ID, mood_type: 'loved', mood_types: ['sad', 'happy', 'sad'] });
+    });
+
+    it('marks only the valid mood synced, under its fingerprint', async () => {
+      const { valid } = await syncMixedBatch();
+      expect(mockedMarkMoodSynced).toHaveBeenCalledTimes(1);
+      expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, SERVER_ROW_ID, moodSyncFingerprint(valid));
+    });
+
+    it('leaves the invalid source row unmodified', async () => {
+      const { invalid } = await syncMixedBatch();
+      expect(invalid.mood).toBe('unknown');
+    });
   });
 
   describe('account scoping', () => {
@@ -250,13 +276,43 @@ describe('service worker mood background sync', () => {
         userId: USER_ID,
         accessToken: 'test-access-token',
         refreshToken: 'test-refresh-token',
-        expiresAt: Math.floor(Date.now() / 1000) - 1,
+        expiresAt: NOW_SEC - 1,
       });
 
       await fireBackgroundSync();
 
       expect(mockedGetPendingMoods).not.toHaveBeenCalled();
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('[token expires within the 5-minute buffer] never reads the moods store', async () => {
+      mockedGetAuthToken.mockResolvedValue({
+        id: 'current',
+        userId: USER_ID,
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: NOW_SEC + 299,
+      });
+
+      await fireBackgroundSync();
+
+      expect(mockedGetPendingMoods).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('[token expires exactly at the 5-minute buffer] reads the moods store', async () => {
+      mockedGetAuthToken.mockResolvedValue({
+        id: 'current',
+        userId: USER_ID,
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: NOW_SEC + 300,
+      });
+      mockedGetPendingMoods.mockResolvedValue([]);
+
+      await fireBackgroundSync();
+
+      expect(mockedGetPendingMoods).toHaveBeenCalledWith(USER_ID);
     });
   });
 

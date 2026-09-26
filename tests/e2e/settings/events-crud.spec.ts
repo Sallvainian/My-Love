@@ -28,8 +28,14 @@ import {
   resolveOwnPair,
   seedEvent,
 } from '../../support/helpers/events';
+import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
+import { EVENTS_WRITE, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
+import { openSettingsFromHome, reloadSettings } from '../../support/helpers/settings-screen';
 import { formatDateLong } from '../../../src/utils/dateUtils';
 import type { Locator, Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
+import type { TypedSupabaseClient } from '../../support/factories';
 
 /**
  * Labels are deliberately unlike any fixed testid on Home — `Wedding` slugifies
@@ -60,26 +66,26 @@ function rowFor(page: Page, label: string) {
  * the text can be up to a second behind the clock the expectation samples.
  */
 async function expectCardCountsDownTo(card: Locator, isoDate: string): Promise<void> {
-  await expect
-    .poll(
-      () =>
-        card.evaluate((element, iso) => {
-          const [year, month, day] = iso.split('-').map(Number);
-          const now = new Date();
-          const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          const target = new Date(year, month - 1, day);
-          const calendarDays = Math.round(
-            (target.getTime() - todayMidnight.getTime()) / 86400000
-          );
-          // Whole days left: the part of today already gone moves to the clock.
-          const intoToday = now.getTime() > todayMidnight.getTime() ? 1 : 0;
-          const days = calendarDays - intoToday;
-          const expected = `${days} ${days === 1 ? 'day' : 'days'}`;
-          return (element.textContent ?? '').includes(expected);
-        }, isoDate),
-      { message: `Home card should be counting down to ${isoDate}` }
-    )
-    .toBe(true);
+  await recurseUntil(
+    () =>
+      card.evaluate((element, iso) => {
+        const [year, month, day] = iso.split('-').map(Number);
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const target = new Date(year, month - 1, day);
+        const calendarDays = Math.round(
+          (target.getTime() - todayMidnight.getTime()) / 86400000
+        );
+        // Whole days left: the part of today already gone moves to the clock.
+        const intoToday = now.getTime() > todayMidnight.getTime() ? 1 : 0;
+        const days = calendarDays - intoToday;
+        const expected = `${days} ${days === 1 ? 'day' : 'days'}`;
+        return (element.textContent ?? '').includes(expected);
+      }, isoDate),
+    (v) => {
+      expect(v, `Home card should be counting down to ${isoDate}`).toBe(true);
+    }
+  );
 }
 
 function longForm(isoDate: string): string {
@@ -97,55 +103,92 @@ test.afterEach(async ({ supabaseAdmin }) => {
   await clearOwnPairEvents(supabaseAdmin);
 });
 
+/**
+ * Open Settings from Home with no event on this worker's couple, and wait for
+ * the empty state.
+ */
+async function openEmptySettings(
+  page: Page,
+  supabaseAdmin: TypedSupabaseClient,
+  interceptNetworkCall: InterceptNetworkCallFn
+): Promise<void> {
+  const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+  // Self-healing against stray rows from a previously failed run, for either
+  // half of the couple — the SELECT policy returns own + partner.
+  await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+  await openSettingsFromHome(page, interceptNetworkCall);
+
+  // The section loads from its own mount effect — Home was never the source.
+  await expect(page.getByTestId('events-settings-empty')).toBeVisible();
+  await expect(page.getByTestId('events-settings-empty-add')).toBeVisible();
+}
+
+/**
+ * Add an event through the Settings empty state, and wait until the server
+ * took it and the list shows it with the form closed. Returns its row.
+ */
+async function addEventFromSettings(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  event: { label: string; date: string; description: string; icon: string }
+): Promise<Locator> {
+  await page.getByTestId('events-settings-empty-add').click();
+  await expect(page.getByTestId('events-form')).toBeVisible();
+
+  await page.getByTestId('events-form-label').fill(event.label);
+  await page.getByTestId('events-form-date').fill(event.date);
+  await page.getByTestId('events-form-description').fill(event.description);
+  // The radio itself is sr-only; the styled label is the control a pointer
+  // user actually hits, and it carries its own testid for exactly this.
+  await page.getByTestId(`events-form-icon-option-${event.icon}`).click();
+  await expect(page.getByTestId(`events-form-icon-${event.icon}`)).toBeChecked();
+
+  // Layer 1 — the write reached the server.
+  const createResponse = interceptNetworkCall({ method: 'POST', url: EVENTS_WRITE });
+  await page.getByTestId('events-form-submit').click();
+  expect((await createResponse).status).toBe(201);
+
+  // Layer 2 and 3 — the store took it and the list shows it, with the form
+  // closed behind it.
+  await expect(page.getByTestId('events-form')).toHaveCount(0);
+  const addedRow = rowFor(page, event.label);
+  await expect(addedRow).toBeVisible();
+  await expect(addedRow).toContainText(longForm(event.date));
+  await expect(addedRow).toContainText(event.description);
+  return addedRow;
+}
+
+/** The event every test below adds, dated 30 days after `anchor`. */
+function tripEvent(anchor: Date) {
+  return {
+    label: ADDED_LABEL,
+    date: isoDateDaysFromNow(30, anchor),
+    description: 'Booked and counting',
+    icon: 'plane',
+  };
+}
+
 test.describe('Managing events from Settings', () => {
-  test('[P0] adds, shows on Home, edits, deletes, and lands on the empty state', async ({
+  test('[P0] adds an event from the empty state and lists it', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    // Self-healing against stray rows from a previously failed run, for either
-    // half of the couple — the SELECT policy returns own + partner.
-    await clearPairEvents(supabaseAdmin, userId, partnerId);
-
-    const anchor = new Date();
-    const addedDate = isoDateDaysFromNow(30, anchor);
-    const editedDate = isoDateDaysFromNow(45, anchor);
-
-    await page.goto('/');
-    await navigateTo(page, 'settings');
-    await expect(page.getByTestId('settings-view')).toBeVisible();
-
-    // The section loads from its own mount effect — Home was never the source.
-    await expect(page.getByTestId('events-settings-empty')).toBeVisible();
-    await expect(page.getByTestId('events-settings-empty-add')).toBeVisible();
+    await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
 
     // ── Add ────────────────────────────────────────────────────────────────
-    await page.getByTestId('events-settings-empty-add').click();
-    await expect(page.getByTestId('events-form')).toBeVisible();
+    await addEventFromSettings(page, interceptNetworkCall, tripEvent(new Date()));
+  });
 
-    await page.getByTestId('events-form-label').fill(ADDED_LABEL);
-    await page.getByTestId('events-form-date').fill(addedDate);
-    await page.getByTestId('events-form-description').fill('Booked and counting');
-    // The radio itself is sr-only; the styled label is the control a pointer
-    // user actually hits, and it carries its own testid for exactly this.
-    await page.getByTestId('events-form-icon-option-plane').click();
-    await expect(page.getByTestId('events-form-icon-plane')).toBeChecked();
-
-    // Layer 1 — the write reached the server.
-    const createResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes('/rest/v1/events') && response.request().method() === 'POST'
-    );
-    await page.getByTestId('events-form-submit').click();
-    expect((await createResponse).status()).toBe(201);
-
-    // Layer 2 and 3 — the store took it and the list shows it, with the form
-    // closed behind it.
-    await expect(page.getByTestId('events-form')).toHaveCount(0);
-    const addedRow = rowFor(page, ADDED_LABEL);
-    await expect(addedRow).toBeVisible();
-    await expect(addedRow).toContainText(longForm(addedDate));
-    await expect(addedRow).toContainText('Booked and counting');
+  test('[P0] an event added in Settings shows on Home with no reload', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const added = tripEvent(new Date());
+    await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
+    await addEventFromSettings(page, interceptNetworkCall, added);
 
     // ── Visible on Home ────────────────────────────────────────────────────
     await navigateTo(page, 'home');
@@ -157,7 +200,23 @@ test.describe('Managing events from Settings', () => {
     // between local midnights. This is the whole date round trip — the
     // <input type="date"> string, the `date` column, and the local-midnight
     // rebuild — pinned to one number.
-    await expectCardCountsDownTo(card, addedDate);
+    await expectCardCountsDownTo(card, added.date);
+  });
+
+  test('[P0] editing an event changes its label and date in the list and on Home', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const anchor = new Date();
+    const added = tripEvent(anchor);
+    const editedDate = isoDateDaysFromNow(45, anchor);
+    await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
+    await addEventFromSettings(page, interceptNetworkCall, added);
+
+    // Premise for the old card's absence below: Home rendered it first.
+    await navigateTo(page, 'home');
+    await expect(page.getByTestId('event-countdown-settings-trip-e2e')).toBeVisible();
 
     // ── Edit ───────────────────────────────────────────────────────────────
     await navigateTo(page, 'settings');
@@ -169,17 +228,14 @@ test.describe('Managing events from Settings', () => {
     // Pre-filled with the same calendar day the row shows — the off-by-one this
     // feature exists to avoid would surface right here.
     await expect(page.getByTestId('events-form-label')).toHaveValue(ADDED_LABEL);
-    await expect(page.getByTestId('events-form-date')).toHaveValue(addedDate);
+    await expect(page.getByTestId('events-form-date')).toHaveValue(added.date);
 
     await page.getByTestId('events-form-label').fill(EDITED_LABEL);
     await page.getByTestId('events-form-date').fill(editedDate);
 
-    const updateResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes('/rest/v1/events') && response.request().method() === 'PATCH'
-    );
+    const updateResponse = interceptNetworkCall({ method: 'PATCH', url: EVENTS_WRITE });
     await page.getByTestId('events-form-submit').click();
-    expect((await updateResponse).status()).toBe(200);
+    expect((await updateResponse).status).toBe(200);
 
     await expect(page.getByTestId('events-form')).toHaveCount(0);
     const editedRow = rowFor(page, EDITED_LABEL);
@@ -196,24 +252,30 @@ test.describe('Managing events from Settings', () => {
     await expect(editedCard.getByText(EDITED_LABEL)).toBeVisible();
     await expectCardCountsDownTo(editedCard, editedDate);
     await expect(page.getByTestId('event-countdown-settings-trip-e2e')).toHaveCount(0);
+  });
 
-    await navigateTo(page, 'settings');
-    const rowToDelete = rowFor(page, EDITED_LABEL);
-    await expect(rowToDelete).toBeVisible();
+  test('[P0] deleting an event behind a confirmation lands on the empty state with its add control', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
+    const rowToDelete = await addEventFromSettings(
+      page,
+      interceptNetworkCall,
+      tripEvent(new Date())
+    );
 
     // ── Delete ─────────────────────────────────────────────────────────────
     await rowToDelete.locator('[data-testid^="event-delete-"]').click();
     await expect(page.getByTestId('events-delete-confirmation')).toBeVisible();
 
-    const deleteResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes('/rest/v1/events') && response.request().method() === 'DELETE'
-    );
+    const deleteResponse = interceptNetworkCall({ method: 'DELETE', url: EVENTS_WRITE });
     await page.getByTestId('events-delete-confirm').click();
-    expect((await deleteResponse).status()).toBe(200);
+    expect((await deleteResponse).status).toBe(200);
 
     await expect(page.getByTestId('events-delete-confirmation')).toHaveCount(0);
-    await expect(rowFor(page, EDITED_LABEL)).toHaveCount(0);
+    await expect(rowFor(page, ADDED_LABEL)).toHaveCount(0);
 
     // ── Empty state, carrying its own add control ──────────────────────────
     await expect(page.getByTestId('events-settings-empty')).toBeVisible();
@@ -223,6 +285,7 @@ test.describe('Managing events from Settings', () => {
   test('[P0] loads the list on a direct reload of /settings, without visiting Home', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // App's loadEvents() effect is gated on Home and the `events` local-copy
     // refresher skips Settings, so without the section's own mount effect a
@@ -241,15 +304,14 @@ test.describe('Managing events from Settings', () => {
       icon: 'calendar',
     });
 
-    await page.goto('/');
-    await navigateTo(page, 'settings');
+    await openSettingsFromHome(page, interceptNetworkCall);
     await page.waitForURL('**/settings');
 
     // The reload is what removes Home from the picture entirely: the app boots
-    // straight onto Settings and never renders the Home view.
-    await page.reload();
-
-    await expect(page.getByTestId('settings-view')).toBeVisible();
+    // straight onto Settings and never renders the Home view. The first visit
+    // saved a copy that renders before the server answers, so the row is read
+    // only after the reload's own read has settled.
+    await reloadSettings(page, interceptNetworkCall);
     const row = rowFor(page, 'Settings Deeplink E2E');
     await expect(row).toBeVisible();
     await expect(row).toContainText(longForm(seededDate));
@@ -259,6 +321,7 @@ test.describe('Managing events from Settings', () => {
   test('[P0] keeps a successful edit when Settings mount returns an older snapshot', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -286,7 +349,9 @@ test.describe('Managing events from Settings', () => {
 
     // Home first populates the real Zustand slice, giving Settings an editable
     // row while its own mount GET is held below.
+    const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await homeRead).status).toBe(200);
     await expect(page.getByTestId('event-countdown-settings-snapshot-before-edit-e2e')).toBeVisible();
 
     let markSnapshotsCaptured: () => void = () => {};
@@ -300,6 +365,7 @@ test.describe('Managing events from Settings', () => {
       releaseSnapshots = resolve;
     });
 
+    // playwright-utils deviation: the route must be installed before the dock navigation to Settings and hold every mount read behind route.fetch until released; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/events*', async (route) => {
       if (route.request().method() !== 'GET') {
         await route.continue();
@@ -335,12 +401,9 @@ test.describe('Managing events from Settings', () => {
     await page.getByTestId('events-form-label').fill('Settings Snapshot After Edit E2E');
     await page.getByTestId('events-form-date').fill(editedDate);
 
-    const updateResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes('/rest/v1/events') && response.request().method() === 'PATCH'
-    );
+    const updateResponse = interceptNetworkCall({ method: 'PATCH', url: EVENTS_WRITE });
     await page.getByTestId('events-form-submit').click();
-    expect((await updateResponse).status()).toBe(200);
+    expect((await updateResponse).status).toBe(200);
 
     await expect(page.getByTestId('events-form')).toHaveCount(0);
     const editedRow = rowFor(page, 'Settings Snapshot After Edit E2E');
@@ -372,6 +435,7 @@ test.describe('Managing events from Settings', () => {
   test('[P0] lists a past event with its controls, where Home hides it', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // Auto-hide is Home's rule alone: Settings is the only place a mistyped
     // year can be seen and corrected, so a past event must be listed AND
@@ -403,13 +467,17 @@ test.describe('Managing events from Settings', () => {
       }),
     ]);
 
+    const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await homeRead).status).toBe(200);
 
     // The witness proves this load landed, so the absence below is a real
     // absence rather than an assertion that beat the fetch.
     await expect(page.getByTestId('event-countdown-settings-witness-e2e')).toBeVisible();
     await expect(page.getByTestId('event-countdown-settings-bygone-e2e')).toHaveCount(0);
-    await expect(page.getByText('Settings Bygone E2E')).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Settings Bygone E2E', {
+      ignoreCase: true,
+    });
 
     await navigateTo(page, 'settings');
     const row = rowFor(page, 'Settings Bygone E2E');
@@ -419,7 +487,11 @@ test.describe('Managing events from Settings', () => {
     await expect(row.locator('[data-testid^="event-delete-"]')).toBeVisible();
   });
 
-  test("[P0] offers no Edit or Delete on a partner's event", async ({ page, supabaseAdmin }) => {
+  test("[P0] offers no Edit or Delete on a partner's event", async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
     // RLS filters a non-creator's write to zero rows, which the service turns
     // into "not yours to edit" — the row is read-only rather than a control
     // that can only ever fail.
@@ -434,8 +506,7 @@ test.describe('Managing events from Settings', () => {
       icon: 'ring',
     });
 
-    await page.goto('/');
-    await navigateTo(page, 'settings');
+    await openSettingsFromHome(page, interceptNetworkCall);
 
     const row = rowFor(page, 'Settings Partner E2E');
     await expect(row).toBeVisible();
@@ -459,8 +530,7 @@ test.describe(
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-      await page.goto('/');
-      await navigateTo(page, 'settings');
+      await openSettingsFromHome(page, interceptNetworkCall);
       await expect(page.getByTestId('events-settings-empty')).toBeVisible();
 
       // Registered before the form is even opened, so the route is in place
@@ -472,12 +542,11 @@ test.describe(
         url: '**/rest/v1/events*',
         fulfillResponse: {
           status: 500,
-          body: {
+          body: createDatabaseErrorEnvelope({
             message: 'Injected create failure',
             details: '',
             hint: '',
-            code: 'XX000',
-          },
+          }),
         },
       });
 

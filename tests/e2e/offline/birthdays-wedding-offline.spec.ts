@@ -14,23 +14,25 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import type { TypedSupabaseClient } from '../../support/factories';
-import { resolveOwnPair } from '../../support/helpers/events';
+import {
+  clockAnchorAvoidingLeapDay,
+  isoBirthdayDaysFromNow,
+  isoDateDaysFromNow,
+  resolveOwnPair,
+} from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import {
+  COUPLE_SETTINGS_READ,
+  OWN_PROFILE_READ,
+  PARTNER_RECORD_READ,
+} from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
 
 function orderedPair(a: string, b: string) {
   return a < b ? { user_a: a, user_b: b } : { user_a: b, user_b: a };
-}
-
-/** A local `YYYY-MM-DD` `days` from today, `yearsBack` years ago; never 29 Feb. */
-function localDateIn(days: number, yearsBack = 0): string {
-  const now = new Date();
-  let d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
-  if (d.getMonth() === 1 && d.getDate() === 29) d = new Date(d.getFullYear(), 2, 1);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear() - yearsBack}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 async function setValues(
@@ -102,28 +104,60 @@ async function goOffline(page: Page, offline: boolean) {
 }
 
 test.describe('Birthdays and wedding date from the local copy', () => {
-  test('the cards from one online session show when the server cannot be reached', async ({
+  test('[P1] the cards from one online session show when the server cannot be reached', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const ids = await resolveOwnPair(supabaseAdmin);
-    const own = localDateIn(5, 31);
-    const partner = localDateIn(10, 30);
-    const wedding = localDateIn(40);
+    // The day counts below are measured from the page clock, pinned to the
+    // anchor the dates are built from; the reload keeps it.
+    const anchor = clockAnchorAvoidingLeapDay([5, 10, 40]);
+    const own = isoBirthdayDaysFromNow(5, 31, anchor);
+    const partner = isoBirthdayDaysFromNow(10, 30, anchor);
+    const wedding = isoDateDaysFromNow(40, anchor);
     await setValues(supabaseAdmin, ids, { own, partner, wedding });
 
     try {
       // GIVEN: one online session loads all three, which saves the copies.
+      await page.clock.install({ time: anchor });
+      const profileRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
+      const partnerRead = interceptNetworkCall({ method: 'GET', url: PARTNER_RECORD_READ });
+      const coupleRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
       await page.goto('/');
-      await expect.poll(() => savedCopy(page, 'profile')).toMatchObject({ birthday: own });
-      await expect
-        .poll(() => savedCopy(page, 'partner'))
-        .toMatchObject({ status: 'linked', partner: { birthday: partner } });
-      await expect
-        .poll(() => savedCopy(page, 'couple-settings'))
-        .toMatchObject({ status: 'linked', weddingDate: wedding });
+      const [profile, partnerRecord, couple] = await Promise.all([
+        profileRead,
+        partnerRead,
+        coupleRead,
+      ]);
+      expect(profile.status).toBe(200);
+      // `maybeSingle` reads come back as a one-row array; `single` as the row.
+      expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
+      expect(partnerRecord.status).toBe(200);
+      expect(partnerRecord.responseJson).toMatchObject({ id: ids.partnerId, birthday: partner });
+      expect(couple.status).toBe(200);
+      expect(couple.responseJson).toEqual([expect.objectContaining({ wedding_date: wedding })]);
+      await recurseUntil(
+        () => savedCopy(page, 'profile'),
+        (v) => {
+          expect(v).toMatchObject({ birthday: own });
+        }
+      );
+      await recurseUntil(
+        () => savedCopy(page, 'partner'),
+        (v) => {
+          expect(v).toMatchObject({ status: 'linked', partner: { birthday: partner } });
+        }
+      );
+      await recurseUntil(
+        () => savedCopy(page, 'couple-settings'),
+        (v) => {
+          expect(v).toMatchObject({ status: 'linked', weddingDate: wedding });
+        }
+      );
 
       // WHEN: the app opens again with the server unreachable, then offline.
+      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route('**/rest/v1/**', (route) => route.abort());
       await page.reload();
       await expect(page.getByTestId('app-container')).toBeVisible();
@@ -153,16 +187,21 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     }
   });
 
-  test('an offline birthday edit is refused with a needs-a-connection message and changes nothing', async ({
+  test('[P1] an offline birthday edit is refused with a needs-a-connection message and changes nothing', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const ids = await resolveOwnPair(supabaseAdmin);
-    const own = localDateIn(20, 29);
+    const own = isoBirthdayDaysFromNow(20, 29, clockAnchorAvoidingLeapDay([20]));
     await setValues(supabaseAdmin, ids, { own, partner: null, wedding: null });
 
     try {
+      const profileRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
       await page.goto('/');
+      const profile = await profileRead;
+      expect(profile.status).toBe(200);
+      expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
       await navigateTo(page, 'settings');
       const dateInput = page.getByTestId('settings-birthday-date');
       await expect(dateInput).toHaveValue(own);
@@ -176,7 +215,12 @@ test.describe('Birthdays and wedding date from the local copy', () => {
       expect(
         await page.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday)
       ).toBe(own);
-      expect(await savedCopy(page, 'profile')).toMatchObject({ birthday: own });
+      await recurseUntil(
+        () => savedCopy(page, 'profile'),
+        (v) => {
+          expect(v).toMatchObject({ birthday: own });
+        }
+      );
       const { data, error } = await supabaseAdmin
         .from('users')
         .select('birthday')

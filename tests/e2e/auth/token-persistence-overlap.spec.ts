@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Browser, Page, TestInfo } from '@playwright/test';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import type {
   PersistenceEvidence,
@@ -23,8 +25,168 @@ const runtime = {
   authJs: version('@supabase/auth-js'),
   vite: version('vite'),
 };
-const scenarios: PersistenceScenario[] = [
-  'sequential', 'local-actions', 'stale-clear', 'stale-overwrite', 'stale-resurrection', 'same-owner-refresh',
+type Token = PersistenceEvidence['finalToken'];
+type Method = 'put' | 'delete' | 'get';
+
+/**
+ * What one scenario's native trace must contain, pinned from observed runs.
+ *
+ * Every list is asserted whole before any loop walks it, so a trace that lost
+ * its dispatches, actions or notifications fails on the count instead of
+ * running the ordering checks zero times.
+ */
+type Expected = {
+  /** Every persistence dispatch, in trace order, with its IndexedDB method. */
+  dispatches: Array<[actor: string, method: Method]>;
+  /** Transactions created in total: one per dispatch, plus the blocker's when there is one. */
+  transactionsCreated: number;
+  actionsStarted: string[];
+  notifications: string[];
+  /** The distinct `owner/version` labels any trace row carries, sorted. */
+  tokenLabels: string[];
+  /** Committed non-read writes, in commit order. */
+  writes: Array<[actor: string, method: Method, token: Token]>;
+  checkpoints: PersistenceEvidence['checkpoints'];
+  finalToken: Token;
+};
+
+type OverlapExpected = Expected & {
+  scenario: Exclude<PersistenceScenario, 'sequential'>;
+  /** The action whose writes queue behind the blocker. */
+  older: string;
+  /** The notification that arrives while the older write is held. */
+  newer: string;
+};
+
+const A1 = { owner: 'A', version: 'v1' } as const;
+const A2 = { owner: 'A', version: 'v2' } as const;
+const B1 = { owner: 'B', version: 'v1' } as const;
+
+const sequential: Expected = {
+  dispatches: [
+    ['sign-in-A-listener', 'put'], ['sign-in-A', 'put'], ['after-sign-in', 'get'],
+    ['sign-out-listener', 'delete'], ['sign-out', 'delete'], ['final', 'get'],
+  ],
+  transactionsCreated: 6,
+  actionsStarted: ['sign-in-A', 'sign-out'],
+  notifications: ['sign-in-A-listener', 'sign-out-listener'],
+  tokenLabels: ['A/v1'],
+  writes: [
+    ['sign-in-A-listener', 'put', A1],
+    ['sign-in-A', 'put', A1],
+    ['sign-out-listener', 'delete', null],
+    ['sign-out', 'delete', null],
+  ],
+  checkpoints: [
+    { name: 'after-sign-in', token: A1 },
+    { name: 'final', token: null },
+  ],
+  finalToken: null,
+};
+
+const overlapping: OverlapExpected[] = [
+  {
+    scenario: 'local-actions',
+    dispatches: [
+      ['seed-A', 'put'], ['before-overlap', 'get'], ['sign-out-listener', 'delete'], ['sign-out', 'delete'],
+      ['sign-in-B', 'put'], ['sign-in-B-listener', 'put'], ['final', 'get'],
+    ],
+    transactionsCreated: 8,
+    actionsStarted: ['sign-out', 'sign-in-B'],
+    notifications: ['seed-A', 'sign-out-listener', 'sign-in-B-listener'],
+    tokenLabels: ['A/v1', 'B/v1'],
+    writes: [
+      ['seed-A', 'put', A1],
+      ['sign-out-listener', 'delete', null],
+      ['sign-out', 'delete', null],
+      ['sign-in-B', 'put', B1],
+      ['sign-in-B-listener', 'put', B1],
+    ],
+    checkpoints: [
+      { name: 'before-overlap', token: A1 },
+      { name: 'final', token: B1 },
+    ],
+    finalToken: B1,
+    older: 'sign-out',
+    newer: 'sign-in-B-listener',
+  },
+  {
+    scenario: 'stale-clear',
+    dispatches: [
+      ['seed-A', 'put'], ['before-overlap', 'get'], ['sign-out-listener', 'delete'], ['sign-out', 'delete'],
+      ['independent-B', 'put'], ['final', 'get'],
+    ],
+    transactionsCreated: 7,
+    actionsStarted: ['sign-out'],
+    notifications: ['seed-A', 'sign-out-listener', 'independent-B'],
+    tokenLabels: ['A/v1', 'B/v1'],
+    writes: [
+      ['seed-A', 'put', A1],
+      ['sign-out-listener', 'delete', null],
+      ['sign-out', 'delete', null],
+      ['independent-B', 'put', B1],
+    ],
+    checkpoints: [
+      { name: 'before-overlap', token: A1 },
+      { name: 'final', token: B1 },
+    ],
+    finalToken: B1,
+    older: 'sign-out',
+    newer: 'independent-B',
+  },
+  {
+    scenario: 'stale-overwrite',
+    dispatches: [['sign-in-A-listener', 'put'], ['sign-in-A', 'put'], ['independent-B', 'put'], ['final', 'get']],
+    transactionsCreated: 5,
+    actionsStarted: ['sign-in-A'],
+    notifications: ['sign-in-A-listener', 'independent-B'],
+    tokenLabels: ['A/v1', 'B/v1'],
+    writes: [
+      ['sign-in-A-listener', 'put', A1],
+      ['sign-in-A', 'put', A1],
+      ['independent-B', 'put', B1],
+    ],
+    checkpoints: [{ name: 'final', token: B1 }],
+    finalToken: B1,
+    older: 'sign-in-A',
+    newer: 'independent-B',
+  },
+  {
+    scenario: 'stale-resurrection',
+    dispatches: [
+      ['sign-in-A-listener', 'put'], ['sign-in-A', 'put'], ['independent-sign-out', 'delete'], ['final', 'get'],
+    ],
+    transactionsCreated: 5,
+    actionsStarted: ['sign-in-A'],
+    notifications: ['sign-in-A-listener', 'independent-sign-out'],
+    tokenLabels: ['A/v1'],
+    writes: [
+      ['sign-in-A-listener', 'put', A1],
+      ['sign-in-A', 'put', A1],
+      ['independent-sign-out', 'delete', null],
+    ],
+    checkpoints: [{ name: 'final', token: null }],
+    finalToken: null,
+    older: 'sign-in-A',
+    newer: 'independent-sign-out',
+  },
+  {
+    scenario: 'same-owner-refresh',
+    dispatches: [['sign-in-A-listener', 'put'], ['sign-in-A', 'put'], ['refresh-A-v2', 'put'], ['final', 'get']],
+    transactionsCreated: 5,
+    actionsStarted: ['sign-in-A'],
+    notifications: ['sign-in-A-listener', 'refresh-A-v2'],
+    tokenLabels: ['A/v1', 'A/v2'],
+    writes: [
+      ['sign-in-A-listener', 'put', A1],
+      ['sign-in-A', 'put', A1],
+      ['refresh-A-v2', 'put', A2],
+    ],
+    checkpoints: [{ name: 'final', token: A2 }],
+    finalToken: A2,
+    older: 'sign-in-A',
+    newer: 'refresh-A-v2',
+  },
 ];
 
 function entry(trace: PersistenceTraceEntry[], actor: string, phase: string) {
@@ -33,12 +195,13 @@ function entry(trace: PersistenceTraceEntry[], actor: string, phase: string) {
   return matches[0];
 }
 
-function assertNativeEvidence(evidence: PersistenceEvidence) {
+function assertNativeEvidence(evidence: PersistenceEvidence, expected: Expected) {
   const { trace } = evidence;
   expect(evidence.errors).toEqual([]);
   expect(evidence.cleanup).toEqual({ drained: true, restored: true, databaseDeleted: true });
   expect(trace.map((row) => row.sequence)).toEqual(trace.map((_row, index) => index + 1));
   const dispatches = trace.filter((row) => row.phase === 'persistence-dispatched');
+  expect(dispatches.map((row) => [row.actor, row.method])).toEqual(expected.dispatches);
   for (const dispatch of dispatches) {
     const phases = [
       'persistence-dispatched', 'open-success', 'transaction-created',
@@ -50,16 +213,24 @@ function assertNativeEvidence(evidence: PersistenceEvidence) {
     expect(new Set(rows.slice(2).map((row) => row.transaction)).size).toBe(1);
     const closed = entry(trace, dispatch.actor, 'connection-closed');
     expect(closed.sequence).toBeGreaterThan(entry(trace, dispatch.actor, 'request-success').sequence);
-    if (dispatch.method !== 'get') {
-      expect(closed.sequence).toBeGreaterThan(entry(trace, dispatch.actor, 'native-complete').sequence);
-    }
+  }
+  // A write's connection closes only after it commits. A read's may close
+  // first: `db.get` does not await `tx.done` (src/sw-db.ts), so reads are left
+  // out of this check by the pinned dispatch list, not by a runtime branch.
+  const writeDispatches = dispatches.filter((row) => row.method !== 'get');
+  expect(writeDispatches).toHaveLength(expected.dispatches.filter(([, method]) => method !== 'get').length);
+  for (const dispatch of writeDispatches) {
+    expect(entry(trace, dispatch.actor, 'connection-closed').sequence)
+      .toBeGreaterThan(entry(trace, dispatch.actor, 'native-complete').sequence);
   }
   const creations = trace.filter((row) => row.phase === 'transaction-created');
   const commits = trace.filter((row) => row.phase === 'native-complete');
-  expect(creations).toHaveLength(dispatches.length + (evidence.scenario === 'sequential' ? 0 : 1));
+  expect(creations).toHaveLength(expected.transactionsCreated);
   // The characterization must not depend on inverted native transaction order.
   expect(commits.map((row) => row.transaction)).toEqual(creations.map((row) => row.transaction));
-  for (const action of trace.filter((row) => row.phase === 'action-started')) {
+  const actions = trace.filter((row) => row.phase === 'action-started');
+  expect(actions.map((row) => row.actor)).toEqual(expected.actionsStarted);
+  for (const action of actions) {
     const callback = action.actor + '-listener';
     const commit = entry(trace, callback, 'native-complete');
     const notification = entry(trace, callback, 'notification-complete');
@@ -72,6 +243,7 @@ function assertNativeEvidence(evidence: PersistenceEvidence) {
       .toBeGreaterThan(entry(trace, action.actor, 'native-complete').sequence);
   }
   const notifications = trace.filter((row) => row.phase === 'notification-dispatched');
+  expect(notifications.map((row) => row.actor)).toEqual(expected.notifications);
   for (const notification of notifications) {
     expect(entry(trace, notification.actor, 'identity-delivered').sequence)
       .toBeLessThan(entry(trace, notification.actor, 'persistence-dispatched').sequence);
@@ -81,7 +253,7 @@ function assertNativeEvidence(evidence: PersistenceEvidence) {
   // Listener writes share one subscription queue: each dispatches only after
   // the previous one commits, so they commit in notification arrival order.
   const listenerCommits = trace.filter((row) => row.source === 'listener' && row.phase === 'native-complete');
-  expect(listenerCommits.map((row) => row.actor)).toEqual(notifications.map((row) => row.actor));
+  expect(listenerCommits.map((row) => row.actor)).toEqual(expected.notifications);
   for (let index = 1; index < notifications.length; index += 1) {
     expect(entry(trace, notifications[index].actor, 'persistence-dispatched').sequence)
       .toBeGreaterThan(entry(trace, notifications[index - 1].actor, 'native-complete').sequence);
@@ -91,64 +263,86 @@ function assertNativeEvidence(evidence: PersistenceEvidence) {
     expect(Object.keys(row).every((key) => [
       'sequence', 'phase', 'actor', 'source', 'method', 'token', 'event', 'operation', 'transaction',
     ].includes(key))).toBe(true);
-    if (row.token) {
-      expect(Object.keys(row.token).sort()).toEqual(['owner', 'version']);
-      expect(['A', 'B']).toContain(row.token.owner);
-      expect(['v1', 'v2']).toContain(row.token.version);
-    }
   }
+  const tokenRows = trace.flatMap((row) => (row.token ? [row.token] : []));
+  expect([...new Set(tokenRows.map((token) => token.owner + '/' + token.version))].sort())
+    .toEqual(expected.tokenLabels);
+  for (const token of tokenRows) {
+    expect(Object.keys(token).sort()).toEqual(['owner', 'version']);
+  }
+  const writes = trace.filter((row) => row.phase === 'native-complete' && row.source !== 'blocker' && row.method !== 'get');
+  expect(writes.map((row) => [row.actor, row.method, row.token])).toEqual(expected.writes);
+  expect(evidence.checkpoints).toEqual(expected.checkpoints);
+  expect(evidence.finalToken).toEqual(expected.finalToken);
 }
 
-for (const scenario of scenarios) {
-  test('characterizes native auth token persistence: ' + scenario, async ({ page, browser, baseURL }, testInfo) => {
-    if (!baseURL) throw new Error('Missing harness origin');
-    let externalRequests = 0;
-    let pageErrors = 0;
-    const origin = new URL(baseURL).origin;
-    page.on('pageerror', () => { pageErrors += 1; });
-    // No synthetic token may reach a server, including if an SDK implementation
-    // changes. Count unexpected attempts without retaining headers or URLs.
-    await page.route('**/*', async (route) => {
-      if (new URL(route.request().url()).origin !== origin) {
-        externalRequests += 1;
-        await route.abort();
-      } else await route.continue();
-    });
-    await page.goto(baseURL + '/tests/support/harnesses/auth-token-persistence.html');
-    await expect.poll(() => page.evaluate(() => !!window.__authTokenPersistence)).toBe(true);
-    const evidence = await page.evaluate((name) => window.__authTokenPersistence!.run(name), scenario);
-    const document = {
-      formatVersion: 1,
-      runtime: { ...runtime, chromium: browser.version() },
-      externalRequests,
-      pageErrors,
-      ...evidence,
-    };
-    const json = JSON.stringify(document, null, 2) + '\n';
-    await testInfo.attach(scenario + '-native-trace', { body: json, contentType: 'application/json' });
-    assertNativeEvidence(evidence);
-    expect(externalRequests).toBe(0);
-    expect(pageErrors).toBe(0);
-    expect(await page.evaluate(() => window.__authTokenPersistence === undefined)).toBe(true);
+/**
+ * Runs one scenario in the harness page, attaches its trace, and checks what
+ * every scenario shares. Returns the evidence for the scenario's own checks.
+ */
+async function runScenario(
+  { page, browser, baseURL }: { page: Page; browser: Browser; baseURL: string | undefined },
+  testInfo: TestInfo,
+  scenario: PersistenceScenario,
+  expected: Expected
+): Promise<PersistenceEvidence> {
+  if (!baseURL) throw new Error('Missing harness origin');
+  let externalRequests = 0;
+  let pageErrors = 0;
+  const origin = new URL(baseURL).origin;
+  page.on('pageerror', () => { pageErrors += 1; });
+  // No synthetic token may reach a server, including if an SDK implementation
+  // changes. Count unexpected attempts without retaining headers or URLs.
+  // playwright-utils deviation: the route must be installed before the next navigation and count every request the page makes; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+  await page.route('**/*', async (route) => {
+    if (new URL(route.request().url()).origin !== origin) {
+      externalRequests += 1;
+      await route.abort();
+    } else await route.continue();
+  });
+  await page.goto(baseURL + '/tests/support/harnesses/auth-token-persistence.html');
+  await recurseUntil(
+    () => page.evaluate(() => !!window.__authTokenPersistence),
+    (v) => {
+      expect(v).toBe(true);
+    }
+  );
+  const evidence = await page.evaluate((name) => window.__authTokenPersistence!.run(name), scenario);
+  const document = {
+    formatVersion: 1,
+    runtime: { ...runtime, chromium: browser.version() },
+    externalRequests,
+    pageErrors,
+    ...evidence,
+  };
+  const json = JSON.stringify(document, null, 2) + '\n';
+  await testInfo.attach(scenario + '-native-trace', { body: json, contentType: 'application/json' });
+  expect(evidence.scenario).toBe(scenario);
+  assertNativeEvidence(evidence, expected);
+  expect(externalRequests).toBe(0);
+  expect(pageErrors).toBe(0);
+  expect(await page.evaluate(() => window.__authTokenPersistence === undefined)).toBe(true);
 
-    const { trace } = evidence;
-    const writes = trace.filter((row) => row.phase === 'native-complete' && row.source !== 'blocker' && row.method !== 'get');
-    if (scenario === 'sequential') {
-      expect(writes.map((row) => [row.actor, row.method, row.token])).toEqual([
-        ['sign-in-A-listener', 'put', { owner: 'A', version: 'v1' }],
-        ['sign-in-A', 'put', { owner: 'A', version: 'v1' }],
-        ['sign-out-listener', 'delete', null],
-        ['sign-out', 'delete', null],
-      ]);
-      expect(evidence.checkpoints).toEqual([
-        { name: 'after-sign-in', token: { owner: 'A', version: 'v1' } },
-        { name: 'final', token: null },
-      ]);
-    } else {
-      const older = scenario === 'local-actions' || scenario === 'stale-clear' ? 'sign-out' : 'sign-in-A';
-      const newer = scenario === 'local-actions' ? 'sign-in-B-listener'
-        : scenario === 'same-owner-refresh' ? 'refresh-A-v2'
-          : scenario === 'stale-resurrection' ? 'independent-sign-out' : 'independent-B';
+  // Ordinary E2E runs attach JSON only. The isolated config opts into retaining
+  // passing evidence alongside this bundle's report, with no shared output file.
+  const evidenceDirectory = testInfo.config.metadata.dw79EvidenceDirectory;
+  if (typeof evidenceDirectory === 'string') {
+    await mkdir(evidenceDirectory, { recursive: true });
+    await writeFile(join(evidenceDirectory, scenario + '.json'), json);
+  }
+  return evidence;
+}
+
+test.describe('Native auth token persistence', () => {
+  test('[P2] characterizes native auth token persistence: sequential', async ({ page, browser, baseURL }, testInfo) => {
+    await runScenario({ page, browser, baseURL }, testInfo, 'sequential', sequential);
+  });
+
+  for (const expected of overlapping) {
+    const { scenario, older, newer } = expected;
+    test('[P2] characterizes native auth token persistence: ' + scenario, async ({ page, browser, baseURL }, testInfo) => {
+      const { trace } = await runScenario({ page, browser, baseURL }, testInfo, scenario, expected);
+
       const blocker = entry(trace, 'blocker', 'transaction-created');
       const release = entry(trace, 'blocker', 'blocker-released');
       // Both older writes queue behind the blocker; the SDK returned without them.
@@ -164,23 +358,8 @@ for (const scenario of scenarios) {
       expect(entry(trace, newer, 'identity-delivered').sequence).toBeLessThan(release.sequence);
       expect(entry(trace, newer, 'persistence-dispatched').sequence)
         .toBeGreaterThan(entry(trace, older + '-listener', 'native-complete').sequence);
-      const expectedActors = scenario === 'local-actions'
-        ? ['seed-A', 'sign-out-listener', 'sign-out', 'sign-in-B', newer]
-        : scenario === 'stale-clear' ? ['seed-A', 'sign-out-listener', 'sign-out', newer]
-          : ['sign-in-A-listener', 'sign-in-A', newer];
-      expect(writes.map((row) => row.actor)).toEqual(expectedActors);
       // The newest auth event now owns the stored token in every schedule.
-      expect(evidence.finalToken).toEqual(scenario === 'same-owner-refresh'
-        ? { owner: 'A', version: 'v2' }
-        : scenario === 'stale-resurrection' ? null : { owner: 'B', version: 'v1' });
-      expect(entry(trace, newer, 'native-complete').token).toEqual(evidence.finalToken);
-    }
-    // Ordinary E2E runs attach JSON only. The isolated config opts into retaining
-    // passing evidence alongside this bundle's report, with no shared output file.
-    const evidenceDirectory = testInfo.config.metadata.dw79EvidenceDirectory;
-    if (typeof evidenceDirectory === 'string') {
-      await mkdir(evidenceDirectory, { recursive: true });
-      await writeFile(join(evidenceDirectory, scenario + '.json'), json);
-    }
-  });
-}
+      expect(entry(trace, newer, 'native-complete').token).toEqual(expected.finalToken);
+    });
+  }
+});

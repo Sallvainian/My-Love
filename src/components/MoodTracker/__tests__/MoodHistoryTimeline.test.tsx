@@ -6,7 +6,7 @@
  * across renders.
  */
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseMood } from '../../../api/validation/supabaseSchemas';
 
 vi.mock('../../../hooks/useMoodHistory', () => ({
@@ -19,6 +19,11 @@ import { MoodHistoryTimeline, TimelineRow } from '../MoodHistoryTimeline';
 const mockedUseMoodHistory = vi.mocked(useMoodHistory);
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
+
+// The day labels are relative to the clock, so it is pinned late in the day:
+// every fixture below is an earlier instant on a fixed calendar day, built
+// from local components under the suite's pinned zone.
+const NOW = new Date(2026, 8, 25, 21, 0, 0);
 
 function mood(id: number, createdAt: string, note: string | null = null): SupabaseMood {
   return {
@@ -46,13 +51,16 @@ function historyOf(moods: SupabaseMood[]): ReturnType<typeof useMoodHistory> {
 describe('MoodHistoryTimeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('[B: two genuine moods on one day] renders both under a single date header', () => {
-    const morning = new Date();
-    morning.setHours(8, 30, 0, 0);
-    const evening = new Date();
-    evening.setHours(20, 15, 0, 0);
+    const morning = new Date(2026, 8, 25, 8, 30);
+    const evening = new Date(2026, 8, 25, 20, 15);
 
     mockedUseMoodHistory.mockReturnValue(
       historyOf([
@@ -64,14 +72,15 @@ describe('MoodHistoryTimeline', () => {
     render(<MoodHistoryTimeline userId={USER_ID} />);
 
     expect(screen.getAllByTestId('mood-history-item')).toHaveLength(2);
-    expect(screen.getAllByText('Today')).toHaveLength(1);
-    expect(screen.getByText('evening')).toBeInTheDocument();
-    expect(screen.getByText('morning')).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: 'Today' })).toHaveLength(1);
+    expect(screen.getAllByTestId('mood-note').map((n) => n.textContent).sort()).toEqual([
+      'evening',
+      'morning',
+    ]);
   });
 
   it('[B: two genuine moods on one day] keeps rows separate when they share a timestamp', () => {
-    const sameInstant = new Date();
-    sameInstant.setHours(12, 0, 0, 0);
+    const sameInstant = new Date(2026, 8, 25, 12, 0);
 
     mockedUseMoodHistory.mockReturnValue(
       historyOf([
@@ -83,12 +92,27 @@ describe('MoodHistoryTimeline', () => {
     render(<MoodHistoryTimeline userId={USER_ID} />);
 
     expect(screen.getAllByTestId('mood-history-item')).toHaveLength(2);
-    expect(screen.getAllByText('Today')).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { name: 'Today' })).toHaveLength(1);
   });
 
-  it('renders a date header row through the module-scope row component', () => {
-    const today = new Date();
-    today.setHours(9, 0, 0, 0);
+  it('labels a mood from the previous calendar day Yesterday, under its own header', () => {
+    mockedUseMoodHistory.mockReturnValue(
+      historyOf([
+        mood(1, new Date(2026, 8, 25, 8, 30).toISOString(), 'this morning'),
+        mood(2, new Date(2026, 8, 24, 22, 0).toISOString(), 'last night'),
+      ])
+    );
+
+    render(<MoodHistoryTimeline userId={USER_ID} />);
+
+    expect(screen.getAllByTestId('mood-history-item')).toHaveLength(2);
+    // Date headers only: the row itself also shows a relative time.
+    expect(screen.getAllByRole('heading', { name: 'Today' })).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { name: 'Yesterday' })).toHaveLength(1);
+  });
+
+  it('renders the date header row and the mood row', () => {
+    const today = new Date(2026, 8, 25, 9, 0);
 
     const items = [
       { type: 'date-header' as const, date: today.toDateString(), dateLabel: 'Today' },
@@ -114,7 +138,7 @@ describe('MoodHistoryTimeline', () => {
       </>
     );
 
-    expect(screen.getByText('Today')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Today' })).toBeInTheDocument();
     expect(screen.getByTestId('mood-history-item')).toBeInTheDocument();
   });
 });

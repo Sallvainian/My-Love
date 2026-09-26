@@ -30,8 +30,8 @@
  * See
  * `_bmad-output/test-artifacts/automation-summary-epic-dw-events-offline-message-honesty.md`.
  */
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import { describe, it, expect } from 'vitest';
 
@@ -124,12 +124,41 @@ function readModule(relativePath: string): string {
   return readFileSync(absolute, 'utf8');
 }
 
+/**
+ * Every non-test `.ts`/`.tsx` module under `src/`, as repo-relative paths with
+ * forward slashes. Tests are skipped because they may import either symbol to
+ * assert on its message.
+ */
+function sourceModules(): string[] {
+  const entries = readdirSync(resolve(REPO_ROOT, 'src'), { recursive: true, encoding: 'utf8' });
+  return entries
+    .map((entry) => join('src', entry).split('\\').join('/'))
+    .filter((path) => /\.tsx?$/.test(path))
+    .filter((path) => !path.includes('/__tests__/') && !/\.test\.tsx?$/.test(path));
+}
+
 describe('offline-message honesty', () => {
   describe('the detector', () => {
     // Nothing below this block means anything if these three fail.
-    it('covers every module in the list', () => {
-      expect(SUPABASE_ONLY_MODULES.length).toBeGreaterThan(0);
-      expect(OFFLINE_FIRST_IMPORTERS.length).toBeGreaterThan(0);
+    it('covers every module in the list and finds every named importer in src', () => {
+      // Exact counts, not just non-empty: an emptied list would make its
+      // `it.each` register zero tests and pass silently.
+      expect(SUPABASE_ONLY_MODULES).toHaveLength(6);
+      expect(OFFLINE_FIRST_IMPORTERS).toHaveLength(3);
+
+      // The positive-control list must be the whole set of named importers
+      // (`import { a } from`, the only form `importedNames` reads — see the
+      // static-scan note in the header), so a new module importing either
+      // symbol that way fails here until someone decides which list it
+      // belongs on.
+      const importers = sourceModules()
+        .filter((path) => {
+          const imported = importedNames(readFileSync(resolve(REPO_ROOT, path), 'utf8'));
+          return SYNC_PROMISING_SYMBOLS.some((symbol) => imported.has(symbol));
+        })
+        .sort();
+
+      expect(importers).toEqual(OFFLINE_FIRST_IMPORTERS.map(({ file }) => file).sort());
     });
 
     it.each(OFFLINE_FIRST_IMPORTERS)(

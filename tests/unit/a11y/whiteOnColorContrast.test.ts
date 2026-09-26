@@ -640,12 +640,12 @@ describe('white text on a coloured background clears WCAG AA', () => {
       failingByKey.set(key, (failingByKey.get(key) ?? 0) + 1);
     }
 
-    for (const [key, expected] of KNOWN_BELOW_FLOOR) {
-      expect(
-        failingByKey.get(key),
-        `${key} is allowlisted for ${expected.count} pairing(s); if that has changed, update or remove the entry`
-      ).toBe(expected.count);
-    }
+    // Compared as whole maps, so the check still runs while the allowlist is
+    // empty: an entry whose pairings are gone, or whose count changed, fails.
+    expect(
+      failingByKey,
+      'white-on-color failures must match the allowlist exactly: an allowlisted file:swatch whose failure count changed or is gone needs its entry updated or removed, and a new failure that is not allowlisted must be fixed'
+    ).toEqual(new Map([...KNOWN_BELOW_FLOOR].map(([key, expected]) => [key, expected.count])));
 
     // Same rule for the gradient idiom: fix some of the ten and this fails
     // until the count is corrected or the entry removed.
@@ -654,11 +654,9 @@ describe('white text on a coloured background clears WCAG AA', () => {
       if (pairing.kind !== 'gradient' || pairing.ratio >= AA_NORMAL_TEXT) continue;
       failingStops.set(pairing.swatch, (failingStops.get(pairing.swatch) ?? 0) + 1);
     }
-    for (const [swatch, expected] of KNOWN_GRADIENT_BELOW_FLOOR) {
-      expect(
-        failingStops.get(swatch),
-        `${swatch} is allowlisted as a gradient stop in ${expected} place(s)`
-      ).toBe(expected);
-    }
+    expect(
+      failingStops,
+      'gradient-stop failures must match the allowlist exactly: an allowlisted stop whose failure count changed or is gone needs its entry updated or removed, and a new failing stop that is not allowlisted must be fixed'
+    ).toEqual(new Map(KNOWN_GRADIENT_BELOW_FLOOR));
   });
 });

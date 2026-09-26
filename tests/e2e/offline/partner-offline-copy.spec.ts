@@ -8,7 +8,10 @@
  * data may be out of date rather than promising a sync.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import { partnerRecordRead } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import type { Page } from '@playwright/test';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -46,18 +49,25 @@ async function partnerCopySaved(page: Page): Promise<boolean> {
 }
 
 test.describe('Partner profile offline', () => {
-  test('a linked user sees the saved partner offline, never the Connect UI', async ({
+  test('[P1] a linked user sees the saved partner offline, never the Connect UI', async ({
     page,
     context,
+    supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // GIVEN: the partner view loaded online, which saves the partner copy.
+    const { partnerId } = await resolveOwnPair(supabaseAdmin);
+    const partnerRead = interceptNetworkCall({ method: 'GET', url: partnerRecordRead(partnerId) });
     await page.goto('/partner');
-    const heading = page.getByTestId('partner-mood-view').getByRole('heading', { level: 1 });
-    await expect(page.getByTestId('partner-mood-refresh-button')).toBeVisible();
-    const partnerName = (await heading.textContent())?.trim() ?? '';
+    const partnerRecord = await partnerRead;
+    expect(partnerRecord.status).toBe(200);
+    const partnerName = ((partnerRecord.responseJson as { display_name: string | null } | null)
+      ?.display_name ?? '').trim();
     expect(partnerName).not.toBe('');
-    expect(partnerName).not.toBe('Connect with Your Partner');
-    await expect.poll(() => partnerCopySaved(page)).toBe(true);
+    const heading = page.getByTestId('partner-mood-view').getByRole('heading', { level: 1 });
+    await expect(heading).toHaveText(partnerName);
+    await expect(page.getByTestId('partner-mood-refresh-button')).toBeVisible();
+    await recurseUntil(() => partnerCopySaved(page), (v) => { expect(v).toBe(true); });
 
     try {
       // WHEN: the device goes offline and the user leaves the view.
@@ -73,7 +83,9 @@ test.describe('Partner profile offline', () => {
 
       // THEN: the saved partner is shown, not the Connect UI or a load error.
       await expect(heading).toHaveText(partnerName);
-      await expect(page.getByText('Connect with Your Partner')).toHaveCount(0);
+      await expect(
+        page.getByRole('heading', { level: 1, name: 'Connect with Your Partner' })
+      ).toHaveCount(0);
       await expect(page.getByTestId('partner-load-error')).toHaveCount(0);
 
       // AND: the global indicator says the data may be out of date.

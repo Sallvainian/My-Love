@@ -15,12 +15,22 @@ function setConnection(connection: object | undefined) {
   Object.defineProperty(navigator, 'connection', { value: connection, configurable: true });
 }
 
+/**
+ * Spies on happy-dom's localStorage. It is a Proxy that caches each method on
+ * first access, so a Storage.prototype spy is bypassed once any earlier test
+ * has read the method, and `vi.restoreAllMocks()` leaves an instance spy in
+ * place — the next test's storage calls would then throw SecurityError. Only
+ * the spy's own `mockRestore()` puts the method back, so afterEach calls it.
+ */
+const storageSpies: { mockRestore(): void }[] = [];
+
 beforeEach(() => {
   localStorage.removeItem(KEY);
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
 afterEach(() => {
+  storageSpies.splice(0).forEach((spy) => spy.mockRestore());
   vi.restoreAllMocks();
   setConnection(undefined);
   localStorage.removeItem(KEY);
@@ -54,12 +64,14 @@ describe('the choice', () => {
   });
 
   it('holds the choice for this page load when storage is unavailable', async () => {
-    vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
-      throw new DOMException('denied', 'SecurityError');
-    });
-    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
-      throw new DOMException('denied', 'SecurityError');
-    });
+    storageSpies.push(
+      vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+        throw new DOMException('denied', 'SecurityError');
+      }),
+      vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw new DOMException('denied', 'SecurityError');
+      })
+    );
     const { getPhotosOverMobileData, setPhotosOverMobileData } = await freshModule();
 
     expect(getPhotosOverMobileData()).toBe(false);

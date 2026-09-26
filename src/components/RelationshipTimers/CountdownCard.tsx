@@ -70,23 +70,37 @@ export function CountdownCard({
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
           highlight ? 'bg-fill text-white' : TONE_TILE[tone]
         }`}
+        data-testid="countdown-tile"
       >
-        <Icon className={`h-4.5 w-4.5 ${iconFilled ? 'fill-current' : ''}`} aria-hidden="true" />
+        <Icon
+          className={`h-4.5 w-4.5 ${iconFilled ? 'fill-current' : ''}`}
+          aria-hidden="true"
+          data-testid="countdown-icon"
+        />
       </div>
       <div className="grid grid-cols-1 gap-x-2 gap-y-0.5 @2xs:grid-cols-[minmax(0,1fr)_auto]">
         <h3 className="text-sm font-normal wrap-break-word text-muted @2xs:col-span-2">{label}</h3>
         <div
           className={`text-[22px] font-bold tabular-nums ${valueMuted ? 'text-muted' : 'text-ink'}`}
+          data-testid="countdown-value"
         >
           {value}
         </div>
         {trailing && (
-          <span className="text-[13px] text-muted tabular-nums @2xs:self-end @2xs:pb-1">
+          <span
+            className="text-[13px] text-muted tabular-nums @2xs:self-end @2xs:pb-1"
+            data-testid="countdown-clock"
+          >
             {trailing}
           </span>
         )}
         {description && (
-          <p className="text-[13px] wrap-break-word text-muted @2xs:col-span-2">{description}</p>
+          <p
+            className="text-[13px] wrap-break-word text-muted @2xs:col-span-2"
+            data-testid="countdown-description"
+          >
+            {description}
+          </p>
         )}
       </div>
     </div>

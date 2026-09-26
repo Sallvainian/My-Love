@@ -166,7 +166,11 @@ export function LoveNotes(): ReactElement {
             // feature, so this must never read "Online". Not a live region: a
             // healthy feed should not announce itself.
             <p className="flex items-center gap-1.5 text-[13px] text-muted">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-good" aria-hidden="true" />
+              <span
+                className="h-2 w-2 shrink-0 rounded-full bg-good"
+                aria-hidden="true"
+                data-testid="realtime-connection-status-dot"
+              />
               Connected
             </p>
           )}
@@ -193,6 +197,7 @@ export function LoveNotes(): ReactElement {
                   realtimeStatus === 'disconnected' ? 'bg-danger' : 'bg-muted'
                 }`}
                 aria-hidden="true"
+                data-testid="realtime-connection-status-dot"
               />
               {realtimeNotice}
             </p>
@@ -209,7 +214,11 @@ export function LoveNotes(): ReactElement {
           className="mx-4 mt-3 flex shrink-0 items-center gap-3 rounded-[14px] bg-dtint p-3"
         >
           <CircleAlert className="h-5 w-5 shrink-0 text-danger" aria-hidden="true" />
-          <p className="flex-1 text-sm text-danger" role="alert">
+          <p
+            className="flex-1 text-sm text-danger"
+            role="alert"
+            data-testid="notes-error-banner"
+          >
             {error}
           </p>
           <button onClick={clearError} className="text-sm font-semibold text-danger hover:underline">

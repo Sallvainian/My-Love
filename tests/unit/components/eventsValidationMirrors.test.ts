@@ -2,7 +2,8 @@
  * DE.5-UNIT-001 [P1], risk R-007: form declarations mirror the shared contract.
  * The pgTAP companion compares that contract with every installed events CHECK
  * after all migrations. Ordinary unit tests need no database. Actual submission
- * boundaries are covered in EventsSettings.test.tsx, independently of constants.
+ * boundaries are covered in EventsSettings.validation.test.tsx, independently
+ * of constants.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -95,10 +96,10 @@ describe('complete validation literal extraction', () => {
   });
 
   it.each([
-    ['empty icons', '[]'],
-    ['duplicate icons', '[{ value: "ring" }, { value: "ring" }]'],
-  ])('rejects invalid icon contracts: %s', (_name, options) => {
-    expect(() => extractEventsFormDeclarations(formSource(options))).toThrow();
+    ['empty icons', '[]', /Too small: expected array to have >=1 items/],
+    ['duplicate icons', '[{ value: "ring" }, { value: "ring" }]', /Icon values must be unique/],
+  ])('rejects invalid icon contracts: %s', (_name, options, expectedError) => {
+    expect(() => extractEventsFormDeclarations(formSource(options))).toThrow(expectedError);
   });
 
   it.each([
@@ -118,16 +119,18 @@ describe('complete validation literal extraction', () => {
       .toThrow(/Could not parse EventsSettings/);
   });
 
+  const missingOrDuplicateTag = 'Expected exactly one tagged events validation contract in the pgTAP SQL';
+
   it.each([
-    ['missing tag', '{}'],
-    ['duplicate tag', `${contractSource(contract)}\n${contractSource(contract)}`],
-    ['malformed JSON', '$events_validation_contract${bad}$events_validation_contract$'],
-    ['string limit', contractSource({ ...contract, labelMaxLength: '100' })],
-    ['non-string icon', contractSource({ ...contract, icons: ['ring', 42] })],
-    ['empty icons', contractSource({ ...contract, icons: [] })],
-    ['duplicate icons', contractSource({ ...contract, icons: ['ring', 'ring'] })],
-    ['unknown shape', contractSource({ ...contract, additionalCheck: 'true' })],
-  ])('fails explicitly for an unsupported shared contract: %s', (_name, sql) => {
-    expect(() => extractEventsValidationContract(sql)).toThrow();
+    ['missing tag', '{}', missingOrDuplicateTag],
+    ['duplicate tag', `${contractSource(contract)}\n${contractSource(contract)}`, missingOrDuplicateTag],
+    ['malformed JSON', '$events_validation_contract${bad}$events_validation_contract$', SyntaxError],
+    ['string limit', contractSource({ ...contract, labelMaxLength: '100' }), /expected number, received string/],
+    ['non-string icon', contractSource({ ...contract, icons: ['ring', 42] }), /expected string, received number/],
+    ['empty icons', contractSource({ ...contract, icons: [] }), /Too small: expected array to have >=1 items/],
+    ['duplicate icons', contractSource({ ...contract, icons: ['ring', 'ring'] }), /Icon values must be unique/],
+    ['unknown shape', contractSource({ ...contract, additionalCheck: 'true' }), /unrecognized_keys/],
+  ] as const)('fails explicitly for an unsupported shared contract: %s', (_name, sql, expectedError) => {
+    expect(() => extractEventsValidationContract(sql)).toThrow(expectedError);
   });
 });

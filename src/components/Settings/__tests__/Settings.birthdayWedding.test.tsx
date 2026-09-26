@@ -6,7 +6,8 @@
  * be in the past and has no Clear; the wedding date is any date, linked
  * couples only, and has a Clear.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const backend = vi.hoisted(() => ({
@@ -40,6 +41,8 @@ const real = {
 };
 
 const LINKED = { status: 'linked', partnerId: 'p', relationshipStart: null } as const;
+/** A profile with neither a chosen name nor a birthday. */
+const NO_PROFILE = { displayName: null, birthday: null } as const;
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -50,12 +53,13 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.useRealTimers();
   useAppStore.setState({ ownProfile: null, coupleSettings: null, ...real });
 });
 
 describe('Settings — Birthday', () => {
   it('shows "Not set yet" and an empty field when no birthday is saved', () => {
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
+    useAppStore.setState({ ownProfile: NO_PROFILE });
     render(<Settings />);
 
     expect(screen.getByTestId('settings-birthday-value')).toHaveTextContent('Not set yet');
@@ -72,47 +76,69 @@ describe('Settings — Birthday', () => {
   });
 
   it('saves the picked date as YYYY-MM-DD', async () => {
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
+    const user = userEvent.setup();
+    useAppStore.setState({ ownProfile: NO_PROFILE });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setBirthday: save });
     render(<Settings />);
 
-    fireEvent.change(screen.getByTestId('settings-birthday-date'), {
-      target: { value: '2000-05-20' },
-    });
-    fireEvent.click(screen.getByTestId('settings-birthday-save'));
+    await user.type(screen.getByTestId('settings-birthday-date'), '2000-05-20');
+    await user.click(screen.getByTestId('settings-birthday-save'));
 
     await waitFor(() => expect(save).toHaveBeenCalledWith('2000-05-20'));
     expect(screen.queryByTestId('settings-birthday-error')).toBeNull();
   });
 
-  it('refuses a birthday that is not in the past, and sends nothing', async () => {
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
-    const save = vi.fn(async () => {});
-    useAppStore.setState({ setBirthday: save });
-    render(<Settings />);
+  describe('"in the past", against a pinned clock', () => {
+    // Pinned before each render: the form reads the clock both for its `max`
+    // and when it validates. Only `Date` is faked, so RTL's `waitFor` keeps
+    // its real timers.
+    beforeEach(() => {
+      vi.setSystemTime(new Date(2026, 8, 25, 12, 0, 0));
+    });
 
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    fireEvent.change(screen.getByTestId('settings-birthday-date'), { target: { value: today } });
-    fireEvent.click(screen.getByTestId('settings-birthday-save'));
+    it('refuses a birthday that is not in the past, and sends nothing', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ ownProfile: NO_PROFILE });
+      const save = vi.fn(async () => {});
+      useAppStore.setState({ setBirthday: save });
+      render(<Settings />);
 
-    expect(await screen.findByTestId('settings-birthday-error')).toHaveTextContent(/in the past/i);
-    expect(save).not.toHaveBeenCalled();
+      await user.type(screen.getByTestId('settings-birthday-date'), '2026-09-25');
+      await user.click(screen.getByTestId('settings-birthday-save'));
+
+      expect(await screen.findByTestId('settings-birthday-error')).toHaveTextContent(
+        /in the past/i
+      );
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('accepts yesterday, the latest date the field offers', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ ownProfile: NO_PROFILE });
+      const save = vi.fn(async () => {});
+      useAppStore.setState({ setBirthday: save });
+      render(<Settings />);
+
+      expect(screen.getByTestId('settings-birthday-date')).toHaveAttribute('max', '2026-09-24');
+      await user.type(screen.getByTestId('settings-birthday-date'), '2026-09-24');
+      await user.click(screen.getByTestId('settings-birthday-save'));
+
+      await waitFor(() => expect(save).toHaveBeenCalledWith('2026-09-24'));
+      expect(screen.queryByTestId('settings-birthday-error')).toBeNull();
+    });
   });
 
   it('refuses a birthday before 1900 (a mistyped year), and sends nothing', async () => {
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: null } });
+    const user = userEvent.setup();
+    useAppStore.setState({ ownProfile: NO_PROFILE });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setBirthday: save });
     render(<Settings />);
 
     expect(screen.getByTestId('settings-birthday-date')).toHaveAttribute('min', '1900-01-01');
-    fireEvent.change(screen.getByTestId('settings-birthday-date'), {
-      target: { value: '0198-03-10' },
-    });
-    fireEvent.click(screen.getByTestId('settings-birthday-save'));
+    await user.type(screen.getByTestId('settings-birthday-date'), '0198-03-10');
+    await user.click(screen.getByTestId('settings-birthday-save'));
 
     expect(await screen.findByTestId('settings-birthday-error')).toHaveTextContent(/after 1900/i);
     expect(save).not.toHaveBeenCalled();
@@ -120,17 +146,17 @@ describe('Settings — Birthday', () => {
 
   // Matrix: "Offline edit" and "Save error shown in Settings, value unchanged".
   it('shows why a save was refused, and keeps the shown value', async () => {
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: '2000-05-20' } });
+    const user = userEvent.setup();
+    useAppStore.setState({ ownProfile: { ...NO_PROFILE, birthday: '2000-05-20' } });
     const save = vi.fn(async () => {
       throw new AccountDataError('offline', 'You are offline. Profile changes need a connection to save.');
     });
     useAppStore.setState({ setBirthday: save });
     render(<Settings />);
 
-    fireEvent.change(screen.getByTestId('settings-birthday-date'), {
-      target: { value: '1999-04-11' },
-    });
-    fireEvent.click(screen.getByTestId('settings-birthday-save'));
+    await user.clear(screen.getByTestId('settings-birthday-date'));
+    await user.type(screen.getByTestId('settings-birthday-date'), '1999-04-11');
+    await user.click(screen.getByTestId('settings-birthday-save'));
 
     expect(await screen.findByTestId('settings-birthday-error')).toHaveTextContent(
       /need a connection/
@@ -157,33 +183,36 @@ describe('Settings — Wedding', () => {
   });
 
   it('saves any date, including one in the future', async () => {
+    const user = userEvent.setup();
+    // Pinned before render, so the date below stays in the future whenever
+    // this runs.
+    vi.setSystemTime(new Date(2026, 8, 25, 12, 0, 0));
     useAppStore.setState({ coupleSettings: { ...LINKED, weddingDate: null } });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setWeddingDate: save });
     render(<Settings />);
 
-    const nextYear = new Date().getFullYear() + 1;
-    fireEvent.change(screen.getByTestId('settings-wedding-date'), {
-      target: { value: `${nextYear}-06-12` },
-    });
-    fireEvent.click(screen.getByTestId('settings-wedding-save'));
+    await user.type(screen.getByTestId('settings-wedding-date'), '2027-06-12');
+    await user.click(screen.getByTestId('settings-wedding-save'));
 
-    await waitFor(() => expect(save).toHaveBeenCalledWith(`${nextYear}-06-12`));
+    await waitFor(() => expect(save).toHaveBeenCalledWith('2027-06-12'));
   });
 
   it('clears a saved wedding date', async () => {
+    const user = userEvent.setup();
     useAppStore.setState({ coupleSettings: { ...LINKED, weddingDate: '2027-06-19' } });
     const save = vi.fn(async () => {});
     useAppStore.setState({ setWeddingDate: save });
     render(<Settings />);
 
     expect(screen.getByTestId('settings-wedding-date')).toHaveValue('2027-06-19');
-    fireEvent.click(screen.getByTestId('settings-wedding-clear'));
+    await user.click(screen.getByTestId('settings-wedding-clear'));
 
     await waitFor(() => expect(save).toHaveBeenCalledWith(null));
   });
 
   it('shows why a save was refused, and sends nothing without a date', async () => {
+    const user = userEvent.setup();
     useAppStore.setState({ coupleSettings: { ...LINKED, weddingDate: '2027-06-19' } });
     const save = vi.fn(async () => {
       throw new AccountDataError('offline', 'You are offline. Couple settings need a connection to save.');
@@ -191,14 +220,14 @@ describe('Settings — Wedding', () => {
     useAppStore.setState({ setWeddingDate: save });
     render(<Settings />);
 
-    fireEvent.click(screen.getByTestId('settings-wedding-clear'));
+    await user.click(screen.getByTestId('settings-wedding-clear'));
     expect(await screen.findByTestId('settings-wedding-error')).toHaveTextContent(
       /need a connection/
     );
 
     save.mockClear();
-    fireEvent.change(screen.getByTestId('settings-wedding-date'), { target: { value: '' } });
-    fireEvent.click(screen.getByTestId('settings-wedding-save'));
+    await user.clear(screen.getByTestId('settings-wedding-date'));
+    await user.click(screen.getByTestId('settings-wedding-save'));
     expect(await screen.findByTestId('settings-wedding-error')).toHaveTextContent(/pick a date/i);
     expect(save).not.toHaveBeenCalled();
   });

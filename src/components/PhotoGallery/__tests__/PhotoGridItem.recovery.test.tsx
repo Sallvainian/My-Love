@@ -12,6 +12,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const images = vi.hoisted(() => new Map<string, Blob>());
 const downloadPhoto = vi.hoisted(() => vi.fn<(path: string) => Promise<Blob>>());
+/** The one photo's id and path, and the `{ id, storage_path }` list the store and the fill read. */
+const { PHOTO_ID, PATH, PHOTO_REFS } = vi.hoisted(() => {
+  const PHOTO_ID = 'photo-0';
+  const PATH = 'me/0.jpg';
+  return { PHOTO_ID, PATH, PHOTO_REFS: () => [{ id: PHOTO_ID, storage_path: PATH }] };
+});
 
 vi.mock('../../../services/imageCache', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../services/imageCache')>();
@@ -35,7 +41,7 @@ vi.mock('../../../stores/useAppStore', async () => {
     useAppStore: create(() => ({
       userId: 'USER-A' as string | null,
       authSessionVersion: 1,
-      photos: [{ id: 'photo-0', storage_path: 'me/0.jpg' }],
+      photos: PHOTO_REFS(),
     })),
   };
 });
@@ -46,9 +52,8 @@ import { requestPhotoImageFill } from '../../../services/photoImageCache';
 import type { PhotoWithUrls } from '../../../services/photoService';
 import { PhotoGridItem } from '../PhotoGridItem';
 
-const PATH = 'me/0.jpg';
 const PHOTO = {
-  id: 'photo-0',
+  id: PHOTO_ID,
   user_id: 'me',
   storage_path: PATH,
   caption: 'cap-0',
@@ -136,7 +141,7 @@ describe('PhotoGridItem after an online download failure', () => {
       await requestPhotoImageFill({
         userId: 'USER-A',
         isCurrent: () => alive,
-        photos: () => [{ id: 'photo-0', storage_path: PATH }],
+        photos: PHOTO_REFS,
       });
     });
 
@@ -163,7 +168,7 @@ describe('PhotoGridItem after an online download failure', () => {
       await requestPhotoImageFill({
         userId: 'USER-A',
         isCurrent: () => alive,
-        photos: () => [{ id: 'photo-0', storage_path: PATH }],
+        photos: PHOTO_REFS,
       });
     });
     expect(downloadPhoto).toHaveBeenCalledTimes(1);

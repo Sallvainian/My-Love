@@ -6,6 +6,12 @@ const subscribeInteractions = vi.hoisted(() => vi.fn());
 const resolvePartnerId = vi.hoisted(() => vi.fn<() => Promise<string | null>>());
 const sendPoke = vi.hoisted(() => vi.fn());
 const sendKiss = vi.hoisted(() => vi.fn());
+/**
+ * Every partner lookup the slice started, as the promise it was handed. The
+ * slice attaches its own `.then` the moment the lookup returns, so a test that
+ * awaits the latest one resumes only after the slice has acted on the answer.
+ */
+const partnerLookups = vi.hoisted((): Array<Promise<unknown>> => []);
 
 vi.mock('../../../src/api/interactionService', () => ({
   InteractionService: class {
@@ -14,13 +20,17 @@ vi.mock('../../../src/api/interactionService', () => ({
     // Derived from the same stub so every existing `resolvePartnerId.mock*`
     // setup keeps working: an id is `linked`, null is `unlinked`, and a
     // rejection is the inconclusive `error` the reconnect path must not act on.
-    resolvePartnerLookup = async () => {
-      try {
-        const partnerId = await resolvePartnerId();
-        return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
-      } catch (error) {
-        return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
-      }
+    resolvePartnerLookup = () => {
+      const lookup = (async () => {
+        try {
+          const partnerId = await resolvePartnerId();
+          return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
+        } catch (error) {
+          return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+        }
+      })();
+      partnerLookups.push(lookup);
+      return lookup;
     };
     sendPoke = sendPoke;
     sendKiss = sendKiss;
@@ -58,12 +68,6 @@ interface CapturedSubscription {
 
 const subscriptions: CapturedSubscription[] = [];
 
-async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
 function createTestStore() {
   const createSlices: AppStateCreator<TestStore> = (...args) => ({
     ...createAuthSlice(...args),
@@ -96,6 +100,7 @@ describe('interactionsSlice subscription bridge', () => {
     vi.clearAllMocks();
     localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
     subscriptions.length = 0;
+    partnerLookups.length = 0;
     resolvePartnerId.mockResolvedValue(OTHER_USER_ID);
     subscribeInteractions.mockImplementation(
       (
@@ -123,28 +128,25 @@ describe('interactionsSlice subscription bridge', () => {
     await serializeAccountDataWrite(async () => {});
   });
 
-  it('forwards every service status and keeps isSubscribed aligned through recovery', async () => {
+  /** Subscribes the store and hands back the service-side subscription it opened. */
+  async function subscribe(
+    store: ReturnType<typeof createTestStore>,
+    onStatusChange: (status: InteractionSubscriptionStatus) => void = vi.fn()
+  ) {
+    const unsubscribe = await store.getState().subscribeToInteractions(onStatusChange);
+    return { unsubscribe, subscription: subscriptions[0] };
+  }
+
+  it('subscribes for the signed-in user and forwards every service status, keeping isSubscribed aligned through recovery', async () => {
     const store = createTestStore();
     const onStatusChange = vi.fn();
 
-    const unsubscribe = await store.getState().subscribeToInteractions(onStatusChange);
-    const subscription = subscriptions[0];
+    const { subscription } = await subscribe(store, onStatusChange);
     expect(subscription.userId).toBe(USER_ID);
     expect(store.getState().isSubscribed).toBe(false);
 
     subscription.reportStatus('SUBSCRIBED');
     expect(store.getState().isSubscribed).toBe(true);
-
-    subscription.reportInteraction(interaction('incoming-1'));
-    expect(store.getState().interactions).toEqual([{
-      id: 'incoming-1',
-      type: 'poke',
-      fromUserId: OTHER_USER_ID,
-      toUserId: USER_ID,
-      viewed: false,
-      createdAt: new Date('2026-08-20T12:00:00.000Z'),
-    }]);
-    expect(store.getState().unviewedCount).toBe(1);
 
     subscription.reportStatus('CHANNEL_ERROR');
     expect(store.getState().isSubscribed).toBe(false);
@@ -160,6 +162,30 @@ describe('interactionsSlice subscription bridge', () => {
       ['TIMED_OUT'],
       ['SUBSCRIBED'],
     ]);
+  });
+
+  it('maps a delivered record into interactions and counts it unviewed', async () => {
+    const store = createTestStore();
+    const { subscription } = await subscribe(store);
+    subscription.reportStatus('SUBSCRIBED');
+
+    subscription.reportInteraction(interaction('incoming-1'));
+    expect(store.getState().interactions).toEqual([{
+      id: 'incoming-1',
+      type: 'poke',
+      fromUserId: OTHER_USER_ID,
+      toUserId: USER_ID,
+      viewed: false,
+      createdAt: new Date('2026-08-20T12:00:00.000Z'),
+    }]);
+    expect(store.getState().unviewedCount).toBe(1);
+  });
+
+  it('unsubscribing tears down the service subscription and clears isSubscribed', async () => {
+    const store = createTestStore();
+    const { unsubscribe, subscription } = await subscribe(store);
+    subscription.reportStatus('SUBSCRIBED');
+    expect(store.getState().isSubscribed).toBe(true);
 
     unsubscribe();
     expect(subscription.unsubscribe).toHaveBeenCalledTimes(1);
@@ -392,7 +418,10 @@ describe('interactionsSlice subscription bridge', () => {
     // Wi-Fi blips; the channel rejoins and the `users` read fails outright.
     resolvePartnerId.mockRejectedValue(new Error('network down'));
     subscription.reportStatus('SUBSCRIBED');
-    await flushMicrotasks();
+    // The subscribe's lookup, then this re-join's: missing the second would
+    // leave `at(-1)` an already-settled promise.
+    expect(partnerLookups).toHaveLength(2);
+    await partnerLookups.at(-1);
 
     subscription.reportInteraction(interaction('after-the-blip'));
     expect(store.getState().interactions.map(({ id }) => id)).toEqual([
@@ -437,7 +466,10 @@ describe('interactionsSlice subscription bridge', () => {
 
     resolvePartnerId.mockResolvedValue(null);
     subscription.reportStatus('SUBSCRIBED');
-    await flushMicrotasks();
+    // The subscribe's lookup, then this re-join's: missing the second would
+    // leave `at(-1)` an already-settled promise.
+    expect(partnerLookups).toHaveLength(2);
+    await partnerLookups.at(-1);
 
     subscription.reportInteraction(interaction('after-the-unlink'));
     expect(store.getState().interactions.map(({ id }) => id)).toEqual(['while-linked']);
@@ -500,8 +532,10 @@ describe('interactionsSlice subscription bridge', () => {
 
     store.getState().clearAuth();
     releaseRefresh!(OTHER_USER_ID);
-    await Promise.resolve();
-    await Promise.resolve();
+    // The subscribe's lookup, then this re-join's: missing the second would
+    // leave `at(-1)` an already-settled promise.
+    expect(partnerLookups).toHaveLength(2);
+    await partnerLookups.at(-1);
 
     // Restoring it here would re-arm addIncomingInteraction for the couple that
     // just signed out.
@@ -591,8 +625,9 @@ describe('interactionsSlice subscription bridge', () => {
     store.getState().setAuthUser(USER_ID);
 
     releaseLookup!(OTHER_USER_ID);
-    await pending.catch(() => undefined);
+    await expect(pending).rejects.toThrow('Cannot subscribe: account changed during partner lookup');
 
     expect(store.getState().interactionPartnerId).toBeNull();
+    expect(subscriptions).toHaveLength(0);
   });
 });

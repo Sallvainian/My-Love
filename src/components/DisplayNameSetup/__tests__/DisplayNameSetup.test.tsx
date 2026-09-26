@@ -18,6 +18,8 @@
  *    checked too.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import { PostgrestError } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -68,10 +70,10 @@ vi.mock('../../../utils/logger', () => ({
 
 import { DisplayNameSetup } from '../DisplayNameSetup';
 
-function submit(name: string, onComplete = vi.fn()) {
+async function submit(user: UserEvent, name: string, onComplete = vi.fn()) {
   render(<DisplayNameSetup isOpen onComplete={onComplete} />);
-  fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: name } });
-  fireEvent.click(screen.getByTestId('display-name-submit'));
+  await user.type(screen.getByLabelText('Display Name'), name);
+  await user.click(screen.getByTestId('display-name-submit'));
   return onComplete;
 }
 
@@ -82,15 +84,18 @@ function submit(name: string, onComplete = vi.fn()) {
  * click-driven test would assert the platform's behaviour and leave
  * `validateDisplayName` untested.
  */
-function submitPastNativeValidation(name: string, onComplete = vi.fn()) {
-  const { container } = render(<DisplayNameSetup isOpen onComplete={onComplete} />);
-  fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: name } });
-  fireEvent.submit(container.querySelector('form')!);
+async function submitPastNativeValidation(user: UserEvent, name: string, onComplete = vi.fn()) {
+  render(<DisplayNameSetup isOpen onComplete={onComplete} />);
+  await user.type(screen.getByLabelText('Display Name'), name);
+  fireEvent.submit(screen.getByTestId('display-name-form')); // raw submit: bypasses the native required/minLength check so the component's own length rule runs
   return onComplete;
 }
 
 describe('DisplayNameSetup saves the name to the profile row', () => {
+  let user: UserEvent;
+
   beforeEach(() => {
+    user = userEvent.setup();
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     backend.result = { data: [{ id: 'user-a' }], error: null };
@@ -105,7 +110,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   });
 
   it('writes display_name scoped to the caller and completes', async () => {
-    const onComplete = submit('Jessie');
+    const onComplete = await submit(user, 'Jessie');
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     expect(backend.updatePayload).toMatchObject({ display_name: 'Jessie' });
@@ -117,15 +122,20 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   it('sets updated_at itself, because no trigger does', async () => {
     // `public.users` has no BEFORE UPDATE trigger, and the column grant covers
     // exactly (display_name, updated_at) so this is the client's job.
-    const onComplete = submit('Jessie');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-12T15:30:00.000Z'));
+    try {
+      const onComplete = await submit(user, 'Jessie');
 
-    await waitFor(() => expect(onComplete).toHaveBeenCalled());
-    expect(typeof backend.updatePayload?.updated_at).toBe('string');
-    expect(Number.isNaN(Date.parse(String(backend.updatePayload?.updated_at)))).toBe(false);
+      await waitFor(() => expect(onComplete).toHaveBeenCalled());
+      expect(backend.updatePayload?.updated_at).toBe('2026-09-12T15:30:00.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('never writes auth metadata', async () => {
-    const onComplete = submit('Jessie');
+    const onComplete = await submit(user, 'Jessie');
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
     expect(backend.updateUser).not.toHaveBeenCalled();
@@ -134,7 +144,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   it('sends no column the caller may not write', async () => {
     // `id`, `email`, `partner_id`, `created_at` are all outside the grant, and
     // naming any of them makes the whole PATCH a 42501.
-    const onComplete = submit('Jessie');
+    const onComplete = await submit(user, 'Jessie');
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
     expect(Object.keys(backend.updatePayload ?? {}).sort()).toEqual(['display_name', 'updated_at']);
@@ -154,7 +164,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
         hint: '',
       }),
     };
-    const onComplete = submit('Jessie');
+    const onComplete = await submit(user, 'Jessie');
 
     await waitFor(() =>
       expect(screen.getByTestId('display-name-error')).toHaveTextContent(
@@ -169,7 +179,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     // The RLS shape: no error, no rows, nothing saved. The old code would have
     // called onComplete here.
     backend.result = { data: [], error: null };
-    const onComplete = submit('Jessie');
+    const onComplete = await submit(user, 'Jessie');
 
     await waitFor(() =>
       expect(screen.getByTestId('display-name-error')).toHaveTextContent(
@@ -180,10 +190,10 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     expect(screen.getByTestId('display-name-setup')).toBeInTheDocument();
   });
 
-  it('offline: refused before getUser() or the write, with the offline reason inline', async () => {
+  it('offline: refuses before reading the session or writing, with the offline reason inline', async () => {
     const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     try {
-      const onComplete = submit('Jessie');
+      const onComplete = await submit(user, 'Jessie');
 
       expect(await screen.findByTestId('display-name-error')).toHaveTextContent(
         'You are offline. Name changes need a connection to save.'
@@ -199,7 +209,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
 
   it('reports a missing session without attempting a write', async () => {
     backend.getUser.mockResolvedValue(null);
-    const onComplete = submit('Jessie');
+    const onComplete = await submit(user, 'Jessie');
 
     await waitFor(() =>
       expect(screen.getByTestId('display-name-error')).toHaveTextContent('User not authenticated')
@@ -218,7 +228,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     ['the account email in another case', 'Person@Example.COM'],
     ['the account email with stray whitespace', '  person@example.com  '],
   ])('refuses %s without writing', async (_label, name) => {
-    const onComplete = submit(name);
+    const onComplete = await submit(user, name);
 
     await waitFor(() =>
       expect(screen.getByTestId('display-name-error')).toHaveTextContent(
@@ -231,7 +241,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   });
 
   it("refuses the literal 'Unknown' without writing", async () => {
-    const onComplete = submit('Unknown');
+    const onComplete = await submit(user, 'Unknown');
 
     // The exact message, not merely "an error is shown": any throw inside
     // handleSubmit renders this same element, so a looser assertion passes on
@@ -248,7 +258,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   it('still accepts a name that merely contains the email or the seed word', async () => {
     // The rule is equality, not containment — refusing these would reject names
     // the read side is perfectly happy to call chosen.
-    const onComplete = submit('Unknown Soldier');
+    const onComplete = await submit(user, 'Unknown Soldier');
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
     expect(backend.updatePayload).toMatchObject({ display_name: 'Unknown Soldier' });
@@ -256,14 +266,14 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
 
   it('accepts a chosen name when the account carries no email to compare against', async () => {
     backend.getUser.mockResolvedValue({ id: 'user-a', email: null });
-    const onComplete = submit('Jessie');
+    const onComplete = await submit(user, 'Jessie');
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
     expect(backend.updatePayload).toMatchObject({ display_name: 'Jessie' });
   });
 
   it('rejects a too-short name before touching the network', async () => {
-    const onComplete = submitPastNativeValidation('ab');
+    const onComplete = await submitPastNativeValidation(user, 'ab');
 
     await waitFor(() =>
       expect(screen.getByTestId('display-name-error')).toHaveTextContent(
@@ -277,7 +287,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
 
   // DW-192: the ring mirrors aria-invalid, as it does on the sign-in fields.
   it('rings the field in danger while an error shows', async () => {
-    submitPastNativeValidation('ab');
+    await submitPastNativeValidation(user, 'ab');
 
     await waitFor(() => expect(screen.getByTestId('display-name-error')).toBeInTheDocument());
     const field = screen.getByLabelText('Display Name');
@@ -328,10 +338,10 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       expect(screen.queryByText(/Welcome!/)).not.toBeInTheDocument();
     });
 
-    it('closes through onCancel without writing anything', async () => {
+    it('Cancel closes the form without writing anything', async () => {
       const { onCancel, onComplete } = renderEdit('Jessie');
 
-      fireEvent.click(screen.getByTestId('display-name-cancel'));
+      await user.click(screen.getByTestId('display-name-cancel'));
 
       expect(onCancel).toHaveBeenCalledTimes(1);
       expect(backend.updatePayload).toBeNull();
@@ -351,10 +361,10 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       expect(dialog).toHaveAccessibleName('Change your name');
     });
 
-    it('closes through onCancel when Escape is pressed', async () => {
+    it('Escape closes the form without writing anything', async () => {
       const { onCancel, onComplete } = renderEdit('Jessie');
 
-      fireEvent.keyDown(document, { key: 'Escape' });
+      await user.keyboard('{Escape}');
 
       expect(onCancel).toHaveBeenCalledTimes(1);
       expect(backend.updatePayload).toBeNull();
@@ -369,14 +379,15 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       backend.getUser.mockReturnValue(new Promise(() => {}));
       const { onCancel, onComplete } = renderEdit('Jessie');
 
-      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Casey' } });
-      fireEvent.click(screen.getByTestId('display-name-submit'));
+      await user.clear(screen.getByLabelText('Display Name'));
+      await user.type(screen.getByLabelText('Display Name'), 'Casey');
+      await user.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() => {
         expect(screen.getByTestId('display-name-cancel')).toBeDisabled();
       });
 
-      fireEvent.keyDown(document, { key: 'Escape' });
+      await user.keyboard('{Escape}');
 
       expect(onCancel).not.toHaveBeenCalled();
       expect(onComplete).not.toHaveBeenCalled();
@@ -385,8 +396,9 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     it('saves an edited name through the same single profile write', async () => {
       const { onComplete } = renderEdit('Jessie');
 
-      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Casey' } });
-      fireEvent.click(screen.getByTestId('display-name-submit'));
+      await user.clear(screen.getByLabelText('Display Name'));
+      await user.type(screen.getByLabelText('Display Name'), 'Casey');
+      await user.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
       expect(Object.keys(backend.updatePayload ?? {}).sort()).toEqual([
@@ -405,8 +417,9 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     ])('still refuses %s when the field started prefilled', async (_label, name) => {
       const { onComplete } = renderEdit('Jessie');
 
-      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: name } });
-      fireEvent.click(screen.getByTestId('display-name-submit'));
+      await user.clear(screen.getByLabelText('Display Name'));
+      await user.type(screen.getByLabelText('Display Name'), name);
+      await user.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() =>
         expect(screen.getByTestId('display-name-error')).toHaveTextContent(
@@ -422,8 +435,9 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     it("still refuses the literal 'Unknown' when the field started prefilled", async () => {
       const { onComplete } = renderEdit('Jessie');
 
-      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Unknown' } });
-      fireEvent.click(screen.getByTestId('display-name-submit'));
+      await user.clear(screen.getByLabelText('Display Name'));
+      await user.type(screen.getByLabelText('Display Name'), 'Unknown');
+      await user.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() =>
         expect(screen.getByTestId('display-name-error')).toHaveTextContent(
@@ -440,8 +454,9 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       backend.result = { data: [], error: null };
       const { onComplete } = renderEdit('Jessie');
 
-      fireEvent.change(screen.getByLabelText('Display Name'), { target: { value: 'Casey' } });
-      fireEvent.click(screen.getByTestId('display-name-submit'));
+      await user.clear(screen.getByLabelText('Display Name'));
+      await user.type(screen.getByLabelText('Display Name'), 'Casey');
+      await user.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() =>
         expect(screen.getByTestId('display-name-error')).toHaveTextContent(
@@ -487,7 +502,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       // exit. Pressing Escape here must not close it or write anything.
       render(<DisplayNameSetup isOpen onComplete={vi.fn()} />);
 
-      fireEvent.keyDown(document, { key: 'Escape' });
+      await user.keyboard('{Escape}');
 
       expect(screen.getByTestId('display-name-setup')).toBeInTheDocument();
       expect(backend.updatePayload).toBeNull();

@@ -6,36 +6,35 @@
  * Settings through the real UI; this worker's Home then shows the partner's
  * birthday card, labelled with the partner's display name, and the wedding
  * countdown after a reload. Clearing the wedding date brings back "Date TBD".
+ * The live-clock layout check seeds both dates through the service client
+ * instead, since it is about the cards and not the save.
  *
  * Identities are this worker's own pooled pair, linked once by global setup.
  * Nothing here links, unlinks or resets an account; teardown resets only this
  * pair's own `birthday` columns and `wedding_date`.
  */
-import type { BrowserContext, Page } from '@playwright/test';
+import type { Browser, BrowserContext, Page } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
+import type { AuthOptions } from '@seontechnologies/playwright-utils/auth-session';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
+import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import type { TypedSupabaseClient } from '../../support/factories';
-import { resolveOwnPair } from '../../support/helpers/events';
-
-/**
- * A `YYYY-MM-DD` date `days` from today in the browser's local time, moved
- * `yearsBack` years into the past. Skips a 29 February, which rolls over.
- */
-async function localDateIn(page: Page, days: number, yearsBack = 0): Promise<string> {
-  return page.evaluate(
-    ({ days, yearsBack }) => {
-      const now = new Date();
-      let d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
-      if (d.getMonth() === 1 && d.getDate() === 29) {
-        d = new Date(d.getFullYear(), 2, 1);
-      }
-      const pad = (n: number) => String(n).padStart(2, '0');
-      return `${d.getFullYear() - yearsBack}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    },
-    { days, yearsBack }
-  );
-}
+import {
+  clockAnchorAvoidingLeapDay,
+  isoBirthdayDaysFromNow,
+  isoDateDaysFromNow,
+  resolveOwnPair,
+} from '../../support/helpers/events';
+import {
+  COUPLE_SETTINGS_READ,
+  COUPLE_SETTINGS_SAVE,
+  OWN_PROFILE_READ,
+  PARTNER_RECORD_READ,
+  SECOND_CONTEXT_READ_TIMEOUT,
+} from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 async function resetPair(
   supabaseAdmin: TypedSupabaseClient,
@@ -58,10 +57,75 @@ async function resetPair(
   expect.soft(couple.error).toBeNull();
 }
 
+/** Whether the pair's couple_settings row exists: `resetPair` keeps one it finds. */
+async function pairRowExists(
+  supabaseAdmin: TypedSupabaseClient,
+  userId: string,
+  partnerId: string
+): Promise<boolean> {
+  const [user_a, user_b] = userId < partnerId ? [userId, partnerId] : [partnerId, userId];
+  const { data, error } = await supabaseAdmin
+    .from('couple_settings')
+    .select('user_a')
+    .eq('user_a', user_a)
+    .eq('user_b', user_b);
+  expect(error).toBeNull();
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Open this worker's Home on the pinned clock, once the couple settings, the
+ * partner record and the own profile have all been read.
+ */
+async function openThisHome(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  anchor: Date
+): Promise<void> {
+  await page.clock.install({ time: anchor });
+  const homeReads = [COUPLE_SETTINGS_READ, PARTNER_RECORD_READ, OWN_PROFILE_READ].map((url) =>
+    interceptNetworkCall({ method: 'GET', url })
+  );
+  await page.goto('/');
+  for (const { status } of await Promise.all(homeReads)) expect(status).toBe(200);
+}
+
+/**
+ * Open the partner's Settings in a second context on the same pinned clock,
+ * with neither date set yet. The caller closes the returned context.
+ */
+async function openPartnerSettings(
+  browser: Browser,
+  baseURL: string | undefined,
+  authOptions: AuthOptions,
+  partnerUserIdentifier: string,
+  anchor: Date
+) {
+  const context = await browser.newContext({
+    storageState: getStorageStatePath({ ...authOptions, userIdentifier: partnerUserIdentifier }),
+    baseURL,
+  });
+  try {
+    await context.clock.install({ time: anchor });
+    const partnerPage = await context.newPage();
+    const partnerReads = [COUPLE_SETTINGS_READ, OWN_PROFILE_READ].map((url) =>
+      observeOn({ page: partnerPage, method: 'GET', url, timeout: SECOND_CONTEXT_READ_TIMEOUT })
+    );
+    await partnerPage.goto('/settings');
+    for (const { status } of await Promise.all(partnerReads)) expect(status).toBe(200);
+    await expect(partnerPage.getByTestId('settings-birthday-value')).toHaveText('Not set yet');
+    await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
+    return { context, page: partnerPage };
+  } catch (error) {
+    await context.close().catch(() => {});
+    throw error;
+  }
+}
+
 test.describe('Birthdays and wedding date shared by both partners', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test('[P1] a birthday and wedding date saved by the partner show on this Home after reload', async ({
+  test('[P1] a birthday the partner saves in Settings shows on this Home after reload', async ({
     page,
     browser,
     baseURL,
@@ -69,6 +133,7 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     authOptions,
     partnerUserIdentifier,
     partnerAuthToken,
+    interceptNetworkCall,
   }) => {
     // Side effect: writes the partner identity's storage-state file.
     expect(partnerAuthToken).not.toBe('');
@@ -76,57 +141,61 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await resetPair(supabaseAdmin, userId, partnerId);
 
+    // Both pages run on one pinned clock, and the dates are built from it, so
+    // the day counts below hold even if the run crosses real midnight.
+    const anchor = clockAnchorAvoidingLeapDay([10, 40]);
+
     let partnerContext: BrowserContext | undefined;
     try {
-      await log.step('With nothing set, the partner card says so and the wedding is TBD');
-      await page.goto('/');
+      await log.step('With nothing set, the partner card says so');
+      await openThisHome(page, interceptNetworkCall, anchor);
       await expect(page.getByTestId('birthday-countdown-partner')).toContainText('Not set yet');
       await expect(page.getByTestId('birthday-countdown-self')).toContainText(
         'Set it in Settings'
       );
-      await expect(page.getByTestId('event-countdown-wedding')).toContainText('Date TBD');
 
-      await log.step('The partner saves a birthday and a wedding date in Settings');
-      partnerContext = await browser.newContext({
-        storageState: getStorageStatePath({ ...authOptions, userIdentifier: partnerUserIdentifier }),
+      await log.step('The partner saves a birthday in Settings');
+      const partner = await openPartnerSettings(
+        browser,
         baseURL,
-      });
-      const partnerPage = await partnerContext.newPage();
-      await partnerPage.goto('/settings');
-      await expect(partnerPage.getByTestId('settings-birthday-value')).toHaveText('Not set yet');
-      await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
+        authOptions,
+        partnerUserIdentifier,
+        anchor
+      );
+      partnerContext = partner.context;
+      const partnerPage = partner.page;
 
       // Ten days from now, thirty years ago: "turns 30" in "10 days".
-      const birthday = await localDateIn(partnerPage, 10, 30);
+      const birthday = isoBirthdayDaysFromNow(10, 30, anchor);
       await partnerPage.getByTestId('settings-birthday-date').fill(birthday);
-      const birthdaySaved = partnerPage.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/users') && response.request().method() === 'PATCH'
-      );
+      const birthdaySaved = observeOn({
+        page: partnerPage,
+        method: 'PATCH',
+        url: '**/rest/v1/users?*',
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
       await partnerPage.getByTestId('settings-birthday-save').click();
-      expect((await birthdaySaved).ok()).toBe(true);
-      await expect
-        .poll(() => partnerPage.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday))
-        .toBe(birthday);
+      expect((await birthdaySaved).status).toBe(200);
+      await recurseUntil(
+        () => partnerPage.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday),
+        (v) => {
+          expect(v).toBe(birthday);
+        }
+      );
       await expect(partnerPage.getByTestId('settings-birthday-error')).toHaveCount(0);
 
-      const wedding = await localDateIn(partnerPage, 40);
-      await partnerPage.getByTestId('settings-wedding-date').fill(wedding);
-      const weddingSaved = partnerPage.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/couple_settings') &&
-          response.request().method() === 'POST'
+      await log.step('This Home shows it after a reload');
+      const reloadReads = [COUPLE_SETTINGS_READ, PARTNER_RECORD_READ].map((url) =>
+        interceptNetworkCall({ method: 'GET', url })
       );
-      await partnerPage.getByTestId('settings-wedding-save').click();
-      expect((await weddingSaved).ok()).toBe(true);
-      await expect(partnerPage.getByTestId('settings-wedding-clear')).toBeVisible();
-      await expect(partnerPage.getByTestId('settings-wedding-error')).toHaveCount(0);
-
-      await log.step('This Home shows both after a reload');
       await page.reload();
-      await expect
-        .poll(() => page.evaluate(() => window.__APP_STORE__?.getState().partner?.birthday))
-        .toBe(birthday);
+      for (const { status } of await Promise.all(reloadReads)) expect(status).toBe(200);
+      await recurseUntil(
+        () => page.evaluate(() => window.__APP_STORE__?.getState().partner?.birthday),
+        (v) => {
+          expect(v).toBe(birthday);
+        }
+      );
       const partnerName = await page.evaluate(
         () => window.__APP_STORE__?.getState().partner?.displayName
       );
@@ -135,7 +204,138 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       // Whole days left plus a live clock to the day's local midnight, so ten
       // calendar days out reads "9 days" and the rest as hours.
       await expect(partnerCard.locator('h3 + div')).toHaveText('9 days');
+    } finally {
+      await partnerContext?.close().catch(() => {});
+      await resetPair(supabaseAdmin, userId, partnerId);
+    }
+  });
+
+  test('[P1] a wedding date the partner saves shows on this Home, and clearing it brings back Date TBD', async ({
+    page,
+    browser,
+    baseURL,
+    supabaseAdmin,
+    authOptions,
+    partnerUserIdentifier,
+    partnerAuthToken,
+    interceptNetworkCall,
+  }) => {
+    // Side effect: writes the partner identity's storage-state file.
+    expect(partnerAuthToken).not.toBe('');
+
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await resetPair(supabaseAdmin, userId, partnerId);
+
+    // Both pages run on one pinned clock, and the dates are built from it, so
+    // the day counts below hold even if the run crosses real midnight.
+    const anchor = clockAnchorAvoidingLeapDay([10, 40]);
+
+    let partnerContext: BrowserContext | undefined;
+    try {
+      await log.step('With nothing set, the wedding is TBD');
+      await openThisHome(page, interceptNetworkCall, anchor);
+      await expect(page.getByTestId('event-countdown-wedding')).toContainText('Date TBD');
+
+      await log.step('The partner saves a wedding date in Settings');
+      const partner = await openPartnerSettings(
+        browser,
+        baseURL,
+        authOptions,
+        partnerUserIdentifier,
+        anchor
+      );
+      partnerContext = partner.context;
+      const partnerPage = partner.page;
+
+      const wedding = isoDateDaysFromNow(40, anchor);
+      await partnerPage.getByTestId('settings-wedding-date').fill(wedding);
+      // The upsert answers 201 when it creates the pair's row, 200 when it updates it.
+      const weddingStatus = (await pairRowExists(supabaseAdmin, userId, partnerId)) ? 200 : 201;
+      const weddingSaved = observeOn({
+        page: partnerPage,
+        method: 'POST',
+        url: COUPLE_SETTINGS_SAVE,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
+      await partnerPage.getByTestId('settings-wedding-save').click();
+      expect((await weddingSaved).status).toBe(weddingStatus);
+      await expect(partnerPage.getByTestId('settings-wedding-clear')).toBeVisible();
+      await expect(partnerPage.getByTestId('settings-wedding-error')).toHaveCount(0);
+
+      await log.step('This Home shows it after a reload');
+      const reloadReads = [COUPLE_SETTINGS_READ, PARTNER_RECORD_READ].map((url) =>
+        interceptNetworkCall({ method: 'GET', url })
+      );
+      await page.reload();
+      for (const { status } of await Promise.all(reloadReads)) expect(status).toBe(200);
       const weddingCard = page.getByTestId('event-countdown-wedding');
+      await expect(weddingCard.locator('h3 + div')).toHaveText('39 days');
+
+      await log.step('The partner clears the wedding date; this Home reads "Date TBD" again');
+      const cleared = observeOn({
+        page: partnerPage,
+        method: 'POST',
+        url: COUPLE_SETTINGS_SAVE,
+        timeout: SECOND_CONTEXT_READ_TIMEOUT,
+      });
+      await partnerPage.getByTestId('settings-wedding-clear').click();
+      expect((await cleared).status).toBe(200);
+      await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
+
+      // The saved copy still holds the wedding date, so the card reads '39 days'
+      // until this reload's own couple read has answered.
+      const clearedRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
+      await page.reload();
+      expect((await clearedRead).status).toBe(200);
+      await expect(page.getByTestId('event-countdown-wedding').locator('h3 + div')).toHaveText(
+        'Date TBD'
+      );
+    } finally {
+      await partnerContext?.close().catch(() => {});
+      await resetPair(supabaseAdmin, userId, partnerId);
+    }
+  });
+
+  test('[P1] each countdown card runs a live clock that fits the card at phone width', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await resetPair(supabaseAdmin, userId, partnerId);
+
+    // The page runs on a pinned clock, and the dates are built from it, so the
+    // day counts below hold even if the run crosses real midnight.
+    const anchor = clockAnchorAvoidingLeapDay([10, 40]);
+
+    try {
+      await log.step('Both dates are seeded: the partner birthday and the wedding');
+      const birthday = isoBirthdayDaysFromNow(10, 30, anchor);
+      const seededBirthday = await supabaseAdmin
+        .from('users')
+        .update({ birthday })
+        .eq('id', partnerId);
+      expect(seededBirthday.error).toBeNull();
+      const [user_a, user_b] = userId < partnerId ? [userId, partnerId] : [partnerId, userId];
+      const seededWedding = await supabaseAdmin
+        .from('couple_settings')
+        .upsert(
+          { user_a, user_b, wedding_date: isoDateDaysFromNow(40, anchor) },
+          { onConflict: 'user_a,user_b' }
+        );
+      expect(seededWedding.error).toBeNull();
+
+      await openThisHome(page, interceptNetworkCall, anchor);
+      await recurseUntil(
+        () => page.evaluate(() => window.__APP_STORE__?.getState().partner?.birthday),
+        (v) => {
+          expect(v).toBe(birthday);
+        }
+      );
+      const partnerCard = page.getByTestId('birthday-countdown-partner');
+      const weddingCard = page.getByTestId('event-countdown-wedding');
+      // Premise: both cards count down to a set date, so both carry a clock.
+      await expect(partnerCard.locator('h3 + div')).toHaveText('9 days');
       await expect(weddingCard.locator('h3 + div')).toHaveText('39 days');
 
       await log.step('Each card runs a live clock that fits the card at phone width');
@@ -143,7 +343,12 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       const partnerClock = partnerCard.locator('h3 ~ span');
       await expect(partnerClock).toHaveText(/^\d{2}h \d{2}m \d{2}s$/);
       const firstReading = await partnerClock.textContent();
-      await expect.poll(() => partnerClock.textContent()).not.toBe(firstReading);
+      await recurseUntil(
+        () => partnerClock.textContent(),
+        (v) => {
+          expect(v).not.toBe(firstReading);
+        }
+      );
 
       const box = async (locator: typeof partnerCard) => {
         const b = await locator.boundingBox();
@@ -162,23 +367,7 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       const fullClock = await box(weddingCard.locator('h3 ~ span'));
       expect(fullClock.x).toBeGreaterThan(fullValue.x + fullValue.width);
       expect(fullClock.y).toBeLessThan(fullValue.y + fullValue.height);
-
-      await log.step('The partner clears the wedding date; this Home reads "Date TBD" again');
-      const cleared = partnerPage.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/couple_settings') &&
-          response.request().method() === 'POST'
-      );
-      await partnerPage.getByTestId('settings-wedding-clear').click();
-      expect((await cleared).ok()).toBe(true);
-      await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
-
-      await page.reload();
-      await expect(page.getByTestId('event-countdown-wedding').locator('h3 + div')).toHaveText(
-        'Date TBD'
-      );
     } finally {
-      await partnerContext?.close().catch(() => {});
       await resetPair(supabaseAdmin, userId, partnerId);
     }
   });

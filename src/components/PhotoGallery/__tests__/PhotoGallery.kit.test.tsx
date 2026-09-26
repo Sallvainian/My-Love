@@ -7,7 +7,8 @@
  * skeleton in the grid's exact layout; load error card with retry; owner
  * badges. The gallery renders the store's list (`fakePhotoStore`).
  */
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PhotoWithUrls } from '../../../services/photoService';
@@ -67,21 +68,35 @@ afterEach(() => {
 });
 
 describe('PhotoGallery grid', () => {
-  it('renders the title, count subtitle and a header Upload pill that is not fixed', async () => {
-    const onUploadClick = await renderGallery();
+  it('renders the title and the count subtitle with the partner name', async () => {
+    await renderGallery();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Photos' })).toBeTruthy();
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe(
       '12 photos · shared with Harper'
     );
+  });
+
+  it('shows a labelled header Upload pill that is not fixed', async () => {
+    await renderGallery();
 
     const upload = screen.getByTestId('photo-gallery-upload-fab');
     expect(upload.getAttribute('aria-label')).toBe('Upload photo');
     expect(upload.className).not.toMatch(/\bfixed\b/);
     expect(upload.textContent).toBe('Upload');
+  });
 
-    fireEvent.click(upload);
+  it('calls onUploadClick once when the header Upload pill is pressed', async () => {
+    const user = userEvent.setup();
+    const onUploadClick = await renderGallery();
+
+    const upload = screen.getByTestId('photo-gallery-upload-fab');
+    await user.click(upload);
     expect(onUploadClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('lays the grid out in three columns at every width', async () => {
+    await renderGallery();
 
     const grid = screen.getByTestId('photo-gallery-grid');
     expect(grid.className).toContain('grid-cols-3');
@@ -89,7 +104,7 @@ describe('PhotoGallery grid', () => {
     expect(grid.className).not.toMatch(/(sm|md|lg):grid-cols/);
   });
 
-  it('hands the header Upload to uploadButtonRef, for the upload dialog focus return', async () => {
+  it('gives the upload dialog the header Upload button to return focus to', async () => {
     const uploadButtonRef = createRef<HTMLButtonElement>();
     render(<PhotoGallery onUploadClick={vi.fn()} uploadButtonRef={uploadButtonRef} />);
     await act(async () => {});
@@ -152,22 +167,24 @@ describe('PhotoGallery owner badge', () => {
     expect(own.className).toContain('w-5');
     expect(own.className).toContain('left-1.5');
     expect(own.className).toContain('bottom-1.5');
-    expect(own.querySelector('[aria-hidden="true"]')?.textContent).toBe('J');
-    expect(own.querySelector('.sr-only')?.textContent).toBe('Uploaded by you');
+    expect(within(own).getByTestId('photo-grid-item-owner-initial').textContent).toBe('J');
+    const ownText = within(own).getByTestId('photo-grid-item-owner-text');
+    expect(ownText.textContent).toBe('Uploaded by you');
+    expect(ownText).toHaveClass('sr-only');
 
     expect(partner.className).toContain('bg-partner');
     expect(partner.className).toContain('text-card');
     expect(partner.className).not.toContain('text-white');
-    expect(partner.querySelector('[aria-hidden="true"]')?.textContent).toBe('H');
-    expect(partner.querySelector('.sr-only')?.textContent).toBe('Uploaded by Harper');
+    expect(within(partner).getByTestId('photo-grid-item-owner-initial').textContent).toBe('H');
+    const partnerText = within(partner).getByTestId('photo-grid-item-owner-text');
+    expect(partnerText.textContent).toBe('Uploaded by Harper');
+    expect(partnerText).toHaveClass('sr-only');
 
     // The tile's aria-label wins over its content, so the uploader reaches
     // assistive tech through aria-describedby.
     const [ownTile, partnerTile] = screen.getAllByTestId('photo-grid-item');
-    const describedText = (tile: HTMLElement) =>
-      document.getElementById(tile.getAttribute('aria-describedby') ?? '')?.textContent;
-    expect(describedText(ownTile)).toBe('Uploaded by you');
-    expect(describedText(partnerTile)).toBe('Uploaded by Harper');
+    expect(ownTile).toHaveAccessibleDescription('Uploaded by you');
+    expect(partnerTile).toHaveAccessibleDescription('Uploaded by Harper');
   });
 
   it('keeps a name that opens with an emoji whole on the badge', async () => {
@@ -176,18 +193,20 @@ describe('PhotoGallery owner badge', () => {
     await renderGallery();
 
     const badge = screen.getByTestId('photo-grid-item-owner-badge');
-    expect(badge.querySelector('[aria-hidden="true"]')?.textContent).toBe('🌸');
+    expect(within(badge).getByTestId('photo-grid-item-owner-initial').textContent).toBe('🌸');
   });
 });
 
 describe('PhotoGallery empty', () => {
   it('shows the empty card and no header Upload', async () => {
     listPhotos.mockResolvedValue([]);
-    const onUploadClick = await renderGallery();
+    await renderGallery();
 
     const empty = screen.getByTestId('photo-gallery-empty-state');
     expect(within(empty).getByRole('heading', { level: 1, name: 'Photos' })).toBeTruthy();
-    expect(within(empty).getByText('Your shared album')).toBeTruthy();
+    expect(within(empty).getByTestId('photo-gallery-subtitle').textContent).toBe(
+      'Your shared album'
+    );
     expect(within(empty).getByRole('heading', { name: 'No photos yet' })).toBeTruthy();
     expect(screen.queryByTestId('photo-gallery-upload-fab')).toBeNull();
     // Not nested inside `photo-gallery`: the E2E `.or()` would match both.
@@ -196,7 +215,17 @@ describe('PhotoGallery empty', () => {
     const button = within(empty).getByTestId('photo-gallery-empty-upload-button');
     expect(button.textContent).toBe('Upload a photo');
     expect(button.className).toContain('bg-fill');
-    fireEvent.click(button);
+  });
+
+  it('calls onUploadClick once when the empty-state Upload button is pressed', async () => {
+    const user = userEvent.setup();
+    listPhotos.mockResolvedValue([]);
+    const onUploadClick = await renderGallery();
+
+    const button = within(screen.getByTestId('photo-gallery-empty-state')).getByTestId(
+      'photo-gallery-empty-upload-button'
+    );
+    await user.click(button);
     expect(onUploadClick).toHaveBeenCalledTimes(1);
   });
 });
@@ -209,7 +238,9 @@ describe('PhotoGallery loading', () => {
 
     const wrapper = screen.getByTestId('photo-gallery');
     expect(within(wrapper).getByRole('heading', { level: 1, name: 'Photos' })).toBeTruthy();
-    expect(within(wrapper).getByText('Your shared album')).toBeTruthy();
+    expect(within(wrapper).getByTestId('photo-gallery-subtitle').textContent).toBe(
+      'Your shared album'
+    );
     expect(screen.queryByTestId('photo-gallery-upload-fab')).toBeNull();
 
     const skeletonGrid = screen.getByTestId('photo-gallery-skeleton-grid');
@@ -229,6 +260,7 @@ describe('PhotoGallery loading', () => {
 
 describe('PhotoGallery load error', () => {
   it('shows the header and a kit error card with a working retry', async () => {
+    const user = userEvent.setup();
     listPhotos.mockRejectedValueOnce(new Error('Network down'));
     await renderGallery();
 
@@ -240,7 +272,7 @@ describe('PhotoGallery load error', () => {
     expect(alert.className).toContain('text-danger');
     expect(screen.queryByTestId('photo-gallery-upload-fab')).toBeNull();
 
-    fireEvent.click(within(errorState).getByTestId('photo-gallery-error-retry-button'));
+    await user.click(within(errorState).getByTestId('photo-gallery-error-retry-button'));
     await act(async () => {});
 
     expect(screen.queryByTestId('photo-gallery-error-state')).toBeNull();

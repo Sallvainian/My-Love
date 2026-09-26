@@ -3,7 +3,7 @@
  * logged: the heart is server-first now, and a silent failure would leave the
  * user believing the favorite was saved.
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -88,7 +88,7 @@ describe('DailyMessage category chip', () => {
     const chip = screen.getByTestId('message-category-badge');
     expect(chip).toHaveTextContent('Why I Love You');
     expect(chip.textContent?.trim()).toBe('Why I Love You');
-    expect(chip.querySelector('svg.lucide-heart')).not.toBeNull();
+    expect(within(chip).getByTestId('message-category-icon')).toHaveClass('lucide-heart');
     expect(chip.textContent ?? '').not.toMatch(/\p{Extended_Pictographic}/u);
   });
 });

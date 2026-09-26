@@ -8,7 +8,7 @@
  * card. The clock is faked throughout; the repo pins `TZ=America/New_York`.
  */
 import type { ReactNode } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CountdownTimer } from '../../CountdownTimer/CountdownTimer';
 import { BirthdayCountdown } from '../BirthdayCountdown';
@@ -32,10 +32,15 @@ vi.mock('motion/react', () => ({
 
 const EMOJI = /\p{Extended_Pictographic}/u;
 
-/** The icon tile is the card's first child. */
-function tileOf(card: HTMLElement): HTMLElement {
-  return card.firstElementChild as HTMLElement;
-}
+/** A linked couple with no start date; each test spreads in the dates it needs. */
+const LINKED = { status: 'linked', partnerId: 'partner', relationshipStart: null } as const;
+
+/** Parts of one CountdownCard; their ids repeat across cards, so always scope to the card. */
+const tileOf = (card: HTMLElement) => within(card).getByTestId('countdown-tile');
+const iconOf = (card: HTMLElement) => within(card).getByTestId('countdown-icon');
+const labelOf = (card: HTMLElement) => within(card).getByRole('heading', { level: 3 });
+const valueOf = (card: HTMLElement) => within(card).getByTestId('countdown-value');
+const clockOf = (card: HTMLElement) => within(card).queryByTestId('countdown-clock');
 
 function expectHighlighted(card: HTMLElement) {
   expect(tileOf(card)).toHaveClass('bg-fill', 'text-white');
@@ -84,8 +89,8 @@ describe('Countdown cards on the day itself', () => {
     const card = screen.getByTestId('birthday-countdown-partner');
     // Noon on 16 March to midnight starting 18 March: 1 day 12h.
     // Exact, on the value element: a substring match also passes "11 days".
-    expect(card.querySelector('h3 + div')?.textContent).toBe('1 day');
-    expect(card.querySelector('h3 ~ span')?.textContent).toBe('12h 00m 00s');
+    expect(valueOf(card).textContent).toBe('1 day');
+    expect(clockOf(card)?.textContent).toBe('12h 00m 00s');
     expect(card).not.toHaveTextContent('Happy Birthday!');
     expect(tileOf(card)).toHaveClass('bg-ptint', 'text-partner');
   });
@@ -102,7 +107,7 @@ describe('Countdown cards on the day itself', () => {
     render(<EventCountdown label="Wedding" icon="ring" date={null} placeholderText="Date TBD" />);
 
     const card = screen.getByTestId('event-countdown-wedding');
-    const value = card.querySelector('h3 + div');
+    const value = valueOf(card);
     expect(value).toHaveTextContent('Date TBD');
     expect(value).toHaveClass('text-muted');
     expect(card).not.toHaveTextContent('XX:XX:XX');
@@ -117,11 +122,10 @@ describe('Countdown cards on the day itself', () => {
       />
     );
 
-    const wrapper = screen.getByTestId('countdown-card-0');
-    const card = wrapper.firstElementChild as HTMLElement;
+    const card = screen.getByTestId('anniversary-countdown-1');
     expect(card).toHaveTextContent('First date');
     expect(card).toHaveTextContent('Today!');
-    expect(tileOf(card).querySelector('svg')).toHaveClass('lucide-sparkles');
+    expect(iconOf(card)).toHaveClass('lucide-sparkles');
     expectHighlighted(card);
   });
 });
@@ -133,8 +137,7 @@ describe('Countdown cards on an ordinary day', () => {
     vi.setSystemTime(new Date(2026, 9, 6, 21, 5, 7));
     useAppStore.setState({
       coupleSettings: {
-        status: 'linked',
-        partnerId: 'partner',
+        ...LINKED,
         relationshipStart: new Date(2025, 9, 4, 18, 0, 0).toISOString(),
         weddingDate: null,
       },
@@ -143,8 +146,8 @@ describe('Countdown cards on an ordinary day', () => {
     render(<TimeTogether />);
 
     const card = screen.getByTestId('time-together');
-    expect(card.querySelector('h3')?.textContent).toBe('Together for');
-    expect(card.querySelector('h3 + div')?.textContent).toBe('1 year 2 days');
+    expect(labelOf(card).textContent).toBe('Together for');
+    expect(valueOf(card).textContent).toBe('1 year 2 days');
     expect(card).toHaveTextContent('03h 05m 07s');
     expect(card.textContent ?? '').toMatch(/\d{2}h \d{2}m \d{2}s/);
   });
@@ -159,9 +162,7 @@ describe('Countdown cards on an ordinary day', () => {
 
     const birthday = screen.getByTestId('birthday-countdown-partner');
     const event = screen.getByTestId('event-countdown-meetup');
-    expect(birthday.querySelector('h3 + div')?.textContent).toBe(
-      event.querySelector('h3 + div')?.textContent
-    );
+    expect(valueOf(birthday).textContent).toBe(valueOf(event).textContent);
   });
 
   it('counts wall-clock time across the 23-hour DST spring-forward day', () => {
@@ -174,8 +175,8 @@ describe('Countdown cards on an ordinary day', () => {
     );
 
     const card = screen.getByTestId('birthday-countdown-partner');
-    expect(card.querySelector('h3 + div')?.textContent).toBe('0 days');
-    expect(card.querySelector('h3 ~ span')?.textContent).toBe('23h 00m 00s');
+    expect(valueOf(card).textContent).toBe('0 days');
+    expect(clockOf(card)?.textContent).toBe('23h 00m 00s');
   });
 
   it('ticks the clock every second and rolls into "Happy Birthday!" at midnight', () => {
@@ -185,19 +186,19 @@ describe('Countdown cards on an ordinary day', () => {
     );
 
     const card = screen.getByTestId('birthday-countdown-partner');
-    expect(card.querySelector('h3 + div')?.textContent).toBe('0 days');
-    expect(card.querySelector('h3 ~ span')?.textContent).toBe('00h 00m 02s');
+    expect(valueOf(card).textContent).toBe('0 days');
+    expect(clockOf(card)?.textContent).toBe('00h 00m 02s');
 
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    expect(card.querySelector('h3 ~ span')?.textContent).toBe('00h 00m 01s');
+    expect(clockOf(card)?.textContent).toBe('00h 00m 01s');
 
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    expect(card.querySelector('h3 + div')?.textContent).toBe('Happy Birthday!');
-    expect(card.querySelector('h3 ~ span')).toBeNull();
+    expect(valueOf(card).textContent).toBe('Happy Birthday!');
+    expect(clockOf(card)).toBeNull();
   });
 
   it('shows the live clock on an upcoming event', () => {
@@ -205,13 +206,13 @@ describe('Countdown cards on an ordinary day', () => {
     render(<EventCountdown label="Meetup" icon="plane" date={new Date(2026, 2, 19)} />);
 
     const card = screen.getByTestId('event-countdown-meetup');
-    expect(card.querySelector('h3 + div')?.textContent).toBe('2 days');
-    expect(card.querySelector('h3 ~ span')?.textContent).toBe('12h 00m 00s');
+    expect(valueOf(card).textContent).toBe('2 days');
+    expect(clockOf(card)?.textContent).toBe('12h 00m 00s');
 
     act(() => {
       vi.advanceTimersByTime(3000);
     });
-    expect(card.querySelector('h3 ~ span')?.textContent).toBe('11h 59m 57s');
+    expect(clockOf(card)?.textContent).toBe('11h 59m 57s');
   });
 
   it('shows no clock on a card dated today or with no date', () => {
@@ -222,8 +223,8 @@ describe('Countdown cards on an ordinary day', () => {
       </>
     );
 
-    expect(screen.getByTestId('event-countdown-today').querySelector('h3 ~ span')).toBeNull();
-    expect(screen.getByTestId('event-countdown-wedding').querySelector('h3 ~ span')).toBeNull();
+    expect(clockOf(screen.getByTestId('event-countdown-today'))).toBeNull();
+    expect(clockOf(screen.getByTestId('event-countdown-wedding'))).toBeNull();
   });
 
   it('shows a plain calendar tile, a day count and a live clock for an upcoming anniversary', () => {
@@ -235,11 +236,11 @@ describe('Countdown cards on an ordinary day', () => {
       />
     );
 
-    const card = screen.getByTestId('countdown-card-0').firstElementChild as HTMLElement;
-    expect(card.querySelector('h3')?.textContent).toBe('First kiss');
-    expect(card.querySelector('h3 + div')?.textContent).toBe('3 days');
-    expect(card.querySelector('h3 ~ span')?.textContent).toBe('12h 00m 00s');
-    expect(tileOf(card).querySelector('svg')).toHaveClass('lucide-calendar');
+    const card = screen.getByTestId('anniversary-countdown-2');
+    expect(labelOf(card).textContent).toBe('First kiss');
+    expect(valueOf(card).textContent).toBe('3 days');
+    expect(clockOf(card)?.textContent).toBe('12h 00m 00s');
+    expect(iconOf(card)).toHaveClass('lucide-calendar');
     expect(tileOf(card)).toHaveClass('bg-tint', 'text-accent');
     expect(tileOf(card)).not.toHaveClass('bg-fill');
     expect(screen.queryByTestId('celebration-animation')).toBeNull();
@@ -256,17 +257,17 @@ describe('Anniversary clock in the last minute', () => {
       />
     );
 
-    const card = screen.getByTestId('countdown-card-0').firstElementChild as HTMLElement;
-    expect(card.querySelector('h3 + div')?.textContent).toBe('0 days');
-    expect(card.querySelector('h3 ~ span')?.textContent).toBe('00h 00m 30s');
+    const card = screen.getByTestId('anniversary-countdown-3');
+    expect(valueOf(card).textContent).toBe('0 days');
+    expect(clockOf(card)?.textContent).toBe('00h 00m 30s');
     expect(screen.queryByTestId('celebration-animation')).toBeNull();
 
     act(() => {
       vi.advanceTimersByTime(30_000);
     });
-    const after = screen.getByTestId('countdown-card-0').firstElementChild as HTMLElement;
-    expect(after.querySelector('h3 + div')?.textContent).toBe('Today!');
-    expect(after.querySelector('h3 ~ span')).toBeNull();
+    const after = screen.getByTestId('anniversary-countdown-3');
+    expect(valueOf(after).textContent).toBe('Today!');
+    expect(clockOf(after)).toBeNull();
   });
 });
 
@@ -277,18 +278,13 @@ describe('Together for, from the couple start date', () => {
 
   it('shows the Settings placeholder for a linked couple with no start date yet', () => {
     useAppStore.setState({
-      coupleSettings: {
-        status: 'linked',
-        partnerId: 'partner',
-        relationshipStart: null,
-        weddingDate: null,
-      },
+      coupleSettings: { ...LINKED, weddingDate: null },
     });
 
     render(<TimeTogether />);
 
     const card = screen.getByTestId('time-together');
-    expect(card.querySelector('h3')?.textContent).toBe('Together for');
+    expect(labelOf(card).textContent).toBe('Together for');
     expect(card).toHaveTextContent('Set your start date in Settings');
     expect(card.textContent ?? '').not.toMatch(/\d{2}h \d{2}m \d{2}s/);
   });
@@ -316,7 +312,7 @@ describe('Birthday cards from the server-held birthdays', () => {
 
     const card = screen.getByTestId('birthday-countdown-self');
     // Noon on 16 March 2026: the next 14 August is in 2026, the 27th birthday.
-    expect(card.querySelector('h3')?.textContent).toBe('You turn 27');
+    expect(labelOf(card).textContent).toBe('You turn 27');
     expect(tileOf(card)).toHaveClass('bg-tint', 'text-accent');
   });
 
@@ -331,17 +327,17 @@ describe('Birthday cards from the server-held birthdays', () => {
     );
 
     const card = screen.getByTestId('birthday-countdown-partner');
-    expect(card.querySelector('h3')?.textContent).toBe('Partner turns 26');
-    expect(card.querySelector('h3 + div')?.textContent).toBe('0 days');
-    expect(card.querySelector('h3 ~ span')?.textContent).toBe('12h 00m 00s');
+    expect(labelOf(card).textContent).toBe('Partner turns 26');
+    expect(valueOf(card).textContent).toBe('0 days');
+    expect(clockOf(card)?.textContent).toBe('12h 00m 00s');
   });
 
   it('counts to next year once this year\'s birthday has passed', () => {
     render(<BirthdayCountdown name="Sam" birthday="1990-03-15" testId="birthday-countdown-self" />);
 
     const card = screen.getByTestId('birthday-countdown-self');
-    expect(card.querySelector('h3')?.textContent).toBe('Sam turns 37');
-    expect(card.querySelector('h3 + div')?.textContent).toBe('363 days');
+    expect(labelOf(card).textContent).toBe('Sam turns 37');
+    expect(valueOf(card).textContent).toBe('363 days');
   });
 
   it('keeps an unset card in place with "Not set yet" and the Settings hint', () => {
@@ -355,8 +351,8 @@ describe('Birthday cards from the server-held birthdays', () => {
     );
 
     const card = screen.getByTestId('birthday-countdown-self');
-    expect(card.querySelector('h3')?.textContent).toBe('Your birthday');
-    const value = card.querySelector('h3 + div');
+    expect(labelOf(card).textContent).toBe('Your birthday');
+    const value = valueOf(card);
     expect(value?.textContent).toBe('Not set yet');
     expect(value).toHaveClass('text-muted');
     expect(card).toHaveTextContent('Set it in Settings');
@@ -373,9 +369,9 @@ describe('Birthday cards from the server-held birthdays', () => {
     );
 
     const card = screen.getByTestId('birthday-countdown-partner');
-    expect(card.querySelector('h3')?.textContent).toBe("Pat's birthday");
-    expect(card.querySelector('h3 + div')?.textContent).toBe('Not set yet');
-    expect(card.querySelector('p')).toBeNull();
+    expect(labelOf(card).textContent).toBe("Pat's birthday");
+    expect(valueOf(card).textContent).toBe('Not set yet');
+    expect(within(card).queryByTestId('countdown-description')).toBeNull();
   });
 
   it('treats an unreadable birthday as not set', () => {
@@ -393,37 +389,51 @@ describe("Home's birthday and wedding cards", () => {
     connectedAt: null,
     birthday: '2000-03-18',
   };
-  const LINKED = { status: 'linked', partnerId: 'partner', relationshipStart: null } as const;
+  /** Your own profile: a chosen name and a birthday. */
+  const SAM = { displayName: 'Sam', birthday: '1999-08-14' };
 
   afterEach(() => {
     useAppStore.setState({ ownProfile: null, partner: null, coupleSettings: null });
   });
 
-  it('linked: both birthday cards side by side, labelled with display names, then the wedding', () => {
+  /** A linked couple: your chosen name, the partner, and a wedding date. */
+  function renderLinked() {
     useAppStore.setState({
-      ownProfile: { displayName: 'Sam', birthday: '1999-08-14' },
+      ownProfile: SAM,
       partner: PARTNER,
       coupleSettings: { ...LINKED, weddingDate: '2026-06-12' },
     });
 
     render(<BirthdayWeddingCards />);
+  }
+
+  it('linked: shows both birthday cards side by side', () => {
+    renderLinked();
 
     expect(screen.getByTestId('birthday-cards')).toHaveClass('grid-cols-2');
-    expect(screen.getByTestId('birthday-countdown-self').querySelector('h3')?.textContent).toBe(
+  });
+
+  it('linked: labels each birthday card with its display name, the partner card in partner tint', () => {
+    renderLinked();
+
+    expect(labelOf(screen.getByTestId('birthday-countdown-self')).textContent).toBe(
       'Sam turns 27'
     );
     const partnerCard = screen.getByTestId('birthday-countdown-partner');
-    expect(partnerCard.querySelector('h3')?.textContent).toBe('Pat turns 26');
+    expect(labelOf(partnerCard).textContent).toBe('Pat turns 26');
     expect(tileOf(partnerCard)).toHaveClass('bg-ptint', 'text-partner');
+  });
+
+  it('linked: counts down to the wedding date', () => {
+    renderLinked();
+
     // Noon on 16 March to midnight starting 12 June 2026: 87 days 12h.
-    expect(
-      screen.getByTestId('event-countdown-wedding').querySelector('h3 + div')?.textContent
-    ).toBe('87 days');
+    expect(valueOf(screen.getByTestId('event-countdown-wedding')).textContent).toBe('87 days');
   });
 
   it('with no chosen names: "You turn N" and "Partner turns N"', () => {
     useAppStore.setState({
-      ownProfile: { displayName: null, birthday: '1999-08-14' },
+      ownProfile: { ...SAM, displayName: null },
       partner: { ...PARTNER, displayName: 'Partner' },
       coupleSettings: { ...LINKED, weddingDate: null },
     });
@@ -436,7 +446,7 @@ describe("Home's birthday and wedding cards", () => {
 
   it('linked with no wedding date: "Date TBD"; unset birthdays stay in place', () => {
     useAppStore.setState({
-      ownProfile: { displayName: 'Sam', birthday: null },
+      ownProfile: { ...SAM, birthday: null },
       partner: { ...PARTNER, birthday: null },
       coupleSettings: { ...LINKED, weddingDate: null },
     });
@@ -454,7 +464,7 @@ describe("Home's birthday and wedding cards", () => {
 
   it('unlinked: your card only, full width, and no partner or wedding card', () => {
     useAppStore.setState({
-      ownProfile: { displayName: 'Sam', birthday: '1999-08-14' },
+      ownProfile: SAM,
       partner: null,
       coupleSettings: { status: 'unlinked' },
     });
@@ -476,12 +486,12 @@ describe("Home's birthday and wedding cards", () => {
 
   // Matrix: "Display name changed" — the label follows the store, no reload.
   it("relabels your card when your display name changes", () => {
-    useAppStore.setState({ ownProfile: { displayName: null, birthday: '1999-08-14' } });
+    useAppStore.setState({ ownProfile: { ...SAM, displayName: null } });
     render(<BirthdayWeddingCards />);
     expect(screen.getByTestId('birthday-countdown-self')).toHaveTextContent('You turn 27');
 
     act(() => {
-      useAppStore.setState({ ownProfile: { displayName: 'Sam', birthday: '1999-08-14' } });
+      useAppStore.setState({ ownProfile: SAM });
     });
 
     expect(screen.getByTestId('birthday-countdown-self')).toHaveTextContent('Sam turns 27');

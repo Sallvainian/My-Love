@@ -7,8 +7,9 @@
  * Love Notes Images: Task 11 - Component tests (AC-1 through AC-6, AC-10, AC-11)
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NoteRefusedOfflineError } from '../../../stores/slices/notesSlice';
@@ -54,6 +55,9 @@ vi.stubGlobal('URL', {
   revokeObjectURL: vi.fn(),
 });
 
+/** The picture a user attaches in every image test. */
+const jpegFile = () => new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+
 describe('MessageInput', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -67,42 +71,49 @@ describe('MessageInput', () => {
       expect(screen.getByPlaceholderText('Send a love note...')).toBeInTheDocument();
     });
 
-    it('should update content when typing', () => {
+    it('should update content when typing', async () => {
+      const user = userEvent.setup();
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      fireEvent.change(textarea, { target: { value: 'Hello love' } });
+      await user.type(textarea, 'Hello love');
 
       expect(textarea).toHaveValue('Hello love');
     });
 
     it('should show character counter at 900+ characters', async () => {
+      const user = userEvent.setup();
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
       const longText = 'a'.repeat(905);
-      fireEvent.change(textarea, { target: { value: longText } });
+      await user.click(textarea);
+      await user.paste(longText);
 
       expect(screen.getByText('905/1000')).toBeInTheDocument();
     });
 
     it('should show warning color at 950+ characters', async () => {
+      const user = userEvent.setup();
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
       const longText = 'a'.repeat(955);
-      fireEvent.change(textarea, { target: { value: longText } });
+      await user.click(textarea);
+      await user.paste(longText);
 
       const counter = screen.getByText('955/1000');
       expect(counter).toHaveClass('text-ink', 'font-medium');
     });
 
-    it('should show error message when over 1000 characters', () => {
+    it('should show error message when over 1000 characters', async () => {
+      const user = userEvent.setup();
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
       const longText = 'a'.repeat(1005);
-      fireEvent.change(textarea, { target: { value: longText } });
+      await user.click(textarea);
+      await user.paste(longText);
 
       expect(screen.getByRole('alert')).toHaveTextContent('Message is too long');
     });
@@ -119,7 +130,7 @@ describe('MessageInput', () => {
     it('should have hidden file input with correct accept types', () => {
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       expect(fileInput).toBeInTheDocument();
       expect(fileInput).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
       expect(fileInput).toHaveClass('hidden');
@@ -129,12 +140,13 @@ describe('MessageInput', () => {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
+      const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
+      const mockFile = jpegFile();
 
-      fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
         expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
@@ -148,12 +160,14 @@ describe('MessageInput', () => {
         error: 'Unsupported file format',
       });
 
+      // applyAccept: false -- the rejected type is the premise; the accept filter would drop it first.
+      const user = userEvent.setup({ applyAccept: false });
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = new File(['test'], 'doc.pdf', { type: 'application/pdf' });
 
-      fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toHaveTextContent('Unsupported file format');
@@ -167,12 +181,13 @@ describe('MessageInput', () => {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
+      const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
+      const mockFile = jpegFile();
 
-      fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
         expect(mockVibrate).toHaveBeenCalledWith(30);
@@ -183,12 +198,13 @@ describe('MessageInput', () => {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
+      const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
+      const mockFile = jpegFile();
 
-      fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
         expect(screen.getByPlaceholderText('Add a caption...')).toBeInTheDocument();
@@ -199,19 +215,20 @@ describe('MessageInput', () => {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
+      const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
+      const mockFile = jpegFile();
 
-      fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
         expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
       });
 
       const removeButton = screen.getByRole('button', { name: /remove selected image/i });
-      fireEvent.click(removeButton);
+      await user.click(removeButton);
 
       await waitFor(() => {
         expect(screen.queryByAltText('Selected image preview')).not.toBeInTheDocument();
@@ -227,11 +244,12 @@ describe('MessageInput', () => {
       expect(sendButton).toBeDisabled();
     });
 
-    it('should be enabled when text is entered', () => {
+    it('should be enabled when text is entered', async () => {
+      const user = userEvent.setup();
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      fireEvent.change(textarea, { target: { value: 'Hello' } });
+      await user.type(textarea, 'Hello');
 
       const sendButton = screen.getByRole('button', { name: /send message/i });
       expect(sendButton).toBeEnabled();
@@ -241,12 +259,13 @@ describe('MessageInput', () => {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
+      const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
+      const mockFile = jpegFile();
 
-      fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
         const sendButton = screen.getByRole('button', { name: /send message/i });
@@ -254,12 +273,14 @@ describe('MessageInput', () => {
       });
     });
 
-    it('should be disabled when text exceeds limit', () => {
+    it('should be disabled when text exceeds limit', async () => {
+      const user = userEvent.setup();
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
       const longText = 'a'.repeat(1005);
-      fireEvent.change(textarea, { target: { value: longText } });
+      await user.click(textarea);
+      await user.paste(longText);
 
       const sendButton = screen.getByRole('button', { name: /send message/i });
       expect(sendButton).toBeDisabled();
@@ -277,28 +298,28 @@ describe('MessageInput', () => {
       const user = userEvent.setup();
       render(<MessageInput />);
 
-      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'In flight' } });
+      await user.type(screen.getByRole('textbox'), 'In flight');
       const sendButton = screen.getByRole('button', { name: /send message/i });
       await user.click(sendButton);
 
       await waitFor(() => {
-        expect(sendButton.querySelector('.animate-spin')).not.toBeNull();
+        expect(within(sendButton).getByTestId('message-input-send-spinner')).toBeInTheDocument();
       });
       expect(sendButton).toBeDisabled();
 
       resolveSend();
 
       await waitFor(() => {
-        expect(sendButton.querySelector('.animate-spin')).toBeNull();
+        expect(within(sendButton).queryByTestId('message-input-send-spinner')).not.toBeInTheDocument();
       });
     });
 
-    it('should call sendNote with text content', async () => {
+    it('sends the typed text as a note', async () => {
       const user = userEvent.setup();
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      fireEvent.change(textarea, { target: { value: 'I love you' } });
+      await user.type(textarea, 'I love you');
 
       const sendButton = screen.getByRole('button', { name: /send message/i });
       await user.click(sendButton);
@@ -308,17 +329,17 @@ describe('MessageInput', () => {
       });
     });
 
-    it('should call sendNote with image file', async () => {
+    it('sends a selected picture with no caption', async () => {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
+      const mockFile = jpegFile();
 
-      fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
         expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
@@ -332,7 +353,7 @@ describe('MessageInput', () => {
       });
     });
 
-    it('should call sendNote with both text and image', async () => {
+    it('sends the caption together with the selected picture', async () => {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
@@ -340,13 +361,13 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       // Select image
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
-      fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
+      const mockFile = jpegFile();
+      await user.upload(fileInput, mockFile);
 
       // Type caption
       const textarea = screen.getByRole('textbox');
-      fireEvent.change(textarea, { target: { value: 'Look at this!' } });
+      await user.type(textarea, 'Look at this!');
 
       await waitFor(() => {
         expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
@@ -369,12 +390,12 @@ describe('MessageInput', () => {
 
       // Add text
       const textarea = screen.getByRole('textbox');
-      fireEvent.change(textarea, { target: { value: 'Test message' } });
+      await user.type(textarea, 'Test message');
 
       // Add image
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
-      fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
+      const mockFile = jpegFile();
+      await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
         expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
@@ -395,7 +416,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      fireEvent.change(textarea, { target: { value: 'Hello' } });
+      await user.type(textarea, 'Hello');
 
       const sendButton = screen.getByRole('button', { name: /send message/i });
       await user.click(sendButton);
@@ -412,7 +433,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      fireEvent.change(textarea, { target: { value: 'Hello' } });
+      await user.type(textarea, 'Hello');
 
       const sendButton = screen.getByRole('button', { name: /send message/i });
       await user.click(sendButton);
@@ -424,14 +445,12 @@ describe('MessageInput', () => {
   });
 
   describe('Offline refusal (ticket 11)', () => {
-    async function sendPictureNote(user: ReturnType<typeof userEvent.setup>) {
+    async function sendPictureNote(user: UserEvent) {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      fireEvent.change(fileInput, {
-        target: { files: [new File(['test'], 'photo.jpg', { type: 'image/jpeg' })] },
-      });
-      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Look!' } });
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
+      await user.upload(fileInput, jpegFile());
+      await user.type(screen.getByRole('textbox'), 'Look!');
       await waitFor(() => {
         expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
       });
@@ -460,7 +479,7 @@ describe('MessageInput', () => {
       const user = userEvent.setup();
       render(<MessageInput />);
 
-      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Hello' } });
+      await user.type(screen.getByRole('textbox'), 'Hello');
       await user.click(screen.getByRole('button', { name: /send message/i }));
 
       expect(await screen.findByText('Failed to send. Try again.')).toBeInTheDocument();
@@ -474,8 +493,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      fireEvent.change(textarea, { target: { value: 'Hello' } });
-      await user.click(textarea);
+      await user.type(textarea, 'Hello');
       await user.keyboard('{Enter}');
 
       await waitFor(() => {
@@ -483,11 +501,14 @@ describe('MessageInput', () => {
       });
     });
 
-    it('should add newline on Shift+Enter', () => {
+    it('should add newline on Shift+Enter', async () => {
+      const user = userEvent.setup();
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      fireEvent.change(textarea, { target: { value: 'Line 1\nLine 2' } });
+      await user.type(textarea, 'Line 1');
+      await user.keyboard('{Shift>}{Enter}{/Shift}');
+      await user.keyboard('Line 2');
 
       expect(textarea).toHaveValue('Line 1\nLine 2');
       expect(mockSendNote).not.toHaveBeenCalled();
@@ -502,12 +523,12 @@ describe('MessageInput', () => {
 
       // Add text
       const textarea = screen.getByRole('textbox');
-      fireEvent.change(textarea, { target: { value: 'Test' } });
+      await user.type(textarea, 'Test');
 
       // Add image
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
-      fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
+      const mockFile = jpegFile();
+      await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
         expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();

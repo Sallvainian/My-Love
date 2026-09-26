@@ -296,7 +296,7 @@ export function MoodTracker() {
       {/* Segmented control - Story 5.4: Log / Timeline / Calendar */}
       <div className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-10 bg-page">
         <div className="mx-auto max-w-2xl px-4 py-3">
-          <div className="flex rounded-full bg-card2 p-1">
+          <div className="flex rounded-full bg-card2 p-1" data-testid="mood-tabs">
             {MOOD_TABS.map(({ key, label }) => {
               const isActive = activeTab === key;
               return (
@@ -431,7 +431,7 @@ export function MoodTracker() {
                 {/* Selection summary + Sync Status Indicator (AC-7), one muted row */}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[13px] text-muted">
                   {selectedMoods.length > 0 && (
-                    <span className="min-w-0">
+                    <span className="min-w-0" data-testid="mood-selected-summary">
                       Selected: {selectedMoods.map((m) => MOOD_DISPLAY[m].label).join(', ')}
                     </span>
                   )}

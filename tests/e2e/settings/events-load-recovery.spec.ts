@@ -122,6 +122,7 @@ test.describe('A failed Settings events load recovers on reconnect (DE.5-COMP-00
       // read before reconnect is aborted (an abort is no 4xx/5xx, so the
       // network-error monitor stays quiet). The client therefore never learns
       // the row seeded below until the reconnect read.
+      // playwright-utils deviation: the route must be installed before the next navigation and abort every events read; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route('**/rest/v1/events*', (route) => route.abort());
       await page.goto('/');
       await expect(page.getByTestId('events-load-error')).toBeVisible();

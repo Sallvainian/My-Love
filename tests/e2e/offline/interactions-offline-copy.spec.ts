@@ -20,7 +20,10 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { INTERACTIONS_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
+import { createInteractionInsert } from '../../support/factories/interaction-record-ownership';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -65,7 +68,7 @@ async function seedPartnerPoke(supabaseAdmin: TypedSupabaseClient): Promise<stri
   const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
   const { data, error } = await supabaseAdmin
     .from('interactions')
-    .insert({ type: 'poke', from_user_id: partnerId, to_user_id: userId, viewed: false })
+    .insert(createInteractionInsert({ type: 'poke', from_user_id: partnerId, to_user_id: userId }))
     .select('id')
     .single();
   expect(error).toBeNull();
@@ -86,23 +89,34 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Poke and kiss history from the local copy', () => {
-  test('history loaded online is listed offline after a reload, with the badge', async ({
+  test('[P1] history loaded online is listed offline after a reload, with the badge', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const pokeId = await seedPartnerPoke(supabaseAdmin);
 
     try {
       // GIVEN: the app starts online; the start refresh loads the history and
       // saves the copy before the sheet is ever opened.
+      const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
       await page.goto('/partner');
+      const history = await historyRead;
+      expect(history.status).toBe(200);
+      expect(history.responseJson).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: pokeId })])
+      );
       await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
-      await expect
-        .poll(async () => (await savedInteractionIds(page))?.includes(pokeId) ?? false)
-        .toBe(true);
+      await recurseUntil(
+        async () => (await savedInteractionIds(page))?.includes(pokeId) ?? false,
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
 
       // WHEN: the app reloads without a server answer and the device goes offline.
       let abortedReads = 0;
+      // playwright-utils deviation: the route must be installed before the next navigation and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route(INTERACTIONS_REST, (route) => {
         abortedReads += 1;
         return route.abort();
@@ -111,7 +125,7 @@ test.describe('Poke and kiss history from the local copy', () => {
       await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
       // The start read really hit the aborted route, so nothing after this
       // point can have come from the server.
-      await expect.poll(() => abortedReads).toBeGreaterThan(0);
+      await recurseUntil(async () => abortedReads, (v) => { expect(v).toBeGreaterThan(0); });
       await goOffline(page, true);
 
       // THEN: the badge shows the saved unviewed count…
@@ -129,45 +143,52 @@ test.describe('Poke and kiss history from the local copy', () => {
     }
   });
 
-  test('a poke sent while offline appears after reconnect without a reload', async ({
+  test('[P1] a poke sent while offline appears after reconnect without a reload', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     let pokeId: string | null = null;
 
     try {
       // GIVEN: signed in on the partner screen, history loaded, then offline.
+      const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
       await page.goto('/partner');
+      expect((await historyRead).status).toBe(200);
       await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
-      await expect.poll(() => savedInteractionIds(page)).not.toBeNull();
+      await recurseUntil(() => savedInteractionIds(page), (v) => { expect(v).not.toBeNull(); });
       await goOffline(page, true);
 
       // WHEN: the partner pokes while this device is offline, then it reconnects.
       pokeId = await seedPartnerPoke(supabaseAdmin);
       const id = pokeId;
-      const refreshRead = page.waitForResponse(
-        (response) =>
-          response.request().method() === 'GET' && response.url().includes('/rest/v1/interactions')
-      );
+      const refreshRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
       await goOffline(page, false);
       // The reconnect itself re-reads the server (the kind's refresher), and
       // that read carries the poke — so the test does not rest on Realtime,
       // whose socket setOffline may leave open.
       const response = await refreshRead;
-      expect(response.ok()).toBe(true);
-      const rows = (await response.json()) as { id: string }[];
+      expect(response.status).toBe(200);
+      const rows = response.responseJson as { id: string }[];
       expect(rows.map((row) => row.id)).toContain(id);
 
       // THEN: the poke is in state, the copy and the sheet, with the badge showing.
-      await expect
-        .poll(() =>
+      await recurseUntil(
+        () =>
           page.evaluate(
             (wanted) => window.__APP_STORE__?.getState().interactions.some((i) => i.id === wanted) ?? false,
             id
-          )
-        )
-        .toBe(true);
-      await expect.poll(async () => (await savedInteractionIds(page))?.includes(id) ?? false).toBe(true);
+          ),
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
+      await recurseUntil(
+        async () => (await savedInteractionIds(page))?.includes(id) ?? false,
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
       await expect(page.getByTestId('notification-badge')).toBeVisible();
       await page.getByTestId('history-button').click();
       await expect(

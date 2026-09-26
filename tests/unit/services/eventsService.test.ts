@@ -1,261 +1,35 @@
 /**
- * eventsService — the date parse and the failure surface
+ * eventsService — the date parse and the read path
  *
- * Two things here cannot be caught by the type system, and both are the reason
+ * One thing here cannot be caught by the type system, and it is the reason
  * this file exists:
  *
- * 1. `database.types.ts` types `event_date` as a plain `string`, so
- *    `new Date(row.event_date)` typechecks and builds. It is also wrong: that is
- *    ECMA-262's date-only form, parsed as UTC midnight, so every viewer west of
- *    UTC renders the previous day. The parse assertions below are written to
- *    hold in EVERY timezone — run the file under `TZ=America/New_York` and
- *    `TZ=Europe/Berlin` and the results must be identical.
- *
- * 2. RLS filters a non-creator's UPDATE or DELETE into a zero-row success with
- *    no error attached. A service that only checked `error` would report that
- *    write as having worked, and the UI would tell the user their edit saved.
+ * `database.types.ts` types `event_date` as a plain `string`, so
+ * `new Date(row.event_date)` typechecks and builds. It is also wrong: that is
+ * ECMA-262's date-only form, parsed as UTC midnight, so every viewer west of
+ * UTC renders the previous day. The parse assertions below are written to
+ * hold in EVERY timezone — run the file under `TZ=America/New_York` and
+ * `TZ=Europe/Berlin` and the results must be identical.
  *
  * The Supabase client is faked per file — `tests/setup.ts` installs no Supabase
  * mock — over a tiny in-memory backend, so the chained PostgREST builder is
  * exercised rather than asserted on.
+ *
+ * The backend and its builder live in `./fakeEventsBackend.ts`; the writes are
+ * covered in `./eventsService.writes.test.ts`.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-const USER_ID = 'USER-A-ID';
-const PARTNER_ID = 'USER-B-ID';
-
-interface EventRow {
-  id: string;
-  user_id: string;
-  label: string;
-  event_date: string;
-  description: string | null;
-  icon: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface FakePostgrestError {
-  code: string;
-  message: string;
-  details: string;
-  hint: string;
-}
-
-const backend = {
-  rows: [] as EventRow[],
-  /** Injected instead of running the query — a PostgREST error object, or a
-   *  plain Error standing in for a mid-flight network failure. */
-  nextError: null as FakePostgrestError | Error | null,
-  /** Reject the query with any thrown value, including null and undefined. */
-  nextRejection: null as { reason: unknown } | null,
-  /** Override a successful response, including `null`, for invalid-response tests. */
-  nextData: undefined as EventRow[] | null | undefined,
-  /** Which side of `getEvents`' two-window read `nextError` applies to. `null`
-   *  fails every query, which is what every write test wants; naming one bound
-   *  fails only the window carrying it, so each window's own error check is
-   *  reachable on its own. */
-  errorForBound: null as 'gte' | 'lt' | null,
-  /** Every `.update()` / `.insert()` payload the service sent, in order. */
-  payloads: [] as Record<string, unknown>[],
-  /** Every `.eq()` the service applied, so an added user_id filter is caught.
-   *  Date bounds live in `queries` instead, so this stays a pure equality log
-   *  and `expect(backend.filters).toEqual([])` keeps its whole meaning. */
-  filters: [] as { column: string; value: unknown }[],
-  /** One entry per query actually RUN, in run order: its date bounds, its
-   *  orderings and its row window. The two-sided read is asserted from here
-   *  rather than from a flat order log, which cannot say which window a
-   *  given `.order()` belonged to. */
-  queries: [] as {
-    bounds: { column: string; op: 'gte' | 'lt'; value: string }[];
-    orderings: { column: string; ascending: boolean }[];
-    range: { from: number; to: number } | null;
-    or?: string;
-  }[],
-  /** Bumped on every `from()` — an offline guard must leave this at 0. */
-  fromCalls: 0,
-  reset() {
-    this.rows = [];
-    this.nextError = null;
-    this.nextRejection = null;
-    this.nextData = undefined;
-    this.errorForBound = null;
-    this.payloads = [];
-    this.filters = [];
-    this.queries = [];
-    this.fromCalls = 0;
-  },
-};
-
-function row(overrides: Partial<EventRow> = {}): EventRow {
-  return {
-    id: 'event-1',
-    user_id: USER_ID,
-    label: 'Anniversary',
-    event_date: '2026-09-12',
-    description: null,
-    icon: 'calendar',
-    created_at: '2026-08-18T00:00:00.000Z',
-    updated_at: '2026-08-18T00:00:00.000Z',
-    ...overrides,
-  };
-}
-
-/** Evaluate the supported PostgREST boolean grammar independently of page logic. */
-function matchesExpression(candidate: EventRow, expression: string): boolean {
-  const group = /^(and|or)\((.*)\)$/.exec(expression);
-  if (group) {
-    const clauses: string[] = [];
-    let depth = 0;
-    let start = 0;
-    for (let i = 0; i < group[2].length; i += 1) {
-      const char = group[2][i];
-      if (char === '(') depth += 1;
-      if (char === ')') depth -= 1;
-      if (char === ',' && depth === 0) {
-        clauses.push(group[2].slice(start, i));
-        start = i + 1;
-      }
-    }
-    clauses.push(group[2].slice(start));
-    return group[1] === 'and'
-      ? clauses.every((clause) => matchesExpression(candidate, clause))
-      : clauses.some((clause) => matchesExpression(candidate, clause));
-  }
-  const comparison = /^(\w+)\.(eq|gt|lt)\.(.*)$/.exec(expression);
-  if (!comparison) throw new Error(`Unsupported filter: ${expression}`);
-  const actual = String(candidate[comparison[1] as keyof EventRow]);
-  const expected = comparison[3];
-  return comparison[2] === 'eq' ? actual === expected
-    : comparison[2] === 'gt' ? actual > expected : actual < expected;
-}
-
-/**
- * The PostgREST builder is chainable and thenable: every method returns itself,
- * and awaiting it runs the query.
- */
-function eventsQuery() {
-  let operation: 'select' | 'insert' | 'update' | 'delete' = 'select';
-  let payload: Record<string, unknown> = {};
-  const filters: { column: string; value: unknown }[] = [];
-  const orderings: { column: string; ascending: boolean }[] = [];
-  const bounds: { column: string; op: 'gte' | 'lt'; value: string }[] = [];
-  let range: { from: number; to: number } | null = null;
-  let or: string | undefined;
-
-  const matches = (candidate: EventRow): boolean => {
-    const record = candidate as unknown as Record<string, unknown>;
-    if (!filters.every((f) => record[f.column] === f.value)) return false;
-    if (or && !matchesExpression(candidate, `or(${or})`)) return false;
-    // `event_date` is a Postgres `date`, so its "YYYY-MM-DD" text compares the
-    // same way lexicographically as it does chronologically — which is what
-    // lets this stand in for a real range predicate.
-    return bounds.every((b) => {
-      const value = String(record[b.column]);
-      return b.op === 'gte' ? value >= b.value : value < b.value;
-    });
-  };
-
-  const run = (): { data: EventRow[] | null; error: FakePostgrestError | Error | null } => {
-    if (backend.nextRejection) throw backend.nextRejection.reason;
-    if (operation === 'select') {
-      backend.queries.push({ bounds: [...bounds], orderings: [...orderings], range, ...(or ? { or } : {}) });
-    }
-    const errorApplies =
-      backend.errorForBound === null || bounds.some((b) => b.op === backend.errorForBound);
-    if (backend.nextError && errorApplies) return { data: null, error: backend.nextError };
-    if (backend.nextData !== undefined) return { data: backend.nextData, error: null };
-
-    if (operation === 'insert') {
-      const inserted: EventRow = {
-        ...row({ id: `event-${backend.rows.length + 1}` }),
-        ...payload,
-      } as EventRow;
-      backend.rows.push(inserted);
-      return { data: [inserted], error: null };
-    }
-
-    if (operation === 'update') {
-      const hits = backend.rows.filter(matches);
-      hits.forEach((hit) => Object.assign(hit, payload));
-      return { data: hits, error: null };
-    }
-
-    if (operation === 'delete') {
-      const hits = backend.rows.filter(matches);
-      backend.rows = backend.rows.filter((candidate) => !hits.includes(candidate));
-      return { data: hits, error: null };
-    }
-
-    const found = backend.rows.filter(matches);
-    if (orderings.length) {
-      found.sort((a, b) => {
-        for (const { column, ascending } of orderings) {
-          const left = String((a as unknown as Record<string, unknown>)[column]);
-          const right = String((b as unknown as Record<string, unknown>)[column]);
-          const cmp = ascending ? left.localeCompare(right) : right.localeCompare(left);
-          if (cmp !== 0) return cmp;
-        }
-        return 0;
-      });
-    }
-    // PostgREST's `.range(from, to)` is inclusive at both ends.
-    return { data: range ? found.slice(range.from, range.to + 1) : found, error: null };
-  };
-
-  const builder: Record<string, unknown> = {
-    select: () => builder,
-    insert: (values: Record<string, unknown>) => {
-      operation = 'insert';
-      payload = values;
-      backend.payloads.push(values);
-      return builder;
-    },
-    update: (values: Record<string, unknown>) => {
-      operation = 'update';
-      payload = values;
-      backend.payloads.push(values);
-      return builder;
-    },
-    delete: () => {
-      operation = 'delete';
-      return builder;
-    },
-    eq: (column: string, value: unknown) => {
-      filters.push({ column, value });
-      backend.filters.push({ column, value });
-      return builder;
-    },
-    gte: (column: string, value: string) => {
-      bounds.push({ column, op: 'gte', value });
-      return builder;
-    },
-    lt: (column: string, value: string) => {
-      bounds.push({ column, op: 'lt', value });
-      return builder;
-    },
-    or: (expression: string) => {
-      or = expression;
-      return builder;
-    },
-    range: (from: number, to: number) => {
-      range = { from, to };
-      return builder;
-    },
-    order: (column: string, options?: { ascending?: boolean }) => {
-      const ascending = options?.ascending ?? true;
-      orderings.push({ column, ascending });
-      return builder;
-    },
-    single: async () => {
-      const result = run();
-      return { data: result.data?.[0] ?? null, error: result.error };
-    },
-    then: (onFulfilled: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) =>
-      Promise.resolve().then(run).then(onFulfilled, onRejected),
-  };
-  return builder;
-}
+import {
+  PAGE_SIZE,
+  PARTNER_ID,
+  USER_ID,
+  backend,
+  eventsQuery,
+  permissionDenied,
+  row,
+  setOnline,
+} from './fakeEventsBackend';
 
 vi.mock('@/api/supabaseClient', () => ({
   supabase: {
@@ -267,25 +41,7 @@ vi.mock('@/api/supabaseClient', () => ({
   },
 }));
 
-import {
-  EventWriteError,
-  eventsService,
-  isEventIcon,
-  parseEventDate,
-} from '@/services/eventsService';
-
-async function eventWriteFailure(promise: Promise<unknown>): Promise<EventWriteError> {
-  const failure = await promise.then(
-    () => null,
-    (error: unknown) => error
-  );
-  expect(failure).toBeInstanceOf(EventWriteError);
-  return failure as EventWriteError;
-}
-
-function setOnline(online: boolean): void {
-  Object.defineProperty(navigator, 'onLine', { value: online, configurable: true });
-}
+import { eventsService, isEventIcon, parseEventDate } from '@/services/eventsService';
 
 describe('eventsService', () => {
   beforeEach(() => {
@@ -378,19 +134,22 @@ describe('eventsService', () => {
     });
     afterEach(() => vi.useRealTimers());
 
-    it.each([0, 50, 51])('returns truthful raw continuation for %i rows in each window', async (count) => {
+    // Empty, exactly one page, and one row past it.
+    const WINDOW_SIZES = [0, PAGE_SIZE, PAGE_SIZE + 1];
+    it.each(WINDOW_SIZES)('returns truthful raw continuation for %i rows in each window', async (count) => {
       backend.rows = ['2026-09-11', '2026-09-12'].flatMap((date, side) =>
         Array.from({ length: count }, (_, index) => row({
           id: `${side}-${String(index).padStart(3, '0')}`, event_date: date,
         }))
       );
       const page = await eventsService.getEventsPage();
-      expect(page.events).toHaveLength(Math.min(count, 50) * 2);
-      expect(page.pagination.upcoming.hasMore).toBe(count > 50);
-      expect(page.pagination.past.hasMore).toBe(count > 50);
+      expect(page.events).toHaveLength(Math.min(count, PAGE_SIZE) * 2);
+      expect(page.pagination.upcoming.hasMore).toBe(count > PAGE_SIZE);
+      expect(page.pagination.past.hasMore).toBe(count > PAGE_SIZE);
       expect(backend.queries).toHaveLength(2);
       for (const query of backend.queries) {
-        expect(query.range).toEqual({ from: 0, to: 50 });
+        // PostgREST's range is inclusive, so `to: PAGE_SIZE` is the one-row lookahead.
+        expect(query.range).toEqual({ from: 0, to: PAGE_SIZE });
         expect(query.orderings.map((order) => order.column)).toEqual(['event_date', 'created_at', 'id']);
       }
       expect(backend.filters).toEqual([]);
@@ -398,7 +157,7 @@ describe('eventsService', () => {
     });
 
     it('continues only unfinished windows, with fixed local today across midnight', async () => {
-      backend.rows = Array.from({ length: 101 }, (_, index) => row({
+      backend.rows = Array.from({ length: 2 * PAGE_SIZE + 1 }, (_, index) => row({
         id: `past-${String(index).padStart(3, '0')}`, event_date: '2026-09-11',
       })).concat(row({ id: 'upcoming', event_date: '2026-09-12' }));
       const first = await eventsService.getEventsPage();
@@ -406,9 +165,9 @@ describe('eventsService', () => {
       const second = await eventsService.getEventsPage(first.pagination);
       const last = await eventsService.getEventsPage(second.pagination);
       const all = [...first.events, ...second.events, ...last.events];
-      expect(all).toHaveLength(102);
-      expect(new Set(all.map((event) => event.id)).size).toBe(102);
-      expect(second.events).toHaveLength(50);
+      expect(all).toHaveLength(2 * PAGE_SIZE + 2);
+      expect(new Set(all.map((event) => event.id)).size).toBe(2 * PAGE_SIZE + 2);
+      expect(second.events).toHaveLength(PAGE_SIZE);
       expect(last.events).toHaveLength(1);
       expect(last.pagination.past.hasMore).toBe(false);
       expect(backend.queries).toHaveLength(4);
@@ -419,7 +178,10 @@ describe('eventsService', () => {
       expect(backend.queries).toHaveLength(4);
     });
 
-    it.each(['2026-09-11', '2026-09-12'])('preserves microseconds and ID ties across the %s boundary', async (eventDate) => {
+    it.each([
+      ['2026-09-11', 'past', 'upcoming'],
+      ['2026-09-12', 'upcoming', 'past'],
+    ] as const)('preserves microseconds and ID ties across the %s boundary', async (eventDate, window, otherWindow) => {
       backend.rows = Array.from({ length: 103 }, (_, index) => row({
         id: `event-${String(index).padStart(3, '0')}`,
         event_date: eventDate,
@@ -427,7 +189,9 @@ describe('eventsService', () => {
         created_at: `2026-08-18T00:00:00.123${String(Math.floor(index / 2)).padStart(3, '0')}+00:00`,
       })).reverse();
       const first = await eventsService.getEventsPage();
-      const cursor = (eventDate < first.pagination.todayISO ? first.pagination.past : first.pagination.upcoming).cursor!;
+      expect(first.pagination.todayISO).toBe('2026-09-12');
+      expect(first.pagination[otherWindow]).toMatchObject({ hasMore: false, cursor: null });
+      const cursor = first.pagination[window].cursor!;
       expect(cursor.created_at).toMatch(/\.123\d{3}\+00:00/);
       const second = await eventsService.getEventsPage(first.pagination);
       const third = await eventsService.getEventsPage(second.pagination);
@@ -438,7 +202,7 @@ describe('eventsService', () => {
     });
 
     it('does not shift a page after a previously read row is deleted', async () => {
-      backend.rows = Array.from({ length: 51 }, (_, index) => row({
+      backend.rows = Array.from({ length: PAGE_SIZE + 1 }, (_, index) => row({
         id: `event-${String(index).padStart(3, '0')}`, event_date: '2026-09-11',
       }));
       const first = await eventsService.getEventsPage();
@@ -448,7 +212,7 @@ describe('eventsService', () => {
     });
 
     it('advances raw cursors even when an entire page cannot convert', async () => {
-      backend.rows = Array.from({ length: 51 }, (_, index) => row({
+      backend.rows = Array.from({ length: PAGE_SIZE + 1 }, (_, index) => row({
         id: `event-${String(index).padStart(3, '0')}`, event_date: 'infinity',
       }));
       const first = await eventsService.getEventsPage();
@@ -458,21 +222,21 @@ describe('eventsService', () => {
       const last = await eventsService.getEventsPage(first.pagination);
       expect(last.events).toEqual([]);
       expect(last.pagination.upcoming.hasMore).toBe(false);
-      expect(console.error).toHaveBeenCalledTimes(51);
+      expect(console.error).toHaveBeenCalledTimes(PAGE_SIZE + 1);
     });
 
     it('keeps lookahead truthful before cross-window deduplication', async () => {
-      backend.nextData = Array.from({ length: 51 }, (_, index) => row({ id: String(index) }));
+      backend.nextData = Array.from({ length: PAGE_SIZE + 1 }, (_, index) => row({ id: String(index) }));
       const page = await eventsService.getEventsPage();
-      expect(page.events).toHaveLength(50);
-      expect(new Set(page.events.map((event) => event.id)).size).toBe(50);
+      expect(page.events).toHaveLength(PAGE_SIZE);
+      expect(new Set(page.events.map((event) => event.id)).size).toBe(PAGE_SIZE);
       expect(page.pagination.past.hasMore).toBe(true);
       expect(page.pagination.upcoming.hasMore).toBe(true);
     });
 
     it.each(['gte', 'lt'] as const)('retries both unfinished windows after the %s window fails', async (bound) => {
       backend.rows = ['2026-09-11', '2026-09-12'].flatMap((eventDate, side) =>
-        Array.from({ length: 51 }, (_, index) => row({
+        Array.from({ length: PAGE_SIZE + 1 }, (_, index) => row({
           id: `event-${side}-${index}`, event_date: eventDate,
         }))
       );
@@ -552,7 +316,7 @@ describe('eventsService', () => {
           // The created_at tiebreak: Postgres leaves same-day order unspecified.
           { column: 'created_at', ascending: true },
         ],
-        range: { from: 0, to: 49 },
+        range: { from: 0, to: PAGE_SIZE - 1 },
       });
       expect(windowFor('lt')).toEqual({
         bounds: [{ column: 'event_date', op: 'lt', value: '2026-08-19' }],
@@ -560,7 +324,7 @@ describe('eventsService', () => {
           { column: 'event_date', ascending: false },
           { column: 'created_at', ascending: false },
         ],
-        range: { from: 0, to: 49 },
+        range: { from: 0, to: PAGE_SIZE - 1 },
       });
       // Exactly two, and only two. `windowFor` uses `.find`, so without this a
       // regression that added a third — an unbounded `.select('*')` alongside
@@ -714,8 +478,8 @@ describe('eventsService', () => {
 
       const events = await eventsService.getEvents(limit);
 
-      expect(windowFor('gte')?.range).toEqual({ from: 0, to: 49 });
-      expect(windowFor('lt')?.range).toEqual({ from: 0, to: 49 });
+      expect(windowFor('gte')?.range).toEqual({ from: 0, to: PAGE_SIZE - 1 });
+      expect(windowFor('lt')?.range).toEqual({ from: 0, to: PAGE_SIZE - 1 });
       expect(events.map((e) => e.id)).toEqual(['upcoming']);
     });
 
@@ -869,12 +633,7 @@ describe('eventsService', () => {
     });
 
     it('throws the mapped message when the query is rejected', async () => {
-      backend.nextError = {
-        code: '42501',
-        message: 'permission denied',
-        details: '',
-        hint: '',
-      };
+      backend.nextError = permissionDenied();
 
       await expect(eventsService.getEvents()).rejects.toThrow(
         /Permission denied - check Row Level Security policies/
@@ -895,12 +654,7 @@ describe('eventsService', () => {
           row({ id: 'upcoming', event_date: dateFromToday(5) }),
         ];
         backend.errorForBound = bound;
-        backend.nextError = {
-          code: '42501',
-          message: 'permission denied',
-          details: '',
-          hint: '',
-        };
+        backend.nextError = permissionDenied();
 
         await expect(eventsService.getEvents()).rejects.toThrow(
           /Permission denied - check Row Level Security policies/
@@ -924,374 +678,6 @@ describe('eventsService', () => {
       expect(failure?.message).toBe(
         '[EventsService.getEvents] Network error: fetch failed. Check your internet connection.'
       );
-    });
-  });
-
-  // ==========================================================================
-  // createEvent
-  // ==========================================================================
-
-  describe('createEvent', () => {
-    it('writes the input date string through untouched and returns the created event', async () => {
-      const created = await eventsService.createEvent({
-        userId: USER_ID,
-        label: 'Flight home',
-        eventDate: '2026-09-12',
-        description: 'Landing at 6pm',
-        icon: 'plane',
-      });
-
-      // The <input type="date"> value reaches the column verbatim — no
-      // toISOString() round trip, which would shift the day.
-      expect(backend.payloads[0]).toMatchObject({
-        user_id: USER_ID,
-        label: 'Flight home',
-        event_date: '2026-09-12',
-        description: 'Landing at 6pm',
-        icon: 'plane',
-      });
-
-      expect(created.label).toBe('Flight home');
-      expect(created.icon).toBe('plane');
-      expect(created.date.getDate()).toBe(12);
-      expect(created.date.getMonth()).toBe(8);
-      expect(backend.rows).toHaveLength(1);
-    });
-
-    it('omits icon so the column default applies when the caller does not choose one', async () => {
-      await eventsService.createEvent({
-        userId: USER_ID,
-        label: 'Something',
-        eventDate: '2026-10-01',
-      });
-
-      expect(backend.payloads[0]).not.toHaveProperty('icon');
-      expect(backend.payloads[0]).toMatchObject({ description: null });
-    });
-
-    it('throws before any request when the device is offline', async () => {
-      setOnline(false);
-
-      const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
-      );
-      expect(failure).toMatchObject({
-        code: 'offline',
-        message: 'You are offline. Events need a connection to save.',
-      });
-      expect(backend.fromCalls).toBe(0);
-      expect(backend.rows).toEqual([]);
-    });
-
-    it('refuses an unreadable date before issuing any request', async () => {
-      const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: 'infinity' })
-      );
-      expect(failure).toMatchObject({
-        code: 'validation',
-        message: 'Not a valid calendar date: infinity',
-      });
-      expect(backend.fromCalls).toBe(0);
-      expect(backend.rows).toEqual([]);
-    });
-
-    it('codes an empty successful insert response without changing its message', async () => {
-      backend.nextData = null;
-
-      const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
-      );
-
-      expect(failure).toMatchObject({
-        code: 'invalid-response',
-        message: 'The event was not created',
-      });
-    });
-
-    it('codes an unreadable created row as an invalid response', async () => {
-      backend.nextData = [row({ event_date: 'infinity' })];
-
-      const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
-      );
-
-      expect(failure).toMatchObject({
-        code: 'invalid-response',
-        message: 'The event was saved but its date could not be read',
-      });
-    });
-
-    it('surfaces the reason when the insert is rejected', async () => {
-      backend.nextError = {
-        code: '42501',
-        message: 'new row violates row-level security policy',
-        details: '',
-        hint: '',
-      };
-
-      const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: PARTNER_ID, label: 'x', eventDate: '2026-10-01' })
-      );
-      expect(failure.code).toBe('transport');
-      expect(failure.message).toMatch(/Permission denied - check Row Level Security policies/);
-    });
-
-    it('does not promise a sync when the insert fails mid-flight — writes have no queue either', async () => {
-      // Same trap as the read path: the write may or may not have landed, and
-      // nothing will retry it, so the message must not claim a queue will.
-      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
-      const originalStack = originalError.stack;
-      backend.nextError = originalError;
-
-      const failure = await eventWriteFailure(
-        eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' })
-      );
-
-      expect(failure.message).toBe(
-        '[EventsService.createEvent] Network error: fetch failed. Check your internet connection.'
-      );
-      expect(failure.code).toBe('transport');
-      expect(failure.cause).toBe(originalError);
-      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
-    });
-  });
-
-  // ==========================================================================
-  // updateEvent
-  // ==========================================================================
-
-  describe('updateEvent', () => {
-    it('stamps updated_at on every write and returns the updated event', async () => {
-      backend.rows = [row({ id: 'event-1' })];
-
-      const updated = await eventsService.updateEvent('event-1', {
-        label: 'Renamed',
-        eventDate: '2026-11-03',
-      });
-
-      // Client-maintained by design: the migration installs no trigger and
-      // PostgREST does not set it.
-      const payload = backend.payloads[0];
-      expect(typeof payload.updated_at).toBe('string');
-      expect(Number.isNaN(Date.parse(payload.updated_at as string))).toBe(false);
-      expect(payload).toMatchObject({ label: 'Renamed', event_date: '2026-11-03' });
-
-      expect(updated.label).toBe('Renamed');
-      expect(updated.date.getDate()).toBe(3);
-      expect(updated.date.getMonth()).toBe(10);
-    });
-
-    it('writes only the fields the caller supplied', async () => {
-      backend.rows = [row({ id: 'event-1', description: 'keep me' })];
-
-      await eventsService.updateEvent('event-1', { icon: 'ring' });
-
-      expect(backend.payloads[0]).not.toHaveProperty('label');
-      expect(backend.payloads[0]).not.toHaveProperty('event_date');
-      expect(backend.payloads[0]).not.toHaveProperty('description');
-      expect(backend.rows[0].description).toBe('keep me');
-    });
-
-    it('accepts an explicit null description', async () => {
-      backend.rows = [row({ id: 'event-1', description: 'drop me' })];
-
-      await eventsService.updateEvent('event-1', { description: null });
-
-      expect(backend.payloads[0]).toMatchObject({ description: null });
-    });
-
-    it('throws when the update matched no row — an RLS filter is silent', async () => {
-      // A partner's UPDATE comes back `{ data: [], error: null }`. Reporting
-      // success here is what would tell the user their edit saved.
-      backend.rows = [row({ id: 'someone-elses' })];
-
-      const failure = await eventWriteFailure(
-        eventsService.updateEvent('event-1', { label: 'x' })
-      );
-      expect(failure).toMatchObject({
-        code: 'not-found',
-        message: 'Event not found or not yours to edit',
-      });
-    });
-
-    it('does not dress a zero-row write up as a network problem', async () => {
-      // The catch tail would otherwise promise the user their change "will be
-      // synced when you're back online", which is the opposite of what happened.
-      await expect(eventsService.updateEvent('missing', { label: 'x' })).rejects.toThrow(
-        /^Event not found or not yours to edit$/
-      );
-    });
-
-    it('throws before any request when the device is offline', async () => {
-      setOnline(false);
-
-      const failure = await eventWriteFailure(
-        eventsService.updateEvent('event-1', { label: 'x' })
-      );
-      expect(failure).toMatchObject({
-        code: 'offline',
-        message: 'You are offline. Events need a connection to save.',
-      });
-      expect(backend.fromCalls).toBe(0);
-    });
-
-    it('refuses an unreadable date before issuing any request', async () => {
-      backend.rows = [row({ id: 'event-1' })];
-
-      const failure = await eventWriteFailure(
-        eventsService.updateEvent('event-1', { eventDate: '2026-02-30' })
-      );
-      expect(failure).toMatchObject({
-        code: 'validation',
-        message: 'Not a valid calendar date: 2026-02-30',
-      });
-      expect(backend.fromCalls).toBe(0);
-    });
-
-    it('codes an unreadable updated row as an invalid response', async () => {
-      backend.rows = [row({ id: 'event-1', event_date: 'infinity' })];
-
-      const failure = await eventWriteFailure(
-        eventsService.updateEvent('event-1', { label: 'Renamed' })
-      );
-
-      expect(failure).toMatchObject({
-        code: 'invalid-response',
-        message: 'The event was saved but its date could not be read',
-      });
-    });
-
-    it('surfaces the reason when the update is rejected', async () => {
-      backend.rows = [row({ id: 'event-1' })];
-      backend.nextError = { code: '42501', message: 'permission denied', details: '', hint: '' };
-
-      const failure = await eventWriteFailure(
-        eventsService.updateEvent('event-1', { label: 'x' })
-      );
-      expect(failure.code).toBe('transport');
-      expect(failure.message).toMatch(/Permission denied - check Row Level Security policies/);
-    });
-
-    it('codes a mid-flight network failure as transport', async () => {
-      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
-      const originalStack = originalError.stack;
-      backend.nextError = originalError;
-
-      const failure = await eventWriteFailure(
-        eventsService.updateEvent('event-1', { label: 'x' })
-      );
-
-      expect(failure).toMatchObject({
-        code: 'transport',
-        message:
-          '[EventsService.updateEvent] Network error: fetch failed. Check your internet connection.',
-      });
-      expect(failure.cause).toBe(originalError);
-      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
-    });
-  });
-
-  // ==========================================================================
-  // deleteEvent
-  // ==========================================================================
-
-  describe('deleteEvent', () => {
-    it('removes the row', async () => {
-      backend.rows = [row({ id: 'event-1' }), row({ id: 'event-2' })];
-
-      await eventsService.deleteEvent('event-1');
-
-      expect(backend.rows.map((r) => r.id)).toEqual(['event-2']);
-    });
-
-    it('throws when the delete matched no row — the same silent RLS filter', async () => {
-      backend.rows = [row({ id: 'someone-elses' })];
-
-      const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
-      expect(failure).toMatchObject({
-        code: 'not-found',
-        message: 'Event not found or not yours to delete',
-      });
-      expect(backend.rows).toHaveLength(1);
-    });
-
-    it('throws before any request when the device is offline', async () => {
-      setOnline(false);
-
-      const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
-      expect(failure).toMatchObject({
-        code: 'offline',
-        message: 'You are offline. Events need a connection to delete.',
-      });
-      expect(backend.fromCalls).toBe(0);
-    });
-
-    it('surfaces the reason when the delete is rejected', async () => {
-      backend.nextError = { code: '42501', message: 'permission denied', details: '', hint: '' };
-
-      const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
-      expect(failure.code).toBe('transport');
-      expect(failure.message).toMatch(/Permission denied - check Row Level Security policies/);
-    });
-
-    it('codes a mid-flight network failure as transport', async () => {
-      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
-      const originalStack = originalError.stack;
-      backend.nextError = originalError;
-
-      const failure = await eventWriteFailure(eventsService.deleteEvent('event-1'));
-
-      expect(failure).toMatchObject({
-        code: 'transport',
-        message:
-          '[EventsService.deleteEvent] Network error: fetch failed. Check your internet connection.',
-      });
-      expect(failure.cause).toBe(originalError);
-      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
-    });
-  });
-
-  describe.each([
-    [
-      'createEvent',
-      () => eventsService.createEvent({ userId: USER_ID, label: 'x', eventDate: '2026-10-01' }),
-    ],
-    ['updateEvent', () => eventsService.updateEvent('event-1', { label: 'x' })],
-    ['deleteEvent', () => eventsService.deleteEvent('event-1')],
-  ] as const)('%s transport rejections', (operation, write) => {
-    it('preserves a rejected TypeError and its diagnostics as the cause', async () => {
-      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
-      const originalStack = originalError.stack;
-      backend.nextRejection = { reason: originalError };
-
-      const failure = await eventWriteFailure(write());
-
-      expect(failure.code).toBe('transport');
-      expect(failure.message).toBe(
-        `[EventsService.${operation}] Network error: fetch failed. Check your internet connection.`
-      );
-      expect(failure.cause).toBe(originalError);
-      expect(failure.cause).toMatchObject({ stack: originalStack, code: 'ECONNRESET' });
-    });
-
-    it.each([
-      ['object', { message: 'socket closed', retryable: true }],
-      ['string', 'socket closed'],
-      ['number', 0],
-      ['boolean', false],
-      ['null', null],
-      ['undefined', undefined],
-    ])('preserves a thrown %s as the cause with the fallback message', async (_kind, reason) => {
-      backend.nextRejection = { reason };
-
-      const failure = await eventWriteFailure(write());
-
-      expect(failure.code).toBe('transport');
-      expect(failure.message).toBe(
-        `[EventsService.${operation}] Network error: Unknown network error. Check your internet connection.`
-      );
-      expect(failure).toHaveProperty('cause');
-      expect(failure.cause).toBe(reason);
     });
   });
 });

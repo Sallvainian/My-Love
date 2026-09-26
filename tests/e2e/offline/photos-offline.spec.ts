@@ -23,6 +23,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { PHOTOS_LIST_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
@@ -179,9 +181,12 @@ function tile(page: Page, caption: string) {
 async function expectTileShowsImage(page: Page, caption: string) {
   const image = tile(page, caption).getByTestId('photo-grid-item-image');
   await expect(image).toHaveAttribute('src', /^blob:/);
-  await expect
-    .poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
-    .toBe(true);
+  await recurseUntil(
+    () => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+    (v) => {
+      expect(v).toBe(true);
+    }
+  );
   await expect(tile(page, caption).getByTestId('photo-grid-item-not-saved')).toHaveCount(0);
 }
 
@@ -191,6 +196,7 @@ async function expectTileShowsImage(page: Page, caption: string) {
  */
 async function reloadWithoutServerThenGoOffline(page: Page) {
   let abortedReads = 0;
+  // playwright-utils deviation: the route must be installed before the next navigation and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
   await page.route(PHOTOS_REST, (route) => {
     abortedReads += 1;
     return route.abort();
@@ -198,7 +204,7 @@ async function reloadWithoutServerThenGoOffline(page: Page) {
   await page.route(STORAGE, (route) => route.abort());
   await page.reload();
   await expect(page.getByRole('heading', { level: 1, name: 'Photos' })).toBeVisible();
-  await expect.poll(() => abortedReads).toBeGreaterThan(0);
+  await recurseUntil(async () => abortedReads, (v) => { expect(v).toBeGreaterThan(0); });
   await goOffline(page, true);
 }
 
@@ -209,10 +215,44 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+/**
+ * Cap the `image-cache` store at `capacity` distinct entries: a put of a new
+ * entry past the cap throws a QuotaExceededError, and a delete frees a slot.
+ * Everything the script uses is declared inside it, because addInitScript
+ * serialises only the function.
+ */
+async function installImageCacheQuota(page: Page, capacity: number) {
+  await page.addInitScript((cap) => {
+    const held = new Set<string>();
+    const reserve = (id: string) => {
+      if (held.has(id)) return;
+      if (held.size >= cap) {
+        throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+      }
+      held.add(id);
+    };
+    const proto = IDBObjectStore.prototype;
+    const put = proto.put;
+    const remove = proto.delete;
+    proto.put = function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+      if (this.name === 'image-cache') {
+        const row = value as { userId: string; path: string };
+        reserve(JSON.stringify([row.userId, row.path]));
+      }
+      return put.call(this, value, key);
+    };
+    proto.delete = function (this: IDBObjectStore, query: IDBValidKey | IDBKeyRange) {
+      if (this.name === 'image-cache' && Array.isArray(query)) held.delete(JSON.stringify(query));
+      return remove.call(this, query);
+    };
+  }, capacity);
+}
+
 test.describe('Photos offline', () => {
-  test('after one online session every photo is listed and every image shows offline', async ({
+  test('[P1] after one online session every photo is listed and every image shows offline', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     let seeded: SeededPhoto[] = [];
 
@@ -222,18 +262,27 @@ test.describe('Photos offline', () => {
 
       // GIVEN: the gallery loads online; the list is saved and the fill caches
       // every image.
+      const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
       await page.goto('/photos');
+      const list = await listRead;
+      expect(list.status).toBe(200);
+      expect(list.responseJson).toEqual(
+        expect.arrayContaining(seeded.map((photo) => expect.objectContaining({ id: photo.id })))
+      );
       for (const photo of seeded) {
         await expect(tile(page, photo.caption)).toBeVisible();
       }
-      await expect
-        .poll(async () => {
+      await recurseUntil(
+        async () => {
           const ids = (await savedPhotoIds(page)) ?? [];
           return seeded.every((photo) => ids.includes(photo.id));
-        })
-        .toBe(true);
+        },
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
       for (const photo of seeded) {
-        await expect.poll(() => imageCached(page, photo.path)).toBe(true);
+        await recurseUntil(() => imageCached(page, photo.path), (v) => { expect(v).toBe(true); });
       }
 
       // WHEN: the app reloads with no server answer, and the device goes offline.
@@ -251,9 +300,12 @@ test.describe('Photos offline', () => {
       await expect(viewer).toBeVisible();
       const viewed = viewer.getByRole('img', { name: seeded[1].caption });
       await expect(viewed).toHaveAttribute('src', /^blob:/);
-      await expect
-        .poll(() => viewed.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
-        .toBe(true);
+      await recurseUntil(
+        () => viewed.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
       await expect(viewer.getByTestId('photo-viewer-not-saved')).toHaveCount(0);
       await expect(viewer.getByText('Failed to load photo')).toHaveCount(0);
     } finally {
@@ -264,36 +316,14 @@ test.describe('Photos offline', () => {
     }
   });
 
-  test('with storage refused, the oldest image is left out and shows a placeholder offline', async ({
+  test('[P1] with storage refused, the oldest image is left out and shows a placeholder offline', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // Refuse a third distinct image-cache entry, as a full browser would: the
     // write throws a QuotaExceededError. Deletes free a slot.
-    await page.addInitScript(() => {
-      const CAPACITY = 2;
-      const held = new Set<string>();
-      const proto = IDBObjectStore.prototype;
-      const put = proto.put;
-      const remove = proto.delete;
-      proto.put = function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
-        if (this.name === 'image-cache') {
-          const row = value as { userId: string; path: string };
-          const id = JSON.stringify([row.userId, row.path]);
-          if (!held.has(id)) {
-            if (held.size >= CAPACITY) {
-              throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
-            }
-            held.add(id);
-          }
-        }
-        return put.call(this, value, key);
-      };
-      proto.delete = function (this: IDBObjectStore, query: IDBValidKey | IDBKeyRange) {
-        if (this.name === 'image-cache' && Array.isArray(query)) held.delete(JSON.stringify(query));
-        return remove.call(this, query);
-      };
-    });
+    await installImageCacheQuota(page, 2);
 
     let seeded: SeededPhoto[] = [];
 
@@ -310,19 +340,30 @@ test.describe('Photos offline', () => {
       });
 
       // GIVEN: the gallery loads online while storage holds only two images.
+      const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
       await page.goto('/photos');
+      const list = await listRead;
+      expect(list.status).toBe(200);
+      expect(list.responseJson).toEqual(
+        expect.arrayContaining(seeded.map((photo) => expect.objectContaining({ id: photo.id })))
+      );
       for (const photo of seeded) {
         await expect(tile(page, photo.caption)).toBeVisible();
       }
-      await expect.poll(() => oldestDownloads).toBeGreaterThanOrEqual(2);
+      await recurseUntil(async () => oldestDownloads, (v) => {
+        expect(v).toBeGreaterThanOrEqual(2);
+      });
       // The newest two are kept; the oldest could not be cached.
-      await expect
-        .poll(async () => [
+      await recurseUntil(
+        async () => [
           await imageCached(page, newest.path),
           await imageCached(page, middle.path),
           await imageCached(page, oldest.path),
-        ])
-        .toEqual([true, true, false]);
+        ],
+        (v) => {
+          expect(v).toEqual([true, true, false]);
+        }
+      );
       // Online, the oldest image still shows (downloaded, just not kept).
       await expectTileShowsImage(page, oldest.caption);
 

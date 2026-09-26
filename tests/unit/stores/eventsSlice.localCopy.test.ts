@@ -120,8 +120,12 @@ function setOnline(value: boolean) {
   Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
 
-/** Let queued microtasks (the copy read, the set) run. */
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+/**
+ * The copy read `loadEvents` started, as the promise it awaits. The slice
+ * registers its own `await` on it first, so a test awaiting it next resumes
+ * only after the slice has acted on the saved copy.
+ */
+const copyReadSettled = (call = 0) => readLocalCopy.mock.results[call].value as Promise<unknown>;
 
 describe('eventsSlice local copy', () => {
   beforeEach(() => {
@@ -290,8 +294,7 @@ describe('eventsSlice local copy', () => {
       const store = createTestStore();
 
       const load = store.getState().loadEvents();
-      await flush();
-      expect(store.getState().events).toEqual([old]);
+      await vi.waitFor(() => expect(store.getState().events).toEqual([old]));
       expect(store.getState().eventsIsLoading).toBe(true);
 
       server.resolve(page([fresh]));
@@ -335,7 +338,8 @@ describe('eventsSlice local copy', () => {
       store.setState({ events: shown });
 
       const load = store.getState().loadEvents();
-      await flush();
+      expect(readLocalCopy).toHaveBeenCalledWith(USER_A, EVENTS_COPY_KIND);
+      await copyReadSettled();
       expect(store.getState().events).toEqual(shown);
 
       server.resolve(page([]));
@@ -411,7 +415,7 @@ describe('eventsSlice local copy', () => {
 
       // The copy read lands after the confirmed write: the copy is older.
       copyRead.resolve([saved(old)]);
-      await flush();
+      await copyRead.promise;
       expect(store.getState().events).toEqual([added]);
 
       // The server page predates the write; the write is replayed over it.
@@ -435,7 +439,7 @@ describe('eventsSlice local copy', () => {
       deleteEvent.mockResolvedValue(undefined);
       await store.getState().removeEvent('a');
       copyRead.resolve([saved(a)]);
-      await flush();
+      await copyRead.promise;
 
       expect(store.getState().events).toEqual([]);
       server.resolve(page([a]));
@@ -461,7 +465,7 @@ describe('eventsSlice local copy', () => {
       expect(await load).toEqual({ status: 'stale' });
       expect(store.getState().events).toEqual([]);
       server.resolve(page([event('a-private', '2026-10-01')]));
-      await flush();
+      await server.promise;
       expect(store.getState().events).toEqual([]);
       expect(writeLocalCopy).not.toHaveBeenCalled();
     });
@@ -472,7 +476,8 @@ describe('eventsSlice local copy', () => {
       const store = createTestStore();
 
       const load = store.getState().loadEvents();
-      await flush();
+      // Past the (empty) copy read, so the load is waiting on the server page.
+      await copyReadSettled();
       store.setState({ userId: USER_B, authSessionVersion: 2, events: [] });
       server.resolve(page([event('a-private', '2026-10-01')]));
 

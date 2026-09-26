@@ -4,6 +4,7 @@
  * Critical path: Google OAuth sign-in must initiate properly.
  * Covers OAuth button visibility and redirect initiation.
  */
+import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 
 test.describe('Google OAuth', () => {
@@ -34,9 +35,10 @@ test.describe('Google OAuth', () => {
     // narrowed to its initial type at the use site, so `authorizeUrl!` would be
     // `never` there and the compiler could not check the assertions below.
     const authorizeUrls: string[] = [];
+    // playwright-utils deviation: the stub must be in place before the click starts the authorize navigation; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/auth/v1/authorize**', (route) => {
       authorizeUrls.push(route.request().url());
-      route.fulfill({
+      return route.fulfill({
         status: 302,
         headers: { Location: appBaseUrl + '/' },
       });
@@ -46,8 +48,13 @@ test.describe('Google OAuth', () => {
     // the SDK awaits `crypto.subtle.digest` before assigning
     // `window.location.href`, so the navigation no longer starts synchronously
     // with the click and the assertions below would otherwise race an empty
-    // `authorizeUrls`.
-    const authorizeRequested = page.waitForRequest('**/auth/v1/authorize**');
+    // `authorizeUrls`. The standalone form, because the fixture drops `timeout`.
+    const authorizeRequested = interceptNetworkCall({
+      page,
+      method: 'GET',
+      url: '**/auth/v1/authorize*',
+      timeout: 15_000,
+    });
     await page.getByTestId('google-signin-button').click();
     await authorizeRequested;
 

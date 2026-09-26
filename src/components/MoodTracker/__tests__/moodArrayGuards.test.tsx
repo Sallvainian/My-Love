@@ -1,5 +1,6 @@
 /** Shared mood normalization at all display boundaries; data hooks are mocked. */
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseMood } from '../../../api/validation/supabaseSchemas';
@@ -157,9 +158,9 @@ function moodRecord(moodTypes: unknown): SupabaseMood {
 }
 
 /** The lucide class MOOD_DISPLAY's icon renders for 'happy' (FaceSlightlySmiling, via its `smile` alias)... */
-const HAPPY_ICON = '.lucide-smile';
+const HAPPY_ICON = 'lucide-smile';
 /** ...and for 'tired' (Battery). */
-const TIRED_ICON = '.lucide-battery';
+const TIRED_ICON = 'lucide-battery';
 
 describe('MoodHistoryItem mood_types guard', () => {
   it.each(NON_ARRAY_ROWS)(
@@ -168,8 +169,8 @@ describe('MoodHistoryItem mood_types guard', () => {
       expect(() => render(<MoodHistoryItem mood={moodRecord(value)} />)).not.toThrow();
 
       const icons = screen.getByTestId('mood-emoji');
-      expect(icons.querySelectorAll('svg')).toHaveLength(1);
-      expect(icons.querySelector(HAPPY_ICON)).not.toBeNull();
+      expect(within(icons).getAllByTestId(/^mood-icon-/)).toHaveLength(1);
+      expect(within(icons).getByTestId('mood-icon-happy')).toHaveClass(HAPPY_ICON);
       expect(screen.getByTestId('mood-label')).toHaveTextContent('Happy');
     }
   );
@@ -178,9 +179,9 @@ describe('MoodHistoryItem mood_types guard', () => {
     render(<MoodHistoryItem mood={moodRecord(['happy', 'tired'])} />);
 
     const icons = screen.getByTestId('mood-emoji');
-    expect(icons.querySelectorAll('svg')).toHaveLength(2);
-    expect(icons.querySelector(HAPPY_ICON)).not.toBeNull();
-    expect(icons.querySelector(TIRED_ICON)).not.toBeNull();
+    expect(within(icons).getAllByTestId(/^mood-icon-/)).toHaveLength(2);
+    expect(within(icons).getByTestId('mood-icon-happy')).toHaveClass(HAPPY_ICON);
+    expect(within(icons).getByTestId('mood-icon-tired')).toHaveClass(TIRED_ICON);
     expect(screen.getByTestId('mood-label')).toHaveTextContent('Happy, Tired');
   });
 });
@@ -202,9 +203,9 @@ describe('PartnerMoodDisplay mood_types guard', () => {
       expect(() => renderWith(value)).not.toThrow();
 
       const chips = screen.getByTestId('partner-mood-emoji');
-      expect(chips.children).toHaveLength(1);
+      expect(within(chips).getAllByTestId('partner-mood-chip')).toHaveLength(1);
       expect(chips).toHaveTextContent('Happy');
-      expect(chips.querySelector(HAPPY_ICON)).not.toBeNull();
+      expect(within(chips).getByTestId('mood-icon-happy')).toHaveClass(HAPPY_ICON);
     }
   );
 
@@ -212,11 +213,12 @@ describe('PartnerMoodDisplay mood_types guard', () => {
     renderWith(['happy', 'tired']);
 
     const chips = screen.getByTestId('partner-mood-emoji');
-    expect(chips.children).toHaveLength(2);
-    expect(chips.children[0]).toHaveTextContent('Happy');
-    expect(chips.children[1]).toHaveTextContent('Tired');
-    expect(chips.querySelector(HAPPY_ICON)).not.toBeNull();
-    expect(chips.querySelector(TIRED_ICON)).not.toBeNull();
+    const chipEls = within(chips).getAllByTestId('partner-mood-chip');
+    expect(chipEls).toHaveLength(2);
+    expect(chipEls[0]).toHaveTextContent('Happy');
+    expect(chipEls[1]).toHaveTextContent('Tired');
+    expect(within(chips).getByTestId('mood-icon-happy')).toHaveClass(HAPPY_ICON);
+    expect(within(chips).getByTestId('mood-icon-tired')).toHaveClass(TIRED_ICON);
     expect(screen.getByTestId('partner-mood-label')).toHaveTextContent('Happy, Tired');
     expect(chips).toHaveAttribute('aria-label', 'happy, tired mood');
   });
@@ -267,12 +269,9 @@ describe('PartnerMoodDisplay partner name', () => {
     return render(<PartnerMoodDisplay partnerId={PARTNER_ID} />);
   }
 
-  /** The avatar is the first child of the card's header row. */
+  /** The partner avatar at the start of the card's header row. */
   function avatar(): HTMLElement {
-    const heading = screen.getByRole('heading', { level: 2 });
-    return heading.closest('[data-testid="partner-mood-display"]')!.querySelector(
-      '[aria-hidden="true"]'
-    ) as HTMLElement;
+    return screen.getByTestId('partner-mood-avatar');
   }
 
   afterEach(() => {
@@ -285,7 +284,7 @@ describe('PartnerMoodDisplay partner name', () => {
 
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sam is feeling');
     expect(avatar()).toHaveTextContent('S');
-    expect(avatar().querySelector('.lucide-user')).toBeNull();
+    expect(within(avatar()).queryByTestId('partner-mood-avatar-icon')).not.toBeInTheDocument();
   });
 
   it('trims the store name', () => {
@@ -313,7 +312,7 @@ describe('PartnerMoodDisplay partner name', () => {
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
       'Your partner is feeling'
     );
-    expect(avatar().querySelector('.lucide-user')).not.toBeNull();
+    expect(within(avatar()).getByTestId('partner-mood-avatar-icon')).toBeInTheDocument();
     expect(avatar().textContent).toBe('');
   });
 });
@@ -471,8 +470,9 @@ describe('MoodTracker moods guard', () => {
 });
 
 /**
- * Standalone store built from the slice, the way `tests/unit/stores/moodSlice.test.ts`
- * builds one — `fetchPartnerMoods` is an action, not a render.
+ * Standalone store built from the slice, the way `createTestStore` in
+ * `tests/unit/stores/moodSliceFixture.ts` builds one — `fetchPartnerMoods` is
+ * an action, not a render.
  */
 function createTestStore() {
   const stateRef = { current: null as (MoodSlice & Record<string, unknown>) | null };
@@ -500,7 +500,9 @@ describe('moodSlice.fetchPartnerMoods mood_types guard', () => {
     mockedGetPartnerId.mockResolvedValue(PARTNER_ID);
   });
 
-  // Matching `tests/unit/stores/moodSlice.test.ts:84-86`, plus the `onLine`
+  // Matching the `describe('moodSlice')` `afterEach` in
+  // `tests/unit/stores/moodSlice.test.ts` (repeated in each
+  // `moodSlice.*.test.ts`), plus the `onLine`
   // redefinition this describe makes — it is a plain data property, so
   // `restoreAllMocks` does not undo it and it would leak into anything appended
   // after this describe.
@@ -568,24 +570,43 @@ describe('malformed element recovery at mood displays', () => {
     return render(<MoodTracker />);
   }
 
-  it.each(displays)('%s preserves recognized values in order, including duplicates', (kind) => {
-    const { container } = display(kind);
-    if (kind === 'calendar') {
-      expect(screen.getByTestId(`calendar-day-${DATE_KEY}`)).toHaveAttribute('aria-label', expect.stringContaining('sad, tired, sad mood'));
-    } else {
-      expect(container.textContent?.toLowerCase()).toContain('sad, tired, sad');
-    }
+  it.each([
+    ['history', () => screen.getByTestId('mood-label').textContent, 'Sad, Tired, Sad'],
+    ['partner', () => screen.getByTestId('partner-mood-label').textContent, 'Sad, Tired, Sad'],
+    ['modal', () => screen.getByTestId('modal-mood-type').textContent, 'Sad, Tired, Sad'],
+    [
+      'calendar',
+      () => screen.getByTestId(`calendar-day-${DATE_KEY}`).getAttribute('aria-label'),
+      'September 12, 2026 - sad, tired, sad mood. Press enter to view details.',
+    ],
+    ['tracker', () => screen.getByText(/^Selected:/).textContent, 'Selected: Sad, Tired, Sad'],
+  ] as const)('%s preserves recognized values in order, including duplicates', (kind, read, expected) => {
+    display(kind);
+    expect(read()).toBe(expected);
   });
 
-  it.each(displays)('%s excludes wholly invalid moods instead of inventing a display value', (kind) => {
-    const { container } = display(kind, true);
-    if (kind === 'calendar') expect(screen.getByTestId(`calendar-day-${DATE_KEY}`)).toHaveAttribute('data-has-mood', 'false');
-    else if (kind === 'tracker') {
-      expect(container.textContent).not.toContain('Selected:');
-      expect(container.querySelector('textarea')?.value ?? '').toBe('');
-    } else {
-      expect(screen.queryByTestId(kind === 'history' ? 'mood-history-item' : kind === 'partner' ? 'partner-mood-display' : 'mood-detail-modal')).toBeNull();
-    }
+  it.each([
+    ['history', 'mood-history-item'],
+    ['partner', 'partner-mood-display'],
+    ['modal', 'mood-detail-modal'],
+  ] as const)('%s excludes wholly invalid moods instead of inventing a display value', (kind, testId) => {
+    display(kind, true);
+    expect(screen.queryByTestId(testId)).toBeNull();
+  });
+
+  it('calendar excludes wholly invalid moods instead of inventing a display value', () => {
+    display('calendar', true);
+    expect(screen.getByTestId(`calendar-day-${DATE_KEY}`)).toHaveAttribute('data-has-mood', 'false');
+  });
+
+  it('tracker excludes wholly invalid moods instead of inventing a display value', async () => {
+    const { container } = display('tracker', true);
+    expect(container.textContent).not.toContain('Selected:');
+    // A seeded entry with a note auto-expands the note field, so the collapsed
+    // toggle is itself evidence the entry was not seeded; opening it must then
+    // show an empty note rather than 'hidden note'.
+    await userEvent.click(screen.getByTestId('mood-add-note-toggle'));
+    expect(screen.getByRole('textbox')).toHaveValue('');
   });
 
   it('normalizes partner records independently and omits invalid siblings', async () => {

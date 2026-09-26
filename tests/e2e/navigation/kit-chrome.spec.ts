@@ -20,6 +20,12 @@ const KIT_ACCENT = {
   dark: 'rgb(244, 114, 182)', // #f472b6
 } as const;
 
+/**
+ * Kit wordmark type, as computed: `font-lora text-[19px] font-semibold italic`
+ * on the "My Love" span in src/components/Navigation/AppNavigation.tsx.
+ */
+const WORDMARK_TYPE = { style: 'italic', weight: '600', size: '19px' } as const;
+
 test.describe('Style kit chrome', () => {
   test.beforeEach(async ({ page }) => {
     // Dismiss welcome splash
@@ -60,20 +66,25 @@ test.describe('Style kit chrome', () => {
         };
       });
       expect(type.family).toMatch(/^"?Lora"?/);
-      expect(type.style).toBe('italic');
-      expect(type.weight).toBe('600');
-      expect(type.size).toBe('19px');
+      expect(type.style).toBe(WORDMARK_TYPE.style);
+      expect(type.weight).toBe(WORDMARK_TYPE.weight);
+      expect(type.size).toBe(WORDMARK_TYPE.size);
 
       // An italic 600 face must actually load: `fonts.check()` is also true when
       // no Lora face exists at all, and `fonts.load()` settles for the nearest
       // weight or an upright face, so the returned faces are checked too.
-      const loraFaces = await page.evaluate(async () =>
-        (await document.fonts.load('italic 600 19px Lora')).map((face) => ({
-          style: face.style,
-          weight: face.weight,
-        }))
+      const loraFaces = await page.evaluate(
+        async (font) =>
+          (await document.fonts.load(font)).map((face) => ({
+            style: face.style,
+            weight: face.weight,
+          })),
+        `${WORDMARK_TYPE.style} ${WORDMARK_TYPE.weight} ${WORDMARK_TYPE.size} Lora`
       );
-      expect(loraFaces).toContainEqual({ style: 'italic', weight: '600' });
+      expect(loraFaces).toContainEqual({
+        style: WORDMARK_TYPE.style,
+        weight: WORDMARK_TYPE.weight,
+      });
     });
   }
 });

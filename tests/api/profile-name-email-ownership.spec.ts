@@ -31,6 +31,7 @@
 import { log } from '@seontechnologies/playwright-utils';
 import { createOutsiderClient } from '../support/helpers/rls-security';
 import { test, expect } from '../support/merged-fixtures';
+import { throwCollected } from '../support/helpers/collected-failures';
 
 /** PostgREST maps SQLSTATE 42501 -- RLS denial and privilege denial alike -- to 403. */
 const DENIED_HTTP_STATUS = 403;
@@ -45,37 +46,43 @@ test.describe('Profile name and email ownership', () => {
     supabaseAdmin,
   }) => {
     const owner = await createOutsiderClient(supabaseAdmin, 'profile-owner');
-    const { data: ownerSession } = await owner.client.auth.getSession();
-    const token = ownerSession.session?.access_token;
-    expect(token, 'the throwaway account must hold a session').toBeTruthy();
-
-    const seeded = await supabaseAdmin
-      .from('users')
-      .select('display_name, email')
-      .eq('id', owner.userId)
-      .single();
-    // Premise: the trigger seeded this row from the email, because
-    // createOutsiderClient supplies no display_name metadata. Without this the
-    // "name changed" assertion below could pass against a row that already read
-    // that way.
-    expect(seeded.data?.display_name).toBe(seeded.data?.email);
-    const seededEmail = seeded.data?.email;
-
-    const patch = (body: Record<string, unknown>) =>
-      apiRequest<ErrorEnvelope>({
-        method: 'PATCH',
-        path: `/rest/v1/users?id=eq.${owner.userId}`,
-        headers: { Authorization: `Bearer ${token}`, Prefer: 'return=representation' },
-        body,
-        retryConfig: { maxRetries: 0 },
-      });
-
-    const readBack = () =>
-      supabaseAdmin.from('users').select('display_name, email').eq('id', owner.userId).single();
-
     const failures: unknown[] = [];
 
     try {
+      // Inside the try: a failed session check or premise read must still reach
+      // the account deletion below, rather than leak the throwaway account.
+      const { data: ownerSession } = await owner.client.auth.getSession();
+      const token = ownerSession.session?.access_token;
+      expect(token, 'the throwaway account must hold a session').toBeTruthy();
+
+      const seeded = await supabaseAdmin
+        .from('users')
+        .select('display_name, email')
+        .eq('id', owner.userId)
+        .single();
+      // Premise: the trigger seeded this row from the email, because
+      // createOutsiderClient supplies no display_name metadata. Without this the
+      // "name changed" assertion below could pass against a row that already read
+      // that way. The read is checked first, so a failed read cannot pass the
+      // premise as undefined === undefined.
+      expect(seeded.error).toBeNull();
+      expect(seeded.data).not.toBeNull();
+      expect(seeded.data?.email).toEqual(expect.any(String));
+      expect(seeded.data?.display_name).toBe(seeded.data?.email);
+      const seededEmail = seeded.data?.email;
+
+      const patch = (body: Record<string, unknown>) =>
+        apiRequest<ErrorEnvelope>({
+          method: 'PATCH',
+          path: `/rest/v1/users?id=eq.${owner.userId}`,
+          headers: { Authorization: `Bearer ${token}`, Prefer: 'return=representation' },
+          body,
+          retryConfig: { maxRetries: 0 },
+        });
+
+      const readBack = () =>
+        supabaseAdmin.from('users').select('display_name, email').eq('id', owner.userId).single();
+
       await log.step('The owner sets its own display name');
       const { status: acceptedStatus, body: accepted } = await apiRequest<ProfileRow[]>({
         method: 'PATCH',
@@ -133,9 +140,7 @@ test.describe('Profile name and email ownership', () => {
       failures.push(error);
     }
 
-    if (failures.length > 0) {
-      throw new AggregateError(failures, 'Profile ownership assertion or account cleanup failed');
-    }
+    throwCollected(failures, 'Profile ownership assertion or account cleanup failed');
   });
 
   test('[P0] the owner cannot write the partner profile row', async ({
@@ -143,14 +148,18 @@ test.describe('Profile name and email ownership', () => {
     supabaseAdmin,
   }) => {
     const owner = await createOutsiderClient(supabaseAdmin, 'profile-pair-a');
-    const partner = await createOutsiderClient(supabaseAdmin, 'profile-pair-b');
-    const { data: ownerSession } = await owner.client.auth.getSession();
-    const token = ownerSession.session?.access_token;
-    expect(token, 'the throwaway account must hold a session').toBeTruthy();
-
+    // Only the accounts that exist: the partner is created inside the try, so a
+    // failure creating it still reaches the owner's deletion below.
+    const accounts = [owner];
     const failures: unknown[] = [];
 
     try {
+      const partner = await createOutsiderClient(supabaseAdmin, 'profile-pair-b');
+      accounts.push(partner);
+      const { data: ownerSession } = await owner.client.auth.getSession();
+      const token = ownerSession.session?.access_token;
+      expect(token, 'the throwaway account must hold a session').toBeTruthy();
+
       // Linked as accept_partner_request would leave them, so the target really
       // is a partner row -- readable to the caller under the SELECT policy, and
       // therefore a row whose refusal says something.
@@ -207,7 +216,7 @@ test.describe('Profile name and email ownership', () => {
       failures.push(error);
     }
 
-    for (const account of [owner, partner]) {
+    for (const account of accounts) {
       try {
         const { error: cleanupError } = await account.cleanup();
         expect(cleanupError, `failed to delete a throwaway account: ${cleanupError?.message}`)
@@ -217,8 +226,6 @@ test.describe('Profile name and email ownership', () => {
       }
     }
 
-    if (failures.length > 0) {
-      throw new AggregateError(failures, 'Partner-row refusal assertion or account cleanup failed');
-    }
+    throwCollected(failures, 'Partner-row refusal assertion or account cleanup failed');
   });
 });

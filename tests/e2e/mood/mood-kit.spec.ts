@@ -8,6 +8,7 @@
  * chrome. The kit colours are `--kit-*` variables that switch under
  * `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import type { Page } from '@playwright/test';
 
@@ -92,13 +93,15 @@ async function savedMoodCount(page: Page): Promise<number | null> {
  * scrollbar narrows clientWidth, and scrollWidth follows it.
  */
 async function expectNoHorizontalOverflow(page: Page) {
-  await expect
-    .poll(() =>
+  await recurseUntil(
+    () =>
       page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-      )
-    )
-    .toBe(0);
+      ),
+    (v) => {
+      expect(v).toBe(0);
+    }
+  );
 }
 
 test.describe('Mood on the style kit', () => {
@@ -135,7 +138,7 @@ test.describe('Mood on the style kit', () => {
         'background-color',
         KIT_PAGE[colorScheme]
       );
-      await expect(page.getByTestId('mood-tab-tracker').locator('..')).toHaveCSS(
+      await expect(page.getByTestId('mood-tabs')).toHaveCSS(
         'background-color',
         KIT_CARD2[colorScheme]
       );
@@ -194,7 +197,7 @@ test.describe('Mood on the style kit', () => {
       // it, and this test never submits. Assert that precondition at its source
       // rather than branching on the tile, so a late reload has nothing to seed
       // from.
-      await expect.poll(() => savedMoodCount(page)).toBe(0);
+      await recurseUntil(() => savedMoodCount(page), (v) => { expect(v).toBe(0); });
       const happy = page.getByTestId('mood-button-happy');
       await expect(happy).toHaveAttribute('aria-pressed', 'false');
 
@@ -203,7 +206,9 @@ test.describe('Mood on the style kit', () => {
       await expect(happy).toHaveAttribute('aria-pressed', 'true');
       await expect(happy).toHaveCSS('background-color', KIT_TINT[colorScheme]);
       await expect(happy).toHaveCSS('color', KIT_ACCENT[colorScheme]);
-      await expect(page.getByText(/Selected:.*Happy/)).toBeVisible();
+      const selectedSummary = page.getByTestId('mood-selected-summary');
+      await expect(selectedSummary).toBeVisible();
+      await expect(selectedSummary).toHaveText(/Selected:.*Happy/);
 
       expect(await chromeText(page)).not.toMatch(/\p{Extended_Pictographic}/u);
     });

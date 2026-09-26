@@ -187,6 +187,7 @@ export function NoteRemoveConfirmation({
         ref={panelRef}
         tabIndex={-1}
         className={`${DIALOG_SURFACE} max-w-md`}
+        data-testid="note-remove-panel"
       >
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">

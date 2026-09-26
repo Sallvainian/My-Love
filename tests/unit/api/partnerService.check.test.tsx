@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { PostgrestError } from '@supabase/supabase-js';
 
 const backend = vi.hoisted(() => ({ error: null as unknown, requests: [] as string[] }));
@@ -96,24 +97,27 @@ describe('partner request CHECK presentation', () => {
 
   it.each(actions)('%s shows a plain backend CHECK error in the rendered caller', async (_method, button) => {
     backend.error = { ...raw };
+    const user = userEvent.setup();
     render(<PartnerMoodView />);
-    fireEvent.click(screen.getByRole('button', { name: button }));
+    await user.click(screen.getByRole('button', { name: button }));
     await vi.waitFor(() => expect(screen.getByText(friendly)).toBeDefined());
     expect(screen.queryByText(/raw constraint/)).toBeNull();
   });
 
   it.each(actions)('%s retains plain non-CHECK caller fallback', async (_method, button, verb) => {
     backend.error = { ...raw, code: '23502', message: 'original database message' };
+    const user = userEvent.setup();
     render(<PartnerMoodView />);
-    fireEvent.click(screen.getByRole('button', { name: button }));
+    await user.click(screen.getByRole('button', { name: button }));
     await vi.waitFor(() => expect(screen.getByText(`Failed to ${verb} partner request`)).toBeDefined());
     expect((backend.error as { message: string }).message).toBe('original database message');
   });
 
   it.each(actions)('%s retains Error instance presentation for non-CHECK errors', async (_method, button) => {
     backend.error = new Error('original error');
+    const user = userEvent.setup();
     render(<PartnerMoodView />);
-    fireEvent.click(screen.getByRole('button', { name: button }));
+    await user.click(screen.getByRole('button', { name: button }));
     await vi.waitFor(() => expect(screen.getByText('original error')).toBeDefined());
   });
 
@@ -144,9 +148,10 @@ describe('partner requests offline (ticket 11)', () => {
     async (_method, button, verb) => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
       vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+      const user = userEvent.setup();
       render(<PartnerMoodView />);
 
-      fireEvent.click(screen.getByRole('button', { name: button }));
+      await user.click(screen.getByRole('button', { name: button }));
 
       await vi.waitFor(() =>
         expect(screen.getByTestId('partner-connection-error')).toHaveTextContent(
@@ -157,9 +162,13 @@ describe('partner requests offline (ticket 11)', () => {
     }
   );
 
-  it.each(actions)('%s goes out as before once online', async (method) => {
+  it.each([
+    ['sendPartnerRequest', ['getUser', 'insert']],
+    ['acceptPartnerRequest', ['accept_partner_request']],
+    ['declinePartnerRequest', ['decline_partner_request']],
+  ] as const)('%s goes out as before once online', async (method, expectedRequests) => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     await partnerService[method]('target');
-    expect(backend.requests.length).toBeGreaterThan(0);
+    expect(backend.requests).toEqual(expectedRequests);
   });
 });

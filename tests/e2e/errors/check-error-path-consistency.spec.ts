@@ -1,4 +1,6 @@
+import type { Page } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import type { Database } from '../../../src/types/database.types';
 import { createCheckErrorPathData } from '../../support/factories/check-error-path-data';
@@ -36,8 +38,10 @@ test.describe('DW-38 CHECK error presentation', () => {
       );
       const bubble = page.getByTestId('love-note-message').filter({ hasText: content });
       await expect(bubble).toHaveCount(1);
-      await expect(page.getByText(friendlyCheck, { exact: true })).toBeVisible();
-      await expect(page.getByText(checkError.message, { exact: true })).toHaveCount(0);
+      const errorBanner = page.getByTestId('notes-error-banner');
+      await expect(errorBanner).toBeVisible();
+      await expect(errorBanner).toHaveText(friendlyCheck);
+      await expect(page.getByRole('main')).not.toContainText(checkError.message);
 
       await log.step('Retry receives the same CHECK and keeps the retry action');
       const failedRetry = interceptNetworkCall({
@@ -58,7 +62,8 @@ test.describe('DW-38 CHECK error presentation', () => {
         { timeout: 10000 }
       );
       await expect(bubble.getByRole('button', { name: 'Retry sending message' })).toBeVisible();
-      await expect(page.getByText(friendlyCheck, { exact: true })).toBeVisible();
+      await expect(errorBanner).toBeVisible();
+      await expect(errorBanner).toHaveText(friendlyCheck);
 
       await log.step('Successful retry replaces the optimistic row and dismisses the CHECK banner');
       // maybeSingle on POST accepts the one-row representation array from PostgREST.
@@ -87,77 +92,127 @@ test.describe('DW-38 CHECK error presentation', () => {
       await expect(bubble).toHaveCount(1);
       await expect(bubble).toBeVisible();
       await expect(bubble.getByRole('button', { name: 'Retry sending message' })).toHaveCount(0);
-      await expect(page.getByText(friendlyCheck, { exact: true })).toHaveCount(0);
+      await expect(errorBanner).toHaveCount(0);
+      await expect(page.getByRole('main')).not.toContainText(friendlyCheck);
     }
   );
 
-  for (const action of ['send', 'accept', 'decline'] as const) {
+  test(
+    '[P1] DW38-E2E-send partner send presents a plain JSON CHECK error',
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ page, authToken, interceptNetworkCall }) => {
+      const data = createCheckErrorPathData();
+      const { friendlyCheck, checkError, targetId } = data;
+      const userId = tokenUserId(authToken);
+      const { partnerRead, profiles, requests } = interceptPartnerReads(interceptNetworkCall, data, []);
+      const write = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/partner_requests',
+        fulfillResponse: { status: 400, body: checkError },
+      });
+      await page.goto('/partner');
+      await Promise.all([partnerRead, requests]);
+      await log.step('Attempt to send a partner request');
+      await page.getByLabel('Search by email or display name').fill('DW38');
+      await profiles;
+      await page.getByRole('button', { name: 'Send Request', exact: true }).click();
+      const response = await write;
+      expect(response.status).toBe(400);
+      expect(response.responseJson).toEqual(checkError);
+      expect(response.requestJson).toEqual({ from_user_id: userId, to_user_id: targetId, status: 'pending' });
+      await expectPlainCheckBanner(page, friendlyCheck);
+      await expect(page.getByRole('button', { name: 'Send Request', exact: true })).toBeVisible();
+    }
+  );
+
+  const incomingActions = [
+    {
+      action: 'accept',
+      writeUrl: '**/rest/v1/rpc/accept_partner_request',
+      button: 'Accept',
+    },
+    {
+      action: 'decline',
+      writeUrl: '**/rest/v1/rpc/decline_partner_request',
+      button: 'Decline',
+    },
+  ] as const;
+
+  for (const { action, writeUrl, button } of incomingActions) {
     test(
       `[P1] DW38-E2E-${action} partner ${action} presents a plain JSON CHECK error`,
       { annotation: [{ type: 'skipNetworkMonitoring' }] },
       async ({ page, authToken, interceptNetworkCall }) => {
-        const { friendlyCheck, checkError, targetId, requestId, createdAt, email } = createCheckErrorPathData();
-        const { sub: userId } = JSON.parse(Buffer.from(authToken.split('.')[1], 'base64url').toString()) as { sub: string };
-        expect(userId).toEqual(expect.any(String));
-        const incoming = action !== 'send';
-        // Fake only this browser's read responses; never unlink worker-pool users.
-        const partnerRead = interceptNetworkCall({
-          method: 'GET',
-          url: '**/rest/v1/users?select=partner_id*',
-          fulfillResponse: { status: 200, body: { partner_id: null, updated_at: createdAt } },
-        });
-        const profiles = interceptNetworkCall({
-          method: 'GET',
-          url: '**/rest/v1/users?select=id*',
-          fulfillResponse: {
-            status: 200,
-            body: [{ id: targetId, email, display_name: 'DW38 Partner' }],
-          },
-        });
-        const requests = interceptNetworkCall({
-          method: 'GET',
-          url: '**/rest/v1/partner_requests?**',
-          fulfillResponse: {
-            status: 200,
-            body: incoming ? [{ id: requestId, from_user_id: targetId, to_user_id: userId, status: 'pending', created_at: createdAt }] : [],
-          },
-        });
+        const data = createCheckErrorPathData();
+        const { friendlyCheck, checkError, targetId, requestId, createdAt } = data;
+        const userId = tokenUserId(authToken);
+        const { partnerRead, profiles, requests } = interceptPartnerReads(interceptNetworkCall, data, [
+          { id: requestId, from_user_id: targetId, to_user_id: userId, status: 'pending', created_at: createdAt },
+        ]);
         const write = interceptNetworkCall({
           method: 'POST',
-          url: action === 'send'
-            ? '**/rest/v1/partner_requests'
-            : `**/rest/v1/rpc/${action}_partner_request`,
+          url: writeUrl,
           fulfillResponse: { status: 400, body: checkError },
         });
         await page.goto('/partner');
         await Promise.all([partnerRead, requests]);
         await log.step(`Attempt to ${action} a partner request`);
-        if (action === 'send') {
-          await page.getByLabel('Search by email or display name').fill('DW38');
-          await profiles;
-          await page.getByRole('button', { name: 'Send Request', exact: true }).click();
-        } else {
-          await profiles;
-          await page.getByRole('button', { name: action === 'accept' ? 'Accept' : 'Decline', exact: true }).click();
-        }
+        await profiles;
+        await page.getByRole('button', { name: button, exact: true }).click();
         const response = await write;
         expect(response.status).toBe(400);
         expect(response.responseJson).toEqual(checkError);
-        expect(response.requestJson).toEqual(action === 'send'
-          ? { from_user_id: userId, to_user_id: targetId, status: 'pending' }
-          : { p_request_id: requestId });
-        // The rejected store action rethrows unchanged; this banner is component-local state.
-        const banner = page.getByTestId('partner-connection-error');
-        await expect(banner).toHaveText(friendlyCheck);
-        await expect(banner).not.toContainText('dw38_unique_length_check');
-        await expect(banner).not.toContainText('new row');
-        if (incoming) {
-          await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible();
-          await expect(page.getByRole('button', { name: 'Decline', exact: true })).toBeVisible();
-        } else {
-          await expect(page.getByRole('button', { name: 'Send Request', exact: true })).toBeVisible();
-        }
+        expect(response.requestJson).toEqual({ p_request_id: requestId });
+        await expectPlainCheckBanner(page, friendlyCheck);
+        // The incoming request stays actionable: both controls remain.
+        await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Decline', exact: true })).toBeVisible();
       }
     );
   }
 });
+
+/** The signed-in worker's user id, read from its access token's `sub`. */
+function tokenUserId(authToken: string): string {
+  const { sub } = JSON.parse(Buffer.from(authToken.split('.')[1], 'base64url').toString()) as { sub: string };
+  expect(sub).toEqual(expect.any(String));
+  return sub;
+}
+
+/**
+ * Fakes only this browser's partner-screen reads; never unlinks worker-pool
+ * users. `pendingRequests` is what the partner_requests read returns.
+ */
+function interceptPartnerReads(
+  interceptNetworkCall: InterceptNetworkCallFn,
+  { targetId, createdAt, email }: ReturnType<typeof createCheckErrorPathData>,
+  pendingRequests: Array<Record<string, string>>
+) {
+  const partnerRead = interceptNetworkCall({
+    method: 'GET',
+    url: '**/rest/v1/users?select=partner_id*',
+    fulfillResponse: { status: 200, body: { partner_id: null, updated_at: createdAt } },
+  });
+  const profiles = interceptNetworkCall({
+    method: 'GET',
+    url: '**/rest/v1/users?select=id*',
+    fulfillResponse: {
+      status: 200,
+      body: [{ id: targetId, email, display_name: 'DW38 Partner' }],
+    },
+  });
+  const requests = interceptNetworkCall({
+    method: 'GET',
+    url: '**/rest/v1/partner_requests?**',
+    fulfillResponse: { status: 200, body: pendingRequests },
+  });
+  return { partnerRead, profiles, requests };
+}
+
+/** The rejected store action rethrows unchanged; this banner is component-local state. */
+async function expectPlainCheckBanner(page: Page, friendlyCheck: string) {
+  const banner = page.getByTestId('partner-connection-error');
+  await expect(banner).toHaveText(friendlyCheck);
+  await expect(banner).not.toContainText('dw38_unique_length_check');
+  await expect(banner).not.toContainText('new row');
+}

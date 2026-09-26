@@ -48,6 +48,14 @@ vi.mock('../../src/api/auth/actionService', () => ({
   signIn: vi.fn(),
   signInWithGoogle: vi.fn(),
 }));
+// Signing in starts App's unawaited refreshLocalCopies(), whose refreshers
+// run against the mocked client through fake-indexeddb and log their failures
+// after the last test, while the worker is closing. The notice never depends
+// on them; App.localCopyRefresh.test.tsx covers that wiring.
+vi.mock('../../src/services/localCopy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/localCopy')>()),
+  refreshLocalCopies: vi.fn(async () => {}),
+}));
 vi.mock('../../src/services/eventsService', () => {
   const eventsService = {
     getEvents: vi.fn(async () => []),
@@ -138,12 +146,18 @@ function deferred<T>() {
 
 const initialState = useAppStore.getInitialState();
 
+// Pinned (noon EDT), so the welcome splash's "seen it recently" stamp below is
+// measured against a fixed clock rather than the live one. Only `Date` is
+// faked, so RTL's `waitFor` keeps its real timers.
+const NOW = new Date('2026-09-15T16:00:00.000Z');
+
 beforeEach(() => {
+  vi.setSystemTime(NOW);
   vi.clearAllMocks();
   localStorage.clear();
   // The welcome splash renders over the shell and would answer for the app
   // instead of `app-container`; this is the "seen it recently" state.
-  localStorage.setItem('lastWelcomeView', String(Date.now()));
+  localStorage.setItem('lastWelcomeView', String(NOW.getTime()));
   window.history.replaceState({}, '', '/');
   // Signed out: the login screen is the only surface a notice has.
   auth.getSession.mockResolvedValue(null);
@@ -166,6 +180,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   localStorage.clear();
+  vi.useRealTimers();
 });
 
 async function renderSignedOut() {
@@ -227,7 +242,7 @@ describe('App callback notice lifetime', () => {
     await act(async () => {});
     // `checkAuth` awaits the outcome before it clears `authLoading`, so the app
     // is still on its bootstrap screen -- which is the window this guards.
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-loading-screen')).toBeInTheDocument();
 
     // WHEN: a session arrives first, and only then does the outcome resolve.
     await act(async () => auth.listener!(session()));

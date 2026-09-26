@@ -35,8 +35,9 @@ describe('validateMessageContent', () => {
     expect(validateMessageContent(exactMessage).valid).toBe(true);
   });
 
-  it('exports MAX_MESSAGE_LENGTH as 1000', () => {
+  it('caps a message at 1000 characters', () => {
     expect(MAX_MESSAGE_LENGTH).toBe(1000);
+    expect(validateMessageContent('a'.repeat(MAX_MESSAGE_LENGTH + 1)).valid).toBe(false);
   });
 });
 
@@ -68,7 +69,7 @@ describe('sanitizeMessageContent', () => {
     expect(sanitizeMessageContent('<a href="http://evil.com">click me</a>')).toBe('click me');
   });
 
-  it('handles empty string', () => {
+  it('returns an empty string unchanged', () => {
     expect(sanitizeMessageContent('')).toBe('');
   });
 });

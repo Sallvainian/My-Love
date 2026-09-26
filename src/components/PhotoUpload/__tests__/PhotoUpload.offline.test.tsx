@@ -3,7 +3,9 @@
  * is compressed or any request goes out, with the reason in the dialog's error
  * block. Retry returns to the preview with the same file.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -41,11 +43,18 @@ import { PhotoUpload } from '../PhotoUpload';
 
 const OFFLINE = 'You are offline. Photos need a connection to upload.';
 
-function pickPhoto() {
+async function pickPhoto(user: UserEvent) {
   const input = screen.getByTestId('photo-upload-file-input') as HTMLInputElement;
-  fireEvent.change(input, {
-    target: { files: [new File(['x'], 'beach.jpg', { type: 'image/jpeg' })] },
-  });
+  await user.upload(input, new File(['x'], 'beach.jpg', { type: 'image/jpeg' }));
+}
+
+/** Pick a photo, go offline, and press Upload. */
+async function refuseOffline(user: UserEvent) {
+  render(<PhotoUpload isOpen onClose={vi.fn()} />);
+  await pickPhoto(user);
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+  await user.click(screen.getByTestId('photo-upload-submit-button'));
 }
 
 beforeEach(() => {
@@ -60,25 +69,29 @@ afterEach(() => {
 });
 
 describe('PhotoUpload offline', () => {
-  it('refuses Upload with the offline reason; nothing is compressed or uploaded', () => {
-    render(<PhotoUpload isOpen onClose={vi.fn()} />);
-    pickPhoto();
-    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
-
-    fireEvent.click(screen.getByTestId('photo-upload-submit-button'));
+  it('refuses Upload with the offline reason; nothing is compressed or uploaded', async () => {
+    const user = userEvent.setup();
+    await refuseOffline(user);
 
     expect(screen.getByTestId('photo-upload-error')).toHaveTextContent(OFFLINE);
     expect(screen.getAllByRole('alert')).toHaveLength(1);
     expect(compressImage).not.toHaveBeenCalled();
     expect(uploadPhoto).not.toHaveBeenCalled();
+  });
+
+  it('Retry after an offline refusal returns to the preview with the same photo', async () => {
+    const user = userEvent.setup();
+    await refuseOffline(user);
+    expect(screen.getByTestId('photo-upload-error')).toHaveTextContent(OFFLINE);
 
     // Retry returns to the preview with the same photo, ready to upload.
-    fireEvent.click(screen.getByTestId('photo-upload-retry'));
+    await user.click(screen.getByTestId('photo-upload-retry'));
     expect(screen.queryByTestId('photo-upload-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('photo-upload-preview-image')).toBeInTheDocument();
   });
 
   it('online, Upload compresses and uploads as before', async () => {
+    const user = userEvent.setup();
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
     compressImage.mockResolvedValue({ blob: new Blob(['x'], { type: 'image/jpeg' }), width: 1, height: 1 });
     uploadPhoto.mockResolvedValue({ success: true });
@@ -96,9 +109,9 @@ describe('PhotoUpload offline', () => {
     );
     try {
       render(<PhotoUpload isOpen onClose={vi.fn()} />);
-      pickPhoto();
+      await pickPhoto(user);
 
-      fireEvent.click(screen.getByTestId('photo-upload-submit-button'));
+      await user.click(screen.getByTestId('photo-upload-submit-button'));
 
       await waitFor(() => expect(uploadPhoto).toHaveBeenCalledTimes(1));
       expect(compressImage).toHaveBeenCalledTimes(1);

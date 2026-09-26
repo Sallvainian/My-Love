@@ -20,6 +20,8 @@ import {
   seedEvent,
 } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -84,9 +86,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Events from the local copy', () => {
-  test('events loaded once online are listed offline on Home and in Settings', async ({
+  test('[P1] events loaded once online are listed offline on Home and in Settings', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -100,9 +103,13 @@ test.describe('Events from the local copy', () => {
     try {
       // GIVEN: Home loads online, which saves the copy. Settings is lazy and
       // dev mode has no service worker, so its module is loaded while online.
+      const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
       await page.goto('/');
+      const upcoming = await upcomingRead;
+      expect(upcoming.status).toBe(200);
+      expect(upcoming.responseJson).toEqual([expect.objectContaining({ id: eventId, label: LABEL })]);
       await expect(page.getByTestId(HOME_CARD)).toBeVisible();
-      await expect.poll(() => savedEventLabels(page)).toEqual([LABEL]);
+      await recurseUntil(() => savedEventLabels(page), (v) => { expect(v).toEqual([LABEL]); });
       await navigateTo(page, 'settings');
       await expect(settingsRow(page)).toBeVisible();
       await navigateTo(page, 'mood');
@@ -116,6 +123,7 @@ test.describe('Events from the local copy', () => {
       // AND: a reload that cannot reach the events table, then offline, shows
       // the saved copy alone — this session never had a server answer.
       await goOffline(page, false);
+      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route('**/rest/v1/events*', (route) => route.abort());
       // The reload stays on /settings, whose list comes from the copy.
       await page.reload();

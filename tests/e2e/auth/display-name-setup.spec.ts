@@ -27,7 +27,9 @@ import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 import { test, expect } from '../../support/merged-fixtures';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { deleteSentNote } from '../../support/helpers/love-notes';
 import { navigateTo } from '../../support/helpers/navigation';
+import { LOVE_NOTES_READ, LOVE_NOTE_SEND, gateNameRead } from '../../support/helpers/reads';
 
 type Dedicated = { email: string; userId: string; cleanup: () => Promise<void> };
 
@@ -95,6 +97,7 @@ test.describe('Display Name Setup', () => {
   test('[P0] should show display name setup for new OAuth users', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // GIVEN: An account signed up without a display name.
     const account = await createNamelessAccount(supabaseAdmin, 'nameless-shows');
@@ -115,7 +118,11 @@ test.describe('Display Name Setup', () => {
       await expect(page.getByTestId('login-screen')).toBeVisible();
       await page.getByRole('textbox', { name: 'Email' }).fill(account.email);
       await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+      const signInGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
       await page.getByTestId('submit-button').click();
+      const signInName = await signInGate;
+      expect(signInName.status).toBe(200);
+      expect(signInName.responseJson).toEqual({ display_name: account.email });
 
       // THEN: Display name setup modal is shown, and the app is not.
       await expect(page.getByTestId('display-name-setup')).toBeVisible();
@@ -127,7 +134,11 @@ test.describe('Display Name Setup', () => {
       // profile on load. Asserting it is *visible* rather than absent is what
       // makes that observable — a `toHaveCount(0)` would pass whether or not the
       // gate ever ran.
+      const coldGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
       await page.reload();
+      const coldName = await coldGate;
+      expect(coldName.status).toBe(200);
+      expect(coldName.responseJson).toEqual({ display_name: account.email });
       await expect(page.getByTestId('display-name-setup')).toBeVisible();
       await expect(page.getByTestId('app-container')).toHaveCount(0);
     } catch (error) {
@@ -148,6 +159,7 @@ test.describe('Display Name Setup', () => {
   test('[P0] should allow setting display name and proceed to app', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // GIVEN: Display name setup modal is shown.
     const account = await createNamelessAccount(supabaseAdmin, 'nameless-sets');
@@ -175,7 +187,11 @@ test.describe('Display Name Setup', () => {
       await expect(page.getByTestId('login-screen')).toBeVisible();
       await page.getByRole('textbox', { name: 'Email' }).fill(account.email);
       await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+      const signInGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
       await page.getByTestId('submit-button').click();
+      const signInName = await signInGate;
+      expect(signInName.status).toBe(200);
+      expect(signInName.responseJson).toEqual({ display_name: account.email });
       await expect(page.getByTestId('display-name-setup')).toBeVisible();
 
       // WHEN: User enters display name and submits.
@@ -193,7 +209,11 @@ test.describe('Display Name Setup', () => {
       // And it survives a reload — which is the case the old trigger broke, and
       // also what proves the gate is reading the saved name back rather than
       // remembering a React state flag.
+      const reloadGate = interceptNetworkCall({ method: 'GET', url: gateNameRead(account.userId) });
       await page.reload();
+      const reloadName = await reloadGate;
+      expect(reloadName.status).toBe(200);
+      expect(reloadName.responseJson).toEqual({ display_name: chosenName });
       await expect(page.getByTestId('app-container')).toBeVisible();
       await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
     } catch (error) {
@@ -277,49 +297,77 @@ test.describe('Display Name Edit', () => {
     expect(stored, "this worker's pool display name must be restored").toBe(originalName);
   });
 
+  /**
+   * The note the test sends into this worker pair's shared thread, recorded
+   * before the send click, and whether its POST answered 2xx.
+   *
+   * A hook of its own rather than a step in the restore above: Playwright runs
+   * every `afterEach` even when an earlier one throws, so a failed name restore
+   * cannot skip the note delete, and a test that failed before renaming still
+   * has its note deleted.
+   */
+  let sentNote: string | null = null;
+  let committed = false;
+
+  test.afterEach(async ({ supabaseAdmin }) => {
+    const content = sentNote;
+    const wasCommitted = committed;
+    sentNote = null;
+    committed = false;
+    if (content) await deleteSentNote(supabaseAdmin, content, wasCommitted);
+  });
+
   test('[P1] should change the display name in Settings and show it in the chat', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     // GIVEN: This worker's own pool account, and whatever name it currently has.
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const originalName = await readProfileName(supabaseAdmin, userId);
-    // Unique per run so the assertion cannot pass on a name left behind by an
+    // Unique per run so the assertions cannot pass on a name left behind by an
     // earlier one, and inside the form's 3-30 character rule.
-    const newName = `E2E ${Date.now().toString().slice(-8)}`;
+    const stamp = Date.now().toString().slice(-8);
+    const seededName = `Prefill ${stamp}`;
+    const newName = `E2E ${stamp}`;
 
     // Armed BEFORE the write, so the teardown restores even if the very first
     // assertion below times out.
     renamed = { userId, originalName };
 
+    // A known chosen name, so the prefill below has one exact expected value
+    // whatever state an earlier run left this pool row in. A seed value (the
+    // email, 'Unknown', blank) would legitimately prefill an empty field.
+    const { error: seedError } = await supabaseAdmin
+      .from('users')
+      .update({ display_name: seededName, updated_at: new Date().toISOString() })
+      .eq('id', userId);
+    if (seedError) throw new Error(`Failed to seed the display name: ${seedError.message}`);
+    expect(await readProfileName(supabaseAdmin, userId)).toBe(seededName);
+
     await page.goto('/');
 
-    // WHEN: The user opens Settings and changes the name.
+    // WHEN: The user opens Settings and changes the name. Settings' mount
+    // reads the name; the app's own gate read of the same URL may answer
+    // first, with the same name.
+    const nameRead = interceptNetworkCall({ method: 'GET', url: gateNameRead(userId) });
     await navigateTo(page, 'settings');
+    expect((await nameRead).status).toBe(200);
 
     const nameRow = page.getByTestId('settings-display-name');
     await expect(nameRow).toBeVisible();
     // Premise: the row has finished its read, so the Change control is live
-    // and the form will open pre-filled from a real answer.
-    await expect(nameRow).not.toHaveText('Loading...');
+    // and the form will open pre-filled from a real answer. The seeded name is
+    // the only text a finished read can show; an error or a stale name cannot.
+    await expect(nameRow).toHaveText(seededName);
 
     await page.getByTestId('settings-display-name-edit').click();
     await expect(page.getByTestId('display-name-setup')).toBeVisible();
 
     // The field carries the current name, not an empty box — the whole point of
     // an edit route rather than a second setup screen.
-    //
-    // Guarded on the FIELD, not on the stored column: `readProfileName` returns
-    // `display_name` verbatim, while the form is prefilled only when the row
-    // classifies as `chosen`. A pool row holding a seed value (its own email,
-    // 'Unknown', blank) is legitimately an empty field, and guarding on
-    // `originalName !== null` would fail there pointing at the prefill instead
-    // of at the row's state.
     const field = page.getByLabel('Display Name');
-    const prefilled = await field.inputValue();
-    if (prefilled !== '') {
-      expect(prefilled).toBe((originalName ?? '').trim());
-    }
+    await expect(field).toHaveValue(seededName);
 
     await field.fill(newName);
     await page.getByTestId('display-name-submit').click();
@@ -340,11 +388,18 @@ test.describe('Display Name Edit', () => {
 
     const uniqueMessage = `Display name edit E2E ${Date.now()}`;
     await page.getByLabel(/love note message input/i).fill(uniqueMessage);
+    sentNote = uniqueMessage;
+    // The reload below must not cut the send short, or the re-fetch it checks
+    // could legitimately miss the note.
+    const noteSaved = interceptNetworkCall({ method: 'POST', url: LOVE_NOTE_SEND });
     await page.getByLabel(/send message/i).click();
+    const { status: sendStatus } = await noteSaved;
+    committed = sendStatus >= 200 && sendStatus < 300;
+    expect(sendStatus).toBe(201);
 
-    const sentNote = page.getByTestId('love-note-message').filter({ hasText: uniqueMessage });
-    await expect(sentNote).toBeVisible();
-    await expect(sentNote).toContainText(newName);
+    const sentMessage = page.getByTestId('love-note-message').filter({ hasText: uniqueMessage });
+    await expect(sentMessage).toBeVisible();
+    await expect(sentMessage).toContainText(newName);
 
     // AND it is still there after a reload. The assertion above sees the
     // OPTIMISTIC render, which a send that fails server-side also produces; only
@@ -352,7 +407,13 @@ test.describe('Display Name Edit', () => {
     // also DW-107's own wording — "the name shows in chat after reload" — and it
     // re-resolves the name from the profile row rather than from the React state
     // the save left behind.
+    const threadRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
     await page.reload();
+    const thread = await threadRead;
+    expect(thread.status).toBe(200);
+    expect(thread.responseJson).toEqual(
+      expect.arrayContaining([expect.objectContaining({ content: uniqueMessage })])
+    );
     await navigateTo(page, 'notes');
 
     const persistedNote = page.getByTestId('love-note-message').filter({ hasText: uniqueMessage });

@@ -50,12 +50,14 @@ test.describe('Sign in on the style kit', () => {
       await expect(root).toHaveCSS('background-image', 'none');
 
       await expect(page.getByRole('heading', { level: 1, name: 'My Love' })).toBeVisible();
-      const wordmark = page.getByText('My Love', { exact: true });
+      const wordmark = page.getByTestId('login-wordmark');
       const fontFamily = await wordmark.evaluate((node) => getComputedStyle(node).fontFamily);
       expect(fontFamily).toContain('Lora');
-      await expect(page.getByText('Welcome back — sign in to continue')).toBeVisible();
+      const tagline = page.getByTestId('login-tagline');
+      await expect(tagline).toBeVisible();
+      await expect(tagline).toHaveText('Welcome back — sign in to continue');
 
-      const card = root.locator('form').locator('..');
+      const card = page.getByTestId('login-card');
       await expect(card).toHaveCSS('background-color', KIT_CARD[colorScheme]);
       await expect(card).toContainText('Continue with Google');
       await expect(page.getByRole('textbox', { name: 'Email' })).toHaveCSS(

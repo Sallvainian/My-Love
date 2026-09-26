@@ -15,6 +15,21 @@ vi.stubGlobal('import', {
   meta: { env: { DEV: false } },
 });
 
+/**
+ * Delete the database and wait for it — deleteDatabase is a request, not a call.
+ * A blocked delete means a connection leaked from an earlier case; failing here
+ * names it, where resolving would only move the hang to the next open.
+ */
+function deleteDatabase(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () =>
+      reject(new Error(`deleteDatabase(${DB_NAME}) is blocked: a connection leaked from an earlier case`));
+  });
+}
+
 describe('dbSchema - Index Integrity', () => {
   const openDbs: Array<{ close: () => void }> = [];
 
@@ -26,8 +41,8 @@ describe('dbSchema - Index Integrity', () => {
     return db;
   }
 
-  beforeEach(() => {
-    indexedDB.deleteDatabase(DB_NAME);
+  beforeEach(async () => {
+    await deleteDatabase();
   });
 
   afterEach(() => {

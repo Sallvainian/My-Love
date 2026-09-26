@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatRelativeDate, getRelativeTime, isJustNow, loveNoteDisplayTime } from '../dateUtils';
 
 describe('getRelativeTime', () => {
@@ -37,8 +37,9 @@ describe('getRelativeTime', () => {
   });
 
   it('returns formatted date for timestamps > 1 day ago', () => {
-    const timestamp = new Date(Date.now() - 3 * 86400000).toISOString();
-    expect(getRelativeTime(timestamp)).toMatch(/^[A-Z][a-z]{2} \d{1,2}$/); // e.g., "Nov 29"
+    vi.setSystemTime(new Date(2026, 2, 15, 12, 0, 0));
+    const timestamp = new Date(2026, 2, 12, 12, 0, 0).toISOString();
+    expect(getRelativeTime(timestamp)).toBe('Mar 12');
   });
 
   it('does not say "Yesterday" for a mood two calendar days old', () => {
@@ -49,14 +50,27 @@ describe('getRelativeTime', () => {
 });
 
 describe('isJustNow', () => {
+  // Pinned, so each timestamp sits an exact distance from "now" and the
+  // 5-minute (300 000 ms) boundary is measured, not approximated.
+  const NOW = new Date(2026, 2, 15, 12, 0, 0).getTime();
+
+  beforeEach(() => {
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns true for timestamps < 5 minutes ago', () => {
-    const timestamp = new Date(Date.now() - 2 * 60000).toISOString();
-    expect(isJustNow(timestamp)).toBe(true);
+    expect(isJustNow(new Date(NOW - 2 * 60000).toISOString())).toBe(true);
+    expect(isJustNow(new Date(NOW - 299_000).toISOString())).toBe(true);
   });
 
   it('returns false for timestamps >= 5 minutes ago', () => {
-    const timestamp = new Date(Date.now() - 6 * 60000).toISOString();
-    expect(isJustNow(timestamp)).toBe(false);
+    expect(isJustNow(new Date(NOW - 300_000).toISOString())).toBe(false);
+    expect(isJustNow(new Date(NOW - 301_000).toISOString())).toBe(false);
+    expect(isJustNow(new Date(NOW - 6 * 60000).toISOString())).toBe(false);
   });
 });
 
@@ -66,10 +80,8 @@ describe('formatRelativeDate', () => {
   });
 
   it('returns "today" for a timestamp from earlier today', () => {
-    // Use a date from 1 hour ago (always same calendar day)
-    const now = new Date();
-    const earlier = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 1, 0, 0);
-    vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0));
+    vi.setSystemTime(new Date(2026, 2, 15, 12, 0, 0)); // March 15, 2026 noon
+    const earlier = new Date(2026, 2, 15, 1, 0, 0); // March 15, 1 AM
     expect(formatRelativeDate(earlier.toISOString())).toBe('today');
   });
 

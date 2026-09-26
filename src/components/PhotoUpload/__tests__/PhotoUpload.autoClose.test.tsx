@@ -5,7 +5,9 @@
  * cleared. Closing by hand and reopening within 3 seconds let it fire into
  * the new session: it closed the dialog and threw away the photo just picked.
  */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import { useState, type HTMLAttributes, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -74,26 +76,41 @@ function Harness({ onClose }: { onClose: () => void }) {
   );
 }
 
-function selectFile() {
+async function selectFile(user: UserEvent) {
   const file = new File(['x'], 'beach.jpg', { type: 'image/jpeg' });
-  fireEvent.change(screen.getByTestId('photo-upload-file-input'), { target: { files: [file] } });
+  await user.upload(screen.getByTestId('photo-upload-file-input'), file);
 }
 
-async function uploadToSuccess() {
-  selectFile();
-  await act(async () => {
-    fireEvent.click(screen.getByTestId('photo-upload-submit-button'));
-  });
-  // findByText polls on setTimeout, which is faked here; flush promises instead.
-  for (let i = 0; i < 10 && !screen.queryByText('Photo uploaded successfully!'); i++) {
+/** setTimeout is faked here, so user-event's own pauses must advance it. */
+function setupUser() {
+  return userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+}
+
+async function uploadToSuccess(user: UserEvent) {
+  await selectFile(user);
+  await user.click(screen.getByTestId('photo-upload-submit-button'));
+  // Not findBy*: through the `jest` stub it would advance the faked clock and
+  // move the 3-second auto-close timer these tests measure. Flush promises instead.
+  for (
+    let i = 0;
+    i < 10 && !screen.queryByRole('heading', { level: 3, name: 'Photo uploaded!' });
+    i++
+  ) {
     await act(async () => {});
   }
-  expect(screen.getByText('Photo uploaded successfully!')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 3, name: 'Photo uploaded!' })).toBeInTheDocument();
+  expect(screen.getByRole('dialog', { name: 'Upload Photo' })).toHaveTextContent(
+    'Photo uploaded successfully!'
+  );
 }
 
 beforeEach(() => {
   // Only the timers: the upload path resolves through promises and microtasks.
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  // Testing Library recognises only Jest's fake timers: without a `jest` global
+  // it ends every user-event action waiting on a setTimeout(0) that the faked
+  // clock never fires, and the test hangs. Hand it vi's clock instead.
+  vi.stubGlobal('jest', { advanceTimersByTime: (ms: number) => vi.advanceTimersByTime(ms) });
   vi.stubGlobal('Image', LoadingImage);
   URL.createObjectURL = vi.fn(() => 'blob:preview');
   URL.revokeObjectURL = vi.fn();
@@ -109,9 +126,10 @@ afterEach(() => {
 
 describe('PhotoUpload: auto-close after success (DW-205)', () => {
   it('closes itself 3 seconds after a successful upload', async () => {
+    const user = setupUser();
     const onClose = vi.fn();
     render(<Harness onClose={onClose} />);
-    await uploadToSuccess();
+    await uploadToSuccess(user);
 
     act(() => vi.advanceTimersByTime(2999));
     expect(onClose).not.toHaveBeenCalled();
@@ -122,15 +140,16 @@ describe('PhotoUpload: auto-close after success (DW-205)', () => {
   });
 
   it('does not close a dialog reopened after a manual close', async () => {
+    const user = setupUser();
     const onClose = vi.fn();
     render(<Harness onClose={onClose} />);
-    await uploadToSuccess();
+    await uploadToSuccess(user);
 
-    fireEvent.click(screen.getByTestId('photo-upload-close'));
+    await user.click(screen.getByTestId('photo-upload-close'));
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByTestId('reopen'));
-    selectFile();
+    await user.click(screen.getByTestId('reopen'));
+    await selectFile(user);
     expect(screen.getByTestId('photo-upload-caption-input')).toBeInTheDocument();
 
     act(() => vi.advanceTimersByTime(3000));

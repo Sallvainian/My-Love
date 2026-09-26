@@ -36,7 +36,8 @@
  *
  * The Supabase client is faked per file — `tests/setup.ts` installs no Supabase
  * mock — with a builder that rejects whatever it is handed. Same idiom as
- * `tests/unit/services/eventsService.test.ts:173` and `./interactionService.test.ts:35`.
+ * `eventsQuery` in `tests/unit/services/fakeEventsBackend.ts` and
+ * `./interactionService.test.ts:35`.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
@@ -183,6 +184,11 @@ const ADOPTERS = [
     context: 'EventsService.createEvent',
     table: 'events',
     envelope: AUTHENTICATED_EVENTS_LABEL_CHECK,
+    // Events wrap the mapped error in their own EventWriteError; the other
+    // adopters keep their established direct-error contract.
+    wrapped: true,
+    outerName: 'EventWriteError',
+    outerCode: 'transport',
     write: () =>
       eventsService.createEvent({
         userId: USER_ID,
@@ -195,6 +201,9 @@ const ADOPTERS = [
     context: 'InteractionService.sendInteraction',
     table: 'interactions',
     envelope: AUTHENTICATED_INTERACTIONS_TYPE_CHECK,
+    wrapped: false,
+    outerName: 'SupabaseServiceError',
+    outerCode: '23514',
     write: () => interactionService.sendPoke(USER_ID),
   },
   {
@@ -202,6 +211,9 @@ const ADOPTERS = [
     context: 'MoodApi.create',
     table: 'moods',
     envelope: AUTHENTICATED_MOODS_NOTE_CHECK,
+    wrapped: false,
+    outerName: 'SupabaseServiceError',
+    outerCode: '23514',
     write: () => moodApi.create(moodInsert()),
   },
 ] as const;
@@ -239,7 +251,7 @@ describe('a 23514 reaching the caller that issued the write', () => {
     });
   });
 
-  describe.each(ADOPTERS)('$module', ({ module, context, table, envelope, write }) => {
+  describe.each(ADOPTERS)('$module', ({ context, table, envelope, write, wrapped, outerName, outerCode }) => {
     it('surfaces the mapped sentence, context-prefixed', async () => {
       backend.nextError = envelope;
 
@@ -282,17 +294,13 @@ describe('a 23514 reaching the caller that issued the write', () => {
       const error = await rejection(write() as Promise<unknown>);
       const mappedError = mappedErrorOf(error);
 
-      if (module === 'eventsService.createEvent') {
-        expect(error).toMatchObject({
-          name: 'EventWriteError',
-          code: 'transport',
-          cause: mappedError,
-        });
-        expect(mappedError).not.toBe(error);
-      } else {
-        // The other adopters keep their established direct-error contract.
-        expect(mappedError).toBe(error);
-      }
+      expect(error).toMatchObject({ name: outerName, code: outerCode });
+      // A wrapper carries the mapped error as its cause; a direct adopter
+      // rejects with the mapped error itself.
+      expect(
+        mappedError === error,
+        'wrapped adopters reject with an outer error carrying the mapped error as cause; direct adopters reject with the mapped error itself'
+      ).toBe(!wrapped);
 
       expect(mappedError.code).toBe('23514');
       // Both null on the wire for an authenticated caller, and both must

@@ -7,8 +7,26 @@
  * Test IDs: 4.2-E2E-001, 4.2-E2E-002, 4.2-E2E-003
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { deleteSentNote } from '../../support/helpers/love-notes';
 
 test.describe('Love Notes', () => {
+  /**
+   * The note the send test puts on the server, recorded before the send click,
+   * and whether its POST answered 2xx. Deleted from `test.afterEach`, not from
+   * the end of the test, so a failure or a timeout mid-test cannot leave it in
+   * this worker pair's shared thread.
+   */
+  let sentNote: string | null = null;
+  let committed = false;
+
+  test.afterEach(async ({ supabaseAdmin }) => {
+    const content = sentNote;
+    const wasCommitted = committed;
+    sentNote = null;
+    committed = false;
+    if (content) await deleteSentNote(supabaseAdmin, content, wasCommitted);
+  });
+
   test('[P0] 4.2-E2E-001 should display love notes view', async ({
     page,
     interceptNetworkCall,
@@ -26,7 +44,9 @@ test.describe('Love Notes', () => {
     // THEN: Love notes interface is visible
     await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
     await expect(
-      page.getByTestId('virtualized-list').or(page.getByText('No messages to show'))
+      page
+        .getByTestId('virtualized-list')
+        .or(page.getByRole('heading', { level: 3, name: 'No messages to show' }))
     ).toBeVisible();
   });
 
@@ -61,6 +81,7 @@ test.describe('Love Notes', () => {
     const uniqueMessage = `E2E test note ${Date.now()}`;
     const messageInput = page.getByLabel(/love note message input/i);
     await messageInput.fill(uniqueMessage);
+    sentNote = uniqueMessage;
 
     const sendCall = interceptNetworkCall({
       method: 'POST',
@@ -74,6 +95,7 @@ test.describe('Love Notes', () => {
 
     // The POST call should complete successfully
     const { status } = await sendCall;
+    committed = status >= 200 && status < 300;
     expect(status).toBeLessThan(400);
   });
 });

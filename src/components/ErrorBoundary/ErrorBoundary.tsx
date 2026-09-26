@@ -51,9 +51,18 @@ export class ErrorBoundary extends Component<Props, State> {
       const Icon = isValidationError ? TriangleAlert : HeartCrack;
 
       return (
-        <div className="flex min-h-screen items-center justify-center bg-page px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-line bg-card p-5 text-center shadow-card">
-            <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-tint text-accent">
+        <div
+          className="flex min-h-screen items-center justify-center bg-page px-4"
+          data-testid="error-boundary-fallback"
+        >
+          <div
+            className="w-full max-w-md rounded-[20px] border border-line bg-card p-5 text-center shadow-card"
+            data-testid="error-boundary-card"
+          >
+            <div
+              className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-tint text-accent"
+              data-testid="error-boundary-icon"
+            >
               <Icon className="h-5 w-5" aria-hidden="true" />
             </div>
             <h1 className="mb-2 text-lg font-semibold text-ink">
@@ -65,7 +74,10 @@ export class ErrorBoundary extends Component<Props, State> {
                 : 'We encountered an unexpected error. Please try again.'}
             </p>
             {this.state.error && (
-              <p className="mb-5 max-h-24 overflow-auto rounded-[14px] bg-card2 p-3 text-left font-mono text-sm wrap-break-word text-muted">
+              <p
+                className="mb-5 max-h-24 overflow-auto rounded-[14px] bg-card2 p-3 text-left font-mono text-sm wrap-break-word text-muted"
+                data-testid="error-boundary-message"
+              >
                 {this.state.error.message}
               </p>
             )}

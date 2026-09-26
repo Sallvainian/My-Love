@@ -23,15 +23,72 @@
  * Pair resolution, scoped cleanup, seeding and local-date creation come from
  * the shared event helper.
  */
+import type { Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import type { TypedSupabaseClient } from '../../support/factories';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
   clearOwnPairEvents,
   clearPairEvents,
+  clockAnchor,
   isoDateDaysFromNow,
   resolveOwnPair,
   seedEvent,
+  type SeedEventOverrides,
 } from '../../support/helpers/events';
+import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
+import { PAST_EVENTS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
+
+// The Home render rows, minus their owner. `daysFromNow` counts from the
+// anchor each test seeds with.
+type Meetup = Omit<SeedEventOverrides, 'userId' | 'eventDate'> & { daysFromNow: number };
+
+const FUTURE_MEETUP: Meetup = {
+  label: 'Future Meetup E2E',
+  daysFromNow: 14,
+  description: 'Future event description',
+  icon: 'calendar',
+};
+
+const PAST_MEETUP: Meetup = {
+  label: 'Past Meetup E2E',
+  daysFromNow: -14,
+  description: 'Past event description',
+  icon: 'calendar',
+};
+
+// CAP-1's couple-shared visibility: the SELECT policy returns own + partner
+// events with no user_id filter applied client-side, so a partner-owned event
+// must render on the signed-in user's Home too. `icon: 'ring'` is not the
+// column default ('calendar'), so this row is what makes `icon={event.icon}`
+// load-bearing: hardcoding any single icon in App.tsx fails the icon assertion.
+const PARTNER_MEETUP: Meetup = {
+  label: 'Partner Meetup E2E',
+  daysFromNow: 21,
+  description: 'Partner event description',
+  icon: 'ring',
+};
+
+async function seedMeetup(
+  supabaseAdmin: TypedSupabaseClient,
+  userId: string,
+  { daysFromNow, ...row }: Meetup,
+  anchor: Date
+) {
+  await seedEvent(supabaseAdmin, {
+    userId,
+    eventDate: isoDateDaysFromNow(daysFromNow, anchor),
+    ...row,
+  });
+}
+
+async function openHome(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
+  const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+  await page.goto('/');
+  expect((await upcomingRead).status).toBe(200);
+}
 
 test.afterEach(async ({ supabaseAdmin }) => {
   await clearOwnPairEvents(supabaseAdmin);
@@ -45,9 +102,10 @@ test.describe('Home dashboard reads events from the store', () => {
     });
   });
 
-  test('[P0] shows own and partner future events, hides a past one, and leaves other cards unchanged', async ({
+  test('[P0] shows own and partner future events soonest first, each with its own icon', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
 
@@ -56,38 +114,10 @@ test.describe('Home dashboard reads events from the store', () => {
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
     const anchor = new Date();
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Future Meetup E2E',
-      eventDate: isoDateDaysFromNow(14, anchor),
-      description: 'Future event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Past Meetup E2E',
-      eventDate: isoDateDaysFromNow(-14, anchor),
-      description: 'Past event description',
-      icon: 'calendar',
-    });
-    // CAP-1's couple-shared visibility: the SELECT policy returns own +
-    // partner events with no user_id filter applied client-side, so a
-    // partner-owned event must render on the signed-in user's Home too.
-    // `icon: 'ring'` is not the column default ('calendar'), so this row is
-    // what makes `icon={event.icon}` load-bearing: hardcoding any single icon
-    // in App.tsx fails the icon assertion below.
-    await seedEvent(
-      supabaseAdmin,
-      {
-        userId: partnerId,
-        label: 'Partner Meetup E2E',
-        eventDate: isoDateDaysFromNow(21, anchor),
-        description: 'Partner event description',
-        icon: 'ring',
-      }
-    );
+    await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, anchor);
+    await seedMeetup(supabaseAdmin, partnerId, PARTNER_MEETUP, anchor);
 
-    await page.goto('/');
+    await openHome(page, interceptNetworkCall);
 
     const futureCard = page.getByTestId('event-countdown-future-meetup-e2e');
     await expect(futureCard).toBeVisible();
@@ -111,11 +141,53 @@ test.describe('Home dashboard reads events from the store', () => {
     // Soonest-first, straight from the store: own event is +14d, partner's is
     // +21d. `events` is rendered in store order with no re-sort, so a
     // regression that re-sorts or reverses shows up here.
-    const eventLabels = await page
-      .getByTestId(/^event-countdown-(future|partner)-meetup-e2e$/)
-      .locator('h3')
-      .allTextContents();
-    expect(eventLabels).toEqual(['Future Meetup E2E', 'Partner Meetup E2E']);
+    await expect(
+      page.getByTestId(/^event-countdown-(future|partner)-meetup-e2e$/).locator('h3')
+    ).toHaveText(['Future Meetup E2E', 'Partner Meetup E2E']);
+  });
+
+  test('[P0] a past event renders nowhere on Home, and "Event passed" never appears', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+    const anchor = new Date();
+    await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, anchor);
+    await seedMeetup(supabaseAdmin, userId, PAST_MEETUP, anchor);
+
+    await openHome(page, interceptNetworkCall);
+
+    // The future row is the load witness: the column rendered, so the absence
+    // checks below are about a real render rather than an empty page.
+    await expect(page.getByTestId('event-countdown-future-meetup-e2e')).toBeVisible();
+
+    // The past event renders nowhere — not as its own card, not its text.
+    await expect(page.getByTestId('event-countdown-past-meetup-e2e')).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Past Meetup E2E', { ignoreCase: true });
+    await expect(page.getByRole('main')).not.toContainText('Past event description', {
+      ignoreCase: true,
+    });
+
+    // No path on the page ever renders the retired "Event passed" branch.
+    await expect(page.getByRole('main')).not.toContainText('Event passed', { ignoreCase: true });
+  });
+
+  test('[P0] TimeTogether, both birthday cards and the wedding card render alongside events', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+    await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, new Date());
+
+    await openHome(page, interceptNetworkCall);
+
+    await expect(page.getByTestId('event-countdown-future-meetup-e2e')).toBeVisible();
 
     // CAP-4: TimeTogether, both BirthdayCountdown cards and the Wedding
     // EventCountdown render unchanged alongside the events.
@@ -123,19 +195,12 @@ test.describe('Home dashboard reads events from the store', () => {
     await expect(page.getByTestId('birthday-countdown-self')).toBeVisible();
     await expect(page.getByTestId('birthday-countdown-partner')).toBeVisible();
     await expect(page.getByTestId('event-countdown-wedding')).toBeVisible();
-
-    // The past event renders nowhere — not as its own card, not its text.
-    await expect(page.getByTestId('event-countdown-past-meetup-e2e')).toHaveCount(0);
-    await expect(page.getByText('Past Meetup E2E')).toHaveCount(0);
-    await expect(page.getByText('Past event description')).toHaveCount(0);
-
-    // No path on the page ever renders the retired "Event passed" branch.
-    await expect(page.getByText('Event passed')).toHaveCount(0);
   });
 
   test('[P0] shows the empty-state placeholder for an account with zero events', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
 
@@ -144,10 +209,12 @@ test.describe('Home dashboard reads events from the store', () => {
     // visible to the account, and Home's SELECT reads own + partner.
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
-    await expect(page.getByText('Event passed')).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Event passed', { ignoreCase: true });
   });
 
   test('[P0] does not flash the empty-state placeholder before the first load settles', async ({
@@ -174,6 +241,7 @@ test.describe('Home dashboard reads events from the store', () => {
     const fetchHeld = new Promise<void>((resolve) => {
       releaseFetch = resolve;
     });
+    // playwright-utils deviation: the route must be installed before the next navigation and hold every events read until released; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/events*', async (route) => {
       await fetchHeld;
       await route.continue();
@@ -198,6 +266,7 @@ test.describe('Home dashboard reads events from the store', () => {
   test('[P0] shows the placeholder when every stored event has already passed', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -223,17 +292,25 @@ test.describe('Home dashboard reads events from the store', () => {
       icon: 'calendar',
     });
 
+    const pastRead = interceptNetworkCall({ method: 'GET', url: PAST_EVENTS_READ });
     await page.goto('/');
+    // Both past rows reached the store, so their absence below is the filter's.
+    const past = await pastRead;
+    expect(past.status).toBe(200);
+    expect(past.responseJson).toHaveLength(2);
 
     await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
-    await expect(page.getByText('Old Meetup E2E')).toHaveCount(0);
-    await expect(page.getByText('Older Meetup E2E')).toHaveCount(0);
-    await expect(page.getByText('Event passed')).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Old Meetup E2E', { ignoreCase: true });
+    await expect(page.getByRole('main')).not.toContainText('Older Meetup E2E', {
+      ignoreCase: true,
+    });
+    await expect(page.getByRole('main')).not.toContainText('Event passed', { ignoreCase: true });
   });
 
   test('[P0] renders an event dated today, with a null description', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -243,15 +320,21 @@ test.describe('Home dashboard reads events from the store', () => {
     // `description: null` is the column's nullable case, which App coerces with
     // `event.description ?? undefined` — every other seeded row supplies a
     // string, so this is the only test that carries a null through.
+    // The page clock is pinned to the anchor the date is built from, so the
+    // event is "today" to the app even if the run crosses real midnight.
+    const anchor = clockAnchor();
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Today Meetup E2E',
-      eventDate: isoDateDaysFromNow(0),
+      eventDate: isoDateDaysFromNow(0, anchor),
       description: null,
       icon: 'calendar',
     });
 
+    await page.clock.install({ time: anchor });
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     const card = page.getByTestId('event-countdown-today-meetup-e2e');
     await expect(card).toBeVisible();
@@ -259,7 +342,7 @@ test.describe('Home dashboard reads events from the store', () => {
     await expect(card.getByText('Today!')).toBeVisible();
 
     // No description paragraph is rendered next to the label for a null value.
-    expect(await card.locator('h3 ~ p').count()).toBe(0);
+    await expect(card.locator('h3 ~ p')).toHaveCount(0);
 
     await expect(page.getByTestId('events-empty-placeholder')).toHaveCount(0);
   });
@@ -267,6 +350,7 @@ test.describe('Home dashboard reads events from the store', () => {
   test('[P0] caps the events column at six cards, keeping the soonest', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -338,15 +422,13 @@ test.describe('Home dashboard reads events from the store', () => {
       icon: 'calendar',
     });
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     await expect(page.getByTestId('event-countdown-first-meetup-e2e')).toBeVisible();
 
-    const cardLabels = await page
-      .getByTestId(/^event-countdown-\w+-meetup-e2e$/)
-      .locator('h3')
-      .allTextContents();
-    expect(cardLabels).toEqual([
+    await expect(page.getByTestId(/^event-countdown-\w+-meetup-e2e$/).locator('h3')).toHaveText([
       'First Meetup E2E',
       'Second Meetup E2E',
       'Third Meetup E2E',
@@ -357,8 +439,10 @@ test.describe('Home dashboard reads events from the store', () => {
 
     // The overflow is not merely off-screen — it renders nowhere on the page.
     await expect(page.getByTestId('event-countdown-seventh-meetup-e2e')).toHaveCount(0);
-    await expect(page.getByText('Seventh event description')).toHaveCount(0);
-    await expect(page.getByText('Old Meetup E2E')).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Seventh event description', {
+      ignoreCase: true,
+    });
+    await expect(page.getByRole('main')).not.toContainText('Old Meetup E2E', { ignoreCase: true });
 
     // Hiding the tail must never turn a real list into the empty state: the
     // slot decision still sees the uncapped upcoming count.
@@ -369,6 +453,7 @@ test.describe('Home dashboard reads events from the store', () => {
   test('[P0] a background reload never blanks a card already on screen', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -381,7 +466,9 @@ test.describe('Home dashboard reads events from the store', () => {
       icon: 'calendar',
     });
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     const card = page.getByTestId('event-countdown-reload-meetup-e2e');
     await expect(card).toBeVisible();
@@ -395,6 +482,7 @@ test.describe('Home dashboard reads events from the store', () => {
     });
     let eventsRequests = 0;
 
+    // playwright-utils deviation: the route must be installed before the dock navigation back to Home and count and hold every events read; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/events*', async (route) => {
       eventsRequests += 1;
       await fetchHeld;
@@ -410,7 +498,7 @@ test.describe('Home dashboard reads events from the store', () => {
     // exercises the effect's `currentView` key, so without this the whole
     // "return to Home reloads events" behaviour could be deleted and every
     // test would still pass off the store's already-loaded data.
-    await expect.poll(() => eventsRequests).toBeGreaterThan(0);
+    await recurseUntil(async () => eventsRequests, (v) => { expect(v).toBeGreaterThan(0); });
 
     // While that response is still held, the card must not have blanked
     // (Design Notes: "A later background reload must never blank cards
@@ -454,12 +542,11 @@ test.describe(
         url: '**/rest/v1/events*',
         fulfillResponse: {
           status: 503,
-          body: {
+          body: createDatabaseErrorEnvelope({
             message: 'Injected events load failure',
             details: '',
             hint: '',
-            code: 'XX000',
-          },
+          }),
         },
       });
 
@@ -474,6 +561,7 @@ test.describe(
       // recovery cannot pass after only one side of getEvents has responded.
       await page.unroute('**/rest/v1/events*');
       let successfulEventReads = 0;
+      // playwright-utils deviation: the route must be installed before the dock navigation back to Home and count every events read; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route('**/rest/v1/events*', async (route) => {
         if (route.request().method() === 'GET') {
           successfulEventReads += 1;
@@ -484,7 +572,9 @@ test.describe(
       await navigateTo(page, 'photos');
       await navigateTo(page, 'home');
 
-      await expect.poll(() => successfulEventReads).toBeGreaterThanOrEqual(2);
+      await recurseUntil(async () => successfulEventReads, (v) => {
+        expect(v).toBeGreaterThanOrEqual(2);
+      });
       await expect(page.getByTestId('events-load-error')).toHaveCount(0);
       await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
       await page.unroute('**/rest/v1/events*');

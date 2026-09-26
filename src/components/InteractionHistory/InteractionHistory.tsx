@@ -131,7 +131,10 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
                 {/* The saved copy (or this session's list) stays on screen
                     while the refresh runs; the spinner is for an empty list. */}
                 {isLoading && interactions.length === 0 ? (
-                  <div className="flex flex-col items-center gap-3 py-10 text-center">
+                  <div
+                    className="flex flex-col items-center gap-3 py-10 text-center"
+                    data-testid="interaction-history-loading"
+                  >
                     <Heart
                       className="h-8 w-8 animate-pulse fill-current text-accent"
                       aria-hidden="true"
@@ -139,7 +142,10 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
                     <p className="text-sm text-muted">Loading interactions...</p>
                   </div>
                 ) : interactions.length === 0 ? (
-                  <div className="flex flex-col items-center gap-2 py-10 text-center">
+                  <div
+                    className="flex flex-col items-center gap-2 py-10 text-center"
+                    data-testid="interaction-history-empty"
+                  >
                     <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-tint text-accent">
                       <Heart className="h-6 w-6" aria-hidden="true" />
                     </div>

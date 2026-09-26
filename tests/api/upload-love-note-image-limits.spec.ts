@@ -32,6 +32,9 @@ const BUCKET = 'love-notes-images';
 /** Mirrors `CONFIG.MAX_FILE_SIZE_BYTES` in the function. */
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
+/** The function's JSON answer: the stored object on success, `error` on a refusal. */
+type UploadReply = { storagePath?: string; size?: number; error?: string; maxSize?: number };
+
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** A body the function's magic-byte check accepts, padded to `totalSize`. */
@@ -56,14 +59,35 @@ async function listOwnPrefix(
   return (data ?? []).map((object) => object.name);
 }
 
+/**
+ * The `storagePath` in a response body, or null when the body is not JSON or
+ * names none. Never throws, so it can run before any assertion.
+ */
+function storagePathOf(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as { storagePath?: unknown };
+    return typeof parsed.storagePath === 'string' ? parsed.storagePath : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Teardown: remove the objects a test created. It runs from `finally`, so a
+ * failure is recorded with `expect.soft` rather than thrown — a throw there
+ * would replace the test's own error and skip the steps after it.
+ */
 async function removeObjects(
   supabaseAdmin: TypedSupabaseClient,
   paths: string[]
 ): Promise<void> {
   if (paths.length === 0) return;
-  const { error } = await supabaseAdmin.storage.from(BUCKET).remove(paths);
-  if (error) {
-    throw new Error(`Failed to clean up ${paths.join(', ')}: ${error.message}`);
+  const what = `Failed to clean up ${paths.join(', ')}`;
+  try {
+    const { error } = await supabaseAdmin.storage.from(BUCKET).remove(paths);
+    expect.soft(error, what).toBeNull();
+  } catch (error) {
+    expect.soft(error, what).toBeUndefined();
   }
 }
 
@@ -78,6 +102,7 @@ test.describe('Love note image upload limits', () => {
     const created: string[] = [];
 
     try {
+      // playwright-utils deviation: apiRequest returns no response headers, and this case asserts x-ratelimit-remaining.
       const response = await request.post(FUNCTION_PATH, {
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -111,7 +136,7 @@ test.describe('Love note image upload limits', () => {
   });
 
   test('[P0] a body at exactly the cap is accepted', async ({
-    request,
+    apiRequest,
     authToken,
     supabaseAdmin,
   }) => {
@@ -120,16 +145,18 @@ test.describe('Love note image upload limits', () => {
     const created: string[] = [];
 
     try {
-      const response = await request.post(FUNCTION_PATH, {
+      const { status, body } = await apiRequest<UploadReply>({
+        method: 'POST',
+        path: FUNCTION_PATH,
         headers: {
           Authorization: `Bearer ${authToken}`,
           'Content-Type': 'application/octet-stream',
         },
-        data: pngBody(MAX_FILE_SIZE_BYTES),
+        body: pngBody(MAX_FILE_SIZE_BYTES),
+        retryConfig: { maxRetries: 0 },
       });
 
-      expect(response.status(), 'the cap itself is inclusive').toBe(200);
-      const body = await response.json();
+      expect(status, 'the cap itself is inclusive').toBe(200);
       // Registered for cleanup before any assertion can throw: a failure after
       // a 200 would otherwise leak the object into this worker's prefix and
       // skew the before/after counts of every later case.
@@ -145,23 +172,25 @@ test.describe('Love note image upload limits', () => {
   });
 
   test('[P0] one byte past the cap is refused with 413 and writes nothing', async ({
-    request,
+    apiRequest,
     authToken,
     supabaseAdmin,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const before = await listOwnPrefix(supabaseAdmin, userId);
 
-    const response = await request.post(FUNCTION_PATH, {
+    const { status, body } = await apiRequest<UploadReply>({
+      method: 'POST',
+      path: FUNCTION_PATH,
       headers: {
         Authorization: `Bearer ${authToken}`,
         'Content-Type': 'application/octet-stream',
       },
-      data: pngBody(MAX_FILE_SIZE_BYTES + 1),
+      body: pngBody(MAX_FILE_SIZE_BYTES + 1),
+      retryConfig: { maxRetries: 0 },
     });
 
-    expect(response.status(), 'one byte past the cap is refused').toBe(413);
-    const body = await response.json();
+    expect(status, 'one byte past the cap is refused').toBe(413);
     expect(body.error).toBe('File too large');
     expect(body.maxSize).toBe(MAX_FILE_SIZE_BYTES);
 
@@ -170,7 +199,7 @@ test.describe('Love note image upload limits', () => {
   });
 
   test('[P0] multipart/form-data is refused with 415 and writes nothing', async ({
-    request,
+    apiRequest,
     authToken,
     supabaseAdmin,
   }) => {
@@ -191,35 +220,41 @@ test.describe('Love note image upload limits', () => {
       Buffer.from(`\r\n--${boundary}--\r\n`),
     ]);
 
-    const response = await request.post(FUNCTION_PATH, {
+    const { status, body } = await apiRequest<UploadReply>({
+      method: 'POST',
+      path: FUNCTION_PATH,
       headers: {
         Authorization: `Bearer ${authToken}`,
         'Content-Type': `multipart/form-data; boundary=${boundary}`,
       },
-      data: multipartBody,
+      body: multipartBody,
+      retryConfig: { maxRetries: 0 },
     });
 
-    expect(response.status(), 'the unused multipart format is rejected').toBe(415);
-    expect((await response.json()).error).toBe('Unsupported media type');
+    expect(status, 'the unused multipart format is rejected').toBe(415);
+    expect(body.error).toBe('Unsupported media type');
 
     const after = await listOwnPrefix(supabaseAdmin, userId);
     expect(after, 'a refused format writes no object').toEqual(before);
   });
 
   test('[P0] an unauthenticated request is refused with 401 and writes nothing', async ({
-    request,
+    apiRequest,
     supabaseAdmin,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const before = await listOwnPrefix(supabaseAdmin, userId);
 
-    const response = await request.post(FUNCTION_PATH, {
+    const { status, body } = await apiRequest<UploadReply>({
+      method: 'POST',
+      path: FUNCTION_PATH,
       headers: { 'Content-Type': 'application/octet-stream' },
-      data: pngBody(1024),
+      body: pngBody(1024),
+      retryConfig: { maxRetries: 0 },
     });
 
-    expect(response.status(), 'no bearer token, no upload').toBe(401);
-    expect((await response.json()).error).toBe('Missing authorization header');
+    expect(status, 'no bearer token, no upload').toBe(401);
+    expect(body.error).toBe('Missing authorization header');
 
     const after = await listOwnPrefix(supabaseAdmin, userId);
     expect(after).toEqual(before);
@@ -252,11 +287,12 @@ test.describe('Love note image upload limits', () => {
       await page.goto('http://localhost:5173/');
 
       const result = await page.evaluate(
-        async ({ url, token }) => {
+        async ({ url, token, magic }) => {
           const bytes = new Uint8Array(4096);
-          bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+          bytes.set(magic);
           const blob = new Blob([bytes], { type: 'image/png' });
 
+          // playwright-utils deviation: the browser's own fetch of a Blob is what is measured; apiRequest runs in Node and frames the body itself.
           const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -268,8 +304,13 @@ test.describe('Love note image upload limits', () => {
 
           return { status: response.status, body: await response.text() };
         },
-        { url: functionUrl, token: authToken }
+        // PNG_MAGIC is a Node Buffer; the page is handed its bytes as a plain array.
+        { url: functionUrl, token: authToken, magic: Array.from(PNG_MAGIC) }
       );
+      // Registered for cleanup before any assertion can throw: a failure after
+      // a 200 would otherwise leak the object into this worker's prefix.
+      const storagePath = storagePathOf(result.body);
+      if (storagePath) created.push(storagePath);
 
       await log.step(`browser Blob upload answered ${result.status}`);
       expect(
@@ -281,10 +322,11 @@ test.describe('Love note image upload limits', () => {
       const parsed = JSON.parse(result.body) as { storagePath: string; size: number };
       expect(parsed.size).toBe(4096);
       expect(parsed.storagePath.startsWith(`${userId}/`)).toBe(true);
-      created.push(parsed.storagePath);
     } finally {
-      await context.close();
+      // Objects first: a context that fails to close must not skip their
+      // removal, and the removal records rather than throws, so the close runs.
       await removeObjects(supabaseAdmin, created);
+      await context.close().catch(() => {});
     }
   });
 });

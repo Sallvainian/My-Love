@@ -46,6 +46,11 @@ vi.mock('@supabase/supabase-js', () => ({
 
 const signedIn = { data: { session: { user: { id: USER_ID, email: EMAIL } } }, error: null };
 
+/** A successful read of the caller's profile row. */
+function profileRow(display_name: string | null) {
+  return { data: { display_name }, error: null };
+}
+
 async function lookup() {
   const { lookupOwnDisplayName } = await import('@/api/supabaseClient');
   return lookupOwnDisplayName();
@@ -71,24 +76,24 @@ describe('own display name contract', () => {
       ['the account email in a different case', 'person@example.com'],
       ['the account email with stray whitespace', `  ${EMAIL}  `],
     ])('treats %s as unset', async (_label, display_name) => {
-      singleResult = { data: { display_name }, error: null };
+      singleResult = profileRow(display_name);
       await expect(lookup()).resolves.toEqual({ status: 'unset' });
     });
   });
 
   describe('a chosen name is returned as chosen', () => {
     it('returns a name the user picked', async () => {
-      singleResult = { data: { display_name: 'Jessie' }, error: null };
+      singleResult = profileRow('Jessie');
       await expect(lookup()).resolves.toEqual({ status: 'chosen', displayName: 'Jessie' });
     });
 
     it('trims the stored value rather than rejecting it', async () => {
-      singleResult = { data: { display_name: '  Jessie  ' }, error: null };
+      singleResult = profileRow('  Jessie  ');
       await expect(lookup()).resolves.toEqual({ status: 'chosen', displayName: 'Jessie' });
     });
 
     it("accepts a name that merely contains the email, rather than equalling it", async () => {
-      singleResult = { data: { display_name: `${EMAIL} (work)` }, error: null };
+      singleResult = profileRow(`${EMAIL} (work)`);
       await expect(lookup()).resolves.toEqual({
         status: 'chosen',
         displayName: `${EMAIL} (work)`,
@@ -98,7 +103,7 @@ describe('own display name contract', () => {
     it('accepts the literal email of a DIFFERENT account', async () => {
       // Only the caller's OWN email is a seed value. Someone else's is a
       // deliberate, if odd, choice.
-      singleResult = { data: { display_name: 'someone.else@example.com' }, error: null };
+      singleResult = profileRow('someone.else@example.com');
       await expect(lookup()).resolves.toEqual({
         status: 'chosen',
         displayName: 'someone.else@example.com',
@@ -106,7 +111,7 @@ describe('own display name contract', () => {
     });
 
     it("accepts 'Unknown' embedded in a longer name", async () => {
-      singleResult = { data: { display_name: 'Unknown Soldier' }, error: null };
+      singleResult = profileRow('Unknown Soldier');
       await expect(lookup()).resolves.toEqual({
         status: 'chosen',
         displayName: 'Unknown Soldier',
@@ -115,7 +120,7 @@ describe('own display name contract', () => {
 
     it('keeps a chosen name when the session carries no email at all', async () => {
       sessionResult = { data: { session: { user: { id: USER_ID } } }, error: null };
-      singleResult = { data: { display_name: 'Jessie' }, error: null };
+      singleResult = profileRow('Jessie');
       await expect(lookup()).resolves.toEqual({ status: 'chosen', displayName: 'Jessie' });
     });
   });
@@ -169,8 +174,8 @@ describe('own display name contract', () => {
 
   describe('getOwnDisplayName collapses the three answers for renderers', () => {
     it.each([
-      ['a chosen name', { data: { display_name: 'Jessie' }, error: null }, 'Jessie'],
-      ['a seed fallback', { data: { display_name: EMAIL }, error: null }, null],
+      ['a chosen name', profileRow('Jessie'), 'Jessie'],
+      ['a seed fallback', profileRow(EMAIL), null],
       ['a failed read', { data: null, error: { code: '500', message: 'boom' } }, null],
     ])('returns %s', async (_label, result, expected) => {
       singleResult = result;

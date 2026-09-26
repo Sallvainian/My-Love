@@ -6,8 +6,15 @@ import type { MoodEntry } from '@/types';
 
 describe('moodService', () => {
   const userId = '123e4567-e89b-42d3-a456-426614174000';
+  // Pinned (noon EDT): `create` stamps today's local date, so every read of
+  // "today" or of the days either side is the same day whenever this runs.
+  // Only `Date` is faked; fake-indexeddb keeps its real timers.
+  const NOW = new Date('2026-09-15T16:00:00.000Z');
+  const YESTERDAY = new Date(2026, 8, 14);
+  const TOMORROW = new Date(2026, 8, 16);
 
   beforeEach(async () => {
+    vi.setSystemTime(NOW);
     // Clear all moods before each test by clearing the store
     try {
       await moodService.clear();
@@ -21,7 +28,7 @@ describe('moodService', () => {
   });
 
   describe('create', () => {
-    it('creates a mood entry with correct fields', async () => {
+    it('creates an unsynced entry for the user with the mood as primary and a YYYY-MM-DD date', async () => {
       const entry = await moodService.create(userId, ['happy']);
       expect(entry.userId).toBe(userId);
       expect(entry.mood).toBe('happy');
@@ -50,12 +57,18 @@ describe('moodService', () => {
     it('throws validation error for invalid mood type', async () => {
       await expect(
         moodService.create(userId, ['invalid-mood' as unknown as MoodEntry['mood']])
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({
+        name: 'ValidationError',
+        message: 'Invalid mood. Please select a valid option., Invalid moods.0. Please select a valid option.',
+      });
     });
 
     it('throws validation error for note exceeding 200 chars', async () => {
       const longNote = 'a'.repeat(201);
-      await expect(moodService.create(userId, ['happy'], longNote)).rejects.toThrow();
+      await expect(moodService.create(userId, ['happy'], longNote)).rejects.toMatchObject({
+        name: 'ValidationError',
+        message: 'Note cannot exceed 200 characters',
+      });
     });
   });
 
@@ -82,7 +95,10 @@ describe('moodService', () => {
       const created = await moodService.create(userId, ['happy']);
       await expect(
         moodService.updateMood(created.id!, ['bad' as unknown as MoodEntry['mood']])
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({
+        name: 'ValidationError',
+        message: 'Invalid mood. Please select a valid option., Invalid moods.0. Please select a valid option.',
+      });
     });
 
     it('[A: edit after failed first sync] leaves timestamp untouched', async () => {
@@ -116,8 +132,7 @@ describe('moodService', () => {
   describe('getMoodForDate', () => {
     it('returns mood entry for matching date', async () => {
       await moodService.create(userId, ['happy']);
-      const today = new Date();
-      const result = await moodService.getMoodForDate(today, userId);
+      const result = await moodService.getMoodForDate(NOW, userId);
       expect(result).not.toBeNull();
       expect(result!.mood).toBe('happy');
     });
@@ -131,15 +146,11 @@ describe('moodService', () => {
 
   describe('getMoodsInRange', () => {
     it('returns moods within date range', async () => {
-      await moodService.create(userId, ['happy']);
+      const created = await moodService.create(userId, ['happy']);
+      await moodService.create('223e4567-e89b-42d3-a456-426614174111', ['sad']);
 
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const result = await moodService.getMoodsInRange(yesterday, tomorrow, userId);
-      expect(result.length).toBeGreaterThanOrEqual(1);
+      const result = await moodService.getMoodsInRange(YESTERDAY, TOMORROW, userId);
+      expect(result).toEqual([created]);
     });
 
     it('returns empty array for range with no moods', async () => {
@@ -174,7 +185,7 @@ describe('moodService', () => {
       );
 
       expect(outcome).toBe('cleared');
-      const fetched = await moodService.getMoodForDate(new Date(), userId);
+      const fetched = await moodService.getMoodForDate(NOW, userId);
       expect(fetched!.synced).toBe(true);
       expect(fetched!.supabaseId).toBe('supa-123');
     });
@@ -374,11 +385,20 @@ describe('moodService', () => {
 
     it('never deletes a local row the server lacks', async () => {
       await moodService.saveForDate(userId, '2026-07-01', ['happy']);
+      const local = await rowFor('2026-07-01');
+      expect(local).toMatchObject({ userId, date: '2026-07-01', mood: 'happy', synced: false });
 
       await merge([serverEntry()]);
 
-      expect(await rowFor('2026-07-01')).toBeDefined();
-      expect(await rowFor('2026-08-01')).toBeDefined();
+      expect(await rowFor('2026-07-01')).toEqual(local);
+      expect(await rowFor('2026-08-01')).toMatchObject({
+        userId,
+        mood: 'grateful',
+        moods: ['grateful'],
+        note: 'from the server',
+        synced: true,
+        supabaseId: 'server-1',
+      });
     });
   });
 
@@ -411,7 +431,7 @@ describe('moodService', () => {
       // the same person on the same day must still be rejected.
       await moodService.create(userId, ['happy']);
 
-      await expect(moodService.create(userId, ['sad'])).rejects.toThrow();
+      await expect(moodService.create(userId, ['sad'])).rejects.toMatchObject({ name: 'ConstraintError' });
     });
 
     it('getAllForUser returns only the caller\'s entries', async () => {
@@ -430,7 +450,7 @@ describe('moodService', () => {
       // straight into the textarea on mount.
       await moodService.create(partnerId, ['sad'], 'their private note');
 
-      const mine = await moodService.getMoodForDate(new Date(), userId);
+      const mine = await moodService.getMoodForDate(NOW, userId);
 
       expect(mine).toBeNull();
     });
@@ -439,12 +459,7 @@ describe('moodService', () => {
       await moodService.create(userId, ['happy'], 'mine');
       await moodService.create(partnerId, ['sad'], 'theirs');
 
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const mine = await moodService.getMoodsInRange(yesterday, tomorrow, userId);
+      const mine = await moodService.getMoodsInRange(YESTERDAY, TOMORROW, userId);
 
       expect(mine).toHaveLength(1);
       expect(mine[0].userId).toBe(userId);

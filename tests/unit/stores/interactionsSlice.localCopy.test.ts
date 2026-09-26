@@ -38,6 +38,7 @@ vi.mock('../../../src/services/localCopy', () => ({
 }));
 
 import type { Interaction, SupabaseInteractionRecord } from '../../../src/api/interactionService';
+import { createInteractionRecord } from '../../support/factories/interaction-record-ownership';
 import {
   createInteractionsSlice,
   INTERACTIONS_COPY_KIND,
@@ -83,16 +84,17 @@ function saved(i: Interaction) {
   };
 }
 
+const INCOMING_AT = '2026-09-21T08:00:00.000Z';
+
+/** A server row, by default an unviewed poke from PARTNER to USER_A. */
 function record(id: string, overrides: Partial<SupabaseInteractionRecord> = {}) {
-  return {
+  return createInteractionRecord({
     id,
-    type: 'poke',
     from_user_id: PARTNER,
     to_user_id: USER_A,
-    viewed: false,
-    created_at: '2026-09-21T08:00:00.000Z',
+    created_at: INCOMING_AT,
     ...overrides,
-  } as SupabaseInteractionRecord;
+  });
 }
 
 const key = (userId: string) => `${userId}|${INTERACTIONS_COPY_KIND}`;
@@ -111,7 +113,12 @@ function setOnline(value: boolean) {
   Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+/**
+ * The copy read `loadInteractionHistory` started, as the promise it awaits. The
+ * slice registers its own `await` on it first, so a test awaiting it next
+ * resumes only after the slice has acted on the saved copy.
+ */
+const copyReadSettled = (call = 0) => readLocalCopy.mock.results[call].value as Promise<unknown>;
 
 describe('interactionsSlice local copy', () => {
   beforeEach(() => {
@@ -180,8 +187,7 @@ describe('interactionsSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadInteractionHistory(100);
-      await flush();
-      expect(store.getState().interactions).toEqual([interaction('old')]);
+      await vi.waitFor(() => expect(store.getState().interactions).toEqual([interaction('old')]));
       expect(store.getState().unviewedCount).toBe(1);
 
       const fresh = [interaction('new-1'), interaction('new-2'), interaction('old', { viewed: true })];
@@ -251,8 +257,10 @@ describe('interactionsSlice local copy', () => {
 
       getInteractionHistory.mockReturnValueOnce(new Promise(() => {}));
       void store.getState().loadInteractionHistory();
-      await flush();
 
+      // The load ran (the server request goes out synchronously), and the copy
+      // read would have been started synchronously beside it.
+      expect(getInteractionHistory).toHaveBeenCalledTimes(2);
       expect(readLocalCopy).not.toHaveBeenCalled();
       expect(store.getState().interactions).toEqual([interaction('server')]);
     });
@@ -264,7 +272,8 @@ describe('interactionsSlice local copy', () => {
       store.setState({ interactions: [interaction('live')], unviewedCount: 1 });
 
       void store.getState().loadInteractionHistory();
-      await flush();
+      expect(readLocalCopy).toHaveBeenCalledWith(USER_A, INTERACTIONS_COPY_KIND);
+      await copyReadSettled();
 
       expect(store.getState().interactions).toEqual([interaction('live')]);
     });
@@ -279,11 +288,12 @@ describe('interactionsSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadInteractionHistory();
-      await flush();
-      expect(store.getState().interactions).toEqual([]);
-      expect(console.error).toHaveBeenCalledWith(
-        '[InteractionsSlice] Ignoring a malformed interactions copy'
+      await vi.waitFor(() =>
+        expect(console.error).toHaveBeenCalledWith(
+          '[InteractionsSlice] Ignoring a malformed interactions copy'
+        )
       );
+      expect(store.getState().interactions).toEqual([]);
 
       server.resolve([interaction('server')]);
       await inFlight;
@@ -315,7 +325,8 @@ describe('interactionsSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadInteractionHistory();
-      await flush();
+      // Past the (empty) copy read, so the load is waiting on the server read.
+      await copyReadSettled();
       store.setState({ userId: USER_B, authSessionVersion: 2, interactions: [], unviewedCount: 0 });
       server.resolve([interaction('a-only')]);
       await inFlight;
@@ -331,7 +342,7 @@ describe('interactionsSlice local copy', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadInteractionHistory();
-      await flush();
+      await copyReadSettled();
       store.setState({ authSessionVersion: 2, interactions: [], unviewedCount: 0 });
       server.resolve([interaction('old-session')]);
       await inFlight;
@@ -402,7 +413,7 @@ describe('interactionsSlice local copy', () => {
   });
 
   describe('refresher', () => {
-    it('registers loadInteractionHistory(100) as the kind refresher', async () => {
+    it('refreshing the interactions copy brings the last 100 interactions into the list, the unviewed count and the saved copy', async () => {
       const store = createTestStore();
       const [kind, refresh] = registerLocalCopy.mock.calls.at(-1) as [string, () => Promise<void>];
       expect(kind).toBe(INTERACTIONS_COPY_KIND);
@@ -434,15 +445,14 @@ describe('interactionsSlice local copy', () => {
       await store.getState().loadInteractionHistory();
 
       store.getState().addIncomingInteraction(record('rt-1'));
-      await flush();
 
       const expected = [
-        interaction('rt-1', { createdAt: new Date('2026-09-21T08:00:00.000Z') }),
+        interaction('rt-1', { createdAt: new Date(INCOMING_AT) }),
         interaction('earlier', { viewed: true }),
       ];
+      await vi.waitFor(() => expect(savedCopies.get(key(USER_A))).toEqual(expected.map(saved)));
       expect(store.getState().interactions).toEqual(expected);
       expect(store.getState().unviewedCount).toBe(1);
-      expect(savedCopies.get(key(USER_A))).toEqual(expected.map(saved));
     });
 
     it('a rejected or duplicate incoming row writes nothing', async () => {
@@ -450,9 +460,13 @@ describe('interactionsSlice local copy', () => {
       store.getState().addIncomingInteraction(record('stranger', { from_user_id: 'SOMEONE-ELSE' }));
       store.setState({ interactions: [interaction('dup')] });
       store.getState().addIncomingInteraction(record('dup'));
-      await flush();
 
+      // A copy save starts synchronously inside `addIncomingInteraction`.
       expect(writeLocalCopy).not.toHaveBeenCalled();
+
+      // Positive control: an accepted row does start one.
+      store.getState().addIncomingInteraction(record('fresh'));
+      expect(writeLocalCopy).toHaveBeenCalledTimes(1);
     });
 
     it('logs a failed copy write for an incoming row and keeps the row in state', async () => {
@@ -460,24 +474,27 @@ describe('interactionsSlice local copy', () => {
       const store = createTestStore();
 
       store.getState().addIncomingInteraction(record('rt-1'));
-      await flush();
 
-      expect(store.getState().interactions.map((i) => i.id)).toEqual(['rt-1']);
-      expect(console.error).toHaveBeenCalledWith(
-        '[InteractionsSlice] Failed to save the interactions copy:',
-        expect.any(Error)
+      await vi.waitFor(() =>
+        expect(console.error).toHaveBeenCalledWith(
+          '[InteractionsSlice] Failed to save the interactions copy:',
+          expect.any(Error)
+        )
       );
+      expect(store.getState().interactions.map((i) => i.id)).toEqual(['rt-1']);
     });
 
-    it.each(['sendPoke', 'sendKiss'] as const)(
+    it.each([
+      ['sendPoke', 'sent-poke'],
+      ['sendKiss', 'sent-kiss'],
+    ] as const)(
       'a confirmed %s is in state and in the copy',
-      async (action) => {
+      async (action, sentId) => {
         const store = createTestStore();
         store.setState({ interactions: [interaction('earlier')] });
 
         await store.getState()[action]();
 
-        const sentId = action === 'sendPoke' ? 'sent-poke' : 'sent-kiss';
         expect(store.getState().interactions.map((i) => i.id)).toEqual([sentId, 'earlier']);
         const copy = savedCopies.get(key(USER_A)) as Array<{ id: string }>;
         expect(copy.map((row) => row.id)).toEqual([sentId, 'earlier']);
@@ -552,7 +569,7 @@ describe('interactionsSlice local copy', () => {
       await store.getState().sendPoke();
       store.setState({ interactions: [] });
       copyRead.resolve([saved(interaction('stale-copy'))]);
-      await flush();
+      await copyRead.promise;
 
       expect(store.getState().interactions).toEqual([]);
     });

@@ -25,8 +25,10 @@
  * (realtime v2.124.4, supabase_realtime_My-Love, 2026-09-12). The REST endpoint
  * evaluates the same INSERT policy without requiring a join. Note also that the
  * SDK's `send()` falls back to that endpoint when the channel is not joined but
- * swallows the denial and resolves 'ok'; `httpSend` rejects. That difference is
- * asserted below, so a regression back to `send()` fails here.
+ * swallows the denial and resolves 'ok'; `httpSend` rejects. Both halves are
+ * asserted below. That pins that `send()` hides the denial from its caller —
+ * the reason the app sends with `httpSend` — but this file cannot catch the
+ * app switching back to `send()`, because it drives the SDK directly.
  *
  * Every client here is SESSION-based — signed in, then `realtime.setAuth()`
  * with no argument — because that is what the app does. Handing `setAuth` an
@@ -45,6 +47,14 @@
  * No worker account is linked, unlinked or reset anywhere in this file; those
  * rows are shared with every other worker.
  *
+ * Sentinel assumption. Non-delivery is proved with a sentinel: a message that
+ * must arrive, sent only after the forbidden call has returned. That proof
+ * rests on Realtime delivering to one subscriber in the order the server
+ * accepted the messages, across senders and across the REST and websocket
+ * paths. It holds on the single-node local stack this file runs against; it is
+ * not a guarantee Realtime makes in general, so on a multi-node deployment a
+ * leak could land after its sentinel and go unseen here.
+ *
  * playwright-utils deviation: the library has no Supabase Realtime/WebSocket
  * subscription utility, so the channels below are opened with the SDK directly,
  * following tests/api/interaction-realtime.spec.ts.
@@ -52,15 +62,13 @@
 import { log } from '@seontechnologies/playwright-utils';
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test } from '../support/merged-fixtures';
+import { throwCollected } from '../support/helpers/collected-failures';
 import { resolveOwnPair } from '../support/helpers/events';
 import { createOutsiderClient, createUserClient } from '../support/helpers/rls-security';
 import type { TypedSupabaseClient } from '../support/factories';
 
 /** A terminal subscribe status — anything the server will not move on from. */
 const TERMINAL_FAILURES = ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'];
-
-/** How long to let a delivery that should NOT happen fail to happen. */
-const NON_DELIVERY_GRACE_MS = 3000;
 
 function envPair(): { url: string; anonKey: string } {
   const url = process.env.SUPABASE_URL;
@@ -89,24 +97,42 @@ function anonClient(): SupabaseClient {
   });
 }
 
+/**
+ * A love-note `new_message` broadcast body, `{ message: { id, content } }`.
+ *
+ * `content` is left off entirely when not given, rather than sent as
+ * `undefined`, so the body on the wire and the exact `toEqual` lists of what a
+ * subscriber received both keep the shape they are written with.
+ */
+function notePayload(id: string, content?: string): { message: { id: string; content?: string } } {
+  return { message: content === undefined ? { id } : { id, content } };
+}
+
 interface Subscription {
   channel: RealtimeChannel;
   statuses: string[];
   received: Array<Record<string, unknown>>;
 }
 
-/** Open one topic and start collecting statuses and payloads from it. */
+/**
+ * Open one topic and start collecting statuses and payloads from it.
+ *
+ * `ack: true` makes a websocket `send()` on the returned channel wait for the
+ * server's reply, so a later sentinel is known to have been sent after it.
+ */
 function join(
   client: SupabaseClient,
   topic: string,
   event: string,
-  options: { private: boolean }
+  options: { private: boolean; ack?: boolean }
 ): Subscription {
   const statuses: string[] = [];
   const received: Array<Record<string, unknown>> = [];
 
   const channel = client
-    .channel(topic, { config: { broadcast: { self: false }, private: options.private } })
+    .channel(topic, {
+      config: { broadcast: { self: false, ack: options.ack ?? false }, private: options.private },
+    })
     .on('broadcast', { event }, (message) => {
       received.push(message.payload as Record<string, unknown>);
     })
@@ -181,7 +207,7 @@ test.describe('Couple broadcast authorization', () => {
 
       await log.step('The partner sends to both topics over the private REST endpoint');
       expect(
-        await senderNotes.httpSend('new_message', { message: { id: 'note-1', content: 'hi' } })
+        await senderNotes.httpSend('new_message', notePayload('note-1', 'hi'))
       ).toEqual({ success: true });
       expect(await senderMoods.httpSend('new_mood', { id: 'mood-1', mood_type: 'happy' })).toEqual({
         success: true,
@@ -218,7 +244,7 @@ test.describe('Couple broadcast authorization', () => {
       await waitForStatus(poll, rejoined, 'victim love-notes after reconnect', 'subscribed');
 
       expect(
-        await senderNotes.httpSend('new_message', { message: { id: 'note-2', content: 'again' } })
+        await senderNotes.httpSend('new_message', notePayload('note-2', 'again'))
       ).toEqual({ success: true });
 
       await poll(
@@ -244,7 +270,7 @@ test.describe('Couple broadcast authorization', () => {
     const client = outsider.client as unknown as SupabaseClient;
     const poll = recurse as unknown as Poll;
 
-    let failure: unknown;
+    const failures: unknown[] = [];
 
     try {
       await client.realtime.setAuth();
@@ -256,12 +282,25 @@ test.describe('Couple broadcast authorization', () => {
       await waitForStatus(poll, notes, 'outsider love-notes join', 'denied');
       await waitForStatus(poll, moods, 'outsider mood-updates join', 'denied');
     } catch (error) {
-      failure = error;
+      failures.push(error);
     }
 
-    await client.removeAllChannels();
-    await outsider.cleanup();
-    if (failure !== undefined) throw failure;
+    // Each teardown step in its own collected try: a failed channel removal must
+    // not skip the account deletion, and neither may replace the test's error.
+    try {
+      await client.removeAllChannels();
+    } catch (error) {
+      failures.push(error);
+    }
+    try {
+      const { error: cleanupError } = await outsider.cleanup();
+      expect(cleanupError, `failed to delete the throwaway account: ${cleanupError?.message}`)
+        .toBeNull();
+    } catch (error) {
+      failures.push(error);
+    }
+
+    throwCollected(failures, 'Outsider join-denial assertion or cleanup failed');
   });
 
   test('[P0] a non-partner send never reaches the victim, and legitimate delivery still works', async ({
@@ -275,7 +314,7 @@ test.describe('Couple broadcast authorization', () => {
     const forger = outsider.client as unknown as SupabaseClient;
     const poll = recurse as unknown as Poll;
 
-    let failure: unknown;
+    const failures: unknown[] = [];
     const notes = join(victim, `love-notes:${victimId}`, 'new_message', { private: true });
 
     try {
@@ -285,28 +324,29 @@ test.describe('Couple broadcast authorization', () => {
       await log.step('The forger is denied at the REST endpoint the app sends over');
       const forged = forger.channel(`love-notes:${victimId}`, { config: { private: true } });
       await expect(
-        forged.httpSend('new_message', { message: { id: 'forged-1', content: 'forged' } })
+        forged.httpSend('new_message', notePayload('forged-1', 'forged'))
       ).rejects.toThrow(/Unauthorized/);
 
       // The SDK's `send()` reaches the same endpoint but reports 'ok' whatever
-      // the endpoint answered. Nothing must be delivered by that path either —
-      // this is why the app uses httpSend, and why a regression to send() would
-      // hide the denial from the caller.
+      // the endpoint answered: pinned here, so the denial it hides is measured
+      // rather than logged. Nothing must be delivered by that path either —
+      // this is why the app uses httpSend.
       const legacyResult = await forged.send({
         type: 'broadcast',
         event: 'new_message',
-        payload: { message: { id: 'forged-2', content: 'forged' } },
+        payload: notePayload('forged-2', 'forged'),
       });
-      log.info(`Forged legacy send() reported: ${legacyResult}`);
+      expect(legacyResult, 'the SDK send() no longer reports ok on a denied forge').toBe('ok');
       await forger.removeChannel(forged);
 
-      await new Promise((resolve) => setTimeout(resolve, NON_DELIVERY_GRACE_MS));
-      expect(notes.received, 'the victim received a forged note').toHaveLength(0);
-
-      await log.step('And the partner can still deliver afterwards');
+      // Both forged calls have returned, so the partner's note below is a
+      // sentinel: a forged note, had one been delivered, would have landed
+      // first and made the exact list below fail -- given in-order delivery
+      // (see "Sentinel assumption" in the header).
+      await log.step('Only the partner note that follows the forgeries reaches the victim');
       const senderNotes = partner.channel(`love-notes:${victimId}`, { config: { private: true } });
       expect(
-        await senderNotes.httpSend('new_message', { message: { id: 'real-1', content: 'real' } })
+        await senderNotes.httpSend('new_message', notePayload('real-1', 'real'))
       ).toEqual({ success: true });
 
       await poll(
@@ -314,18 +354,33 @@ test.describe('Couple broadcast authorization', () => {
         (n: never) => (n as unknown as number) >= 1,
         { timeout: 15000, interval: 100, log: 'Waiting for the legitimate note' }
       );
-      expect(notes.received).toEqual([{ message: { id: 'real-1', content: 'real' } }]);
+      expect(notes.received, 'the victim received a forged note').toEqual([
+        notePayload('real-1', 'real'),
+      ]);
     } catch (error) {
-      failure = error;
+      failures.push(error);
     }
 
-    await Promise.all([
-      victim.removeAllChannels(),
-      partner.removeAllChannels(),
-      forger.removeAllChannels(),
-    ]);
-    await outsider.cleanup();
-    if (failure !== undefined) throw failure;
+    // Each teardown step in its own collected try: a failed channel removal must
+    // not skip the account deletion, and neither may replace the test's error.
+    try {
+      await Promise.all([
+        victim.removeAllChannels(),
+        partner.removeAllChannels(),
+        forger.removeAllChannels(),
+      ]);
+    } catch (error) {
+      failures.push(error);
+    }
+    try {
+      const { error: cleanupError } = await outsider.cleanup();
+      expect(cleanupError, `failed to delete the throwaway account: ${cleanupError?.message}`)
+        .toBeNull();
+    } catch (error) {
+      failures.push(error);
+    }
+
+    throwCollected(failures, 'Forged-send denial assertion or cleanup failed');
   });
 
   test('[P0] an anonymous client cannot join either victim topic privately', async ({
@@ -356,6 +411,7 @@ test.describe('Couple broadcast authorization', () => {
   test('[P1] a PUBLIC join to a victim topic receives nothing that was sent privately', async ({
     recurse,
     supabaseAdmin,
+    apiRequest,
   }) => {
     // The measured answer to the rollout question. This stack has Realtime's
     // "Allow public access to channels" at its default — Enabled — so a bare
@@ -371,11 +427,15 @@ test.describe('Couple broadcast authorization', () => {
     const victim = await signedInClient(supabaseAdmin, victimId);
     const partner = await signedInClient(supabaseAdmin, partnerId);
     const anon = anonClient();
+    const anonSender = anonClient();
     const poll = recurse as unknown as Poll;
     const { url, anonKey } = envPair();
 
     let failure: unknown;
-    const eavesdrop = join(anon, `love-notes:${victimId}`, 'new_message', { private: false });
+    const eavesdrop = join(anon, `love-notes:${victimId}`, 'new_message', {
+      private: false,
+      ack: true,
+    });
     const listener = join(victim, `love-notes:${victimId}`, 'new_message', { private: true });
     const sender = partner.channel(`love-notes:${victimId}`, { config: { private: true } });
 
@@ -398,7 +458,7 @@ test.describe('Couple broadcast authorization', () => {
 
       await log.step('Reading: a privately-sent broadcast does not reach the public subscriber');
       expect(
-        await sender.httpSend('new_message', { message: { id: 'private-1', content: 'private' } })
+        await sender.httpSend('new_message', notePayload('private-1', 'private'))
       ).toEqual({ success: true });
 
       await poll(
@@ -406,10 +466,26 @@ test.describe('Couple broadcast authorization', () => {
         (n: never) => (n as unknown as number) >= 1,
         { timeout: 15000, interval: 100, log: 'Waiting for the private delivery' }
       );
-      await new Promise((resolve) => setTimeout(resolve, NON_DELIVERY_GRACE_MS));
-      expect(eavesdrop.received, 'a public subscriber received a private broadcast').toHaveLength(
-        0
+      // The private send has been delivered, so a PUBLIC sentinel sent now is
+      // what bounds a leak: had private-1 reached the public subscriber, it
+      // would sit ahead of the sentinel in the exact list below, given in-order
+      // delivery (see "Sentinel assumption" in the header). It comes from a
+      // second anon client because `channel()` hands the partner back its
+      // existing private channel for the same topic.
+      const publicSender = anonSender.channel(`love-notes:${victimId}`, {
+        config: { private: false },
+      });
+      expect(
+        await publicSender.httpSend('new_message', notePayload('public-sentinel', 'sentinel'))
+      ).toEqual({ success: true });
+      await poll(
+        async () => eavesdrop.received.length,
+        (n: never) => (n as unknown as number) >= 1,
+        { timeout: 15000, interval: 100, log: 'Waiting for the public sentinel' }
       );
+      expect(eavesdrop.received, 'a public subscriber received a private broadcast').toEqual([
+        notePayload('public-sentinel', 'sentinel'),
+      ]);
 
       // The other half of CAP-2/CAP-3, and the one that matters more: not just
       // that a stranger cannot READ the couple's traffic, but that a stranger
@@ -420,42 +496,59 @@ test.describe('Couple broadcast authorization', () => {
       const publicSend = await eavesdrop.channel.send({
         type: 'broadcast',
         event: 'new_message',
-        payload: { message: { id: 'injected-ws', content: 'injected' } },
+        payload: notePayload('injected-ws', 'injected'),
       });
-      log.info(`Anon public websocket send reported: ${publicSend}`);
+      expect(publicSend, 'the anon public websocket send no longer reports ok').toBe('ok');
 
       // The bulk REST route, with nothing but the publishable key. Both headers
       // are required: without `Authorization` the route answers 500 before it
       // ever looks at the body, which would make this prove nothing.
-      const restResponse = await fetch(`${url}/realtime/v1/api/broadcast`, {
+      // No retry: a retried 5xx could send the injection twice.
+      const restResponse = await apiRequest({
         method: 'POST',
+        baseUrl: url,
+        path: '/realtime/v1/api/broadcast',
         headers: {
           apikey: anonKey,
           Authorization: `Bearer ${anonKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
+        body: {
           messages: [
             {
               topic: `love-notes:${victimId}`,
               event: 'new_message',
-              payload: { message: { id: 'injected-rest', content: 'injected' } },
+              payload: notePayload('injected-rest', 'injected'),
               private: true,
             },
           ],
-        }),
+        },
+        retryConfig: { maxRetries: 0 },
       });
-      log.info(`Anon REST broadcast returned: ${restResponse.status}`);
+      // 202, not the 500 a missing header gives: the route accepted the body,
+      // so the non-delivery below is measured against a message it took.
+      expect(restResponse.status, 'the anon REST broadcast was not accepted').toBe(202);
 
-      await new Promise((resolve) => setTimeout(resolve, NON_DELIVERY_GRACE_MS));
+      // Both injections have been answered by the server (the websocket send
+      // is acked), so a private sentinel from the partner now bounds them: an
+      // injected message would arrive ahead of it, given in-order delivery
+      // (see "Sentinel assumption" in the header).
+      expect(
+        await sender.httpSend('new_message', notePayload('private-sentinel', 'sentinel'))
+      ).toEqual({ success: true });
+      await poll(
+        async () => listener.received.length,
+        (n: never) => (n as unknown as number) >= 2,
+        { timeout: 15000, interval: 100, log: 'Waiting for the private sentinel' }
+      );
       // Both public paths report success — 'ok' and 202 — and neither is
       // delivered. What stops the injection is the private subscriber's
       // separate delivery path, not the sender being told "no", which is
       // exactly why this has to be asserted on the RECEIVER.
-      expect(
-        listener.received,
-        'a public sender injected into a private subscriber'
-      ).toEqual([{ message: { id: 'private-1', content: 'private' } }]);
+      expect(listener.received, 'a public sender injected into a private subscriber').toEqual([
+        notePayload('private-1', 'private'),
+        notePayload('private-sentinel', 'sentinel'),
+      ]);
     } catch (error) {
       failure = error;
     }
@@ -464,6 +557,7 @@ test.describe('Couple broadcast authorization', () => {
       victim.removeAllChannels(),
       partner.removeAllChannels(),
       anon.removeAllChannels(),
+      anonSender.removeAllChannels(),
     ]);
     if (failure !== undefined) throw failure;
   });
@@ -481,10 +575,15 @@ test.describe('Couple broadcast authorization', () => {
     // account is never linked or unlinked: those rows are shared.
     const { userId: victimId } = await resolveOwnPair(supabaseAdmin);
     const outsiderA = await createOutsiderClient(supabaseAdmin, 'broadcast-linked-a');
-    const outsiderB = await createOutsiderClient(supabaseAdmin, 'broadcast-linked-b');
+    // Only the accounts that exist: B is created inside the try, so a failure
+    // creating it still reaches A's deletion below.
+    const accounts = [outsiderA];
+    const failures: unknown[] = [];
 
-    let failure: unknown;
     try {
+      const outsiderB = await createOutsiderClient(supabaseAdmin, 'broadcast-linked-b');
+      accounts.push(outsiderB);
+
       const { error: linkError } = await supabaseAdmin
         .from('users')
         .upsert([
@@ -504,7 +603,7 @@ test.describe('Couple broadcast authorization', () => {
 
       await log.step('Sending to its OWN partner is allowed');
       const own = sender.channel(`love-notes:${outsiderB.userId}`, { config: { private: true } });
-      expect(await own.httpSend('new_message', { message: { id: 'ok-1' } })).toEqual({
+      expect(await own.httpSend('new_message', notePayload('ok-1'))).toEqual({
         success: true,
       });
       await sender.removeChannel(own);
@@ -512,7 +611,7 @@ test.describe('Couple broadcast authorization', () => {
       await log.step("Sending to a third party's topic is not");
       const stranger = sender.channel(`love-notes:${victimId}`, { config: { private: true } });
       await expect(
-        stranger.httpSend('new_message', { message: { id: 'forged-3' } })
+        stranger.httpSend('new_message', notePayload('forged-3'))
       ).rejects.toThrow(/Unauthorized/);
       await sender.removeChannel(stranger);
 
@@ -524,13 +623,28 @@ test.describe('Couple broadcast authorization', () => {
       ).rejects.toThrow(/Unauthorized/);
       await sender.removeChannel(strangerMood);
     } catch (error) {
-      failure = error;
+      failures.push(error);
     }
 
-    await (outsiderA.client as unknown as SupabaseClient).removeAllChannels();
-    await (outsiderB.client as unknown as SupabaseClient).removeAllChannels();
-    await outsiderA.cleanup();
-    await outsiderB.cleanup();
-    if (failure !== undefined) throw failure;
+    // Each teardown step in its own collected try: a failed channel removal must
+    // not skip an account deletion, and none may replace the test's error.
+    for (const account of accounts) {
+      try {
+        await (account.client as unknown as SupabaseClient).removeAllChannels();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    for (const account of accounts) {
+      try {
+        const { error: cleanupError } = await account.cleanup();
+        expect(cleanupError, `failed to delete a throwaway account: ${cleanupError?.message}`)
+          .toBeNull();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+
+    throwCollected(failures, 'Partnered third-party denial or cleanup failed');
   });
 });

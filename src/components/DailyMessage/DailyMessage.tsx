@@ -283,7 +283,11 @@ export function DailyMessage(_props: DailyMessageProps) {
               >
                 {categoryChip && (
                   <>
-                    <categoryChip.Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                    <categoryChip.Icon
+                      className="h-3.5 w-3.5"
+                      aria-hidden="true"
+                      data-testid="message-category-icon"
+                    />
                     {categoryChip.label}
                   </>
                 )}

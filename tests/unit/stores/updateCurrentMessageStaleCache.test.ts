@@ -18,7 +18,7 @@
  * pass if the rotation happened to return the stale id. Each test therefore
  * pins the resolved message to the pool actually in the store.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
@@ -26,7 +26,7 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 }));
 
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { formatDateISO } from '../../../src/utils/dateUtils';
+import { getDailyMessage } from '../../../src/utils/messageRotation';
 
 type Message = ReturnType<typeof useAppStore.getState>['messages'][number];
 
@@ -43,7 +43,11 @@ const message = (id: number, text: string, isCustom = false): Message =>
     tags: [],
   }) as unknown as Message;
 
-const TODAY = formatDateISO(new Date());
+// Pinned: `updateCurrentMessage` reads today's key from the clock at call
+// time, so the key seeded below is today's whenever this runs. Only `Date` is
+// faked.
+const NOW = new Date(2026, 8, 22, 12);
+const TODAY = '2026-09-22';
 
 const seed = (messages: Message[], shownMessages: Map<string, number>) => {
   useAppStore.setState({
@@ -59,7 +63,12 @@ const seed = (messages: Message[], shownMessages: Map<string, number>) => {
 
 describe('updateCurrentMessage with a stale cached id', () => {
   beforeEach(() => {
+    vi.setSystemTime(NOW);
     seed([], new Map());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('recomputes when the cached id is absent from the signed-in pool', () => {
@@ -82,12 +91,15 @@ describe('updateCurrentMessage with a stale cached id', () => {
   it('still honours a cached id that IS in the pool', () => {
     // The cache has to keep working, or today's message changes on every reload.
     const pool = [message(1, 'ONE'), message(2, 'TWO'), message(3, 'THREE')];
-    seed(pool, new Map([[TODAY, 3]]));
+    // Premise: the rotation alone would not pick 1 today (it picks 3 on the
+    // pinned day), so only the cache can.
+    expect(getDailyMessage(pool, NOW).id).not.toBe(1);
+    seed(pool, new Map([[TODAY, 1]]));
 
     useAppStore.getState().updateCurrentMessage();
 
     const { currentMessage, messageHistory } = useAppStore.getState();
-    expect(currentMessage?.id).toBe(3);
-    expect(messageHistory.shownMessages.get(TODAY)).toBe(3);
+    expect(currentMessage?.id).toBe(1);
+    expect(messageHistory.shownMessages.get(TODAY)).toBe(1);
   });
 });

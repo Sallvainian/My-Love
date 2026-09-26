@@ -9,7 +9,9 @@
  * The empty album's Upload button unmounts when the first photo lands, so the
  * dialog it opened had no opener to return focus to and dropped it on <body>.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import { useRef, type HTMLAttributes, type ImgHTMLAttributes, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -85,9 +87,9 @@ class LoadingImage {
   }
 }
 
-function selectFile() {
+async function selectFile(user: UserEvent) {
   const file = new File(['x'], 'beach.jpg', { type: 'image/jpeg' });
-  fireEvent.change(screen.getByTestId('photo-upload-file-input'), { target: { files: [file] } });
+  await user.upload(screen.getByTestId('photo-upload-file-input'), file);
 }
 
 beforeEach(() => {
@@ -134,37 +136,42 @@ describe('DW-180: the upload modal is a dialog', () => {
     expect(document.activeElement).toBe(screen.getByTestId('opener'));
   });
 
-  it('calls onClose on Escape', () => {
+  it('closes on Escape', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<PhotoUpload isOpen onClose={onClose} />);
 
-    fireEvent.keyDown(screen.getByTestId('photo-upload-close'), { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('cycles Tab inside the dialog', () => {
+  it('cycles Tab inside the dialog', async () => {
+    // Without the trap, user-event's own Tab would leave the last control for
+    // <body>, and Shift+Tab would leave the first one the same way.
+    const user = userEvent.setup();
     render(<PhotoUpload isOpen onClose={vi.fn()} />);
     const close = screen.getByTestId('photo-upload-close');
     const select = screen.getByTestId('photo-upload-select-button');
 
     select.focus();
-    fireEvent.keyDown(select, { key: 'Tab' });
+    await user.tab();
     expect(document.activeElement).toBe(close);
 
-    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    await user.tab({ shift: true });
     expect(document.activeElement).toBe(select);
   });
 
-  it('keeps focus on the field being typed in', () => {
+  it('keeps focus on the field being typed in', async () => {
     // A fresh onEscape each render would re-arm the trap and throw focus back
     // to the close button on every keystroke.
+    const user = userEvent.setup();
     render(<PhotoUpload isOpen onClose={vi.fn()} />);
-    selectFile();
+    await selectFile(user);
 
     const caption = screen.getByTestId('photo-upload-caption-input');
-    caption.focus();
-    fireEvent.change(caption, { target: { value: 'sunset' } });
+    await user.type(caption, 'sunset');
+    expect(caption).toHaveValue('sunset');
 
     expect(document.activeElement).toBe(caption);
   });
@@ -173,68 +180,68 @@ describe('DW-180: the upload modal is a dialog', () => {
   // would fall to <body>, outside the element the trap listens on, and both
   // Escape and the Tab cycle would go dead. Escape is fired on whatever holds
   // focus, as a real keypress would be.
-  it('keeps focus inside, and Escape working, once a file is picked', () => {
+  it('keeps focus inside, and Escape working, once a file is picked', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<PhotoUpload isOpen onClose={onClose} />);
     const select = screen.getByTestId('photo-upload-select-button');
-    select.focus();
 
-    fireEvent.click(select);
-    selectFile();
+    await user.click(select);
+    await selectFile(user);
 
     const dialog = screen.getByRole('dialog');
     expect(dialog.contains(document.activeElement)).toBe(true);
     expect(document.activeElement).toBe(screen.getByTestId('photo-upload-caption-input'));
 
-    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('keeps focus inside, and Escape working, after an upload fails', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     uploadPhotoMock.mockResolvedValue({ success: false, error: 'Storage is full' });
     render(<PhotoUpload isOpen onClose={onClose} />);
-    selectFile();
-    const submit = screen.getByTestId('photo-upload-submit-button');
-    submit.focus();
+    await selectFile(user);
 
-    await act(async () => {
-      fireEvent.click(submit);
-    });
+    await user.click(screen.getByTestId('photo-upload-submit-button'));
     await screen.findByTestId('photo-upload-retry');
 
     expect(document.activeElement).toBe(screen.getByTestId('photo-upload-retry'));
 
-    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('keeps focus inside after Retry', async () => {
+    const user = userEvent.setup();
     uploadPhotoMock.mockResolvedValue({ success: false, error: 'Storage is full' });
     render(<PhotoUpload isOpen onClose={vi.fn()} />);
-    selectFile();
+    await selectFile(user);
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('photo-upload-submit-button'));
-    });
-    const retry = await screen.findByTestId('photo-upload-retry');
-    retry.focus();
-    fireEvent.click(retry);
+    await user.click(screen.getByTestId('photo-upload-submit-button'));
+    await user.click(await screen.findByTestId('photo-upload-retry'));
 
     expect(document.activeElement).toBe(screen.getByTestId('photo-upload-caption-input'));
   });
 
   it('ignores Escape mid-upload, as the disabled close button does', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     uploadPhotoMock.mockReturnValue(new Promise(() => {}));
     render(<PhotoUpload isOpen onClose={onClose} />);
-    selectFile();
+    await selectFile(user);
 
-    fireEvent.click(screen.getByTestId('photo-upload-submit-button'));
-    expect(await screen.findByText('This may take a moment')).toBeInTheDocument();
+    await user.click(screen.getByTestId('photo-upload-submit-button'));
+    expect(
+      await screen.findByRole('heading', { name: 'Compressing & Saving...' })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('photo-upload-close')).toBeDisabled();
 
-    fireEvent.keyDown(screen.getByTestId('photo-upload-modal'), { key: 'Escape' });
+    // Pressed where focus is, which must be inside the trap for the key to
+    // reach its handler at all.
+    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true);
+    await user.keyboard('{Escape}');
 
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -307,10 +314,11 @@ describe('DW-203: focus return when the opener is gone', () => {
 });
 
 describe('DW-177: the viewer delete confirmation is a dialog', () => {
-  it('is found by role and named by its heading', () => {
+  it('is found by role and named by its heading', async () => {
+    const user = userEvent.setup();
     render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByLabelText('Delete photo'));
+    await user.click(screen.getByLabelText('Delete photo'));
 
     const confirm = screen.getByRole('dialog', { name: 'Delete Photo?' });
     expect(confirm).toHaveAttribute('aria-modal', 'true');
@@ -319,25 +327,30 @@ describe('DW-177: the viewer delete confirmation is a dialog', () => {
 });
 
 describe('DW-182: photo dialog errors are announced', () => {
-  it('the upload tag error', () => {
-    render(<PhotoUpload isOpen onClose={vi.fn()} />);
-    selectFile();
+  // src/components/PhotoUpload/PhotoUpload.tsx `parsedTags.length > 10` (inline literal).
+  const MAX_PHOTO_TAGS = 10;
 
-    fireEvent.change(screen.getByTestId('photo-upload-tags-input'), {
-      target: { value: 'a,b,c,d,e,f,g,h,i,j,k' },
-    });
+  it('the upload tag error', async () => {
+    const user = userEvent.setup();
+    render(<PhotoUpload isOpen onClose={vi.fn()} />);
+    await selectFile(user);
+
+    // One tag over the limit: 'a,b,…,k'.
+    const tooManyTags = Array.from({ length: MAX_PHOTO_TAGS + 1 }, (_, i) =>
+      String.fromCharCode(97 + i)
+    ).join(',');
+    await user.type(screen.getByTestId('photo-upload-tags-input'), tooManyTags);
 
     expect(screen.getByRole('alert')).toBe(screen.getByTestId('photo-upload-tag-error'));
   });
 
   it('the upload failure', async () => {
+    const user = userEvent.setup();
     uploadPhotoMock.mockResolvedValue({ success: false, error: 'Storage is full' });
     render(<PhotoUpload isOpen onClose={vi.fn()} />);
-    selectFile();
+    await selectFile(user);
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('photo-upload-submit-button'));
-    });
+    await user.click(screen.getByTestId('photo-upload-submit-button'));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toBe(screen.getByTestId('photo-upload-error'));
@@ -373,27 +386,27 @@ describe('DW-183: a grid tile shows its caption to keyboard focus', () => {
 });
 
 describe('DW-206: an outside tap closes the upload modal', () => {
-  it('closes on a tap on the overlay, not on one inside the panel', () => {
+  it('closes on a tap on the overlay, not on one inside the panel', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<PhotoUpload isOpen onClose={onClose} />);
 
-    fireEvent.click(screen.getByTestId('photo-upload-modal'));
+    await user.click(screen.getByTestId('photo-upload-modal'));
     expect(onClose).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByTestId('photo-upload-overlay'));
+    await user.click(screen.getByTestId('photo-upload-overlay'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('ignores an outside tap while the upload is in flight', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     uploadPhotoMock.mockReturnValue(new Promise(() => {}));
     render(<PhotoUpload isOpen onClose={onClose} />);
-    selectFile();
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('photo-upload-submit-button'));
-    });
+    await selectFile(user);
+    await user.click(screen.getByTestId('photo-upload-submit-button'));
 
-    fireEvent.click(screen.getByTestId('photo-upload-overlay'));
+    await user.click(screen.getByTestId('photo-upload-overlay'));
     expect(onClose).not.toHaveBeenCalled();
   });
 });

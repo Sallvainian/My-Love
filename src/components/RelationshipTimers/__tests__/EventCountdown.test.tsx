@@ -212,31 +212,46 @@ describe('EventCountdown — "Event passed" is never rendered', () => {
   });
 });
 
+/** getEventsSlotView with its four positional arguments named at the call. */
+function slot({
+  raw,
+  upcoming,
+  settled,
+  failed,
+}: {
+  raw: number;
+  upcoming: number;
+  settled: boolean;
+  failed: boolean;
+}) {
+  return getEventsSlotView(raw, upcoming, settled, failed);
+}
+
 describe('getEventsSlotView', () => {
   it('hides the slot before the account\'s first load has settled (no empty-state flash)', () => {
     // The regression this pins: keying on eventsSlice's `eventsIsLoading`
     // instead, which initializes false and is only raised once the effect
     // runs, paints the placeholder on the first frame and then removes it.
-    expect(getEventsSlotView(0, 0, false, false)).toBe('hidden');
+    expect(slot({ raw: 0, upcoming: 0, settled: false, failed: false })).toBe('hidden');
   });
 
   it('shows the empty placeholder once settled with zero upcoming events', () => {
-    expect(getEventsSlotView(0, 0, true, false)).toBe('empty');
+    expect(slot({ raw: 0, upcoming: 0, settled: true, failed: false })).toBe('empty');
   });
 
   it('shows the list, never hiding already-loaded cards during a background reload', () => {
     // A revisit re-triggers loadEvents() with stale data already in the
     // store: rawEventCount > 0, so the "hidden" branch must not fire even
     // before that reload settles.
-    expect(getEventsSlotView(2, 2, false, false)).toBe('list');
+    expect(slot({ raw: 2, upcoming: 2, settled: false, failed: false })).toBe('list');
   });
 
   it('shows the list once settled with upcoming events', () => {
-    expect(getEventsSlotView(1, 1, true, false)).toBe('list');
+    expect(slot({ raw: 1, upcoming: 1, settled: true, failed: false })).toBe('list');
   });
 
   it('shows the placeholder, not the list, when every stored event has passed', () => {
-    expect(getEventsSlotView(3, 0, true, false)).toBe('empty');
+    expect(slot({ raw: 3, upcoming: 0, settled: true, failed: false })).toBe('empty');
   });
 
   it('reports the failure instead of claiming emptiness when the settling load failed', () => {
@@ -244,11 +259,11 @@ describe('getEventsSlotView', () => {
     // .finally gate settles identically for success and failure — and an
     // offline user on Home was told "No upcoming events yet." about a list
     // nothing ever observed.
-    expect(getEventsSlotView(0, 0, true, true)).toBe('error');
+    expect(slot({ raw: 0, upcoming: 0, settled: true, failed: true })).toBe('error');
   });
 
   it('keeps showing last-good cards over an error banner when a refresh fails', () => {
-    expect(getEventsSlotView(2, 2, true, true)).toBe('list');
+    expect(slot({ raw: 2, upcoming: 2, settled: true, failed: true })).toBe('list');
   });
 
   it('stays hidden for a new account even if the previous account\'s load had failed', () => {
@@ -256,11 +271,13 @@ describe('getEventsSlotView', () => {
     // moment; the per-user settled gate is what must decide, so a stale
     // failure flag must not surface an error for an account that has not
     // loaded yet.
-    expect(getEventsSlotView(0, 0, false, true)).toBe('hidden');
+    expect(slot({ raw: 0, upcoming: 0, settled: false, failed: true })).toBe('hidden');
   });
 });
 
 describe('getUpcomingEventCards', () => {
+  /** This suite's card cap; Home passes HOME_MAX_EVENT_CARDS (6, src/App.tsx). */
+  const MAX_CARDS = 3;
   /** An event dated `dayOffset` days from the pinned today. */
   const event = (id: string, dayOffset: number) => ({
     id,
@@ -270,7 +287,7 @@ describe('getUpcomingEventCards', () => {
   it('drops events that have already passed and keeps one dated today', () => {
     const events = [event('past', -1), event('today', 0), event('soon', 3)];
 
-    const { upcomingCount, visible } = getUpcomingEventCards(events, new Date(), 3);
+    const { upcomingCount, visible } = getUpcomingEventCards(events, new Date(), MAX_CARDS);
 
     expect(visible.map((e) => e.id)).toEqual(['today', 'soon']);
     expect(upcomingCount).toBe(2);
@@ -279,7 +296,7 @@ describe('getUpcomingEventCards', () => {
   it('renders at most maxCards, and specifically the soonest ones', () => {
     const events = [event('a', 1), event('b', 5), event('c', 9), event('d', 20)];
 
-    const { visible } = getUpcomingEventCards(events, new Date(), 3);
+    const { visible } = getUpcomingEventCards(events, new Date(), MAX_CARDS);
 
     expect(visible.map((e) => e.id)).toEqual(['a', 'b', 'c']);
   });
@@ -289,11 +306,13 @@ describe('getUpcomingEventCards', () => {
     // events than fit" indistinguishable from "exactly the cap".
     const events = [event('a', 1), event('b', 2), event('c', 3), event('d', 4)];
 
-    const { upcomingCount, visible } = getUpcomingEventCards(events, new Date(), 3);
+    const { upcomingCount, visible } = getUpcomingEventCards(events, new Date(), MAX_CARDS);
 
-    expect(visible).toHaveLength(3);
+    expect(visible).toHaveLength(MAX_CARDS);
     expect(upcomingCount).toBe(4);
-    expect(getEventsSlotView(events.length, upcomingCount, true, false)).toBe('list');
+    expect(
+      slot({ raw: events.length, upcoming: upcomingCount, settled: true, failed: false })
+    ).toBe('list');
   });
 
   it('refills the freed slot at local midnight instead of leaving a short list', () => {
@@ -303,19 +322,23 @@ describe('getUpcomingEventCards', () => {
     // or Home shows two cards with a third event pending until a reload.
     const events = [event('first', 0), event('second', 4), event('third', 9), event('fourth', 14)];
 
-    const before = getUpcomingEventCards(events, new Date(), 3);
+    const before = getUpcomingEventCards(events, new Date(), MAX_CARDS);
     expect(before.visible.map((e) => e.id)).toEqual(['first', 'second', 'third']);
 
     // One day on: 'first' is yesterday, so it leaves the filter entirely.
     vi.setSystemTime(new Date(2026, 0, 16, 12, 0, 0));
-    const after = getUpcomingEventCards(events, new Date(), 3);
+    const after = getUpcomingEventCards(events, new Date(), MAX_CARDS);
 
     expect(after.visible.map((e) => e.id)).toEqual(['second', 'third', 'fourth']);
     expect(after.upcomingCount).toBe(3);
   });
 
   it('returns an empty list, not a throw, when nothing is upcoming', () => {
-    const { upcomingCount, visible } = getUpcomingEventCards([event('old', -30)], new Date(), 3);
+    const { upcomingCount, visible } = getUpcomingEventCards(
+      [event('old', -30)],
+      new Date(),
+      MAX_CARDS
+    );
 
     expect(visible).toEqual([]);
     expect(upcomingCount).toBe(0);

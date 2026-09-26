@@ -20,7 +20,9 @@
  * run, so an inline arrow would drag focus back to the label field on every
  * render of the app around this section.
  */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState } from '../../../stores/types';
@@ -111,6 +113,18 @@ function currentEvents(): CoupleEvent[] {
 const ok: EventWriteResult = { success: true };
 const loadOk: EventLoadResult = { status: 'success' };
 
+type EventWriteFailure = Extract<EventWriteResult, { success: false }>;
+
+/** A refused write, as the slice resolves it. */
+function writeFailure(code: EventWriteFailure['code'], error: string): EventWriteFailure {
+  return { success: false, code, error };
+}
+
+/** A save whose response could not be read: it may or may not have landed. */
+const UNREADABLE = writeFailure('invalid-response', 'Unreadable response');
+/** A write against a row that is gone or no longer the caller's. */
+const STALE = writeFailure('not-found', 'Stale row');
+
 function setStore(overrides: Partial<AppState> = {}) {
   let created = 0;
 
@@ -172,16 +186,18 @@ async function renderSection() {
   return utils;
 }
 
-/**
- * The trap captures document.activeElement when it arms, and fireEvent.click
- * does not focus the way a real pointer does — so the opener is focused
- * explicitly first, exactly as MoodDetailModal.focus.test.tsx does.
- */
-function openBy(testId: string) {
+/** The trap captures document.activeElement when it arms; a real click focuses the opener first. */
+async function openBy(user: UserEvent, testId: string) {
   const opener = screen.getByTestId(testId);
-  opener.focus();
-  fireEvent.click(opener);
+  await user.click(opener);
   return opener;
+}
+
+/** Replaces a form field's value the way a user would: select it all away, then type. */
+async function fill(user: UserEvent, testId: string, value: string) {
+  const field = screen.getByTestId(testId);
+  await user.clear(field);
+  await user.type(field, value);
 }
 
 beforeEach(() => {
@@ -191,9 +207,10 @@ beforeEach(() => {
 
 describe('EventsSettings form focus', () => {
   it('moves focus into the panel, onto the label field, when the form opens', async () => {
+    const user = userEvent.setup();
     await renderSection();
 
-    openBy('events-settings-add');
+    await openBy(user, 'events-settings-add');
 
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-form-label'))
@@ -204,22 +221,24 @@ describe('EventsSettings form focus', () => {
   });
 
   it('closes on Escape and hands focus back to the control that opened it', async () => {
+    const user = userEvent.setup();
     await renderSection();
 
-    const opener = openBy('events-settings-add');
+    const opener = await openBy(user, 'events-settings-add');
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-form-label'))
     );
 
-    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     expect(document.activeElement).toBe(opener);
   });
 
   it('wraps Tab inside the form panel rather than letting focus escape it', async () => {
+    const user = userEvent.setup();
     await renderSection();
-    openBy('events-settings-add');
+    await openBy(user, 'events-settings-add');
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-form-label'))
     );
@@ -228,14 +247,15 @@ describe('EventsSettings form focus', () => {
     const last = screen.getByTestId('events-form-submit');
 
     last.focus();
-    fireEvent.keyDown(last, { key: 'Tab' });
+    await user.tab();
     expect(document.activeElement).toBe(first);
 
-    fireEvent.keyDown(first, { key: 'Tab', shiftKey: true });
+    await user.tab({ shift: true });
     expect(document.activeElement).toBe(last);
   });
 
   it('returns focus to a row’s Edit button after a successful edit', async () => {
+    const user = userEvent.setup();
     // The row genuinely survives the edit — the store double keeps the same id —
     // so the opener is still connected and the hook's own restore is correct.
     // The form is handed no fallback in this case; a regression that always
@@ -243,13 +263,13 @@ describe('EventsSettings form focus', () => {
     setStore({ events: [makeEvent({ id: 'mine' })] as AppState['events'] });
     await renderSection();
 
-    const opener = openBy('event-edit-mine');
+    const opener = await openBy(user, 'event-edit-mine');
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-form-label'))
     );
 
-    fireEvent.change(screen.getByTestId('events-form-date'), { target: { value: '2026-10-01' } });
-    fireEvent.click(screen.getByTestId('events-form-submit'));
+    await fill(user, 'events-form-date', '2026-10-01');
+    await user.click(screen.getByTestId('events-form-submit'));
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
@@ -259,19 +279,20 @@ describe('EventsSettings form focus', () => {
   });
 
   it('lands focus on the header Add button when the empty state’s own opener is gone', async () => {
+    const user = userEvent.setup();
     // The add really lands in the store here, so the empty state is replaced by
     // the list and the button that opened the form is removed from the document
     // — the `isConnected === false` branch the fallback exists for.
     await renderSection();
 
-    const opener = openBy('events-settings-empty-add');
+    const opener = await openBy(user, 'events-settings-empty-add');
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-form-label'))
     );
 
-    fireEvent.change(screen.getByTestId('events-form-label'), { target: { value: 'First' } });
-    fireEvent.change(screen.getByTestId('events-form-date'), { target: { value: '2026-10-01' } });
-    fireEvent.click(screen.getByTestId('events-form-submit'));
+    await fill(user, 'events-form-label', 'First');
+    await fill(user, 'events-form-date', '2026-10-01');
+    await user.click(screen.getByTestId('events-form-submit'));
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     // The premise, asserted rather than assumed.
@@ -285,49 +306,76 @@ describe('EventsSettings form focus', () => {
   });
 
   it('hands focus back to Save once a rejected write re-enables it', async () => {
+    const user = userEvent.setup();
     // Focus is parked on the panel for the duration of the write, because the
     // browser drops it to <body> when the focused button becomes disabled. On
     // failure it has to come back to a control the user can act on, and it
     // cannot be done inside the await: setIsSaving(false) has not rendered yet,
     // so Save still carries `disabled` and focusing it is a no-op.
     setStore({
-      addEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'offline' as const,
-        error: 'You are offline. Events need a connection to save.',
-      })),
+      addEvent: vi.fn(async () =>
+        writeFailure('offline', 'You are offline. Events need a connection to save.')
+      ),
     });
 
     await renderSection();
-    openBy('events-settings-add');
+    await openBy(user, 'events-settings-add');
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-form-label'))
     );
 
-    fireEvent.change(screen.getByTestId('events-form-label'), { target: { value: 'Doomed' } });
-    fireEvent.change(screen.getByTestId('events-form-date'), { target: { value: '2026-10-01' } });
-    fireEvent.click(screen.getByTestId('events-form-submit'));
+    await fill(user, 'events-form-label', 'Doomed');
+    await fill(user, 'events-form-date', '2026-10-01');
+    await user.click(screen.getByTestId('events-form-submit'));
 
     await waitFor(() => expect(screen.getByTestId('events-form-error')).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByTestId('events-form-submit')).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByTestId('events-form-submit')).toBeEnabled());
     // The focus effect is passive-phase, so it can run after Save re-enables.
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-form-submit'))
     );
   });
 
-  it.each(['add', 'edit'] as const)('focuses Refresh after an uncertain %s and the header after reconciliation', async (kind) => {
+  const UNCERTAIN_SAVES = [
+    {
+      kind: 'add',
+      initialEvents: (): CoupleEvent[] => [],
+      writeAction: 'addEvent',
+      openerTestId: 'events-settings-empty-add',
+      openerSurvives: false,
+      loadingAfterRefresh: true,
+    },
+    {
+      kind: 'edit',
+      initialEvents: (): CoupleEvent[] => [makeEvent({ id: 'mine' })],
+      writeAction: 'editEvent',
+      openerTestId: 'event-edit-mine',
+      openerSurvives: true,
+      loadingAfterRefresh: false,
+    },
+  ] as const;
+
+  /**
+   * Opens the form from the row's opener, submits a save whose response cannot
+   * be read, and waits for focus to land on Refresh. The reconciliation load it
+   * installs stays pending until `finishRefresh()` is called.
+   */
+  async function arrangeUncertainSave({
+    initialEvents,
+    writeAction,
+    openerTestId,
+  }: (typeof UNCERTAIN_SAVES)[number]) {
+    const user = userEvent.setup();
     let finishRefresh!: () => void;
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
-    const uncertain = vi.fn<() => Promise<EventWriteResult>>(async () => ({
-      success: false, code: 'invalid-response', error: 'Unreadable response',
-    }));
+    const uncertain = vi.fn<() => Promise<EventWriteResult>>(async () => UNREADABLE);
     setStore({
-      events: kind === 'edit' ? [makeEvent({ id: 'mine' })] : [],
+      events: initialEvents(),
       loadEvents,
-      ...(kind === 'add' ? { addEvent: uncertain } : { editEvent: uncertain }),
+      [writeAction]: uncertain,
     });
     await renderSection();
+    // Installed after the render: the mount load consumes the default.
     loadEvents.mockImplementationOnce(() => {
       store.patch({ eventsIsLoading: true, eventsError: null });
       return new Promise<EventLoadResult>((resolve) => {
@@ -342,45 +390,87 @@ describe('EventsSettings form focus', () => {
       });
     });
 
-    const opener = openBy(kind === 'add' ? 'events-settings-empty-add' : 'event-edit-mine');
-    fireEvent.change(screen.getByTestId('events-form-label'), { target: { value: 'Saved event' } });
-    fireEvent.change(screen.getByTestId('events-form-date'), { target: { value: '2026-10-01' } });
-    fireEvent.click(screen.getByTestId('events-form-submit'));
+    const opener = await openBy(user, openerTestId);
+    await fill(user, 'events-form-label', 'Saved event');
+    await fill(user, 'events-form-date', '2026-10-01');
+    await user.click(screen.getByTestId('events-form-submit'));
 
     await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toHaveFocus());
+    // A closure: `finishRefresh` is only assigned once the reconciliation load runs.
+    return { user, loadEvents, uncertain, opener, finishRefresh: () => finishRefresh() };
+  }
+
+  /** Clicks Refresh on the uncertain-save form and waits for the form to close. */
+  async function reconcile(user: UserEvent) {
+    await user.click(screen.getByRole('button', { name: 'Refresh events' }));
+    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
+  }
+
+  it.each(UNCERTAIN_SAVES)('focuses an enabled Refresh after an uncertain $kind', async (save) => {
+    const { opener } = await arrangeUncertainSave(save);
+
     const refresh = screen.getByRole('button', { name: 'Refresh events' });
     expect(refresh).toBeEnabled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/may already have been saved/i);
-    fireEvent.keyDown(refresh, { key: 'Tab' });
-    expect(screen.getByTestId('events-form-close')).toHaveFocus();
-    fireEvent.keyDown(screen.getByTestId('events-form-close'), { key: 'Tab', shiftKey: true });
-    expect(refresh).toHaveFocus();
     expect(opener.isConnected).toBe(true);
-    fireEvent.click(refresh);
-
-    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
-    expect(opener.isConnected).toBe(kind === 'edit');
-    if (kind === 'add') expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument();
-    expect(screen.getByTestId('events-settings-add')).toHaveFocus();
-    expect(loadEvents).toHaveBeenCalledTimes(2);
-    await act(async () => { finishRefresh(); });
-    expect(screen.getByTestId('event-row-mine')).toHaveTextContent('Saved event');
-    expect(opener.isConnected).toBe(kind === 'edit');
-    expect(screen.getByTestId('events-settings-add')).toHaveFocus();
-    expect(uncertain).toHaveBeenCalledTimes(1);
   });
 
+  it.each(UNCERTAIN_SAVES)('explains an uncertain $kind in an alert', async (save) => {
+    await arrangeUncertainSave(save);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/may already have been saved/i);
+  });
+
+  it.each(UNCERTAIN_SAVES)(
+    'wraps Tab between Refresh and Close after an uncertain $kind',
+    async (save) => {
+      const { user } = await arrangeUncertainSave(save);
+      const refresh = screen.getByRole('button', { name: 'Refresh events' });
+
+      await user.tab();
+      expect(screen.getByTestId('events-form-close')).toHaveFocus();
+      await user.tab({ shift: true });
+      expect(refresh).toHaveFocus();
+    }
+  );
+
+  it.each(UNCERTAIN_SAVES)(
+    'focuses the header Add after reconciling an uncertain $kind',
+    async (save) => {
+      const { user, opener, finishRefresh } = await arrangeUncertainSave(save);
+
+      await reconcile(user);
+      expect(opener.isConnected).toBe(save.openerSurvives);
+      expect(Boolean(screen.queryByTestId('events-settings-loading'))).toBe(
+        save.loadingAfterRefresh
+      );
+      expect(screen.getByTestId('events-settings-add')).toHaveFocus();
+      await act(async () => { finishRefresh(); });
+      expect(opener.isConnected).toBe(save.openerSurvives);
+      expect(screen.getByTestId('events-settings-add')).toHaveFocus();
+    }
+  );
+
+  it.each(UNCERTAIN_SAVES)(
+    'reloads once and shows the saved row after reconciling an uncertain $kind',
+    async (save) => {
+      const { user, loadEvents, uncertain, finishRefresh } = await arrangeUncertainSave(save);
+
+      await reconcile(user);
+      expect(loadEvents).toHaveBeenCalledTimes(2);
+      await act(async () => { finishRefresh(); });
+      expect(screen.getByTestId('event-row-mine')).toHaveTextContent('Saved event');
+      expect(uncertain).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('keeps focus on the header after refresh later removes the stale edit opener', async () => {
+    const user = userEvent.setup();
     let finishRefresh: () => void = () => {};
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
-      editEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Stale row',
-      })),
+      editEvent: vi.fn(async () => STALE),
     });
     await renderSection();
     loadEvents.mockClear();
@@ -394,10 +484,10 @@ describe('EventsSettings form focus', () => {
         })
     );
 
-    const opener = openBy('event-edit-mine');
-    fireEvent.click(screen.getByTestId('events-form-submit'));
+    const opener = await openBy(user, 'event-edit-mine');
+    await user.click(screen.getByTestId('events-form-submit'));
     await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId('events-form-refresh'));
+    await user.click(screen.getByTestId('events-form-refresh'));
 
     await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
     await waitFor(() =>
@@ -416,10 +506,11 @@ describe('EventsSettings form focus', () => {
 
 describe('EventsSettings delete dialog focus', () => {
   it('moves focus onto Cancel, because the action cannot be undone', async () => {
+    const user = userEvent.setup();
     setStore({ events: [makeEvent({ id: 'mine' })] as AppState['events'] });
     await renderSection();
 
-    openBy('event-delete-mine');
+    await openBy(user, 'event-delete-mine');
 
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-delete-cancel'))
@@ -430,15 +521,16 @@ describe('EventsSettings delete dialog focus', () => {
   });
 
   it('closes on Escape and hands focus back to the row’s Delete button', async () => {
+    const user = userEvent.setup();
     setStore({ events: [makeEvent({ id: 'mine' })] as AppState['events'] });
     await renderSection();
 
-    const opener = openBy('event-delete-mine');
+    const opener = await openBy(user, 'event-delete-mine');
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-delete-cancel'))
     );
 
-    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     await waitFor(() =>
       expect(screen.queryByTestId('events-delete-confirmation')).not.toBeInTheDocument()
@@ -447,22 +539,27 @@ describe('EventsSettings delete dialog focus', () => {
   });
 
   it('wraps Tab inside the delete panel', async () => {
+    const user = userEvent.setup();
     setStore({ events: [makeEvent({ id: 'mine' })] as AppState['events'] });
     await renderSection();
 
-    openBy('event-delete-mine');
+    await openBy(user, 'event-delete-mine');
     const cancel = screen.getByTestId('events-delete-cancel');
     const confirm = screen.getByTestId('events-delete-confirm');
     await waitFor(() => expect(document.activeElement).toBe(cancel));
 
-    fireEvent.keyDown(confirm, { key: 'Tab' });
+    // Tab from Cancel reaches Delete, the last control, before the wrap is tested.
+    await user.tab();
+    expect(document.activeElement).toBe(confirm);
+    await user.tab();
     expect(document.activeElement).toBe(cancel);
 
-    fireEvent.keyDown(cancel, { key: 'Tab', shiftKey: true });
+    await user.tab({ shift: true });
     expect(document.activeElement).toBe(confirm);
   });
 
   it('lands focus on a surviving element after the delete succeeds', async () => {
+    const user = userEvent.setup();
     // The delete really removes the row, so the button that opened this dialog
     // is gone from the document by the time the trap tears down — useFocusTrap
     // skips its restore, and this fallback is the only thing between a keyboard
@@ -470,12 +567,12 @@ describe('EventsSettings delete dialog focus', () => {
     setStore({ events: [makeEvent({ id: 'mine' })] as AppState['events'] });
     await renderSection();
 
-    const opener = openBy('event-delete-mine');
+    const opener = await openBy(user, 'event-delete-mine');
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-delete-cancel'))
     );
 
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await user.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() =>
       expect(screen.queryByTestId('events-delete-confirmation')).not.toBeInTheDocument()
@@ -490,21 +587,20 @@ describe('EventsSettings delete dialog focus', () => {
   });
 
   it('leaves focus on Cancel when the delete fails, so the user can get out', async () => {
+    const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
-      removeEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Event not found or not yours to delete',
-      })),
+      removeEvent: vi.fn(async () =>
+        writeFailure('not-found', 'Event not found or not yours to delete')
+      ),
     });
     await renderSection();
 
-    openBy('event-delete-mine');
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    await openBy(user, 'event-delete-mine');
+    await user.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() => expect(screen.getByTestId('events-delete-error')).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByTestId('events-delete-cancel')).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByTestId('events-delete-cancel')).toBeEnabled());
     // Same passive-phase race as the Save test above — poll, don't read.
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-delete-cancel'))
@@ -512,15 +608,12 @@ describe('EventsSettings delete dialog focus', () => {
   });
 
   it('moves focus to the header when refreshing a stale delete', async () => {
+    const user = userEvent.setup();
     const loadEvents = vi.fn(async () => loadOk);
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,
-      removeEvent: vi.fn(async () => ({
-        success: false as const,
-        code: 'not-found' as const,
-        error: 'Stale row',
-      })),
+      removeEvent: vi.fn(async () => STALE),
     });
     await renderSection();
     loadEvents.mockClear();
@@ -529,10 +622,10 @@ describe('EventsSettings delete dialog focus', () => {
       return loadOk;
     });
 
-    const opener = openBy('event-delete-mine');
-    fireEvent.click(screen.getByTestId('events-delete-confirm'));
+    const opener = await openBy(user, 'event-delete-mine');
+    await user.click(screen.getByTestId('events-delete-confirm'));
     await waitFor(() => expect(screen.getByTestId('events-delete-refresh')).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId('events-delete-refresh'));
+    await user.click(screen.getByTestId('events-delete-refresh'));
 
     await waitFor(() =>
       expect(screen.queryByTestId('events-delete-confirmation')).not.toBeInTheDocument()

@@ -42,6 +42,9 @@ const SAVED = {
 };
 const FRESH = { ...SAVED, displayName: 'FRESH-NAME' };
 
+/** The partner envelope for a linked account: the copy's value and getPartner's answer. */
+const linked = <P>(partner: P) => ({ status: 'linked' as const, partner });
+
 function deferred<T>() {
   let settle: (value: T) => void = () => {};
   const promise = new Promise<T>((resolve) => {
@@ -88,7 +91,7 @@ describe('partner profile on the local copy', () => {
   });
 
   it('offline with a saved copy: shows the saved partner at once, with no fetch', async () => {
-    await writeLocalCopy(A, PARTNER_COPY_KIND, { status: 'linked', partner: SAVED });
+    await writeLocalCopy(A, PARTNER_COPY_KIND, linked(SAVED));
     setOnline(false);
 
     await state().loadPartner();
@@ -100,7 +103,7 @@ describe('partner profile on the local copy', () => {
   });
 
   it('online: renders the copy first, then replaces and saves the server result', async () => {
-    await writeLocalCopy(A, PARTNER_COPY_KIND, { status: 'linked', partner: SAVED });
+    await writeLocalCopy(A, PARTNER_COPY_KIND, linked(SAVED));
     const server = deferred<unknown>();
     getPartner.mockReturnValue(server.promise);
 
@@ -110,22 +113,22 @@ describe('partner profile on the local copy', () => {
     expect(state().partner).toEqual(SAVED);
     expect(state().isLoadingPartner).toBe(false);
 
-    server.settle({ status: 'linked', partner: FRESH });
+    server.settle(linked(FRESH));
     await inFlight;
 
     expect(state().partner).toEqual(FRESH);
-    expect(await readLocalCopy(A, PARTNER_COPY_KIND)).toEqual({ status: 'linked', partner: FRESH });
+    expect(await readLocalCopy(A, PARTNER_COPY_KIND)).toEqual(linked(FRESH));
   });
 
   it('read fails with a copy: keeps the saved partner and leaves the copy untouched', async () => {
-    await writeLocalCopy(A, PARTNER_COPY_KIND, { status: 'linked', partner: SAVED });
+    await writeLocalCopy(A, PARTNER_COPY_KIND, linked(SAVED));
     getPartner.mockResolvedValue({ status: 'error', reason: 'network' });
 
     await state().loadPartner();
 
     expect(state().partner).toEqual(SAVED);
     expect(state().partnerLoadError).toBe(false);
-    expect(await readLocalCopy(A, PARTNER_COPY_KIND)).toEqual({ status: 'linked', partner: SAVED });
+    expect(await readLocalCopy(A, PARTNER_COPY_KIND)).toEqual(linked(SAVED));
   });
 
   it('read fails with no copy: a load error, not "unlinked", and nothing saved', async () => {
@@ -187,7 +190,7 @@ describe('partner profile on the local copy', () => {
     await vi.waitFor(() => expect(getPartner).toHaveBeenCalled());
     state().setAuthUser(B);
 
-    server.settle({ status: 'linked', partner: FRESH });
+    server.settle(linked(FRESH));
     await inFlight;
 
     expect(state().partner).toBeNull();
@@ -197,7 +200,7 @@ describe('partner profile on the local copy', () => {
   });
 
   it("B never sees A's saved partner after A signs out", async () => {
-    await writeLocalCopy(A, PARTNER_COPY_KIND, { status: 'linked', partner: SAVED });
+    await writeLocalCopy(A, PARTNER_COPY_KIND, linked(SAVED));
 
     state().clearAuth();
     state().setAuthUser(B);
@@ -212,8 +215,8 @@ describe('partner profile on the local copy', () => {
   });
 
   it('reconnect: refreshLocalCopies refreshes the partner without a reload', async () => {
-    await writeLocalCopy(A, PARTNER_COPY_KIND, { status: 'linked', partner: SAVED });
-    getPartner.mockResolvedValue({ status: 'linked', partner: FRESH });
+    await writeLocalCopy(A, PARTNER_COPY_KIND, linked(SAVED));
+    getPartner.mockResolvedValue(linked(FRESH));
 
     await refreshLocalCopies();
 
@@ -233,20 +236,20 @@ describe('partner profile on the local copy', () => {
     const second = state().loadPartner();
     await vi.waitFor(() => expect(getPartner).toHaveBeenCalledTimes(2));
 
-    newer.settle({ status: 'linked', partner: FRESH });
+    newer.settle(linked(FRESH));
     await second;
     older.settle({ status: 'unlinked' });
     await first;
 
     expect(state().partner).toEqual(FRESH);
     expect(state().isLoadingPartner).toBe(false);
-    expect(await readLocalCopy(A, PARTNER_COPY_KIND)).toEqual({ status: 'linked', partner: FRESH });
+    expect(await readLocalCopy(A, PARTNER_COPY_KIND)).toEqual(linked(FRESH));
   });
 
   // Story 4 matrix: "Old copy — lacks the new field".
   it('a copy saved before birthdays existed parses, with the birthday not set', async () => {
     const { birthday: _birthday, ...oldPartner } = SAVED;
-    await writeLocalCopy(A, PARTNER_COPY_KIND, { status: 'linked', partner: oldPartner });
+    await writeLocalCopy(A, PARTNER_COPY_KIND, linked(oldPartner));
     setOnline(false);
 
     await state().loadPartner();
@@ -284,7 +287,7 @@ describe('partner profile on the local copy', () => {
       useAppStore.setState({ coupleSettings: { status: 'unlinked' } } as unknown as Parameters<
         typeof useAppStore.setState
       >[0]);
-      getPartner.mockResolvedValue({ status: 'linked', partner: FRESH });
+      getPartner.mockResolvedValue(linked(FRESH));
 
       await state().loadPartner();
 
@@ -295,7 +298,7 @@ describe('partner profile on the local copy', () => {
       useAppStore.setState({
         coupleSettings: { status: 'linked', partnerId: FRESH.id, relationshipStart: null },
       } as unknown as Parameters<typeof useAppStore.setState>[0]);
-      getPartner.mockResolvedValue({ status: 'linked', partner: FRESH });
+      getPartner.mockResolvedValue(linked(FRESH));
 
       await state().loadPartner();
 

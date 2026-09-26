@@ -174,12 +174,38 @@ describe('useRealtimeMessages — rejoin after a real CHANNEL_ERROR', () => {
     vi.useRealTimers();
   });
 
-  it('replaces the errored channel with a new one that actually joins', async () => {
+  async function mountJoining(): Promise<() => void> {
     let unmount: () => void = () => {};
     await act(async () => {
       ({ unmount } = renderHook(() => useRealtimeMessages()));
       await vi.runOnlyPendingTimersAsync();
     });
+    return unmount;
+  }
+
+  // A genuine transport error, not a hand-fired status string: phoenix's
+  // `onConnError` -> `triggerChanError` -> `channel.trigger(phx_error)` is
+  // what sets `state = errored` AND reaches the hook's status callback.
+  async function failTransport() {
+    await act(async () => {
+      harness.sockets[0].onerror?.(new Error('transport blew up'));
+    });
+  }
+
+  /** The backoff elapses. */
+  async function waitOutBackoff() {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+  }
+
+  async function failTransportAndWaitOutBackoff() {
+    await failTransport();
+    await waitOutBackoff();
+  }
+
+  it('replaces the errored channel with a new one that actually joins', async () => {
+    const unmount = await mountJoining();
 
     // The first join: one channel, registered with the client and joining.
     expect(harness.opened).toHaveLength(1);
@@ -187,23 +213,16 @@ describe('useRealtimeMessages — rejoin after a real CHANNEL_ERROR', () => {
     expect(first.state).toBe('joining');
     expect(registeredChannel()).toBe(first);
 
-    // A genuine transport error, not a hand-fired status string: phoenix's
-    // `onConnError` -> `triggerChanError` -> `channel.trigger(phx_error)` is
-    // what sets `state = errored` AND reaches the hook's status callback.
+    // One socket, for the transport error below to come from.
     expect(harness.sockets).toHaveLength(1);
 
     // Exactly one join went out for this topic so far.
     expect(topicFrames().filter((frame) => frame.event === 'phx_join')).toHaveLength(1);
 
-    await act(async () => {
-      harness.sockets[0].onerror?.(new Error('transport blew up'));
-    });
+    await failTransport();
     expect(first.state).toBe('errored');
 
-    // The backoff elapses.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
-    });
+    await waitOutBackoff();
 
     // A DIFFERENT channel object now serves the topic. Re-subscribing `first`
     // could not have produced this: `subscribe()` returns without sending a
@@ -217,16 +236,6 @@ describe('useRealtimeMessages — rejoin after a real CHANNEL_ERROR', () => {
     // And the errored one was handed back to the client, not left registered.
     expect(registeredChannel()).toBe(second);
     expect(harness.client?.getChannels()).not.toContain(first);
-
-    // The token was re-installed ahead of the re-join, as on the first one.
-    expect(harness.setAuth).toHaveBeenCalledTimes(2);
-
-    // And the partner was NOT re-resolved ahead of it. A re-join re-takes the
-    // snapshot on its SUBSCRIBED, never before the join, so the only lookup in
-    // this whole sequence is the first open's. Asserted here rather than only
-    // against the hand-rolled mock because this is the file where the retry
-    // really is a fresh join.
-    expect(harness.getPartnerId).toHaveBeenCalledTimes(1);
 
     // And the wire says so. The assertion keys on ORDER, not on a count: the
     // SDK's own rejoin loop also fires a `phx_join` for the errored channel
@@ -245,6 +254,34 @@ describe('useRealtimeMessages — rejoin after a real CHANNEL_ERROR', () => {
       .find((frame) => frame.event === 'phx_join');
     const refsBeforeLeave = new Set(topicFrames().slice(0, leaveAt + 1).map((f) => f.joinRef));
     expect(refsBeforeLeave.has(trailingJoin!.joinRef)).toBe(false);
+
+    unmount();
+  });
+
+  it('reinstalls the Realtime token before the replacement channel joins', async () => {
+    const unmount = await mountJoining();
+    await failTransportAndWaitOutBackoff();
+
+    // The token was re-installed ahead of the re-join, as on the first one.
+    expect(harness.setAuth).toHaveBeenCalledTimes(2);
+
+    unmount();
+  });
+
+  it('does not look the partner up again before the replacement joins', async () => {
+    const unmount = await mountJoining();
+    await failTransportAndWaitOutBackoff();
+
+    // Premise: a different channel replaced the errored one, or a lookup count
+    // of one proves nothing.
+    expect(harness.opened).toHaveLength(2);
+    expect(harness.opened[1]).not.toBe(harness.opened[0]);
+
+    // A re-join re-takes the snapshot on its SUBSCRIBED, never before the
+    // join, so the only lookup in this whole sequence is the first open's. This
+    // file checks it as well as the hand-rolled mock does, because here the
+    // retry really is a fresh join.
+    expect(harness.getPartnerId).toHaveBeenCalledTimes(1);
 
     unmount();
   });

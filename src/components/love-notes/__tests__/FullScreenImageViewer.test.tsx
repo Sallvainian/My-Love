@@ -7,7 +7,8 @@
  * Love Notes Images: Task 11 - Component tests (AC-9)
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FullScreenImageViewer } from '../FullScreenImageViewer';
@@ -39,7 +40,7 @@ describe('FullScreenImageViewer', () => {
     document.body.style.overflow = originalOverflow;
   });
 
-  it('should render image when isOpen is true', () => {
+  it('shows the picture full screen when opened', () => {
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />);
 
     const img = screen.getByAltText('Full screen image');
@@ -47,29 +48,31 @@ describe('FullScreenImageViewer', () => {
     expect(img).toHaveAttribute('src', mockImageUrl);
   });
 
-  it('should not render when isOpen is false', () => {
+  it('shows nothing while closed', () => {
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={false} onClose={vi.fn()} />);
 
     expect(screen.queryByAltText('Full screen image')).not.toBeInTheDocument();
   });
 
-  it('should not render when imageUrl is null', () => {
+  it('shows no dialog when there is no picture', () => {
     render(<FullScreenImageViewer imageUrl={null} isOpen={true} onClose={vi.fn()} />);
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('should call onClose when X button is clicked', () => {
+  it('closes when the close button is clicked', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
     const closeButton = screen.getByRole('button', { name: /close/i });
-    fireEvent.click(closeButton);
+    await user.click(closeButton);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('should call onClose when overlay is clicked', () => {
+  it('closes when the backdrop is clicked', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
@@ -78,38 +81,47 @@ describe('FullScreenImageViewer', () => {
     const elements = screen.getAllByLabelText('Close image viewer');
     const overlay = elements.find((el) => el.tagName !== 'BUTTON');
     expect(overlay).toBeDefined();
-    fireEvent.click(overlay!);
+    await user.click(overlay!);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('should not close when image itself is clicked', () => {
+  it('should not close when image itself is clicked', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
     const img = screen.getByAltText('Full screen image');
-    fireEvent.click(img);
+    await user.click(img);
 
     // onClose should NOT be called when clicking the image
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('should call onClose when Escape key is pressed', async () => {
+  it('closes on Escape', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
-    fireEvent.keyDown(document, { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('should not respond to other keys', () => {
+  it('should not respond to other keys', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
-    fireEvent.keyDown(document, { key: 'Enter' });
-    fireEvent.keyDown(document, { key: 'Space' });
-    fireEvent.keyDown(document, { key: 'ArrowLeft' });
+    // The viewer focuses its close button after 100 ms; Enter or Space there
+    // would press it. Wait for that, then return focus to <body> so the keys
+    // reach only the document listener.
+    const closeButton = screen.getByRole('button', { name: /close/i });
+    await waitFor(() => expect(closeButton).toHaveFocus());
+    closeButton.blur();
+    expect(document.body).toHaveFocus();
+
+    await user.keyboard('{Enter}[Space]{ArrowLeft}');
 
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -157,7 +169,7 @@ describe('FullScreenImageViewer', () => {
     expect(screen.getByAltText('Love note image')).toBeInTheDocument();
   });
 
-  it('should have proper accessibility attributes', () => {
+  it('is exposed as a modal dialog named "Full screen image viewer"', () => {
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />);
 
     const dialog = screen.getByRole('dialog');
@@ -165,7 +177,8 @@ describe('FullScreenImageViewer', () => {
     expect(dialog).toHaveAttribute('aria-label', 'Full screen image viewer');
   });
 
-  it('should remove keydown listener when closed', async () => {
+  it('ignores Escape once it has been closed', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     const { rerender } = render(
       <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />
@@ -175,7 +188,7 @@ describe('FullScreenImageViewer', () => {
     rerender(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={false} onClose={onClose} />);
 
     // Escape should not trigger onClose anymore
-    fireEvent.keyDown(document, { key: 'Escape' });
+    await user.keyboard('{Escape}');
 
     expect(onClose).not.toHaveBeenCalled();
   });

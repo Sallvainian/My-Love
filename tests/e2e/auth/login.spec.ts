@@ -4,7 +4,16 @@
  * Critical path: Users must be able to log in to access the app.
  * Covers email/password login, error handling, and session persistence.
  */
+import type { Page, Route } from '@playwright/test';
+import { getWorkerPairEmails } from '../../support/auth/worker-pool';
+import { resolveWorkerPairIds } from '../../support/factories/events';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
+import { TEST_USER_PASSWORD } from '../../support/test-credentials';
+
+// `.env.test` points the dev server at http://127.0.0.1:54321, and the SDK
+// derives its storage key as `sb-${hostname.split('.')[0]}-auth-token`.
+const STORAGE_KEY = 'sb-127-auth-token';
 
 test.describe('Login Flow', () => {
   // Auth tests must run WITHOUT the shared authenticated storage state
@@ -74,36 +83,28 @@ test.describe('Login Flow', () => {
       },
     });
 
-    // Intercept the user endpoint (called after auth state change)
-    interceptNetworkCall({
-      url: '**/auth/v1/user**',
-      method: 'GET',
-      fulfillResponse: {
-        status: 200,
-        body: {
-          id: 'test-user-id',
-          email: 'test@example.com',
-        },
-      },
-    });
+    // The reads below are defensive stubs: each may fire zero times or many,
+    // so none is awaited. Every GET is answered; anything else falls through.
+    const serve = (body: unknown) => (route: Route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+        : route.fallback();
 
-    // Intercept the events fetch Home fires once auth settles — against the
-    // real API the fake access token above earns it a 401, which the
-    // network-error monitor turns into a test failure.
-    interceptNetworkCall({
-      url: '**/rest/v1/events**',
-      method: 'GET',
-      fulfillResponse: { status: 200, body: [] },
-    });
+    // The user endpoint (called after auth state change).
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/auth/v1/user**', serve({ id: 'test-user-id', email: 'test@example.com' }));
+
+    // The events fetch Home fires once auth settles — against the real API the
+    // fake access token above earns it a 401, which the network-error monitor
+    // turns into a test failure.
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/events**', serve([]));
 
     // Same reason, for the profile read App fires to decide whether this
     // account still needs the display-name setup screen. A chosen name keeps
     // that modal shut, which is what "redirected to the app" means here.
-    interceptNetworkCall({
-      url: '**/rest/v1/users?select=display_name**',
-      method: 'GET',
-      fulfillResponse: { status: 200, body: { display_name: 'Test User' } },
-    });
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/users?select=display_name**', serve({ display_name: 'Test User' }));
 
     // Same reason, for the mirror refresh App runs after sign-in: the
     // anniversary and message mirrors, the mood history, the poke/kiss
@@ -118,11 +119,8 @@ test.describe('Login Flow', () => {
       'love_notes_visible',
       'photos',
     ]) {
-      interceptNetworkCall({
-        url: `**/rest/v1/${table}?**`,
-        method: 'GET',
-        fulfillResponse: { status: 200, body: [] },
-      });
+      // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+      await page.route(`**/rest/v1/${table}?**`, serve([]));
     }
 
     // GIVEN: User is on login screen
@@ -140,17 +138,46 @@ test.describe('Login Flow', () => {
     await expect(page.getByTestId('login-screen')).not.toBeVisible({ timeout: 5000 });
   });
 
-  test('[P0] should persist session across page reloads', async ({ page }) => {
-    // Note: This test verifies consistent unauthenticated behavior on reload.
+  test('[P0] should persist session across page reloads', async ({ page, supabaseAdmin }) => {
+    // GIVEN: This worker's own pool account, signed in through the real form
+    // against local Supabase, with the welcome splash already dismissed.
+    const pair = getWorkerPairEmails();
+    if (!pair) throw new Error('This test requires its worker-owned account pair');
+    const { userId } = await resolveWorkerPairIds(supabaseAdmin);
+    await page.addInitScript(() => {
+      localStorage.setItem('lastWelcomeView', Date.now().toString());
+    });
 
-    // GIVEN: User is not authenticated
     await page.goto('/');
     await expect(page.getByTestId('login-screen')).toBeVisible();
+    await page.getByLabel('Email', { exact: true }).fill(pair.user1Email);
+    await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+    await page.getByTestId('submit-button').click();
 
-    // WHEN: Page is reloaded
+    // THEN: The app is open and the SDK has persisted this account's session.
+    await expect(page.getByTestId('app-container')).toBeVisible();
+    await expect(page.getByTestId('login-screen')).toHaveCount(0);
+    await recurseUntil(() => storedSessionUserId(page), (v) => { expect(v).toBe(userId); });
+
+    // WHEN: The page is reloaded
     await page.reload();
 
-    // THEN: Login screen still appears (consistent unauthenticated behavior)
-    await expect(page.getByTestId('login-screen')).toBeVisible();
+    // THEN: The same session is restored without signing in again.
+    await expect(page.getByTestId('app-container')).toBeVisible();
+    await expect(page.getByTestId('login-screen')).toHaveCount(0);
+    await recurseUntil(() => storedSessionUserId(page), (v) => { expect(v).toBe(userId); });
   });
 });
+
+/** The user id of the session the SDK has persisted, or null when there is none. */
+async function storedSessionUserId(page: Page): Promise<string | null> {
+  return await page.evaluate((key) => {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    try {
+      return (JSON.parse(raw) as { user?: { id?: string } }).user?.id ?? null;
+    } catch {
+      return null;
+    }
+  }, STORAGE_KEY);
+}

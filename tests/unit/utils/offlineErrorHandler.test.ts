@@ -29,6 +29,12 @@ describe('OfflineError', () => {
   it('is an instance of Error', () => {
     const err = new OfflineError('test');
     expect(err).toBeInstanceOf(Error);
+    expect(err).toMatchObject({
+      name: 'OfflineError',
+      operation: 'test',
+      isRetryable: true,
+      message: "You're offline. Please check your connection and try again.",
+    });
   });
 });
 
@@ -58,6 +64,10 @@ describe('isOnline / isOffline', () => {
   afterEach(() => {
     if (original) {
       Object.defineProperty(navigator, 'onLine', original);
+    } else {
+      // happy-dom serves `onLine` from the Navigator prototype, so `original`
+      // is undefined; deleting the test's own property restores the real one.
+      Reflect.deleteProperty(navigator, 'onLine');
     }
   });
 
@@ -93,6 +103,10 @@ describe('withOfflineCheck', () => {
   afterEach(() => {
     if (original) {
       Object.defineProperty(navigator, 'onLine', original);
+    } else {
+      // happy-dom serves `onLine` from the Navigator prototype, so `original`
+      // is undefined; deleting the test's own property restores the real one.
+      Reflect.deleteProperty(navigator, 'onLine');
     }
   });
 
@@ -109,11 +123,10 @@ describe('withOfflineCheck', () => {
 
   it('includes operation name in thrown error', async () => {
     Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-    try {
-      await withOfflineCheck('sync-data', async () => 42);
-    } catch (err) {
-      expect((err as OfflineError).operation).toBe('sync-data');
-    }
+    await expect(withOfflineCheck('sync-data', async () => 42)).rejects.toMatchObject({
+      name: 'OfflineError',
+      operation: 'sync-data',
+    });
   });
 
   it('propagates errors from the wrapped function', async () => {
@@ -132,28 +145,29 @@ describe('safeOfflineOperation', () => {
   afterEach(() => {
     if (original) {
       Object.defineProperty(navigator, 'onLine', original);
+    } else {
+      // happy-dom serves `onLine` from the Navigator prototype, so `original`
+      // is undefined; deleting the test's own property restores the real one.
+      Reflect.deleteProperty(navigator, 'onLine');
     }
   });
 
   it('returns success with data when online and operation succeeds', async () => {
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     const result = await safeOfflineOperation('test', async () => 'data');
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data).toBe('data');
-      expect(result.offline).toBe(false);
-    }
+    expect(result).toEqual({ success: true, data: 'data', offline: false });
   });
 
   it('returns offline result when offline', async () => {
     Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
     const fn = vi.fn().mockResolvedValue('data');
     const result = await safeOfflineOperation('test', fn);
-    expect(result.success).toBe(false);
-    if (!result.success && result.offline) {
-      expect(result.message).toBe(OFFLINE_RETRY_MESSAGE);
-      expect(typeof result.retry).toBe('function');
-    }
+    expect(result).toEqual({
+      success: false,
+      offline: true,
+      message: "You're offline. Please check your connection and try again.",
+      retry: fn,
+    });
     expect(fn).not.toHaveBeenCalled();
   });
 
@@ -162,11 +176,7 @@ describe('safeOfflineOperation', () => {
     const result = await safeOfflineOperation('test', async () => {
       throw new Error('boom');
     });
-    expect(result.success).toBe(false);
-    if (!result.success && !result.offline) {
-      expect(result.error.message).toBe('boom');
-      expect(result.message).toBe('boom');
-    }
+    expect(result).toEqual({ success: false, offline: false, error: new Error('boom'), message: 'boom' });
   });
 
   it('wraps non-Error throws in Error', async () => {
@@ -174,21 +184,23 @@ describe('safeOfflineOperation', () => {
     const result = await safeOfflineOperation('test', async () => {
       throw 'string error';
     });
-    if (!result.success && !result.offline) {
-      expect(result.error).toBeInstanceOf(Error);
-      // safeOfflineOperation uses `error instanceof Error ? error.message : 'An error occurred'`
-      // Since thrown string is not an Error instance, message is the generic fallback
-      expect(result.message).toBe('An error occurred');
-    }
+    // safeOfflineOperation uses `error instanceof Error ? error.message : 'An error occurred'`
+    // Since thrown string is not an Error instance, message is the generic fallback
+    expect(result).toEqual({
+      success: false,
+      offline: false,
+      error: new Error('string error'),
+      message: 'An error occurred',
+    });
   });
 });
 
 describe('constants', () => {
-  it('OFFLINE_ERROR_MESSAGE is defined', () => {
-    expect(OFFLINE_ERROR_MESSAGE).toBeTruthy();
+  it('tells an offline user their changes will sync when they reconnect', () => {
+    expect(OFFLINE_ERROR_MESSAGE).toBe("You're offline. Changes will sync when reconnected.");
   });
 
-  it('OFFLINE_RETRY_MESSAGE is defined', () => {
-    expect(OFFLINE_RETRY_MESSAGE).toBeTruthy();
+  it('tells an offline user to check the connection and try again', () => {
+    expect(OFFLINE_RETRY_MESSAGE).toBe("You're offline. Please check your connection and try again.");
   });
 });

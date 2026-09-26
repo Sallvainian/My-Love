@@ -14,7 +14,9 @@
  * three partner mood rows.
  */
 import { randomUUID } from 'node:crypto';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
+import { interceptNetworkCall as fulfillOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { Page } from '@playwright/test';
 
 type Scheme = 'light' | 'dark';
@@ -56,13 +58,15 @@ function partnerMoodRows() {
  * scrollbar narrows clientWidth, and scrollWidth follows it.
  */
 async function expectNoHorizontalOverflow(page: Page) {
-  await expect
-    .poll(() =>
+  await recurseUntil(
+    () =>
       page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-      )
-    )
-    .toBe(0);
+      ),
+    (v) => {
+      expect(v).toBe(0);
+    }
+  );
 }
 
 /** The Partner view's own text with user notes removed. */
@@ -72,6 +76,59 @@ async function chromeText(page: Page): Promise<string> {
     clone.querySelectorAll(notes).forEach((el) => el.remove());
     return clone.textContent ?? '';
   }, USER_NOTES);
+}
+
+/**
+ * Open the connected Partner view with the partner's link, profile, requests and
+ * moods stubbed, at phone width in `colorScheme`; returns the visible view.
+ */
+async function openConnectedPartner(page: Page, colorScheme: Scheme) {
+  // Only this browser's reads are faked; no worker-pool row is touched.
+  // Each stub is awaited after the load that hits it, bounded by a timeout.
+  // Standalone, because the `interceptNetworkCall` fixture drops `timeout`.
+  const partnerLink = fulfillOn({
+    page,
+    method: 'GET',
+    url: '**/rest/v1/users?select=partner_id*',
+    fulfillResponse: {
+      status: 200,
+      body: { partner_id: PARTNER_ID, updated_at: '2026-01-01T00:00:00Z' },
+    },
+    timeout: 15000,
+  });
+  const partnerProfile = fulfillOn({
+    page,
+    method: 'GET',
+    url: '**/rest/v1/users?select=id*',
+    fulfillResponse: {
+      status: 200,
+      body: { id: PARTNER_ID, email: 'partner@example.test', display_name: PARTNER_NAME },
+    },
+    timeout: 15000,
+  });
+  const requests = fulfillOn({
+    page,
+    method: 'GET',
+    url: '**/rest/v1/partner_requests**',
+    fulfillResponse: { status: 200, body: [] },
+    timeout: 15000,
+  });
+  const moods = fulfillOn({
+    page,
+    method: 'GET',
+    url: '**/rest/v1/moods**',
+    fulfillResponse: { status: 200, body: partnerMoodRows() },
+    timeout: 15000,
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme });
+  await page.goto('/partner');
+  await Promise.all([partnerLink, partnerProfile, requests, moods]);
+
+  const view = page.getByTestId('partner-mood-view');
+  await expect(view).toBeVisible();
+  return view;
 }
 
 test.describe('Partner on the style kit', () => {
@@ -85,42 +142,8 @@ test.describe('Partner on the style kit', () => {
   for (const colorScheme of ['light', 'dark'] as const satisfies readonly Scheme[]) {
     test(`[P1] should render the connected Partner view on the kit in ${colorScheme}`, async ({
       page,
-      interceptNetworkCall,
     }) => {
-      // Only this browser's reads are faked; no worker-pool row is touched.
-      interceptNetworkCall({
-        method: 'GET',
-        url: '**/rest/v1/users?select=partner_id*',
-        fulfillResponse: {
-          status: 200,
-          body: { partner_id: PARTNER_ID, updated_at: '2026-01-01T00:00:00Z' },
-        },
-      });
-      interceptNetworkCall({
-        method: 'GET',
-        url: '**/rest/v1/users?select=id*',
-        fulfillResponse: {
-          status: 200,
-          body: { id: PARTNER_ID, email: 'partner@example.test', display_name: PARTNER_NAME },
-        },
-      });
-      interceptNetworkCall({
-        method: 'GET',
-        url: '**/rest/v1/partner_requests**',
-        fulfillResponse: { status: 200, body: [] },
-      });
-      interceptNetworkCall({
-        method: 'GET',
-        url: '**/rest/v1/moods**',
-        fulfillResponse: { status: 200, body: partnerMoodRows() },
-      });
-
-      await page.setViewportSize({ width: 390, height: 844 });
-      await page.emulateMedia({ colorScheme });
-      await page.goto('/partner');
-
-      const view = page.getByTestId('partner-mood-view');
-      await expect(view).toBeVisible();
+      const view = await openConnectedPartner(page, colorScheme);
 
       // Title: the partner's name alone, in Playfair Display.
       const title = page.getByRole('heading', { level: 1 });
@@ -154,6 +177,12 @@ test.describe('Partner on the style kit', () => {
 
       await expectNoHorizontalOverflow(page);
       expect(await chromeText(page)).not.toMatch(/\p{Extended_Pictographic}/u);
+    });
+
+    test(`[P1] should show the Fart toast on the kit card with no emoji in ${colorScheme}`, async ({
+      page,
+    }) => {
+      await openConnectedPartner(page, colorScheme);
 
       // Fart is local-only (no network): its toast is a kit card with no emoji.
       await page.getByTestId('fart-button').click();
@@ -161,8 +190,14 @@ test.describe('Partner on the style kit', () => {
       await expect(toast).toHaveText('Fart sent!');
       await expect(toast).toHaveCSS('background-color', KIT_CARD[colorScheme]);
       expect(await toast.textContent()).not.toMatch(/\p{Extended_Pictographic}/u);
-      // The full-screen overlay closes itself; wait so it cannot eat the History click.
+      // The full-screen overlay closes itself.
       await expect(page.getByTestId('fart-animation')).toHaveCount(0);
+    });
+
+    test(`[P1] should open the History sheet on the kit card inside the viewport in ${colorScheme}`, async ({
+      page,
+    }) => {
+      await openConnectedPartner(page, colorScheme);
 
       // History opens as a kit sheet that lies inside the viewport. The sheet is
       // fixed, so it never adds to scrollWidth -- its own box is what is checked.
@@ -171,39 +206,46 @@ test.describe('Partner on the style kit', () => {
       await expect(sheet).toBeVisible();
       await expect(sheet).toHaveCSS('background-color', KIT_CARD[colorScheme]);
       const viewportWidth = page.viewportSize()!.width;
-      await expect
-        .poll(async () => {
+      await recurseUntil(
+        async () => {
           const box = await sheet.boundingBox();
           return box !== null && box.x >= 0 && box.x + box.width <= viewportWidth;
-        })
-        .toBe(true);
+        },
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
       expect(await sheet.textContent()).not.toMatch(/\p{Extended_Pictographic}/u);
       await expectNoHorizontalOverflow(page);
     });
   }
 
-  test('[P1] should render the connect UI on the kit in dark', async ({
-    page,
-    interceptNetworkCall,
-  }) => {
+  test('[P1] should render the connect UI on the kit in dark', async ({ page }) => {
     // Fake only this browser's read of its own link; never unlink worker-pool users.
-    interceptNetworkCall({
+    // Each stub is awaited after the load that hits it, bounded by a timeout.
+    // Standalone, because the `interceptNetworkCall` fixture drops `timeout`.
+    const partnerLink = fulfillOn({
+      page,
       method: 'GET',
       url: '**/rest/v1/users?select=partner_id*',
       fulfillResponse: {
         status: 200,
         body: { partner_id: null, updated_at: '2026-01-01T00:00:00Z' },
       },
+      timeout: 15000,
     });
-    interceptNetworkCall({
+    const requests = fulfillOn({
+      page,
       method: 'GET',
       url: '**/rest/v1/partner_requests**',
       fulfillResponse: { status: 200, body: [] },
+      timeout: 15000,
     });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('/partner');
+    await Promise.all([partnerLink, requests]);
 
     const view = page.getByTestId('partner-mood-view');
     await expect(view).toBeVisible();

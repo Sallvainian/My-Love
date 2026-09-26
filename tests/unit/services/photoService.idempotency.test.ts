@@ -17,6 +17,7 @@
 import { create, type StateCreator } from 'zustand';
 import { createPhotosSlice, type PhotosSlice } from '@/stores/slices/photosSlice';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { CHECK_VIOLATION_CODE } from '../../support/check-constraint-envelopes';
 
 interface PhotoRow {
   id: string;
@@ -31,6 +32,10 @@ interface PhotoRow {
 }
 
 const USER_ID = '00000000-0000-4000-8000-0000000000c0';
+// The 1GB free tier: src/services/photoService.ts STORAGE_QUOTA (module-private).
+const STORAGE_QUOTA_BYTES = 1024 * 1024 * 1024;
+// The other SQLSTATE the photos insert can fail with; check_violation is CHECK_VIOLATION_CODE.
+const NOT_NULL_VIOLATION = '23502'; // not_null_violation
 
 const backend = {
   errorCode: '',
@@ -166,24 +171,44 @@ describe('photoService upload idempotency', () => {
     // Quota check runs before every upload and hits storage.list()
     vi.spyOn(photoService, 'checkStorageQuota').mockResolvedValue({
       used: 0,
-      quota: 1_073_741_824,
+      quota: STORAGE_QUOTA_BYTES,
       percent: 0,
       warning: 'none',
     });
   });
 
-  it.each(['23514', '23502'])('routes %s through the real service into the store result', async (code) => {
+  const insertFailures = [
+    [CHECK_VIOLATION_CODE, 'Some values are not allowed - check length and format limits'],
+    [NOT_NULL_VIOLATION, 'Upload failed - no photo returned'],
+  ];
+
+  /** A photos store for USER_ID whose next row insert fails with `code`. */
+  function storeWithFailingInsert(code: string) {
     type Store = PhotosSlice & { userId: string; error: string | null };
     const store = create<Store>()(createPhotosSlice as unknown as StateCreator<Store>);
     store.setState({ userId: USER_ID });
     backend.errorCode = code;
     backend.failNextInsert = true;
+    return store;
+  }
+
+  it.each(insertFailures)('routes %s through the real service into the store result', async (code, expected) => {
+    const store = storeWithFailingInsert(code);
     const result = await store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }));
-    const expected = code === '23514' ? 'Some values are not allowed - check length and format limits' : 'Upload failed - no photo returned';
     expect(result).toEqual({ success: false, error: expected });
     expect(store.getState().error).toBe(expected);
+  });
+
+  it.each(insertFailures)('rolls back the stored object and row after a %s failure', async (code) => {
+    const store = storeWithFailingInsert(code);
+    await store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }));
     expect(backend.objects.size).toBe(0);
     expect(backend.rows).toHaveLength(0);
+  });
+
+  it.each(insertFailures)('a retry under the same key after a %s failure lands one row', async (code) => {
+    const store = storeWithFailingInsert(code);
+    await store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }));
     await expect(store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }))).resolves.toEqual({ success: true });
     expect(backend.rows[0].storage_path).toBe(`${USER_ID}/check-key.jpeg`);
     expect(backend.rows).toHaveLength(1);
@@ -192,7 +217,7 @@ describe('photoService upload idempotency', () => {
   it('keeps the service null contract and CHECK rollback safety for a committed row', async () => {
     const input = uploadInput({ idempotencyKey: 'committed-check' });
     await photoService.uploadPhoto(input);
-    backend.errorCode = '23514';
+    backend.errorCode = CHECK_VIOLATION_CODE;
     backend.failNextInsert = true;
     const callback = vi.fn();
     await expect(photoService.uploadPhoto(input, callback)).resolves.toBeNull();

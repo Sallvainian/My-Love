@@ -150,20 +150,35 @@ describe('eventsSlice', () => {
       expect(store.getState().eventsPagination).toEqual(pagination(false));
     });
 
-    it('keeps rows and cursors on failure, retries the same page, and isolates write errors', async () => {
+    /** Loads one event and a next-page cursor, then fails the next history page. */
+    async function failFirstHistoryPage() {
       const store = createTestStore();
       const initialEvents = [event('current', '2026-09-12')];
       const initialPagination = pagination();
       store.setState({ events: initialEvents, eventsPagination: initialPagination });
       getEventsPage.mockRejectedValueOnce(new Error('history failed'));
-      expect(await store.getState().loadMoreEvents()).toEqual({ status: 'failure', error: 'history failed' });
+      const result = await store.getState().loadMoreEvents();
+      return { store, initialEvents, initialPagination, result };
+    }
+
+    it('keeps rows and cursors on a failed page and reports it as the history error', async () => {
+      const { store, initialEvents, initialPagination, result } = await failFirstHistoryPage();
+      expect(result).toEqual({ status: 'failure', error: 'history failed' });
       expect(store.getState().events).toBe(initialEvents);
       expect(store.getState().eventsPagination).toBe(initialPagination);
       expect(store.getState().eventsError).toBeNull();
       expect(store.getState().eventsHistoryError).toBe('history failed');
+    });
+
+    it('a failed write does not touch the history error', async () => {
+      const { store } = await failFirstHistoryPage();
       createEvent.mockRejectedValue(new Error('write failed'));
       await store.getState().addEvent({ label: 'deep', eventDate: '1900-01-01' });
       expect(store.getState().eventsHistoryError).toBe('history failed');
+    });
+
+    it('retries the same page after a failure and clears the history error', async () => {
+      const { store, initialPagination } = await failFirstHistoryPage();
       getEventsPage.mockResolvedValueOnce({ events: [event('older', '1900-01-01')], pagination: pagination(false) });
       await store.getState().loadMoreEvents();
       expect(getEventsPage.mock.calls).toEqual([[initialPagination], [initialPagination]]);
@@ -188,27 +203,32 @@ describe('eventsSlice', () => {
       expect(getEventsPage).toHaveBeenCalledTimes(1);
     });
 
-    it.each(['add', 'edit', 'delete'] as const)('replays a completed %s over the page snapshot without duplicate IDs', async (kind) => {
+    const replayOriginal = event('target', '2026-08-01');
+    const replaySaved = event('target', '1900-01-01', { label: 'Saved deep date' });
+
+    it.each([
+      ['add', (store: ReturnType<typeof createTestStore>) => {
+        createEvent.mockResolvedValueOnce(replaySaved);
+        return store.getState().addEvent({ label: replaySaved.label, eventDate: '1900-01-01' });
+      }, [replaySaved]],
+      ['edit', (store: ReturnType<typeof createTestStore>) => {
+        updateEvent.mockResolvedValueOnce(replaySaved);
+        return store.getState().editEvent(replayOriginal.id, { eventDate: '1900-01-01' });
+      }, [replaySaved]],
+      ['delete', (store: ReturnType<typeof createTestStore>) => {
+        deleteEvent.mockResolvedValueOnce(undefined);
+        return store.getState().removeEvent(replayOriginal.id);
+      }, []],
+    ] as const)('replays a completed %s over the page snapshot without duplicate IDs', async (_kind, perform, expectedEvents) => {
       const store = createTestStore();
-      const original = event('target', '2026-08-01');
-      const saved = event('target', '1900-01-01', { label: 'Saved deep date' });
-      store.setState({ events: [original], eventsPagination: pagination() });
+      store.setState({ events: [replayOriginal], eventsPagination: pagination() });
       const pending = deferred<EventsPage>();
       getEventsPage.mockReturnValueOnce(pending.promise);
       const inFlight = store.getState().loadMoreEvents();
-      if (kind === 'add') {
-        createEvent.mockResolvedValueOnce(saved);
-        expect(await store.getState().addEvent({ label: saved.label, eventDate: '1900-01-01' })).toEqual({ success: true });
-      } else if (kind === 'edit') {
-        updateEvent.mockResolvedValueOnce(saved);
-        expect(await store.getState().editEvent(original.id, { eventDate: '1900-01-01' })).toEqual({ success: true });
-      } else {
-        deleteEvent.mockResolvedValueOnce(undefined);
-        expect(await store.getState().removeEvent(original.id)).toEqual({ success: true });
-      }
-      pending.resolve({ events: [original, original], pagination: pagination(false) });
+      expect(await perform(store)).toEqual({ success: true });
+      pending.resolve({ events: [replayOriginal, replayOriginal], pagination: pagination(false) });
       expect(await inFlight).toEqual({ status: 'success' });
-      expect(store.getState().events).toEqual(kind === 'delete' ? [] : [saved]);
+      expect(store.getState().events).toEqual(expectedEvents);
     });
 
     it.each(['success', 'failure'] as const)('a refresh supersedes page %s and owns its loading state and metadata', async (outcome) => {

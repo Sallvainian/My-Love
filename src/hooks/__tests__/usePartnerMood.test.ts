@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { moodSyncService, type SupabaseMoodRecord } from '../../api/moodSyncService';
 import { usePartnerMood } from '../usePartnerMood';
@@ -20,19 +20,23 @@ vi.mock('../../api/moodSyncService');
 describe('usePartnerMood', () => {
   const mockPartnerId = 'partner-123';
 
+  /** A partner's mood row; a fixed timestamp, since the hook never reads it. */
+  const moodRecord = (overrides: Partial<SupabaseMoodRecord> = {}): SupabaseMoodRecord => ({
+    id: '1',
+    user_id: mockPartnerId,
+    mood_type: 'happy',
+    note: null,
+    created_at: '2026-09-25T08:00:00.000Z',
+    updated_at: '2026-09-25T08:00:00.000Z',
+    ...overrides,
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('loads partner mood on mount', async () => {
-    const mockMood = {
-      id: '1',
-      user_id: mockPartnerId,
-      mood_type: 'happy' as const,
-      note: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const mockMood = moodRecord();
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(mockMood);
     vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(() => {});
@@ -61,7 +65,7 @@ describe('usePartnerMood', () => {
     expect(result.current.partnerMood).toBeNull();
   });
 
-  it('subscribes to partner mood updates via Broadcast', async () => {
+  it("listens for the partner's live mood updates once mounted", async () => {
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
     vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(() => {});
 
@@ -73,23 +77,9 @@ describe('usePartnerMood', () => {
   });
 
   it('updates mood when broadcast received for partner', async () => {
-    const initialMood = {
-      id: '1',
-      user_id: mockPartnerId,
-      mood_type: 'happy' as const,
-      note: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const initialMood = moodRecord();
 
-    const updatedMood = {
-      id: '2',
-      user_id: mockPartnerId,
-      mood_type: 'excited' as const,
-      note: 'Great news!',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const updatedMood = moodRecord({ id: '2', mood_type: 'excited', note: 'Great news!' });
 
     let broadcastCallback: ((mood: SupabaseMoodRecord) => void) | null = null;
 
@@ -118,23 +108,13 @@ describe('usePartnerMood', () => {
   });
 
   it('does not update mood when broadcast is from different user', async () => {
-    const initialMood = {
-      id: '1',
-      user_id: mockPartnerId,
-      mood_type: 'happy' as const,
-      note: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const initialMood = moodRecord();
 
-    const otherUserMood = {
+    const otherUserMood = moodRecord({
       id: '2',
       user_id: 'different-user-123',
-      mood_type: 'excited' as const,
-      note: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+      mood_type: 'excited',
+    });
 
     let broadcastCallback: ((mood: SupabaseMoodRecord) => void) | null = null;
 
@@ -154,17 +134,20 @@ describe('usePartnerMood', () => {
 
     expect(result.current.partnerMood).toEqual(initialMood);
 
-    // Simulate broadcast from different user
-    broadcastCallback!(otherUserMood);
-
-    // Wait a bit to ensure it doesn't update
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Simulate broadcast from different user. The callback is synchronous,
+    // so act has flushed any update it made by the time it returns.
+    act(() => broadcastCallback!(otherUserMood));
 
     // Mood should NOT change
     expect(result.current.partnerMood).toEqual(initialMood);
+
+    // Positive control: the same path does update for the partner's own mood
+    const partnerMood2 = { ...otherUserMood, id: '3', user_id: mockPartnerId };
+    act(() => broadcastCallback!(partnerMood2));
+    expect(result.current.partnerMood).toEqual(partnerMood2);
   });
 
-  it('unsubscribes on unmount', async () => {
+  it('stops receiving mood updates after unmount', async () => {
     const unsubscribeMock = vi.fn();
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
@@ -181,7 +164,7 @@ describe('usePartnerMood', () => {
     expect(unsubscribeMock).toHaveBeenCalled();
   });
 
-  it('sets error state when getLatestPartnerMood rejects', async () => {
+  it('reports a load error and no mood when the partner mood cannot be read', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockRejectedValue(new Error('Network failure'));
@@ -201,7 +184,7 @@ describe('usePartnerMood', () => {
     consoleSpy.mockRestore();
   });
 
-  it('sets disconnected status when subscribeMoodUpdates rejects', async () => {
+  it('reports disconnected with an error when live updates cannot start', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);

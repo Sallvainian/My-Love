@@ -8,11 +8,13 @@
  */
 import type { Session } from '@supabase/supabase-js';
 import { act, cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../src/App';
 import { eventsService } from '../../src/services/eventsService';
 import { useAppStore } from '../../src/stores/useAppStore';
+import { createAuthBootstrapSession } from '../support/factories/auth-bootstrap-notification-order';
 
 const localCopy = vi.hoisted(() => ({
   refreshLocalCopies: vi.fn(async () => {}),
@@ -129,28 +131,21 @@ const USER_ID = 'local-copy-user';
 const OTHER_USER_ID = 'other-local-copy-user';
 
 function session(userId = USER_ID): Session {
-  return {
-    access_token: 'token',
-    refresh_token: 'refresh-token',
-    token_type: 'bearer',
-    expires_in: 3600,
-    user: {
-      id: userId,
-      email: 'copy@example.com',
-      app_metadata: {},
-      user_metadata: {},
-      aud: 'authenticated',
-      created_at: '2026-09-01T00:00:00Z',
-    },
-  };
+  return createAuthBootstrapSession({ userId, accessToken: 'token', email: 'copy@example.com', displayName: null });
 }
 
 const initialState = useAppStore.getInitialState();
 
+// Pinned (noon EDT), so the welcome splash's "seen it recently" stamp below is
+// measured against a fixed clock rather than the live one. Only `Date` is
+// faked, so RTL's `waitFor` keeps its real timers.
+const NOW = new Date('2026-09-15T16:00:00.000Z');
+
 beforeEach(() => {
+  vi.setSystemTime(NOW);
   vi.clearAllMocks();
   localStorage.clear();
-  localStorage.setItem('lastWelcomeView', String(Date.now()));
+  localStorage.setItem('lastWelcomeView', String(NOW.getTime()));
   window.history.replaceState({}, '', '/');
   auth.getSession.mockResolvedValue(session());
   profile.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Copy User' });
@@ -172,6 +167,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   localStorage.clear();
+  vi.useRealTimers();
 });
 
 async function renderApp() {
@@ -201,7 +197,7 @@ describe('App refreshes the local copies', () => {
     await renderApp();
     localCopy.refreshLocalCopies.mockClear();
 
-    await act(async () => window.dispatchEvent(new Event('online')));
+    await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
 
     expect(localCopy.refreshLocalCopies).toHaveBeenCalledTimes(1);
   });
@@ -211,7 +207,7 @@ describe('App refreshes the local copies', () => {
     await renderApp();
     expect(screen.getByText('Sign in')).toBeInTheDocument();
 
-    await act(async () => window.dispatchEvent(new Event('online')));
+    await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
 
     expect(localCopy.refreshLocalCopies).not.toHaveBeenCalled();
   });
@@ -247,13 +243,14 @@ describe('App triggers the message-data refresh once the bundled rows are seeded
 describe('App refreshes the profile copy after the first-run name gate', () => {
   it('completing the display-name setup refreshes the profile copy', async () => {
     profile.lookupOwnDisplayName.mockResolvedValue({ status: 'unset' });
+    const user = userEvent.setup();
     await renderApp();
     // The gate is resolved from the auth listener, as on a real sign-in.
     await act(async () => auth.listener!(session()));
-    const gate = await screen.findByText('Set your display name');
+    const gate = await screen.findByRole('button', { name: 'Set your display name' });
     localCopy.refreshLocalCopy.mockClear();
 
-    await act(async () => gate.click());
+    await user.click(gate);
 
     expect(localCopy.refreshLocalCopy).toHaveBeenCalledWith('profile');
   });
@@ -273,13 +270,14 @@ describe('App drains the love-note send queue', () => {
     await renderApp();
     drain().mockClear();
 
-    await act(async () => window.dispatchEvent(new Event('online')));
+    await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
 
     expect(drain()).toHaveBeenCalledTimes(1);
   });
 
   it('on the 5-minute interval while signed in', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    // 'Date' too: faking timers without it would un-pin the clock.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     try {
       await renderApp();
       drain().mockClear();
@@ -295,13 +293,14 @@ describe('App drains the love-note send queue', () => {
   });
 
   it('not at all while signed out, including on the online event and the interval', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    // 'Date' too: faking timers without it would un-pin the clock.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     try {
       auth.getSession.mockResolvedValue(null);
       await renderApp();
       expect(screen.getByText('Sign in')).toBeInTheDocument();
 
-      await act(async () => window.dispatchEvent(new Event('online')));
+      await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
       await act(async () => {
         vi.advanceTimersByTime(5 * 60 * 1000);
       });

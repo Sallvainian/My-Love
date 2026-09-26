@@ -67,6 +67,7 @@
  * before and after every test, so nothing seeded here outlives its test.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { PAST_EVENTS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 
 /** Home renders at most this many event cards (`HOME_MAX_EVENT_CARDS`, `src/App.tsx`). */
 const HOME_MAX_EVENT_CARDS = 6;
@@ -99,6 +100,7 @@ test.describe('Home under the bounded events read', () => {
   test('[P0] still shows the next event when past history fills the read window', async ({
     page,
     coupleEvents,
+    interceptNetworkCall,
   }) => {
     // The mutant this catches: replacing the two date-anchored windows with a
     // single ascending `.range(0, 49)`. That page would hold 50 of these past
@@ -124,7 +126,19 @@ test.describe('Home under the bounded events read', () => {
       localStorage.setItem('lastWelcomeView', String(stamp));
     }, coupleEvents.anchor.getTime());
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+    const pastRead = interceptNetworkCall({ method: 'GET', url: PAST_EVENTS_READ });
     await page.goto('/');
+
+    const [upcoming, past] = await Promise.all([upcomingRead, pastRead]);
+    expect(upcoming.status).toBe(200);
+    expect(past.status).toBe(200);
+    // The past window came back full, 50 rows plus the one-row lookahead,
+    // and the survivor came back in the upcoming window.
+    expect(past.responseJson).toHaveLength(PAST_HISTORY_SIZE);
+    expect(upcoming.responseJson).toEqual([
+      expect.objectContaining({ label: 'Window Survivor E2E' }),
+    ]);
 
     const survivor = page.getByTestId('event-countdown-window-survivor-e2e');
     await expect(survivor).toBeVisible();
@@ -152,6 +166,7 @@ test.describe('Home under the bounded events read', () => {
   test('[P1] hands the freed slot to the next event when local midnight passes', async ({
     page,
     coupleEvents,
+    interceptNetworkCall,
   }) => {
     // Five minutes before the anchor day's local midnight, so the installed
     // clock sits in the PREVIOUS calendar day — behind real time, never ahead
@@ -190,7 +205,9 @@ test.describe('Home under the bounded events read', () => {
       localStorage.setItem('lastWelcomeView', String(stamp));
     }, beforeMidnight.getTime());
 
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
+    expect((await upcomingRead).status).toBe(200);
 
     const eventCards = page.getByTestId(/^event-countdown-refill-\w+-e2e$/);
 
@@ -213,8 +230,7 @@ test.describe('Home under the bounded events read', () => {
     await expect(page.getByTestId('event-countdown-refill-seventh-e2e')).toBeVisible();
     await expect(eventCards).toHaveCount(HOME_MAX_EVENT_CARDS);
 
-    const cardLabels = await eventCards.locator('h3').allTextContents();
-    expect(cardLabels).toEqual([
+    await expect(eventCards.locator('h3')).toHaveText([
       'Refill Second E2E',
       'Refill Third E2E',
       'Refill Fourth E2E',
