@@ -149,13 +149,16 @@ test.describe('Partner mood realtime delivery', () => {
           );
         };
         let senderMoodReadsInFlight = 0;
+        // playwright-utils deviation: counts every sender-moods read the receiver starts, to know when none is in flight; interceptNetworkCall's observe mode latches onto the first matching request only.
         partnerPage.on('request', (request) => {
           if (isSenderMoodsRead(request)) senderMoodReadsInFlight += 1;
         });
         const settleSenderMoodsRead = (request: Request) => {
           if (isSenderMoodsRead(request)) senderMoodReadsInFlight -= 1;
         };
+        // playwright-utils deviation: settles every sender-moods read that answers against the count above; interceptNetworkCall's observe mode latches onto the first matching request only.
         partnerPage.on('requestfinished', settleSenderMoodsRead);
+        // playwright-utils deviation: settles every sender-moods read that fails, too; interceptNetworkCall's observe mode throws on a request that gets no response rather than reporting it.
         partnerPage.on('requestfailed', settleSenderMoodsRead);
         // A page in a second context: the fixture is bound to `page`.
         const moodListRead = interceptNetworkCall({

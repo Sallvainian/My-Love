@@ -335,6 +335,7 @@ test.describe('Photos offline', () => {
       // Every attempt on the oldest image — the tile's and the fill's — is
       // downloaded and then refused.
       let oldestDownloads = 0;
+      // playwright-utils deviation: counts every successful download of the oldest image, since the tile and the background fill each fetch it; interceptNetworkCall's observe mode latches onto the first matching request only.
       page.on('response', (response) => {
         if (response.url().includes(oldest.path) && response.ok()) oldestDownloads += 1;
       });

@@ -170,6 +170,7 @@ test.describe('Display Name Setup', () => {
     // nothing else. A metadata write is a non-GET to /auth/v1/user; a session
     // refresh is a refresh_token grant.
     const authWrites: string[] = [];
+    // playwright-utils deviation: collects every auth-user write and refresh-token grant for the whole test so it can assert there were none; interceptNetworkCall's observe mode resolves on one matching request and cannot prove an absence.
     page.on('request', (request) => {
       const url = request.url();
       const method = request.method();

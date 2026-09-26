@@ -320,6 +320,7 @@ test.describe('Settings events history pagination', () => {
       await route.continue();
     });
     const button = page.getByTestId('events-settings-load-more');
+    // playwright-utils deviation: waits for the load-more read the route above aborts; interceptNetworkCall's observe mode throws on a request that gets no response instead of resolving on it.
     const failedRequest = page.waitForEvent('requestfailed', {
       predicate: (request) => new URL(request.url()).pathname.endsWith('/rest/v1/events'),
     });
