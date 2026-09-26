@@ -454,7 +454,11 @@ describe('LoveNoteMessage', () => {
       mockReadCachedImage.mockReturnValue(read.promise);
 
       render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
-      await waitFor(() => expect(mockReadCachedImage).toHaveBeenCalled());
+      // The read starts during render, but the loading state commits a task
+      // later. Switch only after that commit: a render still pending at the
+      // switch reads the new session, re-runs the effect as it, and this mock
+      // answers that second read with the same blob, which is then shown.
+      await waitFor(() => expect(document.querySelector('.animate-spin')).toBeInTheDocument());
 
       switchIdentity({ authSessionVersion: 2 });
       await act(async () => {
@@ -462,6 +466,8 @@ describe('LoveNoteMessage', () => {
         await read.promise;
       });
 
+      // One read: only the first session's effect ran, so its drop is what's tested
+      expect(mockReadCachedImage).toHaveBeenCalledTimes(1);
       expect(createObjectURL).not.toHaveBeenCalled();
       expect(mockDownloadLoveNoteImage).not.toHaveBeenCalled();
     });
