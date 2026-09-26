@@ -3,11 +3,11 @@
  *
  * Import by this deep path: `tests/support/helpers` has no barrel.
  *
- * Playwright's report keeps an error's message, stack and cause, never
- * `AggregateError.errors`, so a bare `new AggregateError(failures, summary)`
- * shows only the summary and hides every assertion it wraps. One failure is
- * therefore rethrown as-is; two or more are named in the message, with the
- * first as the `cause`.
+ * Playwright 1.63 lists each child of `AggregateError.errors` as its own entry
+ * in `testInfo.errors`, after the aggregate. One failure is rethrown as-is, so
+ * it is not listed twice; two or more are also named in the aggregate's
+ * message, with the first as the `cause`, so a reporter that prints only the
+ * top-level error still shows every one.
  */
 
 function describeFailure(failure: unknown): string {

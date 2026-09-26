@@ -23,6 +23,7 @@ import { test as interactionRealtimeFixture } from './fixtures/interaction-realt
 import { test as interactionOwnershipFixture } from './fixtures/interaction-record-ownership';
 import { test as authBootstrapFixture } from './fixtures/auth-bootstrap-notification-order';
 import { test as eventsRefreshFixture } from './fixtures/events-refresh-control';
+import { test as cleanupFixture } from './fixtures/cleanup';
 
 /**
  * Create network error monitor with project-specific exclusions.
@@ -47,6 +48,7 @@ const networkMonitorFixture = base.extend(
  * - recurse: Polling for async operations
  * - log: Playwright report-integrated logging
  * - networkErrorMonitor: Automatic HTTP 4xx/5xx detection
+ * - cleanup: teardown registered mid-test that still runs on a timeout
  * - Plus any custom fixtures from ./fixtures
  *
  * Auth: Uses SupabaseAuthProvider via @seontechnologies/playwright-utils auth-session.
@@ -66,6 +68,7 @@ export const test: ReturnType<
       typeof interactionOwnershipFixture,
       typeof authBootstrapFixture,
       typeof eventsRefreshFixture,
+      typeof cleanupFixture,
     ]
   >
 > = mergeTests(
@@ -79,7 +82,8 @@ export const test: ReturnType<
   interactionRealtimeFixture,
   interactionOwnershipFixture,
   authBootstrapFixture,
-  eventsRefreshFixture
+  eventsRefreshFixture,
+  cleanupFixture
 );
 
 export { expect } from '@playwright/test';

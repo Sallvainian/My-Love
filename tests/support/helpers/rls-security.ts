@@ -79,7 +79,8 @@ export async function createOutsiderClient(
         }
       };
 
-      // Playwright reports omit AggregateError.errors, so include both details here.
+      // Playwright lists each AggregateError child too; the message also names
+      // both, so a reporter that prints only the top-level error shows them.
       throw new AggregateError(
         [error, cleanupError],
         `Failed to set up and clean up outsider account ${userId}. ` +
