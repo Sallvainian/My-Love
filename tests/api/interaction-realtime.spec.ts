@@ -9,11 +9,10 @@
  * - Current wire types: src/types/database.types.ts:88-127
  * - Auth/RLS: the receiving user's JWT can join its filtered channel
  *
- * Local Supabase has no tables in the `supabase_realtime` publication, so a
- * Postgres INSERT cannot be used as a delivery probe without mutating shared,
- * parallel test infrastructure. Exact record forwarding remains covered by
- * the service and real-slice tests; this file measures the network join that
- * produces the changed `SUBSCRIBED` status.
+ * `public.interactions` is in the `supabase_realtime` publication since
+ * 20260926020000, so an INSERT is delivered; live delivery between two
+ * browsers is covered end to end by tests/e2e/partner/partner-connect.spec.ts.
+ * This file measures the network join that produces the `SUBSCRIBED` status.
  */
 import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../support/merged-fixtures';

@@ -12,17 +12,27 @@
  * link or unlink pool partners (AGENTS.md). A searches, B is found and accepts
  * in a second browser context, and C and D are linked to each other through the
  * real request/accept RPCs so that D's address is a "taken" answer. Each is
- * deleted at teardown through `cleanup`; the FKs cascade the requests and the
- * links.
+ * deleted at teardown through `cleanup`; the FKs cascade the requests, the
+ * links, the notes and the pokes.
+ *
+ * Nothing is reloaded after the link. A waits on Love Notes while B accepts,
+ * the one screen that joined its channel and loaded its thread with no
+ * partner; then each side sends a love note and a poke, and each arrives on
+ * the other screen over Realtime, with no re-read on the receiving page.
  */
-import type { Browser, BrowserContext, Page, TestInfo } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import type { Browser, BrowserContext, Page, Request, TestInfo } from '@playwright/test';
 import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { AppState } from '../../../src/stores/types';
 import { test, expect } from '../../support/merged-fixtures';
 import { closeContext } from '../../support/fixtures/cleanup';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { navigateTo } from '../../support/helpers/navigation';
-import { SECOND_CONTEXT_READ_TIMEOUT } from '../../support/helpers/reads';
+import {
+  LOVE_NOTE_SEND,
+  LOVE_NOTES_READ,
+  SECOND_CONTEXT_READ_TIMEOUT,
+} from '../../support/helpers/reads';
 import { createOutsiderClient, deleteOutsider } from '../../support/helpers/rls-security';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
@@ -30,6 +40,10 @@ const PARTNER_SEARCH = '**/rest/v1/rpc/find_partner_by_email';
 const REQUEST_SEND = '**/rest/v1/partner_requests*';
 const PENDING_REQUESTS = '**/rest/v1/rpc/get_my_pending_partner_requests';
 const REQUEST_ACCEPT = '**/rest/v1/rpc/accept_partner_request';
+const INTERACTION_SEND = '**/rest/v1/interactions?*';
+
+const NOTES_SUBSCRIBED_LOG = /\[useRealtimeMessages\].*SUBSCRIBED/;
+const INTERACTIONS_SUBSCRIBED_LOG = /\[InteractionService\] Realtime subscription status: SUBSCRIBED/;
 
 const MISSING = "No account uses that email — check it's the one they sign in with.";
 const TAKEN = 'That account is already connected with a partner.';
@@ -114,6 +128,38 @@ async function signInToPartnerTab(page: Page, account: Throwaway): Promise<void>
   await navigateTo(page, 'partner');
 }
 
+/**
+ * Every GET a page starts to a table, and how many have settled. Delivery is
+ * only proved live if no read of the thread (or the interaction history) is in
+ * flight at the send and none starts until the item is on screen.
+ */
+function trackReads(page: Page, table: string) {
+  const counts = { started: 0, settled: 0 };
+  const isRead = (request: Request) =>
+    request.method() === 'GET' && new URL(request.url()).pathname === `/rest/v1/${table}`;
+  // playwright-utils deviation: counts every read a page starts and settles, to prove none is in flight and none follows; interceptNetworkCall's observe mode latches onto the first matching request only.
+  page.on('request', (request) => {
+    if (isRead(request)) counts.started += 1;
+  });
+  const settle = (request: Request) => {
+    if (isRead(request)) counts.settled += 1;
+  };
+  // playwright-utils deviation: settles every read that answers or fails against the count above; interceptNetworkCall's observe mode latches onto the first matching request only.
+  page.on('requestfinished', settle);
+  page.on('requestfailed', settle);
+  return counts;
+}
+
+/** Navigate by the dock and wait for the screen's own Realtime join to report SUBSCRIBED. */
+async function openAndJoin(page: Page, view: 'notes' | 'partner', log: RegExp): Promise<void> {
+  const joined = page.waitForEvent('console', {
+    predicate: (message) => log.test(message.text()),
+    timeout: 30_000,
+  });
+  await navigateTo(page, view);
+  await joined;
+}
+
 /** The store's partner id, read from the running app (observation only). */
 async function storePartnerId(page: Page): Promise<string | null> {
   return page.evaluate(async () => {
@@ -195,21 +241,30 @@ test.describe('Connecting with a partner', () => {
     await expect(results).toContainText(b.name);
 
     // ---- A sends the request, and A's sent list names B ----
+    // Every answer of the pending-requests read, in order: the tab's own mount
+    // read waits on auth.getUser() first, so under load it can land after the
+    // searches, and a first-match wait would take it for the post-send reload.
+    const pendingAnswers: unknown[] = [];
+    // playwright-utils deviation: keeps every answer of a read that runs more than once, so the assertion can take the latest; interceptNetworkCall's observe mode latches onto the first matching request only.
+    page.on('response', (response) => {
+      if (new URL(response.url()).pathname === '/rest/v1/rpc/get_my_pending_partner_requests') {
+        void response.json().then((body: unknown) => pendingAnswers.push(body), () => {});
+      }
+    });
     const sent = interceptNetworkCall({ method: 'POST', url: REQUEST_SEND });
-    const sentList = interceptNetworkCall({ method: 'POST', url: PENDING_REQUESTS });
     await page.getByTestId(`send-request-${b.userId}`).click();
     expect((await sent).status).toBe(201);
-    const aPending = await sentList;
-    expect(aPending.status).toBe(200);
-    expect(aPending.responseJson).toEqual([
-      expect.objectContaining({
-        from_user_id: a.userId,
-        to_user_id: b.userId,
-        other_display_name: b.name,
-        other_email: b.email,
-      }),
-    ]);
     await expect(page.getByTestId('sent-requests-list')).toContainText(b.name);
+    await expect
+      .poll(() => pendingAnswers.at(-1))
+      .toEqual([
+        expect.objectContaining({
+          from_user_id: a.userId,
+          to_user_id: b.userId,
+          other_display_name: b.name,
+          other_email: b.email,
+        }),
+      ]);
     await expect(page.getByText('Unknown User')).toHaveCount(0);
     await expect(results).toHaveCount(0);
 
@@ -221,6 +276,14 @@ test.describe('Connecting with a partner', () => {
       .single();
     expect(requestError).toBeNull();
     expect(request!.status).toBe('pending');
+
+    // ---- A waits on Love Notes, still unlinked ----
+    // The hardest place to be when the link lands: the chat joined its channel
+    // with no partner and its thread load answered "Partner not configured",
+    // and nothing on this screen listens for the link itself.
+    const aThreadReads = trackReads(page, 'love_notes_visible');
+    await openAndJoin(page, 'notes', NOTES_SUBSCRIBED_LOG);
+    await expect(page.getByTestId('notes-error-banner')).toHaveText('Partner not configured');
 
     // ---- B, in a second browser, accepts ----
     const second = await newBareContext(browser, testInfo);
@@ -255,6 +318,8 @@ test.describe('Connecting with a partner', () => {
       url: REQUEST_ACCEPT,
       timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
+    // A's thread load once A learns of the link.
+    const aThreadAfterLink = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
     await accept.click();
     const acceptResponse = await accepted;
     expect(acceptResponse.status).toBeGreaterThanOrEqual(200);
@@ -267,10 +332,82 @@ test.describe('Connecting with a partner', () => {
     await expect(bPage.getByRole('heading', { level: 1, name: a.name })).toBeVisible();
     await expect(bPage.getByTestId('partner-search-card')).toHaveCount(0);
 
-    // ---- A, still on the Partner tab and never reloaded, sees B as partner ----
-    // B's accept announces the link on A's mood topic, and A re-reads.
+    // ---- A, still on Love Notes and never reloaded, learns of the link ----
+    // B's accept announces it on A's mood topic; App's listener re-reads the
+    // partner, and the chat loads its thread and names B.
     await expect.poll(() => storePartnerId(page)).toBe(b.userId);
+    expect((await aThreadAfterLink).status).toBe(200);
+    await expect(page.getByTestId('notes-error-banner')).toHaveCount(0);
+    await expect(page.getByTestId('notes-partner-row')).toContainText(b.name);
+
+    // ---- Love notes, each way, live ----
+    const bThreadReads = trackReads(bPage, 'love_notes_visible');
+    await openAndJoin(bPage, 'notes', NOTES_SUBSCRIBED_LOG);
+
+    await sendNoteAndSeeItArrive(bPage, page, aThreadReads, `From B ${randomUUID()}`);
+    await sendNoteAndSeeItArrive(page, bPage, bThreadReads, `From A ${randomUUID()}`);
+
+    // ---- A poke, each way, live ----
+    const aHistoryReads = trackReads(page, 'interactions');
+    const bHistoryReads = trackReads(bPage, 'interactions');
+    await Promise.all([
+      openAndJoin(page, 'partner', INTERACTIONS_SUBSCRIBED_LOG),
+      openAndJoin(bPage, 'partner', INTERACTIONS_SUBSCRIBED_LOG),
+    ]);
     await expect(page.getByRole('heading', { level: 1, name: b.name })).toBeVisible();
-    await expect(page.getByTestId('partner-search-card')).toHaveCount(0);
+
+    await pokeAndSeeItArrive(page, bPage, bHistoryReads);
+    await pokeAndSeeItArrive(bPage, page, aHistoryReads);
   });
 });
+
+/**
+ * Send a note from `from` through the real input, and see it on `to` with no
+ * thread read on `to` in flight at the send or started after it.
+ */
+async function sendNoteAndSeeItArrive(
+  from: Page,
+  to: Page,
+  toReads: { started: number; settled: number },
+  text: string
+): Promise<void> {
+  await expect.poll(() => toReads.started - toReads.settled, { timeout: 15_000 }).toBe(0);
+  const readsBefore = toReads.started;
+  await from.getByLabel(/love note message input/i).fill(text);
+  const saved = observeOn({
+    page: from,
+    method: 'POST',
+    url: LOVE_NOTE_SEND,
+    timeout: SECOND_CONTEXT_READ_TIMEOUT,
+  });
+  await from.getByLabel(/send message/i).click();
+  expect((await saved).status).toBe(201);
+
+  await expect(to.getByTestId('love-note-message').filter({ hasText: text })).toBeVisible();
+  expect(toReads.started, 'the note arrived over Realtime, not a thread re-read').toBe(readsBefore);
+}
+
+/**
+ * Poke from `from`, and see the unviewed badge on `to` with no history read on
+ * `to` in flight at the send or started after it.
+ */
+async function pokeAndSeeItArrive(
+  from: Page,
+  to: Page,
+  toReads: { started: number; settled: number }
+): Promise<void> {
+  await expect.poll(() => toReads.started - toReads.settled, { timeout: 15_000 }).toBe(0);
+  const readsBefore = toReads.started;
+  await expect(to.getByTestId('notification-badge')).toHaveCount(0);
+  const sent = observeOn({
+    page: from,
+    method: 'POST',
+    url: INTERACTION_SEND,
+    timeout: SECOND_CONTEXT_READ_TIMEOUT,
+  });
+  await from.getByTestId('poke-button').click();
+  expect((await sent).status).toBe(201);
+
+  await expect(to.getByTestId('notification-badge')).toHaveText('1');
+  expect(toReads.started, 'the poke arrived over Realtime, not a history re-read').toBe(readsBefore);
+}
