@@ -70,7 +70,7 @@ async function fillForm(user: UserEvent, label: string, date: string) {
 }
 
 describe('AnniversarySettings writes', () => {
-  it('editing calls updateAnniversary with the row’s id and the form data, then closes', async () => {
+  it('editing saves the changes to the row it was opened from, then closes the form', async () => {
     const user = userEvent.setup();
     updateAnniversary.mockResolvedValue(undefined);
     render(<AnniversarySettings />);
@@ -86,7 +86,9 @@ describe('AnniversarySettings writes', () => {
         description: undefined,
       })
     );
-    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Anniversary' })).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Edit Anniversary' })).not.toBeInTheDocument()
+    );
     expect(addAnniversary).not.toHaveBeenCalled();
   });
 
@@ -99,7 +101,7 @@ describe('AnniversarySettings writes', () => {
     await fillForm(user, 'Moving day', '2025-06-01');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
-    expect(await screen.findByText(OFFLINE)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(OFFLINE);
     expect(addAnniversary).toHaveBeenCalledWith(
       { label: 'Moving day', date: '2025-06-01', description: undefined },
       expect.any(String)
@@ -116,7 +118,7 @@ describe('AnniversarySettings writes', () => {
     await user.click(screen.getByRole('button', { name: 'Add Anniversary' }));
     await fillForm(user, 'Moving day', '2025-06-01');
     await user.click(screen.getByRole('button', { name: 'Add' }));
-    await screen.findByText(OFFLINE);
+    expect(await screen.findByRole('alert')).toHaveTextContent(OFFLINE);
     await user.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(addAnniversary).toHaveBeenCalledTimes(2));
 
@@ -141,7 +143,7 @@ describe('AnniversarySettings writes', () => {
     await fillForm(user, 'Edited', '2024-02-14');
     await user.click(screen.getByRole('button', { name: 'Update' }));
 
-    expect(await screen.findByText(OFFLINE)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(OFFLINE);
     expect(screen.getByRole('heading', { name: 'Edit Anniversary' })).toBeInTheDocument();
   });
 
@@ -157,7 +159,7 @@ describe('AnniversarySettings writes', () => {
     expect(alert).toHaveTextContent(OFFLINE);
     expect(removeAnniversary).toHaveBeenCalledWith(7);
     expect(screen.getByRole('heading', { name: 'Delete Anniversary?' })).toBeInTheDocument();
-    expect(screen.getByText('First date')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 4, name: 'First date' })).toBeInTheDocument();
   });
 
   it('says an empty list in the subtitle alone, with no empty block', () => {

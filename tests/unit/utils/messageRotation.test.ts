@@ -98,7 +98,7 @@ describe('getDailyMessage', () => {
 });
 
 describe('getMessageForDate', () => {
-  it('returns same result as getDailyMessage', () => {
+  it("shows the same message for a date as that date's daily message", () => {
     const messages = createMessages(10);
     const date = new Date(2025, 3, 10);
     expect(getMessageForDate(messages, date)).toBe(getDailyMessage(messages, date));

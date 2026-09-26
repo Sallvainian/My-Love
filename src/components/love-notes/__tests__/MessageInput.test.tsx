@@ -7,7 +7,7 @@
  * Love Notes Images: Task 11 - Component tests (AC-1 through AC-6, AC-10, AC-11)
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
@@ -130,7 +130,7 @@ describe('MessageInput', () => {
     it('should have hidden file input with correct accept types', () => {
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       expect(fileInput).toBeInTheDocument();
       expect(fileInput).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
       expect(fileInput).toHaveClass('hidden');
@@ -143,7 +143,7 @@ describe('MessageInput', () => {
       const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
@@ -164,7 +164,7 @@ describe('MessageInput', () => {
       const user = userEvent.setup({ applyAccept: false });
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = new File(['test'], 'doc.pdf', { type: 'application/pdf' });
 
       await user.upload(fileInput, mockFile);
@@ -184,7 +184,7 @@ describe('MessageInput', () => {
       const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
@@ -201,7 +201,7 @@ describe('MessageInput', () => {
       const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
@@ -218,7 +218,7 @@ describe('MessageInput', () => {
       const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
@@ -262,7 +262,7 @@ describe('MessageInput', () => {
       const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
@@ -303,18 +303,18 @@ describe('MessageInput', () => {
       await user.click(sendButton);
 
       await waitFor(() => {
-        expect(sendButton.querySelector('.animate-spin')).not.toBeNull();
+        expect(within(sendButton).getByTestId('message-input-send-spinner')).toBeInTheDocument();
       });
       expect(sendButton).toBeDisabled();
 
       resolveSend();
 
       await waitFor(() => {
-        expect(sendButton.querySelector('.animate-spin')).toBeNull();
+        expect(within(sendButton).queryByTestId('message-input-send-spinner')).not.toBeInTheDocument();
       });
     });
 
-    it('should call sendNote with text content', async () => {
+    it('sends the typed text as a note', async () => {
       const user = userEvent.setup();
       render(<MessageInput />);
 
@@ -329,14 +329,14 @@ describe('MessageInput', () => {
       });
     });
 
-    it('should call sendNote with image file', async () => {
+    it('sends a selected picture with no caption', async () => {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       const user = userEvent.setup();
       render(<MessageInput />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = jpegFile();
 
       await user.upload(fileInput, mockFile);
@@ -353,7 +353,7 @@ describe('MessageInput', () => {
       });
     });
 
-    it('should call sendNote with both text and image', async () => {
+    it('sends the caption together with the selected picture', async () => {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
@@ -361,7 +361,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       // Select image
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = jpegFile();
       await user.upload(fileInput, mockFile);
 
@@ -393,7 +393,7 @@ describe('MessageInput', () => {
       await user.type(textarea, 'Test message');
 
       // Add image
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = jpegFile();
       await user.upload(fileInput, mockFile);
 
@@ -448,7 +448,7 @@ describe('MessageInput', () => {
     async function sendPictureNote(user: UserEvent) {
       const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       await user.upload(fileInput, jpegFile());
       await user.type(screen.getByRole('textbox'), 'Look!');
       await waitFor(() => {
@@ -526,7 +526,7 @@ describe('MessageInput', () => {
       await user.type(textarea, 'Test');
 
       // Add image
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const fileInput = screen.getByTestId('message-input-file') as HTMLInputElement;
       const mockFile = jpegFile();
       await user.upload(fileInput, mockFile);
 

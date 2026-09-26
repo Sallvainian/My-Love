@@ -28,10 +28,15 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
       data-testid="welcome-splash"
     >
       {/* Raining hearts animation */}
-      <div className="pointer-events-none fixed inset-0 z-0" aria-hidden="true">
+      <div
+        className="pointer-events-none fixed inset-0 z-0"
+        aria-hidden="true"
+        data-testid="welcome-heart-rain"
+      >
         {hearts.map((heart) => (
           <motion.div
             key={heart.id}
+            data-testid="welcome-heart-drop"
             className="absolute text-accent will-change-transform"
             style={{
               left: `${heart.x}%`,
@@ -53,7 +58,11 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
               repeatDelay: 0,
             }}
           >
-            <Heart className="h-full w-full fill-current" strokeWidth={0} />
+            <Heart
+              className="h-full w-full fill-current"
+              strokeWidth={0}
+              data-testid="welcome-heart-drop-icon"
+            />
           </motion.div>
         ))}
       </div>
@@ -63,7 +72,10 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="relative z-10 w-full max-w-2xl"
       >
-        <div className="rounded-[20px] border border-line bg-card p-5 text-center shadow-card">
+        <div
+          className="rounded-[20px] border border-line bg-card p-5 text-center shadow-card"
+          data-testid="welcome-card"
+        >
           {/* Animated heart */}
           <motion.div
             initial={{ scale: 0 }}
@@ -90,6 +102,7 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
             className="mb-6 text-[15px] leading-relaxed text-ink"
+            data-testid="welcome-caption"
           >
             I will never stop finding ways to express my love for you, here's just one of many
             more to come. From the bottom of my heart, I love you Baby Cakes
@@ -110,7 +123,11 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
               className={PRIMARY_BUTTON}
             >
               Continue
-              <ArrowRight className="h-5 w-5" aria-hidden="true" />
+              <ArrowRight
+                className="h-5 w-5"
+                aria-hidden="true"
+                data-testid="welcome-continue-icon"
+              />
             </button>
           </motion.div>
         </div>

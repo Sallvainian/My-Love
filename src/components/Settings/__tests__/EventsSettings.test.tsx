@@ -458,8 +458,11 @@ describe('EventsSettings list states', () => {
     );
   });
 
-  it('keeps the form write failure when its pending mount load succeeds', async () => {
-    const user = userEvent.setup();
+  /**
+   * Fails an add while the mount load is still pending, and waits for the form
+   * error. The mount load stays pending until `finishLoad()` is called.
+   */
+  async function failSaveDuringMountLoad(user: UserEvent) {
     let finishLoad: () => void = () => {};
     setStore({
       eventsIsLoading: true,
@@ -485,10 +488,14 @@ describe('EventsSettings list states', () => {
         'This event did not save'
       )
     );
-    const loadRegion = screen.getByTestId('events-settings-load-region');
-    expect(loadRegion).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getByTestId('events-settings')).not.toHaveAttribute('aria-busy');
-    expect(loadRegion).not.toContainElement(screen.getByTestId('events-form-error'));
+    // A closure: `finishLoad` is only assigned once the mount load runs.
+    return { finishLoad: () => finishLoad() };
+  }
+
+  it('keeps the form write failure when its pending mount load succeeds', async () => {
+    const user = userEvent.setup();
+    const { finishLoad } = await failSaveDuringMountLoad(user);
+
     await act(async () => {
       finishLoad();
     });
@@ -496,6 +503,16 @@ describe('EventsSettings list states', () => {
     expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
     expect(screen.getByTestId('events-form-error')).toHaveTextContent('This event did not save');
+  });
+
+  it('marks only the load region busy, not the section or the open form, while the mount load is pending', async () => {
+    const user = userEvent.setup();
+    await failSaveDuringMountLoad(user);
+
+    const loadRegion = screen.getByTestId('events-settings-load-region');
+    expect(loadRegion).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('events-settings')).not.toHaveAttribute('aria-busy');
+    expect(loadRegion).not.toContainElement(screen.getByTestId('events-form-error'));
   });
 
   it('uses the successful call outcome even when shared load error state disagrees', async () => {
@@ -569,8 +586,11 @@ describe('EventsSettings list states', () => {
     expect(screen.getByTestId('event-row-reconnected')).toBeInTheDocument();
   });
 
-  it('shows the truthful empty state and moves focus to Add after a successful Retry', async () => {
-    const user = userEvent.setup();
+  /**
+   * A mount load that fails, then a Retry load that stays pending until
+   * `finishRetry()` lands an empty list.
+   */
+  function arrangeEmptyRetry() {
     let finishRetry: () => void = () => {};
     const clearEventsError = vi.fn(() => store.patch({ eventsError: null }));
     const loadEvents = vi
@@ -589,16 +609,33 @@ describe('EventsSettings list states', () => {
         });
       });
     setStore({ loadEvents, clearEventsError });
+    // A closure: `finishRetry` is only assigned once the Retry load runs.
+    return { loadEvents, clearEventsError, finishRetry: () => finishRetry() };
+  }
 
+  /** Renders the load-error notice and clicks its Retry until the Retry load has started. */
+  async function retryFromNotice(user: UserEvent, loadEvents: Mock) {
     await renderSection();
-    const retry = screen.getByTestId('events-settings-retry');
-    await user.click(retry);
-
+    await user.click(screen.getByTestId('events-settings-retry'));
     await waitFor(() => expect(loadEvents).toHaveBeenCalledTimes(2));
+  }
+
+  it('clears the stored load error before the Retry reload starts', async () => {
+    const user = userEvent.setup();
+    const { loadEvents, clearEventsError } = arrangeEmptyRetry();
+    await retryFromNotice(user, loadEvents);
+
     expect(clearEventsError).toHaveBeenCalledTimes(1);
     expect(clearEventsError.mock.invocationCallOrder[0]).toBeLessThan(
       loadEvents.mock.invocationCallOrder[1]
     );
+  });
+
+  it('swaps Retry for the loading indicator, then shows the truthful empty state after a successful Retry', async () => {
+    const user = userEvent.setup();
+    const { loadEvents, finishRetry } = arrangeEmptyRetry();
+    await retryFromNotice(user, loadEvents);
+
     await waitFor(() => expect(screen.getByTestId('events-settings-loading')).toBeInTheDocument());
     expect(screen.queryByTestId('events-settings-retry')).not.toBeInTheDocument();
 
@@ -610,6 +647,17 @@ describe('EventsSettings list states', () => {
       expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument()
     );
     expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
+  });
+
+  it('moves focus to Add after a successful Retry', async () => {
+    const user = userEvent.setup();
+    const { loadEvents, finishRetry } = arrangeEmptyRetry();
+    await retryFromNotice(user, loadEvents);
+
+    await act(async () => {
+      finishRetry();
+    });
+
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-settings-add'))
     );
@@ -1208,7 +1256,7 @@ describe('EventsSettings edit', () => {
     expect(screen.getByTestId('events-form-date')).toHaveValue('2026-09-12');
   });
 
-  it('routes the save through editEvent with the row id', async () => {
+  it('saves an edit to the row it was opened from rather than adding a new event', async () => {
     const user = userEvent.setup();
     setStore({
       events: [makeEvent({ id: 'mine', label: 'Harper visits' })] as AppState['events'],
@@ -1429,6 +1477,39 @@ describe.each([
       expect(store.state.removeEvent).not.toHaveBeenCalled();
     }
 
+    /**
+     * Submits a save whose response cannot be read and clicks the form's
+     * Refresh. The refresh load and the list Retry load after it stay pending
+     * until their deferreds resolve.
+     */
+    async function startReconciliationRefresh(user: UserEvent) {
+      const refresh = deferredLoad();
+      const retry = deferredLoad();
+      const loadEvents = vi.mocked(store.state.loadEvents as AppState['loadEvents']);
+      saveAction().mockResolvedValueOnce(UNREADABLE);
+      await renderSection();
+      loadEvents.mockImplementationOnce(() => {
+        store.patch({ eventsIsLoading: true, eventsError: null });
+        return refresh.promise;
+      }).mockImplementationOnce(() => {
+        store.patch({ eventsIsLoading: true, eventsError: null });
+        return retry.promise;
+      });
+      await prepareForm(user);
+      await submitForm(user);
+      await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
+      await user.click(screen.getByTestId('events-form-refresh'));
+      return { loadEvents, refresh, retry };
+    }
+
+    /** Fails the reconciliation refresh the way the slice reports a failed load. */
+    async function failRefresh(refresh: ReturnType<typeof deferredLoad>) {
+      await act(async () => {
+        store.patch({ eventsIsLoading: false, eventsError: 'Refresh failed' });
+        refresh.resolve({ status: 'failure', error: 'Refresh failed' });
+      });
+    }
+
     beforeEach(() => {
       setStore({ events: initialEvents() });
     });
@@ -1466,7 +1547,7 @@ describe.each([
       await renderSection();
       await prepareForm(user);
       await submitForm(user);
-      const form = screen.getByTestId('events-form-label').closest('form')!;
+      const form = screen.getByTestId('events-form-element');
 
       await act(async () => {
         finishSave(UNREADABLE);
@@ -1490,7 +1571,7 @@ describe.each([
       await prepareForm(user);
       await submitForm(user);
       await waitFor(() => expect(screen.getByTestId('events-form-error')).toBeInTheDocument());
-      const form = screen.getByTestId('events-form-label').closest('form')!;
+      const form = screen.getByTestId('events-form-element');
 
       // A direct submit event still reaches the form after its button is gone.
       await act(async () => { fireEvent.submit(form); }); // raw submit: the submit button is gone, so only a direct submit reaches the handler it must still guard
@@ -1565,30 +1646,12 @@ describe.each([
       expectWrites(1);
     });
 
-    it('keeps the form closed after refresh fails and recovers through the list Retry', async () => {
+    it('keeps the form closed with one retryable notice when the reconciliation refresh fails', async () => {
       const user = userEvent.setup();
-      const refresh = deferredLoad();
-      const retry = deferredLoad();
-      const loadEvents = vi.mocked(store.state.loadEvents as AppState['loadEvents']);
-      saveAction().mockResolvedValueOnce(UNREADABLE);
-      await renderSection();
-      loadEvents.mockImplementationOnce(() => {
-        store.patch({ eventsIsLoading: true, eventsError: null });
-        return refresh.promise;
-      }).mockImplementationOnce(() => {
-        store.patch({ eventsIsLoading: true, eventsError: null });
-        return retry.promise;
-      });
-      await prepareForm(user);
-      await submitForm(user);
-      await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toBeInTheDocument());
-      await user.click(screen.getByTestId('events-form-refresh'));
+      const { loadEvents, refresh } = await startReconciliationRefresh(user);
       expect(screen.queryByTestId('events-form')).not.toBeInTheDocument();
       expect(loadEvents).toHaveBeenCalledTimes(2);
-      await act(async () => {
-        store.patch({ eventsIsLoading: false, eventsError: 'Refresh failed' });
-        refresh.resolve({ status: 'failure', error: 'Refresh failed' });
-      });
+      await failRefresh(refresh);
 
       expect(screen.getAllByTestId('events-settings-load-error')).toHaveLength(1);
       expect(screen.getByTestId('events-settings-load-error')).toHaveTextContent(
@@ -1597,10 +1660,15 @@ describe.each([
       expect(screen.queryByTestId('events-form')).not.toBeInTheDocument();
       expect(regionLabels()).toEqual(labelsAfterRefreshFailure);
       expectWrites(1);
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+    });
 
-      const retryButton = screen.getByRole('button', { name: 'Retry' });
-      expect(retryButton).toBeEnabled();
-      await user.click(retryButton);
+    it('recovers the saved row through the list Retry after the refresh fails', async () => {
+      const user = userEvent.setup();
+      const { loadEvents, refresh, retry } = await startReconciliationRefresh(user);
+      await failRefresh(refresh);
+
+      await user.click(screen.getByRole('button', { name: 'Retry' }));
       expect(loadEvents).toHaveBeenCalledTimes(3);
       expect(Boolean(screen.queryByTestId('events-settings-loading'))).toBe(loadingDuringRetry);
       expect(regionLabels()).toEqual(labelsDuringRetry);
@@ -1697,8 +1765,8 @@ describe('EventsSettings delete', () => {
     expect(store.state.removeEvent).not.toHaveBeenCalled();
   });
 
-  it('keeps the row and shows the returned message when the delete is rejected', async () => {
-    const user = userEvent.setup();
+  /** Confirms a delete that the slice refuses as not found, and waits for its alert. */
+  async function rejectDeleteAsNotFound(user: UserEvent) {
     setStore({
       events: [makeEvent({ id: 'mine', label: 'Harper visits' })] as AppState['events'],
       removeEvent: vi.fn(async () =>
@@ -1713,12 +1781,24 @@ describe('EventsSettings delete', () => {
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('Event not found or not yours to delete')
     );
+  }
+
+  it('keeps the row and shows the returned message when the delete is rejected', async () => {
+    const user = userEvent.setup();
+    await rejectDeleteAsNotFound(user);
+
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();
     expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
+    expect(screen.queryByTestId('events-delete-confirm')).not.toBeInTheDocument();
+  });
+
+  it('styles the stale-delete Refresh as the kit primary action', async () => {
+    const user = userEvent.setup();
+    await rejectDeleteAsNotFound(user);
+
     // The kit primary action: pink fill, white label.
     expect(screen.getByTestId('events-delete-refresh')).toHaveClass('bg-fill', 'text-white');
     expect(screen.getByTestId('events-delete-refresh')).not.toHaveClass('bg-red-500');
-    expect(screen.queryByTestId('events-delete-confirm')).not.toBeInTheDocument();
   });
 
   it('keeps deliberate delete retry enabled for a transport-coded failure', async () => {
@@ -1918,9 +1998,7 @@ describe('EventsSettings dismissal guards', () => {
     // never reached. The panel itself, not merely "somewhere inside the
     // dialog": the label input already satisfies the weaker form before submit,
     // which makes it pass with the parking deleted.
-    expect(document.activeElement).toBe(
-      screen.getByTestId('events-form').querySelector('[tabindex="-1"]')
-    );
+    expect(document.activeElement).toBe(screen.getByTestId('events-form-panel'));
 
     await user.keyboard('{Escape}');
     expect(screen.getByTestId('events-form')).toBeInTheDocument();
@@ -1967,9 +2045,7 @@ describe('EventsSettings dismissal guards', () => {
     await waitFor(() => expect(screen.getByTestId('events-delete-confirm')).toBeDisabled());
 
     // Same parking as the form — see the note in the save-in-flight test.
-    expect(document.activeElement).toBe(
-      screen.getByTestId('events-delete-confirmation').querySelector('[tabindex="-1"]')
-    );
+    expect(document.activeElement).toBe(screen.getByTestId('events-delete-panel'));
 
     await user.keyboard('{Escape}');
     expect(screen.getByTestId('events-delete-confirmation')).toBeInTheDocument();

@@ -85,9 +85,9 @@ async function submit(user: UserEvent, name: string, onComplete = vi.fn()) {
  * `validateDisplayName` untested.
  */
 async function submitPastNativeValidation(user: UserEvent, name: string, onComplete = vi.fn()) {
-  const { container } = render(<DisplayNameSetup isOpen onComplete={onComplete} />);
+  render(<DisplayNameSetup isOpen onComplete={onComplete} />);
   await user.type(screen.getByLabelText('Display Name'), name);
-  fireEvent.submit(container.querySelector('form')!); // raw submit: bypasses the native required/minLength check so the component's own length rule runs
+  fireEvent.submit(screen.getByTestId('display-name-form')); // raw submit: bypasses the native required/minLength check so the component's own length rule runs
   return onComplete;
 }
 
@@ -190,7 +190,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     expect(screen.getByTestId('display-name-setup')).toBeInTheDocument();
   });
 
-  it('offline: refused before getUser() or the write, with the offline reason inline', async () => {
+  it('offline: refuses before reading the session or writing, with the offline reason inline', async () => {
     const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     try {
       const onComplete = await submit(user, 'Jessie');
@@ -338,7 +338,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       expect(screen.queryByText(/Welcome!/)).not.toBeInTheDocument();
     });
 
-    it('closes through onCancel without writing anything', async () => {
+    it('Cancel closes the form without writing anything', async () => {
       const { onCancel, onComplete } = renderEdit('Jessie');
 
       await user.click(screen.getByTestId('display-name-cancel'));
@@ -361,7 +361,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
       expect(dialog).toHaveAccessibleName('Change your name');
     });
 
-    it('closes through onCancel when Escape is pressed', async () => {
+    it('Escape closes the form without writing anything', async () => {
       const { onCancel, onComplete } = renderEdit('Jessie');
 
       await user.keyboard('{Escape}');

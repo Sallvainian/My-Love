@@ -104,7 +104,7 @@ async function goOffline(page: Page, offline: boolean) {
 }
 
 test.describe('Birthdays and wedding date from the local copy', () => {
-  test('the cards from one online session show when the server cannot be reached', async ({
+  test('[P1] the cards from one online session show when the server cannot be reached', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -187,7 +187,7 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     }
   });
 
-  test('an offline birthday edit is refused with a needs-a-connection message and changes nothing', async ({
+  test('[P1] an offline birthday edit is refused with a needs-a-connection message and changes nothing', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,

@@ -65,10 +65,13 @@ test.describe('Settings on the style kit', () => {
 
       // Cards on the kit card colour: Countdowns (the events group's card) and
       // the Sign out card.
-      const countdownsCard = page.getByTestId('events-settings').locator('..');
+      const countdownsCard = page.getByTestId('settings-countdowns-card');
       await expect(countdownsCard).toHaveCSS('background-color', KIT_CARD[colorScheme]);
       const signOut = page.getByTestId('settings-sign-out');
-      await expect(signOut.locator('..')).toHaveCSS('background-color', KIT_CARD[colorScheme]);
+      await expect(page.getByTestId('settings-sign-out-card')).toHaveCSS(
+        'background-color',
+        KIT_CARD[colorScheme]
+      );
 
       // Quiet Sign out: no gradient, kit danger text.
       await expect(signOut).toHaveCSS('background-image', 'none');

@@ -143,7 +143,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Mood history and partner moods offline', () => {
-  test('a device with an empty moods store shows earlier server moods in the calendar', async ({
+  test('[P1] a device with an empty moods store shows earlier server moods in the calendar', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -228,7 +228,7 @@ test.describe('Mood history and partner moods offline', () => {
     }
   });
 
-  test('partner moods loaded online are listed offline after a reload', async ({
+  test('[P1] partner moods loaded online are listed offline after a reload', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,

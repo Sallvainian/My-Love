@@ -131,7 +131,7 @@ describe('useRealtimeMessages', () => {
     });
   });
 
-  it('should subscribe to a PRIVATE broadcast channel on mount', async () => {
+  it('joins only the private love-notes topic for this user on mount', async () => {
     const { supabase } = await import('../../api/supabaseClient');
 
     renderHook(() => useRealtimeMessages());
@@ -393,7 +393,7 @@ describe('useRealtimeMessages', () => {
     expect(mockChannel.subscribe).not.toHaveBeenCalled();
   });
 
-  it('should listen for broadcast new_message events', async () => {
+  it('receives new notes broadcast on the love-notes topic', async () => {
     const mockChannel = {
       on: vi.fn().mockReturnThis(),
       subscribe: vi.fn((callback) => {
@@ -416,7 +416,7 @@ describe('useRealtimeMessages', () => {
     });
   });
 
-  it('should unsubscribe on unmount', async () => {
+  it('releases the love-notes channel on unmount', async () => {
     const { supabase } = await import('../../api/supabaseClient');
 
     const { unmount } = renderHook(() => useRealtimeMessages());
@@ -434,7 +434,7 @@ describe('useRealtimeMessages', () => {
   // Both gates are synchronous, so fake timers run every pending step of the
   // open (including `waitForSocketReady`'s poll) without a wall-clock sleep,
   // and the positive control proves the same run would have subscribed.
-  it('should not subscribe when enabled is false', async () => {
+  it('opens no channel while disabled, and one once enabled', async () => {
     const { supabase } = await import('../../api/supabaseClient');
 
     vi.useFakeTimers();
@@ -641,7 +641,7 @@ describe('useRealtimeMessages', () => {
       expect(supabase.removeChannel).toHaveBeenCalledTimes(6);
     });
 
-    it('should reset retry count on successful subscription', async () => {
+    it('restarts the backoff at 1s after a successful rejoin', async () => {
       const { supabase } = await import('../../api/supabaseClient');
 
       let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
@@ -861,7 +861,11 @@ describe('useRealtimeMessages', () => {
       expect(addNote).toHaveBeenCalledWith(note);
     });
 
-    it('re-installs the Realtime token before every retry', async () => {
+    /**
+     * Opens the feed, fails its first join with CHANNEL_ERROR and waits out the
+     * 1s backoff, so exactly one retry has joined.
+     */
+    async function mountAndRetryOnce() {
       const { supabase } = await import('../../api/supabaseClient');
 
       // Every subscribe call's callback ARGUMENT, in call order — not a single
@@ -893,23 +897,43 @@ describe('useRealtimeMessages', () => {
         await vi.advanceTimersByTimeAsync(1000);
       });
 
+      return { subscribeCallbacks };
+    }
+
+    it('re-installs the Realtime token before every retry', async () => {
+      await mountAndRetryOnce();
+
       // A retry is a re-join, and a private join is authorized against the
       // token on the socket. A retry scheduled because that token had gone
       // stale would otherwise re-join with the same stale token and be denied
       // again, five times over, before giving up.
       expect(mocks.order).toEqual(['setAuth', 'subscribe', 'setAuth', 'subscribe']);
+    });
+
+    it('hands the status callback to the retried join', async () => {
+      const { subscribeCallbacks } = await mountAndRetryOnce();
 
       // The retry must hand the status callback back. Without it the rejoined
       // channel reports nothing, so neither the retry-count reset nor the
-      // partner-snapshot refresh below ever runs again.
+      // partner-snapshot refresh ever runs again.
       expect(subscribeCallbacks).toHaveLength(2);
       expect(subscribeCallbacks[1]).toBeTypeOf('function');
+    });
 
-      // And the retry did NOT re-resolve the partner ahead of its join. The
-      // contract is that every re-join re-takes the snapshot on SUBSCRIBED, so
-      // a pre-join lookup here would take it twice and null the ref for a
+    it('does not look the partner up again before the retried join', async () => {
+      const { subscribeCallbacks } = await mountAndRetryOnce();
+
+      // Premise: the retry really joined again, or a lookup count of one proves nothing.
+      expect(subscribeCallbacks).toHaveLength(2);
+
+      // The contract is that every re-join re-takes the snapshot on SUBSCRIBED,
+      // so a pre-join lookup here would take it twice and null the ref for a
       // round-trip the join does not need.
       expect(mocks.getPartnerId).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-takes the partner snapshot when the retried join reports SUBSCRIBED', async () => {
+      const { subscribeCallbacks } = await mountAndRetryOnce();
 
       const partnerLookupsBefore = mocks.getPartnerId.mock.calls.length;
       await act(async () => {
@@ -920,8 +944,17 @@ describe('useRealtimeMessages', () => {
       // Proof it actually reached handleStatus: only that path re-takes the
       // snapshot, and a stale snapshot is the staleness this refresh closes.
       expect(mocks.getPartnerId.mock.calls.length).toBe(partnerLookupsBefore + 1);
+    });
 
-      // And the counter was reset, so the next failure starts the backoff over
+    it('restarts the backoff after the retried join reports SUBSCRIBED', async () => {
+      const { subscribeCallbacks } = await mountAndRetryOnce();
+
+      await act(async () => {
+        emitStatus(subscribeCallbacks[1], 'SUBSCRIBED');
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // The counter was reset, so the next failure starts the backoff over
       // rather than continuing toward the five-retry give-up.
       await act(async () => {
         emitStatus(subscribeCallbacks[1], 'CHANNEL_ERROR');
@@ -1094,47 +1127,88 @@ describe('useRealtimeMessages', () => {
       expect(second.subscribe).toHaveBeenCalled();
     });
 
-    it('attempts no join when the retry token install rejects', async () => {
-      const { supabase } = await import('../../api/supabaseClient');
-
-      let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
-      const mockChannel = {
-        on: vi.fn().mockReturnThis(),
-        subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
-          if (callback) subscribeCallback = callback;
-          return mockChannel;
-        }),
-      };
-      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
-
+    describe('when the retry token install rejects', () => {
       // A rejected token install must never escape as an unhandled rejection:
       // nothing in the hook is awaiting the retry, so an uncaught one would
       // take the page's error handler, not this call stack.
-      const unhandled = vi.fn();
-      process.on('unhandledRejection', unhandled);
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      let unhandled = vi.fn<(reason: unknown) => void>();
+      let consoleError: ReturnType<typeof vi.spyOn>;
 
-      try {
+      beforeEach(() => {
+        unhandled = vi.fn<(reason: unknown) => void>();
+        process.on('unhandledRejection', unhandled);
+        consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      });
+
+      afterEach(() => {
+        process.off('unhandledRejection', unhandled);
+        consoleError.mockRestore();
+      });
+
+      /** Opens the feed; its first join lands normally. */
+      async function mountFirstJoin() {
+        const { supabase } = await import('../../api/supabaseClient');
+
+        let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
+        const mockChannel = {
+          on: vi.fn().mockReturnThis(),
+          subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
+            if (callback) subscribeCallback = callback;
+            return mockChannel;
+          }),
+        };
+        vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
+
         await act(async () => {
           renderHook(() => useRealtimeMessages());
           await vi.runOnlyPendingTimersAsync();
         });
 
-        // The first join lands normally.
-        expect(mockChannel.subscribe).toHaveBeenCalledTimes(1);
-        expect(supabase.channel).toHaveBeenCalledTimes(1);
+        const emitError = () =>
+          emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
+        return { supabase, mockChannel, emitError };
+      }
 
+      /** Fails the join, then fails the retry's token install as the backoff ends. */
+      async function failRetryTokenInstall(emitError: () => void) {
         // The retry's setAuth is the one that fails — a refresh that could not
         // reach Supabase, say.
         const tokenFailure = new Error('token refresh failed');
         mocks.setAuth.mockRejectedValueOnce(tokenFailure);
 
         await act(async () => {
-          emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
+          emitError();
         });
         await act(async () => {
           await vi.advanceTimersByTimeAsync(1000);
         });
+        return tokenFailure;
+      }
+
+      async function mountThenFailRetryTokenInstall() {
+        const joined = await mountFirstJoin();
+        const tokenFailure = await failRetryTokenInstall(joined.emitError);
+        return { ...joined, tokenFailure };
+      }
+
+      async function expectNoUnhandledRejection() {
+        // Let any rejection Node was going to report reach its checkpoint.
+        // Real timers for this last turn: vitest's fake timers stub
+        // setImmediate too, so a faked one would never fire. Nothing is pending
+        // by now — the hook has given up until the next CHANNEL_ERROR.
+        vi.useRealTimers();
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(unhandled).not.toHaveBeenCalled();
+      }
+
+      it('attempts no join and releases nothing when the retry token install rejects', async () => {
+        const { supabase, mockChannel, emitError } = await mountFirstJoin();
+
+        // The first join lands normally.
+        expect(mockChannel.subscribe).toHaveBeenCalledTimes(1);
+        expect(supabase.channel).toHaveBeenCalledTimes(1);
+
+        await failRetryTokenInstall(emitError);
 
         // The token install rejected before any channel could be created, so
         // nothing joined.
@@ -1146,12 +1220,21 @@ describe('useRealtimeMessages', () => {
         // left to report a status, so nothing to schedule another retry, and
         // the feed dead until the view is remounted.
         expect(supabase.removeChannel).not.toHaveBeenCalled();
+      });
+
+      it('logs a rejected retry token install instead of throwing it', async () => {
+        const { tokenFailure } = await mountThenFailRetryTokenInstall();
 
         // Caught and logged rather than thrown.
         expect(consoleError).toHaveBeenCalledWith(
           '[useRealtimeMessages] Retry setup failed:',
           tokenFailure
         );
+        await expectNoUnhandledRejection();
+      });
+
+      it('schedules no further attempt on its own after the token install rejects', async () => {
+        const { supabase, mockChannel } = await mountThenFailRetryTokenInstall();
 
         // The channel stays closed: no later timer revives it on its own. Only
         // the next CHANNEL_ERROR — which a channel that never joined cannot
@@ -1161,13 +1244,22 @@ describe('useRealtimeMessages', () => {
         });
         expect(supabase.channel).toHaveBeenCalledTimes(1);
         expect(mockChannel.subscribe).toHaveBeenCalledTimes(1);
+      });
+
+      it('retries at the second backoff step on the next CHANNEL_ERROR', async () => {
+        const { supabase, mockChannel, emitError } = await mountThenFailRetryTokenInstall();
+
+        // The same idle 30s as above, so the timer sequence matches it.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(30000);
+        });
 
         // Recovery is still possible, which is the point of holding the
         // channel: it is still there to report, and the next failure retries
         // normally — at 2000ms, the second step of the backoff, since the
         // attempt that failed still spent one of the five.
         await act(async () => {
-          emitStatus(subscribeCallback, 'CHANNEL_ERROR', new Error('Connection failed'));
+          emitError();
         });
         await act(async () => {
           await vi.advanceTimersByTimeAsync(2000);
@@ -1175,21 +1267,11 @@ describe('useRealtimeMessages', () => {
         expect(supabase.removeChannel).toHaveBeenCalledTimes(1);
         expect(supabase.channel).toHaveBeenCalledTimes(2);
         expect(mockChannel.subscribe).toHaveBeenCalledTimes(2);
-
-        // Let any rejection Node was going to report reach its checkpoint.
-        // Real timers for this last turn: vitest's fake timers stub
-        // setImmediate too, so a faked one would never fire. Nothing is pending
-        // by now — the hook has given up until the next CHANNEL_ERROR.
-        vi.useRealTimers();
-        await new Promise((resolve) => setImmediate(resolve));
-        expect(unhandled).not.toHaveBeenCalled();
-      } finally {
-        process.off('unhandledRejection', unhandled);
-        consoleError.mockRestore();
-      }
+        await expectNoUnhandledRejection();
+      });
     });
 
-    it('should clear retry timeout on unmount', async () => {
+    it('does not retry after unmount', async () => {
       const { supabase } = await import('../../api/supabaseClient');
 
       let subscribeCallback: ((status: string, err?: Error) => void) | null = null;
@@ -1271,7 +1353,7 @@ describe('useRealtimeMessages', () => {
       return (payload: unknown) => act(() => broadcastCallback?.(payload));
     }
 
-    it('should call onNewMessage callback when message received', async () => {
+    it('delivers a partner note to the thread and to the caller', async () => {
       const onNewMessage = vi.fn();
       const emit = await mountAndCaptureBroadcast(onNewMessage);
 

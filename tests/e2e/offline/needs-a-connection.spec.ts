@@ -33,7 +33,7 @@
  * `partner_requests` row is ever seeded, linked or unlinked, and their writes
  * are also aborted, so a regressed guard cannot insert one.
  */
-import type { Page, Request } from '@playwright/test';
+import type { Locator, Page, Request } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
@@ -123,7 +123,7 @@ async function pairPhotoIds(supabaseAdmin: TypedSupabaseClient): Promise<string[
 }
 
 test.describe('Photos offline', () => {
-  test('upload is refused before anything is sent', async ({
+  test('[P1] upload is refused before anything is sent', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -163,7 +163,7 @@ test.describe('Photos offline', () => {
     }
   });
 
-  test('delete is refused and the confirmation stays open', async ({
+  test('[P1] delete is refused and the confirmation stays open', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -246,7 +246,7 @@ test.describe('Photos offline', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Display name offline', () => {
-  test('a name change is refused inline and the profile row is unchanged', async ({
+  test('[P1] a name change is refused inline and the profile row is unchanged', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -315,7 +315,7 @@ async function ownRequestIds(supabaseAdmin: TypedSupabaseClient, userId: string)
 }
 
 test.describe('Partner requests offline', () => {
-  test('send, accept and decline are each refused before any request', async ({
+  test('[P1] send, accept and decline are each refused before any request', async ({
     page,
     supabaseAdmin,
   }) => {
@@ -409,7 +409,7 @@ test.describe('Poke and kiss badge offline', () => {
     ['poke', 'A poke'],
     ['kiss', 'A kiss'],
   ] as const) {
-    test(`a ${type} plays but is not marked seen, and the badge stays`, async ({
+    test(`[P1] a ${type} plays but is not marked seen, and the badge stays`, async ({
       page,
       supabaseAdmin,
       interceptNetworkCall,
@@ -510,7 +510,7 @@ async function openNotesWithPartner(
 }
 
 async function attachPicture(page: Page) {
-  await page.locator('input[type="file"][accept*="image/"]').setInputFiles(PNG_FILE);
+  await page.getByTestId('message-input-file').setInputFiles(PNG_FILE);
   await expect(page.getByAltText('Selected image preview')).toBeVisible();
 }
 
@@ -525,7 +525,7 @@ async function stampedNoteIds(supabaseAdmin: TypedSupabaseClient, stamp: string)
 }
 
 test.describe('Love notes offline', () => {
-  test('a picture note is refused with one message, and the composer keeps text and picture', async ({
+  test('[P1] a picture note is refused with one message, and the composer keeps text and picture', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -548,7 +548,9 @@ test.describe('Love notes offline', () => {
       watch.stop();
       expect(watch.requests).toEqual([]);
       expect(watch.partnerLookups).toEqual([]);
-      await expect(page.getByText('Failed to send. Try again.')).toHaveCount(0);
+      await expect(
+        page.getByRole('alert').filter({ hasText: 'Failed to send. Try again.' })
+      ).toHaveCount(0);
       await expect(input).toHaveValue(text);
       await expect(page.getByAltText('Selected image preview')).toBeVisible();
       await expect(noteBubble(page, text)).toHaveCount(0);
@@ -558,7 +560,7 @@ test.describe('Love notes offline', () => {
     }
   });
 
-  test('Retry on a failed picture note is refused, and the note stays failed', async ({
+  test('[P1] Retry on a failed picture note is refused, and the note stays failed', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -597,7 +599,7 @@ test.describe('Love notes offline', () => {
     }
   });
 
-  test('removing a note is refused in the dialog, and the note never leaves the list', async ({
+  test('[P1] removing a note is refused in the dialog, and the note never leaves the list', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -664,8 +666,84 @@ test.describe('Love notes offline', () => {
 // Custom messages editor
 // ---------------------------------------------------------------------------
 
+const CUSTOM_REFUSAL = offline('Custom messages need a connection to save.');
+
+/** This worker's custom message texts carrying `stamp`, sorted. */
+async function stampedCustomTexts(
+  supabaseAdmin: TypedSupabaseClient,
+  userId: string,
+  stamp: string
+): Promise<string[]> {
+  const { data, error } = await supabaseAdmin
+    .from('custom_messages')
+    .select('text')
+    .eq('user_id', userId)
+    .like('text', `${stamp}%`);
+  expect(error).toBeNull();
+  return (data ?? []).map((row) => row.text).sort();
+}
+
+/**
+ * Save one custom message online, then take the editor offline and check it
+ * says so. Returns the saved message's row.
+ */
+async function openEditorOffline(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  saved: string
+) {
+  // GIVEN: one saved message, created online.
+  await page.goto('/admin');
+  await page.getByTestId('admin-create-button').click();
+  await page.getByTestId('admin-create-form-text').fill(saved);
+  const created = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });
+  await page.getByTestId('admin-create-form-save').click();
+  expect((await created).status).toBe(201);
+  const row = page.getByTestId('admin-message-row').filter({ hasText: saved });
+  await expect(row).toBeVisible();
+  await expect(page.getByTestId('network-status-indicator')).toHaveCount(0);
+
+  // WHEN: the device goes offline, the editor says so.
+  await goOffline(page, true);
+  await expect(page.getByTestId('network-status-indicator')).toHaveAttribute(
+    'data-status',
+    'offline'
+  );
+  return row;
+}
+
+/** Nothing went out, and only the saved message exists, unchanged. */
+async function expectNothingSaved(
+  page: Page,
+  watch: ReturnType<typeof watchSupabaseRequests>,
+  row: Locator,
+  stamp: string,
+  texts: () => Promise<string[]>,
+  saved: string
+) {
+  watch.stop();
+  expect(watch.requests).toEqual([]);
+  await expect(page.getByTestId('admin-message-row').filter({ hasText: stamp })).toHaveCount(1);
+  await expect(row).toBeVisible();
+  expect(await texts()).toEqual([saved]);
+}
+
+/** Delete this worker's custom messages carrying `stamp`. */
+async function deleteStampedCustomMessages(
+  supabaseAdmin: TypedSupabaseClient,
+  userId: string,
+  stamp: string
+) {
+  const { error } = await supabaseAdmin
+    .from('custom_messages')
+    .delete()
+    .eq('user_id', userId)
+    .like('text', `${stamp}%`);
+  expect.soft(error).toBeNull();
+}
+
 test.describe('Custom messages editor offline', () => {
-  test('shows the offline indicator, and create, edit, delete and import are refused', async ({
+  test('[P1] creating a custom message offline is refused and the typed text stays', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -673,58 +751,113 @@ test.describe('Custom messages editor offline', () => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
     const stamp = `E2E-CUSTOM-OFFLINE-${Date.now()}`;
     const saved = `${stamp} saved`;
-    const refusal = offline('Custom messages need a connection to save.');
-    const stampedTexts = async () => {
-      const { data, error } = await supabaseAdmin
-        .from('custom_messages')
-        .select('text')
-        .eq('user_id', userId)
-        .like('text', `${stamp}%`);
-      expect(error).toBeNull();
-      return (data ?? []).map((row) => row.text).sort();
-    };
 
     try {
-      // GIVEN: one saved message, created online.
-      await page.goto('/admin');
-      await page.getByTestId('admin-create-button').click();
-      await page.getByTestId('admin-create-form-text').fill(saved);
-      const created = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });
-      await page.getByTestId('admin-create-form-save').click();
-      expect((await created).status).toBe(201);
-      const row = page.getByTestId('admin-message-row').filter({ hasText: saved });
-      await expect(row).toBeVisible();
-      await expect(page.getByTestId('network-status-indicator')).toHaveCount(0);
-
-      // WHEN: the device goes offline, the editor says so.
-      await goOffline(page, true);
-      await expect(page.getByTestId('network-status-indicator')).toHaveAttribute(
-        'data-status',
-        'offline'
-      );
+      const row = await openEditorOffline(page, interceptNetworkCall, saved);
       const watch = watchSupabaseRequests(page);
 
       // Create: the form error, and the typed text stays.
       await page.getByTestId('admin-create-button').click();
       await page.getByTestId('admin-create-form-text').fill(`${stamp} new`);
       await page.getByTestId('admin-create-form-save').click();
-      await expect(page.getByTestId('admin-create-form-error')).toHaveText(refusal);
+      await expect(page.getByTestId('admin-create-form-error')).toHaveText(CUSTOM_REFUSAL);
       await expect(page.getByTestId('admin-create-form-text')).toHaveValue(`${stamp} new`);
       await page.getByTestId('admin-create-form-cancel').click();
+
+      await expectNothingSaved(
+        page,
+        watch,
+        row,
+        stamp,
+        () => stampedCustomTexts(supabaseAdmin, userId, stamp),
+        saved
+      );
+    } finally {
+      await page.context().setOffline(false);
+      await deleteStampedCustomMessages(supabaseAdmin, userId, stamp);
+    }
+  });
+
+  test('[P1] editing a custom message offline is refused', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId } = await resolveOwnPair(supabaseAdmin);
+    const stamp = `E2E-CUSTOM-OFFLINE-${Date.now()}`;
+    const saved = `${stamp} saved`;
+
+    try {
+      const row = await openEditorOffline(page, interceptNetworkCall, saved);
+      const watch = watchSupabaseRequests(page);
 
       // Edit: the form error.
       await row.getByTestId('message-row-edit-button').click();
       await page.getByTestId('admin-edit-form-text').fill(`${stamp} edited`);
       await page.getByTestId('admin-edit-form-save').click();
-      await expect(page.getByTestId('admin-edit-form-error')).toHaveText(refusal);
+      await expect(page.getByTestId('admin-edit-form-error')).toHaveText(CUSTOM_REFUSAL);
       await page.getByTestId('admin-edit-form-cancel').click();
+
+      await expectNothingSaved(
+        page,
+        watch,
+        row,
+        stamp,
+        () => stampedCustomTexts(supabaseAdmin, userId, stamp),
+        saved
+      );
+    } finally {
+      await page.context().setOffline(false);
+      await deleteStampedCustomMessages(supabaseAdmin, userId, stamp);
+    }
+  });
+
+  test('[P1] deleting a custom message offline is refused in the dialog', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId } = await resolveOwnPair(supabaseAdmin);
+    const stamp = `E2E-CUSTOM-OFFLINE-${Date.now()}`;
+    const saved = `${stamp} saved`;
+
+    try {
+      const row = await openEditorOffline(page, interceptNetworkCall, saved);
+      const watch = watchSupabaseRequests(page);
 
       // Delete: the dialog error.
       await row.getByTestId('message-row-delete-button').click();
       const dialog = page.getByTestId('admin-delete-dialog');
       await page.getByTestId('admin-delete-dialog-confirm').click();
-      await expect(dialog.getByRole('alert')).toHaveText(refusal);
+      await expect(dialog.getByRole('alert')).toHaveText(CUSTOM_REFUSAL);
       await page.getByTestId('admin-delete-dialog-cancel').click();
+
+      await expectNothingSaved(
+        page,
+        watch,
+        row,
+        stamp,
+        () => stampedCustomTexts(supabaseAdmin, userId, stamp),
+        saved
+      );
+    } finally {
+      await page.context().setOffline(false);
+      await deleteStampedCustomMessages(supabaseAdmin, userId, stamp);
+    }
+  });
+
+  test('[P1] importing custom messages offline is refused with an alert naming the connection', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId } = await resolveOwnPair(supabaseAdmin);
+    const stamp = `E2E-CUSTOM-OFFLINE-${Date.now()}`;
+    const saved = `${stamp} saved`;
+
+    try {
+      const row = await openEditorOffline(page, interceptNetworkCall, saved);
+      const watch = watchSupabaseRequests(page);
 
       // Import: the alert names the connection, not the file.
       const alertShown = page.waitForEvent('dialog');
@@ -749,23 +882,20 @@ test.describe('Custom messages editor offline', () => {
         ),
       });
       const alert = await alertShown;
-      expect(alert.message()).toBe(refusal);
+      expect(alert.message()).toBe(CUSTOM_REFUSAL);
       await alert.accept();
 
-      // THEN: nothing went out, and only the saved message exists, unchanged.
-      watch.stop();
-      expect(watch.requests).toEqual([]);
-      await expect(page.getByTestId('admin-message-row').filter({ hasText: stamp })).toHaveCount(1);
-      await expect(row).toBeVisible();
-      expect(await stampedTexts()).toEqual([saved]);
+      await expectNothingSaved(
+        page,
+        watch,
+        row,
+        stamp,
+        () => stampedCustomTexts(supabaseAdmin, userId, stamp),
+        saved
+      );
     } finally {
       await page.context().setOffline(false);
-      const { error } = await supabaseAdmin
-        .from('custom_messages')
-        .delete()
-        .eq('user_id', userId)
-        .like('text', `${stamp}%`);
-      expect.soft(error).toBeNull();
+      await deleteStampedCustomMessages(supabaseAdmin, userId, stamp);
     }
   });
 });

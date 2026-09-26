@@ -148,7 +148,7 @@ describe('backgroundSync utilities', () => {
       expect(mockRegistration.sync.register).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle multiple sync tag registrations', async () => {
+    it('registers each tag it is given, in order', async () => {
       await registerBackgroundSync('tag1');
       await registerBackgroundSync('tag2');
 
@@ -172,7 +172,7 @@ describe('backgroundSync utilities', () => {
       await expect(registerBackgroundSync('test-tag')).resolves.not.toThrow();
     });
 
-    it('should handle registration errors gracefully', async () => {
+    it('logs and resolves when the sync registration fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockRegistration.sync.register.mockRejectedValueOnce(new Error('Registration failed'));
 
@@ -187,7 +187,7 @@ describe('backgroundSync utilities', () => {
   });
 
   describe('setupServiceWorkerListener', () => {
-    it('should setup message listener and call callback on BACKGROUND_SYNC_COMPLETED', async () => {
+    it('runs the refresh when the worker reports a completed background sync', async () => {
       const mockCallback = vi.fn().mockResolvedValue(undefined);
 
       setupServiceWorkerListener(mockCallback);
@@ -232,7 +232,7 @@ describe('backgroundSync utilities', () => {
       expect(mockCallback).not.toHaveBeenCalled();
     });
 
-    it('should handle messages with no data gracefully', () => {
+    it('ignores a worker message with no data', () => {
       const mockCallback = vi.fn();
 
       setupServiceWorkerListener(mockCallback);
@@ -249,7 +249,7 @@ describe('backgroundSync utilities', () => {
       expect(mockCallback).not.toHaveBeenCalled();
     });
 
-    it('should return cleanup function that removes listener', () => {
+    it('stops listening for worker messages after cleanup', () => {
       const mockCallback = vi.fn();
 
       const cleanup = setupServiceWorkerListener(mockCallback);
@@ -264,7 +264,7 @@ describe('backgroundSync utilities', () => {
       );
     });
 
-    it('should handle callback errors gracefully', async () => {
+    it('logs when the post-sync refresh fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const mockCallback = vi.fn().mockRejectedValue(new Error('Refresh failed'));
 
@@ -289,7 +289,7 @@ describe('backgroundSync utilities', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should setup multiple listeners independently', () => {
+    it('registers one worker message listener per caller', () => {
       const callback1 = vi.fn();
       const callback2 = vi.fn();
 
@@ -299,7 +299,7 @@ describe('backgroundSync utilities', () => {
       expect(mockServiceWorker.addEventListener).toHaveBeenCalledTimes(2);
     });
 
-    it('should cleanup only the specific listener', () => {
+    it("cleanup removes only its own caller's listener", () => {
       const callback1 = vi.fn();
       const callback2 = vi.fn();
 
@@ -314,7 +314,7 @@ describe('backgroundSync utilities', () => {
   });
 
   describe('Edge cases and error scenarios', () => {
-    it('should handle concurrent sync registrations', async () => {
+    it('registers every tag requested concurrently', async () => {
       const promises = [
         registerBackgroundSync('tag1'),
         registerBackgroundSync('tag2'),
@@ -344,7 +344,7 @@ describe('backgroundSync utilities', () => {
       expect(mockRegistration.sync.register).toHaveBeenCalledWith('stuck-tag');
     });
 
-    it('should preserve message event data integrity', async () => {
+    it("logs the worker's sync counts unchanged and runs the refresh once", async () => {
       const debug = vi.spyOn(logger, 'debug');
       try {
         const mockCallback = vi.fn().mockResolvedValue(undefined);

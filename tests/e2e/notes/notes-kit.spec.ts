@@ -167,7 +167,7 @@ test.describe('Love Notes on the style kit', () => {
       expect(status).toBeLessThan(400);
 
       // The bubble is the element that directly wraps the text block.
-      const bubble = message.getByText(uniqueMessage).locator('xpath=../..');
+      const bubble = message.getByTestId('love-note-bubble');
       const bubbleFill = await background(bubble);
       const sendFill = await background(page.getByLabel(/send message/i));
       expect(bubbleFill).toBe(KIT_FILL);

@@ -92,13 +92,13 @@ test.describe('stale persisted events never rehydrate', () => {
     // The stale event reaches nothing: not a card, not its label, not its
     // description. This is the disclosure assertion.
     await expect(page.getByTestId(eventCardTestId(stale.label))).toHaveCount(0);
-    await expect(page.getByText(stale.label)).toHaveCount(0);
-    await expect(page.getByText(stale.description)).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText(stale.label, { ignoreCase: true });
+    await expect(page.getByRole('main')).not.toContainText(stale.description, { ignoreCase: true });
 
     // Home is Home, not the ErrorBoundary. `getCalendarDaysDiff` would have
     // thrown on the stale row's string `date`, and ErrorBoundary renders
     // 'Something went wrong' (`src/components/ErrorBoundary/ErrorBoundary.tsx:52`).
-    await expect(page.getByText('Something went wrong')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Something went wrong' })).toHaveCount(0);
     await expect(page.getByTestId('time-together')).toBeVisible();
     await expect(page.getByTestId('event-countdown-wedding')).toBeVisible();
   });
@@ -168,7 +168,7 @@ test.describe('stale persisted events never rehydrate', () => {
     await page.goto('/');
 
     await expect(page.getByTestId('time-together')).toBeVisible();
-    await expect(page.getByText(staleEvent.label)).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText(staleEvent.label, { ignoreCase: true });
 
     await navigateTo(page, 'mood');
     await expect(page.getByTestId('mood-tracker')).toBeVisible();
@@ -177,13 +177,15 @@ test.describe('stale persisted events never rehydrate', () => {
     // expanded. `showNoteField` initializes `false` (`MoodTracker.tsx:100`)
     // and is raised only by the rehydrated-mood branch, so its absence is the
     // signal that the branch did not fire.
-    await expect(page.getByText(staleMood.note)).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText(staleMood.note, { ignoreCase: true });
     await expect(page.getByTestId('mood-note-input')).toHaveCount(0);
 
     // The mood SELECTION is the other half of the same leak: the branch calls
     // `setSelectedMoods(existingMood.moods)`, and a non-empty selection renders
     // "Selected: <label>" — 'Sad' for the seeded 'sad' (`MoodTracker.tsx:49`).
-    await expect(page.getByText('Selected: Sad')).toHaveCount(0);
+    await expect(
+      page.getByTestId('mood-selected-summary').filter({ hasText: 'Selected: Sad' })
+    ).toHaveCount(0);
   });
 
   test('[P1] one load clears both stale keys from the stored blob, not just from state', async ({

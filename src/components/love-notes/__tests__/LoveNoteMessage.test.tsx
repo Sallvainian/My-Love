@@ -146,13 +146,13 @@ describe('LoveNoteMessage', () => {
     it('should render message content', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText('Hello love!')).toBeInTheDocument();
+      expect(screen.getByTestId('love-note-text')).toHaveTextContent('Hello love!');
     });
 
     it('should render sender name and timestamp', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText(/You/)).toBeInTheDocument();
+      expect(screen.getByTestId('love-note-caption')).toHaveTextContent(/^You · .+$/);
     });
 
     it('shows when a late-delivered note was written, not when it arrived', () => {
@@ -183,13 +183,13 @@ describe('LoveNoteMessage', () => {
       );
     });
 
-    it('should apply own message styling when isOwnMessage is true', () => {
+    it('shows your own note as a filled bubble on the right', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
       const messageContainer = screen.getByTestId('love-note-message');
       expect(messageContainer).toHaveClass('items-end');
-      expect(screen.queryByText('Sending...')).not.toBeInTheDocument();
-      const bubble = messageContainer.querySelector('.rounded-\\[20px\\]');
+      expect(screen.queryByTestId('love-note-status')).not.toBeInTheDocument();
+      const bubble = screen.getByTestId('love-note-bubble');
       // Own bubble: kit `fill` with white text and the 6px bottom-right tail,
       // no hairline (the fill is the edge).
       expect(bubble).toHaveClass('max-w-[78%]', 'rounded-br-md', 'bg-fill', 'text-white');
@@ -197,12 +197,12 @@ describe('LoveNoteMessage', () => {
       expect(bubble).not.toHaveClass('opacity-70');
     });
 
-    it('should apply partner message styling when isOwnMessage is false', () => {
+    it('shows a partner note as an outlined bubble on the left', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={false} senderName="Partner" />);
 
       const messageContainer = screen.getByTestId('love-note-message');
       expect(messageContainer).toHaveClass('items-start');
-      const bubble = messageContainer.querySelector('.rounded-\\[20px\\]');
+      const bubble = screen.getByTestId('love-note-bubble');
       // Partner bubble: kit `card` with an inset 1px `line` edge and the 6px
       // bottom-left tail.
       expect(bubble).toHaveClass(
@@ -226,13 +226,14 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={maliciousMessage} isOwnMessage={true} senderName="You" />);
 
       // Script tags should be stripped
-      expect(screen.queryByText('<script>')).not.toBeInTheDocument();
-      expect(screen.getByText('Hello')).toBeInTheDocument();
+      const text = screen.getByTestId('love-note-text');
+      expect(text).toHaveTextContent(/^Hello$/);
+      expect(text).not.toHaveTextContent('<script>');
     });
   });
 
   describe('Image Message Rendering', () => {
-    it('should fetch signed URL for server image', async () => {
+    it('loads a stored picture by its storage path', async () => {
       const messageWithImage = withImage('user-123/1705315800000-uuid.jpg');
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
@@ -281,10 +282,9 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
-      // Should show loading state (spinner with animate-spin class)
+      // Should show the image loading placeholder while the URL is pending
       await waitFor(() => {
-        const loadingSpinner = document.querySelector('.animate-spin');
-        expect(loadingSpinner).toBeInTheDocument();
+        expect(screen.getByTestId('love-note-image-loading')).toBeInTheDocument();
       });
 
       // Once the URL arrives, the image replaces the spinner
@@ -296,7 +296,7 @@ describe('LoveNoteMessage', () => {
         'src',
         'https://storage.example.com/late.jpg'
       );
-      expect(document.querySelector('.animate-spin')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('love-note-image-loading')).not.toBeInTheDocument();
     });
 
     it('should show error state when image fails to load', async () => {
@@ -307,11 +307,13 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to load image')).toBeInTheDocument();
+        expect(screen.getByTestId('love-note-image-error')).toHaveTextContent(
+          'Failed to load image'
+        );
       });
     });
 
-    it('should show uploading overlay when imageUploading is true', () => {
+    it('shows Uploading... over a picture that is still uploading', () => {
       const uploadingMessage: LoveNote = {
         ...baseMessage,
         imagePreviewUrl: 'blob:preview',
@@ -320,7 +322,7 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={uploadingMessage} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText('Uploading...')).toBeInTheDocument();
+      expect(screen.getByTestId('love-note-image-uploading')).toHaveTextContent('Uploading...');
     });
   });
 
@@ -400,7 +402,9 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={imageMessage} isOwnMessage={false} senderName="Partner" />);
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to load image')).toBeInTheDocument();
+        expect(screen.getByTestId('love-note-image-error')).toHaveTextContent(
+          'Failed to load image'
+        );
       });
       expect(mockWriteCachedImage).not.toHaveBeenCalled();
     });
@@ -466,7 +470,7 @@ describe('LoveNoteMessage', () => {
       expect(mockDownloadLoveNoteImage).not.toHaveBeenCalled();
     });
 
-    it('revokes the object URL on unmount', async () => {
+    it('releases the cached picture when the note unmounts', async () => {
       mockReadCachedImage.mockResolvedValue(new Blob(['cached']));
 
       const { unmount } = render(
@@ -550,7 +554,9 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to load image')).toBeInTheDocument();
+        expect(screen.getByTestId('love-note-image-error')).toHaveTextContent(
+          'Failed to load image'
+        );
       });
 
       // No image button should exist when there's an error
@@ -567,11 +573,12 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={sendingMessage} isOwnMessage={true} senderName="You" />);
 
-      const sending = screen.getByText('Sending...');
+      const sending = screen.getByTestId('love-note-status');
+      expect(sending).toHaveTextContent('Sending...');
       expect(sending).toBeInTheDocument();
       expect(sending).toHaveAttribute('aria-live', 'polite');
       expect(sending).toHaveClass('text-muted');
-      const bubble = screen.getByTestId('love-note-message').querySelector('.rounded-\\[20px\\]');
+      const bubble = screen.getByTestId('love-note-bubble');
       expect(bubble).toHaveClass('bg-fill', 'text-white');
       expect(bubble).not.toHaveClass('opacity-70');
     });
@@ -586,10 +593,11 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={queuedMessage} isOwnMessage={true} senderName="You" />);
 
-      const waiting = screen.getByText('Waiting to send');
+      const waiting = screen.getByTestId('love-note-status');
+      expect(waiting).toHaveTextContent('Waiting to send');
       expect(waiting).toHaveAttribute('aria-live', 'polite');
       expect(waiting).toHaveClass('text-muted');
-      expect(screen.queryByText('Sending...')).not.toBeInTheDocument();
+      expect(waiting).not.toHaveTextContent('Sending...');
       expect(screen.queryByRole('button', { name: 'Retry sending message' })).not.toBeInTheDocument();
     });
 
@@ -598,8 +606,9 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={sendingQueued} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText('Sending...')).toBeInTheDocument();
-      expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
+      const status = screen.getByTestId('love-note-status');
+      expect(status).toHaveTextContent('Sending...');
+      expect(status).not.toHaveTextContent('Waiting to send');
     });
 
     it('should show only Retry for a failed queued note', () => {
@@ -614,7 +623,7 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={failedQueued} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByRole('button', { name: 'Retry sending message' })).toBeInTheDocument();
-      expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('love-note-status')).not.toBeInTheDocument();
     });
 
     it('should not show sending indicator when image is uploading', () => {
@@ -628,8 +637,8 @@ describe('LoveNoteMessage', () => {
       render(<LoveNoteMessage message={uploadingMessage} isOwnMessage={true} senderName="You" />);
 
       // Should show "Uploading..." not "Sending..."
-      expect(screen.getByText('Uploading...')).toBeInTheDocument();
-      expect(screen.queryByText('Sending...')).not.toBeInTheDocument();
+      expect(screen.getByTestId('love-note-image-uploading')).toHaveTextContent('Uploading...');
+      expect(screen.queryByTestId('love-note-status')).not.toBeInTheDocument();
     });
 
     it('should show error state with retry button', () => {
@@ -641,15 +650,15 @@ describe('LoveNoteMessage', () => {
 
       render(<LoveNoteMessage message={failedMessage} isOwnMessage={true} senderName="You" />);
 
-      expect(screen.getByText(/Failed to send/)).toBeInTheDocument();
-      const retry = screen.getByRole('button', { name: /retry/i });
+      const retry = screen.getByRole('button', { name: 'Retry sending message' });
+      expect(retry).toHaveTextContent(/Failed to send/);
       expect(retry).toBeInTheDocument();
       expect(retry).toHaveClass('text-danger');
-      const bubble = screen.getByTestId('love-note-message').querySelector('.rounded-\\[20px\\]');
+      const bubble = screen.getByTestId('love-note-bubble');
       expect(bubble).toHaveClass('outline-2', 'outline-offset-2', 'outline-danger');
     });
 
-    it('should call onRetry when retry button clicked', async () => {
+    it('retries the failed note by its temp id when Retry is tapped', async () => {
       const user = userEvent.setup();
       const onRetry = vi.fn();
       const failedMessage: LoveNote = {
@@ -706,7 +715,7 @@ describe('LoveNoteMessage', () => {
   });
 
   describe('Accessibility', () => {
-    it('should have proper aria-label with sender and time', () => {
+    it('names the note by its sender and time for screen readers', () => {
       render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
       const messageContainer = screen.getByRole('listitem');
@@ -730,7 +739,7 @@ describe('LoveNoteMessage', () => {
   });
 
   describe('Memory Leak Prevention', () => {
-    it('should not update state after unmount during signed URL fetch', async () => {
+    it('ignores a signed URL that arrives after unmount', async () => {
       // Create a deferred promise we can control
       const signedUrl = deferred<{ url: string; expiresAt: number }>();
       mockGetSignedImageUrl.mockReturnValue(signedUrl.promise);
@@ -765,7 +774,7 @@ describe('LoveNoteMessage', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should not update state after unmount during error retry', async () => {
+    it('ignores a retried signed URL that arrives after unmount', async () => {
       // First call succeeds to load the image
       mockGetSignedImageUrl.mockResolvedValueOnce({
         url: 'https://storage.example.com/signed.jpg',
@@ -812,7 +821,7 @@ describe('LoveNoteMessage', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should not update state after unmount when fetch fails', async () => {
+    it('logs but ignores a signed-URL failure that settles after unmount', async () => {
       // Create a deferred rejection
       const signedUrl = deferred<{ url: string; expiresAt: number }>();
       mockGetSignedImageUrl.mockReturnValue(signedUrl.promise);

@@ -963,6 +963,7 @@ function EventForm({
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
         className={`${DIALOG_PANEL} max-w-md`}
+        data-testid="events-form-panel"
       >
         <div className="mb-5 flex items-center justify-between gap-3">
           <h3 id={titleId} className={DIALOG_TITLE}>
@@ -980,7 +981,12 @@ function EventForm({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4"
+          noValidate
+          data-testid="events-form-element"
+        >
           {/* Label */}
           <div>
             <label
@@ -1336,6 +1342,7 @@ function EventDeleteConfirmation({
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
         className={`${DIALOG_PANEL} max-w-sm`}
+        data-testid="events-delete-panel"
       >
         <div className="mb-2 flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dtint text-danger">

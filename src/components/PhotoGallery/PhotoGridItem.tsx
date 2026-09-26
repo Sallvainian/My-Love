@@ -97,7 +97,10 @@ export function PhotoGridItem({
     >
       {/* AC-6.3.6: Blur placeholder while loading */}
       {!isLoaded && isVisible && !notSaved && (
-        <div className="absolute inset-0 animate-pulse bg-card2" />
+        <div
+          className="absolute inset-0 animate-pulse bg-card2"
+          data-testid="photo-grid-item-loading"
+        />
       )}
 
       {/* The photo is listed, but its image is not on this device */}
@@ -134,8 +137,10 @@ export function PhotoGridItem({
         }`}
         data-testid="photo-grid-item-owner-badge"
       >
-        <span aria-hidden="true">{photo.isOwn ? ownInitial : partnerInitial}</span>
-        <span id={ownerTextId} className="sr-only">
+        <span aria-hidden="true" data-testid="photo-grid-item-owner-initial">
+          {photo.isOwn ? ownInitial : partnerInitial}
+        </span>
+        <span id={ownerTextId} className="sr-only" data-testid="photo-grid-item-owner-text">
           {photo.isOwn ? 'Uploaded by you' : `Uploaded by ${partnerName ?? 'your partner'}`}
         </span>
       </div>

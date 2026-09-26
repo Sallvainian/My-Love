@@ -155,6 +155,25 @@ async function activateHistory(user: UserEvent) {
   return button;
 }
 
+/** Renders the section with a history page that stays pending until settled. */
+async function startHistoryLoad() {
+  const user = userEvent.setup();
+  const pending = deferredLoad();
+  const loadMoreEvents = vi.fn(() => startPendingHistory(pending));
+  setStore({ loadMoreEvents });
+  await renderSection();
+  return { user, pending, loadMoreEvents };
+}
+
+/** Lands the last history page: a deep own row, the own row, and a partner row. */
+async function settleDeepPage(pending: ReturnType<typeof deferredLoad>) {
+  const deep = { ...makeEvent('deep'), date: new Date(1999, 11, 31) };
+  await settleHistory(pending, loadOk, {
+    events: [deep, makeEvent(), makeEvent('partner', 'user-partner')],
+    eventsPagination: pagination(false, false),
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   setStore();
@@ -171,7 +190,7 @@ describe('EventsSettings explicit history', () => {
     { upcoming: true, past: false, more: true, notice: HISTORY_NOTICE },
     { upcoming: false, past: true, more: true, notice: HISTORY_NOTICE },
     { upcoming: true, past: true, more: true, notice: HISTORY_NOTICE },
-  ])('uses raw continuation flags: upcoming=$upcoming, past=$past', async ({ upcoming, past, more, notice }) => {
+  ])('offers Load more history only when either direction has more: upcoming=$upcoming, past=$past', async ({ upcoming, past, more, notice }) => {
     const loadMoreEvents = vi.fn(async () => loadOk);
     setStore({ eventsPagination: pagination(upcoming, past), loadMoreEvents });
     await renderSection();
@@ -193,43 +212,63 @@ describe('EventsSettings explicit history', () => {
     expect(screen.getByTestId('events-settings-empty')).toHaveTextContent(
       'No events to display in this part of your history.'
     );
-    expect(screen.queryByText(/No events yet/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('events-settings-empty')).not.toHaveTextContent(/No events yet/);
     expect(screen.getByRole('button', { name: 'Load more history' })).toBeEnabled();
   });
 
-  it('keeps loaded rows while busy, blocks duplicates, and makes a deep own row editable', async () => {
-    const user = userEvent.setup();
-    const pending = deferredLoad();
-    const loadMoreEvents = vi.fn(() => startPendingHistory(pending));
-    setStore({ loadMoreEvents });
-    await renderSection();
+  it('exposes the history status as a polite, atomic status region', async () => {
+    await startHistoryLoad();
+
     const status = screen.getByTestId('events-settings-history-status');
     expect(status).toHaveAttribute('role', 'status');
     expect(status).toHaveAttribute('aria-live', 'polite');
     expect(status).toHaveAttribute('aria-atomic', 'true');
+  });
+
+  it('keeps loaded rows on screen while a history page loads', async () => {
+    const { user } = await startHistoryLoad();
+    const status = screen.getByTestId('events-settings-history-status');
+
     const button = await activateHistory(user);
     expect(button).toHaveAccessibleName('Loading history…');
     expect(button).toBeDisabled();
     expect(status).toHaveTextContent('Loading history…');
     expect(screen.getByTestId('events-settings-load-region')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
+  });
+
+  it('blocks a duplicate history request while one is in flight', async () => {
+    const { user, loadMoreEvents } = await startHistoryLoad();
+
+    const button = await activateHistory(user);
     await user.click(button);
     expect(loadMoreEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it('parks focus on the header Add and announces exhaustion when the last page lands', async () => {
+    const { user, pending } = await startHistoryLoad();
+    const status = screen.getByTestId('events-settings-history-status');
+    await activateHistory(user);
     // happy-dom refuses to blur disabled controls; reproduce Chromium's body
     // focus explicitly after the focused history control becomes disabled.
     document.body.focus();
     expect(document.body).toHaveFocus();
 
-    const deep = { ...makeEvent('deep'), date: new Date(1999, 11, 31) };
-    await settleHistory(pending, loadOk, {
-      events: [deep, makeEvent(), makeEvent('partner', 'user-partner')],
-      eventsPagination: pagination(false, false),
-    });
+    await settleDeepPage(pending);
 
     expect(screen.getByTestId('events-settings-load-region')).toHaveAttribute('aria-busy', 'false');
     expect(screen.queryByTestId('events-settings-load-more')).not.toBeInTheDocument();
     expect(screen.getByTestId('events-settings-add')).toHaveFocus();
     expect(status).toHaveTextContent('3 events loaded. No more history to load.');
+  });
+
+  it('makes a deep own row from history editable, but not a partner row', async () => {
+    const { user, pending } = await startHistoryLoad();
+    await activateHistory(user);
+
+    await settleDeepPage(pending);
+
+    expect(screen.getByTestId('event-row-partner')).toBeInTheDocument();
     expect(screen.queryByTestId('event-edit-partner')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Edit Event deep' }));
     expect(screen.getByTestId('events-form-date')).toHaveValue('1999-12-31');

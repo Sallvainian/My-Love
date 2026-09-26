@@ -173,6 +173,7 @@ function AnniversaryCard({ countdown, isCelebrating }: AnniversaryCardProps) {
         value={celebrating ? 'Today!' : formatDayCount(remaining.days)}
         trailing={celebrating ? undefined : formatCountdownClock(remaining)}
         description={anniversary.description}
+        testId={`anniversary-countdown-${anniversary.id}`}
       />
 
       {/* Celebration Animation, over the card and clipped to its corners */}

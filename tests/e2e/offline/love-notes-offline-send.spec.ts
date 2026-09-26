@@ -107,7 +107,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Love-note text sent offline', () => {
-  test('three notes sent offline survive a reload and reach the partner once each, in order', async ({
+  test('[P1] three notes sent offline survive a reload and reach the partner once each, in order', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,

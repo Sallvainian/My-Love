@@ -354,6 +354,33 @@ async function sendThreeOffline(store: Store) {
   await store.getState().drainQueuedNotes();
 }
 
+/**
+ * The three notes of `sendThreeOffline` were delivered: each sent once, in
+ * order, under its own key, then shown, saved to the copy, removed from the
+ * queue and broadcast.
+ */
+async function expectQueueDeliveredOnceInOrder(store: Store, keys: (string | undefined)[]) {
+  expect(server.rows.map((r) => [r.content, r.idempotency_key])).toEqual([
+    ['one', keys[0]],
+    ['two', keys[1]],
+    ['three', keys[2]],
+  ]);
+  expect(server.upserts).toBe(3);
+  expect(store.getState().notes.map((n) => n.id)).toEqual(['server-1', 'server-2', 'server-3']);
+  expect(store.getState().notes.every((n) => !n.queued && !n.sending && !n.error)).toBe(true);
+  // The drain saves the copy without awaiting it.
+  await vi.waitFor(async () => expect(await copyIds()).toEqual(['server-1', 'server-2', 'server-3']));
+  expect(await queuedIds()).toEqual([]);
+  expect(sendEphemeralBroadcast.mock.calls.map(([topic, , payload]) => [
+    topic,
+    (payload as { message: Row }).message.content,
+  ])).toEqual([
+    [`love-notes:${PARTNER}`, 'one'],
+    [`love-notes:${PARTNER}`, 'two'],
+    [`love-notes:${PARTNER}`, 'three'],
+  ]);
+}
+
 describe('notesSlice offline send queue', () => {
   beforeEach(async () => {
     await clearStores();
@@ -400,25 +427,7 @@ describe('notesSlice offline send queue', () => {
     setOnline(true);
     await store.getState().drainQueuedNotes();
 
-    expect(server.rows.map((r) => [r.content, r.idempotency_key])).toEqual([
-      ['one', keys[0]],
-      ['two', keys[1]],
-      ['three', keys[2]],
-    ]);
-    expect(server.upserts).toBe(3);
-    expect(store.getState().notes.map((n) => n.id)).toEqual(['server-1', 'server-2', 'server-3']);
-    expect(store.getState().notes.every((n) => !n.queued && !n.sending && !n.error)).toBe(true);
-    // The drain saves the copy without awaiting it.
-    await vi.waitFor(async () => expect(await copyIds()).toEqual(['server-1', 'server-2', 'server-3']));
-    expect(await queuedIds()).toEqual([]);
-    expect(sendEphemeralBroadcast.mock.calls.map(([topic, , payload]) => [
-      topic,
-      (payload as { message: Row }).message.content,
-    ])).toEqual([
-      [`love-notes:${PARTNER}`, 'one'],
-      [`love-notes:${PARTNER}`, 'two'],
-      [`love-notes:${PARTNER}`, 'three'],
-    ]);
+    await expectQueueDeliveredOnceInOrder(store, keys);
   });
 
   it('a queued note is sent with its composition time as written_at, and keeps it in state and copy', async () => {
@@ -769,7 +778,8 @@ describe('notesSlice offline send queue', () => {
     expect(store.getState().notes.map((n) => n.id)).toEqual(['server-1', 'server-2', 'server-3']);
   });
 
-  it('server rejection: the note is marked failed with the banner, later notes still send, and Retry resends under the same key', async () => {
+  /** Queues three notes offline, reconnects, and has the server reject the first with CHECK. */
+  async function rejectFirstOfThree() {
     const store = createTestStore();
     await sendThreeOffline(store);
     const failedKey = store.getState().notes[0].tempId!;
@@ -777,15 +787,32 @@ describe('notesSlice offline send queue', () => {
     server.outcomes = [{ reject: '23514' }];
 
     await store.getState().drainQueuedNotes();
+    return { store, failedKey };
+  }
 
-    expect(server.rows.map((r) => r.content)).toEqual(['two', 'three']);
+  it('server rejection: the note and its queue row are marked failed, with the banner', async () => {
+    const { store, failedKey } = await rejectFirstOfThree();
+
     expect(store.getState().notes[0]).toMatchObject({ tempId: failedKey, error: true, sending: false, queued: true });
     expect(store.getState().notesError).toBe(FRIENDLY_CHECK);
     expect(await listQueuedNotes(A)).toEqual([expect.objectContaining({ id: failedKey, failed: true })]);
+  });
 
-    // A later trigger does not resend a failed note.
+  it('server rejection: the notes after the rejected one still send', async () => {
+    await rejectFirstOfThree();
+
+    expect(server.rows.map((r) => r.content)).toEqual(['two', 'three']);
+  });
+
+  it('server rejection: a later trigger does not resend the failed note', async () => {
+    const { store } = await rejectFirstOfThree();
+
     await store.getState().drainQueuedNotes();
     expect(server.upserts).toBe(3);
+  });
+
+  it('server rejection: Retry resends under the same key and clears the failure', async () => {
+    const { store, failedKey } = await rejectFirstOfThree();
 
     await store.getState().retryFailedMessage(failedKey);
 
@@ -1464,7 +1491,11 @@ describe('notesSlice offline send queue', () => {
       expect(await queuedIds(A)).toEqual([]);
     });
 
-    it('a session change during the insert: the row is deleted, no state write, and the same account still broadcasts', async () => {
+    /**
+     * Holds a note's insert at the server while the same account signs out and
+     * back in, then lets the insert land. Returns the new session's notes list.
+     */
+    async function insertAcrossSameAccountRelogin() {
       const store = createTestStore();
       const reply = deferred();
       server.outcomes = [{ hold: reply.promise }];
@@ -1476,9 +1507,24 @@ describe('notesSlice offline send queue', () => {
       store.setState({ authSessionVersion: 2, notes: fresh });
       reply.resolve();
       await store.getState().drainQueuedNotes();
+      return { store, fresh };
+    }
+
+    it("a session change during the insert writes nothing into the new session's notes", async () => {
+      const { store, fresh } = await insertAcrossSameAccountRelogin();
 
       expect(store.getState().notes).toBe(fresh);
+    });
+
+    it('a session change during the insert still removes the sent row from the queue', async () => {
+      await insertAcrossSameAccountRelogin();
+
       expect(await queuedIds()).toEqual([]);
+    });
+
+    it('a session change during the insert still broadcasts for the same account', async () => {
+      await insertAcrossSameAccountRelogin();
+
       expect(sendEphemeralBroadcast).toHaveBeenCalledWith(`love-notes:${PARTNER}`, 'new_message', {
         message: expect.objectContaining({ content: 'in flight' }),
       });

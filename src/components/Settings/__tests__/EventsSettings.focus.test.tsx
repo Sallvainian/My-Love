@@ -329,14 +329,14 @@ describe('EventsSettings form focus', () => {
     await user.click(screen.getByTestId('events-form-submit'));
 
     await waitFor(() => expect(screen.getByTestId('events-form-error')).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByTestId('events-form-submit')).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByTestId('events-form-submit')).toBeEnabled());
     // The focus effect is passive-phase, so it can run after Save re-enables.
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-form-submit'))
     );
   });
 
-  it.each([
+  const UNCERTAIN_SAVES = [
     {
       kind: 'add',
       initialEvents: (): CoupleEvent[] => [],
@@ -353,13 +353,18 @@ describe('EventsSettings form focus', () => {
       openerSurvives: true,
       loadingAfterRefresh: false,
     },
-  ] as const)('focuses Refresh after an uncertain $kind and the header after reconciliation', async ({
+  ] as const;
+
+  /**
+   * Opens the form from the row's opener, submits a save whose response cannot
+   * be read, and waits for focus to land on Refresh. The reconciliation load it
+   * installs stays pending until `finishRefresh()` is called.
+   */
+  async function arrangeUncertainSave({
     initialEvents,
     writeAction,
     openerTestId,
-    openerSurvives,
-    loadingAfterRefresh,
-  }) => {
+  }: (typeof UNCERTAIN_SAVES)[number]) {
     const user = userEvent.setup();
     let finishRefresh!: () => void;
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
@@ -370,6 +375,7 @@ describe('EventsSettings form focus', () => {
       [writeAction]: uncertain,
     });
     await renderSection();
+    // Installed after the render: the mount load consumes the default.
     loadEvents.mockImplementationOnce(() => {
       store.patch({ eventsIsLoading: true, eventsError: null });
       return new Promise<EventLoadResult>((resolve) => {
@@ -390,27 +396,72 @@ describe('EventsSettings form focus', () => {
     await user.click(screen.getByTestId('events-form-submit'));
 
     await waitFor(() => expect(screen.getByTestId('events-form-refresh')).toHaveFocus());
+    // A closure: `finishRefresh` is only assigned once the reconciliation load runs.
+    return { user, loadEvents, uncertain, opener, finishRefresh: () => finishRefresh() };
+  }
+
+  /** Clicks Refresh on the uncertain-save form and waits for the form to close. */
+  async function reconcile(user: UserEvent) {
+    await user.click(screen.getByRole('button', { name: 'Refresh events' }));
+    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
+  }
+
+  it.each(UNCERTAIN_SAVES)('focuses an enabled Refresh after an uncertain $kind', async (save) => {
+    const { opener } = await arrangeUncertainSave(save);
+
     const refresh = screen.getByRole('button', { name: 'Refresh events' });
     expect(refresh).toBeEnabled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/may already have been saved/i);
-    await user.tab();
-    expect(screen.getByTestId('events-form-close')).toHaveFocus();
-    await user.tab({ shift: true });
-    expect(refresh).toHaveFocus();
     expect(opener.isConnected).toBe(true);
-    await user.click(refresh);
-
-    await waitFor(() => expect(screen.queryByTestId('events-form')).not.toBeInTheDocument());
-    expect(opener.isConnected).toBe(openerSurvives);
-    expect(Boolean(screen.queryByTestId('events-settings-loading'))).toBe(loadingAfterRefresh);
-    expect(screen.getByTestId('events-settings-add')).toHaveFocus();
-    expect(loadEvents).toHaveBeenCalledTimes(2);
-    await act(async () => { finishRefresh(); });
-    expect(screen.getByTestId('event-row-mine')).toHaveTextContent('Saved event');
-    expect(opener.isConnected).toBe(openerSurvives);
-    expect(screen.getByTestId('events-settings-add')).toHaveFocus();
-    expect(uncertain).toHaveBeenCalledTimes(1);
   });
+
+  it.each(UNCERTAIN_SAVES)('explains an uncertain $kind in an alert', async (save) => {
+    await arrangeUncertainSave(save);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/may already have been saved/i);
+  });
+
+  it.each(UNCERTAIN_SAVES)(
+    'wraps Tab between Refresh and Close after an uncertain $kind',
+    async (save) => {
+      const { user } = await arrangeUncertainSave(save);
+      const refresh = screen.getByRole('button', { name: 'Refresh events' });
+
+      await user.tab();
+      expect(screen.getByTestId('events-form-close')).toHaveFocus();
+      await user.tab({ shift: true });
+      expect(refresh).toHaveFocus();
+    }
+  );
+
+  it.each(UNCERTAIN_SAVES)(
+    'focuses the header Add after reconciling an uncertain $kind',
+    async (save) => {
+      const { user, opener, finishRefresh } = await arrangeUncertainSave(save);
+
+      await reconcile(user);
+      expect(opener.isConnected).toBe(save.openerSurvives);
+      expect(Boolean(screen.queryByTestId('events-settings-loading'))).toBe(
+        save.loadingAfterRefresh
+      );
+      expect(screen.getByTestId('events-settings-add')).toHaveFocus();
+      await act(async () => { finishRefresh(); });
+      expect(opener.isConnected).toBe(save.openerSurvives);
+      expect(screen.getByTestId('events-settings-add')).toHaveFocus();
+    }
+  );
+
+  it.each(UNCERTAIN_SAVES)(
+    'reloads once and shows the saved row after reconciling an uncertain $kind',
+    async (save) => {
+      const { user, loadEvents, uncertain, finishRefresh } = await arrangeUncertainSave(save);
+
+      await reconcile(user);
+      expect(loadEvents).toHaveBeenCalledTimes(2);
+      await act(async () => { finishRefresh(); });
+      expect(screen.getByTestId('event-row-mine')).toHaveTextContent('Saved event');
+      expect(uncertain).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('keeps focus on the header after refresh later removes the stale edit opener', async () => {
     const user = userEvent.setup();
@@ -549,7 +600,7 @@ describe('EventsSettings delete dialog focus', () => {
     await user.click(screen.getByTestId('events-delete-confirm'));
 
     await waitFor(() => expect(screen.getByTestId('events-delete-error')).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByTestId('events-delete-cancel')).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByTestId('events-delete-cancel')).toBeEnabled());
     // Same passive-phase race as the Save test above — poll, don't read.
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('events-delete-cancel'))

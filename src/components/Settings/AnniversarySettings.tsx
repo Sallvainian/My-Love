@@ -139,7 +139,12 @@ export function AnniversarySettings() {
                 <div className={ITEM_ROW}>
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <h4 className={ITEM_LABEL}>{anniversary.label}</h4>
-                    <p className={ITEM_META}>{formatAnniversaryDate(anniversary.date)}</p>
+                    <p
+                      className={ITEM_META}
+                      data-testid={`anniversary-row-date-${anniversary.id}`}
+                    >
+                      {formatAnniversaryDate(anniversary.date)}
+                    </p>
                     {anniversary.description && (
                       <p className={ITEM_META}>{anniversary.description}</p>
                     )}
@@ -315,6 +320,7 @@ function AnniversaryDeleteConfirmation({
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
         className={`${DIALOG_PANEL} max-w-sm`}
+        data-testid="anniversary-delete-panel"
       >
         <h3 id={titleId} className={`${DIALOG_TITLE} mb-2`}>Delete Anniversary?</h3>
         <p className="mb-5 text-[15px] text-ink">

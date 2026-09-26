@@ -102,7 +102,7 @@ async function localDateOf(page: Page, iso: string): Promise<string> {
 }
 
 test.describe('Couple start date from the local copy', () => {
-  test('the start date from one online session is shown when the server cannot be reached', async ({
+  test('[P1] the start date from one online session is shown when the server cannot be reached', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -166,7 +166,7 @@ test.describe('Couple start date from the local copy', () => {
     }
   });
 
-  test('an offline edit is refused with a needs-a-connection message and changes nothing', async ({
+  test('[P1] an offline edit is refused with a needs-a-connection message and changes nothing', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,

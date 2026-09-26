@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { openDB, unwrap } from 'idb';
+import { within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 import {
@@ -1028,11 +1029,7 @@ describe('dbSchema', () => {
     }
 
     async function clickDialogButton(dialog: HTMLElement, name: 'Reload' | 'Not now'): Promise<void> {
-      const button = [...dialog.querySelectorAll('button')].find(
-        (el) => el.textContent === name
-      );
-      expect(button).toBeDefined();
-      await user.click(button as HTMLButtonElement);
+      await user.click(within(dialog).getByRole('button', { name }));
     }
 
     it('shows a reload confirm and rejects the open when dismissed', async () => {
@@ -1215,7 +1212,7 @@ describe('dbSchema', () => {
   });
 
   describe('store indexes', () => {
-    it('should have correct indexes on core stores', async () => {
+    it('indexes messages by category and date but not by user, and moods by user and date', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
       });
@@ -1236,7 +1233,7 @@ describe('dbSchema', () => {
   });
 
   describe('STORE_NAMES constants', () => {
-    it('should have correct core store names', () => {
+    it('names the core stores messages, moods, sw-auth, local-copies, image-cache and note-queue', () => {
       expect(STORE_NAMES).toEqual({
         MESSAGES: 'messages',
         MOODS: 'moods',
@@ -1249,11 +1246,11 @@ describe('dbSchema', () => {
   });
 
   describe('DB constants', () => {
-    it('should export correct database name', () => {
+    it("names the database 'my-love-db'", () => {
       expect(DB_NAME).toBe('my-love-db');
     });
 
-    it('should export correct database version', () => {
+    it('is at schema version 15, after custom messages moved onto the message-data copy', () => {
       // v6 re-fires upgradeDb so profiles stranded at v5 by storage.ts's old
       // callback get their missing stores created; v7 swaps the moods index;
       // v8 adds by-user to messages; v9 stores favorites by account; v10 drops

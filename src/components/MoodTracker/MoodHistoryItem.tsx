@@ -55,7 +55,14 @@ export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
       <div className="flex shrink-0 gap-1 pt-0.5 text-accent" data-testid="mood-emoji">
         {allMoods.map((m, index) => {
           const Icon = MOOD_DISPLAY[m].icon;
-          return <Icon key={`${m}-${index}`} className="h-5 w-5" aria-hidden="true" />;
+          return (
+            <Icon
+              key={`${m}-${index}`}
+              className="h-5 w-5"
+              aria-hidden="true"
+              data-testid={`mood-icon-${m}`}
+            />
+          );
         })}
       </div>
 

@@ -28,7 +28,7 @@ describe('moodService', () => {
   });
 
   describe('create', () => {
-    it('creates a mood entry with correct fields', async () => {
+    it('creates an unsynced entry for the user with the mood as primary and a YYYY-MM-DD date', async () => {
       const entry = await moodService.create(userId, ['happy']);
       expect(entry.userId).toBe(userId);
       expect(entry.mood).toBe('happy');

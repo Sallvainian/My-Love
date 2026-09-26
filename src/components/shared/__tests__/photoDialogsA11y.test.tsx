@@ -136,7 +136,7 @@ describe('DW-180: the upload modal is a dialog', () => {
     expect(document.activeElement).toBe(screen.getByTestId('opener'));
   });
 
-  it('calls onClose on Escape', async () => {
+  it('closes on Escape', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     render(<PhotoUpload isOpen onClose={onClose} />);
@@ -233,7 +233,9 @@ describe('DW-180: the upload modal is a dialog', () => {
     await selectFile(user);
 
     await user.click(screen.getByTestId('photo-upload-submit-button'));
-    expect(await screen.findByText('This may take a moment')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Compressing & Saving...' })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('photo-upload-close')).toBeDisabled();
 
     // Pressed where focus is, which must be inside the trap for the key to

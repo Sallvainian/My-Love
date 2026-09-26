@@ -42,7 +42,8 @@ describe('AnniversarySettings date display', () => {
 
     render(<AnniversarySettings />);
 
-    expect(screen.getByText('November 26, 2025')).toBeInTheDocument();
-    expect(screen.queryByText('November 25, 2025')).toBeNull();
+    const shown = screen.getByTestId('anniversary-row-date-1');
+    expect(shown.textContent).toBe('November 26, 2025');
+    expect(shown).not.toHaveTextContent('November 25, 2025');
   });
 });

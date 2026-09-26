@@ -10,7 +10,7 @@
  * Settings") and activated under the configured runner by DW-30.
  *
  * Test-design IDs covered: DE.5-API-004, DE.5-API-005, DE.5-API-006, DE.5-API-007,
- * DE.5-API-008.
+ * DE.5-API-008. DE.5-API-004b and -008b are splits of -004 and -008, not new IDs.
  * The `API` level is an extension the story-5 ATDD run introduced on top of the
  * `DE.5-<LEVEL>-<SEQ>` convention fixed at
  * `_bmad-output/test-artifacts/test-design-epic-5.md:288-290` (which lists `DB`,
@@ -134,6 +134,7 @@ import {
 // Only the batch seeder: this factory module also exports a `clearPairEvents`,
 // with a different signature from the helpers' one imported above.
 import { seedEvents } from '../support/factories/events';
+import type { TypedSupabaseClient } from '../support/factories';
 
 /**
  * The `public.events` row exactly as PostgREST returns it. Columns, nullability
@@ -167,6 +168,7 @@ type PostgrestErrorBody = {
 
 const ANON_ATTEMPT_LABEL = 'Events Wire Anon Attempt';
 const DEFAULTS_LABEL = 'Events Wire Defaults Probe';
+const SCHEMA_PROBE_LABEL = 'Events Wire Schema Probe';
 const BOUNDARY_PREFIX = 'Events Wire Boundary ';
 const OVERLONG_PREFIX = 'Events Wire Overlong ';
 
@@ -185,6 +187,59 @@ const ORDER_PARTNER_LAST = 'Events Wire Order Partner Last';
 /** DE.5-API-008 fixtures — one row on each half of the pair. */
 const OUTSIDER_CREATOR_LABEL = 'Events Wire Outsider Creator Row';
 const OUTSIDER_PARTNER_LABEL = 'Events Wire Outsider Partner Row';
+
+/** DE.5-API-008b fixtures — the pair rows the shared teardown must clear. */
+const TEARDOWN_CREATOR_LABEL = 'Events Wire Teardown Creator Row';
+const TEARDOWN_PARTNER_LABEL = 'Events Wire Teardown Partner Row';
+
+type Outsider = Awaited<ReturnType<typeof createOutsiderClient>>;
+
+/**
+ * Run `body` with a throwaway, unlinked account of its own, and delete that
+ * account afterwards even when `body` throws. Its rows cascade on the delete
+ * (`events.user_id … on delete cascade`).
+ */
+async function withOutsider(
+  supabaseAdmin: TypedSupabaseClient,
+  emailPrefix: string,
+  body: (outsider: Outsider) => Promise<void>
+): Promise<void> {
+  const outsider = await createOutsiderClient(supabaseAdmin, emailPrefix);
+  let testFailure: unknown;
+  let testFailed = false;
+  let cleanupFailure: Error | null = null;
+
+  try {
+    await body(outsider);
+  } catch (error) {
+    testFailed = true;
+    testFailure = error;
+  } finally {
+    // Always, even on failure: the account exists in auth.users until this runs.
+    try {
+      const { error: cleanupError } = await outsider.cleanup();
+      if (cleanupError) {
+        cleanupFailure = new Error(
+          `Failed to clean up outsider account ${outsider.userId}: ${cleanupError.message}`
+        );
+      }
+    } catch (error) {
+      cleanupFailure =
+        error instanceof Error
+          ? error
+          : new Error(`Outsider account cleanup rejected with: ${String(error)}`);
+    }
+  }
+
+  if (testFailed && cleanupFailure) {
+    throw new AggregateError(
+      [testFailure, cleanupFailure],
+      'The outsider test and its account cleanup both failed'
+    );
+  }
+  if (cleanupFailure) throw cleanupFailure;
+  if (testFailed) throw testFailure;
+}
 
 test.describe('Events wire contract over PostgREST — story 5', () => {
   // Scoped to this worker's own pair, and checked. Runs even when a test throws
@@ -364,6 +419,51 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     expect(body[0].user_id).toBe(userId);
     expect(body[0].label).toBe(DEFAULTS_LABEL);
 
+    // THEN: the stored value is the same string, read back independently
+    await log.step('Confirm the stored date is the same string, not a shifted one');
+    const { data: storedRow, error: storedError } = await supabaseAdmin
+      .from('events')
+      .select('event_date, icon, description')
+      .eq('id', body[0].id)
+      .single();
+
+    expect(storedError).toBeNull();
+    expect(storedRow?.event_date).toBe(EXACT_EVENT_DATE);
+    expect(storedRow?.icon).toBe('calendar');
+    expect(storedRow?.description).toBeNull();
+  });
+
+  // ==========================================================================
+  // DE.5-API-004b [P1]
+  // The test-local schema itself, checked against the real representation, so
+  // a schema that accepted anything could not pass the validations above.
+  // ==========================================================================
+  test('[P1] DE.5-API-004b the test-local EventRow schema accepts the real representation and rejects an undeclared column', async ({
+    apiRequest,
+    supabaseAdmin,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+    await log.step('Sign in as the creator and POST an event with return=representation');
+    const creatorToken = await getUserAccessToken(supabaseAdmin, userId);
+    const { status, body } = await apiRequest<EventRow[]>({
+      method: 'POST',
+      path: '/rest/v1/events',
+      headers: {
+        Authorization: `Bearer ${creatorToken}`,
+        Prefer: 'return=representation',
+      },
+      body: {
+        user_id: userId,
+        label: SCHEMA_PROBE_LABEL,
+        event_date: isoDateDaysFromNow(30),
+      },
+    }).validateSchema<z.infer<typeof EventRowsSchema>>(EventRowsSchema);
+
+    // Premise: a real row came back to serve as the valid control.
+    expect(status).toBe(201);
+
     // Use the real representation as the valid control for both shared schemas.
     // Adding one undeclared column must fail specifically for that unknown key.
     expect(EventRowSchema.safeParse(body[0]).success).toBe(true);
@@ -381,19 +481,6 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     expect(arrayWithExtraColumn.error?.issues).toEqual([
       expect.objectContaining({ code: 'unrecognized_keys', keys: ['unexpected_column'], path: [0] }),
     ]);
-
-    // THEN: the stored value is the same string, read back independently
-    await log.step('Confirm the stored date is the same string, not a shifted one');
-    const { data: storedRow, error: storedError } = await supabaseAdmin
-      .from('events')
-      .select('event_date, icon, description')
-      .eq('id', body[0].id)
-      .single();
-
-    expect(storedError).toBeNull();
-    expect(storedRow?.event_date).toBe(EXACT_EVENT_DATE);
-    expect(storedRow?.icon).toBe('calendar');
-    expect(storedRow?.description).toBeNull();
   });
 
   // ==========================================================================
@@ -561,12 +648,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     // A throwaway account of its own, never a pool account belonging to another
     // worker. It is linked to nobody, which is the whole point: it is exactly
     // the caller `get_my_partner_id()` returns NULL for.
-    const outsider = await createOutsiderClient(supabaseAdmin, 'events-wire-outsider');
-    let testFailure: unknown;
-    let testFailed = false;
-    let cleanupFailure: Error | null = null;
-
-    try {
+    await withOutsider(supabaseAdmin, 'events-wire-outsider', async (outsider) => {
       // GIVEN (positive control): the same endpoint does serve the creator both rows,
       // so an empty outsider read cannot be a dead endpoint masquerading as RLS.
       await log.step('Positive control: the creator can see both rows over the same endpoint');
@@ -615,7 +697,36 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
 
       expect(stillError).toBeNull();
       expect(stillThere).toHaveLength(2);
+    });
+  });
 
+  // ==========================================================================
+  // DE.5-API-008b [P1]
+  // The shared afterEach teardown, scoped to this worker's pair: it must clear
+  // the couple's rows and leave a non-pool user's row alone.
+  // ==========================================================================
+  test('[P1] DE.5-API-008b the shared pair teardown deletes this pair\'s events and leaves an outsider\'s row', async ({
+    supabaseAdmin,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+    // GIVEN: one event on each half of the couple
+    const anchor = new Date();
+    await log.step('Seed one event on each half of the pair');
+    const seeded = await seedEvents(
+      supabaseAdmin,
+      { userId, partnerId },
+      [
+        { label: TEARDOWN_CREATOR_LABEL, dayOffset: 12 },
+        { owner: 'partner', label: TEARDOWN_PARTNER_LABEL, dayOffset: 18 },
+      ],
+      anchor
+    );
+
+    expect(seeded).toHaveLength(2);
+
+    await withOutsider(supabaseAdmin, 'events-wire-teardown-outsider', async (outsider) => {
       // The shared afterEach helper must remain scoped to this worker's pair.
       // Give a non-pool user a row, run the real helper, and prove that row
       // survives while the couple's two rows are cleared.
@@ -642,34 +753,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
       expect(outsiderRow?.id).toBe(outsiderEventId);
       expect(pairCountError).toBeNull();
       expect(remainingPairRows).toBe(0);
-    } catch (error) {
-      testFailed = true;
-      testFailure = error;
-    } finally {
-      // Always, even on failure: the account exists in auth.users until this runs.
-      try {
-        const { error: cleanupError } = await outsider.cleanup();
-        if (cleanupError) {
-          cleanupFailure = new Error(
-            `Failed to clean up outsider account ${outsider.userId}: ${cleanupError.message}`
-          );
-        }
-      } catch (error) {
-        cleanupFailure =
-          error instanceof Error
-            ? error
-            : new Error(`Outsider account cleanup rejected with: ${String(error)}`);
-      }
-    }
-
-    if (testFailed && cleanupFailure) {
-      throw new AggregateError(
-        [testFailure, cleanupFailure],
-        'The outsider test and its account cleanup both failed'
-      );
-    }
-    if (cleanupFailure) throw cleanupFailure;
-    if (testFailed) throw testFailure;
+    });
   });
 
   // ==========================================================================

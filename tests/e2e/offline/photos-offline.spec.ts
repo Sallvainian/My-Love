@@ -215,8 +215,41 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+/**
+ * Cap the `image-cache` store at `capacity` distinct entries: a put of a new
+ * entry past the cap throws a QuotaExceededError, and a delete frees a slot.
+ * Everything the script uses is declared inside it, because addInitScript
+ * serialises only the function.
+ */
+async function installImageCacheQuota(page: Page, capacity: number) {
+  await page.addInitScript((cap) => {
+    const held = new Set<string>();
+    const reserve = (id: string) => {
+      if (held.has(id)) return;
+      if (held.size >= cap) {
+        throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+      }
+      held.add(id);
+    };
+    const proto = IDBObjectStore.prototype;
+    const put = proto.put;
+    const remove = proto.delete;
+    proto.put = function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+      if (this.name === 'image-cache') {
+        const row = value as { userId: string; path: string };
+        reserve(JSON.stringify([row.userId, row.path]));
+      }
+      return put.call(this, value, key);
+    };
+    proto.delete = function (this: IDBObjectStore, query: IDBValidKey | IDBKeyRange) {
+      if (this.name === 'image-cache' && Array.isArray(query)) held.delete(JSON.stringify(query));
+      return remove.call(this, query);
+    };
+  }, capacity);
+}
+
 test.describe('Photos offline', () => {
-  test('after one online session every photo is listed and every image shows offline', async ({
+  test('[P1] after one online session every photo is listed and every image shows offline', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -283,37 +316,14 @@ test.describe('Photos offline', () => {
     }
   });
 
-  test('with storage refused, the oldest image is left out and shows a placeholder offline', async ({
+  test('[P1] with storage refused, the oldest image is left out and shows a placeholder offline', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
   }) => {
     // Refuse a third distinct image-cache entry, as a full browser would: the
     // write throws a QuotaExceededError. Deletes free a slot.
-    await page.addInitScript(() => {
-      const CAPACITY = 2;
-      const held = new Set<string>();
-      const proto = IDBObjectStore.prototype;
-      const put = proto.put;
-      const remove = proto.delete;
-      proto.put = function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
-        if (this.name === 'image-cache') {
-          const row = value as { userId: string; path: string };
-          const id = JSON.stringify([row.userId, row.path]);
-          if (!held.has(id)) {
-            if (held.size >= CAPACITY) {
-              throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
-            }
-            held.add(id);
-          }
-        }
-        return put.call(this, value, key);
-      };
-      proto.delete = function (this: IDBObjectStore, query: IDBValidKey | IDBKeyRange) {
-        if (this.name === 'image-cache' && Array.isArray(query)) held.delete(JSON.stringify(query));
-        return remove.call(this, query);
-      };
-    });
+    await installImageCacheQuota(page, 2);
 
     let seeded: SeededPhoto[] = [];
 

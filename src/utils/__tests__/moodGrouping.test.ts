@@ -33,7 +33,7 @@ describe('groupMoodsByDate', () => {
     vi.useRealTimers();
   });
 
-  it('groups moods by date correctly', () => {
+  it("groups today's moods apart from yesterday's, today first", () => {
     const moods: SupabaseMood[] = [
       moodAt('1', new Date(2026, 8, 25, 9), { note: 'Great day!' }),
       moodAt('2', new Date(2026, 8, 25, 11), { mood_type: 'content' }),
@@ -77,12 +77,12 @@ describe('groupMoodsByDate', () => {
     });
   });
 
-  it('handles empty mood array', () => {
+  it('returns no groups for no moods', () => {
     const groups = groupMoodsByDate([]);
     expect(groups).toHaveLength(0);
   });
 
-  it('handles multiple moods on the same day', () => {
+  it('keeps several moods from one day in a single group', () => {
     const moods: SupabaseMood[] = [
       moodAt('1', new Date(2026, 8, 25, 8), { note: 'Morning' }),
       moodAt('2', new Date(2026, 8, 25, 10), { mood_type: 'content', note: 'Mid-morning' }),

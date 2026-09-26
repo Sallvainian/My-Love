@@ -118,11 +118,15 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
 
       {/* File size info */}
       <div className="mt-1 flex items-center gap-2 text-xs text-muted">
-        <span>{formatFileSize(originalSize)}</span>
+        <span data-testid="image-preview-original-size">{formatFileSize(originalSize)}</span>
         <span>→</span>
-        <span className="text-good">~{formatFileSize(estimatedCompressedSize)}</span>
+        <span className="text-good" data-testid="image-preview-compressed-size">
+          ~{formatFileSize(estimatedCompressedSize)}
+        </span>
         {showCompressionIndicator && !isCompressing && (
-          <span className="text-muted">(large file)</span>
+          <span className="text-muted" data-testid="image-preview-large-file">
+            (large file)
+          </span>
         )}
       </div>
     </motion.div>

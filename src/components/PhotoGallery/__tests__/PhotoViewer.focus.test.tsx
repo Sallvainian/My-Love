@@ -9,7 +9,7 @@
  * Pinned here so the shared hook these five components depend on can be changed
  * with evidence rather than assumption.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -115,7 +115,7 @@ describe('PhotoViewer focus', () => {
     render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     await user.click(screen.getByLabelText('Delete photo'));
-    expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Delete Photo?' })).toBeInTheDocument();
 
     await user.keyboard('{ArrowRight}');
 
@@ -148,11 +148,11 @@ describe('PhotoViewer focus', () => {
     render(<PhotoViewer photos={[photo]} selectedPhotoId="photo-1" onClose={onClose} />);
 
     await user.click(screen.getByLabelText('Delete photo'));
-    expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Delete Photo?' })).toBeInTheDocument();
 
     await user.keyboard('{Escape}');
 
-    expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(screen.getByLabelText('Delete photo'));
 
@@ -177,7 +177,7 @@ describe('PhotoViewer focus', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('runs onClose exactly once per Escape when focus is inside the container', async () => {
+  it('closes the viewer only once per Escape press when focus is inside it', async () => {
     // The window fallback must stand down while the trap's listener can see the
     // key, or one Escape closes twice -- the double-call the fallback's guard
     // exists to prevent.
@@ -189,30 +189,58 @@ describe('PhotoViewer focus', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('deletes exactly one photo on a double-tap of Delete', async () => {
-    // A re-entered handleDeleteConfirm would send a second delete while the
-    // first is still in flight.
-    const user = userEvent.setup();
+  /** Open the delete confirmation for photo-2, with the delete held pending. */
+  async function openPendingDelete() {
     deletePhotoMock.mockClear();
     let resolveDelete!: (deleted: boolean) => void;
     deletePhotoMock.mockReturnValue(new Promise<boolean>((r) => (resolveDelete = r)));
     render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-2" onClose={vi.fn()} />);
+    const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Delete photo'));
-    const deleteButton = await screen.findByRole('button', { name: 'Delete' });
-    expect(deleteButton.querySelector('.animate-spin')).toBeNull();
+    return {
+      user,
+      deleteButton: await screen.findByRole('button', { name: 'Delete' }),
+      resolve: () => resolveDelete(true),
+    };
+  }
+
+  it('deletes exactly one photo on a double-tap of Delete', async () => {
+    // A re-entered handleDeleteConfirm would send a second delete while the
+    // first is still in flight.
+    const { user, deleteButton, resolve } = await openPendingDelete();
+    expect(
+      within(deleteButton).queryByTestId('photo-viewer-delete-spinner')
+    ).not.toBeInTheDocument();
     await user.dblClick(deleteButton);
 
     expect(deletePhotoMock).toHaveBeenCalledTimes(1);
     // The spinner shows while the delete is held pending.
-    expect(deleteButton.querySelector('.animate-spin')).not.toBeNull();
+    expect(within(deleteButton).getByTestId('photo-viewer-delete-spinner')).toHaveClass(
+      'animate-spin'
+    );
     expect(deletePhotoMock).toHaveBeenCalledWith('photo-2');
-    // And the second tap had nothing to land on anyway. Cancel stays enabled
-    // as the trap's one focusable, but is inert mid-flight -- clicking it (or
-    // Escape) must not dismiss the dialog while the request is pending, or the
-    // stuck isDeletingRef swallows the next Delete and the pending finally
-    // closes whatever confirmation is open by then.
+    // And the second tap had nothing to land on anyway.
     expect(deleteButton).toBeDisabled();
+
+    resolve();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
+    });
+    deletePhotoMock.mockReset();
+  });
+
+  it('keeps the confirmation open when Cancel or Escape is pressed while the delete is pending', async () => {
+    const { user, deleteButton, resolve } = await openPendingDelete();
+    await user.click(deleteButton);
+    expect(deletePhotoMock).toHaveBeenCalledTimes(1);
+    expect(deleteButton).toBeDisabled();
+
+    // Cancel stays enabled as the trap's one focusable, but is inert
+    // mid-flight -- clicking it (or Escape) must not dismiss the dialog while
+    // the request is pending, or the stuck isDeletingRef swallows the next
+    // Delete and the pending finally closes whatever confirmation is open by
+    // then.
     const cancel = screen.getByRole('button', { name: 'Cancel' });
     expect(cancel).not.toBeDisabled();
     await user.click(cancel);
@@ -220,11 +248,11 @@ describe('PhotoViewer focus', () => {
     // Escape handler receives it.
     expect(document.activeElement).toBe(cancel);
     await user.keyboard('{Escape}');
-    expect(screen.getByText('Delete Photo?')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Delete Photo?' })).toBeInTheDocument();
 
-    resolveDelete(true);
+    resolve();
     await waitFor(() => {
-      expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
     });
     deletePhotoMock.mockReset();
   });
@@ -240,7 +268,7 @@ describe('PhotoViewer focus', () => {
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
-      expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
     });
     const overlay = screen.getByTestId('photo-viewer-overlay');
     expect(overlay.contains(document.activeElement)).toBe(true);
@@ -257,7 +285,7 @@ describe('PhotoViewer focus', () => {
     render(<PhotoViewer photos={TWO_PHOTOS} selectedPhotoId="photo-1" onClose={vi.fn()} />);
 
     await user.click(screen.getByLabelText('Delete photo'));
-    expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Delete Photo?' })).toBeInTheDocument();
 
     expect(screen.getByLabelText('Delete photo')).toBeDisabled();
     expect(screen.getByLabelText('Close viewer')).toBeDisabled();
@@ -335,7 +363,7 @@ describe('PhotoViewer failed delete', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
-      expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
     });
     expect(screen.queryByTestId('photo-viewer-delete-error')).not.toBeInTheDocument();
     expect(deletePhotoMock).toHaveBeenLastCalledWith('photo-1');
@@ -354,13 +382,13 @@ describe('PhotoViewer failed delete', () => {
     expect(await screen.findByTestId('photo-viewer-delete-error')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
     await waitFor(() => {
       expect(document.activeElement).toBe(screen.getByLabelText('Delete photo'));
     });
 
     await user.click(screen.getByLabelText('Delete photo'));
-    expect(await screen.findByText('Delete Photo?')).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Delete Photo?' })).toBeInTheDocument();
     expect(screen.queryByTestId('photo-viewer-delete-error')).not.toBeInTheDocument();
     deletePhotoMock.mockReset();
   });

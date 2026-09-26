@@ -43,7 +43,7 @@ describe('InteractionHistory loading state', () => {
 
     expect(storeMocks.loadInteractionHistory).toHaveBeenCalledWith(HISTORY_PAGE_SIZE);
     expect(screen.getByTestId('interaction-recent-1')).toBeInTheDocument();
-    expect(screen.queryByText('Loading interactions...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('interaction-history-loading')).not.toBeInTheDocument();
   });
 
   it('shows the loading state while the refresh is in flight with an empty list', () => {
@@ -51,7 +51,9 @@ describe('InteractionHistory loading state', () => {
 
     render(<InteractionHistory isOpen onClose={() => {}} />);
 
-    expect(screen.getByText('Loading interactions...')).toBeInTheDocument();
-    expect(screen.queryByText('No interactions yet')).not.toBeInTheDocument();
+    expect(screen.getByTestId('interaction-history-loading')).toHaveTextContent(
+      'Loading interactions...'
+    );
+    expect(screen.queryByTestId('interaction-history-empty')).not.toBeInTheDocument();
   });
 });

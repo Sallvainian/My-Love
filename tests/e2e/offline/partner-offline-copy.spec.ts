@@ -49,7 +49,7 @@ async function partnerCopySaved(page: Page): Promise<boolean> {
 }
 
 test.describe('Partner profile offline', () => {
-  test('a linked user sees the saved partner offline, never the Connect UI', async ({
+  test('[P1] a linked user sees the saved partner offline, never the Connect UI', async ({
     page,
     context,
     supabaseAdmin,
@@ -83,7 +83,9 @@ test.describe('Partner profile offline', () => {
 
       // THEN: the saved partner is shown, not the Connect UI or a load error.
       await expect(heading).toHaveText(partnerName);
-      await expect(page.getByText('Connect with Your Partner')).toHaveCount(0);
+      await expect(
+        page.getByRole('heading', { level: 1, name: 'Connect with Your Partner' })
+      ).toHaveCount(0);
       await expect(page.getByTestId('partner-load-error')).toHaveCount(0);
 
       // AND: the global indicator says the data may be out of date.

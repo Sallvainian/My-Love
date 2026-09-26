@@ -89,12 +89,19 @@ function setupUser() {
 async function uploadToSuccess(user: UserEvent) {
   await selectFile(user);
   await user.click(screen.getByTestId('photo-upload-submit-button'));
-  // Not findByText: through the `jest` stub it would advance the faked clock and
+  // Not findBy*: through the `jest` stub it would advance the faked clock and
   // move the 3-second auto-close timer these tests measure. Flush promises instead.
-  for (let i = 0; i < 10 && !screen.queryByText('Photo uploaded successfully!'); i++) {
+  for (
+    let i = 0;
+    i < 10 && !screen.queryByRole('heading', { level: 3, name: 'Photo uploaded!' });
+    i++
+  ) {
     await act(async () => {});
   }
-  expect(screen.getByText('Photo uploaded successfully!')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 3, name: 'Photo uploaded!' })).toBeInTheDocument();
+  expect(screen.getByRole('dialog', { name: 'Upload Photo' })).toHaveTextContent(
+    'Photo uploaded successfully!'
+  );
 }
 
 beforeEach(() => {

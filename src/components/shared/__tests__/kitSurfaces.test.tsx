@@ -6,7 +6,7 @@
  * hex, gradient, `bg-white` or Tailwind palette class), which is what lets it
  * follow the OS theme.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement, forwardRef, type ComponentType, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -113,8 +113,10 @@ describe('SyncToast on the kit', () => {
     const toast = await screen.findByTestId('sync-toast');
     expect(toast).toHaveClass('bg-card', 'border-line', 'shadow-float', 'rounded-[20px]');
     expect(toast.className).toContain('top-[calc(5rem+env(safe-area-inset-top))]');
-    expect(toast.querySelector('svg')).toHaveClass(iconColor);
-    expect(screen.getByText(message)).toHaveClass('text-ink');
+    expect(within(toast).getByTestId('sync-toast-icon')).toHaveClass(iconColor);
+    const text = screen.getByTestId('sync-toast-message');
+    expect(text.textContent).toBe(message);
+    expect(text).toHaveClass('text-ink');
 
     const dismiss = screen.getByRole('button', { name: 'Dismiss notification' });
     expect(dismiss).toHaveClass('h-11', 'w-11', 'rounded-full', 'text-muted');
@@ -131,11 +133,14 @@ describe('NetworkStatusIndicator on the kit', () => {
     expect(indicator).toHaveAttribute('data-status', 'offline');
     expect(indicator).toHaveAttribute('role', 'status');
     expect(indicator).toHaveAttribute('aria-label', expect.stringContaining('Offline'));
-    const banner = indicator.firstElementChild!;
+    const banner = screen.getByTestId('network-status-banner');
+    expect(indicator).toContainElement(banner);
     expect(banner).toHaveClass('bg-card2', 'border-b', 'border-line');
-    expect(banner.querySelector('span')).toHaveClass('bg-muted');
-    expect(banner.querySelector('svg')).toHaveClass('text-muted');
-    expect(screen.getByText('Offline')).toHaveClass('text-ink');
+    expect(within(banner).getByTestId('network-status-dot')).toHaveClass('bg-muted');
+    expect(within(banner).getByTestId('network-status-icon')).toHaveClass('text-muted');
+    const label = screen.getByTestId('network-status-label');
+    expect(label).toHaveTextContent('Offline');
+    expect(label).toHaveClass('text-ink');
     expectOnKit(container.innerHTML);
   });
 
@@ -146,10 +151,14 @@ describe('NetworkStatusIndicator on the kit', () => {
 
     const indicator = screen.getByTestId('network-status-indicator');
     expect(indicator).toHaveAttribute('data-status', 'connecting');
-    const banner = indicator.firstElementChild!;
+    const banner = screen.getByTestId('network-status-banner');
+    expect(indicator).toContainElement(banner);
     expect(banner).toHaveClass('bg-card2', 'border-line');
-    expect(banner.querySelector('span')).toHaveClass('bg-accent');
-    expect(banner.querySelector('svg')).toHaveClass('text-accent', 'animate-spin');
+    expect(within(banner).getByTestId('network-status-dot')).toHaveClass('bg-accent');
+    expect(within(banner).getByTestId('network-status-icon')).toHaveClass(
+      'text-accent',
+      'animate-spin'
+    );
     expectOnKit(container.innerHTML);
   });
 
@@ -158,8 +167,8 @@ describe('NetworkStatusIndicator on the kit', () => {
 
     const indicator = screen.getByTestId('network-status-indicator');
     expect(indicator).toHaveAttribute('data-status', 'online');
-    expect(indicator.querySelector('span')).toHaveClass('bg-good');
-    expect(indicator.querySelector('svg')).toHaveClass('text-good');
+    expect(within(indicator).getByTestId('network-status-dot')).toHaveClass('bg-good');
+    expect(within(indicator).getByTestId('network-status-icon')).toHaveClass('text-good');
     expectOnKit(container.innerHTML);
   });
 });
@@ -174,11 +183,22 @@ describe('ErrorBoundary fallback on the kit', () => {
 
     const title = screen.getByRole('heading', { level: 1, name: 'Something went wrong' });
     expect(title).toHaveClass('text-lg', 'font-semibold', 'text-ink');
-    const card = title.parentElement!;
+    const card = screen.getByTestId('error-boundary-card');
+    expect(card).toContainElement(title);
     expect(card).toHaveClass('bg-card', 'border-line', 'shadow-card', 'rounded-[20px]', 'p-5');
-    expect(card.parentElement).toHaveClass('bg-page');
-    expect(card.firstElementChild).toHaveClass('h-10', 'w-10', 'rounded-xl', 'bg-tint', 'text-accent');
-    expect(screen.getByText('boom')).toHaveClass('bg-card2');
+    const fallback = screen.getByTestId('error-boundary-fallback');
+    expect(fallback).toHaveClass('bg-page');
+    expect(fallback).toContainElement(card);
+    expect(screen.getByTestId('error-boundary-icon')).toHaveClass(
+      'h-10',
+      'w-10',
+      'rounded-xl',
+      'bg-tint',
+      'text-accent'
+    );
+    const message = screen.getByTestId('error-boundary-message');
+    expect(message.textContent).toBe('boom');
+    expect(message).toHaveClass('bg-card2');
     expect(screen.getByRole('button', { name: 'Try Again' })).toHaveClass('bg-fill');
     expect(screen.queryByRole('button', { name: 'Clear Storage & Reload' })).not.toBeInTheDocument();
     expectOnKit(container.innerHTML);
@@ -212,7 +232,7 @@ describe('ErrorBoundary fallback on the kit', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Something went wrong' })).toBeInTheDocument();
-    expect(screen.getByText(shown)).toBeInTheDocument();
+    expect(screen.getByTestId('error-boundary-message').textContent).toBe(shown);
   });
 
   // DW-195: a long message scrolls inside its box, left-aligned, instead of
@@ -224,36 +244,52 @@ describe('ErrorBoundary fallback on the kit', () => {
       </ErrorBoundary>
     );
 
-    expect(screen.getByText('boom')).toHaveClass('max-h-24', 'overflow-auto', 'text-left');
+    const message = screen.getByTestId('error-boundary-message');
+    expect(message.textContent).toBe('boom');
+    expect(message).toHaveClass('max-h-24', 'overflow-auto', 'text-left');
   });
 });
 
 describe('ViewErrorBoundary fallback on the kit', () => {
-  it('renders the view error on a kit card with primary Try Again and secondary Go Home', async () => {
-    const user = userEvent.setup();
-    const onNavigateHome = vi.fn();
+  function renderViewError(onNavigateHome = vi.fn()) {
     const { container } = render(
       <ViewErrorBoundary viewName="photos" onNavigateHome={onNavigateHome}>
         <Thrower error={new Error('render failed')} />
       </ViewErrorBoundary>
     );
+    return { container, onNavigateHome };
+  }
+
+  it('renders the view error on a kit card with primary Try Again and secondary Go Home', () => {
+    const { container } = renderViewError();
 
     const fallback = screen.getByTestId('view-error-boundary');
-    const card = fallback.firstElementChild!;
+    const card = screen.getByTestId('view-error-card');
+    expect(fallback).toContainElement(card);
     expect(card).toHaveClass('bg-card', 'border-line', 'shadow-card', 'rounded-[20px]', 'p-5');
-    expect(card.firstElementChild).toHaveClass('h-10', 'w-10', 'bg-tint', 'text-accent');
+    const icon = screen.getByTestId('view-error-icon');
+    expect(card).toContainElement(icon);
+    expect(icon).toHaveClass('h-10', 'w-10', 'bg-tint', 'text-accent');
     expect(screen.getByRole('heading', { level: 2, name: 'Error loading photos' })).toHaveClass(
       'text-lg',
       'font-semibold',
       'text-ink'
     );
-    expect(screen.getByText('render failed')).toHaveClass('bg-card2', 'wrap-break-word');
+    const message = screen.getByTestId('view-error-message');
+    expect(message.textContent).toBe('render failed');
+    expect(message).toHaveClass('bg-card2', 'wrap-break-word');
     expect(screen.getByTestId('error-try-again')).toHaveClass('bg-fill');
     const goHome = screen.getByTestId('error-go-home');
     expect(goHome).toHaveClass('bg-tint', 'text-accent');
-    await user.click(goHome);
-    expect(onNavigateHome).toHaveBeenCalledTimes(1);
     expectOnKit(container.innerHTML);
+  });
+
+  it('Go Home on the view error takes the person home', async () => {
+    const user = userEvent.setup();
+    const { onNavigateHome } = renderViewError();
+
+    await user.click(screen.getByTestId('error-go-home'));
+    expect(onNavigateHome).toHaveBeenCalledTimes(1);
   });
 
   it('renders the offline message for a chunk load failure', () => {
@@ -264,7 +300,10 @@ describe('ViewErrorBoundary fallback on the kit', () => {
     );
 
     expect(screen.getByRole('heading', { name: "Can't load this page offline" })).toBeInTheDocument();
-    expect(screen.queryByText('Failed to fetch dynamically imported module')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('view-error-message')).not.toBeInTheDocument();
+    expect(screen.getByTestId('view-error-boundary')).not.toHaveTextContent(
+      'Failed to fetch dynamically imported module'
+    );
     expectOnKit(container.innerHTML);
   });
 
@@ -280,35 +319,52 @@ describe('ViewErrorBoundary fallback on the kit', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Error loading photos' })).toBeInTheDocument();
-    expect(screen.getByText(shown)).toBeInTheDocument();
+    expect(screen.getByTestId('view-error-message').textContent).toBe(shown);
   });
 });
 
 describe('WelcomeSplash on the kit', () => {
-  it('renders a page ground, lucide heart rain, a kit card and a primary Continue', async () => {
-    const user = userEvent.setup();
-    const onContinue = vi.fn();
+  function renderSplash(onContinue = vi.fn()) {
     const { container } = render(<WelcomeSplash onContinue={onContinue} />);
+    return { container, onContinue };
+  }
+
+  it('renders a page ground, lucide heart rain, a kit card and a primary Continue', () => {
+    const { container } = renderSplash();
 
     const splash = screen.getByTestId('welcome-splash');
     expect(splash).toHaveClass('bg-page');
     const heading = screen.getByRole('heading', { level: 1, name: 'Welcome to Your App' });
     expect(heading).toHaveClass('font-serif', 'font-semibold', 'text-[30px]', 'text-ink');
-    const card = heading.parentElement!;
+    const card = screen.getByTestId('welcome-card');
+    expect(card).toContainElement(heading);
     expect(card).toHaveClass('bg-card', 'border-line', 'shadow-card', 'rounded-[20px]', 'p-5');
-    expect(heading.nextElementSibling).toHaveClass('text-[15px]', 'text-ink');
+    const caption = screen.getByTestId('welcome-caption');
+    expect(card).toContainElement(caption);
+    expect(caption).toHaveClass('text-[15px]', 'text-ink');
 
     // 15 falling hearts plus the big one, all lucide and all accent.
-    const rain = splash.firstElementChild!;
-    expect(rain.querySelectorAll('svg')).toHaveLength(15);
-    for (const drop of rain.children) expect(drop).toHaveClass('text-accent');
+    const rain = screen.getByTestId('welcome-heart-rain');
+    expect(splash).toContainElement(rain);
+    const drops = within(rain).getAllByTestId('welcome-heart-drop');
+    expect(drops).toHaveLength(15);
+    for (const drop of drops) {
+      expect(drop).toHaveClass('text-accent');
+      expect(within(drop).getByTestId('welcome-heart-drop-icon')).toBeInstanceOf(SVGSVGElement);
+    }
 
     const continueButton = screen.getByTestId('welcome-continue-button');
     expect(continueButton).toHaveClass('bg-fill', 'text-white', 'rounded-full');
-    expect(continueButton.querySelector('svg')).not.toBeNull();
-    await user.click(continueButton);
-    expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(within(continueButton).getByTestId('welcome-continue-icon')).toBeInTheDocument();
     expectOnKit(container.innerHTML);
+  });
+
+  it('Continue on the welcome splash continues once', async () => {
+    const user = userEvent.setup();
+    const { onContinue } = renderSplash();
+
+    await user.click(screen.getByTestId('welcome-continue-button'));
+    expect(onContinue).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -320,9 +376,13 @@ describe('DisplayNameSetup on the kit', () => {
     const dialog = screen.getByRole('dialog', { name: 'Welcome!' });
     expect(dialog).toHaveClass('bg-card', 'rounded-[20px]', 'max-w-md');
     expect(screen.getByRole('heading', { level: 2 })).toHaveClass('text-lg', 'font-semibold', 'text-ink');
-    expect(screen.getByText('What would you like to be called?')).toHaveClass('text-sm', 'text-muted');
+    const subtitle = screen.getByTestId('display-name-subtitle');
+    expect(subtitle).toHaveTextContent('What would you like to be called?');
+    expect(subtitle).toHaveClass('text-sm', 'text-muted');
     expect(screen.getByLabelText('Display Name')).toHaveClass('bg-field', 'h-12');
-    expect(screen.getByText('3-30 characters')).toHaveClass('text-[13px]', 'text-muted');
+    const hint = screen.getByTestId('display-name-hint');
+    expect(hint).toHaveTextContent('3-30 characters');
+    expect(hint).toHaveClass('text-[13px]', 'text-muted');
     const submit = screen.getByTestId('display-name-submit');
     expect(submit).toHaveClass('bg-fill', 'w-full');
     expect(screen.queryByTestId('display-name-cancel')).not.toBeInTheDocument();
@@ -342,12 +402,12 @@ describe('DisplayNameSetup on the kit', () => {
 
     expect(screen.getByTestId('display-name-cancel')).toHaveClass('bg-tint', 'text-accent');
     expect(screen.getByTestId('display-name-submit')).toHaveClass('bg-fill');
-    fireEvent.submit(container.querySelector('form')!); // raw submit: happy-dom applies minLength to the prefilled 2-char name and blocks a click-driven submit (a browser would not, as the value was never user-edited), so the component's own length check never runs
+    fireEvent.submit(screen.getByTestId('display-name-form')); // raw submit: happy-dom applies minLength to the prefilled 2-char name and blocks a click-driven submit (a browser would not, as the value was never user-edited), so the component's own length check never runs
 
     const error = screen.getByTestId('display-name-error');
     expect(error).toHaveAttribute('role', 'alert');
     expect(error).toHaveClass('bg-dtint', 'text-danger');
-    expect(error.querySelector('svg')).not.toBeNull();
+    expect(within(error).getByTestId('display-name-error-icon')).toBeInTheDocument();
     expectOnKit(container.innerHTML);
   });
 });

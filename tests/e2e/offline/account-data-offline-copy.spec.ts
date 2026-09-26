@@ -123,7 +123,7 @@ async function goOffline(page: Page, offline: boolean) {
 }
 
 test.describe('Account data from the local copy', () => {
-  test('an anniversary from one online session is shown when the server cannot be reached', async ({
+  test('[P1] an anniversary from one online session is shown when the server cannot be reached', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -155,7 +155,7 @@ test.describe('Account data from the local copy', () => {
       const loaded = await settingsRead;
       expect(loaded.status).toBe(200);
       expect(loaded.responseJson).toEqual([expect.objectContaining({ label })]);
-      await expect(page.getByText(label)).toBeVisible();
+      await expect(page.getByRole('heading', { level: 4, name: label })).toBeVisible();
       await recurseUntil(
         () => savedAnniversaryLabels(page),
         (v) => {
@@ -175,7 +175,7 @@ test.describe('Account data from the local copy', () => {
       // THEN: the anniversary is still listed — from the copy, since the
       // device-global blob no longer holds any.
       await navigateTo(page, 'settings');
-      await expect(page.getByText(label)).toBeVisible();
+      await expect(page.getByRole('heading', { level: 4, name: label })).toBeVisible();
       const blob = await page.evaluate(() => localStorage.getItem('my-love-storage') ?? '');
       expect(blob).not.toContain(label);
     } finally {
@@ -185,7 +185,7 @@ test.describe('Account data from the local copy', () => {
     }
   });
 
-  test('a favorite added on the server while offline appears after reconnect', async ({
+  test('[P1] a favorite added on the server while offline appears after reconnect', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -240,7 +240,7 @@ test.describe('Account data from the local copy', () => {
     }
   });
 
-  test('a favorite and a custom message from one online session are shown when the server cannot be reached', async ({
+  test('[P1] a favorite and a custom message from one online session are shown when the server cannot be reached', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,

@@ -219,7 +219,8 @@ describe('DW-187: form errors are linked and announced', () => {
 
     expect(label).toHaveAttribute('aria-invalid', 'false');
     expect(label).not.toHaveAttribute('aria-describedby');
-    expect(screen.queryByText('Anniversary label cannot be empty')).toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent('Date is required');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Anniversary label cannot be empty');
     expect(screen.getByLabelText(/^Date/)).toHaveAttribute('aria-invalid', 'true');
 
     const date = screen.getByLabelText(/^Date/);

@@ -89,7 +89,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Poke and kiss history from the local copy', () => {
-  test('history loaded online is listed offline after a reload, with the badge', async ({
+  test('[P1] history loaded online is listed offline after a reload, with the badge', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -143,7 +143,7 @@ test.describe('Poke and kiss history from the local copy', () => {
     }
   });
 
-  test('a poke sent while offline appears after reconnect without a reload', async ({
+  test('[P1] a poke sent while offline appears after reconnect without a reload', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,

@@ -23,7 +23,10 @@
  * Pair resolution, scoped cleanup, seeding and local-date creation come from
  * the shared event helper.
  */
+import type { Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import type { TypedSupabaseClient } from '../../support/factories';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
   clearOwnPairEvents,
@@ -32,10 +35,60 @@ import {
   isoDateDaysFromNow,
   resolveOwnPair,
   seedEvent,
+  type SeedEventOverrides,
 } from '../../support/helpers/events';
 import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
 import { PAST_EVENTS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
+
+// The Home render rows, minus their owner. `daysFromNow` counts from the
+// anchor each test seeds with.
+type Meetup = Omit<SeedEventOverrides, 'userId' | 'eventDate'> & { daysFromNow: number };
+
+const FUTURE_MEETUP: Meetup = {
+  label: 'Future Meetup E2E',
+  daysFromNow: 14,
+  description: 'Future event description',
+  icon: 'calendar',
+};
+
+const PAST_MEETUP: Meetup = {
+  label: 'Past Meetup E2E',
+  daysFromNow: -14,
+  description: 'Past event description',
+  icon: 'calendar',
+};
+
+// CAP-1's couple-shared visibility: the SELECT policy returns own + partner
+// events with no user_id filter applied client-side, so a partner-owned event
+// must render on the signed-in user's Home too. `icon: 'ring'` is not the
+// column default ('calendar'), so this row is what makes `icon={event.icon}`
+// load-bearing: hardcoding any single icon in App.tsx fails the icon assertion.
+const PARTNER_MEETUP: Meetup = {
+  label: 'Partner Meetup E2E',
+  daysFromNow: 21,
+  description: 'Partner event description',
+  icon: 'ring',
+};
+
+async function seedMeetup(
+  supabaseAdmin: TypedSupabaseClient,
+  userId: string,
+  { daysFromNow, ...row }: Meetup,
+  anchor: Date
+) {
+  await seedEvent(supabaseAdmin, {
+    userId,
+    eventDate: isoDateDaysFromNow(daysFromNow, anchor),
+    ...row,
+  });
+}
+
+async function openHome(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
+  const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+  await page.goto('/');
+  expect((await upcomingRead).status).toBe(200);
+}
 
 test.afterEach(async ({ supabaseAdmin }) => {
   await clearOwnPairEvents(supabaseAdmin);
@@ -49,7 +102,7 @@ test.describe('Home dashboard reads events from the store', () => {
     });
   });
 
-  test('[P0] shows own and partner future events, hides a past one, and leaves other cards unchanged', async ({
+  test('[P0] shows own and partner future events soonest first, each with its own icon', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -61,40 +114,10 @@ test.describe('Home dashboard reads events from the store', () => {
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
     const anchor = new Date();
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Future Meetup E2E',
-      eventDate: isoDateDaysFromNow(14, anchor),
-      description: 'Future event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Past Meetup E2E',
-      eventDate: isoDateDaysFromNow(-14, anchor),
-      description: 'Past event description',
-      icon: 'calendar',
-    });
-    // CAP-1's couple-shared visibility: the SELECT policy returns own +
-    // partner events with no user_id filter applied client-side, so a
-    // partner-owned event must render on the signed-in user's Home too.
-    // `icon: 'ring'` is not the column default ('calendar'), so this row is
-    // what makes `icon={event.icon}` load-bearing: hardcoding any single icon
-    // in App.tsx fails the icon assertion below.
-    await seedEvent(
-      supabaseAdmin,
-      {
-        userId: partnerId,
-        label: 'Partner Meetup E2E',
-        eventDate: isoDateDaysFromNow(21, anchor),
-        description: 'Partner event description',
-        icon: 'ring',
-      }
-    );
+    await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, anchor);
+    await seedMeetup(supabaseAdmin, partnerId, PARTNER_MEETUP, anchor);
 
-    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
-    await page.goto('/');
-    expect((await upcomingRead).status).toBe(200);
+    await openHome(page, interceptNetworkCall);
 
     const futureCard = page.getByTestId('event-countdown-future-meetup-e2e');
     await expect(futureCard).toBeVisible();
@@ -121,6 +144,50 @@ test.describe('Home dashboard reads events from the store', () => {
     await expect(
       page.getByTestId(/^event-countdown-(future|partner)-meetup-e2e$/).locator('h3')
     ).toHaveText(['Future Meetup E2E', 'Partner Meetup E2E']);
+  });
+
+  test('[P0] a past event renders nowhere on Home, and "Event passed" never appears', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+    const anchor = new Date();
+    await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, anchor);
+    await seedMeetup(supabaseAdmin, userId, PAST_MEETUP, anchor);
+
+    await openHome(page, interceptNetworkCall);
+
+    // The future row is the load witness: the column rendered, so the absence
+    // checks below are about a real render rather than an empty page.
+    await expect(page.getByTestId('event-countdown-future-meetup-e2e')).toBeVisible();
+
+    // The past event renders nowhere — not as its own card, not its text.
+    await expect(page.getByTestId('event-countdown-past-meetup-e2e')).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Past Meetup E2E', { ignoreCase: true });
+    await expect(page.getByRole('main')).not.toContainText('Past event description', {
+      ignoreCase: true,
+    });
+
+    // No path on the page ever renders the retired "Event passed" branch.
+    await expect(page.getByRole('main')).not.toContainText('Event passed', { ignoreCase: true });
+  });
+
+  test('[P0] TimeTogether, both birthday cards and the wedding card render alongside events', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+    await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, new Date());
+
+    await openHome(page, interceptNetworkCall);
+
+    await expect(page.getByTestId('event-countdown-future-meetup-e2e')).toBeVisible();
 
     // CAP-4: TimeTogether, both BirthdayCountdown cards and the Wedding
     // EventCountdown render unchanged alongside the events.
@@ -128,14 +195,6 @@ test.describe('Home dashboard reads events from the store', () => {
     await expect(page.getByTestId('birthday-countdown-self')).toBeVisible();
     await expect(page.getByTestId('birthday-countdown-partner')).toBeVisible();
     await expect(page.getByTestId('event-countdown-wedding')).toBeVisible();
-
-    // The past event renders nowhere — not as its own card, not its text.
-    await expect(page.getByTestId('event-countdown-past-meetup-e2e')).toHaveCount(0);
-    await expect(page.getByText('Past Meetup E2E')).toHaveCount(0);
-    await expect(page.getByText('Past event description')).toHaveCount(0);
-
-    // No path on the page ever renders the retired "Event passed" branch.
-    await expect(page.getByText('Event passed')).toHaveCount(0);
   });
 
   test('[P0] shows the empty-state placeholder for an account with zero events', async ({
@@ -155,7 +214,7 @@ test.describe('Home dashboard reads events from the store', () => {
     expect((await upcomingRead).status).toBe(200);
 
     await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
-    await expect(page.getByText('Event passed')).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Event passed', { ignoreCase: true });
   });
 
   test('[P0] does not flash the empty-state placeholder before the first load settles', async ({
@@ -241,9 +300,11 @@ test.describe('Home dashboard reads events from the store', () => {
     expect(past.responseJson).toHaveLength(2);
 
     await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
-    await expect(page.getByText('Old Meetup E2E')).toHaveCount(0);
-    await expect(page.getByText('Older Meetup E2E')).toHaveCount(0);
-    await expect(page.getByText('Event passed')).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Old Meetup E2E', { ignoreCase: true });
+    await expect(page.getByRole('main')).not.toContainText('Older Meetup E2E', {
+      ignoreCase: true,
+    });
+    await expect(page.getByRole('main')).not.toContainText('Event passed', { ignoreCase: true });
   });
 
   test('[P0] renders an event dated today, with a null description', async ({
@@ -378,8 +439,10 @@ test.describe('Home dashboard reads events from the store', () => {
 
     // The overflow is not merely off-screen — it renders nowhere on the page.
     await expect(page.getByTestId('event-countdown-seventh-meetup-e2e')).toHaveCount(0);
-    await expect(page.getByText('Seventh event description')).toHaveCount(0);
-    await expect(page.getByText('Old Meetup E2E')).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Seventh event description', {
+      ignoreCase: true,
+    });
+    await expect(page.getByRole('main')).not.toContainText('Old Meetup E2E', { ignoreCase: true });
 
     // Hiding the tail must never turn a real list into the empty state: the
     // slot decision still sees the uncapped upcoming count.

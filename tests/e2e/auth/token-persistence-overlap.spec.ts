@@ -333,31 +333,33 @@ async function runScenario(
   return evidence;
 }
 
-test('characterizes native auth token persistence: sequential', async ({ page, browser, baseURL }, testInfo) => {
-  await runScenario({ page, browser, baseURL }, testInfo, 'sequential', sequential);
-});
-
-for (const expected of overlapping) {
-  const { scenario, older, newer } = expected;
-  test('characterizes native auth token persistence: ' + scenario, async ({ page, browser, baseURL }, testInfo) => {
-    const { trace } = await runScenario({ page, browser, baseURL }, testInfo, scenario, expected);
-
-    const blocker = entry(trace, 'blocker', 'transaction-created');
-    const release = entry(trace, 'blocker', 'blocker-released');
-    // Both older writes queue behind the blocker; the SDK returned without them.
-    for (const actor of [older + '-listener', older]) {
-      expect(entry(trace, actor, 'transaction-created').sequence).toBeGreaterThan(blocker.sequence);
-      expect(entry(trace, actor, 'transaction-created').sequence).toBeLessThan(release.sequence);
-      expect(entry(trace, actor, 'native-complete').sequence)
-        .toBeGreaterThan(entry(trace, 'blocker', 'native-complete').sequence);
-    }
-    expect(entry(trace, older, 'sdk-response').sequence).toBeLessThan(release.sequence);
-    // The newer notification reaches the app while the older write is held,
-    // but its own write waits in the queue until that older write commits.
-    expect(entry(trace, newer, 'identity-delivered').sequence).toBeLessThan(release.sequence);
-    expect(entry(trace, newer, 'persistence-dispatched').sequence)
-      .toBeGreaterThan(entry(trace, older + '-listener', 'native-complete').sequence);
-    // The newest auth event now owns the stored token in every schedule.
-    expect(entry(trace, newer, 'native-complete').token).toEqual(expected.finalToken);
+test.describe('Native auth token persistence', () => {
+  test('[P2] characterizes native auth token persistence: sequential', async ({ page, browser, baseURL }, testInfo) => {
+    await runScenario({ page, browser, baseURL }, testInfo, 'sequential', sequential);
   });
-}
+
+  for (const expected of overlapping) {
+    const { scenario, older, newer } = expected;
+    test('[P2] characterizes native auth token persistence: ' + scenario, async ({ page, browser, baseURL }, testInfo) => {
+      const { trace } = await runScenario({ page, browser, baseURL }, testInfo, scenario, expected);
+
+      const blocker = entry(trace, 'blocker', 'transaction-created');
+      const release = entry(trace, 'blocker', 'blocker-released');
+      // Both older writes queue behind the blocker; the SDK returned without them.
+      for (const actor of [older + '-listener', older]) {
+        expect(entry(trace, actor, 'transaction-created').sequence).toBeGreaterThan(blocker.sequence);
+        expect(entry(trace, actor, 'transaction-created').sequence).toBeLessThan(release.sequence);
+        expect(entry(trace, actor, 'native-complete').sequence)
+          .toBeGreaterThan(entry(trace, 'blocker', 'native-complete').sequence);
+      }
+      expect(entry(trace, older, 'sdk-response').sequence).toBeLessThan(release.sequence);
+      // The newer notification reaches the app while the older write is held,
+      // but its own write waits in the queue until that older write commits.
+      expect(entry(trace, newer, 'identity-delivered').sequence).toBeLessThan(release.sequence);
+      expect(entry(trace, newer, 'persistence-dispatched').sequence)
+        .toBeGreaterThan(entry(trace, older + '-listener', 'native-complete').sequence);
+      // The newest auth event now owns the stored token in every schedule.
+      expect(entry(trace, newer, 'native-complete').token).toEqual(expected.finalToken);
+    });
+  }
+});

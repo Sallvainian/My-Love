@@ -576,9 +576,13 @@ function App() {
   // Story 6.7: Show loading screen while checking authentication
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div
+        className="flex min-h-screen items-center justify-center"
+        data-testid="auth-loading-screen"
+      >
         <div className="text-center">
           <Heart
+            data-testid="auth-loading-icon"
             className="mx-auto mb-4 h-14 w-14 animate-pulse fill-current text-accent"
             strokeWidth={0}
             aria-hidden="true"
@@ -629,9 +633,13 @@ function App() {
   // Show app loading screen while initializing data
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div
+        className="flex min-h-screen items-center justify-center"
+        data-testid="app-data-loading-screen"
+      >
         <div className="text-center">
           <Heart
+            data-testid="app-data-loading-icon"
             className="mx-auto mb-4 h-14 w-14 animate-pulse fill-current text-accent"
             strokeWidth={0}
             aria-hidden="true"
@@ -779,7 +787,7 @@ function App() {
                   role="status"
                   aria-live="polite"
                 >
-                  <p className="text-sm text-muted">
+                  <p className="text-sm text-muted" data-testid="events-load-error-message">
                     Unable to load events — check your connection, then come back to Home.
                   </p>
                 </div>
@@ -790,7 +798,9 @@ function App() {
                   role="status"
                   aria-live="polite"
                 >
-                  <p className="text-sm text-muted">No upcoming events yet.</p>
+                  <p className="text-sm text-muted" data-testid="events-empty-placeholder-message">
+                    No upcoming events yet.
+                  </p>
                 </div>
               ) : (
                 // Already filtered and capped by getUpcomingEventCards, which

@@ -53,20 +53,32 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('PhotoUpload: a rejected file (DW-202)', () => {
-  it('says why, clears the input for a re-pick, and clears the error on a valid file', async () => {
-    // applyAccept off: the GIF must reach the validator, not be dropped by the
-    // input's accept list before any change fires.
-    const user = userEvent.setup({ applyAccept: false });
-    render(<PhotoUpload isOpen onClose={vi.fn()} />);
-    const input = screen.getByTestId('photo-upload-file-input') as HTMLInputElement;
-    const gif = new File(['x'], 'scan.gif', { type: 'image/gif' });
+/** Pick a GIF the validator rejects, on a freshly opened dialog. */
+async function rejectGif() {
+  // applyAccept off: the GIF must reach the validator, not be dropped by the
+  // input's accept list before any change fires.
+  const user = userEvent.setup({ applyAccept: false });
+  render(<PhotoUpload isOpen onClose={vi.fn()} />);
+  const input = screen.getByTestId('photo-upload-file-input') as HTMLInputElement;
+  const gif = new File(['x'], 'scan.gif', { type: 'image/gif' });
 
-    validateImageFile.mockReturnValueOnce({ valid: false, error: REJECTION });
-    await user.upload(input, gif);
+  validateImageFile.mockReturnValueOnce({ valid: false, error: REJECTION });
+  await user.upload(input, gif);
+
+  return { user, input, gif };
+}
+
+describe('PhotoUpload: a rejected file (DW-202)', () => {
+  it('says why a picked file was rejected and stays on the select step', async () => {
+    await rejectGif();
 
     expect(screen.getByRole('alert')).toHaveTextContent(REJECTION);
     expect(screen.getByTestId('photo-upload-select-button')).toBeInTheDocument();
+  });
+
+  it('clears the input after a rejection so the same file can be re-picked', async () => {
+    const { user, input, gif } = await rejectGif();
+
     // user-event reports the picked file as the input's value until the
     // component resets it.
     expect(input.value).toBe('');
@@ -77,6 +89,11 @@ describe('PhotoUpload: a rejected file (DW-202)', () => {
     validateImageFile.mockReturnValueOnce({ valid: false, error: REJECTION });
     await user.upload(input, gif);
     expect(validateImageFile).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('alert')).toHaveTextContent(REJECTION);
+  });
+
+  it('clears the error when a valid file is picked after a rejection', async () => {
+    const { user, input } = await rejectGif();
     expect(screen.getByRole('alert')).toHaveTextContent(REJECTION);
 
     validateImageFile.mockReturnValueOnce({ valid: true });

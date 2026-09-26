@@ -611,7 +611,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
         <div className={CARD}>
           {userEmail && (
             <>
-              <div className={ROW}>
+              <div className={ROW} data-testid="settings-identity">
                 <div
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-fill text-base font-semibold text-white"
                   aria-hidden="true"
@@ -620,7 +620,12 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
                   {avatarInitial}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <p className="text-[15px] font-medium wrap-break-word text-ink">{userEmail}</p>
+                  <p
+                    className="text-[15px] font-medium wrap-break-word text-ink"
+                    data-testid="settings-email"
+                  >
+                    {userEmail}
+                  </p>
                   <p className="text-[13px] text-muted">Signed in</p>
                 </div>
               </div>
@@ -667,7 +672,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
         <h2 id="settings-countdowns-label" className={SECTION_LABEL}>
           Countdowns
         </h2>
-        <div className={CARD}>
+        <div className={CARD} data-testid="settings-countdowns-card">
           <EventsSettings />
           <div className={DIVIDER} aria-hidden="true" />
           <AnniversarySettings />
@@ -696,7 +701,9 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <p className="text-[15px] font-medium text-ink">My Love</p>
-              <p className="text-[13px] text-muted">Version {__APP_VERSION__} · made for the two of you</p>
+              <p className="text-[13px] text-muted" data-testid="settings-version">
+                Version {__APP_VERSION__} · made for the two of you
+              </p>
             </div>
           </div>
           {onShowWelcome && (
@@ -722,7 +729,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
       </section>
 
       {/* Sign out — its own quiet card, not a red block. */}
-      <div className={CARD}>
+      <div className={CARD} data-testid="settings-sign-out-card">
         <button
           type="button"
           onClick={handleLogout}

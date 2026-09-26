@@ -159,12 +159,10 @@ describe('saveStartDate', () => {
   it('refuses offline before any request', async () => {
     setOnline(false);
 
-    const failure = await coupleSettingsService
-      .saveStartDate(LOW, HIGH, '2025-10-04T22:00:00.000Z')
-      .catch((error: unknown) => error);
+    const refusal = coupleSettingsService.saveStartDate(LOW, HIGH, '2025-10-04T22:00:00.000Z');
 
-    expect(failure).toBeInstanceOf(AccountDataError);
-    expect((failure as AccountDataError).code).toBe('offline');
+    await expect(refusal).rejects.toBeInstanceOf(AccountDataError);
+    await expect(refusal).rejects.toMatchObject({ code: 'offline' });
     expect(calls).toHaveLength(0);
   });
 

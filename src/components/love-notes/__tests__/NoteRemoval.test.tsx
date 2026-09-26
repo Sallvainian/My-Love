@@ -12,7 +12,7 @@
  *    the partner, so a user who misreads it as "delete for both" cannot find out
  *    they were wrong and cannot undo it.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useRef, useState, type HTMLAttributes, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -155,8 +155,9 @@ describe('remove confirmation dialog', () => {
       <NoteRemoveConfirmation note={committed} onClose={vi.fn()} onConfirmRemove={vi.fn()} fallbackFocusRef={inertFallback} />
     );
 
-    expect(screen.getByText(/your partner keeps their copy/i)).toBeInTheDocument();
-    expect(screen.getByText(/cannot undo/i)).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent(/your partner keeps their copy/i);
+    expect(dialog).toHaveTextContent(/cannot undo/i);
   });
 
   it('says a failed note failed to send, not that the partner keeps a copy', () => {
@@ -170,11 +171,12 @@ describe('remove confirmation dialog', () => {
     );
 
     // Not "never sent": a picture note whose response was lost may be stored.
-    expect(
-      screen.getByText('This message failed to send. It will be deleted from this device.')
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/your partner keeps their copy/i)).toBeNull();
-    expect(screen.getByText(/cannot undo/i)).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent(
+      'This message failed to send. It will be deleted from this device.'
+    );
+    expect(dialog).not.toHaveTextContent(/your partner keeps their copy/i);
+    expect(dialog).toHaveTextContent(/cannot undo/i);
   });
 
   it('leaves the message alone when cancelled', async () => {
@@ -190,7 +192,7 @@ describe('remove confirmation dialog', () => {
       />
     );
 
-    await user.click(screen.getByText('Cancel'));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onConfirmRemove).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
@@ -219,7 +221,9 @@ describe('remove confirmation dialog', () => {
     screen.getByTestId('trigger').focus();
 
     rerender(<Harness open />);
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
+    );
 
     rerender(<Harness open={false} />);
 
@@ -261,7 +265,9 @@ describe('remove confirmation dialog', () => {
     const trigger = screen.getByTestId('trigger');
     await user.click(trigger);
 
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
+    );
     await user.click(screen.getByTestId('note-remove-confirm'));
 
     // Gate on focus itself. onConfirmRemove drops the row and onClose closes the
@@ -314,7 +320,9 @@ describe('remove confirmation dialog', () => {
     const trigger = screen.getByTestId('trigger');
     await user.click(trigger);
 
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
+    );
     await user.click(screen.getByTestId('note-remove-confirm'));
 
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('thread')));
@@ -350,11 +358,13 @@ describe('remove confirmation dialog', () => {
     const trigger = screen.getByTestId('trigger');
     await user.click(trigger);
 
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
-    await user.click(screen.getByText('Cancel'));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
+    );
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('trigger')));
-    expect(screen.queryByText('Cancel')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
   });
 
   it('closes on Escape and takes focus off the trash button behind the overlay', async () => {
@@ -371,7 +381,9 @@ describe('remove confirmation dialog', () => {
     );
 
     // Cancel takes initial focus because this cannot be undone.
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
+    );
 
     // useFocusTrap listens on the dialog container; the keypress starts where
     // focus actually is (Cancel) and bubbles up to it.
@@ -390,7 +402,9 @@ describe('remove confirmation dialog', () => {
     const { rerender } = render(
       <NoteRemoveConfirmation note={committed} onClose={() => {}} onConfirmRemove={vi.fn()} fallbackFocusRef={inertFallback} />
     );
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
+    );
 
     // the user tabs to the destructive button and pauses
     await user.tab();
@@ -418,7 +432,9 @@ describe('remove confirmation dialog', () => {
         fallbackFocusRef={inertFallback}
       />
     );
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByText('Cancel')));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
+    );
 
     const confirm = screen.getByTestId('note-remove-confirm');
     await user.click(confirm);
@@ -429,7 +445,7 @@ describe('remove confirmation dialog', () => {
     // whether or not the bug existed). Assert the explicit custody handover
     // instead — the panel takes focus before the disable lands.
     await waitFor(() => expect(screen.getByTestId('note-remove-confirm')).toBeDisabled());
-    const panel = screen.getByRole('dialog').querySelector('[tabindex="-1"]');
+    const panel = within(screen.getByRole('dialog')).getByTestId('note-remove-panel');
     expect(document.activeElement).toBe(panel);
 
     release?.();
@@ -498,8 +514,8 @@ describe('remove confirmation dialog', () => {
     expect(onClose).not.toHaveBeenCalled();
 
     // The catch intends to hand focus back to Cancel so the user can leave.
-    await waitFor(() => expect(screen.getByText('Cancel')).not.toBeDisabled());
-    expect(document.activeElement).toBe(screen.getByText('Cancel'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).not.toBeDisabled());
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }));
   });
 });
 

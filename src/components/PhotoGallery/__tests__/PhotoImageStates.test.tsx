@@ -103,7 +103,7 @@ describe('PhotoGridItem image status', () => {
       expect(within(tile).getByTestId('photo-grid-item-not-saved')).toHaveTextContent(
         'Not saved on this device'
       );
-      expect(tile.querySelector('.animate-pulse')).toBeNull();
+      expect(within(tile).queryByTestId('photo-grid-item-loading')).not.toBeInTheDocument();
     }
   );
 
@@ -111,8 +111,8 @@ describe('PhotoGridItem image status', () => {
     imageFor.mockReturnValue({ status: 'loading', url: null });
     const tile = renderTile();
 
-    expect(tile.querySelector('.animate-pulse')).not.toBeNull();
-    expect(within(tile).queryByTestId('photo-grid-item-not-saved')).toBeNull();
+    expect(within(tile).getByTestId('photo-grid-item-loading')).toHaveClass('animate-pulse');
+    expect(within(tile).queryByTestId('photo-grid-item-not-saved')).not.toBeInTheDocument();
   });
 
   it('ready: the blob image', () => {
@@ -132,14 +132,16 @@ describe('PhotoViewer image status', () => {
     );
     render(<PhotoViewer photos={[photo(0)]} selectedPhotoId="photo-0" onClose={vi.fn()} />);
 
-    expect(screen.getByText('Failed to load photo')).toBeInTheDocument();
-    expect(screen.queryByAltText('cap-0')).toBeNull();
+    expect(screen.getByTestId('photo-viewer-load-error')).toHaveTextContent(
+      'Failed to load photo'
+    );
+    expect(screen.queryByAltText('cap-0')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(imageFor).toHaveBeenCalledWith('me/0.jpg', { retryKey: 1 });
     expect(screen.getByAltText('cap-0')).toHaveAttribute('src', 'blob:me/0.jpg');
-    expect(screen.queryByText('Failed to load photo')).toBeNull();
+    expect(screen.queryByTestId('photo-viewer-load-error')).not.toBeInTheDocument();
   });
 
   it('loading: a spinner while the image downloads', () => {
@@ -149,8 +151,8 @@ describe('PhotoViewer image status', () => {
     render(<PhotoViewer photos={[photo(0)]} selectedPhotoId="photo-0" onClose={vi.fn()} />);
 
     const overlay = screen.getByTestId('photo-viewer-overlay');
-    expect(overlay.querySelector('.animate-spin')).not.toBeNull();
-    expect(screen.queryByAltText('cap-0')).toBeNull();
+    expect(within(overlay).getByTestId('photo-viewer-loading-spinner')).toHaveClass('animate-spin');
+    expect(screen.queryByAltText('cap-0')).not.toBeInTheDocument();
   });
 
   it('unavailable: the "not saved on this device" placeholder', () => {
@@ -171,7 +173,7 @@ describe('PhotoViewer on a live list', () => {
       <PhotoViewer photos={[photo(1), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
     );
     expect(screen.getByAltText('cap-1')).toBeInTheDocument();
-    expect(screen.getByText(/Photo 1 of 2 •/)).toBeInTheDocument();
+    expect(screen.getByTestId('photo-viewer-position')).toHaveTextContent(/Photo 1 of 2 •/);
 
     rerender(
       <PhotoViewer
@@ -182,7 +184,7 @@ describe('PhotoViewer on a live list', () => {
     );
 
     expect(screen.getByAltText('cap-1')).toBeInTheDocument();
-    expect(screen.getByText(/Photo 2 of 3 •/)).toBeInTheDocument();
+    expect(screen.getByTestId('photo-viewer-position')).toHaveTextContent(/Photo 2 of 3 •/);
   });
 
   it('deletes the photo the dialog names even after the list changed', async () => {
@@ -217,7 +219,7 @@ describe('PhotoViewer on a live list', () => {
       />
     );
     await user.click(screen.getByLabelText('Delete photo'));
-    expect(screen.getByText('Delete Photo?')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Delete Photo?' })).toBeInTheDocument();
 
     rerender(
       <PhotoViewer photos={[photo(0), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
@@ -229,7 +231,7 @@ describe('PhotoViewer on a live list', () => {
     }
 
     expect(deletePhotoMock).not.toHaveBeenCalled();
-    expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
     // The viewer itself keeps its fallback: the photo now at that index.
     expect(screen.getByAltText('cap-2')).toBeInTheDocument();
   });
@@ -243,16 +245,18 @@ describe('PhotoViewer on a live list', () => {
       />
     );
     fireEvent.error(screen.getByAltText('cap-1')); // raw error: an image load failure is a resource event, not a user action
-    expect(screen.getByText('Failed to load photo')).toBeInTheDocument();
+    expect(screen.getByTestId('photo-viewer-load-error')).toHaveTextContent(
+      'Failed to load photo'
+    );
 
     // Deleted on another device: the refresh drops photo-1 while it is open.
     rerender(
       <PhotoViewer photos={[photo(0), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
     );
 
-    expect(screen.queryByText('Failed to load photo')).toBeNull();
+    expect(screen.queryByTestId('photo-viewer-load-error')).not.toBeInTheDocument();
     expect(screen.getByAltText('cap-2')).toHaveAttribute('src', 'blob:me/2.jpg');
-    expect(screen.getByText(/Photo 2 of 2 •/)).toBeInTheDocument();
+    expect(screen.getByTestId('photo-viewer-position')).toHaveTextContent(/Photo 2 of 2 •/);
   });
 
   it('finishes its own delete when the store drops the row before the delete resolves', async () => {
@@ -275,7 +279,7 @@ describe('PhotoViewer on a live list', () => {
     rerender(
       <PhotoViewer photos={[photo(0), photo(2)]} selectedPhotoId="photo-1" onClose={vi.fn()} />
     );
-    expect(screen.getByText('Delete Photo?')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Delete Photo?' })).toBeInTheDocument();
 
     await act(async () => {
       resolveDelete(true);
@@ -283,7 +287,7 @@ describe('PhotoViewer on a live list', () => {
 
     expect(deletePhotoMock).toHaveBeenCalledTimes(1);
     expect(deletePhotoMock).toHaveBeenCalledWith('photo-1');
-    expect(screen.queryByText('Delete Photo?')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Delete Photo?' })).not.toBeInTheDocument();
     expect(screen.getByAltText('cap-2')).toBeInTheDocument();
   });
 
@@ -303,6 +307,6 @@ describe('PhotoViewer on a live list', () => {
     );
 
     expect(screen.getByAltText('cap-2')).toBeInTheDocument();
-    expect(screen.getByText(/Photo 2 of 2 •/)).toBeInTheDocument();
+    expect(screen.getByTestId('photo-viewer-position')).toHaveTextContent(/Photo 2 of 2 •/);
   });
 });

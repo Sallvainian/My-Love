@@ -128,28 +128,25 @@ describe('interactionsSlice subscription bridge', () => {
     await serializeAccountDataWrite(async () => {});
   });
 
-  it('forwards every service status and keeps isSubscribed aligned through recovery', async () => {
+  /** Subscribes the store and hands back the service-side subscription it opened. */
+  async function subscribe(
+    store: ReturnType<typeof createTestStore>,
+    onStatusChange: (status: InteractionSubscriptionStatus) => void = vi.fn()
+  ) {
+    const unsubscribe = await store.getState().subscribeToInteractions(onStatusChange);
+    return { unsubscribe, subscription: subscriptions[0] };
+  }
+
+  it('subscribes for the signed-in user and forwards every service status, keeping isSubscribed aligned through recovery', async () => {
     const store = createTestStore();
     const onStatusChange = vi.fn();
 
-    const unsubscribe = await store.getState().subscribeToInteractions(onStatusChange);
-    const subscription = subscriptions[0];
+    const { subscription } = await subscribe(store, onStatusChange);
     expect(subscription.userId).toBe(USER_ID);
     expect(store.getState().isSubscribed).toBe(false);
 
     subscription.reportStatus('SUBSCRIBED');
     expect(store.getState().isSubscribed).toBe(true);
-
-    subscription.reportInteraction(interaction('incoming-1'));
-    expect(store.getState().interactions).toEqual([{
-      id: 'incoming-1',
-      type: 'poke',
-      fromUserId: OTHER_USER_ID,
-      toUserId: USER_ID,
-      viewed: false,
-      createdAt: new Date('2026-08-20T12:00:00.000Z'),
-    }]);
-    expect(store.getState().unviewedCount).toBe(1);
 
     subscription.reportStatus('CHANNEL_ERROR');
     expect(store.getState().isSubscribed).toBe(false);
@@ -165,6 +162,30 @@ describe('interactionsSlice subscription bridge', () => {
       ['TIMED_OUT'],
       ['SUBSCRIBED'],
     ]);
+  });
+
+  it('maps a delivered record into interactions and counts it unviewed', async () => {
+    const store = createTestStore();
+    const { subscription } = await subscribe(store);
+    subscription.reportStatus('SUBSCRIBED');
+
+    subscription.reportInteraction(interaction('incoming-1'));
+    expect(store.getState().interactions).toEqual([{
+      id: 'incoming-1',
+      type: 'poke',
+      fromUserId: OTHER_USER_ID,
+      toUserId: USER_ID,
+      viewed: false,
+      createdAt: new Date('2026-08-20T12:00:00.000Z'),
+    }]);
+    expect(store.getState().unviewedCount).toBe(1);
+  });
+
+  it('unsubscribing tears down the service subscription and clears isSubscribed', async () => {
+    const store = createTestStore();
+    const { unsubscribe, subscription } = await subscribe(store);
+    subscription.reportStatus('SUBSCRIBED');
+    expect(store.getState().isSubscribed).toBe(true);
 
     unsubscribe();
     expect(subscription.unsubscribe).toHaveBeenCalledTimes(1);

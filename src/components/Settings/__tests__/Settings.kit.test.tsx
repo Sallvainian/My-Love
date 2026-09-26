@@ -76,8 +76,8 @@ describe('Settings on the kit', () => {
     ).toEqual(['Account', 'Countdowns', 'Photos', 'About']);
     expect(screen.getAllByRole('heading', { level: 3, name: 'Events' })).toHaveLength(1);
     expect(screen.getAllByRole('heading', { level: 3, name: 'Anniversaries' })).toHaveLength(1);
-    expect(screen.queryByText(/Event Countdowns/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Anniversary Countdowns/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Event Countdowns/);
+    expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Anniversary Countdowns/);
   });
 
   it('replays the welcome message from About when a handler is passed', async () => {
@@ -94,14 +94,16 @@ describe('Settings on the kit', () => {
   it('shows the package.json version in the About row', async () => {
     await renderSettings();
 
-    expect(screen.getByText(`Version ${pkg.version} · made for the two of you`)).toBeInTheDocument();
+    expect(screen.getByTestId('settings-version').textContent).toBe(
+      `Version ${pkg.version} · made for the two of you`
+    );
   });
 
   it('renders no replay row without a handler', async () => {
     await renderSettings();
 
     expect(screen.queryByTestId('settings-replay-welcome')).not.toBeInTheDocument();
-    expect(screen.queryByText('Replay welcome message')).not.toBeInTheDocument();
+    expect(screen.getByTestId('settings-view')).not.toHaveTextContent('Replay welcome message');
   });
 
   it('disables the Sign out row and says so while the sign-out is in flight', async () => {
@@ -155,15 +157,16 @@ describe('Settings on the kit', () => {
       await backend.getUser.mock.results[0]?.value;
     });
 
-    expect(screen.queryByText('Signed in')).not.toBeInTheDocument();
-    expect(screen.queryByText('person@example.com')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settings-identity')).not.toBeInTheDocument();
+    expect(screen.getByTestId('settings-view')).not.toHaveTextContent('Signed in');
+    expect(screen.getByTestId('settings-view')).not.toHaveTextContent('person@example.com');
   });
 
   it('renders the identity row with the display name initial when there is an email', async () => {
     await renderSettings();
 
-    expect(await screen.findByText('person@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Signed in')).toBeInTheDocument();
+    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
+    expect(screen.getByTestId('settings-identity')).toHaveTextContent('Signed in');
     expect(screen.getByTestId('settings-avatar').textContent).toBe('J');
   });
 
@@ -174,7 +177,7 @@ describe('Settings on the kit', () => {
       expect(screen.getByTestId('settings-display-name').textContent).toBe('Not set yet')
     );
 
-    expect(await screen.findByText('person@example.com')).toBeInTheDocument();
+    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
     expect(screen.getByTestId('settings-avatar').textContent).toBe('P');
   });
 
@@ -185,7 +188,7 @@ describe('Settings on the kit', () => {
       expect(screen.getByTestId('settings-display-name').textContent).toBe('💖 Jessie')
     );
 
-    expect(await screen.findByText('person@example.com')).toBeInTheDocument();
+    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
     expect(screen.getByTestId('settings-avatar').textContent).toBe('💖');
   });
 
@@ -196,7 +199,7 @@ describe('Settings on the kit', () => {
       expect(screen.getByTestId('settings-display-name').textContent).toBe('👍🏽 Jessie')
     );
 
-    expect(await screen.findByText('person@example.com')).toBeInTheDocument();
+    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
     expect(screen.getByTestId('settings-avatar').textContent).toBe('👍🏽');
   });
 

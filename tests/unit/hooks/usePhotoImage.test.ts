@@ -121,11 +121,17 @@ describe('usePhotoImage', () => {
     expect(cachePhotoImage).not.toHaveBeenCalled();
   });
 
-  it('online and not cached: downloads, caches under the refusal rule, shows it', async () => {
+  it('online and not cached: downloads the image and shows it', async () => {
     const { result } = renderHook(() => usePhotoImage(PATH));
 
     await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(downloadPhoto).toHaveBeenCalledWith(PATH);
+  });
+
+  it('online and not cached: caches the download under the refusal rule for the current session', async () => {
+    const { result } = renderHook(() => usePhotoImage(PATH));
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(cachePhotoImage).toHaveBeenCalledTimes(1);
     const [session, path, blob] = cachePhotoImage.mock.calls[0] as [PhotoCacheSession, string, Blob];
     expect(session.userId).toBe('USER-A');

@@ -197,20 +197,43 @@ describe('service worker mood background sync', () => {
     vi.useRealTimers();
   });
 
-  it('sends normalized values while retaining failure accounting for invalid siblings', async () => {
-    const invalid = pendingMood({ id: 2, mood: 'unknown', moods: [null] } as unknown as Partial<MoodEntry>);
-    const valid = pendingMood({ mood: 'loved', moods: ['sad', null, 'happy', 'sad'] } as unknown as Partial<MoodEntry>);
-    mockedGetPendingMoods.mockResolvedValue([invalid, valid]);
-    fetchMock.mockResolvedValue(jsonResponse(201, [{ id: SERVER_ROW_ID }]));
-    const postMessage = vi.fn();
-    vi.mocked((globalScope.clients as { matchAll: ReturnType<typeof vi.fn> }).matchAll).mockResolvedValueOnce([{ postMessage }] as unknown as WindowClient[]);
-    await fireBackgroundSync();
-    expect(postMessage).toHaveBeenCalledWith({ type: 'BACKGROUND_SYNC_COMPLETED', successCount: 1, failCount: 1 });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchCall(0).body).toMatchObject({ user_id: USER_ID, mood_type: 'loved', mood_types: ['sad', 'happy', 'sad'] });
-    expect(mockedMarkMoodSynced).toHaveBeenCalledTimes(1);
-    expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, SERVER_ROW_ID, moodSyncFingerprint(valid));
-    expect(invalid.mood).toBe('unknown');
+  describe('a batch with one invalid sibling', () => {
+    /**
+     * Syncs one mood with no recognized value next to a valid one that needs
+     * normalizing, with one open client listening for the completion message.
+     */
+    async function syncMixedBatch() {
+      const invalid = pendingMood({ id: 2, mood: 'unknown', moods: [null] } as unknown as Partial<MoodEntry>);
+      const valid = pendingMood({ mood: 'loved', moods: ['sad', null, 'happy', 'sad'] } as unknown as Partial<MoodEntry>);
+      mockedGetPendingMoods.mockResolvedValue([invalid, valid]);
+      fetchMock.mockResolvedValue(jsonResponse(201, [{ id: SERVER_ROW_ID }]));
+      const postMessage = vi.fn();
+      vi.mocked((globalScope.clients as { matchAll: ReturnType<typeof vi.fn> }).matchAll).mockResolvedValueOnce([{ postMessage }] as unknown as WindowClient[]);
+      await fireBackgroundSync();
+      return { invalid, valid, postMessage };
+    }
+
+    it('reports one success and one failure to the open clients', async () => {
+      const { postMessage } = await syncMixedBatch();
+      expect(postMessage).toHaveBeenCalledWith({ type: 'BACKGROUND_SYNC_COMPLETED', successCount: 1, failCount: 1 });
+    });
+
+    it('sends only the valid mood, with normalized values', async () => {
+      await syncMixedBatch();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchCall(0).body).toMatchObject({ user_id: USER_ID, mood_type: 'loved', mood_types: ['sad', 'happy', 'sad'] });
+    });
+
+    it('marks only the valid mood synced, under its fingerprint', async () => {
+      const { valid } = await syncMixedBatch();
+      expect(mockedMarkMoodSynced).toHaveBeenCalledTimes(1);
+      expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, SERVER_ROW_ID, moodSyncFingerprint(valid));
+    });
+
+    it('leaves the invalid source row unmodified', async () => {
+      const { invalid } = await syncMixedBatch();
+      expect(invalid.mood).toBe('unknown');
+    });
   });
 
   describe('account scoping', () => {

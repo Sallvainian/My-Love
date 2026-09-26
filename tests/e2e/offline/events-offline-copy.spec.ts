@@ -86,7 +86,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Events from the local copy', () => {
-  test('events loaded once online are listed offline on Home and in Settings', async ({
+  test('[P1] events loaded once online are listed offline on Home and in Settings', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,

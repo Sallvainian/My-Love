@@ -34,6 +34,8 @@ import { recurseUntil } from '../../support/helpers/recurse';
 import { openSettingsFromHome, reloadSettings } from '../../support/helpers/settings-screen';
 import { formatDateLong } from '../../../src/utils/dateUtils';
 import type { Locator, Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
+import type { TypedSupabaseClient } from '../../support/factories';
 
 /**
  * Labels are deliberately unlike any fixed testid on Home — `Wedding` slugifies
@@ -101,51 +103,92 @@ test.afterEach(async ({ supabaseAdmin }) => {
   await clearOwnPairEvents(supabaseAdmin);
 });
 
+/**
+ * Open Settings from Home with no event on this worker's couple, and wait for
+ * the empty state.
+ */
+async function openEmptySettings(
+  page: Page,
+  supabaseAdmin: TypedSupabaseClient,
+  interceptNetworkCall: InterceptNetworkCallFn
+): Promise<void> {
+  const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+  // Self-healing against stray rows from a previously failed run, for either
+  // half of the couple — the SELECT policy returns own + partner.
+  await clearPairEvents(supabaseAdmin, userId, partnerId);
+
+  await openSettingsFromHome(page, interceptNetworkCall);
+
+  // The section loads from its own mount effect — Home was never the source.
+  await expect(page.getByTestId('events-settings-empty')).toBeVisible();
+  await expect(page.getByTestId('events-settings-empty-add')).toBeVisible();
+}
+
+/**
+ * Add an event through the Settings empty state, and wait until the server
+ * took it and the list shows it with the form closed. Returns its row.
+ */
+async function addEventFromSettings(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  event: { label: string; date: string; description: string; icon: string }
+): Promise<Locator> {
+  await page.getByTestId('events-settings-empty-add').click();
+  await expect(page.getByTestId('events-form')).toBeVisible();
+
+  await page.getByTestId('events-form-label').fill(event.label);
+  await page.getByTestId('events-form-date').fill(event.date);
+  await page.getByTestId('events-form-description').fill(event.description);
+  // The radio itself is sr-only; the styled label is the control a pointer
+  // user actually hits, and it carries its own testid for exactly this.
+  await page.getByTestId(`events-form-icon-option-${event.icon}`).click();
+  await expect(page.getByTestId(`events-form-icon-${event.icon}`)).toBeChecked();
+
+  // Layer 1 — the write reached the server.
+  const createResponse = interceptNetworkCall({ method: 'POST', url: EVENTS_WRITE });
+  await page.getByTestId('events-form-submit').click();
+  expect((await createResponse).status).toBe(201);
+
+  // Layer 2 and 3 — the store took it and the list shows it, with the form
+  // closed behind it.
+  await expect(page.getByTestId('events-form')).toHaveCount(0);
+  const addedRow = rowFor(page, event.label);
+  await expect(addedRow).toBeVisible();
+  await expect(addedRow).toContainText(longForm(event.date));
+  await expect(addedRow).toContainText(event.description);
+  return addedRow;
+}
+
+/** The event every test below adds, dated 30 days after `anchor`. */
+function tripEvent(anchor: Date) {
+  return {
+    label: ADDED_LABEL,
+    date: isoDateDaysFromNow(30, anchor),
+    description: 'Booked and counting',
+    icon: 'plane',
+  };
+}
+
 test.describe('Managing events from Settings', () => {
-  test('[P0] adds, shows on Home, edits, deletes, and lands on the empty state', async ({
+  test('[P0] adds an event from the empty state and lists it', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
   }) => {
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    // Self-healing against stray rows from a previously failed run, for either
-    // half of the couple — the SELECT policy returns own + partner.
-    await clearPairEvents(supabaseAdmin, userId, partnerId);
-
-    const anchor = new Date();
-    const addedDate = isoDateDaysFromNow(30, anchor);
-    const editedDate = isoDateDaysFromNow(45, anchor);
-
-    await openSettingsFromHome(page, interceptNetworkCall);
-
-    // The section loads from its own mount effect — Home was never the source.
-    await expect(page.getByTestId('events-settings-empty')).toBeVisible();
-    await expect(page.getByTestId('events-settings-empty-add')).toBeVisible();
+    await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
 
     // ── Add ────────────────────────────────────────────────────────────────
-    await page.getByTestId('events-settings-empty-add').click();
-    await expect(page.getByTestId('events-form')).toBeVisible();
+    await addEventFromSettings(page, interceptNetworkCall, tripEvent(new Date()));
+  });
 
-    await page.getByTestId('events-form-label').fill(ADDED_LABEL);
-    await page.getByTestId('events-form-date').fill(addedDate);
-    await page.getByTestId('events-form-description').fill('Booked and counting');
-    // The radio itself is sr-only; the styled label is the control a pointer
-    // user actually hits, and it carries its own testid for exactly this.
-    await page.getByTestId('events-form-icon-option-plane').click();
-    await expect(page.getByTestId('events-form-icon-plane')).toBeChecked();
-
-    // Layer 1 — the write reached the server.
-    const createResponse = interceptNetworkCall({ method: 'POST', url: EVENTS_WRITE });
-    await page.getByTestId('events-form-submit').click();
-    expect((await createResponse).status).toBe(201);
-
-    // Layer 2 and 3 — the store took it and the list shows it, with the form
-    // closed behind it.
-    await expect(page.getByTestId('events-form')).toHaveCount(0);
-    const addedRow = rowFor(page, ADDED_LABEL);
-    await expect(addedRow).toBeVisible();
-    await expect(addedRow).toContainText(longForm(addedDate));
-    await expect(addedRow).toContainText('Booked and counting');
+  test('[P0] an event added in Settings shows on Home with no reload', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const added = tripEvent(new Date());
+    await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
+    await addEventFromSettings(page, interceptNetworkCall, added);
 
     // ── Visible on Home ────────────────────────────────────────────────────
     await navigateTo(page, 'home');
@@ -157,7 +200,23 @@ test.describe('Managing events from Settings', () => {
     // between local midnights. This is the whole date round trip — the
     // <input type="date"> string, the `date` column, and the local-midnight
     // rebuild — pinned to one number.
-    await expectCardCountsDownTo(card, addedDate);
+    await expectCardCountsDownTo(card, added.date);
+  });
+
+  test('[P0] editing an event changes its label and date in the list and on Home', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const anchor = new Date();
+    const added = tripEvent(anchor);
+    const editedDate = isoDateDaysFromNow(45, anchor);
+    await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
+    await addEventFromSettings(page, interceptNetworkCall, added);
+
+    // Premise for the old card's absence below: Home rendered it first.
+    await navigateTo(page, 'home');
+    await expect(page.getByTestId('event-countdown-settings-trip-e2e')).toBeVisible();
 
     // ── Edit ───────────────────────────────────────────────────────────────
     await navigateTo(page, 'settings');
@@ -169,7 +228,7 @@ test.describe('Managing events from Settings', () => {
     // Pre-filled with the same calendar day the row shows — the off-by-one this
     // feature exists to avoid would surface right here.
     await expect(page.getByTestId('events-form-label')).toHaveValue(ADDED_LABEL);
-    await expect(page.getByTestId('events-form-date')).toHaveValue(addedDate);
+    await expect(page.getByTestId('events-form-date')).toHaveValue(added.date);
 
     await page.getByTestId('events-form-label').fill(EDITED_LABEL);
     await page.getByTestId('events-form-date').fill(editedDate);
@@ -193,10 +252,19 @@ test.describe('Managing events from Settings', () => {
     await expect(editedCard.getByText(EDITED_LABEL)).toBeVisible();
     await expectCardCountsDownTo(editedCard, editedDate);
     await expect(page.getByTestId('event-countdown-settings-trip-e2e')).toHaveCount(0);
+  });
 
-    await navigateTo(page, 'settings');
-    const rowToDelete = rowFor(page, EDITED_LABEL);
-    await expect(rowToDelete).toBeVisible();
+  test('[P0] deleting an event behind a confirmation lands on the empty state with its add control', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
+    const rowToDelete = await addEventFromSettings(
+      page,
+      interceptNetworkCall,
+      tripEvent(new Date())
+    );
 
     // ── Delete ─────────────────────────────────────────────────────────────
     await rowToDelete.locator('[data-testid^="event-delete-"]').click();
@@ -207,7 +275,7 @@ test.describe('Managing events from Settings', () => {
     expect((await deleteResponse).status).toBe(200);
 
     await expect(page.getByTestId('events-delete-confirmation')).toHaveCount(0);
-    await expect(rowFor(page, EDITED_LABEL)).toHaveCount(0);
+    await expect(rowFor(page, ADDED_LABEL)).toHaveCount(0);
 
     // ── Empty state, carrying its own add control ──────────────────────────
     await expect(page.getByTestId('events-settings-empty')).toBeVisible();
@@ -407,7 +475,9 @@ test.describe('Managing events from Settings', () => {
     // absence rather than an assertion that beat the fetch.
     await expect(page.getByTestId('event-countdown-settings-witness-e2e')).toBeVisible();
     await expect(page.getByTestId('event-countdown-settings-bygone-e2e')).toHaveCount(0);
-    await expect(page.getByText('Settings Bygone E2E')).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Settings Bygone E2E', {
+      ignoreCase: true,
+    });
 
     await navigateTo(page, 'settings');
     const row = rowFor(page, 'Settings Bygone E2E');

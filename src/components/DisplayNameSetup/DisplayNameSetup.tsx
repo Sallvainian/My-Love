@@ -247,14 +247,14 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
           <h2 className={DIALOG_TITLE} id="display-name-modal-title">
             {isEdit ? 'Change your name' : 'Welcome!'}
           </h2>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 text-sm text-muted" data-testid="display-name-subtitle">
             {isEdit
               ? 'This is the name your partner sees on your notes.'
               : 'What would you like to be called?'}
           </p>
         </div>
 
-        <form className="grid gap-5" onSubmit={handleSubmit}>
+        <form className="grid gap-5" onSubmit={handleSubmit} data-testid="display-name-form">
           {error && (
             <div
               className={`${FAILURE_BOX} flex items-start gap-2`}
@@ -262,7 +262,11 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
               role="alert"
               aria-live="polite"
             >
-              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <CircleAlert
+                className="mt-0.5 h-4 w-4 shrink-0"
+                aria-hidden="true"
+                data-testid="display-name-error-icon"
+              />
               <span>{error}</span>
             </div>
           )}
@@ -286,7 +290,9 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
               aria-required="true"
               aria-invalid={error ? 'true' : 'false'}
             />
-            <p className="mt-1.5 text-[13px] text-muted">3-30 characters</p>
+            <p className="mt-1.5 text-[13px] text-muted" data-testid="display-name-hint">
+              3-30 characters
+            </p>
           </div>
 
           {/* Cancel first in the DOM so Tab reaches it before the primary

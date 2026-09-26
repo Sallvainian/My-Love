@@ -68,7 +68,7 @@ describe('ImagePreview', () => {
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} />);
 
-    expect(screen.getByText('2.0 MB')).toBeInTheDocument();
+    expect(screen.getByTestId('image-preview-original-size')).toHaveTextContent(/^2\.0 MB$/);
   });
 
   it('should display estimated compressed size', () => {
@@ -80,7 +80,7 @@ describe('ImagePreview', () => {
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} />);
 
     // Estimated size is 10% of original = 500KB
-    expect(screen.getByText('~512.0 KB')).toBeInTheDocument();
+    expect(screen.getByTestId('image-preview-compressed-size')).toHaveTextContent(/^~512\.0 KB$/);
   });
 
   it('should show large file indicator for files over 5MB', () => {
@@ -92,7 +92,7 @@ describe('ImagePreview', () => {
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} />);
 
-    expect(screen.getByText('(large file)')).toBeInTheDocument();
+    expect(screen.getByTestId('image-preview-large-file')).toHaveTextContent('(large file)');
   });
 
   it('should not show large file indicator for files under 5MB', () => {
@@ -104,10 +104,11 @@ describe('ImagePreview', () => {
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} />);
 
-    expect(screen.queryByText('(large file)')).not.toBeInTheDocument();
+    expect(screen.getByTestId('image-preview-original-size')).toHaveTextContent(/^3\.0 MB$/);
+    expect(screen.queryByTestId('image-preview-large-file')).not.toBeInTheDocument();
   });
 
-  it('should call onRemove when remove button clicked', async () => {
+  it('removes the selected picture when Remove is clicked', async () => {
     const user = userEvent.setup();
     const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
     const onRemove = vi.fn();
@@ -134,23 +135,24 @@ describe('ImagePreview', () => {
     expect(onRemove).not.toHaveBeenCalled();
   });
 
-  it('should show compression overlay when isCompressing is true', () => {
+  it('shows Compressing... over the picture while it compresses', () => {
     const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} isCompressing={true} />);
 
-    expect(screen.getByText('Compressing...')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Compressing...');
   });
 
-  it('should not show compression overlay when isCompressing is false', () => {
+  it('shows no compressing overlay once compression is done', () => {
     const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} isCompressing={false} />);
 
-    expect(screen.queryByText('Compressing...')).not.toBeInTheDocument();
+    expect(screen.getByTestId('image-preview')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('should revoke object URL on unmount', async () => {
+  it('releases the preview image when unmounted', async () => {
     const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
 
     const { unmount } = render(<ImagePreview file={mockFile} onRemove={vi.fn()} />);
@@ -164,19 +166,19 @@ describe('ImagePreview', () => {
     expect(revokeObjectURLSpy).toHaveBeenCalledWith(mockObjectUrl);
   });
 
-  it('should format file sizes correctly', () => {
+  it('shows small sizes in B and larger ones in KB', () => {
     // Test bytes
     const tinyFile = new File(['x'], 'tiny.jpg', { type: 'image/jpeg' });
     Object.defineProperty(tinyFile, 'size', { value: 500 });
 
     const { rerender } = render(<ImagePreview file={tinyFile} onRemove={vi.fn()} />);
-    expect(screen.getByText('500 B')).toBeInTheDocument();
+    expect(screen.getByTestId('image-preview-original-size')).toHaveTextContent(/^500 B$/);
 
     // Test KB
     const kbFile = new File(['x'], 'kb.jpg', { type: 'image/jpeg' });
     Object.defineProperty(kbFile, 'size', { value: 50 * 1024 });
 
     rerender(<ImagePreview file={kbFile} onRemove={vi.fn()} />);
-    expect(screen.getByText('50.0 KB')).toBeInTheDocument();
+    expect(screen.getByTestId('image-preview-original-size')).toHaveTextContent(/^50\.0 KB$/);
   });
 });

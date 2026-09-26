@@ -5,7 +5,7 @@
  * store/auth actions, and control outcomes at that consumer boundary.
  */
 import type { Session } from '@supabase/supabase-js';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -218,7 +218,7 @@ function expectKitPlaceholder(testId: 'events-empty-placeholder' | 'events-load-
   const placeholder = screen.getByTestId(testId);
   expect(placeholder).toHaveAttribute('role', 'status');
   expect(placeholder).toHaveClass('bg-card', 'border-line', 'shadow-card');
-  expect(placeholder.querySelector('p')).toHaveClass('text-muted');
+  expect(within(placeholder).getByTestId(`${testId}-message`)).toHaveClass('text-muted');
 }
 
 /** The production auth listener calls the real clearAuth/setAuthUser actions. */
@@ -256,26 +256,44 @@ function controlHomeLoads() {
 }
 
 describe('Auth bootstrap notification ownership', () => {
-  it('installs the initial authenticated session when no notification supersedes it', async () => {
+  /** Renders App with the initial session lookup still pending. */
+  function renderPendingLookup() {
     const lookup = deferred<Session | null>();
     auth.getSession.mockReturnValueOnce(lookup.promise);
     const { requests, loadEvents } = controlHomeLoads();
     const ownership = useAppStore.getState().authSessionVersion;
     render(<App />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    return { lookup, requests, loadEvents, ownership };
+  }
+
+  it('shows the kit heart, not an emoji, on the auth loader while the session lookup is pending', () => {
+    renderPendingLookup();
+
     // The auth loader's heart is a kit-accent lucide icon, not an emoji.
-    const loader = screen.getByText('Loading...').parentElement!;
-    expect(loader.querySelector('svg')).toHaveClass('text-accent');
+    const loader = screen.getByTestId('auth-loading-screen');
+    expect(loader).toBeInTheDocument();
+    expect(within(loader).getByTestId('auth-loading-icon')).toHaveClass('text-accent');
     expect(loader.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+
+  it('installs the initial authenticated session when no notification supersedes it', async () => {
+    const { lookup, ownership } = renderPendingLookup();
+    expect(screen.getByTestId('auth-loading-screen')).toBeInTheDocument();
 
     await act(async () => lookup.resolve(session()));
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
     expect(useAppStore.getState()).toMatchObject({
       userId: USER_ID,
       isAuthenticated: true,
       authSessionVersion: ownership + 1,
     });
+  });
+
+  it('loads Home events once for the installed session and shows the result', async () => {
+    const { lookup, requests, loadEvents } = renderPendingLookup();
+
+    await act(async () => lookup.resolve(session()));
     expect(loadEvents).toHaveBeenCalledTimes(1);
     await act(async () => requests[0].resolve(success));
     expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
@@ -515,12 +533,12 @@ describe('App data loader', () => {
     render(<App />);
     await act(async () => {});
     expect(useAppStore.getState()).toMatchObject({ userId: USER_ID, isAuthenticated: true });
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
 
     // Same kit mark as the auth loader: a kit-accent lucide icon, not an emoji.
-    const loader = screen.getByText('Loading your data...').parentElement!;
-    expect(loader.querySelector('svg')).toHaveClass('text-accent');
+    const loader = screen.getByTestId('app-data-loading-screen');
+    expect(within(loader).getByTestId('app-data-loading-icon')).toHaveClass('text-accent');
     expect(loader.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 });
@@ -695,7 +713,7 @@ describe('Home event-load session ownership', () => {
     profile.lookupOwnDisplayName.mockReturnValueOnce(firstRead.promise);
     await act(async () => auth.listener!(session()));
     await act(async () => firstRead.resolve({ status: 'unset' }));
-    expect(screen.getByText('Set your display name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Set your display name' })).toBeInTheDocument();
 
     // A token refresh while the modal is open raises a second read, which is
     // still in flight when the user submits their name. Auth never changes here,
@@ -705,12 +723,16 @@ describe('Home event-load session ownership', () => {
     const ownership = useAppStore.getState().authSessionVersion;
     await act(async () => auth.listener!(session('refreshed-token')));
 
-    await user.click(screen.getByText('Set your display name'));
-    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Set your display name' }));
+    expect(
+      screen.queryByRole('button', { name: 'Set your display name' })
+    ).not.toBeInTheDocument();
 
     await act(async () => staleRead.resolve({ status: 'unset' }));
     expect(useAppStore.getState().authSessionVersion).toBe(ownership);
-    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Set your display name' })
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
   });
 

@@ -150,20 +150,35 @@ describe('eventsSlice', () => {
       expect(store.getState().eventsPagination).toEqual(pagination(false));
     });
 
-    it('keeps rows and cursors on failure, retries the same page, and isolates write errors', async () => {
+    /** Loads one event and a next-page cursor, then fails the next history page. */
+    async function failFirstHistoryPage() {
       const store = createTestStore();
       const initialEvents = [event('current', '2026-09-12')];
       const initialPagination = pagination();
       store.setState({ events: initialEvents, eventsPagination: initialPagination });
       getEventsPage.mockRejectedValueOnce(new Error('history failed'));
-      expect(await store.getState().loadMoreEvents()).toEqual({ status: 'failure', error: 'history failed' });
+      const result = await store.getState().loadMoreEvents();
+      return { store, initialEvents, initialPagination, result };
+    }
+
+    it('keeps rows and cursors on a failed page and reports it as the history error', async () => {
+      const { store, initialEvents, initialPagination, result } = await failFirstHistoryPage();
+      expect(result).toEqual({ status: 'failure', error: 'history failed' });
       expect(store.getState().events).toBe(initialEvents);
       expect(store.getState().eventsPagination).toBe(initialPagination);
       expect(store.getState().eventsError).toBeNull();
       expect(store.getState().eventsHistoryError).toBe('history failed');
+    });
+
+    it('a failed write does not touch the history error', async () => {
+      const { store } = await failFirstHistoryPage();
       createEvent.mockRejectedValue(new Error('write failed'));
       await store.getState().addEvent({ label: 'deep', eventDate: '1900-01-01' });
       expect(store.getState().eventsHistoryError).toBe('history failed');
+    });
+
+    it('retries the same page after a failure and clears the history error', async () => {
+      const { store, initialPagination } = await failFirstHistoryPage();
       getEventsPage.mockResolvedValueOnce({ events: [event('older', '1900-01-01')], pagination: pagination(false) });
       await store.getState().loadMoreEvents();
       expect(getEventsPage.mock.calls).toEqual([[initialPagination], [initialPagination]]);

@@ -16,6 +16,7 @@
  */
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type UpdateResult = { data: { id: string }[] | null; error: null };
@@ -174,24 +175,43 @@ describe('Settings offers a way to change the display name', () => {
   });
 
   describe('completing the form re-reads the row', () => {
-    it('shows the saved name without a reload', async () => {
-      const user = userEvent.setup();
-      await renderSettings('Jessie');
-
+    /** Saves `name` through the form and waits for the re-read to reach the row. */
+    async function saveNameAs(user: UserEvent, name: string) {
       await user.click(changeButton());
       await user.clear(nameField());
-      await user.type(nameField(), 'Casey');
+      await user.type(nameField(), name);
 
       // The second read is what the row renders from — the component never
       // takes the submitted string for granted, because the read applies the
       // seed rule and the write only refuses it.
-      backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Casey' });
+      backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: name });
       await user.click(screen.getByTestId('display-name-submit'));
 
-      await waitFor(() => expect(nameRow().textContent).toBe('Casey'));
+      await waitFor(() => expect(nameRow().textContent).toBe(name));
+    }
+
+    it('shows the saved name without a reload', async () => {
+      const user = userEvent.setup();
+      await renderSettings('Jessie');
+      await saveNameAs(user, 'Casey');
+
       expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument();
-      expect(backend.updatePayload).toMatchObject({ display_name: 'Casey' });
       expect(backend.lookupOwnDisplayName).toHaveBeenCalledTimes(2);
+    });
+
+    it('writes the new name to the users row', async () => {
+      const user = userEvent.setup();
+      await renderSettings('Jessie');
+      await saveNameAs(user, 'Casey');
+
+      expect(backend.updatePayload).toMatchObject({ display_name: 'Casey' });
+    });
+
+    it('refreshes Home’s profile copy so its birthday card shows the new name', async () => {
+      const user = userEvent.setup();
+      await renderSettings('Jessie');
+      await saveNameAs(user, 'Casey');
+
       // Home's own birthday card is labelled with the name: its copy refreshes.
       expect(backend.refreshLocalCopy).toHaveBeenCalledWith('profile');
     });

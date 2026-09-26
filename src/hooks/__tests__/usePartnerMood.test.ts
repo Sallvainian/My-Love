@@ -65,7 +65,7 @@ describe('usePartnerMood', () => {
     expect(result.current.partnerMood).toBeNull();
   });
 
-  it('subscribes to partner mood updates via Broadcast', async () => {
+  it("listens for the partner's live mood updates once mounted", async () => {
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
     vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(() => {});
 
@@ -147,7 +147,7 @@ describe('usePartnerMood', () => {
     expect(result.current.partnerMood).toEqual(partnerMood2);
   });
 
-  it('unsubscribes on unmount', async () => {
+  it('stops receiving mood updates after unmount', async () => {
     const unsubscribeMock = vi.fn();
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
@@ -164,7 +164,7 @@ describe('usePartnerMood', () => {
     expect(unsubscribeMock).toHaveBeenCalled();
   });
 
-  it('sets error state when getLatestPartnerMood rejects', async () => {
+  it('reports a load error and no mood when the partner mood cannot be read', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockRejectedValue(new Error('Network failure'));
@@ -184,7 +184,7 @@ describe('usePartnerMood', () => {
     consoleSpy.mockRestore();
   });
 
-  it('sets disconnected status when subscribeMoodUpdates rejects', async () => {
+  it('reports disconnected with an error when live updates cannot start', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);

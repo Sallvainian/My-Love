@@ -168,7 +168,8 @@ describe('createSettingsSlice initializeApp', () => {
     mockReadMessageData.mockResolvedValue(null);
   });
 
-  it('loads default messages only when IndexedDB has no messages', async () => {
+  /** Initializes against an empty IndexedDB, so the bundled defaults are seeded and re-read. */
+  async function initializeEmptyDb() {
     const seededMessages = [message(1, 'Seeded', { category: 'memory' })];
 
     mockStorageService.init.mockResolvedValue(undefined);
@@ -180,6 +181,11 @@ describe('createSettingsSlice initializeApp', () => {
 
     const { store, updateCurrentMessage } = await buildTestStore();
     await store.getState().initializeApp();
+    return { store, updateCurrentMessage, seededMessages };
+  }
+
+  it('seeds the bundled defaults when IndexedDB has no messages', async () => {
+    await initializeEmptyDb();
 
     expect(mockLoadDefaultMessages).toHaveBeenCalledTimes(1);
     expect(mockStorageService.addMessages).toHaveBeenCalledTimes(1);
@@ -193,6 +199,11 @@ describe('createSettingsSlice initializeApp', () => {
         }),
       ])
     );
+  });
+
+  it("re-reads the shared bundled rows after seeding and reads the account's rows from its copy", async () => {
+    await initializeEmptyDb();
+
     expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(2);
     // Both reads — the "is this database seeded?" check and the re-read for
     // auto-generated ids — are of the shared bundled rows; the signed-in
@@ -200,6 +211,11 @@ describe('createSettingsSlice initializeApp', () => {
     expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(1);
     expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2);
     expect(mockReadMessageData).toHaveBeenCalledWith(SIGNED_IN_USER);
+  });
+
+  it('publishes the seeded pool and picks a current message', async () => {
+    const { store, updateCurrentMessage, seededMessages } = await initializeEmptyDb();
+
     expect(store.getState().messages).toEqual(unfavorited(seededMessages));
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });
@@ -238,7 +254,12 @@ describe('createSettingsSlice initializeApp', () => {
       .toEqual([42, 400]);
   });
 
-  it('withholds the stale pool and re-reads under C when the account changes mid-flight (seeded)', async () => {
+  /**
+   * Starts initialization on a seeded database and switches to C while the
+   * first read is held. Stops at `await inFlight`, with the handoff read under
+   * C still pending.
+   */
+  async function switchToCDuringSeededInit() {
     const initRead = deferred<Message[]>();
     const handoffRead = deferred<Message[]>();
     mockStorageService.init.mockResolvedValue(undefined);
@@ -258,6 +279,11 @@ describe('createSettingsSlice initializeApp', () => {
     });
     initRead.settle(aOutgoingPool());
     await inFlight;
+    return { store, updateCurrentMessage, loadMessagesRequestedBy, lastLoadSettled, handoffRead };
+  }
+
+  it('withholds the stale pool when the account changes mid-flight (seeded)', async () => {
+    const { store, updateCurrentMessage } = await switchToCDuringSeededInit();
 
     // Stale `set({ messages })` did not land — cold-boot `messages` is still
     // empty, and the outgoing account's rows are not on screen.
@@ -265,6 +291,11 @@ describe('createSettingsSlice initializeApp', () => {
     expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).not.toHaveBeenCalled();
     expect(store.getState().isLoading).toBe(false);
+  });
+
+  it("hands off a re-read under C and never reads the outgoing account's copy (seeded)", async () => {
+    const { loadMessagesRequestedBy } = await switchToCDuringSeededInit();
+
     // Handoff was issued under C, but its write has not landed yet.
     expect(loadMessagesRequestedBy).toEqual([USER_C]);
     expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(1);
@@ -273,6 +304,11 @@ describe('createSettingsSlice initializeApp', () => {
     // the session has moved on.
     expect(mockReadMessageData).toHaveBeenCalledWith(USER_C);
     expect(mockReadMessageData).not.toHaveBeenCalledWith(SIGNED_IN_USER);
+  });
+
+  it("publishes C's pool once the handoff read lands (seeded)", async () => {
+    const { store, updateCurrentMessage, lastLoadSettled, handoffRead } =
+      await switchToCDuringSeededInit();
 
     const incoming = cIncomingPool();
     handoffRead.settle(incoming);
@@ -281,6 +317,12 @@ describe('createSettingsSlice initializeApp', () => {
     expect(store.getState().messages).toEqual(unfavorited(incoming));
     expect(store.getState().messages).not.toEqual([]);
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('latches initialization after the handoff, so a second initializeApp reads nothing (seeded)', async () => {
+    const { store, lastLoadSettled, handoffRead } = await switchToCDuringSeededInit();
+    handoffRead.settle(cIncomingPool());
+    await lastLoadSettled();
 
     // The handoff, not a re-init, recovered the pool: `isInitialized` latches.
     mockStorageService.getAllMessages.mockClear();

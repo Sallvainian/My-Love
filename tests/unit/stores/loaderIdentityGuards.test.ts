@@ -1210,7 +1210,11 @@ describe('loader identity guards', () => {
   });
 
   describe('importCustomMessages', () => {
-    it('stamps the imported rows with A and never writes under C', async () => {
+    /**
+     * Starts A's import, switches to C while the file is still being read, and
+     * lets the server create land. Returns the import, which may still be settling.
+     */
+    async function importAcrossSwitchToC() {
       const fileRead = deferred<string>();
       const creating = deferred<unknown>();
       customCreate.mockReturnValue(creating.promise);
@@ -1226,18 +1230,38 @@ describe('loader identity guards', () => {
       fileRead.settle(JSON.stringify(exportFile()));
       await vi.waitFor(() => expect(customCreate).toHaveBeenCalled());
       creating.settle({ ...aRemote('A-IMPORTED-MESSAGE'), serverId: 'srv-imported' });
+      return { inFlight };
+    }
 
-      // The caller still learns what happened to THEIR import…
+    it('still reports the import result to the caller after a switch to C', async () => {
+      const { inFlight } = await importAcrossSwitchToC();
+
       await expect(inFlight).resolves.toEqual({ imported: 1, skipped: 0 });
-      // …the rows carry A's id, because it was captured before the switch…
+    });
+
+    it('stamps the imported rows with A, captured before the switch', async () => {
+      const { inFlight } = await importAcrossSwitchToC();
+      await inFlight;
+
       expect(customCreate).toHaveBeenCalledWith(
         A,
         expect.objectContaining({ text: 'A-IMPORTED-MESSAGE' }),
         expect.any(String)
       );
-      // …duplicates were judged against A's copy, never C's…
+    });
+
+    it("judges duplicates against A's copy, never C's", async () => {
+      const { inFlight } = await importAcrossSwitchToC();
+      await inFlight;
+
       expect(readLocalCopy).not.toHaveBeenCalledWith(C, 'message-data');
-      // …and C's store is untouched, neither list nor rotation pool, nor either copy.
+    });
+
+    it("leaves C's lists and saved copy untouched", async () => {
+      const { inFlight } = await importAcrossSwitchToC();
+      await inFlight;
+
+      // Neither list nor rotation pool, nor either copy.
       expect(useAppStore.getState().customMessages).toEqual(cCustomList());
       expect(useAppStore.getState().messages).toEqual(cRotationPool());
       expect(messageDataWrites()).toEqual([]);
@@ -2136,7 +2160,7 @@ describe('loader identity guards', () => {
   // ==========================================================================
 
   describe('when the identity has not changed', () => {
-    it('loadPartner writes normally', async () => {
+    it("a partner load shows the linked partner and saves it to the account's partner copy", async () => {
       getPartner.mockResolvedValue({ status: 'linked', partner: PARTNER_A });
 
       await useAppStore.getState().loadPartner();
@@ -2149,7 +2173,7 @@ describe('loader identity guards', () => {
       });
     });
 
-    it('fetchNotes writes normally', async () => {
+    it("a notes fetch shows the account's notes and stops loading", async () => {
       loveNotesQuery.mockReturnValue(
         loveNotesBuilder(Promise.resolve({ data: [note('a1', 'A-CHAT')], error: null }))
       );
@@ -2160,7 +2184,7 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().notesIsLoading).toBe(false);
     });
 
-    it('loadMessages writes normally', async () => {
+    it("a messages load shows the bundled pool plus the account's saved custom message", async () => {
       getAllStoredMessages.mockResolvedValue(cRotationPool());
       savedMessageData({ [A]: aCopy() });
 
@@ -2172,7 +2196,7 @@ describe('loader identity guards', () => {
       ]);
     });
 
-    it('loadCustomMessages writes normally', async () => {
+    it("a custom-messages load lists the account's saved custom message and marks the list loaded", async () => {
       savedMessageData({ [A]: aCopy() });
 
       await useAppStore.getState().loadCustomMessages();
@@ -2183,7 +2207,7 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().customMessagesLoaded).toBe(true);
     });
 
-    it('createCustomMessage writes normally', async () => {
+    it("a created custom message is listed, saved to the account's copy, and the rotation pool re-read", async () => {
       customCreate.mockResolvedValue(aRemote());
 
       await useAppStore
@@ -2201,18 +2225,29 @@ describe('loader identity guards', () => {
       expect(readLocalCopy).toHaveBeenLastCalledWith(A, 'message-data');
     });
 
-    it('updateCustomMessage and deleteCustomMessage write normally', async () => {
+    /** Lists A's saved custom message (id 7) from A's copy. */
+    async function loadACustomMessage() {
       savedMessageData({ [A]: aCopy() });
-      customUpdateMessage.mockResolvedValue(aRemote('A-EDITED'));
-      customDeleteForUser.mockResolvedValue(undefined);
       await useAppStore.getState().loadCustomMessages();
+    }
+
+    it("an edited custom message shows its new text and is saved to the account's copy", async () => {
+      customUpdateMessage.mockResolvedValue(aRemote('A-EDITED'));
+      await loadACustomMessage();
 
       await useAppStore.getState().updateCustomMessage({ id: 7, text: 'A-EDITED' });
       expect(useAppStore.getState().customMessages[0].text).toBe('A-EDITED');
+      expect(messageDataWrites()).toHaveLength(1);
+    });
+
+    it("a deleted custom message leaves the list and the account's copy is saved", async () => {
+      customDeleteForUser.mockResolvedValue(undefined);
+      await loadACustomMessage();
+      expect(useAppStore.getState().customMessages).toHaveLength(1);
 
       await useAppStore.getState().deleteCustomMessage(7);
       expect(useAppStore.getState().customMessages).toEqual([]);
-      expect(messageDataWrites()).toHaveLength(2);
+      expect(messageDataWrites()).toHaveLength(1);
     });
 
     it('exportCustomMessages still downloads the file', async () => {
@@ -2236,7 +2271,7 @@ describe('loader identity guards', () => {
       }
     });
 
-    it('importCustomMessages writes normally', async () => {
+    it("an import reports one imported row, saves it to the account's copy and re-reads the rotation pool", async () => {
       customCreate.mockResolvedValue({ ...aRemote('A-IMPORTED-MESSAGE'), serverId: 'srv-imported' });
 
       await expect(
@@ -2249,7 +2284,7 @@ describe('loader identity guards', () => {
       expect(readLocalCopy).toHaveBeenLastCalledWith(A, 'message-data');
     });
 
-    it('loadEvents writes normally', async () => {
+    it("an events load shows the account's events and stops loading", async () => {
       getEvents.mockResolvedValue([{ id: 'a-event', label: 'A-EVENT' }]);
 
       await useAppStore.getState().loadEvents();
@@ -2258,7 +2293,7 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().eventsIsLoading).toBe(false);
     });
 
-    it('uploadPhoto writes normally', async () => {
+    it("an uploaded photo resolves success and joins the gallery as the account's own, with no signed URL", async () => {
       uploadPhotoService.mockResolvedValue(aPhoto());
 
       await expect(useAppStore.getState().uploadPhoto(uploadInput())).resolves.toEqual({
@@ -2336,7 +2371,7 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().photos).toHaveLength(1);
     });
 
-    it('deletePhoto writes normally', async () => {
+    it('a deleted photo leaves the gallery', async () => {
       useAppStore.setState({ photos: [{ ...aPhoto(), signedUrl: null, isOwn: true }] } as unknown as Parameters<
         typeof useAppStore.setState
       >[0]);

@@ -232,7 +232,9 @@ describe('PokeKissInterface on the kit', () => {
   it('renders the three action tiles and History without any click', () => {
     render(<PokeKissInterface />);
 
-    expect(screen.getByText('Send a little something')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Send a little something' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Poke' })).toHaveAttribute('data-testid', 'poke-button');
     expect(screen.getByRole('button', { name: 'Kiss' })).toHaveAttribute('data-testid', 'kiss-button');
     expect(screen.getByRole('button', { name: 'Fart' })).toHaveAttribute('data-testid', 'fart-button');

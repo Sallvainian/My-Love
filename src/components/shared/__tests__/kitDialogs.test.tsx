@@ -108,9 +108,12 @@ describe('the delete dialogs scroll on a short screen', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delete First date' }));
 
-    const panel = screen.getByRole('heading', { name: 'Delete Anniversary?' }).parentElement!;
+    const scrim = screen.getByRole('dialog', { name: 'Delete Anniversary?' });
+    const panel = screen.getByTestId('anniversary-delete-panel');
+    expect(scrim).toContainElement(panel);
+    expect(panel).toContainElement(screen.getByRole('heading', { name: 'Delete Anniversary?' }));
     expect(panel).toHaveClass('max-h-full', 'overflow-y-auto', 'max-w-sm');
-    expectSafeScrim(panel.parentElement!);
+    expectSafeScrim(scrim);
   });
 
   it('the note removal panel, on the layer above the chat', () => {
@@ -126,7 +129,8 @@ describe('the delete dialogs scroll on a short screen', () => {
     const scrim = screen.getByTestId('note-remove-confirmation');
     expectSafeScrim(scrim);
     expect(zClasses(scrim)).toEqual(['z-70']);
-    const panel = scrim.firstElementChild as HTMLElement;
+    const panel = screen.getByTestId('note-remove-panel');
+    expect(scrim).toContainElement(panel);
     expect(panel).toHaveClass('max-h-full', 'overflow-y-auto', 'max-w-md');
     expect(panel).not.toHaveClass('p-5');
   });

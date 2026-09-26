@@ -166,7 +166,7 @@ describe('auth session/action services', () => {
     expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
   });
 
-  it('applies token side effects in onAuthStateChange for sign-in and sign-out events', async () => {
+  async function fireSignInThenSignOut() {
     const session = createAuthBootstrapSession({
       userId: 'user-456',
       email: 'auth@example.com',
@@ -187,15 +187,35 @@ describe('auth session/action services', () => {
     authStateCallback('SIGNED_OUT', null);
     await vi.waitFor(() => expect(mockClearAuthToken).toHaveBeenCalled());
 
+    return { session, listener, unsubscribe };
+  }
+
+  it('persists the token when onAuthStateChange reports a sign-in', async () => {
+    await fireSignInThenSignOut();
+
     expect(mockStoreAuthToken).toHaveBeenCalledWith({
       accessToken: 'new-access-token',
       refreshToken: 'new-refresh-token',
       expiresAt: 777,
       userId: 'user-456',
     });
+  });
+
+  it('clears the stored token when onAuthStateChange reports a sign-out', async () => {
+    await fireSignInThenSignOut();
+
     expect(mockClearAuthToken).toHaveBeenCalled();
+  });
+
+  it('delivers the sign-in session, then null for the sign-out, to the listener', async () => {
+    const { session, listener } = await fireSignInThenSignOut();
+
     expect(listener).toHaveBeenNthCalledWith(1, session);
     expect(listener).toHaveBeenNthCalledWith(2, null);
+  });
+
+  it('unsubscribe releases the Supabase auth subscription', async () => {
+    const { unsubscribe } = await fireSignInThenSignOut();
 
     unsubscribe();
     expect(mockUnsubscribe).toHaveBeenCalledTimes(1);

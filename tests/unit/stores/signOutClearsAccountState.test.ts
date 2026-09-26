@@ -863,7 +863,7 @@ describe('clearAuth on sign-out', () => {
     }
   });
 
-  it('signedOutState() and this test agree on which fields exist', () => {
+  it('sign-out resets exactly the account fields this suite lists, so a newly added field cannot go unasserted', () => {
     // Catches drift in the other direction: a field ADDED to the source without
     // being added here would otherwise go unasserted forever.
     expect(Object.keys(signedOutState()).sort()).toEqual(Object.keys(EXPECTED_RESET).sort());

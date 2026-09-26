@@ -80,6 +80,27 @@ function makeState(overrides: Record<string, unknown> = {}) {
 
 let state = makeState();
 
+/** Render the view with three partner moods: one current card, two Recent rows. */
+function renderSeveral() {
+  state = makeState({ partnerMoods: SEVERAL });
+  render(<PartnerMoodView />);
+  const cards = screen.getAllByTestId('partner-mood-card');
+  const current = cards[0];
+  const list = screen.getByTestId('partner-mood-list');
+  return { cards, current, list, rows: within(list).getAllByTestId('partner-mood-card') };
+}
+
+/** Render offline with no moods while the saved-copy read is still pending. */
+function renderOfflineWithPendingRead() {
+  let finishRead: () => void = () => {};
+  state = makeState({
+    syncStatus: { isOnline: false },
+    fetchPartnerMoods: vi.fn(() => new Promise<void>((resolve) => (finishRead = resolve))),
+  });
+  render(<PartnerMoodView />);
+  return () => finishRead();
+}
+
 describe('PartnerMoodView on the kit', () => {
   beforeEach(() => {
     cleanup();
@@ -89,37 +110,46 @@ describe('PartnerMoodView on the kit', () => {
     vi.clearAllMocks();
   });
 
-  it('puts the newest mood in the current card and the rest in Recent moods', async () => {
-    state = makeState({ partnerMoods: SEVERAL });
-    render(<PartnerMoodView />);
+  it('puts the newest mood in the current card and the rest in Recent moods', () => {
+    const { cards, current, list, rows } = renderSeveral();
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Harper$/);
-
-    const cards = screen.getAllByTestId('partner-mood-card');
     expect(cards).toHaveLength(3);
-
-    const current = cards[0];
     expect(current).toHaveTextContent('Feeling right now');
     expect(current).toHaveTextContent('Loved');
     expect(current).toHaveTextContent('Sad');
     expect(current).toHaveTextContent('Thinking of you');
 
-    const list = screen.getByTestId('partner-mood-list');
     expect(list).not.toContainElement(current);
-    const rows = within(list).getAllByTestId('partner-mood-card');
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('Happy');
     expect(rows[1]).toHaveTextContent('Tired');
-    expect(screen.getByText('Recent moods')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Recent moods' })).toBeInTheDocument();
+  });
+
+  it('titles the page with the partner display name', () => {
+    renderSeveral();
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Harper$/);
+  });
+
+  it('dates the current card by full weekday and the Recent rows by short day', () => {
+    const { current, rows } = renderSeveral();
 
     // Row dates are "Thu 19 Mar"; the current card's is "Friday 20 March".
     expect(rows[0]).toHaveTextContent(/^Happy.*Fri 11 Sep · /);
     expect(current).toHaveTextContent(/Saturday 12 September · /);
+  });
 
-    // The action tiles sit between the current card and Recent moods.
+  it('places the action tiles between the current card and Recent moods', () => {
+    const { current, list } = renderSeveral();
+
     const tiles = screen.getByTestId('poke-kiss-interface');
     expect(current.compareDocumentPosition(tiles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(tiles.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('enables refresh when online', async () => {
+    renderSeveral();
 
     expect(await screen.findByTestId('partner-mood-refresh-button')).toBeEnabled();
   });
@@ -129,9 +159,14 @@ describe('PartnerMoodView on the kit', () => {
     render(<PartnerMoodView />);
 
     expect(screen.getAllByTestId('partner-mood-card')).toHaveLength(1);
-    expect(screen.getByText('Feeling right now')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('partner-mood-card')).getByRole('heading', {
+        level: 2,
+        name: 'Feeling right now',
+      })
+    ).toBeInTheDocument();
     expect(screen.queryByTestId('partner-mood-list')).not.toBeInTheDocument();
-    expect(screen.queryByText('Recent moods')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Recent moods' })).not.toBeInTheDocument();
   });
 
   it('shows the empty-state card and no current card when there are no moods', async () => {
@@ -144,16 +179,22 @@ describe('PartnerMoodView on the kit', () => {
     expect(screen.queryByTestId('partner-mood-list')).not.toBeInTheDocument();
   });
 
-  it('reads Offline, disables refresh and shows the offline notice when offline with no moods', async () => {
-    let finishRead: () => void = () => {};
-    state = makeState({
-      syncStatus: { isOnline: false },
-      fetchPartnerMoods: vi.fn(() => new Promise<void>((resolve) => (finishRead = resolve))),
-    });
-    render(<PartnerMoodView />);
+  it('reads Offline in the status line when offline', () => {
+    renderOfflineWithPendingRead();
 
     expect(screen.getByTestId('realtime-connection-status')).toHaveTextContent(/^Offline$/);
+  });
+
+  it('disables refresh when offline', () => {
+    renderOfflineWithPendingRead();
+
     expect(screen.getByTestId('partner-mood-refresh-button')).toBeDisabled();
+  });
+
+  it('shows the offline notice and the empty state only after the saved copy is read, offline with no moods', async () => {
+    const finishRead = renderOfflineWithPendingRead();
+
+    expect(screen.getByTestId('partner-mood-view')).toBeInTheDocument();
     // Not while the saved copy is still being read: it may fill the list.
     expect(screen.queryByTestId('partner-mood-offline-notice')).not.toBeInTheDocument();
     await act(async () => finishRead());
@@ -248,7 +289,9 @@ describe('PartnerMoodView on the kit', () => {
     render(<PartnerMoodView />);
 
     expect(screen.getByTestId('partner-load-error')).toHaveTextContent("Couldn't load your partner");
-    expect(screen.queryByText('Connect with Your Partner')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 1, name: 'Connect with Your Partner' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('partner-search-card')).not.toBeInTheDocument();
   });
 
@@ -256,7 +299,9 @@ describe('PartnerMoodView on the kit', () => {
     state = makeState({ partner: null, partnerLoadError: false });
     render(<PartnerMoodView />);
 
-    expect(screen.getByText('Connect with Your Partner')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Connect with Your Partner' })
+    ).toBeInTheDocument();
     expect(screen.queryByTestId('partner-load-error')).not.toBeInTheDocument();
   });
 

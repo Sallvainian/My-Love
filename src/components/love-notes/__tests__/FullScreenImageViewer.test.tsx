@@ -40,7 +40,7 @@ describe('FullScreenImageViewer', () => {
     document.body.style.overflow = originalOverflow;
   });
 
-  it('should render image when isOpen is true', () => {
+  it('shows the picture full screen when opened', () => {
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />);
 
     const img = screen.getByAltText('Full screen image');
@@ -48,19 +48,19 @@ describe('FullScreenImageViewer', () => {
     expect(img).toHaveAttribute('src', mockImageUrl);
   });
 
-  it('should not render when isOpen is false', () => {
+  it('shows nothing while closed', () => {
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={false} onClose={vi.fn()} />);
 
     expect(screen.queryByAltText('Full screen image')).not.toBeInTheDocument();
   });
 
-  it('should not render when imageUrl is null', () => {
+  it('shows no dialog when there is no picture', () => {
     render(<FullScreenImageViewer imageUrl={null} isOpen={true} onClose={vi.fn()} />);
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('should call onClose when X button is clicked', async () => {
+  it('closes when the close button is clicked', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
@@ -71,7 +71,7 @@ describe('FullScreenImageViewer', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('should call onClose when overlay is clicked', async () => {
+  it('closes when the backdrop is clicked', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
@@ -98,7 +98,7 @@ describe('FullScreenImageViewer', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('should call onClose when Escape key is pressed', async () => {
+  it('closes on Escape', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
@@ -169,7 +169,7 @@ describe('FullScreenImageViewer', () => {
     expect(screen.getByAltText('Love note image')).toBeInTheDocument();
   });
 
-  it('should have proper accessibility attributes', () => {
+  it('is exposed as a modal dialog named "Full screen image viewer"', () => {
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />);
 
     const dialog = screen.getByRole('dialog');
@@ -177,7 +177,7 @@ describe('FullScreenImageViewer', () => {
     expect(dialog).toHaveAttribute('aria-label', 'Full screen image viewer');
   });
 
-  it('should remove keydown listener when closed', async () => {
+  it('ignores Escape once it has been closed', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const { rerender } = render(

@@ -152,7 +152,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Love notes from the local copy', () => {
-  test('a thread loaded online is listed offline after a reload, image included', async ({
+  test('[P1] a thread loaded online is listed offline after a reload, image included', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -229,7 +229,7 @@ test.describe('Love notes from the local copy', () => {
     }
   });
 
-  test('a note written while offline appears after reconnect without a reload', async ({
+  test('[P1] a note written while offline appears after reconnect without a reload', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,

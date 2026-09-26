@@ -635,13 +635,19 @@ export function PhotoViewer({
             {/* AC 6.4.15: Loading spinner */}
             {(isLoading || image.status === 'loading') && !showImageError && !imageNotSaved && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <LoaderCircle className="h-12 w-12 animate-spin text-white" />
+                <LoaderCircle
+                  className="h-12 w-12 animate-spin text-white"
+                  data-testid="photo-viewer-loading-spinner"
+                />
               </div>
             )}
 
             {/* AC 6.4.16: Error state */}
             {showImageError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+              <div
+                className="absolute inset-0 flex flex-col items-center justify-center text-white"
+                data-testid="photo-viewer-load-error"
+              >
                 <p className="mb-4">Failed to load photo</p>
                 <button
                   onClick={handleRetryLoad}
@@ -690,7 +696,7 @@ export function PhotoViewer({
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="mb-1 text-sm text-muted">
+          <div className="mb-1 text-sm text-muted" data-testid="photo-viewer-position">
             Photo {currentIndex + 1} of {photos.length} •{' '}
             {currentPhoto.isOwn ? 'Your photo' : 'Partner photo'}
           </div>
@@ -771,7 +777,11 @@ export function PhotoViewer({
                   className="flex h-12 items-center gap-2 rounded-full bg-dtint px-5 text-[15px] font-semibold text-danger transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
                 >
                   {isDeleting && (
-                    <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    <LoaderCircle
+                      className="h-4 w-4 animate-spin"
+                      aria-hidden="true"
+                      data-testid="photo-viewer-delete-spinner"
+                    />
                   )}
                   Delete
                 </button>

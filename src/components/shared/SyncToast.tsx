@@ -123,8 +123,14 @@ export function SyncToast({ syncResult, onDismiss, autoDismissMs = 5000 }: SyncT
           aria-live="polite"
           data-testid="sync-toast"
         >
-          <Icon className={`h-5 w-5 shrink-0 ${config.iconColor}`} aria-hidden="true" />
-          <span className="flex-1 text-sm font-medium text-ink">{config.message}</span>
+          <Icon
+            className={`h-5 w-5 shrink-0 ${config.iconColor}`}
+            aria-hidden="true"
+            data-testid="sync-toast-icon"
+          />
+          <span className="flex-1 text-sm font-medium text-ink" data-testid="sync-toast-message">
+            {config.message}
+          </span>
           <button
             type="button"
             onClick={handleDismiss}

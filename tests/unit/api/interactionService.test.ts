@@ -375,7 +375,7 @@ describe('interactionService', () => {
       expect(failure?.message).not.toContain(SYNC_PROMISE);
     });
 
-    it('is re-thrown ahead of logSupabaseError, so it is not logged as a Supabase failure', async () => {
+    it('reports the empty body without logging it as a Supabase failure', async () => {
       // The re-throw sits above logSupabaseError in the catch tail. Reordering
       // it would restore both the double-log and the network dressing, and
       // nothing else in this file would notice.
@@ -472,7 +472,7 @@ describe('interactionService', () => {
     // `isPostgrestError` branch in two of them had no test at all.
     const denied: FakePostgrestError = RLS_DENIED;
 
-    it('still maps a send through handleSupabaseError, unchanged', async () => {
+    it('tells the sender a denied send is a Row Level Security permission failure', async () => {
       backend.nextError = denied;
 
       const failure = await rejection(interactionService.sendPoke(USER_ID));

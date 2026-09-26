@@ -115,7 +115,7 @@ describe('offline writes fail before any request', () => {
     ['deleteCustomMessage', () => customMessagesApi.deleteCustomMessage('cm-1')],
     ['addFavorite', () => messageFavoritesApi.addFavorite(A, 'b:1')],
     ['removeFavorite', () => messageFavoritesApi.removeFavorite(A, 'b:1')],
-  ])('%s', async (_name, write) => {
+  ])('%s refuses offline with an AccountDataError before any request', async (_name, write) => {
     setOnline(false);
     const failure = await write().catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(AccountDataError);

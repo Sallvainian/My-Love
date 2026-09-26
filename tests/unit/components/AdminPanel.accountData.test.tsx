@@ -83,7 +83,7 @@ function savedRow(id: number, userId: string, serverId: string, text: string): M
 }
 
 function row(text: string) {
-  return screen.getByText(text).closest('tr')!;
+  return screen.getByRole('row', { name: new RegExp(text) });
 }
 
 beforeEach(async () => {
@@ -127,16 +127,29 @@ describe('AdminPanel with the real local copy and store', () => {
     await user.click(within(row('Account A message')).getByTestId(`message-row-${dialog}-button`));
     expect(screen.getByTestId(previewTestId)).toBeInTheDocument();
     await switchAccount(B);
+    expect(screen.getByText('Account B message')).toBeInTheDocument();
     expect(screen.queryByText('Account A message')).toBeNull();
     expect(screen.queryByTestId('admin-edit-form')).toBeNull();
     expect(screen.queryByTestId('admin-delete-dialog')).toBeNull();
-    expect(screen.getByText('Account B message')).toBeInTheDocument();
+    await switchAccount(A);
+    expect(screen.getByTestId('admin-message-list')).toBeInTheDocument();
+    expect(screen.queryByText('Account B message')).toBeNull();
+  });
+
+  it("deletes the outgoing account's saved copy on each switch and keeps the incoming one's", async () => {
+    panel();
+    await switchAccount(B);
     // A's copy left the device with A's session (CAP-7); B's stays.
     await waitFor(async () => expect(await readMessageData(A)).toBeNull());
     expect(await diskRow(bId, B)).toBeDefined();
     await switchAccount(A);
-    expect(screen.queryByText('Account B message')).toBeNull();
     await waitFor(async () => expect(await readMessageData(B)).toBeNull());
+  });
+
+  it("lists A's own row once after switching back and refreshing from the server", async () => {
+    panel();
+    await switchAccount(B);
+    await switchAccount(A);
     // A's own rows come back from the server on A's refresh, listed once.
     const { fakeCustomMessagesApi } = await import('../helpers/fakeAccountDataApis');
     fakeCustomMessagesApi.fetchCustomMessages.mockResolvedValueOnce([
@@ -152,8 +165,11 @@ describe('AdminPanel with the real local copy and store', () => {
     expect(screen.getAllByText('Account A message')).toHaveLength(1);
   });
 
-  it('keeps deletion pending, prevents dismissal and duplicate submits, then closes after persisted success', async () => {
-    const user = userEvent.setup();
+  /**
+   * Opens A's delete dialog with the server delete held at a gate, and confirms
+   * once. The row's message is the current daily message.
+   */
+  async function openGatedDelete(user: ReturnType<typeof userEvent.setup>) {
     panel();
     act(() => { useAppStore.setState({ currentMessage: useAppStore.getState().messages.find((message) => message.id === aId)! }); });
     const gate = deferred();
@@ -164,7 +180,12 @@ describe('AdminPanel with the real local copy and store', () => {
     });
     await user.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
     await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
-    await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
+    return { gate, remove };
+  }
+
+  it('keeps the delete dialog busy and undismissable while the delete is in flight', async () => {
+    const user = userEvent.setup();
+    const { gate, remove } = await openGatedDelete(user);
     await user.click(screen.getByTestId('admin-delete-dialog-cancel'));
     await user.click(screen.getByTestId('admin-delete-dialog-backdrop'));
     // The server call follows a read of the saved copy, so it lands a moment later.
@@ -172,10 +193,30 @@ describe('AdminPanel with the real local copy and store', () => {
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByTestId('admin-delete-dialog-cancel')).toBeDisabled();
     expect(await diskRow(aId)).toBeDefined();
+
+    // Release the held delete, so it does not hold the account-data queue into the next test.
+    await act(async () => { gate.resolve(); });
+    await waitFor(() => expect(screen.queryByTestId('admin-delete-dialog')).toBeNull());
+  });
+
+  it('sends a single delete for repeated confirm clicks', async () => {
+    const user = userEvent.setup();
+    const { gate, remove } = await openGatedDelete(user);
+    await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
+    await waitFor(() => expect(remove).toHaveBeenCalledTimes(1));
+    await act(async () => { gate.resolve(); });
+    await waitFor(() => expect(screen.queryByTestId('admin-delete-dialog')).toBeNull());
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes and removes the row from disk, store and list after the server accepts the delete', async () => {
+    const user = userEvent.setup();
+    const { gate } = await openGatedDelete(user);
     await act(async () => { gate.resolve(); });
     await waitFor(() => expect(screen.queryByTestId('admin-delete-dialog')).toBeNull());
     expect(await diskRow(aId)).toBeUndefined();
     expect(useAppStore.getState().customMessages.some((message) => message.id === aId)).toBe(false);
+    expect(screen.getByTestId('admin-message-list')).toBeInTheDocument();
     expect(screen.queryByText('Account A message')).toBeNull();
     expect(useAppStore.getState().currentMessage?.text).toBe('Shared daily');
   });
@@ -292,7 +333,8 @@ describe('AdminPanel offline (ticket 11)', () => {
 
     expect(await screen.findByTestId('admin-create-form-error')).toHaveTextContent(OFFLINE);
     expect(screen.getByTestId('admin-create-form-text')).toHaveValue('Not yet');
-    expect(screen.queryByText('Not yet', { selector: 'td' })).toBeNull();
+    const listed = screen.getAllByTestId('message-row-text').map((cell) => cell.textContent);
+    expect(listed).not.toContain('Not yet');
     expect(useAppStore.getState().customMessages.map((message) => message.text)).toEqual([
       'Account A message',
     ]);

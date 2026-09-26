@@ -65,15 +65,31 @@ describe('canonical mood normalization', () => {
     expect(normalizeMoodValues(mood, [null, 'unknown'])).toBeNull();
   });
 
-  it('returns independent display copies and equivalent fingerprints without changing raw data', () => {
+  /** A legacy raw entry with an invalid primary and a null element, plus a snapshot of it. */
+  function legacySource() {
     const source = raw('unknown', ['sad', null, 'sad']);
-    const before = structuredClone(source);
+    return { source, before: structuredClone(source) };
+  }
+
+  it('returns a display copy that shares no arrays with the raw entry', () => {
+    const { source, before } = legacySource();
     const display = normalizeMoodEntry(source)!;
     expect(display).not.toBe(source);
     expect(display.moods).not.toBe(source.moods);
-    expect(moodSyncPayload(source, A)).toMatchObject({ mood_type: 'sad', mood_types: ['sad', 'sad'] });
-    expect(moodSyncFingerprint(source)).toBe(moodSyncFingerprint(display));
     display.moods.push('happy');
+    expect(source).toEqual(before);
+  });
+
+  it('builds the sync payload from the normalized moods without changing the raw entry', () => {
+    const { source, before } = legacySource();
+    expect(moodSyncPayload(source, A)).toMatchObject({ mood_type: 'sad', mood_types: ['sad', 'sad'] });
+    expect(source).toEqual(before);
+  });
+
+  it('fingerprints the raw and display entries identically', () => {
+    const { source, before } = legacySource();
+    const display = normalizeMoodEntry(source)!;
+    expect(moodSyncFingerprint(source)).toBe(moodSyncFingerprint(display));
     expect(source).toEqual(before);
   });
 
@@ -92,17 +108,38 @@ describe('canonical mood normalization', () => {
 });
 
 describe('saved mood recovery', () => {
-  it('normalizes scoped display reads while keeping raw invalid rows in both pending queues', async () => {
+  /**
+   * A's row with some recognized moods, A's row with none (hidden from display
+   * reads), and B's valid row.
+   */
+  async function seedMixedRows() {
     const mixed = await seedRaw(raw('bad', ['sad', null, 'happy']));
     const hidden = await seedRaw(raw('bad', 'happy', { date: '2026-09-14' }));
     const other = await seedRaw(raw('loved', ['loved'], { userId: B }));
+    return { mixed, hidden, other };
+  }
+
+  it("shows only the recognized moods of A's rows in A's display reads", async () => {
+    const { mixed } = await seedMixedRows();
     expect((await moodService.getAllForUser(A)).map((row) => row.id)).toEqual([mixed.id]);
     expect(await moodService.getMoodForDate(new Date(2026, 8, 15), A)).toMatchObject({ mood: 'sad', moods: ['sad', 'happy'] });
     expect(await moodService.getMoodForDate(new Date(2026, 8, 14), A)).toBeNull();
     expect(await moodService.getMoodsInRange(new Date(2026, 8, 1), new Date(2026, 8, 30), A)).toHaveLength(1);
+  });
+
+  it("returns another account's row only to that account's display read", async () => {
+    const { other } = await seedMixedRows();
     expect((await moodService.getAllForUser(B)).map((row) => row.id)).toEqual([other.id]);
+  });
+
+  it('returns raw rows unchanged from get()', async () => {
+    const { mixed, hidden } = await seedMixedRows();
     expect(await moodService.get(mixed.id!)).toEqual(mixed);
     expect(await moodService.get(hidden.id!)).toEqual(hidden);
+  });
+
+  it('keeps raw invalid rows in both pending queues', async () => {
+    const { mixed, hidden } = await seedMixedRows();
     expect((await moodService.getUnsyncedMoods(A)).map((row) => row.id)).toEqual([mixed.id, hidden.id]);
     expect((await getPendingMoods(A)).map((row) => row.id)).toEqual([mixed.id, hidden.id]);
   });
@@ -127,7 +164,7 @@ describe('saved mood recovery', () => {
     expect(edited.timestamp).toEqual(timestamp);
   });
 
-  it('serializes concurrent saves on one owner/date and preserves UI validation errors', async () => {
+  it('serializes concurrent saves on one owner/date into one row', async () => {
     const saved = await Promise.all([
       moodService.saveForDate(A, date, ['happy']),
       moodService.saveForDate(A, date, ['sad']),
@@ -135,8 +172,18 @@ describe('saved mood recovery', () => {
     expect(saved[0].id).toBe(saved[1].id);
     expect(await moodService.getAll()).toHaveLength(1);
     expect(await moodService.getAllForUser(A)).toMatchObject([{ mood: 'sad' }]);
+  });
+
+  it('refuses an empty mood list with a UI validation error', async () => {
     await expect(moodService.saveForDate(A, date, [], undefined)).rejects.toSatisfy(isValidationError);
+  });
+
+  it('refuses a save with no owner', async () => {
     await expect(moodService.saveForDate('', date, ['happy'])).rejects.toThrow();
+  });
+
+  it("refuses B's edit of a date only A has saved", async () => {
+    await moodService.saveForDate(A, date, ['sad']);
     await expect(moodService.saveForDate(B, date, ['happy'], '', true)).rejects.toThrow('not found');
   });
 

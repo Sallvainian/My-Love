@@ -247,7 +247,7 @@ describe('App refreshes the profile copy after the first-run name gate', () => {
     await renderApp();
     // The gate is resolved from the auth listener, as on a real sign-in.
     await act(async () => auth.listener!(session()));
-    const gate = await screen.findByText('Set your display name');
+    const gate = await screen.findByRole('button', { name: 'Set your display name' });
     localCopy.refreshLocalCopy.mockClear();
 
     await user.click(gate);

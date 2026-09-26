@@ -165,13 +165,15 @@ describe('deleting a note that failed to send', () => {
     await renderScreen();
 
     const dialog = await openRemoval(user, 'this one was refused');
-    expect(within(dialog).getByText(/failed to send\. It will be deleted from this device/)).toBeInTheDocument();
+    expect(dialog).toHaveTextContent(/failed to send\. It will be deleted from this device/);
 
     await user.click(within(dialog).getByTestId('note-remove-confirm'));
 
     await waitFor(() => expect(screen.queryByTestId('note-remove-confirmation')).toBeNull());
     expect(holder.store.getState().notes.map((note) => note.id)).toEqual([sent.id]);
-    expect(screen.queryByText('this one was refused')).toBeNull();
+    const remaining = screen.getAllByTestId('love-note-text');
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]).toHaveTextContent('this one arrived');
     await waitFor(async () => expect(await listQueuedNotes(USER_ID)).toEqual([]));
     // Never through removeNote: there is no server row to point at.
     expect(holder.removalUpserts).toEqual([]);
@@ -182,7 +184,7 @@ describe('deleting a note that failed to send', () => {
     await renderScreen();
 
     const dialog = await openRemoval(user, 'this one was refused');
-    await user.click(within(dialog).getByText('Cancel'));
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => expect(screen.queryByTestId('note-remove-confirmation')).toBeNull());
     expect(holder.store.getState().notes.map((note) => note.id)).toEqual([sent.id, TEMP_ID]);
@@ -221,7 +223,7 @@ describe('deleting a note that failed to send', () => {
     await renderScreen();
 
     const dialog = await openRemoval(user, 'this one arrived');
-    expect(within(dialog).getByText(/your partner keeps their copy/i)).toBeInTheDocument();
+    expect(dialog).toHaveTextContent(/your partner keeps their copy/i);
 
     await user.click(within(dialog).getByTestId('note-remove-confirm'));
 

@@ -63,7 +63,7 @@ describe('MoodHistoryTimeline row identity', () => {
     });
   });
 
-  it('passes the same row component across re-renders', () => {
+  it('does not remount visible rows when the timeline re-renders', () => {
     const { rerender } = render(<MoodHistoryTimeline userId={USER_ID} />);
     // isPartnerView flips so React genuinely re-renders rather than bailing out
     rerender(<MoodHistoryTimeline userId={USER_ID} isPartnerView />);

@@ -107,7 +107,7 @@ test.describe('Logout Flow', () => {
     await expect(page.getByTestId('login-screen')).toBeVisible({ timeout: 5000 });
   });
 
-  test('[P0] should clear account state through signedOutState on logout', async ({
+  test("[P0] signing out empties the account's notes, photos, moods, events and partner from the store", async ({
     page,
     interceptNetworkCall,
   }) => {

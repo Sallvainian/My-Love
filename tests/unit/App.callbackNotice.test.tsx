@@ -242,7 +242,7 @@ describe('App callback notice lifetime', () => {
     await act(async () => {});
     // `checkAuth` awaits the outcome before it clears `authLoading`, so the app
     // is still on its bootstrap screen -- which is the window this guards.
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-loading-screen')).toBeInTheDocument();
 
     // WHEN: a session arrives first, and only then does the outcome resolve.
     await act(async () => auth.listener!(session()));

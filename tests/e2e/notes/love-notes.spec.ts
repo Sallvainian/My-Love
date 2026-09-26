@@ -44,7 +44,9 @@ test.describe('Love Notes', () => {
     // THEN: Love notes interface is visible
     await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
     await expect(
-      page.getByTestId('virtualized-list').or(page.getByText('No messages to show'))
+      page
+        .getByTestId('virtualized-list')
+        .or(page.getByRole('heading', { level: 3, name: 'No messages to show' }))
     ).toBeVisible();
   });
 

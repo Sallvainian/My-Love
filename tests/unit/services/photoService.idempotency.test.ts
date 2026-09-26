@@ -177,20 +177,38 @@ describe('photoService upload idempotency', () => {
     });
   });
 
-  it.each([
+  const insertFailures = [
     [CHECK_VIOLATION_CODE, 'Some values are not allowed - check length and format limits'],
     [NOT_NULL_VIOLATION, 'Upload failed - no photo returned'],
-  ])('routes %s through the real service into the store result', async (code, expected) => {
+  ];
+
+  /** A photos store for USER_ID whose next row insert fails with `code`. */
+  function storeWithFailingInsert(code: string) {
     type Store = PhotosSlice & { userId: string; error: string | null };
     const store = create<Store>()(createPhotosSlice as unknown as StateCreator<Store>);
     store.setState({ userId: USER_ID });
     backend.errorCode = code;
     backend.failNextInsert = true;
+    return store;
+  }
+
+  it.each(insertFailures)('routes %s through the real service into the store result', async (code, expected) => {
+    const store = storeWithFailingInsert(code);
     const result = await store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }));
     expect(result).toEqual({ success: false, error: expected });
     expect(store.getState().error).toBe(expected);
+  });
+
+  it.each(insertFailures)('rolls back the stored object and row after a %s failure', async (code) => {
+    const store = storeWithFailingInsert(code);
+    await store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }));
     expect(backend.objects.size).toBe(0);
     expect(backend.rows).toHaveLength(0);
+  });
+
+  it.each(insertFailures)('a retry under the same key after a %s failure lands one row', async (code) => {
+    const store = storeWithFailingInsert(code);
+    await store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }));
     await expect(store.getState().uploadPhoto(uploadInput({ idempotencyKey: 'check-key' }))).resolves.toEqual({ success: true });
     expect(backend.rows[0].storage_path).toBe(`${USER_ID}/check-key.jpeg`);
     expect(backend.rows).toHaveLength(1);

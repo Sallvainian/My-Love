@@ -196,11 +196,11 @@ describe('safeOfflineOperation', () => {
 });
 
 describe('constants', () => {
-  it('OFFLINE_ERROR_MESSAGE is defined', () => {
+  it('tells an offline user their changes will sync when they reconnect', () => {
     expect(OFFLINE_ERROR_MESSAGE).toBe("You're offline. Changes will sync when reconnected.");
   });
 
-  it('OFFLINE_RETRY_MESSAGE is defined', () => {
+  it('tells an offline user to check the connection and try again', () => {
     expect(OFFLINE_RETRY_MESSAGE).toBe("You're offline. Please check your connection and try again.");
   });
 });

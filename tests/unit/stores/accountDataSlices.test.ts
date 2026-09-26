@@ -708,7 +708,8 @@ describe('messages: favorites, custom messages and the message-data copy', () =>
     expect(copy?.custom.map((row) => [row.id, row.serverId])).toEqual([[BASE + 3, `srv-same-${A}`]]);
   });
 
-  it('offline: shows the reason, changes nothing, and sign-out clears the message', async () => {
+  /** Favorites a bundled message while the server refuses it as offline; returns its id. */
+  async function failFavoriteOffline() {
     const [id] = await seedBundled([`OFF-${A}`]);
     server.addFavorite.mockRejectedValue(
       new AccountDataError('offline', 'You are offline. Favorites need a connection to save.')
@@ -716,10 +717,20 @@ describe('messages: favorites, custom messages and the message-data copy', () =>
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await useAppStore.getState().toggleFavorite(id);
+    return id;
+  }
+
+  it('offline: shows the reason and changes nothing', async () => {
+    const id = await failFavoriteOffline();
 
     expect(useAppStore.getState().favoriteError).toMatch(/offline/i);
     expect(await copyOf(A)).toBeNull();
     expect(useAppStore.getState().messageHistory.favoriteIds).not.toContain(id);
+  });
+
+  it('offline: sign-out clears the favorite error', async () => {
+    await failFavoriteOffline();
+    expect(useAppStore.getState().favoriteError).toMatch(/offline/i);
 
     useAppStore.getState().clearAuth();
     expect(useAppStore.getState().favoriteError).toBeNull();

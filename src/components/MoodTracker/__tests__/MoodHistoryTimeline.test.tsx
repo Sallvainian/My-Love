@@ -72,9 +72,11 @@ describe('MoodHistoryTimeline', () => {
     render(<MoodHistoryTimeline userId={USER_ID} />);
 
     expect(screen.getAllByTestId('mood-history-item')).toHaveLength(2);
-    expect(screen.getAllByText('Today')).toHaveLength(1);
-    expect(screen.getByText('evening')).toBeInTheDocument();
-    expect(screen.getByText('morning')).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: 'Today' })).toHaveLength(1);
+    expect(screen.getAllByTestId('mood-note').map((n) => n.textContent).sort()).toEqual([
+      'evening',
+      'morning',
+    ]);
   });
 
   it('[B: two genuine moods on one day] keeps rows separate when they share a timestamp', () => {
@@ -90,7 +92,7 @@ describe('MoodHistoryTimeline', () => {
     render(<MoodHistoryTimeline userId={USER_ID} />);
 
     expect(screen.getAllByTestId('mood-history-item')).toHaveLength(2);
-    expect(screen.getAllByText('Today')).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { name: 'Today' })).toHaveLength(1);
   });
 
   it('labels a mood from the previous calendar day Yesterday, under its own header', () => {
@@ -109,7 +111,7 @@ describe('MoodHistoryTimeline', () => {
     expect(screen.getAllByRole('heading', { name: 'Yesterday' })).toHaveLength(1);
   });
 
-  it('renders a date header row through the module-scope row component', () => {
+  it('renders the date header row and the mood row', () => {
     const today = new Date(2026, 8, 25, 9, 0);
 
     const items = [
@@ -136,7 +138,7 @@ describe('MoodHistoryTimeline', () => {
       </>
     );
 
-    expect(screen.getByText('Today')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Today' })).toBeInTheDocument();
     expect(screen.getByTestId('mood-history-item')).toBeInTheDocument();
   });
 });

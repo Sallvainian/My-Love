@@ -413,7 +413,7 @@ describe('interactionsSlice local copy', () => {
   });
 
   describe('refresher', () => {
-    it('registers loadInteractionHistory(100) as the kind refresher', async () => {
+    it('refreshing the interactions copy brings the last 100 interactions into the list, the unviewed count and the saved copy', async () => {
       const store = createTestStore();
       const [kind, refresh] = registerLocalCopy.mock.calls.at(-1) as [string, () => Promise<void>];
       expect(kind).toBe(INTERACTIONS_COPY_KIND);

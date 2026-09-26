@@ -130,12 +130,26 @@ test.describe('Home on the style kit', () => {
         });
         expect(valueStyle, testId).toEqual(KIT_COUNTDOWN_VALUE);
       }
+    });
+
+    test(`[P1] should render the daily message on the kit card in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       // The daily message sits on the same kit card.
       await expect(page.getByTestId('message-card')).toHaveCSS(
         'background-color',
         KIT_CARD[colorScheme]
       );
+    });
+
+    test(`[P1] should tint your birthday tile accent and your partner's tile partner in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       // Tile tones: birthdays belong to accounts now, so your own card takes the
       // `you` (accent) tile and your partner's the `partner` tile on each device.
@@ -145,14 +159,30 @@ test.describe('Home on the style kit', () => {
           .evaluate((el) => getComputedStyle(el.firstElementChild as Element).color);
       expect(await tileColor('birthday-countdown-self')).toBe(KIT_ACCENT[colorScheme]);
       expect(await tileColor('birthday-countdown-partner')).toBe(KIT_PARTNER[colorScheme]);
+    });
+
+    test(`[P1] should show the dateless wedding as Date TBD in muted in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       // Dateless wedding: "Date TBD" as the value, in the kit muted colour.
       const weddingValue = page.getByTestId('event-countdown-wedding').locator('h3 + div');
       await expect(weddingValue).toHaveText('Date TBD');
       await expect(weddingValue).toHaveCSS('color', KIT_MUTED[colorScheme]);
       await expect(page.getByTestId('event-countdown-wedding')).not.toContainText('XX:XX:XX');
+    });
+
+    test(`[P1] should set the two birthday cards side by side at phone width in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openHome(page, interceptNetworkCall, colorScheme);
 
       // Birthdays sit side by side at phone width.
+      await expect(page.getByTestId('birthday-countdown-self')).toBeVisible();
+      await expect(page.getByTestId('birthday-countdown-partner')).toBeVisible();
       const selfBox = await page.getByTestId('birthday-countdown-self').boundingBox();
       const partnerBox = await page.getByTestId('birthday-countdown-partner').boundingBox();
       if (!selfBox || !partnerBox) throw new Error('[home-kit.spec] expected birthday boxes');
@@ -230,7 +260,9 @@ test.describe('Home on the style kit', () => {
   }) => {
     await openHome(page, interceptNetworkCall, 'light');
 
-    await expect(page.getByText('Upcoming', { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Upcoming', exact: true })
+    ).toBeVisible();
     const addButton = page.getByRole('button', { name: 'Add event' });
     await expect(addButton).toBeVisible();
     await expect(addButton).toHaveAttribute('data-testid', 'home-add-event');

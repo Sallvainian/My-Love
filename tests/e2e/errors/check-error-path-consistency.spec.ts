@@ -38,8 +38,10 @@ test.describe('DW-38 CHECK error presentation', () => {
       );
       const bubble = page.getByTestId('love-note-message').filter({ hasText: content });
       await expect(bubble).toHaveCount(1);
-      await expect(page.getByText(friendlyCheck, { exact: true })).toBeVisible();
-      await expect(page.getByText(checkError.message, { exact: true })).toHaveCount(0);
+      const errorBanner = page.getByTestId('notes-error-banner');
+      await expect(errorBanner).toBeVisible();
+      await expect(errorBanner).toHaveText(friendlyCheck);
+      await expect(page.getByRole('main')).not.toContainText(checkError.message);
 
       await log.step('Retry receives the same CHECK and keeps the retry action');
       const failedRetry = interceptNetworkCall({
@@ -60,7 +62,8 @@ test.describe('DW-38 CHECK error presentation', () => {
         { timeout: 10000 }
       );
       await expect(bubble.getByRole('button', { name: 'Retry sending message' })).toBeVisible();
-      await expect(page.getByText(friendlyCheck, { exact: true })).toBeVisible();
+      await expect(errorBanner).toBeVisible();
+      await expect(errorBanner).toHaveText(friendlyCheck);
 
       await log.step('Successful retry replaces the optimistic row and dismisses the CHECK banner');
       // maybeSingle on POST accepts the one-row representation array from PostgREST.
@@ -89,7 +92,8 @@ test.describe('DW-38 CHECK error presentation', () => {
       await expect(bubble).toHaveCount(1);
       await expect(bubble).toBeVisible();
       await expect(bubble.getByRole('button', { name: 'Retry sending message' })).toHaveCount(0);
-      await expect(page.getByText(friendlyCheck, { exact: true })).toHaveCount(0);
+      await expect(errorBanner).toHaveCount(0);
+      await expect(page.getByRole('main')).not.toContainText(friendlyCheck);
     }
   );
 

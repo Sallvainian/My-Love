@@ -1,5 +1,5 @@
 /** Shared mood normalization at all display boundaries; data hooks are mocked. */
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -158,9 +158,9 @@ function moodRecord(moodTypes: unknown): SupabaseMood {
 }
 
 /** The lucide class MOOD_DISPLAY's icon renders for 'happy' (FaceSlightlySmiling, via its `smile` alias)... */
-const HAPPY_ICON = '.lucide-smile';
+const HAPPY_ICON = 'lucide-smile';
 /** ...and for 'tired' (Battery). */
-const TIRED_ICON = '.lucide-battery';
+const TIRED_ICON = 'lucide-battery';
 
 describe('MoodHistoryItem mood_types guard', () => {
   it.each(NON_ARRAY_ROWS)(
@@ -169,8 +169,8 @@ describe('MoodHistoryItem mood_types guard', () => {
       expect(() => render(<MoodHistoryItem mood={moodRecord(value)} />)).not.toThrow();
 
       const icons = screen.getByTestId('mood-emoji');
-      expect(icons.querySelectorAll('svg')).toHaveLength(1);
-      expect(icons.querySelector(HAPPY_ICON)).not.toBeNull();
+      expect(within(icons).getAllByTestId(/^mood-icon-/)).toHaveLength(1);
+      expect(within(icons).getByTestId('mood-icon-happy')).toHaveClass(HAPPY_ICON);
       expect(screen.getByTestId('mood-label')).toHaveTextContent('Happy');
     }
   );
@@ -179,9 +179,9 @@ describe('MoodHistoryItem mood_types guard', () => {
     render(<MoodHistoryItem mood={moodRecord(['happy', 'tired'])} />);
 
     const icons = screen.getByTestId('mood-emoji');
-    expect(icons.querySelectorAll('svg')).toHaveLength(2);
-    expect(icons.querySelector(HAPPY_ICON)).not.toBeNull();
-    expect(icons.querySelector(TIRED_ICON)).not.toBeNull();
+    expect(within(icons).getAllByTestId(/^mood-icon-/)).toHaveLength(2);
+    expect(within(icons).getByTestId('mood-icon-happy')).toHaveClass(HAPPY_ICON);
+    expect(within(icons).getByTestId('mood-icon-tired')).toHaveClass(TIRED_ICON);
     expect(screen.getByTestId('mood-label')).toHaveTextContent('Happy, Tired');
   });
 });
@@ -203,9 +203,9 @@ describe('PartnerMoodDisplay mood_types guard', () => {
       expect(() => renderWith(value)).not.toThrow();
 
       const chips = screen.getByTestId('partner-mood-emoji');
-      expect(chips.children).toHaveLength(1);
+      expect(within(chips).getAllByTestId('partner-mood-chip')).toHaveLength(1);
       expect(chips).toHaveTextContent('Happy');
-      expect(chips.querySelector(HAPPY_ICON)).not.toBeNull();
+      expect(within(chips).getByTestId('mood-icon-happy')).toHaveClass(HAPPY_ICON);
     }
   );
 
@@ -213,11 +213,12 @@ describe('PartnerMoodDisplay mood_types guard', () => {
     renderWith(['happy', 'tired']);
 
     const chips = screen.getByTestId('partner-mood-emoji');
-    expect(chips.children).toHaveLength(2);
-    expect(chips.children[0]).toHaveTextContent('Happy');
-    expect(chips.children[1]).toHaveTextContent('Tired');
-    expect(chips.querySelector(HAPPY_ICON)).not.toBeNull();
-    expect(chips.querySelector(TIRED_ICON)).not.toBeNull();
+    const chipEls = within(chips).getAllByTestId('partner-mood-chip');
+    expect(chipEls).toHaveLength(2);
+    expect(chipEls[0]).toHaveTextContent('Happy');
+    expect(chipEls[1]).toHaveTextContent('Tired');
+    expect(within(chips).getByTestId('mood-icon-happy')).toHaveClass(HAPPY_ICON);
+    expect(within(chips).getByTestId('mood-icon-tired')).toHaveClass(TIRED_ICON);
     expect(screen.getByTestId('partner-mood-label')).toHaveTextContent('Happy, Tired');
     expect(chips).toHaveAttribute('aria-label', 'happy, tired mood');
   });
@@ -268,12 +269,9 @@ describe('PartnerMoodDisplay partner name', () => {
     return render(<PartnerMoodDisplay partnerId={PARTNER_ID} />);
   }
 
-  /** The avatar is the first child of the card's header row. */
+  /** The partner avatar at the start of the card's header row. */
   function avatar(): HTMLElement {
-    const heading = screen.getByRole('heading', { level: 2 });
-    return heading.closest('[data-testid="partner-mood-display"]')!.querySelector(
-      '[aria-hidden="true"]'
-    ) as HTMLElement;
+    return screen.getByTestId('partner-mood-avatar');
   }
 
   afterEach(() => {
@@ -286,7 +284,7 @@ describe('PartnerMoodDisplay partner name', () => {
 
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sam is feeling');
     expect(avatar()).toHaveTextContent('S');
-    expect(avatar().querySelector('.lucide-user')).toBeNull();
+    expect(within(avatar()).queryByTestId('partner-mood-avatar-icon')).not.toBeInTheDocument();
   });
 
   it('trims the store name', () => {
@@ -314,7 +312,7 @@ describe('PartnerMoodDisplay partner name', () => {
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
       'Your partner is feeling'
     );
-    expect(avatar().querySelector('.lucide-user')).not.toBeNull();
+    expect(within(avatar()).getByTestId('partner-mood-avatar-icon')).toBeInTheDocument();
     expect(avatar().textContent).toBe('');
   });
 });

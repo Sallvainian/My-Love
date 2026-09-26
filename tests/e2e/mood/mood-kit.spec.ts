@@ -138,7 +138,7 @@ test.describe('Mood on the style kit', () => {
         'background-color',
         KIT_PAGE[colorScheme]
       );
-      await expect(page.getByTestId('mood-tab-tracker').locator('..')).toHaveCSS(
+      await expect(page.getByTestId('mood-tabs')).toHaveCSS(
         'background-color',
         KIT_CARD2[colorScheme]
       );
@@ -206,7 +206,9 @@ test.describe('Mood on the style kit', () => {
       await expect(happy).toHaveAttribute('aria-pressed', 'true');
       await expect(happy).toHaveCSS('background-color', KIT_TINT[colorScheme]);
       await expect(happy).toHaveCSS('color', KIT_ACCENT[colorScheme]);
-      await expect(page.getByText(/Selected:.*Happy/)).toBeVisible();
+      const selectedSummary = page.getByTestId('mood-selected-summary');
+      await expect(selectedSummary).toBeVisible();
+      await expect(selectedSummary).toHaveText(/Selected:.*Happy/);
 
       expect(await chromeText(page)).not.toMatch(/\p{Extended_Pictographic}/u);
     });
