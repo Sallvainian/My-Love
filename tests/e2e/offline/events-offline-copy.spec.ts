@@ -22,6 +22,7 @@ import {
 import { navigateTo } from '../../support/helpers/navigation';
 import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
+import { deleteRowById } from '../../support/helpers/teardown';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -90,6 +91,7 @@ test.describe('Events from the local copy', () => {
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -99,46 +101,40 @@ test.describe('Events from the local copy', () => {
       eventDate: isoDateDaysFromNow(14),
       icon: 'plane',
     });
+    cleanup.defer('delete the seeded event', () => deleteRowById(supabaseAdmin, 'events', eventId));
 
-    try {
-      // GIVEN: Home loads online, which saves the copy. Settings is lazy and
-      // dev mode has no service worker, so its module is loaded while online.
-      const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
-      await page.goto('/');
-      const upcoming = await upcomingRead;
-      expect(upcoming.status).toBe(200);
-      expect(upcoming.responseJson).toEqual([expect.objectContaining({ id: eventId, label: LABEL })]);
-      await expect(page.getByTestId(HOME_CARD)).toBeVisible();
-      await recurseUntil(() => savedEventLabels(page), (v) => { expect(v).toEqual([LABEL]); });
-      await navigateTo(page, 'settings');
-      await expect(settingsRow(page)).toBeVisible();
-      await navigateTo(page, 'mood');
-      await expect(page.getByTestId('mood-tracker')).toBeVisible();
+    // GIVEN: Home loads online, which saves the copy. Settings is lazy and
+    // dev mode has no service worker, so its module is loaded while online.
+    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+    await page.goto('/');
+    const upcoming = await upcomingRead;
+    expect(upcoming.status).toBe(200);
+    expect(upcoming.responseJson).toEqual([expect.objectContaining({ id: eventId, label: LABEL })]);
+    await expect(page.getByTestId(HOME_CARD)).toBeVisible();
+    await recurseUntil(() => savedEventLabels(page), (v) => { expect(v).toEqual([LABEL]); });
+    await navigateTo(page, 'settings');
+    await expect(settingsRow(page)).toBeVisible();
+    await navigateTo(page, 'mood');
+    await expect(page.getByTestId('mood-tracker')).toBeVisible();
 
-      // WHEN offline in the same session, returning to Home through the dock.
-      await goOffline(page, true);
-      // THEN: listed, with no load-error card or banner.
-      await expectListedOffline(page);
+    // WHEN offline in the same session, returning to Home through the dock.
+    await goOffline(page, true);
+    // THEN: listed, with no load-error card or banner.
+    await expectListedOffline(page);
 
-      // AND: a reload that cannot reach the events table, then offline, shows
-      // the saved copy alone — this session never had a server answer.
-      await goOffline(page, false);
-      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-      await page.route('**/rest/v1/events*', (route) => route.abort());
-      // The reload stays on /settings, whose list comes from the copy.
-      await page.reload();
-      await expect(page.getByTestId('settings-view')).toBeVisible();
-      await expect(settingsRow(page)).toBeVisible();
-      await navigateTo(page, 'mood');
-      await expect(page.getByTestId('mood-tracker')).toBeVisible();
-      await goOffline(page, true);
-      await expectListedOffline(page);
-      expect(await page.evaluate(() => window.__APP_STORE__?.getState().eventsError ?? null)).toBeNull();
-    } finally {
-      await page.context().setOffline(false);
-      await page.unroute('**/rest/v1/events*');
-      const { error } = await supabaseAdmin.from('events').delete().eq('id', eventId);
-      expect.soft(error).toBeNull();
-    }
+    // AND: a reload that cannot reach the events table, then offline, shows
+    // the saved copy alone — this session never had a server answer.
+    await goOffline(page, false);
+    // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/events*', (route) => route.abort());
+    // The reload stays on /settings, whose list comes from the copy.
+    await page.reload();
+    await expect(page.getByTestId('settings-view')).toBeVisible();
+    await expect(settingsRow(page)).toBeVisible();
+    await navigateTo(page, 'mood');
+    await expect(page.getByTestId('mood-tracker')).toBeVisible();
+    await goOffline(page, true);
+    await expectListedOffline(page);
+    expect(await page.evaluate(() => window.__APP_STORE__?.getState().eventsError ?? null)).toBeNull();
   });
 });

@@ -26,6 +26,8 @@ import { resolveOwnPair } from '../../support/helpers/events';
 import { PHOTOS_LIST_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
+import type { Cleanup } from '../../support/fixtures/cleanup';
+import { deleteRowById } from '../../support/helpers/teardown';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -107,10 +109,13 @@ async function goOffline(page: Page, offline: boolean) {
 
 /**
  * Seed `count` photos, newest first: the first is the worker's partner's, the
- * rest the worker user's own, each a minute older than the one before.
+ * rest the worker user's own, each a minute older than the one before. Each
+ * object's removal and each row's delete is deferred as it is created, so a
+ * seed that fails half-way still undoes what it made.
  */
 async function seedPhotos(
   supabaseAdmin: TypedSupabaseClient,
+  cleanup: Cleanup,
   count: number,
   label: string
 ): Promise<SeededPhoto[]> {
@@ -120,6 +125,10 @@ async function seedPhotos(
   for (let i = 0; i < count; i++) {
     const owner = i === 0 ? partnerId : userId;
     const path = `${owner}/e2e-offline-${label}-${stamp}-${i}.png`;
+    cleanup.defer(`remove photo object ${i}`, async () => {
+      const { error } = await supabaseAdmin.storage.from(BUCKET).remove([path]);
+      if (error) throw error;
+    });
     const upload = await supabaseAdmin.storage
       .from(BUCKET)
       .upload(path, PNG_BYTES, { contentType: 'image/png', upsert: true });
@@ -141,7 +150,9 @@ async function seedPhotos(
       .select('id')
       .single();
     expect(error).toBeNull();
-    seeded.push({ id: data!.id, path, caption });
+    const id = data!.id;
+    cleanup.defer(`delete photo row ${i}`, () => deleteRowById(supabaseAdmin, 'photos', id));
+    seeded.push({ id, path, caption });
   }
   return seeded;
 }
@@ -158,20 +169,6 @@ async function expectAlbumIsSeeded(supabaseAdmin: TypedSupabaseClient, seeded: S
     (data ?? []).map((row) => row.id).sort(),
     "the worker pair's album holds photos this spec did not seed"
   ).toEqual(seeded.map((photo) => photo.id).sort());
-}
-
-async function deletePhotos(supabaseAdmin: TypedSupabaseClient, seeded: SeededPhoto[]) {
-  if (seeded.length === 0) return;
-  const rows = await supabaseAdmin
-    .from('photos')
-    .delete()
-    .in(
-      'id',
-      seeded.map((photo) => photo.id)
-    );
-  expect.soft(rows.error).toBeNull();
-  const objects = await supabaseAdmin.storage.from(BUCKET).remove(seeded.map((photo) => photo.path));
-  expect.soft(objects.error).toBeNull();
 }
 
 function tile(page: Page, caption: string) {
@@ -253,140 +250,124 @@ test.describe('Photos offline', () => {
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
-    let seeded: SeededPhoto[] = [];
+    const seeded = await seedPhotos(supabaseAdmin, cleanup, 3, 'all');
+    await expectAlbumIsSeeded(supabaseAdmin, seeded);
 
-    try {
-      seeded = await seedPhotos(supabaseAdmin, 3, 'all');
-      await expectAlbumIsSeeded(supabaseAdmin, seeded);
-
-      // GIVEN: the gallery loads online; the list is saved and the fill caches
-      // every image.
-      const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
-      await page.goto('/photos');
-      const list = await listRead;
-      expect(list.status).toBe(200);
-      expect(list.responseJson).toEqual(
-        expect.arrayContaining(seeded.map((photo) => expect.objectContaining({ id: photo.id })))
-      );
-      for (const photo of seeded) {
-        await expect(tile(page, photo.caption)).toBeVisible();
-      }
-      await recurseUntil(
-        async () => {
-          const ids = (await savedPhotoIds(page)) ?? [];
-          return seeded.every((photo) => ids.includes(photo.id));
-        },
-        (v) => {
-          expect(v).toBe(true);
-        }
-      );
-      for (const photo of seeded) {
-        await recurseUntil(() => imageCached(page, photo.path), (v) => { expect(v).toBe(true); });
-      }
-
-      // WHEN: the app reloads with no server answer, and the device goes offline.
-      await reloadWithoutServerThenGoOffline(page);
-
-      // THEN: every photo is listed and every image decodes from the cache…
-      for (const photo of seeded) {
-        await expect(tile(page, photo.caption)).toBeVisible();
-        await expectTileShowsImage(page, photo.caption);
-      }
-
-      // …and in the viewer too.
-      await tile(page, seeded[1].caption).click();
-      const viewer = page.getByTestId('photo-viewer-overlay');
-      await expect(viewer).toBeVisible();
-      const viewed = viewer.getByRole('img', { name: seeded[1].caption });
-      await expect(viewed).toHaveAttribute('src', /^blob:/);
-      await recurseUntil(
-        () => viewed.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
-        (v) => {
-          expect(v).toBe(true);
-        }
-      );
-      await expect(viewer.getByTestId('photo-viewer-not-saved')).toHaveCount(0);
-      await expect(viewer.getByText('Failed to load photo')).toHaveCount(0);
-    } finally {
-      await page.context().setOffline(false);
-      await page.unroute(PHOTOS_REST);
-      await page.unroute(STORAGE);
-      await deletePhotos(supabaseAdmin, seeded);
+    // GIVEN: the gallery loads online; the list is saved and the fill caches
+    // every image.
+    const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
+    await page.goto('/photos');
+    const list = await listRead;
+    expect(list.status).toBe(200);
+    expect(list.responseJson).toEqual(
+      expect.arrayContaining(seeded.map((photo) => expect.objectContaining({ id: photo.id })))
+    );
+    for (const photo of seeded) {
+      await expect(tile(page, photo.caption)).toBeVisible();
     }
+    await recurseUntil(
+      async () => {
+        const ids = (await savedPhotoIds(page)) ?? [];
+        return seeded.every((photo) => ids.includes(photo.id));
+      },
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
+    for (const photo of seeded) {
+      await recurseUntil(() => imageCached(page, photo.path), (v) => { expect(v).toBe(true); });
+    }
+
+    // WHEN: the app reloads with no server answer, and the device goes offline.
+    await reloadWithoutServerThenGoOffline(page);
+
+    // THEN: every photo is listed and every image decodes from the cache…
+    for (const photo of seeded) {
+      await expect(tile(page, photo.caption)).toBeVisible();
+      await expectTileShowsImage(page, photo.caption);
+    }
+
+    // …and in the viewer too.
+    await tile(page, seeded[1].caption).click();
+    const viewer = page.getByTestId('photo-viewer-overlay');
+    await expect(viewer).toBeVisible();
+    const viewed = viewer.getByRole('img', { name: seeded[1].caption });
+    await expect(viewed).toHaveAttribute('src', /^blob:/);
+    await recurseUntil(
+      () => viewed.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
+    await expect(viewer.getByTestId('photo-viewer-not-saved')).toHaveCount(0);
+    await expect(viewer.getByText('Failed to load photo')).toHaveCount(0);
   });
 
   test('[P1] with storage refused, the oldest image is left out and shows a placeholder offline', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     // Refuse a third distinct image-cache entry, as a full browser would: the
     // write throws a QuotaExceededError. Deletes free a slot.
     await installImageCacheQuota(page, 2);
 
-    let seeded: SeededPhoto[] = [];
+    const seeded = await seedPhotos(supabaseAdmin, cleanup, 3, 'refused');
+    await expectAlbumIsSeeded(supabaseAdmin, seeded);
+    const [newest, middle, oldest] = seeded;
 
-    try {
-      seeded = await seedPhotos(supabaseAdmin, 3, 'refused');
-      await expectAlbumIsSeeded(supabaseAdmin, seeded);
-      const [newest, middle, oldest] = seeded;
+    // Every attempt on the oldest image — the tile's and the fill's — is
+    // downloaded and then refused.
+    let oldestDownloads = 0;
+    page.on('response', (response) => {
+      if (response.url().includes(oldest.path) && response.ok()) oldestDownloads += 1;
+    });
 
-      // Every attempt on the oldest image — the tile's and the fill's — is
-      // downloaded and then refused.
-      let oldestDownloads = 0;
-      page.on('response', (response) => {
-        if (response.url().includes(oldest.path) && response.ok()) oldestDownloads += 1;
-      });
-
-      // GIVEN: the gallery loads online while storage holds only two images.
-      const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
-      await page.goto('/photos');
-      const list = await listRead;
-      expect(list.status).toBe(200);
-      expect(list.responseJson).toEqual(
-        expect.arrayContaining(seeded.map((photo) => expect.objectContaining({ id: photo.id })))
-      );
-      for (const photo of seeded) {
-        await expect(tile(page, photo.caption)).toBeVisible();
-      }
-      await recurseUntil(async () => oldestDownloads, (v) => {
-        expect(v).toBeGreaterThanOrEqual(2);
-      });
-      // The newest two are kept; the oldest could not be cached.
-      await recurseUntil(
-        async () => [
-          await imageCached(page, newest.path),
-          await imageCached(page, middle.path),
-          await imageCached(page, oldest.path),
-        ],
-        (v) => {
-          expect(v).toEqual([true, true, false]);
-        }
-      );
-      // Online, the oldest image still shows (downloaded, just not kept).
-      await expectTileShowsImage(page, oldest.caption);
-
-      // WHEN: the app reloads with no server answer, and the device goes offline.
-      await reloadWithoutServerThenGoOffline(page);
-
-      // THEN: every photo is still listed; the newest two show, the oldest is a
-      // placeholder.
-      await expectTileShowsImage(page, newest.caption);
-      await expectTileShowsImage(page, middle.caption);
-      await expect(tile(page, oldest.caption)).toBeVisible();
-      await expect(tile(page, oldest.caption).getByTestId('photo-grid-item-not-saved')).toBeVisible();
-      await expect(page.getByTestId('photo-grid-item')).toHaveCount(3);
-
-      await tile(page, oldest.caption).click();
-      await expect(
-        page.getByTestId('photo-viewer-overlay').getByTestId('photo-viewer-not-saved')
-      ).toBeVisible();
-    } finally {
-      await page.context().setOffline(false);
-      await page.unroute(PHOTOS_REST);
-      await page.unroute(STORAGE);
-      await deletePhotos(supabaseAdmin, seeded);
+    // GIVEN: the gallery loads online while storage holds only two images.
+    const listRead = interceptNetworkCall({ method: 'GET', url: PHOTOS_LIST_READ });
+    await page.goto('/photos');
+    const list = await listRead;
+    expect(list.status).toBe(200);
+    expect(list.responseJson).toEqual(
+      expect.arrayContaining(seeded.map((photo) => expect.objectContaining({ id: photo.id })))
+    );
+    for (const photo of seeded) {
+      await expect(tile(page, photo.caption)).toBeVisible();
     }
+    await recurseUntil(async () => oldestDownloads, (v) => {
+      expect(v).toBeGreaterThanOrEqual(2);
+    });
+    // The newest two are kept; the oldest could not be cached.
+    await recurseUntil(
+      async () => [
+        await imageCached(page, newest.path),
+        await imageCached(page, middle.path),
+        await imageCached(page, oldest.path),
+      ],
+      (v) => {
+        expect(v).toEqual([true, true, false]);
+      }
+    );
+    // Online, the oldest image still shows (downloaded, just not kept).
+    await expectTileShowsImage(page, oldest.caption);
+
+    // WHEN: the app reloads with no server answer, and the device goes offline.
+    await reloadWithoutServerThenGoOffline(page);
+
+    // THEN: every photo is still listed; the newest two show, the oldest is a
+    // placeholder.
+    await expectTileShowsImage(page, newest.caption);
+    await expectTileShowsImage(page, middle.caption);
+    await expect(tile(page, oldest.caption)).toBeVisible();
+    await expect(tile(page, oldest.caption).getByTestId('photo-grid-item-not-saved')).toBeVisible();
+    await expect(page.getByTestId('photo-grid-item')).toHaveCount(3);
+
+    await tile(page, oldest.caption).click();
+    await expect(
+      page.getByTestId('photo-viewer-overlay').getByTestId('photo-viewer-not-saved')
+    ).toBeVisible();
   });
 });

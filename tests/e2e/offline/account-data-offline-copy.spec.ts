@@ -127,6 +127,7 @@ test.describe('Account data from the local copy', () => {
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }, testInfo) => {
     // Awaited here so the cold start's own anniversaries read, sent before the
     // row exists, cannot be the one the Settings visit below waits on.
@@ -135,60 +136,54 @@ test.describe('Account data from the local copy', () => {
     expect((await startRead).status).toBe(200);
     const userId = await signedInUserId(page);
     const label = `Offline anniversary ${testInfo.workerIndex}-${Date.now()}`;
-    // Hard before the test, so it never runs on leftover rows; soft in the
-    // teardown, so the test's own error stands.
-    const clear = async ({ soft }: { soft: boolean }) => {
+    // Cleared before the test, so it never runs on leftover rows, and at teardown.
+    const clear = async () => {
       const { error } = await supabaseAdmin.from('anniversaries').delete().eq('user_id', userId);
-      const message = 'clearing anniversaries for this worker account';
-      (soft ? expect.soft(error, message) : expect(error, message)).toBeNull();
+      expect(error, 'clearing anniversaries for this worker account').toBeNull();
     };
-    await clear({ soft: false });
+    await clear();
+    cleanup.defer('clear the anniversaries', clear);
     const { error: insertError } = await supabaseAdmin
       .from('anniversaries')
       .insert({ user_id: userId, event_date: '2024-02-14', label });
     expect(insertError).toBeNull();
 
-    try {
-      // GIVEN: one online session loads the anniversary, which saves the copy.
-      const settingsRead = interceptNetworkCall({ method: 'GET', url: ANNIVERSARIES_READ });
-      await page.goto('/settings');
-      const loaded = await settingsRead;
-      expect(loaded.status).toBe(200);
-      expect(loaded.responseJson).toEqual([expect.objectContaining({ label })]);
-      await expect(page.getByRole('heading', { level: 4, name: label })).toBeVisible();
-      await recurseUntil(
-        () => savedAnniversaryLabels(page),
-        (v) => {
-          expect(v).toEqual([label]);
-        }
-      );
+    // GIVEN: one online session loads the anniversary, which saves the copy.
+    const settingsRead = interceptNetworkCall({ method: 'GET', url: ANNIVERSARIES_READ });
+    await page.goto('/settings');
+    const loaded = await settingsRead;
+    expect(loaded.status).toBe(200);
+    expect(loaded.responseJson).toEqual([expect.objectContaining({ label })]);
+    await expect(page.getByRole('heading', { level: 4, name: label })).toBeVisible();
+    await recurseUntil(
+      () => savedAnniversaryLabels(page),
+      (v) => {
+        expect(v).toEqual([label]);
+      }
+    );
 
-      // WHEN: the app opens again with the server unreachable, then offline.
-      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-      await page.route('**/rest/v1/anniversaries**', (route) => route.abort());
-      await page.reload();
-      // Settings is a lazy view: going offline before its module has loaded
-      // fails the import and shows the offline error screen instead.
-      await expect(page.getByTestId('settings-view')).toBeVisible();
-      await goOffline(page, true);
+    // WHEN: the app opens again with the server unreachable, then offline.
+    // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/anniversaries**', (route) => route.abort());
+    await page.reload();
+    // Settings is a lazy view: going offline before its module has loaded
+    // fails the import and shows the offline error screen instead.
+    await expect(page.getByTestId('settings-view')).toBeVisible();
+    await goOffline(page, true);
 
-      // THEN: the anniversary is still listed — from the copy, since the
-      // device-global blob no longer holds any.
-      await navigateTo(page, 'settings');
-      await expect(page.getByRole('heading', { level: 4, name: label })).toBeVisible();
-      const blob = await page.evaluate(() => localStorage.getItem('my-love-storage') ?? '');
-      expect(blob).not.toContain(label);
-    } finally {
-      await page.context().setOffline(false);
-      await page.unroute('**/rest/v1/anniversaries**');
-      await clear({ soft: true });
-    }
+    // THEN: the anniversary is still listed — from the copy, since the
+    // device-global blob no longer holds any.
+    await navigateTo(page, 'settings');
+    await expect(page.getByRole('heading', { level: 4, name: label })).toBeVisible();
+    const blob = await page.evaluate(() => localStorage.getItem('my-love-storage') ?? '');
+    expect(blob).not.toContain(label);
   });
 
   test('[P1] a favorite added on the server while offline appears after reconnect', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     const favoritesRead = () => interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
     // Awaited here so the cold start's own favorites read cannot be the one the
@@ -199,55 +194,53 @@ test.describe('Account data from the local copy', () => {
     const userId = await signedInUserId(page);
     // This worker account's own rows only: a custom message could win today's
     // rotation, and a leftover favorite would open on "Remove from favorites".
-    // Hard before the test, so it never runs on leftover rows; soft in the
-    // teardown, so every table is attempted and the test's own error stands.
-    const clear = async ({ soft }: { soft: boolean }) => {
+    // Cleared before the test, so it never runs on leftover rows, and at teardown.
+    // Every table is attempted before any failure is reported.
+    const clear = async () => {
+      const errors = [];
       for (const table of ['message_favorites', 'custom_messages'] as const) {
-        const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
-        const message = `clearing ${table} for this worker account`;
-        (soft ? expect.soft(error, message) : expect(error, message)).toBeNull();
+        errors.push((await supabaseAdmin.from(table).delete().eq('user_id', userId)).error);
       }
+      expect(errors, 'clearing favorites and custom messages for this worker account')
+        .toEqual([null, null]);
     };
-    await clear({ soft: false });
+    await clear();
+    cleanup.defer('clear the favorites and custom messages', clear);
 
-    try {
-      // GIVEN: today's bundled message, not a favorite, after a settled refresh.
-      const settled = favoritesRead();
-      await page.reload();
-      expect((await settled).status).toBe(200);
-      const favorite = page.getByTestId('message-favorite-button');
-      await expect(favorite).toHaveAccessibleName('Add to favorites');
-      const messageKey = await page.evaluate(async () => {
-        const modulePath = '/src/services/messageFavoritesApi.ts';
-        const { bundledMessageKey } = await import(modulePath);
-        const current = window.__APP_STORE__!.getState().currentMessage;
-        if (!current || current.isCustom) throw new Error('Expected a bundled daily message');
-        return bundledMessageKey(current.text) as Promise<string>;
-      });
+    // GIVEN: today's bundled message, not a favorite, after a settled refresh.
+    const settled = favoritesRead();
+    await page.reload();
+    expect((await settled).status).toBe(200);
+    const favorite = page.getByTestId('message-favorite-button');
+    await expect(favorite).toHaveAccessibleName('Add to favorites');
+    const messageKey = await page.evaluate(async () => {
+      const modulePath = '/src/services/messageFavoritesApi.ts';
+      const { bundledMessageKey } = await import(modulePath);
+      const current = window.__APP_STORE__!.getState().currentMessage;
+      if (!current || current.isCustom) throw new Error('Expected a bundled daily message');
+      return bundledMessageKey(current.text) as Promise<string>;
+    });
 
-      // WHEN: the device is offline while another device favorites it.
-      await goOffline(page, true);
-      const { error: insertError } = await supabaseAdmin
-        .from('message_favorites')
-        .insert({ user_id: userId, message_key: messageKey });
-      expect(insertError).toBeNull();
-      await expect(favorite).toHaveAccessibleName('Add to favorites');
+    // WHEN: the device is offline while another device favorites it.
+    await goOffline(page, true);
+    const { error: insertError } = await supabaseAdmin
+      .from('message_favorites')
+      .insert({ user_id: userId, message_key: messageKey });
+    expect(insertError).toBeNull();
+    await expect(favorite).toHaveAccessibleName('Add to favorites');
 
-      // THEN: coming back online refreshes it in, with no reload.
-      const refreshed = favoritesRead();
-      await goOffline(page, false);
-      expect((await refreshed).status).toBe(200);
-      await expect(favorite).toHaveAccessibleName('Remove from favorites');
-    } finally {
-      await page.context().setOffline(false);
-      await clear({ soft: true });
-    }
+    // THEN: coming back online refreshes it in, with no reload.
+    const refreshed = favoritesRead();
+    await goOffline(page, false);
+    expect((await refreshed).status).toBe(200);
+    await expect(favorite).toHaveAccessibleName('Remove from favorites');
   });
 
   test('[P1] a favorite and a custom message from one online session are shown when the server cannot be reached', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }, testInfo) => {
     const favoritesRead = () => interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
     // Awaited here so the cold start's own favorites read cannot be the one the
@@ -257,78 +250,73 @@ test.describe('Account data from the local copy', () => {
     expect((await startRead).status).toBe(200);
     const userId = await signedInUserId(page);
     const custom = `Offline custom ${testInfo.workerIndex}-${Date.now()}`;
-    // Hard before the test, so it never runs on leftover rows; soft in the
-    // teardown, so every table is attempted and the test's own error stands.
-    const clear = async ({ soft }: { soft: boolean }) => {
+    // Cleared before the test, so it never runs on leftover rows, and at teardown.
+    // Every table is attempted before any failure is reported.
+    const clear = async () => {
+      const errors = [];
       for (const table of ['message_favorites', 'custom_messages'] as const) {
-        const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
-        const message = `clearing ${table} for this worker account`;
-        (soft ? expect.soft(error, message) : expect(error, message)).toBeNull();
+        errors.push((await supabaseAdmin.from(table).delete().eq('user_id', userId)).error);
       }
+      expect(errors, 'clearing favorites and custom messages for this worker account')
+        .toEqual([null, null]);
     };
-    await clear({ soft: false });
+    await clear();
+    cleanup.defer('clear the favorites and custom messages', clear);
     const { error: insertError } = await supabaseAdmin
       .from('custom_messages')
       .insert({ user_id: userId, text: custom, category: 'custom' });
     expect(insertError).toBeNull();
 
-    try {
-      // GIVEN: one online session loads the custom message and favorites
-      // today's bundled message; both are saved in the account's copy.
-      const settled = favoritesRead();
-      await page.reload();
-      expect((await settled).status).toBe(200);
-      const favorite = page.getByTestId('message-favorite-button');
-      await expect(favorite).toHaveAccessibleName('Add to favorites');
-      const todayId = await page.evaluate(() => window.__APP_STORE__!.getState().currentMessage!.id);
-      await favorite.click();
-      await expect(favorite).toHaveAccessibleName('Remove from favorites');
-      await recurseUntil(
-        () => savedMessageData(page),
-        (v) => {
-          expect(v).toEqual({
-            texts: [custom],
-            bundledFavoriteIds: [todayId],
-          });
-        }
-      );
-      expect(await customRowsInMessagesStore(page)).toBe(0);
+    // GIVEN: one online session loads the custom message and favorites
+    // today's bundled message; both are saved in the account's copy.
+    const settled = favoritesRead();
+    await page.reload();
+    expect((await settled).status).toBe(200);
+    const favorite = page.getByTestId('message-favorite-button');
+    await expect(favorite).toHaveAccessibleName('Add to favorites');
+    const todayId = await page.evaluate(() => window.__APP_STORE__!.getState().currentMessage!.id);
+    await favorite.click();
+    await expect(favorite).toHaveAccessibleName('Remove from favorites');
+    await recurseUntil(
+      () => savedMessageData(page),
+      (v) => {
+        expect(v).toEqual({
+          texts: [custom],
+          bundledFavoriteIds: [todayId],
+        });
+      }
+    );
+    expect(await customRowsInMessagesStore(page)).toBe(0);
 
-      // WHEN: the app opens again with the server unreachable, then offline.
-      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-      await page.route('**/rest/v1/custom_messages**', (route) => route.abort());
-      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-      await page.route('**/rest/v1/message_favorites**', (route) => route.abort());
-      await page.reload();
-      await expect(page.getByTestId('daily-message')).toBeVisible();
-      await goOffline(page, true);
+    // WHEN: the app opens again with the server unreachable, then offline.
+    // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/custom_messages**', (route) => route.abort());
+    // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/message_favorites**', (route) => route.abort());
+    await page.reload();
+    await expect(page.getByTestId('daily-message')).toBeVisible();
+    await goOffline(page, true);
 
-      // THEN: the favorite is still shown — from the copy.
-      await expect(favorite).toHaveAccessibleName('Remove from favorites');
+    // THEN: the favorite is still shown — from the copy.
+    await expect(favorite).toHaveAccessibleName('Remove from favorites');
 
-      // …and so is the custom message, in the editor. The read is still
-      // aborted, so it cannot be awaited. Counted from just before the goto:
-      // the cold start's message-data refresh asked the server for the custom
-      // messages and was refused, so the row can only come from the copy.
-      await goOffline(page, false);
-      let abortedCustomReads = 0;
-      const countAbortedCustomRead = (request: Request) => {
-        if (request.method() === 'GET' && request.url().includes('/rest/v1/custom_messages')) {
-          abortedCustomReads += 1;
-        }
-      };
-      page.on('requestfailed', countAbortedCustomRead);
-      await page.goto('/admin');
-      await recurseUntil(async () => abortedCustomReads, (v) => { expect(v).toBeGreaterThan(0); });
-      page.off('requestfailed', countAbortedCustomRead);
-      await expect(page.getByTestId('admin-message-row').filter({ hasText: custom })).toBeVisible();
-      await goOffline(page, true);
-      await expect(page.getByTestId('admin-message-row').filter({ hasText: custom })).toBeVisible();
-    } finally {
-      await page.context().setOffline(false);
-      await page.unroute('**/rest/v1/custom_messages**');
-      await page.unroute('**/rest/v1/message_favorites**');
-      await clear({ soft: true });
-    }
+    // …and so is the custom message, in the editor. The read is still
+    // aborted, so it cannot be awaited. Counted from just before the goto:
+    // the cold start's message-data refresh asked the server for the custom
+    // messages and was refused, so the row can only come from the copy.
+    await goOffline(page, false);
+    let abortedCustomReads = 0;
+    const countAbortedCustomRead = (request: Request) => {
+      if (request.method() === 'GET' && request.url().includes('/rest/v1/custom_messages')) {
+        abortedCustomReads += 1;
+      }
+    };
+    page.on('requestfailed', countAbortedCustomRead);
+    await page.goto('/admin');
+    await recurseUntil(async () => abortedCustomReads, (v) => { expect(v).toBeGreaterThan(0); });
+    page.off('requestfailed', countAbortedCustomRead);
+    await expect(page.getByTestId('admin-message-row').filter({ hasText: custom })).toBeVisible();
+    await goOffline(page, true);
+    await expect(page.getByTestId('admin-message-row').filter({ hasText: custom })).toBeVisible();
   });
 });

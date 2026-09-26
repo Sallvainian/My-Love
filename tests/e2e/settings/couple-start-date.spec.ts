@@ -10,7 +10,7 @@
  * Nothing here links, unlinks or resets an account; teardown deletes only this
  * pair's couple_settings row.
  */
-import type { BrowserContext, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
 import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
@@ -56,6 +56,7 @@ test.describe('Couple start date shared by both partners', () => {
     partnerUserIdentifier,
     partnerAuthToken,
     interceptNetworkCall,
+    cleanup,
   }) => {
     // Side effect: writes the partner identity's storage-state file.
     expect(partnerAuthToken).not.toBe('');
@@ -70,77 +71,74 @@ test.describe('Couple start date shared by both partners', () => {
         .delete()
         .eq('user_a', pair.user_a)
         .eq('user_b', pair.user_b);
-      expect.soft(error).toBeNull();
+      expect(error).toBeNull();
     };
     await clearPair();
+    cleanup.defer("delete the pair's couple settings", clearPair);
 
-    let partnerContext: BrowserContext | undefined;
-    try {
-      await log.step('With no row yet, Home shows the placeholder');
-      const homeRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
-      await page.goto('/');
-      expect((await homeRead).status).toBe(200);
-      await expect(page.getByTestId('time-together')).toContainText(
-        'Set your start date in Settings'
-      );
+    await log.step('With no row yet, Home shows the placeholder');
+    const homeRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
+    await page.goto('/');
+    expect((await homeRead).status).toBe(200);
+    await expect(page.getByTestId('time-together')).toContainText(
+      'Set your start date in Settings'
+    );
 
-      await log.step('The partner saves a date and time in Settings');
-      partnerContext = await browser.newContext({
-        storageState: getStorageStatePath({ ...authOptions, userIdentifier: partnerUserIdentifier }),
-        baseURL,
-      });
-      const partnerPage = await partnerContext.newPage();
-      const partnerRead = observeOn({
-        page: partnerPage,
-        method: 'GET',
-        url: COUPLE_SETTINGS_READ,
-        timeout: SECOND_CONTEXT_READ_TIMEOUT,
-      });
-      await partnerPage.goto('/settings');
-      expect((await partnerRead).status).toBe(200);
-      await expect(partnerPage.getByTestId('settings-together-since-value')).toHaveText(
-        'Not set yet'
-      );
+    await log.step('The partner saves a date and time in Settings');
+    const partnerContext = await browser.newContext({
+      storageState: getStorageStatePath({ ...authOptions, userIdentifier: partnerUserIdentifier }),
+      baseURL,
+    });
+    // Closed before the clear above runs: the partner's page can still be saving.
+    cleanup.defer('close the partner context', () => partnerContext.close());
+    const partnerPage = await partnerContext.newPage();
+    const partnerRead = observeOn({
+      page: partnerPage,
+      method: 'GET',
+      url: COUPLE_SETTINGS_READ,
+      timeout: SECOND_CONTEXT_READ_TIMEOUT,
+    });
+    await partnerPage.goto('/settings');
+    expect((await partnerRead).status).toBe(200);
+    await expect(partnerPage.getByTestId('settings-together-since-value')).toHaveText(
+      'Not set yet'
+    );
 
-      // Twelve days and an hour ago, to the minute.
-      const target = new Date(Date.now() - 12 * DAY_MS - 60 * 60 * 1000);
-      target.setSeconds(0, 0);
-      const targetIso = target.toISOString();
-      const inputs = await localInputsOf(partnerPage, targetIso);
-      await partnerPage.getByTestId('settings-together-since-date').fill(inputs.date);
-      await partnerPage.getByTestId('settings-together-since-time').fill(inputs.time);
+    // Twelve days and an hour ago, to the minute.
+    const target = new Date(Date.now() - 12 * DAY_MS - 60 * 60 * 1000);
+    target.setSeconds(0, 0);
+    const targetIso = target.toISOString();
+    const inputs = await localInputsOf(partnerPage, targetIso);
+    await partnerPage.getByTestId('settings-together-since-date').fill(inputs.date);
+    await partnerPage.getByTestId('settings-together-since-time').fill(inputs.time);
 
-      const saved = observeOn({
-        page: partnerPage,
-        method: 'POST',
-        url: COUPLE_SETTINGS_SAVE,
-        timeout: SECOND_CONTEXT_READ_TIMEOUT,
-      });
-      await partnerPage.getByTestId('settings-together-since-save').click();
-      expect((await saved).status).toBe(201);
-      await recurseUntil(() => storeStart(partnerPage), (v) => { expect(v).toBe(targetIso); });
-      await expect(partnerPage.getByTestId('settings-together-since-error')).toHaveCount(0);
+    const saved = observeOn({
+      page: partnerPage,
+      method: 'POST',
+      url: COUPLE_SETTINGS_SAVE,
+      timeout: SECOND_CONTEXT_READ_TIMEOUT,
+    });
+    await partnerPage.getByTestId('settings-together-since-save').click();
+    expect((await saved).status).toBe(201);
+    await recurseUntil(() => storeStart(partnerPage), (v) => { expect(v).toBe(targetIso); });
+    await expect(partnerPage.getByTestId('settings-together-since-error')).toHaveCount(0);
 
-      await log.step('This partner sees the same date after a reload');
-      const reloadRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
-      await page.reload();
-      expect((await reloadRead).status).toBe(200);
-      await recurseUntil(() => storeStart(page), (v) => { expect(v).toBe(targetIso); });
-      const card = page.getByTestId('time-together');
-      await expect(card).toContainText('12 days');
-      await expect(card).not.toContainText('Set your start date in Settings');
+    await log.step('This partner sees the same date after a reload');
+    const reloadRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
+    await page.reload();
+    expect((await reloadRead).status).toBe(200);
+    await recurseUntil(() => storeStart(page), (v) => { expect(v).toBe(targetIso); });
+    const card = page.getByTestId('time-together');
+    await expect(card).toContainText('12 days');
+    await expect(card).not.toContainText('Set your start date in Settings');
 
-      // The saved copy already holds targetIso, so the inputs are read only
-      // after this visit's own couple read has answered.
-      const settingsRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
-      await page.goto('/settings');
-      expect((await settingsRead).status).toBe(200);
-      const own = await localInputsOf(page, targetIso);
-      await expect(page.getByTestId('settings-together-since-date')).toHaveValue(own.date);
-      await expect(page.getByTestId('settings-together-since-time')).toHaveValue(own.time);
-    } finally {
-      await partnerContext?.close().catch(() => {});
-      await clearPair();
-    }
+    // The saved copy already holds targetIso, so the inputs are read only
+    // after this visit's own couple read has answered.
+    const settingsRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
+    await page.goto('/settings');
+    expect((await settingsRead).status).toBe(200);
+    const own = await localInputsOf(page, targetIso);
+    await expect(page.getByTestId('settings-together-since-date')).toHaveValue(own.date);
+    await expect(page.getByTestId('settings-together-since-time')).toHaveValue(own.time);
   });
 });

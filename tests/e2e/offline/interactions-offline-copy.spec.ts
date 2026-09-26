@@ -22,6 +22,7 @@ import { test, expect } from '../../support/merged-fixtures';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { INTERACTIONS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
+import { deleteRowById } from '../../support/helpers/teardown';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { createInteractionInsert } from '../../support/factories/interaction-record-ownership';
 
@@ -75,12 +76,6 @@ async function seedPartnerPoke(supabaseAdmin: TypedSupabaseClient): Promise<stri
   return data!.id;
 }
 
-async function deleteInteraction(supabaseAdmin: TypedSupabaseClient, id: string | null) {
-  if (!id) return;
-  const { error } = await supabaseAdmin.from('interactions').delete().eq('id', id);
-  expect.soft(error).toBeNull();
-}
-
 test.beforeEach(async ({ page }) => {
   // Dismiss the welcome splash, matching events-offline-copy.spec.ts.
   await page.addInitScript(() => {
@@ -93,110 +88,102 @@ test.describe('Poke and kiss history from the local copy', () => {
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     const pokeId = await seedPartnerPoke(supabaseAdmin);
+    cleanup.defer('delete the seeded poke', () =>
+      deleteRowById(supabaseAdmin, 'interactions', pokeId)
+    );
 
-    try {
-      // GIVEN: the app starts online; the start refresh loads the history and
-      // saves the copy before the sheet is ever opened.
-      const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
-      await page.goto('/partner');
-      const history = await historyRead;
-      expect(history.status).toBe(200);
-      expect(history.responseJson).toEqual(
-        expect.arrayContaining([expect.objectContaining({ id: pokeId })])
-      );
-      await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
-      await recurseUntil(
-        async () => (await savedInteractionIds(page))?.includes(pokeId) ?? false,
-        (v) => {
-          expect(v).toBe(true);
-        }
-      );
+    // GIVEN: the app starts online; the start refresh loads the history and
+    // saves the copy before the sheet is ever opened.
+    const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
+    await page.goto('/partner');
+    const history = await historyRead;
+    expect(history.status).toBe(200);
+    expect(history.responseJson).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: pokeId })])
+    );
+    await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
+    await recurseUntil(
+      async () => (await savedInteractionIds(page))?.includes(pokeId) ?? false,
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
 
-      // WHEN: the app reloads without a server answer and the device goes offline.
-      let abortedReads = 0;
-      // playwright-utils deviation: the route must be installed before the next navigation and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-      await page.route(INTERACTIONS_REST, (route) => {
-        abortedReads += 1;
-        return route.abort();
-      });
-      await page.reload();
-      await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
-      // The start read really hit the aborted route, so nothing after this
-      // point can have come from the server.
-      await recurseUntil(async () => abortedReads, (v) => { expect(v).toBeGreaterThan(0); });
-      await goOffline(page, true);
+    // WHEN: the app reloads without a server answer and the device goes offline.
+    let abortedReads = 0;
+    // playwright-utils deviation: the route must be installed before the next navigation and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route(INTERACTIONS_REST, (route) => {
+      abortedReads += 1;
+      return route.abort();
+    });
+    await page.reload();
+    await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
+    // The start read really hit the aborted route, so nothing after this
+    // point can have come from the server.
+    await recurseUntil(async () => abortedReads, (v) => { expect(v).toBeGreaterThan(0); });
+    await goOffline(page, true);
 
-      // THEN: the badge shows the saved unviewed count…
-      await expect(page.getByTestId('notification-badge')).toBeVisible();
-      // …and the history sheet lists the saved poke, not "No interactions yet".
-      await page.getByTestId('history-button').click();
-      const sheet = page.getByTestId('interaction-history-modal');
-      await expect(sheet).toBeVisible();
-      await expect(sheet.getByTestId(`interaction-${pokeId}`)).toBeVisible();
-      await expect(sheet.getByText('No interactions yet')).toHaveCount(0);
-    } finally {
-      await page.context().setOffline(false);
-      await page.unroute(INTERACTIONS_REST);
-      await deleteInteraction(supabaseAdmin, pokeId);
-    }
+    // THEN: the badge shows the saved unviewed count…
+    await expect(page.getByTestId('notification-badge')).toBeVisible();
+    // …and the history sheet lists the saved poke, not "No interactions yet".
+    await page.getByTestId('history-button').click();
+    const sheet = page.getByTestId('interaction-history-modal');
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByTestId(`interaction-${pokeId}`)).toBeVisible();
+    await expect(sheet.getByText('No interactions yet')).toHaveCount(0);
   });
 
   test('[P1] a poke sent while offline appears after reconnect without a reload', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
-    let pokeId: string | null = null;
+    // GIVEN: signed in on the partner screen, history loaded, then offline.
+    const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
+    await page.goto('/partner');
+    expect((await historyRead).status).toBe(200);
+    await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
+    await recurseUntil(() => savedInteractionIds(page), (v) => { expect(v).not.toBeNull(); });
+    await goOffline(page, true);
 
-    try {
-      // GIVEN: signed in on the partner screen, history loaded, then offline.
-      const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
-      await page.goto('/partner');
-      expect((await historyRead).status).toBe(200);
-      await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
-      await recurseUntil(() => savedInteractionIds(page), (v) => { expect(v).not.toBeNull(); });
-      await goOffline(page, true);
+    // WHEN: the partner pokes while this device is offline, then it reconnects.
+    const id = await seedPartnerPoke(supabaseAdmin);
+    cleanup.defer('delete the seeded poke', () => deleteRowById(supabaseAdmin, 'interactions', id));
+    const refreshRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
+    await goOffline(page, false);
+    // The reconnect itself re-reads the server (the kind's refresher), and
+    // that read carries the poke — so the test does not rest on Realtime,
+    // whose socket setOffline may leave open.
+    const response = await refreshRead;
+    expect(response.status).toBe(200);
+    const rows = response.responseJson as { id: string }[];
+    expect(rows.map((row) => row.id)).toContain(id);
 
-      // WHEN: the partner pokes while this device is offline, then it reconnects.
-      pokeId = await seedPartnerPoke(supabaseAdmin);
-      const id = pokeId;
-      const refreshRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
-      await goOffline(page, false);
-      // The reconnect itself re-reads the server (the kind's refresher), and
-      // that read carries the poke — so the test does not rest on Realtime,
-      // whose socket setOffline may leave open.
-      const response = await refreshRead;
-      expect(response.status).toBe(200);
-      const rows = response.responseJson as { id: string }[];
-      expect(rows.map((row) => row.id)).toContain(id);
-
-      // THEN: the poke is in state, the copy and the sheet, with the badge showing.
-      await recurseUntil(
-        () =>
-          page.evaluate(
-            (wanted) => window.__APP_STORE__?.getState().interactions.some((i) => i.id === wanted) ?? false,
-            id
-          ),
-        (v) => {
-          expect(v).toBe(true);
-        }
-      );
-      await recurseUntil(
-        async () => (await savedInteractionIds(page))?.includes(id) ?? false,
-        (v) => {
-          expect(v).toBe(true);
-        }
-      );
-      await expect(page.getByTestId('notification-badge')).toBeVisible();
-      await page.getByTestId('history-button').click();
-      await expect(
-        page.getByTestId('interaction-history-modal').getByTestId(`interaction-${id}`)
-      ).toBeVisible();
-    } finally {
-      await page.context().setOffline(false);
-      await deleteInteraction(supabaseAdmin, pokeId);
-    }
+    // THEN: the poke is in state, the copy and the sheet, with the badge showing.
+    await recurseUntil(
+      () =>
+        page.evaluate(
+          (wanted) => window.__APP_STORE__?.getState().interactions.some((i) => i.id === wanted) ?? false,
+          id
+        ),
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
+    await recurseUntil(
+      async () => (await savedInteractionIds(page))?.includes(id) ?? false,
+      (v) => {
+        expect(v).toBe(true);
+      }
+    );
+    await expect(page.getByTestId('notification-badge')).toBeVisible();
+    await page.getByTestId('history-button').click();
+    await expect(
+      page.getByTestId('interaction-history-modal').getByTestId(`interaction-${id}`)
+    ).toBeVisible();
   });
 });

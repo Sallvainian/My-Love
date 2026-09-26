@@ -28,7 +28,7 @@
  * is taken from that context.
  */
 import { randomUUID } from 'node:crypto';
-import type { BrowserContext, Page, Request } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
 import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call';
@@ -87,6 +87,7 @@ test.describe('Love notes realtime delivery', () => {
       authOptions,
       partnerUserIdentifier,
       partnerAuthToken,
+      cleanup,
     }) => {
       // Depended on for its side effect: `partnerAuthToken` is what calls
       // `provider.manageAuthToken` for `worker-N-partner`, which writes that
@@ -111,143 +112,16 @@ test.describe('Love notes realtime delivery', () => {
       const expectedBroadcastPath = `${BROADCAST_PATH}${encodeURIComponent(
         `love-notes:${partnerId}`
       )}/events/new_message`;
-      let partnerContext: BrowserContext | undefined;
       // Whether a `love_notes` row exists for teardown to find. Raised only once
       // the broadcast request has been observed, which `notesSlice.ts:565` reaches
       // solely after `insertNoteOnce` returned a row — so this is true exactly
       // when a row was committed. Without it, every failure before the send would
       // add a misleading second failure from the row-count check below.
       let noteRowCommitted = false;
-
-      try {
-        await log.step('Park the partner on /notes until its own hook reports SUBSCRIBED');
-        partnerContext = await browser.newContext({
-          storageState: getStorageStatePath({
-            ...authOptions,
-            userIdentifier: partnerUserIdentifier,
-          }),
-          // Explicit: the storage state is scoped to this origin, and a context
-          // built without it resolves relative gotos against nothing.
-          baseURL,
-        });
-        const partnerPage: Page = await partnerContext.newPage();
-
-        // The partner's thread reads, counted from before its goto: the notes
-        // screen reads the thread on mount, and the love-notes refresher reads
-        // it again on every signed-in start. Delivery below is only proved live
-        // if every one of them has settled before the send and none starts after.
-        let threadReadsStarted = 0;
-        let threadReadsSettled = 0;
-        const isThreadRead = (request: Request) =>
-          request.method() === 'GET' &&
-          new URL(request.url()).pathname.endsWith('/rest/v1/love_notes_visible');
-        partnerPage.on('request', (request) => {
-          if (isThreadRead(request)) threadReadsStarted += 1;
-        });
-        const settleThreadRead = (request: Request) => {
-          if (isThreadRead(request)) threadReadsSettled += 1;
-        };
-        partnerPage.on('requestfinished', settleThreadRead);
-        partnerPage.on('requestfailed', settleThreadRead);
-        // A page in a second context: the fixture is bound to `page`.
-        const threadRead = interceptNetworkCall({
-          page: partnerPage,
-          method: 'GET',
-          url: LOVE_NOTES_READ,
-          timeout: 30_000,
-        });
-
-        // Registered BEFORE the navigation that causes the log. Registering it
-        // after would race the join and could miss it entirely, which would read
-        // as "the partner never subscribed" on a perfectly healthy run.
-        const subscribed = partnerPage.waitForEvent('console', {
-          predicate: (message) => SUBSCRIBED_LOG.test(message.text()),
-          timeout: 30_000,
-        });
-        await partnerPage.goto('/notes');
-        try {
-          await subscribed;
-        } catch (cause) {
-          // Playwright's own message is `waitForEvent: Timeout 30000ms exceeded`,
-          // which names neither the hook nor which of the two pages was waiting.
-          // Sending anyway is not an option: a broadcast has no replay, so the
-          // note would be lost and the run would read as a delivery failure.
-          throw new Error(
-            "The partner page's useRealtimeMessages never reported SUBSCRIBED within 30s of " +
-              'landing on /notes, so the receiver was never joined and no send could be measured.',
-            { cause }
-          );
-        }
-        expect((await threadRead).status).toBe(200);
-
-        // This page is not touched again until the assertion: no reload, no
-        // second goto, no manual refetch. Its thread reads — the screen's own
-        // mount read and the love-notes refresher's — must all have settled
-        // just before the send, and the count is checked again after delivery,
-        // so anything that appears from here on can only have arrived over the
-        // broadcast.
-
-        await log.step('Send a unique note from the sender through the real UI');
-        await page.goto('/notes');
-        const messageInput = page.getByLabel(/love note message input/i);
-        await expect(messageInput).toBeVisible();
-        await messageInput.fill(noteText);
-
-        // The standalone form: the fixture drops `timeout`.
-        const broadcast = interceptNetworkCall({
-          page,
-          method: 'POST',
-          url: `**${expectedBroadcastPath}?*`,
-          // Bounds only the wait for the POST to be sent: the utility then awaits
-          // `request.response()` with no bound of its own. A send the app aborts
-          // at `BROADCAST_TIMEOUT_MS` (15s, `src/api/ephemeralBroadcast.ts:77`)
-          // therefore fails here as "No response received for the request", and
-          // only a send that never starts runs into these 30s.
-          timeout: 30_000,
-        });
-        // Checked here, after the whole sender setup, so every start-up thread
-        // read on the partner's page has had that time to start and settle.
-        await recurseUntil(
-          async () => threadReadsStarted - threadReadsSettled,
-          (v) => {
-            expect(v, "every one of the partner's thread reads has settled").toBe(0);
-          },
-          { timeout: 15_000 }
-        );
-        const threadReadsBeforeSend = threadReadsStarted;
-        await page.getByLabel(/send message/i).click();
-
-        await log.step('The private INSERT policy admits the app own client send');
-        // Asserted before the UI: a send the policy refused answers non-202 and
-        // `notesSlice.ts:567-571` swallows it as non-fatal, so checking the
-        // partner's screen first would report a rejected broadcast as a missing
-        // element and point at the wrong layer.
-        const { status: broadcastStatus, request: broadcastRequest } = await broadcast;
-        noteRowCommitted = true;
-        expect(broadcastStatus).toBe(202);
-        const broadcastUrl = broadcastRequest!.url();
-        // Re-asserted rather than left to the glob, so that loosening the glob
-        // later cannot silently widen what the 202 is taken to prove.
-        // Compared against the raw URL: `decodeURIComponent` throws a URIError on
-        // any stray percent sequence in a query value, which would replace a real
-        // result with a decoding failure.
-        expect(broadcastUrl).toContain(expectedBroadcastPath);
-        // `private=true` is what makes this an authorization result rather than
-        // merely a delivery one. Without it Realtime does not evaluate
-        // `couple_broadcast_partner_can_send` at all, and the 202 would say
-        // nothing about the policy this spec exists to exercise
-        // (`RealtimeChannel.js:456-458`).
-        expect(new URL(broadcastUrl).searchParams.get('private')).toBe('true');
-
-        await log.step('The note reaches the partner live, with no reload and no re-navigation');
-        await expect(partnerPage.getByTestId('love-note-message').getByText(noteText)).toBeVisible();
-        expect(threadReadsStarted, 'no thread read may deliver the note instead').toBe(
-          threadReadsBeforeSend
-        );
-      } finally {
-        // A close that rejects must not become the failure the report shows
-        // instead of the real one.
-        await partnerContext?.close().catch(() => {});
+      cleanup.defer('delete the note row this test created', async () => {
+        // The sender's page first: its queued-note drain could otherwise send
+        // the note after the delete.
+        await page.close();
 
         // Keyed on this test's own uuid AND on this worker's own pair, so a
         // mis-resolved identity deletes nothing rather than another worker's
@@ -259,14 +133,7 @@ test.describe('Love notes realtime delivery', () => {
           .eq('content', noteText)
           .in('from_user_id', [userId, partnerId])
           .select('id');
-
-        // Soft, and deliberately so. A hard assertion here throws out of a
-        // `finally` and replaces whatever the test was already failing on — the
-        // one failure worth reading — with a teardown message. Soft records the
-        // leak, still fails the run, and leaves the original error standing.
-        expect
-          .soft(error, 'Teardown must delete the note row this test created')
-          .toBeNull();
+        if (error) throw error;
 
         // The row count, not just the absence of an error. A delete whose filter
         // matches nothing — the shape a mis-resolved `userId`/`partnerId` would
@@ -279,7 +146,133 @@ test.describe('Love notes realtime delivery', () => {
             .soft(deleted ?? [], 'Teardown must delete exactly the one row this test created')
             .toHaveLength(1);
         }
+      });
+
+      await log.step('Park the partner on /notes until its own hook reports SUBSCRIBED');
+      const partnerContext = await browser.newContext({
+        storageState: getStorageStatePath({
+          ...authOptions,
+          userIdentifier: partnerUserIdentifier,
+        }),
+        // Explicit: the storage state is scoped to this origin, and a context
+        // built without it resolves relative gotos against nothing.
+        baseURL,
+      });
+      cleanup.defer('close the partner context', () => partnerContext.close());
+      const partnerPage: Page = await partnerContext.newPage();
+
+      // The partner's thread reads, counted from before its goto: the notes
+      // screen reads the thread on mount, and the love-notes refresher reads
+      // it again on every signed-in start. Delivery below is only proved live
+      // if every one of them has settled before the send and none starts after.
+      let threadReadsStarted = 0;
+      let threadReadsSettled = 0;
+      const isThreadRead = (request: Request) =>
+        request.method() === 'GET' &&
+        new URL(request.url()).pathname.endsWith('/rest/v1/love_notes_visible');
+      partnerPage.on('request', (request) => {
+        if (isThreadRead(request)) threadReadsStarted += 1;
+      });
+      const settleThreadRead = (request: Request) => {
+        if (isThreadRead(request)) threadReadsSettled += 1;
+      };
+      partnerPage.on('requestfinished', settleThreadRead);
+      partnerPage.on('requestfailed', settleThreadRead);
+      // A page in a second context: the fixture is bound to `page`.
+      const threadRead = interceptNetworkCall({
+        page: partnerPage,
+        method: 'GET',
+        url: LOVE_NOTES_READ,
+        timeout: 30_000,
+      });
+
+      // Registered BEFORE the navigation that causes the log. Registering it
+      // after would race the join and could miss it entirely, which would read
+      // as "the partner never subscribed" on a perfectly healthy run.
+      const subscribed = partnerPage.waitForEvent('console', {
+        predicate: (message) => SUBSCRIBED_LOG.test(message.text()),
+        timeout: 30_000,
+      });
+      await partnerPage.goto('/notes');
+      try {
+        await subscribed;
+      } catch (cause) {
+        // Playwright's own message is `waitForEvent: Timeout 30000ms exceeded`,
+        // which names neither the hook nor which of the two pages was waiting.
+        // Sending anyway is not an option: a broadcast has no replay, so the
+        // note would be lost and the run would read as a delivery failure.
+        throw new Error(
+          "The partner page's useRealtimeMessages never reported SUBSCRIBED within 30s of " +
+            'landing on /notes, so the receiver was never joined and no send could be measured.',
+          { cause }
+        );
       }
+      expect((await threadRead).status).toBe(200);
+
+      // This page is not touched again until the assertion: no reload, no
+      // second goto, no manual refetch. Its thread reads — the screen's own
+      // mount read and the love-notes refresher's — must all have settled
+      // just before the send, and the count is checked again after delivery,
+      // so anything that appears from here on can only have arrived over the
+      // broadcast.
+
+      await log.step('Send a unique note from the sender through the real UI');
+      await page.goto('/notes');
+      const messageInput = page.getByLabel(/love note message input/i);
+      await expect(messageInput).toBeVisible();
+      await messageInput.fill(noteText);
+
+      // The standalone form: the fixture drops `timeout`.
+      const broadcast = interceptNetworkCall({
+        page,
+        method: 'POST',
+        url: `**${expectedBroadcastPath}?*`,
+        // Bounds only the wait for the POST to be sent: the utility then awaits
+        // `request.response()` with no bound of its own. A send the app aborts
+        // at `BROADCAST_TIMEOUT_MS` (15s, `src/api/ephemeralBroadcast.ts:77`)
+        // therefore fails here as "No response received for the request", and
+        // only a send that never starts runs into these 30s.
+        timeout: 30_000,
+      });
+      // Checked here, after the whole sender setup, so every start-up thread
+      // read on the partner's page has had that time to start and settle.
+      await recurseUntil(
+        async () => threadReadsStarted - threadReadsSettled,
+        (v) => {
+          expect(v, "every one of the partner's thread reads has settled").toBe(0);
+        },
+        { timeout: 15_000 }
+      );
+      const threadReadsBeforeSend = threadReadsStarted;
+      await page.getByLabel(/send message/i).click();
+
+      await log.step('The private INSERT policy admits the app own client send');
+      // Asserted before the UI: a send the policy refused answers non-202 and
+      // `notesSlice.ts:567-571` swallows it as non-fatal, so checking the
+      // partner's screen first would report a rejected broadcast as a missing
+      // element and point at the wrong layer.
+      const { status: broadcastStatus, request: broadcastRequest } = await broadcast;
+      noteRowCommitted = true;
+      expect(broadcastStatus).toBe(202);
+      const broadcastUrl = broadcastRequest!.url();
+      // Re-asserted rather than left to the glob, so that loosening the glob
+      // later cannot silently widen what the 202 is taken to prove.
+      // Compared against the raw URL: `decodeURIComponent` throws a URIError on
+      // any stray percent sequence in a query value, which would replace a real
+      // result with a decoding failure.
+      expect(broadcastUrl).toContain(expectedBroadcastPath);
+      // `private=true` is what makes this an authorization result rather than
+      // merely a delivery one. Without it Realtime does not evaluate
+      // `couple_broadcast_partner_can_send` at all, and the 202 would say
+      // nothing about the policy this spec exists to exercise
+      // (`RealtimeChannel.js:456-458`).
+      expect(new URL(broadcastUrl).searchParams.get('private')).toBe('true');
+
+      await log.step('The note reaches the partner live, with no reload and no re-navigation');
+      await expect(partnerPage.getByTestId('love-note-message').getByText(noteText)).toBeVisible();
+      expect(threadReadsStarted, 'no thread read may deliver the note instead').toBe(
+        threadReadsBeforeSend
+      );
     }
   );
 });

@@ -50,7 +50,7 @@ async function clearPair(
     .delete()
     .eq('user_a', pair.user_a)
     .eq('user_b', pair.user_b);
-  expect.soft(error).toBeNull();
+  if (error) throw error;
 }
 
 /** The signed-in account's saved `couple-settings` copy, or `null`. */
@@ -106,6 +106,7 @@ test.describe('Couple start date from the local copy', () => {
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const pair = orderedPair(userId, partnerId);
@@ -113,110 +114,102 @@ test.describe('Couple start date from the local copy', () => {
     const start = new Date(Date.now() - 10 * DAY_MS - 60 * 60 * 1000);
     start.setSeconds(0, 0);
     const startIso = start.toISOString();
+    cleanup.defer("delete the pair's couple settings", () => clearPair(supabaseAdmin, pair));
     await setPairStart(supabaseAdmin, pair, startIso);
 
-    try {
-      // GIVEN: one online session loads the date, which saves the copy.
-      const coupleRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
-      await page.goto('/');
-      expect((await coupleRead).status).toBe(200);
-      await recurseUntil(() => storeStart(page), (v) => { expect(v).toBe(startIso); });
-      await recurseUntil(
-        () => savedCoupleCopy(page),
-        (v) => {
-          expect(v).toEqual({
-            status: 'linked',
-            partnerId,
-            relationshipStart: startIso,
-            weddingDate: null,
-          });
-        }
-      );
-      await expect(page.getByTestId('time-together')).toContainText('10 days');
+    // GIVEN: one online session loads the date, which saves the copy.
+    const coupleRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
+    await page.goto('/');
+    expect((await coupleRead).status).toBe(200);
+    await recurseUntil(() => storeStart(page), (v) => { expect(v).toBe(startIso); });
+    await recurseUntil(
+      () => savedCoupleCopy(page),
+      (v) => {
+        expect(v).toEqual({
+          status: 'linked',
+          partnerId,
+          relationshipStart: startIso,
+          weddingDate: null,
+        });
+      }
+    );
+    await expect(page.getByTestId('time-together')).toContainText('10 days');
 
-      // WHEN: the app opens again with the table unreachable, then offline.
-      // Settings is lazy and dev mode has no service worker, so its module is
-      // loaded while still online.
-      // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-      await page.route('**/rest/v1/couple_settings**', (route) => route.abort());
-      await page.reload();
-      await expect(page.getByTestId('app-container')).toBeVisible();
-      await navigateTo(page, 'settings');
-      await expect(page.getByTestId('settings-view')).toBeVisible();
-      await goOffline(page, true);
+    // WHEN: the app opens again with the table unreachable, then offline.
+    // Settings is lazy and dev mode has no service worker, so its module is
+    // loaded while still online.
+    // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/couple_settings**', (route) => route.abort());
+    await page.reload();
+    await expect(page.getByTestId('app-container')).toBeVisible();
+    await navigateTo(page, 'settings');
+    await expect(page.getByTestId('settings-view')).toBeVisible();
+    await goOffline(page, true);
 
-      // THEN: Settings shows the saved date, and Home counts from it.
-      await expect(page.getByTestId('settings-together-since-date')).toHaveValue(
-        await localDateOf(page, startIso)
-      );
+    // THEN: Settings shows the saved date, and Home counts from it.
+    await expect(page.getByTestId('settings-together-since-date')).toHaveValue(
+      await localDateOf(page, startIso)
+    );
 
-      await navigateTo(page, 'home');
-      const card = page.getByTestId('time-together');
-      await expect(card).toContainText('10 days');
-      await expect(card).toContainText(/\d{2}h \d{2}m \d{2}s/);
-      await expect(card).not.toContainText('Set your start date in Settings');
+    await navigateTo(page, 'home');
+    const card = page.getByTestId('time-together');
+    await expect(card).toContainText('10 days');
+    await expect(card).toContainText(/\d{2}h \d{2}m \d{2}s/);
+    await expect(card).not.toContainText('Set your start date in Settings');
 
-      // The device-global blob never holds it: it came from the copy.
-      const blob = await page.evaluate(() => localStorage.getItem('my-love-storage') ?? '');
-      expect(blob).not.toContain(startIso);
-    } finally {
-      await page.context().setOffline(false);
-      await page.unroute('**/rest/v1/couple_settings**');
-      await clearPair(supabaseAdmin, pair);
-    }
+    // The device-global blob never holds it: it came from the copy.
+    const blob = await page.evaluate(() => localStorage.getItem('my-love-storage') ?? '');
+    expect(blob).not.toContain(startIso);
   });
 
   test('[P1] an offline edit is refused with a needs-a-connection message and changes nothing', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
+    cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const pair = orderedPair(userId, partnerId);
     const start = new Date(Date.now() - 40 * DAY_MS);
     start.setSeconds(0, 0);
     const startIso = start.toISOString();
+    cleanup.defer("delete the pair's couple settings", () => clearPair(supabaseAdmin, pair));
     await setPairStart(supabaseAdmin, pair, startIso);
 
-    try {
-      const coupleRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
-      await page.goto('/settings');
-      expect((await coupleRead).status).toBe(200);
-      await recurseUntil(() => storeStart(page), (v) => { expect(v).toBe(startIso); });
-      const dateInput = page.getByTestId('settings-together-since-date');
-      await expect(dateInput).toHaveValue(await localDateOf(page, startIso));
+    const coupleRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
+    await page.goto('/settings');
+    expect((await coupleRead).status).toBe(200);
+    await recurseUntil(() => storeStart(page), (v) => { expect(v).toBe(startIso); });
+    const dateInput = page.getByTestId('settings-together-since-date');
+    await expect(dateInput).toHaveValue(await localDateOf(page, startIso));
 
-      await goOffline(page, true);
-      await dateInput.fill('2020-02-02');
-      await page.getByTestId('settings-together-since-save').click();
+    await goOffline(page, true);
+    await dateInput.fill('2020-02-02');
+    await page.getByTestId('settings-together-since-save').click();
 
-      await expect(page.getByTestId('settings-together-since-error')).toContainText(
-        /need a connection/i
-      );
-      // Store, copy and server all still hold the saved date.
-      expect(await storeStart(page)).toBe(startIso);
-      await recurseUntil(
-        () => savedCoupleCopy(page),
-        (v) => {
-          expect(v).toEqual({
-            status: 'linked',
-            partnerId,
-            relationshipStart: startIso,
-            weddingDate: null,
-          });
-        }
-      );
-      const { data, error } = await supabaseAdmin
-        .from('couple_settings')
-        .select('relationship_start')
-        .eq('user_a', pair.user_a)
-        .eq('user_b', pair.user_b)
-        .single();
-      expect(error).toBeNull();
-      expect(new Date(data!.relationship_start!).toISOString()).toBe(startIso);
-    } finally {
-      await page.context().setOffline(false);
-      await clearPair(supabaseAdmin, pair);
-    }
+    await expect(page.getByTestId('settings-together-since-error')).toContainText(
+      /need a connection/i
+    );
+    // Store, copy and server all still hold the saved date.
+    expect(await storeStart(page)).toBe(startIso);
+    await recurseUntil(
+      () => savedCoupleCopy(page),
+      (v) => {
+        expect(v).toEqual({
+          status: 'linked',
+          partnerId,
+          relationshipStart: startIso,
+          weddingDate: null,
+        });
+      }
+    );
+    const { data, error } = await supabaseAdmin
+      .from('couple_settings')
+      .select('relationship_start')
+      .eq('user_a', pair.user_a)
+      .eq('user_b', pair.user_b)
+      .single();
+    expect(error).toBeNull();
+    expect(new Date(data!.relationship_start!).toISOString()).toBe(startIso);
   });
 });
