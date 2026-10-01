@@ -97,8 +97,8 @@
  * ── Isolation ──────────────────────────────────────────────────────────────
  *
  * Rows belong to this worker's own pair only, resolved through
- * `getWorkerPairEmails()` (keyed on `TEST_WORKER_INDEX`, never
- * `TEST_PARALLEL_INDEX`). Nothing here links or unlinks partners, resets a
+ * `getWorkerPairEmails()` (keyed on `TEST_PARALLEL_INDEX`, never
+ * `TEST_WORKER_INDEX`). Nothing here links or unlinks partners, resets a
  * password, or touches a row owned by another worker. The one identity that is
  * NOT from the pool — DE.5-API-008's outsider — is self-provisioned by
  * `createOutsiderClient` (`tests/support/helpers/rls-security.ts:43`), which

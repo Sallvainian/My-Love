@@ -16,7 +16,7 @@ import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-ses
 import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { closeContext } from '../../support/fixtures/cleanup';
-import { resolveOwnPair } from '../../support/helpers/events';
+import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
 import {
   COUPLE_SETTINGS_READ,
   COUPLE_SETTINGS_SAVE,
@@ -77,6 +77,11 @@ test.describe('Couple start date shared by both partners', () => {
     await clearPair();
     cleanup.defer("delete the pair's couple settings", clearPair);
 
+    // This page runs on a pinned clock and the date is built from it, so the
+    // day count below holds whenever the run happens.
+    const anchor = clockAnchor();
+    await page.clock.install({ time: anchor });
+
     await log.step('With no row yet, Home shows the placeholder');
     const homeRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
     await page.goto('/');
@@ -105,8 +110,8 @@ test.describe('Couple start date shared by both partners', () => {
       'Not set yet'
     );
 
-    // Twelve days and an hour ago, to the minute.
-    const target = new Date(Date.now() - 12 * DAY_MS - 60 * 60 * 1000);
+    // Twelve days and an hour before the pinned clock, to the minute.
+    const target = new Date(anchor.getTime() - 12 * DAY_MS - 60 * 60 * 1000);
     target.setSeconds(0, 0);
     const targetIso = target.toISOString();
     const inputs = await localInputsOf(partnerPage, targetIso);

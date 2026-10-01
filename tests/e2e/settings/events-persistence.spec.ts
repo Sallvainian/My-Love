@@ -30,7 +30,7 @@
  * by design and are deliberately not lifted here.
  *
  * Test data: rows belong to THIS worker's pair only, keyed on
- * TEST_WORKER_INDEX through `getWorkerPairEmails()`. No partner is linked or
+ * TEST_PARALLEL_INDEX through `getWorkerPairEmails()`. No partner is linked or
  * unlinked, no password is reset, no shared row is nulled — those rows belong
  * to other workers. `resolveOwnPair` / `clearPairEvents` / `clearOwnPairEvents`
  * come from `tests/support/helpers/events.ts`, which this automation run
@@ -44,6 +44,7 @@
  *   npx playwright test tests/e2e/settings/events-persistence.spec.ts --project=chromium
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
 // The pair resolution, the scoped teardown and the two date rules live in one
 // module now. They were hand-copied into eight files before it existed, and
@@ -149,10 +150,7 @@ async function submitNewEvent(
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching the Home and Settings specs.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.afterEach(async ({ supabaseAdmin }) => {
@@ -214,12 +212,12 @@ test.describe('An event survives the round trip through the server', () => {
     const card = page.getByTestId(ICON_CARD_TESTID);
     await expect(card).toBeVisible();
 
-    // The card holds exactly one svg — the icon from `iconComponents` in
+    // The card's icon is the one from `iconComponents` in
     // `EventCountdown.tsx`. `ring` selects lucide's `Gem`, which stamps
     // `lucide-gem` on the element. Colour no longer varies by icon (every
     // event tile is the kit tint/accent pair), so the glyph is the whole of
     // the icon's own treatment.
-    const cardIcon = card.locator('svg');
+    const cardIcon = card.getByTestId('countdown-icon');
     await expect(cardIcon).toHaveClass(/lucide-gem/);
   });
 

@@ -31,7 +31,7 @@
  * - older notes offline: it needs a thread longer than one page.
  *
  * Test data: rows of THIS worker's pair (`resolveOwnPair`, keyed on
- * TEST_WORKER_INDEX), seeded through the service client and deleted by id at
+ * TEST_PARALLEL_INDEX), seeded through the service client and deleted by id at
  * teardown, each delete deferred as its row is created. Partner requests are
  * faked in the browser only — no real `partner_requests` row is ever seeded,
  * linked or unlinked, and their writes are also aborted, so a regressed guard
@@ -40,6 +40,10 @@
 import type { Locator, Page, Request } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { createPartnerRequestRow } from '../../support/factories/partner-requests';
+import { createPhotoInsert } from '../../support/factories/photos';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
+import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
@@ -68,11 +72,6 @@ const PNG_BYTES = Buffer.from(
 const PNG_FILE = { name: 'offline.png', mimeType: 'image/png', buffer: PNG_BYTES };
 
 const SUPABASE_PATHS = ['/rest/v1', '/storage/v1', '/auth/v1', '/functions/v1'];
-
-async function goOffline(page: Page, isOffline: boolean) {
-  await page.context().setOffline(isOffline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), isOffline ? 'offline' : 'online');
-}
 
 /** POSTs that only read, so a writes-only watch skips them like a GET. */
 const READ_RPCS = ['/rest/v1/rpc/get_my_pending_partner_requests'];
@@ -111,10 +110,7 @@ function watchSupabaseRequests(page: Page, { writesOnly = false } = {}) {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching photos-offline.spec.ts.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 // ---------------------------------------------------------------------------
@@ -194,16 +190,15 @@ test.describe('Photos offline', () => {
     expect(uploaded.error).toBeNull();
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .insert({
-        user_id: userId,
-        storage_path: path,
-        filename: 'offline.png',
-        caption,
-        mime_type: 'image/png',
-        file_size: PNG_BYTES.length,
-        width: 2,
-        height: 2,
-      })
+      .insert(
+        createPhotoInsert({
+          user_id: userId,
+          storage_path: path,
+          file_size: PNG_BYTES.length,
+          filename: 'offline.png',
+          caption,
+        })
+      )
       .select('id')
       .single();
     expect(error).toBeNull();
@@ -337,14 +332,12 @@ test.describe('Partner requests offline', () => {
     await page.route('**/rest/v1/rpc/get_my_pending_partner_requests', (route) =>
       route.fulfill({
         json: [
-          {
+          createPartnerRequestRow({
             id: FAKE_REQUEST,
             from_user_id: FAKE_SENDER,
             to_user_id: userId,
-            created_at: '2026-09-01T00:00:00Z',
             other_display_name: 'Offline Sender',
-            other_email: 'sender@example.test',
-          },
+          }),
         ],
       })
     );

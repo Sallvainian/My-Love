@@ -8,8 +8,11 @@
  * chrome. The kit colours are `--kit-*` variables that switch under
  * `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
+import { resolveOwnPair } from '../../support/helpers/events';
+import { ownMoodHistoryRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { Page } from '@playwright/test';
 
 type Scheme = 'light' | 'dark';
@@ -106,14 +109,11 @@ async function expectNoHorizontalOverflow(page: Page) {
 
 test.describe('Mood on the style kit', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {
-    test(`[P1] should render the Mood title, track and tiles on the kit in ${colorScheme}`, async ({
+    test(`[P1] should set the Mood title in Playfair Display in ${colorScheme}`, async ({
       page,
     }) => {
       await openMood(page, colorScheme);
@@ -132,6 +132,12 @@ test.describe('Mood on the style kit', () => {
         (await document.fonts.load('600 30px "Playfair Display"')).map((face) => face.family)
       );
       expect(playfairFaces.length).toBeGreaterThan(0);
+    });
+
+    test(`[P1] should draw the page, the tab track and an unselected tile on the kit in ${colorScheme}`, async ({
+      page,
+    }) => {
+      await openMood(page, colorScheme);
 
       // Page ground, segmented track, unselected tile.
       await expect(page.getByTestId('mood-tracker')).toHaveCSS(
@@ -142,16 +148,25 @@ test.describe('Mood on the style kit', () => {
         'background-color',
         KIT_CARD2[colorScheme]
       );
-      await expect(page.getByTestId('mood-tab-tracker')).toHaveAttribute('aria-pressed', 'true');
-      await expect(page.getByTestId('mood-tab-timeline')).toHaveAttribute('aria-pressed', 'false');
-
-      // All twelve moods stay selectable.
-      await expect(page.locator('[data-testid^="mood-button-"]')).toHaveCount(12);
 
       // An unselected tile sits on the kit card. Each test starts on an empty
       // mood store, so no tile is pre-selected; the first unpressed one serves.
       const unselected = page.locator('[data-testid^="mood-button-"][aria-pressed="false"]').first();
       await expect(unselected).toHaveCSS('background-color', KIT_CARD[colorScheme]);
+    });
+
+    test(`[P1] should open on the Tracker tab with all twelve moods selectable in ${colorScheme}`, async ({
+      page,
+    }) => {
+      await openMood(page, colorScheme);
+
+      await expect(page.getByTestId('mood-tab-tracker')).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('mood-tab-timeline')).toHaveAttribute('aria-pressed', 'false');
+      await expect(page.locator('[data-testid^="mood-button-"]')).toHaveCount(12);
+    });
+
+    test(`[P1] should not scroll sideways at phone width in ${colorScheme}`, async ({ page }) => {
+      await openMood(page, colorScheme);
 
       await expectNoHorizontalOverflow(page);
     });
@@ -186,9 +201,9 @@ test.describe('Mood on the style kit', () => {
 
     test(`[P1] should select Happy as a tint/accent tile in ${colorScheme}`, async ({
       page,
+      supabaseAdmin,
+      interceptNetworkCall,
     }) => {
-      await openMood(page, colorScheme);
-
       // Nothing may pre-select Happy or re-seed the form under the click.
       // MoodTracker re-seeds only from a saved entry for today, whenever a
       // loadMoods reload (mount, or after App's mount sync) swaps `moods`.
@@ -197,8 +212,15 @@ test.describe('Mood on the style kit', () => {
       // (`loadMoodHistoryFromServer`, moodSlice.ts) does copy the account's own
       // server moods into it, so the store stays empty only while this worker
       // account has none on the server; this test never submits. Assert that
-      // precondition at its source rather than branching on the tile, so a late
-      // reload has nothing to seed from.
+      // precondition at its source, the backfill's own answer, awaited before
+      // the tile is read rather than branching on the tile, so a late reload
+      // has nothing to seed from.
+      const { userId } = await resolveOwnPair(supabaseAdmin);
+      const backfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
+      await openMood(page, colorScheme);
+      const backfilled = await backfill;
+      expect(backfilled.status).toBe(200);
+      expect(backfilled.responseJson).toEqual([]);
       await recurseUntil(() => savedMoodCount(page), (v) => { expect(v).toBe(0); });
       const happy = page.getByTestId('mood-button-happy');
       await expect(happy).toHaveAttribute('aria-pressed', 'false');

@@ -8,6 +8,7 @@
  * data may be out of date rather than promising a sync.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import { partnerRecordRead } from '../../support/helpers/reads';
@@ -21,31 +22,7 @@ const OFFLINE_TEXT = "You're offline. Showing saved data, which may be out of da
 
 /** Whether the signed-in account's partner copy has been saved as linked. */
 async function partnerCopySaved(page: Page): Promise<boolean> {
-  return page.evaluate(async () => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return false;
-    return new Promise<boolean>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve(false);
-      open.onsuccess = () => {
-        const db = open.result;
-        if (!db.objectStoreNames.contains('local-copies')) {
-          db.close();
-          resolve(false);
-          return;
-        }
-        const get = db.transaction('local-copies').objectStore('local-copies').get([userId, 'partner']);
-        get.onsuccess = () => {
-          db.close();
-          resolve(get.result?.value?.status === 'linked');
-        };
-        get.onerror = () => {
-          db.close();
-          resolve(false);
-        };
-      };
-    });
-  });
+  return (await savedLocalCopy<{ status?: string }>(page, 'partner'))?.status === 'linked';
 }
 
 test.describe('Partner profile offline', () => {

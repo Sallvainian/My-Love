@@ -10,6 +10,7 @@
  * switch under `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import {
@@ -54,6 +55,12 @@ const KIT_COUNTDOWN_VALUE = { size: '22px', weight: '700', numeric: 'tabular-num
  */
 const DAILY_MESSAGE_TYPE = { style: 'italic', weight: '500', size: '21px' } as const;
 
+/** The `border-2` every countdown card wore before the kit; no side may keep it. */
+const PRE_KIT_BORDER_WIDTH = '2px';
+
+/** The placeholder clock the dateless wedding card showed before the kit. */
+const RETIRED_PLACEHOLDER_CLOCK = 'XX:XX:XX';
+
 const COUNTDOWN_CARDS = [
   'time-together',
   'birthday-countdown-self',
@@ -87,10 +94,7 @@ async function openHome(
 
 test.describe('Home on the style kit', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {
@@ -104,30 +108,21 @@ test.describe('Home on the style kit', () => {
         const card = page.getByTestId(testId);
         await expect(card).toBeVisible();
 
-        const cardStyle = await card.evaluate((el) => {
-          const style = getComputedStyle(el);
-          return {
-            background: style.backgroundColor,
-            borderWidths: [
-              style.borderTopWidth,
-              style.borderRightWidth,
-              style.borderBottomWidth,
-              style.borderLeftWidth,
-            ],
-          };
-        });
-        expect(cardStyle.background, testId).toBe(KIT_CARD[colorScheme]);
-        expect(cardStyle.borderWidths, testId).not.toContain('2px');
+        await expect(card, testId).toHaveCSS('background-color', KIT_CARD[colorScheme]);
+        for (const side of ['top', 'right', 'bottom', 'left']) {
+          await expect(card, `${testId} ${side} border`).not.toHaveCSS(
+            `border-${side}-width`,
+            PRE_KIT_BORDER_WIDTH
+          );
+        }
 
-        const valueStyle = await card.getByTestId('countdown-value').evaluate((el) => {
-          const style = getComputedStyle(el);
-          return {
-            size: style.fontSize,
-            weight: style.fontWeight,
-            numeric: style.fontVariantNumeric,
-          };
-        });
-        expect(valueStyle, testId).toEqual(KIT_COUNTDOWN_VALUE);
+        const value = card.getByTestId('countdown-value');
+        await expect(value, testId).toHaveCSS('font-size', KIT_COUNTDOWN_VALUE.size);
+        await expect(value, testId).toHaveCSS('font-weight', KIT_COUNTDOWN_VALUE.weight);
+        await expect(value, testId).toHaveCSS(
+          'font-variant-numeric',
+          KIT_COUNTDOWN_VALUE.numeric
+        );
       }
     });
 
@@ -152,13 +147,12 @@ test.describe('Home on the style kit', () => {
 
       // Tile tones: birthdays belong to accounts now, so your own card takes the
       // `you` (accent) tile and your partner's the `partner` tile on each device.
-      const tileColor = (testId: string) =>
-        page
-          .getByTestId(testId)
-          .getByTestId('countdown-tile')
-          .evaluate((el) => getComputedStyle(el).color);
-      expect(await tileColor('birthday-countdown-self')).toBe(KIT_ACCENT[colorScheme]);
-      expect(await tileColor('birthday-countdown-partner')).toBe(KIT_PARTNER[colorScheme]);
+      const tile = (testId: string) => page.getByTestId(testId).getByTestId('countdown-tile');
+      await expect(tile('birthday-countdown-self')).toHaveCSS('color', KIT_ACCENT[colorScheme]);
+      await expect(tile('birthday-countdown-partner')).toHaveCSS(
+        'color',
+        KIT_PARTNER[colorScheme]
+      );
     });
 
     test(`[P1] should show the dateless wedding as Date TBD in muted in ${colorScheme}`, async ({
@@ -173,7 +167,9 @@ test.describe('Home on the style kit', () => {
         .getByTestId('countdown-value');
       await expect(weddingValue).toHaveText('Date TBD');
       await expect(weddingValue).toHaveCSS('color', KIT_MUTED[colorScheme]);
-      await expect(page.getByTestId('event-countdown-wedding')).not.toContainText('XX:XX:XX');
+      await expect(page.getByTestId('event-countdown-wedding')).not.toContainText(
+        RETIRED_PLACEHOLDER_CLOCK
+      );
     });
 
     test(`[P1] should set the two birthday cards side by side at phone width in ${colorScheme}`, async ({
@@ -235,23 +231,19 @@ test.describe('Home on the style kit', () => {
       // takes its copy.
       await expect(page.getByTestId('birthday-countdown-self')).toBeVisible();
       await expect(page.getByTestId('birthday-countdown-partner')).toBeVisible();
-      const chromeText = await page.evaluate(() => {
-        const main = document.getElementById('main-content');
-        if (!main) return null;
+      const storedEvent =
+        '[data-testid^="event-countdown-"]:not([data-testid="event-countdown-wedding"])';
+      const userAuthored = [
+        '[data-testid="message-text"]',
+        `${storedEvent} [data-testid="countdown-label"]`,
+        `${storedEvent} [data-testid="countdown-description"]`,
+        '[data-testid="countdown-timer"]',
+      ].join(', ');
+      const chromeText = await page.getByRole('main').evaluate((main, selectors) => {
         const clone = main.cloneNode(true) as HTMLElement;
-        clone
-          .querySelectorAll(
-            [
-              '[data-testid="message-text"]',
-              '[data-testid^="event-countdown-"]:not([data-testid="event-countdown-wedding"]) h3',
-              '[data-testid^="event-countdown-"]:not([data-testid="event-countdown-wedding"]) p',
-              '[data-testid="countdown-timer"]',
-            ].join(', ')
-          )
-          .forEach((el) => el.remove());
+        clone.querySelectorAll(selectors).forEach((el) => el.remove());
         return clone.textContent ?? '';
-      });
-      expect(chromeText).not.toBeNull();
+      }, userAuthored);
       expect(chromeText).not.toMatch(/\p{Extended_Pictographic}/u);
     });
   }

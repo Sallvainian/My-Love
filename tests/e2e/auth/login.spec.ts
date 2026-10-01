@@ -9,6 +9,8 @@ import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
+import { createAuthBootstrapSession } from '../../support/factories/auth-bootstrap-notification-order';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 // `.env.test` points the dev server at http://127.0.0.1:54321, and the SDK
@@ -65,22 +67,11 @@ test.describe('Login Flow', () => {
     interceptNetworkCall,
   }) => {
     // Intercept token endpoint for successful login
+    const session = createAuthBootstrapSession({ email: 'test@example.com' });
     const authCall = interceptNetworkCall({
       url: '**/auth/v1/token**',
       method: 'POST',
-      fulfillResponse: {
-        status: 200,
-        body: {
-          access_token: 'fake-access-token',
-          token_type: 'bearer',
-          expires_in: 3600,
-          refresh_token: 'fake-refresh-token',
-          user: {
-            id: 'test-user-id',
-            email: 'test@example.com',
-          },
-        },
-      },
+      fulfillResponse: { status: 200, body: session },
     });
 
     // The reads below are defensive stubs: each may fire zero times or many,
@@ -92,7 +83,7 @@ test.describe('Login Flow', () => {
 
     // The user endpoint (called after auth state change).
     // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-    await page.route('**/auth/v1/user**', serve({ id: 'test-user-id', email: 'test@example.com' }));
+    await page.route('**/auth/v1/user**', serve(session.user));
 
     // The events fetch Home fires once auth settles — against the real API the
     // fake access token above earns it a 401, which the network-error monitor
@@ -150,9 +141,7 @@ test.describe('Login Flow', () => {
     const pair = getWorkerPairEmails();
     if (!pair) throw new Error('This test requires its worker-owned account pair');
     const { userId } = await resolveWorkerPairIds(supabaseAdmin);
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
 
     await page.goto('/');
     await expect(page.getByTestId('login-screen')).toBeVisible();

@@ -39,10 +39,11 @@
  * chain fails here.
  *
  * Test data: seeded and torn down for THIS worker's pair only, keyed on
- * TEST_WORKER_INDEX through `getWorkerPairEmails()`. No partner is linked or
+ * TEST_PARALLEL_INDEX through `getWorkerPairEmails()`. No partner is linked or
  * unlinked, no password reset, no shared row nulled.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import {
   clearOwnPairEvents,
   clearPairEvents,
@@ -82,10 +83,7 @@ function rowFor(page: Page, label: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching events-crud.spec.ts:139-144.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.afterEach(async ({ supabaseAdmin }) => {

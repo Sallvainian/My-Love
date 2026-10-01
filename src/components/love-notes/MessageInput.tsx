@@ -213,7 +213,10 @@ export function MessageInput() {
   return (
     // Transparent over the page ground, as the kit artboard draws it: the
     // composer is a row of kit controls, not a bar of its own.
-    <div className="relative z-10 flex shrink-0 flex-col gap-2 px-4 pt-2 pb-3">
+    <div
+      className="relative z-10 flex shrink-0 flex-col gap-2 px-4 pt-2 pb-3"
+      data-testid="message-composer"
+    >
       {/* Image preview (when image selected) */}
       <AnimatePresence>
         {selectedImage && (

@@ -12,7 +12,9 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
-import { resolveOwnPair } from '../../support/helpers/events';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
+import { goOffline } from '../../support/helpers/offline';
+import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import { COUPLE_SETTINGS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -53,43 +55,11 @@ async function clearPair(
   if (error) throw error;
 }
 
-/** The signed-in account's saved `couple-settings` copy, or `null`. */
-async function savedCoupleCopy(page: Page): Promise<unknown> {
-  return page.evaluate(async () => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return null;
-    return new Promise<unknown>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve(null);
-      open.onsuccess = () => {
-        const db = open.result;
-        const get = db
-          .transaction('local-copies')
-          .objectStore('local-copies')
-          .get([userId, 'couple-settings']);
-        get.onsuccess = () => {
-          db.close();
-          resolve(get.result?.value ?? null);
-        };
-        get.onerror = () => {
-          db.close();
-          resolve(null);
-        };
-      };
-    });
-  });
-}
-
 async function storeStart(page: Page): Promise<string | null | undefined> {
   return page.evaluate(() => {
     const couple = window.__APP_STORE__?.getState().coupleSettings;
     return couple?.status === 'linked' ? couple.relationshipStart : undefined;
   });
-}
-
-async function goOffline(page: Page, offline: boolean) {
-  await page.context().setOffline(offline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), offline ? 'offline' : 'online');
 }
 
 /** The instant as the browser's local `YYYY-MM-DD`, which the date input shows. */
@@ -110,8 +80,11 @@ test.describe('Couple start date from the local copy', () => {
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const pair = orderedPair(userId, partnerId);
-    // Ten days and an hour ago: Home reads "10 days" whatever the clock says.
-    const start = new Date(Date.now() - 10 * DAY_MS - 60 * 60 * 1000);
+    // Ten days and an hour before the page's pinned clock, so Home reads
+    // "10 days" whenever the run happens. The clock survives the reload below.
+    const anchor = clockAnchor();
+    await page.clock.install({ time: anchor });
+    const start = new Date(anchor.getTime() - 10 * DAY_MS - 60 * 60 * 1000);
     start.setSeconds(0, 0);
     const startIso = start.toISOString();
     cleanup.defer("delete the pair's couple settings", () => clearPair(supabaseAdmin, pair));
@@ -123,7 +96,7 @@ test.describe('Couple start date from the local copy', () => {
     expect((await coupleRead).status).toBe(200);
     await recurseUntil(() => storeStart(page), (v) => { expect(v).toBe(startIso); });
     await recurseUntil(
-      () => savedCoupleCopy(page),
+      () => savedLocalCopy(page, 'couple-settings'),
       (v) => {
         expect(v).toEqual({
           status: 'linked',
@@ -193,7 +166,7 @@ test.describe('Couple start date from the local copy', () => {
     // Store, copy and server all still hold the saved date.
     expect(await storeStart(page)).toBe(startIso);
     await recurseUntil(
-      () => savedCoupleCopy(page),
+      () => savedLocalCopy(page, 'couple-settings'),
       (v) => {
         expect(v).toEqual({
           status: 'linked',

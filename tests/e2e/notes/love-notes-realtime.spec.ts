@@ -103,7 +103,7 @@ test.describe('Love notes realtime delivery', () => {
       // The uuid is the whole teardown filter and the whole delivery assertion:
       // no other row in the table can carry it, on any worker, from any run.
       const noteText = `DW-90 realtime note ${randomUUID()}`;
-      // Resolved once, up front, from `TEST_WORKER_INDEX` — the same pair the
+      // Resolved once, up front, from `TEST_PARALLEL_INDEX` — the same pair the
       // two contexts below sign in as. Used to name the topic the broadcast has
       // to be addressed to, and to bound the teardown delete.
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);

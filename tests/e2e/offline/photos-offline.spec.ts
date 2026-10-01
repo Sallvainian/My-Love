@@ -16,12 +16,16 @@
  * device then goes offline.
  *
  * Test data: photos of THIS worker's pair (`resolveOwnPair`, keyed on
- * TEST_WORKER_INDEX) — rows inserted and Storage objects uploaded through the
+ * TEST_PARALLEL_INDEX) — rows inserted and Storage objects uploaded through the
  * service client, all deleted by id / path at teardown. No partner is linked
  * or unlinked, no password reset, no shared row nulled.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { createPhotoInsert } from '../../support/factories/photos';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
+import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { PHOTOS_LIST_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -79,32 +83,7 @@ async function imageCached(page: Page, path: string): Promise<boolean> {
 
 /** Ids in the signed-in account's saved `photos` copy, or `null`. */
 async function savedPhotoIds(page: Page): Promise<string[] | null> {
-  return page.evaluate(async () => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return null;
-    return new Promise<string[] | null>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve(null);
-      open.onsuccess = () => {
-        const db = open.result;
-        const get = db.transaction('local-copies').objectStore('local-copies').get([userId, 'photos']);
-        get.onsuccess = () => {
-          db.close();
-          const value = get.result?.value as { id: string }[] | undefined;
-          resolve(value ? value.map((row) => row.id) : null);
-        };
-        get.onerror = () => {
-          db.close();
-          resolve(null);
-        };
-      };
-    });
-  });
-}
-
-async function goOffline(page: Page, offline: boolean) {
-  await page.context().setOffline(offline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), offline ? 'offline' : 'online');
+  return (await savedLocalCopy<{ id: string }[]>(page, 'photos'))?.map((row) => row.id) ?? null;
 }
 
 /**
@@ -136,17 +115,16 @@ async function seedPhotos(
     const caption = `E2E offline ${label} ${stamp} #${i}`;
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .insert({
-        user_id: owner,
-        storage_path: path,
-        filename: `offline-${i}.png`,
-        caption,
-        mime_type: 'image/png',
-        file_size: PNG_BYTES.length,
-        width: 2,
-        height: 2,
-        created_at: new Date(stamp - i * 60_000).toISOString(),
-      })
+      .insert(
+        createPhotoInsert({
+          user_id: owner,
+          storage_path: path,
+          file_size: PNG_BYTES.length,
+          filename: `offline-${i}.png`,
+          caption,
+          created_at: new Date(stamp - i * 60_000).toISOString(),
+        })
+      )
       .select('id')
       .single();
     expect(error).toBeNull();
@@ -206,10 +184,7 @@ async function reloadWithoutServerThenGoOffline(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching love-notes-offline-copy.spec.ts.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 /**

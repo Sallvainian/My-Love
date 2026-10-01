@@ -30,6 +30,7 @@
 import type { Page } from '@playwright/test';
 import { faker } from '@faker-js/faker';
 import { formatDateISO } from '../../../src/utils/dateUtils';
+import { dismissWelcomeSplash } from './welcome-splash';
 
 /** The single key the whole store persists under (`useAppStore.ts:96`). */
 export const STORAGE_KEY = 'my-love-storage';
@@ -234,10 +235,10 @@ export async function seedPersistedBlob(
   await page.addInitScript(
     ([key, value]: [string, string]) => {
       localStorage.setItem(key, value);
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
     },
     [STORAGE_KEY, raw] as [string, string]
   );
+  await dismissWelcomeSplash(page);
 }
 
 /** What the persisted blob looks like right now, or `null` if the key is gone. */

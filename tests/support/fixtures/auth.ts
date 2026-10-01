@@ -3,14 +3,14 @@
  *
  * Replaces the hand-rolled worker-auth fixture with the library's
  * auth-session system. Each worker gets a unique user identifier
- * mapped to its pool index.
+ * mapped to its parallel slot (see ../auth/worker-pool.ts).
  */
 import { test as base } from '@playwright/test';
 import type { AuthOptions } from '@seontechnologies/playwright-utils/auth-session';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
 import { initializeAuthSystem } from '../auth/setup';
 import { SupabaseAuthProvider } from '../auth/supabase-auth-provider';
-import { getAuthPoolSize, normalizeWorkerIndex } from '../auth/worker-pool';
+import { getAuthPoolSize, poolSlot } from '../auth/worker-pool';
 
 // Must run before any auth operations
 initializeAuthSystem();
@@ -29,13 +29,15 @@ type AuthWorkerFixtures = {
 };
 
 export const test = base.extend<AuthTestFixtures, AuthWorkerFixtures>({
-  // Worker-scoped: map workerIndex → user identifier
+  // Worker-scoped: map the parallel slot → user identifier. The slot, never
+  // workerIndex: seeding keys on the same slot (worker-pool.ts), and no two
+  // live workers share one.
   authOptions: [
     async ({}, use, workerInfo) => {
-      const normalizedIndex = normalizeWorkerIndex(workerInfo.workerIndex, getAuthPoolSize());
+      const slot = poolSlot(workerInfo.parallelIndex, getAuthPoolSize());
       await use({
         environment: 'local',
-        userIdentifier: `worker-${normalizedIndex}`,
+        userIdentifier: `worker-${slot}`,
       });
     },
     { scope: 'worker' },
@@ -92,8 +94,8 @@ export const test = base.extend<AuthTestFixtures, AuthWorkerFixtures>({
   // Worker-scoped: partner user identifier for two-context specs
   partnerUserIdentifier: [
     async ({}, use, workerInfo) => {
-      const normalizedIndex = normalizeWorkerIndex(workerInfo.workerIndex, getAuthPoolSize());
-      await use(`worker-${normalizedIndex}-partner`);
+      const slot = poolSlot(workerInfo.parallelIndex, getAuthPoolSize());
+      await use(`worker-${slot}-partner`);
     },
     { scope: 'worker' },
   ],

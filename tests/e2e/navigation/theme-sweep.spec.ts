@@ -25,6 +25,7 @@
  * error state.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { TypedSupabaseClient } from '../../support/factories';
@@ -94,7 +95,9 @@ const SIGNED_IN_SCREENS: Screen[] = [
       await expect(page.getByTestId('notes-partner-row')).toBeVisible();
       await expect(page.getByLabel(/love note message input/i)).toBeVisible();
       await expect(
-        page.getByTestId('virtualized-list').or(page.getByText('No messages to show'))
+        page
+          .getByTestId('virtualized-list')
+          .or(page.getByRole('heading', { level: 3, name: 'No messages to show' }))
       ).toBeVisible();
     },
   },
@@ -297,10 +300,7 @@ async function openSignIn(page: Page, colorScheme: Scheme): Promise<void> {
 
 test.describe('Theme sweep, signed in', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   for (const screen of SIGNED_IN_SCREENS) {

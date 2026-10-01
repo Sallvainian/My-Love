@@ -8,6 +8,7 @@
  * horizontal overflow. The kit colours are `--kit-*` variables that switch
  * under `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
+import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 
 const KIT_PAGE = {
@@ -33,29 +34,28 @@ const KIT_CARD2 = {
 /** `fill` is the same pink in both themes. */
 const KIT_FILL = 'rgb(219, 39, 119)'; // #db2777
 
+type Scheme = 'light' | 'dark';
+
+/** Signed out, at phone width in `colorScheme`, with the Sign in screen up. */
+async function openSignIn(page: Page, colorScheme: Scheme) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme });
+  await page.goto('/');
+  await expect(page.getByTestId('login-screen')).toBeVisible();
+}
+
 test.describe('Sign in on the style kit', () => {
   test.use({ authSessionEnabled: false });
 
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`[P1] should render the Sign in artboard on kit surfaces in ${colorScheme}`, async ({
+  for (const colorScheme of ['light', 'dark'] as const satisfies readonly Scheme[]) {
+    test(`[P1] should draw the Sign in screen, card, fields and buttons on kit surfaces in ${colorScheme}`, async ({
       page,
     }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
-      await page.emulateMedia({ colorScheme });
-      await page.goto('/');
+      await openSignIn(page, colorScheme);
 
       const root = page.getByTestId('login-screen');
-      await expect(root).toBeVisible();
       await expect(root).toHaveCSS('background-color', KIT_PAGE[colorScheme]);
       await expect(root).toHaveCSS('background-image', 'none');
-
-      await expect(page.getByRole('heading', { level: 1, name: 'My Love' })).toBeVisible();
-      const wordmark = page.getByTestId('login-wordmark');
-      const fontFamily = await wordmark.evaluate((node) => getComputedStyle(node).fontFamily);
-      expect(fontFamily).toContain('Lora');
-      const tagline = page.getByTestId('login-tagline');
-      await expect(tagline).toBeVisible();
-      await expect(tagline).toHaveText('Welcome back — sign in to continue');
 
       const card = page.getByTestId('login-card');
       await expect(card).toHaveCSS('background-color', KIT_CARD[colorScheme]);
@@ -73,8 +73,31 @@ test.describe('Sign in on the style kit', () => {
       await expect(submit).toHaveText('Sign in');
       await expect(submit).toHaveCSS('background-color', KIT_FILL);
       await expect(submit).toHaveCSS('background-image', 'none');
+    });
+
+    test(`[P1] should show the Lora wordmark and the tagline in ${colorScheme}`, async ({
+      page,
+    }) => {
+      await openSignIn(page, colorScheme);
+
+      await expect(page.getByRole('heading', { level: 1, name: 'My Love' })).toBeVisible();
+      const wordmark = page.getByTestId('login-wordmark');
+      const fontFamily = await wordmark.evaluate((node) => getComputedStyle(node).fontFamily);
+      expect(fontFamily).toContain('Lora');
+      const tagline = page.getByTestId('login-tagline');
+      await expect(tagline).toBeVisible();
+      await expect(tagline).toHaveText('Welcome back — sign in to continue');
+    });
+
+    test(`[P1] should offer Contact admin in ${colorScheme}`, async ({ page }) => {
+      await openSignIn(page, colorScheme);
 
       await expect(page.getByRole('button', { name: 'Contact admin' })).toBeVisible();
+    });
+
+    test(`[P1] should not scroll sideways at phone width in ${colorScheme}`, async ({ page }) => {
+      await openSignIn(page, colorScheme);
+      await expect(page.getByTestId('submit-button')).toBeVisible();
 
       const widths = await page.evaluate(() => ({
         scroll: document.documentElement.scrollWidth,

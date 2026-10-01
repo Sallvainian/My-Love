@@ -13,6 +13,8 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
+import { goOffline } from '../../support/helpers/offline';
 import type { TypedSupabaseClient } from '../../support/factories';
 import {
   clockAnchorAvoidingLeapDay,
@@ -77,35 +79,6 @@ async function resetValues(
   ]);
 }
 
-/** The signed-in account's saved copy of `kind`, or `null`. */
-async function savedCopy(page: Page, kind: string): Promise<unknown> {
-  return page.evaluate(async (copyKind) => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return null;
-    return new Promise<unknown>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve(null);
-      open.onsuccess = () => {
-        const db = open.result;
-        const get = db.transaction('local-copies').objectStore('local-copies').get([userId, copyKind]);
-        get.onsuccess = () => {
-          db.close();
-          resolve(get.result?.value ?? null);
-        };
-        get.onerror = () => {
-          db.close();
-          resolve(null);
-        };
-      };
-    });
-  }, kind);
-}
-
-async function goOffline(page: Page, offline: boolean) {
-  await page.context().setOffline(offline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), offline ? 'offline' : 'online');
-}
-
 test.describe('Birthdays and wedding date from the local copy', () => {
   test('[P1] the cards from one online session show when the server cannot be reached', async ({
     page,
@@ -145,19 +118,19 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     expect(couple.status).toBe(200);
     expect(couple.responseJson).toEqual([expect.objectContaining({ wedding_date: wedding })]);
     await recurseUntil(
-      () => savedCopy(page, 'profile'),
+      () => savedLocalCopy(page, 'profile'),
       (v) => {
         expect(v).toMatchObject({ birthday: own });
       }
     );
     await recurseUntil(
-      () => savedCopy(page, 'partner'),
+      () => savedLocalCopy(page, 'partner'),
       (v) => {
         expect(v).toMatchObject({ status: 'linked', partner: { birthday: partner } });
       }
     );
     await recurseUntil(
-      () => savedCopy(page, 'couple-settings'),
+      () => savedLocalCopy(page, 'couple-settings'),
       (v) => {
         expect(v).toMatchObject({ status: 'linked', weddingDate: wedding });
       }
@@ -172,15 +145,15 @@ test.describe('Birthdays and wedding date from the local copy', () => {
 
     // THEN: all three cards count from the saved values: whole days left,
     // one fewer than the calendar days while the clock carries today's rest.
-    await expect(page.getByTestId('birthday-countdown-self').locator('h3')).toHaveText(
-      /turns? 31$/
-    );
+    await expect(
+      page.getByTestId('birthday-countdown-self').getByRole('heading', { level: 3 })
+    ).toHaveText(/turns? 31$/);
     await expect(
       page.getByTestId('birthday-countdown-self').getByTestId('countdown-value')
     ).toHaveText('4 days');
-    await expect(page.getByTestId('birthday-countdown-partner').locator('h3')).toContainText(
-      'turns 30'
-    );
+    await expect(
+      page.getByTestId('birthday-countdown-partner').getByRole('heading', { level: 3 })
+    ).toContainText('turns 30');
     await expect(
       page.getByTestId('birthday-countdown-partner').getByTestId('countdown-value')
     ).toHaveText('9 days');
@@ -219,7 +192,7 @@ test.describe('Birthdays and wedding date from the local copy', () => {
       await page.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday)
     ).toBe(own);
     await recurseUntil(
-      () => savedCopy(page, 'profile'),
+      () => savedLocalCopy(page, 'profile'),
       (v) => {
         expect(v).toMatchObject({ birthday: own });
       }

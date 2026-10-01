@@ -15,12 +15,15 @@
  * the device then goes offline.
  *
  * Test data: notes from THIS worker's partner to its user (`resolveOwnPair`,
- * keyed on TEST_WORKER_INDEX) and one Storage object under the partner's
+ * keyed on TEST_PARALLEL_INDEX) and one Storage object under the partner's
  * folder, all deleted by id / path at teardown. No partner is linked or
  * unlinked, no password reset, no shared row nulled.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
+import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { LOVE_NOTES_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -42,30 +45,7 @@ const PNG_BYTES = Buffer.from(
 
 /** Ids in the signed-in account's saved `love-notes` copy, or `null`. */
 async function savedNoteIds(page: Page): Promise<string[] | null> {
-  return page.evaluate(async () => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return null;
-    return new Promise<string[] | null>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve(null);
-      open.onsuccess = () => {
-        const db = open.result;
-        const get = db
-          .transaction('local-copies')
-          .objectStore('local-copies')
-          .get([userId, 'love-notes']);
-        get.onsuccess = () => {
-          db.close();
-          const value = get.result?.value as { id: string }[] | undefined;
-          resolve(value ? value.map((row) => row.id) : null);
-        };
-        get.onerror = () => {
-          db.close();
-          resolve(null);
-        };
-      };
-    });
-  });
+  return (await savedLocalCopy<{ id: string }[]>(page, 'love-notes'))?.map((row) => row.id) ?? null;
 }
 
 /** Whether the signed-in account's image cache holds a Blob for `path`. */
@@ -95,11 +75,6 @@ async function imageCached(page: Page, path: string): Promise<boolean> {
       };
     });
   }, path);
-}
-
-async function goOffline(page: Page, offline: boolean) {
-  await page.context().setOffline(offline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), offline ? 'offline' : 'online');
 }
 
 /** A note from this worker's partner to its user. Returns its id. */
@@ -139,10 +114,7 @@ function noteBubble(page: Page, content: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching interactions-offline-copy.spec.ts.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.describe('Love notes from the local copy', () => {
@@ -175,7 +147,7 @@ test.describe('Love notes from the local copy', () => {
       expect.arrayContaining(noteIds.map((id) => expect.objectContaining({ id })))
     );
     await expect(noteBubble(page, textContent)).toBeVisible();
-    await expect(noteBubble(page, imageContent).locator('img')).toBeVisible();
+    await expect(noteBubble(page, imageContent).getByRole('img')).toBeVisible();
     await recurseUntil(
       async () => {
         const ids = (await savedNoteIds(page)) ?? [];
@@ -205,7 +177,7 @@ test.describe('Love notes from the local copy', () => {
 
     // THEN: both saved notes are listed, the image decoded from the cache…
     await expect(noteBubble(page, textContent)).toBeVisible();
-    const image = noteBubble(page, imageContent).locator('img');
+    const image = noteBubble(page, imageContent).getByRole('img');
     await expect(image).toBeVisible();
     await expect(image).toHaveAttribute('src', /^blob:/);
     await recurseUntil(

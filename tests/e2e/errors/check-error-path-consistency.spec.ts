@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { createPartnerRequestRow } from '../../support/factories/partner-requests';
 import type { Database } from '../../../src/types/database.types';
 import { createCheckErrorPathData } from '../../support/factories/check-error-path-data';
 
@@ -157,14 +158,14 @@ test.describe('DW-38 CHECK error presentation', () => {
         const { friendlyCheck, checkError, targetId, requestId, createdAt } = data;
         const userId = tokenUserId(authToken);
         const { partnerRead, requests } = interceptPartnerReads(interceptNetworkCall, data, [
-          {
+          createPartnerRequestRow({
             id: requestId,
             from_user_id: targetId,
             to_user_id: userId,
             created_at: createdAt,
             other_display_name: 'DW38 Partner',
             other_email: data.email,
-          },
+          }),
         ]);
         const write = interceptNetworkCall({
           method: 'POST',
@@ -202,7 +203,7 @@ function tokenUserId(authToken: string): string {
 function interceptPartnerReads(
   interceptNetworkCall: InterceptNetworkCallFn,
   { createdAt }: ReturnType<typeof createCheckErrorPathData>,
-  pendingRequests: Array<Record<string, string | null>>
+  pendingRequests: ReturnType<typeof createPartnerRequestRow>[]
 ) {
   const partnerRead = interceptNetworkCall({
     method: 'GET',

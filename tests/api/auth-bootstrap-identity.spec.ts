@@ -37,7 +37,7 @@ test.describe('Auth bootstrap identity contract', () => {
   }) => {
     // Given the existing worker pair, resolved without changing either account.
     const emails = getWorkerPairEmails();
-    if (!emails) throw new Error('Auth identity contract requires TEST_WORKER_INDEX');
+    if (!emails) throw new Error('Auth identity contract requires TEST_PARALLEL_INDEX');
     const { userId, partnerId } = await resolveWorkerPairIds(supabaseAdmin);
     expect(userId).not.toBe(partnerId);
 

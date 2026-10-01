@@ -1,6 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
 import { isoDateDaysFromNow } from '../../support/helpers/events';
 
@@ -17,9 +18,7 @@ test.describe('DW-39 empty database error fallback', () => {
       const expectedMessage =
         '[EventsService.createEvent] Database error: An unknown database error occurred';
 
-      await page.addInitScript(() => {
-        localStorage.setItem('lastWelcomeView', Date.now().toString());
-      });
+      await dismissWelcomeSplash(page);
       // Fulfill the write before navigation. Existing worker-pool events stay
       // untouched, and no seed, insertion, or cleanup reaches the database.
       const rejectedCreate = interceptNetworkCall({

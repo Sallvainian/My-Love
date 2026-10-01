@@ -59,10 +59,11 @@ export async function resolveAppUserId(
 /**
  * This worker's own pair, resolved to `public.users.id`s.
  *
- * Keyed on `TEST_WORKER_INDEX` through `getWorkerPairEmails()`, never
- * `TEST_PARALLEL_INDEX` — the two diverge on retry, and a spec that followed
- * the parallel index would start writing another worker's rows on exactly the
- * runs that are already failing. Throws outside a worker rather than falling
+ * Keyed on `TEST_PARALLEL_INDEX` through `getWorkerPairEmails()`, the same
+ * slot the browser's auth fixture signs in with, never `TEST_WORKER_INDEX` —
+ * the two diverge whenever a worker restarts, and a spec that followed the
+ * other index would write another worker's rows (`auth/worker-pool.ts`).
+ * Throws outside a worker rather than falling
  * back to a default pair, so a misconfigured run fails loudly instead of
  * quietly sharing one identity.
  */
@@ -71,7 +72,7 @@ export async function resolveOwnPair(
 ): Promise<{ userId: string; partnerId: string }> {
   const pair = getWorkerPairEmails();
   if (!pair) {
-    throw new Error('resolveOwnPair: no worker identity (TEST_WORKER_INDEX unset)');
+    throw new Error('resolveOwnPair: no worker identity (TEST_PARALLEL_INDEX unset)');
   }
 
   const [userId, partnerId] = await Promise.all([

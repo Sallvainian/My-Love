@@ -9,6 +9,7 @@
  * under `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { Locator, Page } from '@playwright/test';
 import { deleteSentNote } from '../../support/helpers/love-notes';
 
@@ -37,6 +38,9 @@ const KIT_INK = {
 /** `fill` is the same pink in both themes. */
 const KIT_FILL = 'rgb(219, 39, 119)'; // #db2777
 
+/** Text on the `fill` pink: white in both themes. */
+const KIT_ON_FILL = 'rgb(255, 255, 255)'; // #ffffff
+
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 
 async function openNotes(page: Page, colorScheme: Scheme) {
@@ -52,10 +56,7 @@ const background = (locator: Locator) =>
 
 test.describe('Love Notes on the style kit', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   /**
@@ -76,40 +77,63 @@ test.describe('Love Notes on the style kit', () => {
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {
-    test(`[P1] should draw the partner row and kit surfaces without scrolling in ${colorScheme}`, async ({
+    test(`[P1] should replace the header bar with the partner row in ${colorScheme}`, async ({
       page,
     }) => {
       await openNotes(page, colorScheme);
 
       // The partner row replaces the header bar: no back arrow, and the view
       // title survives only as a visually hidden h1.
-      const row = page.getByTestId('notes-partner-row');
-      await expect(row).toBeVisible();
+      await expect(page.getByTestId('notes-partner-row')).toBeVisible();
       await expect(page.getByRole('button', { name: /go back home/i })).toHaveCount(0);
       await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeAttached();
+    });
 
-      // Page ground: the view container (the partner row's parent) is `page`.
-      const ground = await row.evaluate(
-        (el) => getComputedStyle(el.parentElement as Element).backgroundColor
+    test(`[P1] should draw the page ground and the composer controls on kit surfaces in ${colorScheme}`, async ({
+      page,
+    }) => {
+      await openNotes(page, colorScheme);
+
+      // Page ground: the view container is `page`.
+      await expect(page.getByTestId('love-notes-view')).toHaveCSS(
+        'background-color',
+        KIT_PAGE[colorScheme]
       );
-      expect(ground).toBe(KIT_PAGE[colorScheme]);
 
       // Composer: transparent over the ground, its controls on kit surfaces.
       const input = page.getByLabel(/love note message input/i);
-      const composer = await input.evaluate(
-        (el) => getComputedStyle(el.parentElement?.parentElement as Element).backgroundColor
+      await expect(page.getByTestId('message-composer')).toHaveCSS(
+        'background-color',
+        TRANSPARENT
       );
-      expect(composer).toBe(TRANSPARENT);
       expect(await background(input)).toBe(KIT_CARD[colorScheme]);
       await expect(input).toHaveCSS('color', KIT_INK[colorScheme]);
       expect(await background(page.getByLabel(/attach image/i))).toBe(KIT_CARD2[colorScheme]);
       expect(await background(page.getByLabel(/send message/i))).toBe(KIT_FILL);
+    });
 
-      // The composer ends above the dock and the page itself does not scroll.
+    test(`[P1] should end the composer just above the dock in ${colorScheme}`, async ({ page }) => {
+      await openNotes(page, colorScheme);
+
+      const input = page.getByLabel(/love note message input/i);
       const sendBox = await page.getByLabel(/send message/i).boundingBox();
+      const inputBox = await input.boundingBox();
       const dockBox = await page.getByTestId('nav-dock').boundingBox();
-      if (!sendBox || !dockBox) throw new Error('[notes-kit.spec] expected composer and dock boxes');
+      if (!sendBox || !inputBox || !dockBox) {
+        throw new Error('[notes-kit.spec] expected composer and dock boxes');
+      }
       expect(sendBox.y + sendBox.height).toBeLessThanOrEqual(dockBox.y);
+
+      // The composer sits just above the dock: its 12px bottom pad is the gap.
+      const gap = dockBox.y - (inputBox.y + inputBox.height);
+      expect(gap).toBeGreaterThanOrEqual(0);
+      expect(gap).toBeLessThanOrEqual(16);
+    });
+
+    test(`[P1] should pin the view to the screen so the page never scrolls in ${colorScheme}`, async ({
+      page,
+    }) => {
+      await openNotes(page, colorScheme);
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollHeight - window.innerHeight
@@ -120,13 +144,6 @@ test.describe('Love Notes on the style kit', () => {
       );
       expect(sideways).toBeLessThanOrEqual(0);
 
-      // iOS zooms the page in when a field under 16px is focused and leaves it
-      // zoomed, which lets the whole page be dragged about; and the page must
-      // not rubber-band when dragged past its edge.
-      await expect(input).toHaveCSS('font-size', '16px');
-      await expect(page.locator('html')).toHaveCSS('overscroll-behavior', 'none');
-      await expect(page.locator('body')).toHaveCSS('overscroll-behavior', 'none');
-
       // The view is pinned to the visible screen rather than sized from 100dvh
       // (which the installed iOS app reads about 60pt too tall), so the page
       // has nothing to scroll: a scroll request leaves it where it is.
@@ -136,13 +153,19 @@ test.describe('Love Notes on the style kit', () => {
         return window.scrollY;
       });
       expect(scrolledTo).toBe(0);
+    });
 
-      // The composer sits just above the dock: its 12px bottom pad is the gap.
-      const inputBox = await input.boundingBox();
-      if (!inputBox) throw new Error('[notes-kit.spec] expected an input box');
-      const gap = dockBox.y - (inputBox.y + inputBox.height);
-      expect(gap).toBeGreaterThanOrEqual(0);
-      expect(gap).toBeLessThanOrEqual(16);
+    test(`[P1] should neither zoom on focus nor rubber-band on iOS in ${colorScheme}`, async ({
+      page,
+    }) => {
+      await openNotes(page, colorScheme);
+
+      // iOS zooms the page in when a field under 16px is focused and leaves it
+      // zoomed, which lets the whole page be dragged about; and the page must
+      // not rubber-band when dragged past its edge.
+      await expect(page.getByLabel(/love note message input/i)).toHaveCSS('font-size', '16px');
+      await expect(page.locator('html')).toHaveCSS('overscroll-behavior', 'none');
+      await expect(page.locator('body')).toHaveCSS('overscroll-behavior', 'none');
     });
 
     test(`[P1] should fill a sent note's bubble with the Send button's pink in ${colorScheme}`, async ({
@@ -172,7 +195,7 @@ test.describe('Love Notes on the style kit', () => {
       const sendFill = await background(page.getByLabel(/send message/i));
       expect(bubbleFill).toBe(KIT_FILL);
       expect(sendFill).toBe(bubbleFill);
-      await expect(bubble).toHaveCSS('color', 'rgb(255, 255, 255)');
+      await expect(bubble).toHaveCSS('color', KIT_ON_FILL);
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollHeight - window.innerHeight

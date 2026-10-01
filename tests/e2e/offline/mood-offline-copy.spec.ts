@@ -14,12 +14,15 @@
  * the session never gets a server answer, and the device then goes offline.
  *
  * Test data: one row per test, seeded for THIS worker's own pair
- * (`resolveOwnPair`, keyed on TEST_WORKER_INDEX) and deleted by id at teardown.
+ * (`resolveOwnPair`, keyed on TEST_PARALLEL_INDEX) and deleted by id at teardown.
  * No partner is linked or unlinked, no password reset, no shared row nulled.
  */
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
+import { goOffline } from '../../support/helpers/offline';
 import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import { ownMoodHistoryRead, partnerMoodListRead } from '../../support/helpers/reads';
@@ -105,42 +108,12 @@ async function clearMoodsStore(page: Page): Promise<void> {
 
 /** Notes in the signed-in account's saved `partner-moods` copy, or `null`. */
 async function savedPartnerNotes(page: Page): Promise<string[] | null> {
-  return page.evaluate(async () => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return null;
-    return new Promise<string[] | null>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve(null);
-      open.onsuccess = () => {
-        const db = open.result;
-        const get = db
-          .transaction('local-copies')
-          .objectStore('local-copies')
-          .get([userId, 'partner-moods']);
-        get.onsuccess = () => {
-          db.close();
-          const value = get.result?.value as { note?: string }[] | undefined;
-          resolve(value ? value.map((mood) => mood.note ?? '') : null);
-        };
-        get.onerror = () => {
-          db.close();
-          resolve(null);
-        };
-      };
-    });
-  });
-}
-
-async function goOffline(page: Page, offline: boolean) {
-  await page.context().setOffline(offline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), offline ? 'offline' : 'online');
+  const moods = await savedLocalCopy<{ note?: string }[]>(page, 'partner-moods');
+  return moods ? moods.map((mood) => mood.note ?? '') : null;
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching events-offline-copy.spec.ts.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.describe('Mood history and partner moods offline', () => {

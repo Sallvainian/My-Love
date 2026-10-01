@@ -10,6 +10,7 @@
  * `emulateMedia` alone flips them.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash, WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { openSettingsFromHome } from '../../support/helpers/settings-screen';
@@ -36,14 +37,11 @@ async function openSettings(
 
 test.describe('Settings on the style kit', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {
-    test(`[P1] should render grouped kit cards and a quiet Sign out in ${colorScheme}`, async ({
+    test(`[P1] should head the countdowns with one Events and one Anniversaries group in ${colorScheme}`, async ({
       page,
       interceptNetworkCall,
     }) => {
@@ -62,21 +60,44 @@ test.describe('Settings on the style kit', () => {
       for (const label of ['Account', 'Countdowns', 'About']) {
         await expect(view.getByRole('heading', { level: 2, name: label, exact: true })).toBeVisible();
       }
+    });
+
+    test(`[P1] should draw the Countdowns and Sign out cards on the kit card in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openSettings(page, interceptNetworkCall, colorScheme);
 
       // Cards on the kit card colour: Countdowns (the events group's card) and
       // the Sign out card.
-      const countdownsCard = page.getByTestId('settings-countdowns-card');
-      await expect(countdownsCard).toHaveCSS('background-color', KIT_CARD[colorScheme]);
-      const signOut = page.getByTestId('settings-sign-out');
+      await expect(page.getByTestId('settings-countdowns-card')).toHaveCSS(
+        'background-color',
+        KIT_CARD[colorScheme]
+      );
       await expect(page.getByTestId('settings-sign-out-card')).toHaveCSS(
         'background-color',
         KIT_CARD[colorScheme]
       );
+    });
+
+    test(`[P1] should draw a quiet Sign out in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openSettings(page, interceptNetworkCall, colorScheme);
 
       // Quiet Sign out: no gradient, kit danger text.
+      const signOut = page.getByTestId('settings-sign-out');
       await expect(signOut).toHaveCSS('background-image', 'none');
       await expect(signOut).toHaveCSS('color', KIT_DANGER[colorScheme]);
       await expect(signOut).toHaveText('Sign out');
+    });
+
+    test(`[P1] should not scroll sideways at phone width in ${colorScheme}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await openSettings(page, interceptNetworkCall, colorScheme);
 
       // No horizontal page scroll at phone width, measured once the events
       // list has settled so its final rows are what is measured. The loading
@@ -99,7 +120,7 @@ test.describe('Settings on the style kit', () => {
     interceptNetworkCall,
   }) => {
     await openSettings(page, interceptNetworkCall, 'light');
-    const before = await page.evaluate(() => localStorage.getItem('lastWelcomeView'));
+    const before = await page.evaluate((key) => localStorage.getItem(key), WELCOME_SPLASH_KEY);
 
     await page.getByTestId('settings-replay-welcome').click();
     await expect(page.getByTestId('welcome-splash')).toBeVisible();
@@ -109,7 +130,7 @@ test.describe('Settings on the style kit', () => {
     await expect(page.getByTestId('settings-view')).toBeVisible();
 
     // A manual replay does not reset the automatic splash timer.
-    const after = await page.evaluate(() => localStorage.getItem('lastWelcomeView'));
+    const after = await page.evaluate((key) => localStorage.getItem(key), WELCOME_SPLASH_KEY);
     expect(after).toBe(before);
   });
 });

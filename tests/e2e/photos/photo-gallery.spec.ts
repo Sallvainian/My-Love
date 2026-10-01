@@ -7,6 +7,7 @@
  * Test IDs: 4.3-E2E-001, 4.3-E2E-002, 4.3-E2E-003
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { createPhotoInsert } from '../../support/factories/photos';
 
 test.describe('Photo Gallery', () => {
   test('[P0] 4.3-E2E-001 should display photo gallery view', async ({
@@ -49,20 +50,18 @@ test.describe('Photo Gallery', () => {
   }) => {
     // GIVEN: User is on photo gallery with at least one photo
     const mockPhotos = [
-      {
+      createPhotoInsert({
         id: 'test-photo-1',
         user_id: 'test-user',
         storage_path: 'photos/test.jpg',
-        thumbnail_path: 'photos/test_thumb.jpg',
+        file_size: 100000,
         filename: 'test.jpg',
         mime_type: 'image/jpeg',
         width: 800,
         height: 600,
-        file_size: 100000,
         caption: 'Test photo',
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
+      }),
     ];
 
     const photosCall = interceptNetworkCall({
@@ -89,7 +88,9 @@ test.describe('Photo Gallery', () => {
     await expect(page.getByTestId('photo-gallery')).toBeVisible();
 
     // WHEN: User clicks a photo
-    const photoItem = page.getByTestId('photo-gallery-grid').locator('img').first();
+    const photoItem = page
+      .getByTestId('photo-gallery-grid')
+      .getByRole('button', { name: 'Test photo', exact: true });
     await photoItem.click();
 
     // THEN: Photo viewer opens

@@ -11,8 +11,9 @@
  * swaps the tile to the solid fill. The card itself is always the plain kit
  * card.
  *
- * Tests find the label as the card's `<h3>`, and the value, the trailing figure
- * and the description by their test ids (`countdown-value`, `countdown-clock`,
+ * Tests find the label as the card's level-3 heading, and the label, the value,
+ * the trailing figure and the description by their test ids
+ * (`countdown-label`, `countdown-value`, `countdown-clock`,
  * `countdown-description`).
  *
  * The trailing figure (a countdown's live h/m/s) sits to the right of the value
@@ -78,7 +79,12 @@ export function CountdownCard({
         />
       </div>
       <div className="grid grid-cols-1 gap-x-2 gap-y-0.5 @2xs:grid-cols-[minmax(0,1fr)_auto]">
-        <h3 className="text-sm font-normal wrap-break-word text-muted @2xs:col-span-2">{label}</h3>
+        <h3
+          className="text-sm font-normal wrap-break-word text-muted @2xs:col-span-2"
+          data-testid="countdown-label"
+        >
+          {label}
+        </h3>
         <div
           className={`text-[22px] font-bold tabular-nums ${valueMuted ? 'text-muted' : 'text-ink'}`}
           data-testid="countdown-value"

@@ -8,14 +8,12 @@
  * so `nav-dock` is the element that has to survive.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
 
 test.describe('Navigation Routing', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   test('[P0] should keep navigation visible when views load', async ({ page }) => {

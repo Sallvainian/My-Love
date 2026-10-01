@@ -11,6 +11,7 @@
  */
 import type { Page, Route } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { createAuthBootstrapEvent } from '../../support/factories/auth-bootstrap-notification-order';
 import { navigateTo } from '../../support/helpers/navigation';
 import { recurseUntil } from '../../support/helpers/recurse';
 
@@ -128,7 +129,12 @@ test.describe('Logout Flow', () => {
     await page.goto('/');
     await expect(page.getByTestId('nav-dock')).toBeVisible();
 
-    await page.evaluate(() => {
+    const seededEvent = createAuthBootstrapEvent({
+      id: 'seed-event',
+      userId: 'seed-sender',
+      label: 'Seeded anniversary',
+    });
+    await page.evaluate((event) => {
       window.__APP_STORE__?.setState({
         notes: [
           {
@@ -139,19 +145,9 @@ test.describe('Logout Flow', () => {
             created_at: new Date().toISOString(),
           },
         ],
-        events: [
-          {
-            id: 'seed-event',
-            userId: 'seed-sender',
-            label: 'Seeded anniversary',
-            date: new Date(),
-            createdAt: new Date(),
-            description: null,
-            icon: 'calendar',
-          },
-        ],
+        events: [event],
       });
-    });
+    }, seededEvent);
 
     // The seed has to have landed, or the assertion is vacuous again.
     await recurseUntil(

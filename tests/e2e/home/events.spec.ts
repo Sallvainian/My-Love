@@ -26,6 +26,7 @@
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
@@ -96,10 +97,7 @@ test.afterEach(async ({ supabaseAdmin }) => {
 
 test.describe('Home dashboard reads events from the store', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash, matching the other Home specs.
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   test('[P0] shows own and partner future events soonest first, each with its own icon', async ({
@@ -124,7 +122,7 @@ test.describe('Home dashboard reads events from the store', () => {
     await expect(futureCard.getByText('Future Meetup E2E')).toBeVisible();
     await expect(futureCard.getByText('Future event description')).toBeVisible();
     // The countdown day-count is this component's rendering of "the date".
-    await expect(futureCard.getByText(/\d+\s*days?/i)).toBeVisible();
+    await expect(futureCard.getByTestId('countdown-value')).toHaveText(/^\d+ days?$/);
 
     const partnerCard = page.getByTestId('event-countdown-partner-meetup-e2e');
     await expect(partnerCard).toBeVisible();
@@ -135,14 +133,16 @@ test.describe('Home dashboard reads events from the store', () => {
     // the own row takes the 'calendar' default, so the two must not render the
     // same glyph. Colour no longer varies by icon (it lives only in the tile),
     // so the lucide glyph class each icon stamps is what tells them apart.
-    await expect(partnerCard.locator('svg')).toHaveClass(/lucide-gem/);
-    await expect(futureCard.locator('svg')).toHaveClass(/lucide-calendar/);
+    await expect(partnerCard.getByTestId('countdown-icon')).toHaveClass(/lucide-gem/);
+    await expect(futureCard.getByTestId('countdown-icon')).toHaveClass(/lucide-calendar/);
 
     // Soonest-first, straight from the store: own event is +14d, partner's is
     // +21d. `events` is rendered in store order with no re-sort, so a
     // regression that re-sorts or reverses shows up here.
     await expect(
-      page.getByTestId(/^event-countdown-(future|partner)-meetup-e2e$/).locator('h3')
+      page
+        .getByTestId(/^event-countdown-(future|partner)-meetup-e2e$/)
+        .getByRole('heading', { level: 3 })
     ).toHaveText(['Future Meetup E2E', 'Partner Meetup E2E']);
   });
 
@@ -339,7 +339,7 @@ test.describe('Home dashboard reads events from the store', () => {
     const card = page.getByTestId('event-countdown-today-meetup-e2e');
     await expect(card).toBeVisible();
     await expect(card.getByText('Today Meetup E2E')).toBeVisible();
-    await expect(card.getByText('Today!')).toBeVisible();
+    await expect(card.getByTestId('countdown-value')).toHaveText('Today!');
 
     // No description line is rendered for a null value.
     await expect(card.getByTestId('countdown-description')).toHaveCount(0);
@@ -349,78 +349,44 @@ test.describe('Home dashboard reads events from the store', () => {
 
   test('[P0] caps the events column at six cards, keeping the soonest', async ({
     page,
-    supabaseAdmin,
+    coupleEvents,
     interceptNetworkCall,
   }) => {
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    await clearPairEvents(supabaseAdmin, userId, partnerId);
-
     // Seven upcoming events against a cap of six (DW-22). Without the cap the
     // events grid below Wedding keeps growing, pushing Daily Message further off
     // screen. Seeded out of date order and across both halves of the couple,
     // so the assertion pins "the six SOONEST" rather than "the first six
     // rows the query happened to return".
-    const anchor = new Date();
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Fourth Meetup E2E',
-      eventDate: isoDateDaysFromNow(24, anchor),
-      description: 'Fourth event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId: partnerId,
-      label: 'Second Meetup E2E',
-      eventDate: isoDateDaysFromNow(6, anchor),
-      description: 'Second event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Fifth Meetup E2E',
-      eventDate: isoDateDaysFromNow(31, anchor),
-      description: 'Fifth event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Third Meetup E2E',
-      eventDate: isoDateDaysFromNow(18, anchor),
-      description: 'Third event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId: partnerId,
-      label: 'First Meetup E2E',
-      eventDate: isoDateDaysFromNow(2, anchor),
-      description: 'First event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId: partnerId,
-      label: 'Sixth Meetup E2E',
-      eventDate: isoDateDaysFromNow(38, anchor),
-      description: 'Sixth event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Seventh Meetup E2E',
-      eventDate: isoDateDaysFromNow(45, anchor),
-      description: 'Seventh event description',
-      icon: 'calendar',
-    });
-    // A past event too: the store holds it (Settings lists past events), so
-    // this is what pins that the cap counts UPCOMING events only. Cap the raw
-    // `events` array instead of the filtered one and this row eats a slot,
-    // leaving 'Third Meetup E2E' off the page.
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Old Meetup E2E',
-      eventDate: isoDateDaysFromNow(-9, anchor),
-      description: 'Old event description',
-      icon: 'calendar',
-    });
+    //
+    // The last row is a past event: the store holds it (Settings lists past
+    // events), so it is what pins that the cap counts UPCOMING events only.
+    // Cap the raw `events` array instead of the filtered one and this row eats
+    // a slot, leaving 'Third Meetup E2E' off the page.
+    await coupleEvents.seed([
+      { dayOffset: 24, label: 'Fourth Meetup E2E', description: 'Fourth event description' },
+      {
+        dayOffset: 6,
+        label: 'Second Meetup E2E',
+        description: 'Second event description',
+        owner: 'partner',
+      },
+      { dayOffset: 31, label: 'Fifth Meetup E2E', description: 'Fifth event description' },
+      { dayOffset: 18, label: 'Third Meetup E2E', description: 'Third event description' },
+      {
+        dayOffset: 2,
+        label: 'First Meetup E2E',
+        description: 'First event description',
+        owner: 'partner',
+      },
+      {
+        dayOffset: 38,
+        label: 'Sixth Meetup E2E',
+        description: 'Sixth event description',
+        owner: 'partner',
+      },
+      { dayOffset: 45, label: 'Seventh Meetup E2E', description: 'Seventh event description' },
+      { dayOffset: -9, label: 'Old Meetup E2E', description: 'Old event description' },
+    ]);
 
     const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
@@ -428,7 +394,9 @@ test.describe('Home dashboard reads events from the store', () => {
 
     await expect(page.getByTestId('event-countdown-first-meetup-e2e')).toBeVisible();
 
-    await expect(page.getByTestId(/^event-countdown-\w+-meetup-e2e$/).locator('h3')).toHaveText([
+    await expect(
+      page.getByTestId(/^event-countdown-\w+-meetup-e2e$/).getByRole('heading', { level: 3 })
+    ).toHaveText([
       'First Meetup E2E',
       'Second Meetup E2E',
       'Third Meetup E2E',
@@ -524,9 +492,7 @@ test.describe(
   { annotation: [{ type: 'skipNetworkMonitoring' }] },
   () => {
     test.beforeEach(async ({ page }) => {
-      await page.addInitScript(() => {
-        localStorage.setItem('lastWelcomeView', Date.now().toString());
-      });
+      await dismissWelcomeSplash(page);
     });
 
     test('[P0] renders the load error and recovers on a later successful Home load', async ({

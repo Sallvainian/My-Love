@@ -22,9 +22,10 @@
  * starts signed out and signs in as the dedicated account through the real
  * login form.
  */
-import type { Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { deleteSentNote } from '../../support/helpers/love-notes';
@@ -41,7 +42,7 @@ async function createNamelessAccount(
   supabaseAdmin: TypedSupabaseClient,
   prefix: string
 ): Promise<Dedicated> {
-  const email = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.example.com`;
+  const email = `${prefix}-${randomUUID()}@test.example.com`;
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password: TEST_USER_PASSWORD,
@@ -62,18 +63,6 @@ async function createNamelessAccount(
       if (deleteError) throw new Error(`Failed to delete ${email}: ${deleteError.message}`);
     },
   };
-}
-
-/**
- * Stamp the welcome-splash timer so Home renders straight away, the same way
- * every other signed-in E2E does (`tests/e2e/home/events.spec.ts:44`). An init
- * script rather than an `evaluate`, so it is in place before the app's first
- * render reads it.
- */
-async function suppressWelcomeSplash(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', String(Date.now()));
-  });
 }
 
 async function readProfileName(
@@ -113,7 +102,7 @@ test.describe('Display Name Setup', () => {
     // (`tests/support/auth/supabase-auth-provider.ts:153`) and
     // `authSessionEnabled: false` drops it, so the 60-minute welcome splash
     // would otherwise stand between setup and the app.
-    await suppressWelcomeSplash(page);
+    await dismissWelcomeSplash(page);
     await page.goto('/');
     await expect(page.getByTestId('login-screen')).toBeVisible();
     await page.getByRole('textbox', { name: 'Email' }).fill(account.email);
@@ -170,7 +159,7 @@ test.describe('Display Name Setup', () => {
       }
     });
 
-    await suppressWelcomeSplash(page);
+    await dismissWelcomeSplash(page);
     await page.goto('/');
     await expect(page.getByTestId('login-screen')).toBeVisible();
     await page.getByRole('textbox', { name: 'Email' }).fill(account.email);
@@ -224,7 +213,7 @@ test.describe('Display Name Setup', () => {
  * chat to render a name into. A dedicated throwaway account would have no
  * partner and no `getPartnerId()`, and it is this worker's OWN pool row that is
  * written here, never the partner's and never another worker's: the pair comes
- * from `resolveOwnPair`, which is keyed on `TEST_WORKER_INDEX`.
+ * from `resolveOwnPair`, which is keyed on `TEST_PARALLEL_INDEX`.
  */
 test.describe('Display Name Edit', () => {
   /**

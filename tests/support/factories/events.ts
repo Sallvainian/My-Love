@@ -119,7 +119,7 @@ export async function resolveWorkerPairIds(
 ): Promise<WorkerPairIds> {
   const pair = getWorkerPairEmails();
   if (!pair) {
-    throw new Error('resolveWorkerPairIds: no worker identity (TEST_WORKER_INDEX unset)');
+    throw new Error('resolveWorkerPairIds: no worker identity (TEST_PARALLEL_INDEX unset)');
   }
 
   const [userId, partnerId] = await Promise.all([

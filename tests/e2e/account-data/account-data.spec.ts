@@ -1,10 +1,12 @@
 import type { Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { AppState } from '../../../src/stores/types';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
-import { clockAnchor } from '../../support/helpers/events';
-import { FAVORITES_READ } from '../../support/helpers/reads';
+import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
+import { FAVORITES_READ, ownMoodHistoryRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 // These tests load the actual app with local Supabase auth. Source imports are
@@ -64,26 +66,8 @@ async function localRows(page: Page, store: 'moods') {
  * the account has no copy on this device.
  */
 async function savedFavoriteIds(page: Page, userId: string): Promise<number[] | null> {
-  return page.evaluate(async (owner) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('my-love-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      return await new Promise<number[] | null>((resolve, reject) => {
-        const request = db
-          .transaction('local-copies')
-          .objectStore('local-copies')
-          .get([owner, 'message-data']);
-        request.onsuccess = () =>
-          resolve((request.result?.value as { bundledFavoriteIds: number[] } | undefined)?.bundledFavoriteIds ?? null);
-        request.onerror = () => reject(request.error);
-      });
-    } finally {
-      db.close();
-    }
-  }, userId);
+  const copy = await savedLocalCopy<{ bundledFavoriteIds: number[] }>(page, 'message-data', userId);
+  return copy?.bundledFavoriteIds ?? null;
 }
 
 async function signOut(page: Page) {
@@ -94,13 +78,21 @@ async function signOut(page: Page) {
   expect((await snapshot(page)).favoriteIds).toEqual([]);
 }
 
-async function signIn(page: Page, email: string) {
+/**
+ * Sign in and return the new session's favorites read, armed before the submit
+ * and awaited, so nothing checked afterwards can run ahead of it.
+ */
+async function signIn(page: Page, interceptNetworkCall: InterceptNetworkCallFn, email: string) {
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+  const favoritesRead = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
   await page.getByTestId('submit-button').click();
   await expect(page.getByTestId('app-container')).toBeVisible();
+  const read = await favoritesRead;
+  expect(read.status).toBe(200);
   await navigate(page, 'home');
   await expect(page.getByTestId('message-favorite-button')).toBeVisible();
+  return read;
 }
 
 test.describe('Account data through the real browser and local services', () => {
@@ -180,7 +172,10 @@ test.describe('Account data through the real browser and local services', () => 
       }
     );
     await signOut(page);
-    await signIn(page, pair.user2Email);
+    // B has no favorites on the server, so anything B's session shows as a
+    // favorite could only have leaked from A.
+    const userBRead = await signIn(page, interceptNetworkCall, pair.user2Email);
+    expect(userBRead.responseJson).toEqual([]);
     await recurseUntil(
       async () => (await snapshot(page)).userId,
       (v) => {
@@ -219,11 +214,11 @@ test.describe('Account data through the real browser and local services', () => 
 
     // A's sign-in refreshes the favorite back from the server.
     await signOut(page);
-    await signIn(page, pair.user1Email);
+    await signIn(page, interceptNetworkCall, pair.user1Email);
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
     const beforeRelogin = await snapshot(page);
     await signOut(page);
-    await signIn(page, pair.user1Email);
+    await signIn(page, interceptNetworkCall, pair.user1Email);
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
     const afterRelogin = await snapshot(page);
     expect(afterRelogin.userId).toBe(original.userId);
@@ -234,12 +229,21 @@ test.describe('Account data through the real browser and local services', () => 
   test('[P1] repairs an invalid local mood through the form, preserving its row and syncing the result', async ({
     page,
     supabaseAdmin,
+    interceptNetworkCall,
     cleanup,
   }) => {
     // The seeded row is dated by the page's clock and the form edits today's
     // mood, so the clock is pinned: a real midnight cannot split the two.
     await page.clock.install({ time: clockAnchor() });
+    const { userId } = await resolveOwnPair(supabaseAdmin);
+    // The signed-in start's mood-history backfill has answered before the row
+    // is seeded, and answered empty, so it has nothing to merge into the moods
+    // the form reads.
+    const backfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
     await page.goto('/');
+    const backfilled = await backfill;
+    expect(backfilled.status).toBe(200);
+    expect(backfilled.responseJson).toEqual([]);
     await expect(page.getByTestId('daily-message')).toBeVisible();
     const seeded = await page.evaluate(async () => {
       const storePath = '/src/stores/useAppStore.ts';

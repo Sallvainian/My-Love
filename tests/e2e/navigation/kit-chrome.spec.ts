@@ -8,6 +8,7 @@
  * switch under `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 
 const PAGE_GROUND = {
   light: 'rgb(253, 244, 247)', // #fdf4f7
@@ -28,10 +29,7 @@ const WORDMARK_TYPE = { style: 'italic', weight: '600', size: '19px' } as const;
 
 test.describe('Style kit chrome', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {

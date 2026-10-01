@@ -67,6 +67,7 @@
  * before and after every test, so nothing seeded here outlives its test.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { PAST_EVENTS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 
 /** Home renders at most this many event cards (`HOME_MAX_EVENT_CARDS`, `src/App.tsx`). */
@@ -122,9 +123,7 @@ test.describe('Home under the bounded events read', () => {
       { dayOffset: 7, label: 'Window Survivor E2E', description: 'Still ahead' },
     ]);
 
-    await page.addInitScript((stamp) => {
-      localStorage.setItem('lastWelcomeView', String(stamp));
-    }, coupleEvents.anchor.getTime());
+    await dismissWelcomeSplash(page, coupleEvents.anchor.getTime());
 
     const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     const pastRead = interceptNetworkCall({ method: 'GET', url: PAST_EVENTS_READ });
@@ -201,9 +200,7 @@ test.describe('Home under the bounded events read', () => {
     // runs normally, so the page loads, authenticates and animates as it would
     // without it — the jump below is the only discontinuity.
     await page.clock.install({ time: beforeMidnight });
-    await page.addInitScript((stamp) => {
-      localStorage.setItem('lastWelcomeView', String(stamp));
-    }, beforeMidnight.getTime());
+    await dismissWelcomeSplash(page, beforeMidnight.getTime());
 
     const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
@@ -230,7 +227,7 @@ test.describe('Home under the bounded events read', () => {
     await expect(page.getByTestId('event-countdown-refill-seventh-e2e')).toBeVisible();
     await expect(eventCards).toHaveCount(HOME_MAX_EVENT_CARDS);
 
-    await expect(eventCards.locator('h3')).toHaveText([
+    await expect(eventCards.getByRole('heading', { level: 3 })).toHaveText([
       'Refill Second E2E',
       'Refill Third E2E',
       'Refill Fourth E2E',

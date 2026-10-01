@@ -12,6 +12,9 @@ import { test, expect } from '../../support/merged-fixtures';
 import { PHOTOS_LIST_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 
+/** A point in the viewport's top-left corner, outside the centred upload modal. */
+const OUTSIDE_TAP = { x: 4, y: 4 };
+
 /**
  * Open the gallery and return once its list has loaded. The loading skeleton
  * also carries `photo-gallery`, so only the grid or the empty state counts.
@@ -118,14 +121,18 @@ test.describe('Photo Upload', () => {
     // mid-animation the corner still reaches the backdrop beneath it, so tap
     // only once the overlay covers the corner.
     const box = (await modal.boundingBox())!;
-    expect(box.y).toBeGreaterThan(8);
+    expect(box.y).toBeGreaterThan(OUTSIDE_TAP.y);
     await recurseUntil(
-      () => page.evaluate(() => document.elementFromPoint(4, 4)?.getAttribute('data-testid')),
+      () =>
+        page.evaluate(
+          ({ x, y }) => document.elementFromPoint(x, y)?.getAttribute('data-testid'),
+          OUTSIDE_TAP
+        ),
       (v) => {
         expect(v).toBe('photo-upload-overlay');
       }
     );
-    await page.mouse.click(4, 4);
+    await page.mouse.click(OUTSIDE_TAP.x, OUTSIDE_TAP.y);
 
     await expect(modal).toBeHidden();
   });
