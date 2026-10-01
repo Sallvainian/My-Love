@@ -44,7 +44,7 @@ import { interceptNetworkCall } from '@seontechnologies/playwright-utils/interce
 import { test, expect } from '../../support/merged-fixtures';
 import { closeContext } from '../../support/fixtures/cleanup';
 import { resolveOwnPair } from '../../support/helpers/events';
-import { partnerMoodListRead } from '../../support/helpers/reads';
+import { ownMoodHistoryRead, partnerMoodListRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 
 /**
@@ -232,7 +232,16 @@ test.describe('Partner mood realtime delivery', () => {
       // that appears from here on can only have arrived over the broadcast.
 
       await log.step('Log a mood with a unique note from the sender, through the real UI');
+      // The sender's start backfill answers before the form is filled, so a
+      // late merge cannot re-seed the selection or the note mid-fill.
+      const senderBackfill = interceptNetworkCall({
+        page,
+        method: 'GET',
+        url: ownMoodHistoryRead(userId),
+        timeout: 30_000,
+      });
       await page.goto('/mood');
+      expect((await senderBackfill).status).toBe(200);
       await expect(page.getByTestId('mood-tracker')).toBeVisible();
       await page.getByRole('button', { name: /happy/i }).click();
       // The note field is collapsed by default (`MoodTracker.tsx:549-557`),

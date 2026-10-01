@@ -9,11 +9,14 @@
  * and the history bottom sheet on the kit card. Plus one dark pass over the
  * no-partner connect UI.
  *
- * The partner identity and their moods are stubbed so the content is stable: a
- * ~40-character display name (the long-name row of the story's matrix) and
- * three partner mood rows.
+ * The partner identity, their moods and the poke/kiss history are stubbed so
+ * the content is stable: a ~40-character display name (the long-name row of
+ * the story's matrix), three partner mood rows, and one poke sent and one kiss
+ * received.
  */
 import { randomUUID } from 'node:crypto';
+import { resolveOwnPair } from '../../support/helpers/events';
+import { INTERACTIONS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import { interceptNetworkCall as fulfillOn } from '@seontechnologies/playwright-utils/intercept-network-call';
@@ -53,6 +56,21 @@ function partnerMoodRows() {
   }));
 }
 
+/** One poke this account sent and one kiss it received, both unviewed. */
+function interactionRows(ownUserId: string) {
+  const now = Date.now();
+  const at = (hoursAgo: number) => new Date(now - hoursAgo * 3_600_000).toISOString();
+  return [
+    { from_user_id: ownUserId, to_user_id: PARTNER_ID, type: 'poke', hoursAgo: 2 },
+    { from_user_id: PARTNER_ID, to_user_id: ownUserId, type: 'kiss', hoursAgo: 30 },
+  ].map(({ hoursAgo, ...row }) => ({
+    id: randomUUID(),
+    ...row,
+    viewed: false,
+    created_at: at(hoursAgo),
+  }));
+}
+
 /**
  * Compared with clientWidth, never a literal 390: a classic (non-overlay)
  * scrollbar narrows clientWidth, and scrollWidth follows it.
@@ -79,10 +97,11 @@ async function chromeText(page: Page): Promise<string> {
 }
 
 /**
- * Open the connected Partner view with the partner's link, profile, requests and
- * moods stubbed, at phone width in `colorScheme`; returns the visible view.
+ * Open the connected Partner view with the partner's link, profile, requests,
+ * moods and the poke/kiss history stubbed, at phone width in `colorScheme`;
+ * returns the visible view and the stubbed history rows.
  */
-async function openConnectedPartner(page: Page, colorScheme: Scheme) {
+async function openConnectedPartner(page: Page, colorScheme: Scheme, ownUserId: string) {
   // Only this browser's reads are faked; no worker-pool row is touched.
   // Each stub is awaited after the load that hits it, bounded by a timeout.
   // Standalone, because the `interceptNetworkCall` fixture drops `timeout`.
@@ -120,15 +139,25 @@ async function openConnectedPartner(page: Page, colorScheme: Scheme) {
     fulfillResponse: { status: 200, body: partnerMoodRows() },
     timeout: 15000,
   });
+  // The history is read at the signed-in start and again when the sheet opens;
+  // the stub stays installed and answers both.
+  const interactions = interactionRows(ownUserId);
+  const history = fulfillOn({
+    page,
+    method: 'GET',
+    url: INTERACTIONS_READ,
+    fulfillResponse: { status: 200, body: interactions },
+    timeout: 15000,
+  });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme });
   await page.goto('/partner');
-  await Promise.all([partnerLink, partnerProfile, requests, moods]);
+  await Promise.all([partnerLink, partnerProfile, requests, moods, history]);
 
   const view = page.getByTestId('partner-mood-view');
   await expect(view).toBeVisible();
-  return view;
+  return { view, interactions };
 }
 
 test.describe('Partner on the style kit', () => {
@@ -142,8 +171,10 @@ test.describe('Partner on the style kit', () => {
   for (const colorScheme of ['light', 'dark'] as const satisfies readonly Scheme[]) {
     test(`[P1] should render the connected Partner view on the kit in ${colorScheme}`, async ({
       page,
+      supabaseAdmin,
     }) => {
-      const view = await openConnectedPartner(page, colorScheme);
+      const { userId } = await resolveOwnPair(supabaseAdmin);
+      const { view } = await openConnectedPartner(page, colorScheme, userId);
 
       // Title: the partner's name alone, in Playfair Display.
       const title = page.getByRole('heading', { level: 1 });
@@ -181,8 +212,10 @@ test.describe('Partner on the style kit', () => {
 
     test(`[P1] should show the Fart toast on the kit card with no emoji in ${colorScheme}`, async ({
       page,
+      supabaseAdmin,
     }) => {
-      await openConnectedPartner(page, colorScheme);
+      const { userId } = await resolveOwnPair(supabaseAdmin);
+      await openConnectedPartner(page, colorScheme, userId);
 
       // Fart is local-only (no network): its toast is a kit card with no emoji.
       await page.getByTestId('fart-button').click();
@@ -196,14 +229,20 @@ test.describe('Partner on the style kit', () => {
 
     test(`[P1] should open the History sheet on the kit card inside the viewport in ${colorScheme}`, async ({
       page,
+      supabaseAdmin,
     }) => {
-      await openConnectedPartner(page, colorScheme);
+      const { userId } = await resolveOwnPair(supabaseAdmin);
+      const { interactions } = await openConnectedPartner(page, colorScheme, userId);
 
       // History opens as a kit sheet that lies inside the viewport. The sheet is
       // fixed, so it never adds to scrollWidth -- its own box is what is checked.
       await page.getByTestId('history-button').click();
       const sheet = page.getByTestId('interaction-history-modal');
       await expect(sheet).toBeVisible();
+      // Both stubbed rows are drawn before the sheet's text is read for emoji.
+      for (const { id } of interactions) {
+        await expect(sheet.getByTestId(`interaction-${id}`)).toBeVisible();
+      }
       await expect(sheet).toHaveCSS('background-color', KIT_CARD[colorScheme]);
       const viewportWidth = page.viewportSize()!.width;
       await recurseUntil(

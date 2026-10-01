@@ -8,6 +8,8 @@
  * chrome. The kit colours are `--kit-*` variables that switch under
  * `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
+import { resolveOwnPair } from '../../support/helpers/events';
+import { ownMoodHistoryRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import type { Page } from '@playwright/test';
@@ -186,9 +188,9 @@ test.describe('Mood on the style kit', () => {
 
     test(`[P1] should select Happy as a tint/accent tile in ${colorScheme}`, async ({
       page,
+      supabaseAdmin,
+      interceptNetworkCall,
     }) => {
-      await openMood(page, colorScheme);
-
       // Nothing may pre-select Happy or re-seed the form under the click.
       // MoodTracker re-seeds only from a saved entry for today, whenever a
       // loadMoods reload (mount, or after App's mount sync) swaps `moods`.
@@ -197,8 +199,15 @@ test.describe('Mood on the style kit', () => {
       // (`loadMoodHistoryFromServer`, moodSlice.ts) does copy the account's own
       // server moods into it, so the store stays empty only while this worker
       // account has none on the server; this test never submits. Assert that
-      // precondition at its source rather than branching on the tile, so a late
-      // reload has nothing to seed from.
+      // precondition at its source, the backfill's own answer, awaited before
+      // the tile is read rather than branching on the tile, so a late reload
+      // has nothing to seed from.
+      const { userId } = await resolveOwnPair(supabaseAdmin);
+      const backfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
+      await openMood(page, colorScheme);
+      const backfilled = await backfill;
+      expect(backfilled.status).toBe(200);
+      expect(backfilled.responseJson).toEqual([]);
       await recurseUntil(() => savedMoodCount(page), (v) => { expect(v).toBe(0); });
       const happy = page.getByTestId('mood-button-happy');
       await expect(happy).toHaveAttribute('aria-pressed', 'false');
