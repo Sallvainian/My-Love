@@ -124,7 +124,7 @@ async function deleteProbeRow(
 async function resolveOwnUserId(supabaseAdmin: TypedSupabaseClient): Promise<string> {
   const pair = getWorkerPairEmails();
   if (!pair) {
-    throw new Error('resolveOwnUserId: no worker identity (TEST_WORKER_INDEX unset)');
+    throw new Error('resolveOwnUserId: no worker identity (TEST_PARALLEL_INDEX unset)');
   }
 
   const { data, error } = await supabaseAdmin

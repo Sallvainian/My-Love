@@ -54,8 +54,8 @@
  * test here.
  *
  * Isolation: rows belong to this worker's own pair only, resolved through
- * `getWorkerPairEmails()` (keyed on `TEST_WORKER_INDEX`, never
- * `TEST_PARALLEL_INDEX`). Nothing here links or unlinks partners, resets a
+ * `getWorkerPairEmails()` (keyed on `TEST_PARALLEL_INDEX`, never
+ * `TEST_WORKER_INDEX`). Nothing here links or unlinks partners, resets a
  * password, or touches a row owned by another worker.
  */
 import { test, expect } from '../support/merged-fixtures';

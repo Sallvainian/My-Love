@@ -7,6 +7,7 @@
  * Does NOT pre-fetch auth tokens — the auth-session library handles that
  * lazily per-worker on first test.
  */
+import type { FullConfig } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../../src/types/database.types';
 import type { TypedSupabaseClient } from '../factories';
@@ -125,7 +126,19 @@ async function linkUserPair(
   if (e2) throw new Error(`Failed to link ${secondEmail} to ${firstEmail}: ${e2.message}`);
 }
 
-export default async function globalSetup(): Promise<void> {
+export default async function globalSetup(config: FullConfig): Promise<void> {
+  // Each parallel slot owns one pool pair (worker-pool.ts), so a run with more
+  // workers than pairs would have to share accounts between live workers.
+  // Refuse it before anything is provisioned rather than let a slot wrap.
+  const authPoolSize = getAuthPoolSize();
+  if (config.workers > authPoolSize) {
+    throw new Error(
+      `[global-setup] ${config.workers} workers but only ${authPoolSize} worker pairs: ` +
+        'each worker needs a pair of its own. Run with fewer workers or raise ' +
+        'PLAYWRIGHT_AUTH_POOL_SIZE.'
+    );
+  }
+
   // Initialize the auth system (provider + config) so authStorageInit works
   initializeAuthSystem();
 
@@ -150,7 +163,6 @@ export default async function globalSetup(): Promise<void> {
   }
 
   // Create worker pool users + partners
-  const authPoolSize = getAuthPoolSize();
   for (let i = 0; i < authPoolSize; i++) {
     await ensureUser(admin, getWorkerEmail(i), TEST_USER_PASSWORD, `Test Worker ${i}`);
     await ensureUser(

@@ -14,7 +14,7 @@
  * the session never gets a server answer, and the device then goes offline.
  *
  * Test data: one row per test, seeded for THIS worker's own pair
- * (`resolveOwnPair`, keyed on TEST_WORKER_INDEX) and deleted by id at teardown.
+ * (`resolveOwnPair`, keyed on TEST_PARALLEL_INDEX) and deleted by id at teardown.
  * No partner is linked or unlinked, no password reset, no shared row nulled.
  */
 import { randomUUID } from 'node:crypto';

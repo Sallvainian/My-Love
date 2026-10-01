@@ -16,7 +16,7 @@
  * device then goes offline.
  *
  * Test data: photos of THIS worker's pair (`resolveOwnPair`, keyed on
- * TEST_WORKER_INDEX) — rows inserted and Storage objects uploaded through the
+ * TEST_PARALLEL_INDEX) — rows inserted and Storage objects uploaded through the
  * service client, all deleted by id / path at teardown. No partner is linked
  * or unlinked, no password reset, no shared row nulled.
  */

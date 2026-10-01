@@ -5,7 +5,7 @@
  *
  * A spec that sends a note through the UI never learns the row's id, so the
  * note's unique content is the only handle there is. The delete is also keyed
- * on THIS worker's own pair (`resolveOwnPair`, keyed on `TEST_WORKER_INDEX`),
+ * on THIS worker's own pair (`resolveOwnPair`, keyed on `TEST_PARALLEL_INDEX`),
  * so a content collision or a mis-resolved identity deletes nothing of another
  * worker's — the same shape as the teardown in `love-notes-realtime.spec.ts`.
  */

@@ -8,7 +8,7 @@
  * copy alone.
  *
  * Test data: one row seeded for THIS worker's own user (`resolveOwnPair`, keyed
- * on TEST_WORKER_INDEX) and deleted by id at teardown. No partner is linked or
+ * on TEST_PARALLEL_INDEX) and deleted by id at teardown. No partner is linked or
  * unlinked, no password reset, no shared row nulled.
  */
 import type { Page } from '@playwright/test';

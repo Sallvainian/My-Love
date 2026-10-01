@@ -31,7 +31,7 @@
  * - older notes offline: it needs a thread longer than one page.
  *
  * Test data: rows of THIS worker's pair (`resolveOwnPair`, keyed on
- * TEST_WORKER_INDEX), seeded through the service client and deleted by id at
+ * TEST_PARALLEL_INDEX), seeded through the service client and deleted by id at
  * teardown, each delete deferred as its row is created. Partner requests are
  * faked in the browser only — no real `partner_requests` row is ever seeded,
  * linked or unlinked, and their writes are also aborted, so a regressed guard

@@ -97,7 +97,7 @@ async function resolveOwnPair(
 ): Promise<{ userId: string; partnerId: string }> {
   const pair = getWorkerPairEmails();
   if (!pair) {
-    throw new Error('resolveOwnPair: no worker identity (TEST_WORKER_INDEX unset)');
+    throw new Error('resolveOwnPair: no worker identity (TEST_PARALLEL_INDEX unset)');
   }
 
   const [userId, partnerId] = await Promise.all([

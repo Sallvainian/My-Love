@@ -30,7 +30,7 @@
  * by design and are deliberately not lifted here.
  *
  * Test data: rows belong to THIS worker's pair only, keyed on
- * TEST_WORKER_INDEX through `getWorkerPairEmails()`. No partner is linked or
+ * TEST_PARALLEL_INDEX through `getWorkerPairEmails()`. No partner is linked or
  * unlinked, no password is reset, no shared row is nulled — those rows belong
  * to other workers. `resolveOwnPair` / `clearPairEvents` / `clearOwnPairEvents`
  * come from `tests/support/helpers/events.ts`, which this automation run

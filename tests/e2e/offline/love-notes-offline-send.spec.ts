@@ -14,7 +14,7 @@
  * sent to the server, and the device then goes offline again.
  *
  * Test data: three notes from THIS worker's user to its partner
- * (`resolveOwnPair`, keyed on TEST_WORKER_INDEX), found by a per-run content
+ * (`resolveOwnPair`, keyed on TEST_PARALLEL_INDEX), found by a per-run content
  * stamp and deleted by that stamp at teardown. No partner is linked or unlinked, no
  * password reset, no shared row nulled.
  */

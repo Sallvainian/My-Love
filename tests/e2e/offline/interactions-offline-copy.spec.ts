@@ -14,7 +14,7 @@
  * offline.
  *
  * Test data: one row per test, a poke from THIS worker's partner to its user
- * (`resolveOwnPair`, keyed on TEST_WORKER_INDEX), deleted by id at teardown.
+ * (`resolveOwnPair`, keyed on TEST_PARALLEL_INDEX), deleted by id at teardown.
  * No partner is linked or unlinked, no password reset, no shared row nulled.
  */
 import type { Page } from '@playwright/test';

@@ -63,7 +63,7 @@
  *   npx playwright test tests/e2e/settings/events-load-recovery.spec.ts --project=chromium
  *
  * Test data: seeded and torn down for THIS worker's pair only, keyed on
- * TEST_WORKER_INDEX through `getWorkerPairEmails()`. No partner is linked or
+ * TEST_PARALLEL_INDEX through `getWorkerPairEmails()`. No partner is linked or
  * unlinked, no password reset, no shared row nulled.
  */
 import { test, expect } from '../../support/merged-fixtures';

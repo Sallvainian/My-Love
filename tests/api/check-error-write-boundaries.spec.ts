@@ -28,7 +28,7 @@ test.describe('DW-38 CHECK write boundaries', () => {
       cleanup,
     }) => {
       const pair = getWorkerPairEmails();
-      if (!pair) throw new Error('DW-38 requires TEST_WORKER_INDEX from the worker pool');
+      if (!pair) throw new Error('DW-38 requires TEST_PARALLEL_INDEX from the worker pool');
       const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (!adminKey) throw new Error('DW-38 requires the local service role key for exact-row cleanup');
       const headers = { Authorization: `Bearer ${authToken}` };

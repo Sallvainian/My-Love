@@ -97,7 +97,7 @@ test.describe('Partner mood realtime delivery', () => {
       // It is the whole teardown filter and the whole delivery assertion: no
       // other row can carry it, on any worker, from any run.
       const moodNote = `DW-123 realtime mood ${randomUUID()}`;
-      // Resolved once, up front, from `TEST_WORKER_INDEX` — the same pair the
+      // Resolved once, up front, from `TEST_PARALLEL_INDEX` — the same pair the
       // two contexts below sign in as.
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       // The sender's own display name, read before the send: the toast names

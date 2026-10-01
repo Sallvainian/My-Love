@@ -213,7 +213,7 @@ test.describe('Display Name Setup', () => {
  * chat to render a name into. A dedicated throwaway account would have no
  * partner and no `getPartnerId()`, and it is this worker's OWN pool row that is
  * written here, never the partner's and never another worker's: the pair comes
- * from `resolveOwnPair`, which is keyed on `TEST_WORKER_INDEX`.
+ * from `resolveOwnPair`, which is keyed on `TEST_PARALLEL_INDEX`.
  */
 test.describe('Display Name Edit', () => {
   /**

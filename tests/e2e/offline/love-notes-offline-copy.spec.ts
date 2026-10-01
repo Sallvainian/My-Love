@@ -15,7 +15,7 @@
  * the device then goes offline.
  *
  * Test data: notes from THIS worker's partner to its user (`resolveOwnPair`,
- * keyed on TEST_WORKER_INDEX) and one Storage object under the partner's
+ * keyed on TEST_PARALLEL_INDEX) and one Storage object under the partner's
  * folder, all deleted by id / path at teardown. No partner is linked or
  * unlinked, no password reset, no shared row nulled.
  */
