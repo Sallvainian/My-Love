@@ -95,6 +95,9 @@ describe('notesSlice offline send queue', () => {
   });
 
   describe('retry after a transient failure while online', () => {
+    /** Twice the 60 s backoff cap: long enough that any scheduled retry would have fired. */
+    const BEYOND_MAX_BACKOFF_MS = 2 * 60_000;
+
     /** Yields to IndexedDB (setImmediate, not faked) until `cond` holds. */
     async function until(cond: () => boolean) {
       for (let i = 0; i < 1000 && !cond(); i++) {
@@ -181,7 +184,7 @@ describe('notesSlice offline send queue', () => {
       await expectRetryAfter(5_000, 2);
     });
 
-    it('keeps one timer at a time', async () => {
+    it('a second transient failure does not schedule a second retry', async () => {
       const store = createTestStore();
       await failOnce(store, 3);
 
@@ -206,7 +209,7 @@ describe('notesSlice offline send queue', () => {
       await run;
 
       expect(vi.getTimerCount()).toBe(0);
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(BEYOND_MAX_BACKOFF_MS);
       expect(server.upserts).toBe(1);
     });
 
@@ -217,7 +220,7 @@ describe('notesSlice offline send queue', () => {
       setOnline(false);
       await vi.advanceTimersByTimeAsync(5_000);
       await until(() => vi.getTimerCount() === 0);
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(BEYOND_MAX_BACKOFF_MS);
       expect(server.upserts).toBe(1);
     });
 
@@ -228,7 +231,7 @@ describe('notesSlice offline send queue', () => {
       store.setState({ userId: null, authSessionVersion: 2, notes: [] });
 
       expect(vi.getTimerCount()).toBe(0);
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(BEYOND_MAX_BACKOFF_MS);
       expect(server.upserts).toBe(1);
       expect(await queuedIds()).toHaveLength(1);
     });
@@ -240,7 +243,7 @@ describe('notesSlice offline send queue', () => {
       store.setState({ userId: B, authSessionVersion: 2, notes: [] });
 
       expect(vi.getTimerCount()).toBe(0);
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(BEYOND_MAX_BACKOFF_MS);
       expect(server.upserts).toBe(1);
       expect(await queuedIds(A)).toHaveLength(1);
     });

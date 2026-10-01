@@ -89,6 +89,12 @@ function shown(r: SupabasePhoto, userId = USER_A): PhotoWithUrls {
 
 const key = (userId: string) => `${userId}|${PHOTOS_COPY_KIND}`;
 
+/**
+ * More rows than the store once held: it loaded only `photoService.getPhotos()`'s
+ * default 50, so "every photo" is measured past that old cap.
+ */
+const MORE_THAN_THE_OLD_STORE_CAP = 60;
+
 function deferred<T>() {
   let resolve: (value: T) => void = () => {};
   let reject: (reason: unknown) => void = () => {};
@@ -141,7 +147,9 @@ describe('photosSlice local copy', () => {
 
   describe('loadPhotos', () => {
     it('first online start: lists every photo, saves the copy, requests the fill', async () => {
-      const rows = Array.from({ length: 60 }, (_, n) => row(n, n % 3 ? USER_A : PARTNER));
+      const rows = Array.from({ length: MORE_THAN_THE_OLD_STORE_CAP }, (_, n) =>
+        row(n, n % 3 ? USER_A : PARTNER)
+      );
       listAllPhotos.mockResolvedValue(rows);
       const store = createTestStore();
 
