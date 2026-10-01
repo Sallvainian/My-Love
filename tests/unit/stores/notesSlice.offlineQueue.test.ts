@@ -455,13 +455,16 @@ describe('notesSlice offline send queue', () => {
 
   it('with no partner loaded, an unlinked lookup refuses the note and queues nothing', async () => {
     const store = createTestStore({ partnerLoaded: false });
+    // A note already on screen, so the refusal is shown to leave it alone.
+    await store.getState().sendNote('already shown');
+    await store.getState().drainQueuedNotes();
     server.lookup = { status: 'unlinked' };
 
     await store.getState().sendNote('nobody');
 
     expect(store.getState().notesError).toBe('Partner not configured');
     expect(await queuedIds()).toEqual([]);
-    expect(contents(store)).toEqual([]);
+    expect(contents(store)).toEqual(['already shown']);
   });
 
   it('a failed enqueue throws from sendNote and shows nothing', async () => {

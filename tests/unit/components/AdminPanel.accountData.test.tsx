@@ -136,11 +136,13 @@ describe('AdminPanel with the real local copy and store', () => {
     await switchAccount(B);
     expect(listedRows('Account B message')).toHaveLength(1);
     expect(listedRows('Account A message')).toEqual([]);
+    expect(document.body).not.toHaveTextContent('Account A message');
     expect(screen.queryByTestId('admin-edit-form')).toBeNull();
     expect(screen.queryByTestId('admin-delete-dialog')).toBeNull();
     await switchAccount(A);
     expect(screen.getByTestId('admin-message-list')).toBeInTheDocument();
     expect(listedRows('Account B message')).toEqual([]);
+    expect(document.body).not.toHaveTextContent('Account B message');
   });
 
   it("deletes the outgoing account's saved copy on each switch and keeps the incoming one's", async () => {
@@ -230,6 +232,7 @@ describe('AdminPanel with the real local copy and store', () => {
     expect(useAppStore.getState().customMessages.some((message) => message.id === aId)).toBe(false);
     expect(screen.getByTestId('admin-message-list')).toBeInTheDocument();
     expect(listedRows('Account A message')).toEqual([]);
+    expect(document.body).not.toHaveTextContent('Account A message');
   });
 
   it('falls back to a bundled daily message when the deleted row was the current one', async () => {
