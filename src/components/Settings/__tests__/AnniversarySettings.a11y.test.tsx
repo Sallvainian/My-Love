@@ -285,7 +285,7 @@ describe('DW-191: a dialog stays put while its write is pending', () => {
 
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     // The write parked focus on the panel, where the trap listens for Escape.
-    expect(dialog.firstElementChild).toHaveFocus();
+    expect(screen.getByTestId('anniversary-delete-panel')).toHaveFocus();
     await user.keyboard('{Escape}');
     await user.click(dialog);
     expect(screen.getByRole('dialog', { name: 'Delete Anniversary?' })).toBeInTheDocument();
@@ -310,7 +310,7 @@ describe('DW-191: a dialog stays put while its write is pending', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Close form' })).toBeDisabled();
     // The write parked focus on the panel, where the trap listens for Escape.
-    expect(dialog.firstElementChild).toHaveFocus();
+    expect(screen.getByTestId('anniversary-form-panel')).toHaveFocus();
     await user.keyboard('{Escape}');
     await user.click(dialog);
     expect(screen.getByRole('dialog', { name: 'Add Anniversary' })).toBeInTheDocument();
