@@ -34,6 +34,7 @@ import {
   LOVE_NOTES_READ,
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
+import { recurseUntil } from '../../support/helpers/recurse';
 import { createOutsiderClient, deleteOutsider } from '../../support/helpers/rls-security';
 import { dismissWelcomeSplash, WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
@@ -283,16 +284,19 @@ test.describe('Connecting with a partner', () => {
     await page.getByTestId(`send-request-${b.userId}`).click();
     expect((await sent).status).toBe(201);
     await expect(page.getByTestId('sent-requests-list')).toContainText(b.name);
-    await expect
-      .poll(() => pendingAnswers.at(-1))
-      .toEqual([
-        expect.objectContaining({
-          from_user_id: a.userId,
-          to_user_id: b.userId,
-          other_display_name: b.name,
-          other_email: b.email,
-        }),
-      ]);
+    await recurseUntil(
+      async () => pendingAnswers.at(-1),
+      (v) => {
+        expect(v).toEqual([
+          expect.objectContaining({
+            from_user_id: a.userId,
+            to_user_id: b.userId,
+            other_display_name: b.name,
+            other_email: b.email,
+          }),
+        ]);
+      }
+    );
     await expect(page.getByText('Unknown User')).toHaveCount(0);
     await expect(results).toHaveCount(0);
 
@@ -356,14 +360,24 @@ test.describe('Connecting with a partner', () => {
     // Server, then store, then screen.
     expect(await partnerIdOf(supabaseAdmin, b.userId)).toBe(a.userId);
     expect(await partnerIdOf(supabaseAdmin, a.userId)).toBe(b.userId);
-    await expect.poll(() => storePartnerId(bPage)).toBe(a.userId);
+    await recurseUntil(
+      () => storePartnerId(bPage),
+      (v) => {
+        expect(v).toBe(a.userId);
+      }
+    );
     await expect(bPage.getByRole('heading', { level: 1, name: a.name })).toBeVisible();
     await expect(bPage.getByTestId('partner-search-card')).toHaveCount(0);
 
     // ---- A, still on Love Notes and never reloaded, learns of the link ----
     // B's accept announces it on A's mood topic; App's listener re-reads the
     // partner, and the chat loads its thread and names B.
-    await expect.poll(() => storePartnerId(page)).toBe(b.userId);
+    await recurseUntil(
+      () => storePartnerId(page),
+      (v) => {
+        expect(v).toBe(b.userId);
+      }
+    );
     expect((await aThreadAfterLink).status).toBe(200);
     await expect(page.getByTestId('notes-error-banner')).toHaveCount(0);
     await expect(page.getByTestId('notes-partner-row')).toContainText(b.name);
@@ -399,7 +413,13 @@ async function sendNoteAndSeeItArrive(
   toReads: { started: number; settled: number },
   text: string
 ): Promise<void> {
-  await expect.poll(() => toReads.started - toReads.settled, { timeout: 15_000 }).toBe(0);
+  await recurseUntil(
+    async () => toReads.started - toReads.settled,
+    (v) => {
+      expect(v).toBe(0);
+    },
+    { timeout: 15_000 }
+  );
   const readsBefore = toReads.started;
   await from.getByLabel(/love note message input/i).fill(text);
   const saved = observeOn({
@@ -424,7 +444,13 @@ async function pokeAndSeeItArrive(
   to: Page,
   toReads: { started: number; settled: number }
 ): Promise<void> {
-  await expect.poll(() => toReads.started - toReads.settled, { timeout: 15_000 }).toBe(0);
+  await recurseUntil(
+    async () => toReads.started - toReads.settled,
+    (v) => {
+      expect(v).toBe(0);
+    },
+    { timeout: 15_000 }
+  );
   const readsBefore = toReads.started;
   await expect(to.getByTestId('notification-badge')).toHaveCount(0);
   const sent = observeOn({
