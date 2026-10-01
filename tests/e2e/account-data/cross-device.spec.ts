@@ -172,7 +172,10 @@ test.describe('Account data follows the account, not the browser', () => {
     );
 
     // ---- First context: create through the UI ----
+    // The list the new row joins is read on mount; it settles before the write.
+    const customListed = interceptNetworkCall({ method: 'GET', url: CUSTOM_MESSAGES_READ });
     await page.goto('/admin');
+    expect((await customListed).status).toBe(200);
     await page.getByTestId('admin-create-button').click();
     await page.getByTestId('admin-create-form-text').fill(customText);
     const customSaved = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });
@@ -211,7 +214,10 @@ test.describe('Account data follows the account, not the browser', () => {
     );
 
     // ---- First context: add through the UI ----
+    // The list the new row joins is read on mount; it settles before the write.
+    const anniversariesListed = interceptNetworkCall({ method: 'GET', url: ANNIVERSARIES_READ });
     await page.goto('/settings');
+    expect((await anniversariesListed).status).toBe(200);
     await page.getByRole('button', { name: 'Add Anniversary' }).click();
     const anniversaryForm = page.getByRole('dialog', { name: 'Add Anniversary' });
     await anniversaryForm.getByLabel('Label').fill(anniversaryLabel);

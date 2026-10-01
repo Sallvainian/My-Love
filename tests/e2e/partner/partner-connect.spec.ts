@@ -43,6 +43,9 @@ const REQUEST_SEND = '**/rest/v1/partner_requests*';
 const PENDING_REQUESTS = '**/rest/v1/rpc/get_my_pending_partner_requests';
 const REQUEST_ACCEPT = '**/rest/v1/rpc/accept_partner_request';
 const INTERACTION_SEND = '**/rest/v1/interactions?*';
+// The Partner tab's own read of the signed-in account's link
+// (`partnerService.getPartner`); not in reads.ts.
+const PARTNER_LOOKUP = '**/rest/v1/users?select=partner_id%2Cupdated_at*';
 
 const NOTES_SUBSCRIBED_LOG = /\[useRealtimeMessages\].*SUBSCRIBED/;
 const INTERACTIONS_SUBSCRIBED_LOG = /\[InteractionService\] Realtime subscription status: SUBSCRIBED/;
@@ -129,7 +132,10 @@ async function newBareContext(
   return context;
 }
 
-/** Sign in through the real login form and open the Partner tab. */
+/**
+ * Sign in through the real login form and open the Partner tab, once the tab's
+ * partner lookup has answered: its heading renders before that read starts.
+ */
 async function signInToPartnerTab(page: Page, account: Throwaway): Promise<void> {
   await page.goto('/');
   await expect(page.getByTestId('login-screen')).toBeVisible();
@@ -137,7 +143,14 @@ async function signInToPartnerTab(page: Page, account: Throwaway): Promise<void>
   await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
   await page.getByTestId('submit-button').click();
   await expect(page.getByTestId('app-container')).toBeVisible();
+  const partnerLookup = observeOn({
+    page,
+    method: 'GET',
+    url: PARTNER_LOOKUP,
+    timeout: SECOND_CONTEXT_READ_TIMEOUT,
+  });
   await navigateTo(page, 'partner');
+  expect((await partnerLookup).status).toBe(200);
 }
 
 /**

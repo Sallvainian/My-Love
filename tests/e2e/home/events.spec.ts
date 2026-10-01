@@ -39,7 +39,13 @@ import {
   type SeedEventOverrides,
 } from '../../support/helpers/events';
 import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
-import { PAST_EVENTS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import {
+  COUPLE_SETTINGS_READ,
+  OWN_PROFILE_READ,
+  PARTNER_RECORD_READ,
+  PAST_EVENTS_READ,
+  UPCOMING_EVENTS_READ,
+} from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 
 // The Home render rows, minus their owner. `daysFromNow` counts from the
@@ -194,7 +200,14 @@ test.describe('Home dashboard reads events from the store', () => {
     const anchor = await pinClock(page);
     await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, anchor);
 
+    // TimeTogether, the birthday cards and the wedding card render from the
+    // couple-settings, own-profile and partner-record reads, not the events
+    // read openHome waits on, so each is armed before the navigation too.
+    const cardReads = [COUPLE_SETTINGS_READ, OWN_PROFILE_READ, PARTNER_RECORD_READ].map((url) =>
+      interceptNetworkCall({ method: 'GET', url })
+    );
     await openHome(page, interceptNetworkCall);
+    for (const { status } of await Promise.all(cardReads)) expect(status).toBe(200);
 
     await expect(page.getByTestId('event-countdown-future-meetup-e2e')).toBeVisible();
 
