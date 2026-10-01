@@ -55,6 +55,9 @@ vi.stubGlobal('URL', {
   revokeObjectURL: vi.fn(),
 });
 
+/** The error haptic's buzz-pause-buzz, as MessageInput passes it to `vibrate`. */
+const ERROR_HAPTIC = [100, 50, 100];
+
 /** The picture a user attaches in every image test. */
 const jpegFile = () => new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
 
@@ -174,7 +177,7 @@ describe('MessageInput', () => {
       });
 
       // Should trigger error haptic
-      expect(mockVibrate).toHaveBeenCalledWith([100, 50, 100]);
+      expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC);
     });
 
     it('should trigger selection haptic when valid image selected', async () => {
@@ -439,7 +442,7 @@ describe('MessageInput', () => {
       await user.click(sendButton);
 
       await waitFor(() => {
-        expect(mockVibrate).toHaveBeenCalledWith([100, 50, 100]);
+        expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC);
       });
     });
   });
@@ -457,7 +460,8 @@ describe('MessageInput', () => {
       await user.click(screen.getByRole('button', { name: /send message/i }));
     }
 
-    it('keeps the text and picture and shows no "Failed to send" of its own', async () => {
+    /** Sends a picture note that the slice refuses because the device is offline. */
+    async function sendRefusedPictureNote() {
       // The slice has already put the reason in the page banner.
       mockSendNote.mockRejectedValueOnce(
         new NoteRefusedOfflineError('You are offline. Notes with a picture need a connection to send.')
@@ -468,10 +472,23 @@ describe('MessageInput', () => {
       await sendPictureNote(user);
 
       await waitFor(() => expect(mockSendNote).toHaveBeenCalledTimes(1));
-      await waitFor(() => expect(mockVibrate).toHaveBeenCalledWith([100, 50, 100]));
+    }
+
+    it('keeps the text and picture and shows no "Failed to send" of its own', async () => {
+      await sendRefusedPictureNote();
+
+      // The composer is locked while the send is in flight and unlocks only once
+      // the refusal has been handled, so the absence below cannot run early.
+      await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled());
       expect(screen.queryByText('Failed to send. Try again.')).not.toBeInTheDocument();
       expect(screen.getByRole('textbox')).toHaveValue('Look!');
       expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
+    });
+
+    it('still fires the error haptic on an offline refusal', async () => {
+      await sendRefusedPictureNote();
+
+      await waitFor(() => expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC));
     });
 
     it('any other failure, such as a failed save to the offline queue, still shows it', async () => {

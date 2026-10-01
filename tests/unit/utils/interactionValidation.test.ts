@@ -10,6 +10,7 @@ import {
   INTERACTION_ERRORS,
 } from '@/utils/interactionValidation';
 import type { SupabaseInteractionRecord } from '@/types';
+import { createInteractionRecord } from '../../support/factories/interaction-record-ownership';
 
 describe('isValidUUID', () => {
   it('accepts a valid UUID v4', () => {
@@ -138,15 +139,13 @@ describe('validateIncomingInteraction', () => {
   function incoming(
     overrides: Partial<SupabaseInteractionRecord> = {}
   ): SupabaseInteractionRecord {
-    return {
+    return createInteractionRecord({
       id: 'incoming-1',
       type: 'poke',
       from_user_id: PARTNER,
       to_user_id: ME,
-      viewed: false,
-      created_at: '2026-09-12T12:00:00.000Z',
       ...overrides,
-    };
+    });
   }
 
   it('accepts a row addressed to me and sent by my current partner', () => {

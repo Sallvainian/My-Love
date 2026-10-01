@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../src/App';
 import type { AuthCallbackOutcome } from '../../src/api/supabaseClient';
 import { useAppStore } from '../../src/stores/useAppStore';
+import { createAuthBootstrapSession } from '../support/factories/auth-bootstrap-notification-order';
 
 const auth = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -120,20 +121,13 @@ vi.mock('motion/react', () => ({
 const USER_ID = 'callback-notice-user';
 
 function session(): Session {
-  return {
-    access_token: 'callback-notice-token',
-    refresh_token: 'refresh-token',
-    token_type: 'bearer',
-    expires_in: 3600,
-    user: {
-      id: USER_ID,
-      email: 'notice@example.com',
-      app_metadata: {},
-      user_metadata: {},
-      aud: 'authenticated',
-      created_at: '2026-09-01T00:00:00Z',
-    },
-  };
+  return createAuthBootstrapSession({
+    userId: USER_ID,
+    accessToken: 'callback-notice-token',
+    refreshToken: 'refresh-token',
+    email: 'notice@example.com',
+    displayName: null,
+  });
 }
 
 function deferred<T>() {

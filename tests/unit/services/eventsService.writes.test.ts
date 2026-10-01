@@ -22,6 +22,7 @@ import {
   USER_ID,
   backend,
   eventsQuery,
+  networkFailure,
   permissionDenied,
   row,
   setOnline,
@@ -76,13 +77,14 @@ describe('eventsService', () => {
 
   describe('createEvent', () => {
     it('writes the input date string through untouched and returns the created event', async () => {
-      const created = await eventsService.createEvent({
-        userId: USER_ID,
-        label: 'Flight home',
-        eventDate: '2026-09-12',
-        description: 'Landing at 6pm',
-        icon: 'plane',
-      });
+      const created = await eventsService.createEvent(
+        eventInput({
+          label: 'Flight home',
+          eventDate: '2026-09-12',
+          description: 'Landing at 6pm',
+          icon: 'plane',
+        })
+      );
 
       // The <input type="date"> value reaches the column verbatim — no
       // toISOString() round trip, which would shift the day.
@@ -102,11 +104,7 @@ describe('eventsService', () => {
     });
 
     it('omits icon so the column default applies when the caller does not choose one', async () => {
-      await eventsService.createEvent({
-        userId: USER_ID,
-        label: 'Something',
-        eventDate: '2026-10-01',
-      });
+      await eventsService.createEvent(eventInput({ label: 'Something' }));
 
       expect(backend.payloads[0]).not.toHaveProperty('icon');
       expect(backend.payloads[0]).toMatchObject({ description: null });
@@ -177,7 +175,7 @@ describe('eventsService', () => {
     it('does not promise a sync when the insert fails mid-flight — writes have no queue either', async () => {
       // Same trap as the read path: the write may or may not have landed, and
       // nothing will retry it, so the message must not claim a queue will.
-      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalError = networkFailure();
       const originalStack = originalError.stack;
       backend.nextError = originalError;
 
@@ -311,7 +309,7 @@ describe('eventsService', () => {
     });
 
     it('codes a mid-flight network failure as transport', async () => {
-      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalError = networkFailure();
       const originalStack = originalError.stack;
       backend.nextError = originalError;
 
@@ -373,7 +371,7 @@ describe('eventsService', () => {
     });
 
     it('codes a mid-flight network failure as transport', async () => {
-      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalError = networkFailure();
       const originalStack = originalError.stack;
       backend.nextError = originalError;
 
@@ -395,7 +393,7 @@ describe('eventsService', () => {
     ['deleteEvent', () => eventsService.deleteEvent('event-1')],
   ] as const)('%s transport rejections', (operation, write) => {
     it('preserves a rejected TypeError and its diagnostics as the cause', async () => {
-      const originalError = Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+      const originalError = networkFailure();
       const originalStack = originalError.stack;
       backend.nextRejection = { reason: originalError };
 

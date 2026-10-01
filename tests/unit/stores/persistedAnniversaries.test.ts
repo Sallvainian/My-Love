@@ -13,7 +13,12 @@
  * after the upgrade still knows whose saved data to delete.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { persistedBlob, SEEDED_SETTINGS, STORAGE_KEY } from '../helpers/persistedBlob';
+import {
+  PERSISTED_MESSAGE_HISTORY,
+  persistedBlob,
+  SEEDED_SETTINGS,
+  STORAGE_KEY,
+} from '../helpers/persistedBlob';
 
 const VAULT_KEY = 'my-love-anniversary-vault';
 const OLD_OWNER_KEY = 'my-love-anniversary-owner';
@@ -55,7 +60,9 @@ describe('anniversaries in the persisted blob', () => {
     // The rest of the blob survives; its removed couple and notification keys
     // are stripped on the same load.
     expect(settings).toEqual({ relationship: { anniversaries: [] } });
-    expect(useAppStore.getState().messageHistory.currentIndex).toBe(7);
+    expect(useAppStore.getState().messageHistory.currentIndex).toBe(
+      PERSISTED_MESSAGE_HISTORY.currentIndex
+    );
   });
 
   it('writes anniversaries as [] even while they are in memory, at persist version 0', async () => {

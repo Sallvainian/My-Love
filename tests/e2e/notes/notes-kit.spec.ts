@@ -38,6 +38,13 @@ const KIT_INK = {
 /** `fill` is the same pink in both themes. */
 const KIT_FILL = 'rgb(219, 39, 119)'; // #db2777
 
+/** The composer's bottom pad, `pb-3` in src/components/love-notes/MessageInput.tsx. */
+const COMPOSER_BOTTOM_PAD_PX = 12;
+
+/** Slack over that pad: the gap is measured from the input's box, which need
+ * not end flush with the composer row. */
+const LAYOUT_TOLERANCE_PX = 4;
+
 /** Text on the `fill` pink: white in both themes. */
 const KIT_ON_FILL = 'rgb(255, 255, 255)'; // #ffffff
 
@@ -124,10 +131,10 @@ test.describe('Love Notes on the style kit', () => {
       }
       expect(sendBox.y + sendBox.height).toBeLessThanOrEqual(dockBox.y);
 
-      // The composer sits just above the dock: its 12px bottom pad is the gap.
+      // The composer sits just above the dock: its bottom pad is the gap.
       const gap = dockBox.y - (inputBox.y + inputBox.height);
       expect(gap).toBeGreaterThanOrEqual(0);
-      expect(gap).toBeLessThanOrEqual(16);
+      expect(gap).toBeLessThanOrEqual(COMPOSER_BOTTOM_PAD_PX + LAYOUT_TOLERANCE_PX);
     });
 
     test(`[P1] should pin the view to the screen so the page never scrolls in ${colorScheme}`, async ({

@@ -147,14 +147,19 @@ describe('notesSlice offline send queue', () => {
     expect(server.rows.map((r) => r.content)).toEqual(['x', 'y']);
     expect(server.upserts).toBe(2);
     expect(await queuedIds()).toEqual([]);
+  });
 
+  it('a tab that loses the lock while online shows its note waiting, and the lock holder sends it once', async () => {
+    stubWebLocks();
+    const tab1 = createTestStore();
+    const tab2 = createTestStore();
     // Tab 1 holds the lock mid-insert; tab 2 sends online and loses the lock:
     // its note waits rather than showing "Sending..." that nothing does.
     const reply = deferred();
     server.outcomes = [{ hold: reply.promise }];
     await enqueueNote(queued('temp-z', 'z', { createdAt: '2026-09-24T09:00:02.000Z' }));
     const tab1Run = tab1.getState().drainQueuedNotes();
-    await vi.waitFor(() => expect(server.upserts).toBe(3));
+    await vi.waitFor(() => expect(server.upserts).toBe(1));
 
     await tab2.getState().sendNote('from tab2');
     // Tab 2's drain now waits for tab 1 to let go.
@@ -171,7 +176,7 @@ describe('notesSlice offline send queue', () => {
     reply.resolve();
     await tab1Run;
     await tab2Run;
-    expect(server.rows.map((r) => r.content)).toEqual(['x', 'y', 'z', 'from tab2']);
+    expect(server.rows.map((r) => r.content)).toEqual(['z', 'from tab2']);
     expect(await queuedIds()).toEqual([]);
   });
 
@@ -212,7 +217,11 @@ describe('notesSlice offline send queue', () => {
     await vi.waitFor(async () => expect(await copyIds()).toContain('server-2'));
   });
 
-  it('another tab sends this tab\'s waiting note and the server rejects it: this tab shows it failed, with Retry', async () => {
+  /**
+   * Tab 2's note waits behind tab 1's held insert; tab 1 then sends it from the
+   * shared queue and the server rejects it. Returns once tab 1's drain ends.
+   */
+  async function tab1SendsTab2sNoteAndItIsRejected() {
     stubWebLocks();
     const tab1 = createTestStore();
     const tab2 = createTestStore();
@@ -232,11 +241,11 @@ describe('notesSlice offline send queue', () => {
     // Tab 1 re-reads the shared queue, sends tab 2's note, and it is rejected.
     reply.resolve();
     await tab1.getState().drainQueuedNotes();
-    expect(server.rows.map((r) => r.content)).toEqual(['from tab1']);
-    expect(await listQueuedNotes(A)).toEqual([expect.objectContaining({ id: key, failed: true })]);
+    return { tab2, key };
+  }
 
-    // No further trigger: tab 2 shows it failed once tab 1's drain lets go,
-    // exactly as its own drain marks a rejection, and raises no banner.
+  /** No further trigger: tab 2 shows the note failed once tab 1's drain lets go. */
+  async function tab2ShowsFailed(tab2: ReturnType<typeof createTestStore>, key: string) {
     await vi.waitFor(() =>
       expect(tab2.getState().notes[0]).toMatchObject({
         tempId: key,
@@ -245,12 +254,33 @@ describe('notesSlice offline send queue', () => {
         error: true,
       })
     );
-    expect(tab2.getState().notesError).toBeNull();
-    await tab2.getState().drainQueuedNotes();
-    expect(server.upserts).toBe(2);
+  }
 
-    // Retry from tab 2 resends it under the same key.
+  it('another tab sends this tab\'s waiting note and the server rejects it: this tab shows it failed, with no banner', async () => {
+    const { tab2, key } = await tab1SendsTab2sNoteAndItIsRejected();
+
+    expect(server.rows.map((r) => r.content)).toEqual(['from tab1']);
+    expect(await listQueuedNotes(A)).toEqual([expect.objectContaining({ id: key, failed: true })]);
+    // Exactly as its own drain marks a rejection, and raising no banner.
+    await tab2ShowsFailed(tab2, key);
+    expect(tab2.getState().notesError).toBeNull();
+  });
+
+  it('another tab\'s rejection of this tab\'s note: a later drain in this tab does not resend it', async () => {
+    const { tab2, key } = await tab1SendsTab2sNoteAndItIsRejected();
+    await tab2ShowsFailed(tab2, key);
+
+    await tab2.getState().drainQueuedNotes();
+
+    expect(server.upserts).toBe(2);
+  });
+
+  it('another tab\'s rejection of this tab\'s note: Retry in this tab resends it under the same key', async () => {
+    const { tab2, key } = await tab1SendsTab2sNoteAndItIsRejected();
+    await tab2ShowsFailed(tab2, key);
+
     await tab2.getState().retryFailedMessage(key);
+
     expect(server.rows.map((r) => [r.content, r.idempotency_key])).toEqual([
       ['from tab1', expect.any(String)],
       ['from tab2', key],

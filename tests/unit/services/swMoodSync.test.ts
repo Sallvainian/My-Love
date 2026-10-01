@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MoodEntry } from '@/types';
+import type { StoredAuthToken } from '@/services/dbSchema';
 import { FakeMoodsBackend } from '../api/fakeMoodsBackend';
 
 vi.mock('workbox-cacheable-response', () => ({ CacheableResponsePlugin: class {} }));
@@ -80,6 +81,21 @@ function pendingMood(overrides: Partial<MoodEntry> = {}): MoodEntry {
     timestamp: new Date(LOG_TIME),
     synced: false,
     ...overrides,
+  };
+}
+
+/**
+ * The worker's stored `sw-auth` token row for USER_ID. Only `expiresAt` varies
+ * between cases: the default is an hour past NOW, well clear of the worker's
+ * 300 s refresh buffer.
+ */
+function authToken(expiresAt = NOW_SEC + 3600): StoredAuthToken {
+  return {
+    id: 'current',
+    userId: USER_ID,
+    accessToken: 'test-access-token',
+    refreshToken: 'test-refresh-token',
+    expiresAt,
   };
 }
 
@@ -182,13 +198,7 @@ describe('service worker mood background sync', () => {
     // Only `Date` is faked; the worker's own awaits need nothing else.
     vi.setSystemTime(NOW);
     vi.clearAllMocks();
-    mockedGetAuthToken.mockResolvedValue({
-      id: 'current',
-      userId: USER_ID,
-      accessToken: 'test-access-token',
-      refreshToken: 'test-refresh-token',
-      expiresAt: NOW_SEC + 3600,
-    });
+    mockedGetAuthToken.mockResolvedValue(authToken());
     mockedMarkMoodSynced.mockResolvedValue('cleared');
   });
 
@@ -271,13 +281,7 @@ describe('service worker mood background sync', () => {
     });
 
     it('[expired token] never reads the moods store at all', async () => {
-      mockedGetAuthToken.mockResolvedValue({
-        id: 'current',
-        userId: USER_ID,
-        accessToken: 'test-access-token',
-        refreshToken: 'test-refresh-token',
-        expiresAt: NOW_SEC - 1,
-      });
+      mockedGetAuthToken.mockResolvedValue(authToken(NOW_SEC - 1));
 
       await fireBackgroundSync();
 
@@ -286,13 +290,7 @@ describe('service worker mood background sync', () => {
     });
 
     it('[token expires within the 5-minute buffer] never reads the moods store', async () => {
-      mockedGetAuthToken.mockResolvedValue({
-        id: 'current',
-        userId: USER_ID,
-        accessToken: 'test-access-token',
-        refreshToken: 'test-refresh-token',
-        expiresAt: NOW_SEC + 299,
-      });
+      mockedGetAuthToken.mockResolvedValue(authToken(NOW_SEC + 299));
 
       await fireBackgroundSync();
 
@@ -301,13 +299,7 @@ describe('service worker mood background sync', () => {
     });
 
     it('[token expires exactly at the 5-minute buffer] reads the moods store', async () => {
-      mockedGetAuthToken.mockResolvedValue({
-        id: 'current',
-        userId: USER_ID,
-        accessToken: 'test-access-token',
-        refreshToken: 'test-refresh-token',
-        expiresAt: NOW_SEC + 300,
-      });
+      mockedGetAuthToken.mockResolvedValue(authToken(NOW_SEC + 300));
       mockedGetPendingMoods.mockResolvedValue([]);
 
       await fireBackgroundSync();

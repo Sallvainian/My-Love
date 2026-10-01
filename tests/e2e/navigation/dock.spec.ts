@@ -12,6 +12,10 @@
 import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
+import { createPhotoInsert } from '../../support/factories/photos';
+
+/** The phone-width viewport the layout checks below run at, as the kit specs do. */
+const PHONE_VIEWPORT = { width: 390, height: 844 } as const;
 
 const DOCK_DESTINATIONS = ['home', 'mood', 'notes', 'photos', 'partner'] as const;
 const ALL_DESTINATIONS = [...DOCK_DESTINATIONS, 'settings'] as const;
@@ -71,7 +75,7 @@ test.describe('Bottom Dock', () => {
   test('[P1] should keep the Love Notes composer above the dock without scrolling', async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE_VIEWPORT);
     await page.goto('/notes');
 
     const sendButton = page.getByLabel(/send message/i);
@@ -93,7 +97,7 @@ test.describe('Bottom Dock', () => {
     page,
     interceptNetworkCall,
   }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE_VIEWPORT);
 
     // The header Upload button renders only beside a non-empty grid, so photos are mocked
     // rather than left to whatever the pool account holds.
@@ -103,20 +107,17 @@ test.describe('Bottom Dock', () => {
       fulfillResponse: {
         status: 200,
         body: [
-          {
+          createPhotoInsert({
             id: 'dock-photo-1',
             user_id: 'test-user',
             storage_path: 'photos/dock.jpg',
-            thumbnail_path: 'photos/dock_thumb.jpg',
-            filename: 'dock.jpg',
+            file_size: 100000,
             mime_type: 'image/jpeg',
             width: 800,
             height: 600,
-            file_size: 100000,
             caption: 'Dock photo',
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
+          }),
         ],
       },
     });

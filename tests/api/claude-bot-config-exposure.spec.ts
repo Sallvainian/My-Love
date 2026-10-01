@@ -74,10 +74,23 @@ test.describe('F1 claude_bot_config exposure over PostgREST', () => {
   test('[P1] F1-API-003 an authenticated app user cannot insert a row, and none is committed', async ({
     apiRequest,
     authToken,
+    cleanup,
   }) => {
     // A unique key so a refused write can be looked for by name afterwards,
     // and a value that is not a secret.
     const probeKey = `f1-probe-${randomUUID()}`;
+    // The table is shared by every worker and every run, and three tests in
+    // two files assert it holds exactly the identifier keys. Registered before
+    // the write, so a regression that lets it commit fails this test without
+    // leaving a row behind for the others. Matches only this test's own key.
+    cleanup.defer('delete any committed claude_bot_config probe', async () => {
+      const removed = await apiRequest({
+        method: 'DELETE',
+        path: `${TABLE_PATH}?key=eq.${probeKey}`,
+        headers: serviceRoleHeaders(),
+      });
+      expect(removed.status).toBe(204);
+    });
 
     // WHEN: the signed-in user writes a well-formed row.
     await log.step(`POST ${TABLE_PATH} as this worker's authenticated user`);

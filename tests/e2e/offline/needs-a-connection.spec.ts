@@ -48,6 +48,7 @@ import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
   CUSTOM_MESSAGE_SAVE,
+  CUSTOM_MESSAGES_READ,
   INTERACTIONS_READ,
   LOVE_NOTES_READ,
   PHOTOS_LIST_READ,
@@ -670,8 +671,12 @@ async function openEditorOffline(
   interceptNetworkCall: InterceptNetworkCallFn,
   saved: string
 ) {
-  // GIVEN: one saved message, created online.
+  // GIVEN: one saved message, created online, once the account's own custom
+  // messages have answered — a list read that landed after the save could
+  // replace the list the saved row is then looked for in.
+  const listRead = interceptNetworkCall({ method: 'GET', url: CUSTOM_MESSAGES_READ });
   await page.goto('/admin');
+  expect((await listRead).status).toBe(200);
   await page.getByTestId('admin-create-button').click();
   await page.getByTestId('admin-create-form-text').fill(saved);
   const created = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });

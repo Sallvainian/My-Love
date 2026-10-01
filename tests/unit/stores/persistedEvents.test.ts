@@ -26,6 +26,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   PERSISTED_EVENT,
+  PERSISTED_MESSAGE_HISTORY,
   PERSISTED_MOOD,
   PERSISTED_SETTINGS,
   persistedBlob,
@@ -135,8 +136,10 @@ describe('persisted events', () => {
 
     expect(state.isOnboarded).toBe(true);
     expect(state.settings).toEqual(PERSISTED_SETTINGS);
-    expect(state.messageHistory.currentIndex).toBe(7);
-    expect(state.messageHistory.shownMessages.get('2026-07-26')).toBe(3);
+    expect(state.messageHistory.currentIndex).toBe(PERSISTED_MESSAGE_HISTORY.currentIndex);
+    expect(Array.from(state.messageHistory.shownMessages)).toEqual(
+      PERSISTED_MESSAGE_HISTORY.shownMessages
+    );
   });
 
   it('clears both stale keys from one blob', async () => {
@@ -156,8 +159,10 @@ describe('persisted events', () => {
 
     expect(state.isOnboarded).toBe(true);
     expect(state.settings).toMatchObject(PERSISTED_SETTINGS);
-    expect(state.messageHistory.currentIndex).toBe(7);
-    expect(state.messageHistory.shownMessages.get('2026-07-26')).toBe(3);
+    expect(state.messageHistory.currentIndex).toBe(PERSISTED_MESSAGE_HISTORY.currentIndex);
+    expect(Array.from(state.messageHistory.shownMessages)).toEqual(
+      PERSISTED_MESSAGE_HISTORY.shownMessages
+    );
   });
 
   // The three shapes the strip must never be reached by. Each one is rejected

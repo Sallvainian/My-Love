@@ -12,7 +12,9 @@ import {
   FAVORITES_READ,
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
+import { clockAnchor } from '../../support/helpers/events';
 import { recurseUntil } from '../../support/helpers/recurse';
+import { WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 // Anniversaries, favorites and custom messages now live in Supabase, with the
@@ -69,19 +71,25 @@ function deferTeardown(
   cleanup.defer('close the second context', () => closeContext(second));
 }
 
-// Nothing but the welcome-splash timestamp: no session, no mirrors.
+// Nothing but the welcome-splash timestamp: no session, no mirrors. The
+// context runs on a clock pinned to one anchor and the stamp is that same
+// anchor, so the splash's 60-minute window is measured from a fixed instant
+// rather than from whenever the Node clock was read.
 async function newBareContext(browser: Browser, testInfo: TestInfo): Promise<BrowserContext> {
   const baseURL = testInfo.project.use.baseURL ?? 'http://localhost:5173';
-  return browser.newContext({
+  const anchor = clockAnchor();
+  const context = await browser.newContext({
     baseURL,
     storageState: {
       cookies: [],
       origins: [{
         origin: new URL(baseURL).origin,
-        localStorage: [{ name: 'lastWelcomeView', value: String(Date.now()) }],
+        localStorage: [{ name: WELCOME_SPLASH_KEY, value: String(anchor.getTime()) }],
       }],
     },
   });
+  await context.clock.install({ time: anchor });
+  return context;
 }
 
 // ---- Second context: same account, nothing local ----
@@ -164,7 +172,10 @@ test.describe('Account data follows the account, not the browser', () => {
     );
 
     // ---- First context: create through the UI ----
+    // The list the new row joins is read on mount; it settles before the write.
+    const customListed = interceptNetworkCall({ method: 'GET', url: CUSTOM_MESSAGES_READ });
     await page.goto('/admin');
+    expect((await customListed).status).toBe(200);
     await page.getByTestId('admin-create-button').click();
     await page.getByTestId('admin-create-form-text').fill(customText);
     const customSaved = interceptNetworkCall({ method: 'POST', url: CUSTOM_MESSAGE_SAVE });
@@ -203,7 +214,10 @@ test.describe('Account data follows the account, not the browser', () => {
     );
 
     // ---- First context: add through the UI ----
+    // The list the new row joins is read on mount; it settles before the write.
+    const anniversariesListed = interceptNetworkCall({ method: 'GET', url: ANNIVERSARIES_READ });
     await page.goto('/settings');
+    expect((await anniversariesListed).status).toBe(200);
     await page.getByRole('button', { name: 'Add Anniversary' }).click();
     const anniversaryForm = page.getByRole('dialog', { name: 'Add Anniversary' });
     await anniversaryForm.getByLabel('Label').fill(anniversaryLabel);

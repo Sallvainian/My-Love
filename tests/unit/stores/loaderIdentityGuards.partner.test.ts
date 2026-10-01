@@ -171,6 +171,9 @@ import {
 const PARTNER_A = { id: 'USER-B-ID', displayName: 'A-PARTNER-NAME', email: 'b@example.com' };
 const PARTNER_C = { id: 'USER-D-ID', displayName: 'C-PARTNER-NAME', email: 'd@example.com' };
 
+/** The partner envelope for a linked account: the copy's value and getPartner's answer. */
+const linked = <P>(partner: P) => ({ status: 'linked' as const, partner });
+
 describe('loader identity guards', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -240,7 +243,7 @@ describe('loader identity guards', () => {
       await untilServerRead();
       switchToUserC({ partner: PARTNER_C });
 
-      pending.settle({ status: 'linked', partner: PARTNER_A });
+      pending.settle(linked(PARTNER_A));
       await inFlight;
 
       expect(useAppStore.getState().partner).toEqual(PARTNER_C);
@@ -256,7 +259,7 @@ describe('loader identity guards', () => {
       const inFlight = useAppStore.getState().loadPartner();
       switchToUserC({ partner: PARTNER_C });
 
-      copy.settle({ status: 'linked', partner: PARTNER_A });
+      copy.settle(linked(PARTNER_A));
       await inFlight;
 
       expect(useAppStore.getState().partner).toEqual(PARTNER_C);
@@ -275,7 +278,7 @@ describe('loader identity guards', () => {
       switchToUserC();
       expect(useAppStore.getState().isLoadingPartner).toBe(true);
 
-      pending.settle({ status: 'linked', partner: PARTNER_A });
+      pending.settle(linked(PARTNER_A));
       await inFlight;
 
       // Stuck true renders neither branch of the partner tab.
@@ -510,16 +513,13 @@ describe('loader identity guards', () => {
 
   describe('when the identity has not changed', () => {
     it("a partner load shows the linked partner and saves it to the account's partner copy", async () => {
-      getPartner.mockResolvedValue({ status: 'linked', partner: PARTNER_A });
+      getPartner.mockResolvedValue(linked(PARTNER_A));
 
       await useAppStore.getState().loadPartner();
 
       expect(useAppStore.getState().partner).toEqual(PARTNER_A);
       expect(useAppStore.getState().isLoadingPartner).toBe(false);
-      expect(writeLocalCopy).toHaveBeenCalledWith(A, 'partner', {
-        status: 'linked',
-        partner: PARTNER_A,
-      });
+      expect(writeLocalCopy).toHaveBeenCalledWith(A, 'partner', linked(PARTNER_A));
     });
   });
 });

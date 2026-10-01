@@ -600,7 +600,7 @@ describe('malformed element recovery at mood displays', () => {
     ['modal', 'mood-detail-modal'],
   ] as const)('%s excludes wholly invalid moods instead of inventing a display value', (kind, testId) => {
     display(kind, true);
-    expect(screen.queryByTestId(testId)).toBeNull();
+    expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
   });
 
   it('calendar excludes wholly invalid moods instead of inventing a display value', () => {

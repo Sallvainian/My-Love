@@ -95,6 +95,9 @@ describe('notesSlice offline send queue', () => {
   });
 
   describe('retry after a transient failure while online', () => {
+    /** Twice the 60 s backoff cap: long enough that any scheduled retry would have fired. */
+    const BEYOND_MAX_BACKOFF_MS = 2 * 60_000;
+
     /** Yields to IndexedDB (setImmediate, not faked) until `cond` holds. */
     async function until(cond: () => boolean) {
       for (let i = 0; i < 1000 && !cond(); i++) {
@@ -139,8 +142,11 @@ describe('notesSlice offline send queue', () => {
       expect(vi.getTimerCount()).toBe(0);
     });
 
-    it('backs off 5, 10, 20, 40, then every 60 s, and resets after a completed pass', async () => {
-      const store = createTestStore();
+    /**
+     * Seven transient failures, retried through the whole backoff until the
+     * eighth attempt lands and the pass completes.
+     */
+    async function backOffThroughSevenFailures(store: Store) {
       await failOnce(store, 7);
 
       // [delay before this attempt, upserts after it, timers left behind]: the
@@ -160,14 +166,25 @@ describe('notesSlice offline send queue', () => {
       }
       await until(() => store.getState().notes[0]?.id === 'server-1');
       await until(() => vi.getTimerCount() === 0);
+    }
 
-      // The next transient failure starts from 5 s again.
+    it('backs off 5, 10, 20, 40, then every 60 s', async () => {
+      const store = createTestStore();
+
+      await backOffThroughSevenFailures(store);
+    });
+
+    it('after a completed pass, the next transient failure retries after 5 s again', async () => {
+      const store = createTestStore();
+      await backOffThroughSevenFailures(store);
+
       server.upserts = 0;
       await failOnce(store, 1);
+
       await expectRetryAfter(5_000, 2);
     });
 
-    it('keeps one timer at a time', async () => {
+    it('a second transient failure does not schedule a second retry', async () => {
       const store = createTestStore();
       await failOnce(store, 3);
 
@@ -192,7 +209,7 @@ describe('notesSlice offline send queue', () => {
       await run;
 
       expect(vi.getTimerCount()).toBe(0);
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(BEYOND_MAX_BACKOFF_MS);
       expect(server.upserts).toBe(1);
     });
 
@@ -203,7 +220,7 @@ describe('notesSlice offline send queue', () => {
       setOnline(false);
       await vi.advanceTimersByTimeAsync(5_000);
       await until(() => vi.getTimerCount() === 0);
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(BEYOND_MAX_BACKOFF_MS);
       expect(server.upserts).toBe(1);
     });
 
@@ -214,7 +231,7 @@ describe('notesSlice offline send queue', () => {
       store.setState({ userId: null, authSessionVersion: 2, notes: [] });
 
       expect(vi.getTimerCount()).toBe(0);
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(BEYOND_MAX_BACKOFF_MS);
       expect(server.upserts).toBe(1);
       expect(await queuedIds()).toHaveLength(1);
     });
@@ -226,7 +243,7 @@ describe('notesSlice offline send queue', () => {
       store.setState({ userId: B, authSessionVersion: 2, notes: [] });
 
       expect(vi.getTimerCount()).toBe(0);
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(BEYOND_MAX_BACKOFF_MS);
       expect(server.upserts).toBe(1);
       expect(await queuedIds(A)).toHaveLength(1);
     });

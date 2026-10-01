@@ -86,7 +86,7 @@ vi.mock('../../src/components/RelationshipTimers/TimeTogether', () => ({
   TimeTogether: () => null,
 }));
 vi.mock('../../src/components/LoginScreen', () => ({
-  LoginScreen: () => <p>Sign in</p>,
+  LoginScreen: () => <p data-testid="login-screen">Sign in</p>,
 }));
 // A button, not a <p>: the setup gate's `onComplete` has to be reachable so a
 // test can prove a read raised before the save does not re-open the modal.
@@ -205,7 +205,7 @@ describe('App refreshes the local copies', () => {
   it('not at all while signed out, including on the online event', async () => {
     auth.getSession.mockResolvedValue(null);
     await renderApp();
-    expect(screen.getByText('Sign in')).toBeInTheDocument();
+    expect(screen.getByTestId('login-screen')).toBeInTheDocument();
 
     await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
 
@@ -298,7 +298,7 @@ describe('App drains the love-note send queue', () => {
     try {
       auth.getSession.mockResolvedValue(null);
       await renderApp();
-      expect(screen.getByText('Sign in')).toBeInTheDocument();
+      expect(screen.getByTestId('login-screen')).toBeInTheDocument();
 
       await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
       await act(async () => {

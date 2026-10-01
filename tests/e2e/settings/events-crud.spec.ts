@@ -24,6 +24,7 @@ import { navigateTo } from '../../support/helpers/navigation';
 import {
   clearOwnPairEvents,
   clearPairEvents,
+  clockAnchor,
   isoDateDaysFromNow,
   localDateFromIso,
   resolveOwnPair,
@@ -31,7 +32,6 @@ import {
 } from '../../support/helpers/events';
 import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
 import { EVENTS_WRITE, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
-import { recurseUntil } from '../../support/helpers/recurse';
 import {
   openSettingsFromHome,
   reloadSettings,
@@ -58,49 +58,30 @@ function rowFor(page: Page, label: string) {
   return page.locator('[data-testid^="event-row-"]').filter({ hasText: label });
 }
 
-/** One calendar day in milliseconds. */
-const DAY_MS = 24 * 60 * 60 * 1000;
+/** Calendar days from the anchor to the event every test below adds. */
+const TRIP_DAYS_AHEAD = 30;
+/** Calendar days from the anchor to the date the edit test moves it to. */
+const VOYAGE_DAYS_AHEAD = 45;
 
 /**
- * Assert a Home card is counting down to the date it was created with.
- *
- * The expectation and the rendered text are read inside ONE page.evaluate, so
- * both come from a single sample of the browser's own clock. Computing the
- * count in Node and comparing it to the DOM later is a one-day flake waiting
- * for local midnight to tick between the two reads — and the day-count is the
- * only thing on this card that carries the date at all.
- *
- * Polled because EventCountdown recomputes on its own one-second interval, so
- * the text can be up to a second behind the clock the expectation samples.
+ * Pin the page clock to `anchor` (noon of its local day, from `clockAnchor`)
+ * and stamp the welcome splash from it, before the first navigation. Every
+ * date a test builds comes from the returned anchor, so the browser's today
+ * is the anchor's day however long the run takes. At noon a date N calendar
+ * days ahead reads as N - 1 whole days on a countdown card — the half day left
+ * today belongs to its live clock — so the countdowns asserted below are fixed
+ * literals, not a rerun of the app's arithmetic.
  */
-async function expectCardCountsDownTo(card: Locator, isoDate: string): Promise<void> {
-  await recurseUntil(
-    () =>
-      card.evaluate((element, { iso, dayMs }) => {
-        const [year, month, day] = iso.split('-').map(Number);
-        const now = new Date();
-        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const target = new Date(year, month - 1, day);
-        const calendarDays = Math.round((target.getTime() - todayMidnight.getTime()) / dayMs);
-        // Whole days left: the part of today already gone moves to the clock.
-        const intoToday = now.getTime() > todayMidnight.getTime() ? 1 : 0;
-        const days = calendarDays - intoToday;
-        const expected = `${days} ${days === 1 ? 'day' : 'days'}`;
-        return (element.textContent ?? '').includes(expected);
-      }, { iso: isoDate, dayMs: DAY_MS }),
-    (v) => {
-      expect(v, `Home card should be counting down to ${isoDate}`).toBe(true);
-    }
-  );
+async function pinClock(page: Page): Promise<Date> {
+  const anchor = clockAnchor();
+  await page.clock.install({ time: anchor });
+  await dismissWelcomeSplash(page, anchor.getTime());
+  return anchor;
 }
 
 function longForm(isoDate: string): string {
   return formatDateLong(localDateFromIso(isoDate));
 }
-
-test.beforeEach(async ({ page }) => {
-  await dismissWelcomeSplash(page);
-});
 
 test.afterEach(async ({ supabaseAdmin }) => {
   await clearOwnPairEvents(supabaseAdmin);
@@ -162,11 +143,11 @@ async function addEventFromSettings(
   return addedRow;
 }
 
-/** The event every test below adds, dated 30 days after `anchor`. */
+/** The event every test below adds, dated TRIP_DAYS_AHEAD days after `anchor`. */
 function tripEvent(anchor: Date) {
   return {
     label: ADDED_LABEL,
-    date: isoDateDaysFromNow(30, anchor),
+    date: isoDateDaysFromNow(TRIP_DAYS_AHEAD, anchor),
     description: 'Booked and counting',
     icon: 'plane',
   };
@@ -178,10 +159,11 @@ test.describe('Managing events from Settings', () => {
     supabaseAdmin,
     interceptNetworkCall,
   }) => {
+    const anchor = await pinClock(page);
     await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
 
     // ── Add ────────────────────────────────────────────────────────────────
-    await addEventFromSettings(page, interceptNetworkCall, tripEvent(new Date()));
+    await addEventFromSettings(page, interceptNetworkCall, tripEvent(anchor));
   });
 
   test('[P0] an event added in Settings shows on Home with no reload', async ({
@@ -189,7 +171,7 @@ test.describe('Managing events from Settings', () => {
     supabaseAdmin,
     interceptNetworkCall,
   }) => {
-    const added = tripEvent(new Date());
+    const added = tripEvent(await pinClock(page));
     await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
     await addEventFromSettings(page, interceptNetworkCall, added);
 
@@ -199,11 +181,11 @@ test.describe('Managing events from Settings', () => {
     await expect(card).toBeVisible();
     await expect(card.getByText(ADDED_LABEL)).toBeVisible();
     await expect(card.getByText('Booked and counting')).toBeVisible();
-    // The date itself, as this component renders it: the calendar-day count
-    // between local midnights. This is the whole date round trip — the
-    // <input type="date"> string, the `date` column, and the local-midnight
-    // rebuild — pinned to one number.
-    await expectCardCountsDownTo(card, added.date);
+    // The date itself, as this component renders it: whole days left on the
+    // pinned clock (TRIP_DAYS_AHEAD calendar days from noon). This is the
+    // whole date round trip — the <input type="date"> string, the `date`
+    // column, and the local-midnight rebuild — pinned to one number.
+    await expect(card.getByTestId('countdown-value')).toHaveText('29 days');
   });
 
   test('[P0] editing an event changes its label and date in the list and on Home', async ({
@@ -211,9 +193,9 @@ test.describe('Managing events from Settings', () => {
     supabaseAdmin,
     interceptNetworkCall,
   }) => {
-    const anchor = new Date();
+    const anchor = await pinClock(page);
     const added = tripEvent(anchor);
-    const editedDate = isoDateDaysFromNow(45, anchor);
+    const editedDate = isoDateDaysFromNow(VOYAGE_DAYS_AHEAD, anchor);
     await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
     await addEventFromSettings(page, interceptNetworkCall, added);
 
@@ -255,7 +237,8 @@ test.describe('Managing events from Settings', () => {
     const editedCard = page.getByTestId('event-countdown-settings-voyage-e2e');
     await expect(editedCard).toBeVisible();
     await expect(editedCard.getByText(EDITED_LABEL)).toBeVisible();
-    await expectCardCountsDownTo(editedCard, editedDate);
+    // VOYAGE_DAYS_AHEAD calendar days from noon on the pinned clock.
+    await expect(editedCard.getByTestId('countdown-value')).toHaveText('44 days');
     await expect(page.getByTestId('event-countdown-settings-trip-e2e')).toHaveCount(0);
   });
 
@@ -264,11 +247,12 @@ test.describe('Managing events from Settings', () => {
     supabaseAdmin,
     interceptNetworkCall,
   }) => {
+    const anchor = await pinClock(page);
     await openEmptySettings(page, supabaseAdmin, interceptNetworkCall);
     const rowToDelete = await addEventFromSettings(
       page,
       interceptNetworkCall,
-      tripEvent(new Date())
+      tripEvent(anchor)
     );
 
     // ── Delete ─────────────────────────────────────────────────────────────
@@ -300,7 +284,8 @@ test.describe('Managing events from Settings', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const seededDate = isoDateDaysFromNow(20);
+    const anchor = await pinClock(page);
+    const seededDate = isoDateDaysFromNow(20, anchor);
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Settings Deeplink E2E',
@@ -331,7 +316,7 @@ test.describe('Managing events from Settings', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const anchor = new Date();
+    const anchor = await pinClock(page);
     const originalDate = isoDateDaysFromNow(20, anchor);
     const orderWitnessDate = isoDateDaysFromNow(28, anchor);
     const editedDate = isoDateDaysFromNow(35, anchor);
@@ -448,7 +433,7 @@ test.describe('Managing events from Settings', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const anchor = new Date();
+    const anchor = await pinClock(page);
     const pastDate = isoDateDaysFromNow(-14, anchor);
     // A future event is seeded alongside it purely as a load witness: without
     // one, `toHaveCount(0)` on the past card runs before loadEvents can have
@@ -503,10 +488,11 @@ test.describe('Managing events from Settings', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
+    const anchor = await pinClock(page);
     await seedEvent(supabaseAdmin, {
       userId: partnerId,
       label: 'Settings Partner E2E',
-      eventDate: isoDateDaysFromNow(25),
+      eventDate: isoDateDaysFromNow(25, anchor),
       description: 'Theirs, not mine',
       icon: 'ring',
     });
@@ -535,6 +521,7 @@ test.describe(
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
 
+      const anchor = await pinClock(page);
       await openSettingsFromHome(page, interceptNetworkCall);
       await expect(page.getByTestId('events-settings-empty')).toBeVisible();
 
@@ -557,7 +544,7 @@ test.describe(
 
       await page.getByTestId('events-settings-empty-add').click();
       await page.getByTestId('events-form-label').fill('Settings Rejected E2E');
-      await page.getByTestId('events-form-date').fill(isoDateDaysFromNow(10));
+      await page.getByTestId('events-form-date').fill(isoDateDaysFromNow(10, anchor));
       await page.getByTestId('events-form-submit').click();
 
       await rejectedCreate;

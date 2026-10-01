@@ -69,6 +69,7 @@ import {
   deleteOutsider,
 } from '../support/helpers/rls-security';
 import type { TypedSupabaseClient } from '../support/factories';
+import type { Cleanup } from '../support/fixtures/cleanup';
 
 /** A terminal subscribe status — anything the server will not move on from. */
 const TERMINAL_FAILURES = ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'];
@@ -181,6 +182,57 @@ async function waitForStatus(
     expect(status, detail).not.toBe('SUBSCRIBED');
     expect(sub.statuses, detail).not.toContain('SUBSCRIBED');
   }
+}
+
+/**
+ * The setup both PUBLIC-join tests share, on this worker's victim topic
+ * `love-notes:<victim>`: a bare anon client joined PUBLICLY (with `ack`, so
+ * its websocket `send()` waits for the server's reply), the victim joined
+ * privately, and the partner's private REST sender. Returns once the public
+ * join has reached SUBSCRIBED — asserted, since that is the rollout premise
+ * both tests stand on — and the private one has too.
+ */
+async function joinPublicAndPrivate(
+  poll: Poll,
+  supabaseAdmin: TypedSupabaseClient,
+  cleanup: Cleanup
+): Promise<{
+  victimId: string;
+  eavesdrop: Subscription;
+  listener: Subscription;
+  sender: RealtimeChannel;
+}> {
+  const { userId: victimId, partnerId } = await resolveOwnPair(supabaseAdmin);
+  const victim = await signedInClient(supabaseAdmin, victimId);
+  cleanup.defer('remove the victim channels', () => victim.removeAllChannels());
+  const partner = await signedInClient(supabaseAdmin, partnerId);
+  cleanup.defer('remove the partner channels', () => partner.removeAllChannels());
+  const anon = anonClient();
+  cleanup.defer('remove the eavesdropper channels', () => anon.removeAllChannels());
+
+  const eavesdrop = join(anon, `love-notes:${victimId}`, 'new_message', {
+    private: false,
+    ack: true,
+  });
+  const listener = join(victim, `love-notes:${victimId}`, 'new_message', { private: true });
+  const sender = partner.channel(`love-notes:${victimId}`, { config: { private: true } });
+
+  await log.step('The public join is not itself refused on this stack');
+  await poll(async () => settledStatus(eavesdrop), (s: never) => s !== null, {
+    timeout: 20000,
+    interval: 100,
+    log: 'Waiting for the public join to settle',
+  });
+  // Asserted, not merely logged: rollout.md and the story's Operational
+  // Evidence both record this as measured, so a change in it has to fail a
+  // test rather than pass with a different log line.
+  expect(
+    settledStatus(eavesdrop),
+    'the public join to a victim topic no longer reaches SUBSCRIBED'
+  ).toBe('SUBSCRIBED');
+
+  await waitForStatus(poll, listener, 'victim private love-notes', 'subscribed');
+  return { victimId, eavesdrop, listener, sender };
 }
 
 test.describe('Couple broadcast authorization', () => {
@@ -361,7 +413,6 @@ test.describe('Couple broadcast authorization', () => {
   test('[P1] a PUBLIC join to a victim topic receives nothing that was sent privately', async ({
     recurse,
     supabaseAdmin,
-    apiRequest,
     cleanup,
   }) => {
     // The measured answer to the rollout question. This stack has Realtime's
@@ -374,40 +425,14 @@ test.describe('Couple broadcast authorization', () => {
     // subscriber. That is what closes CAP-2/CAP-3 without flipping the hosted
     // setting, which src/api/interactionService.ts still depends on being
     // Enabled for its public postgres_changes channel.
-    const { userId: victimId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    const victim = await signedInClient(supabaseAdmin, victimId);
-    cleanup.defer('remove the victim channels', () => victim.removeAllChannels());
-    const partner = await signedInClient(supabaseAdmin, partnerId);
-    cleanup.defer('remove the partner channels', () => partner.removeAllChannels());
-    const anon = anonClient();
-    cleanup.defer('remove the eavesdropper channels', () => anon.removeAllChannels());
+    const poll = recurse as unknown as Poll;
+    const { victimId, eavesdrop, listener, sender } = await joinPublicAndPrivate(
+      poll,
+      supabaseAdmin,
+      cleanup
+    );
     const anonSender = anonClient();
     cleanup.defer('remove the anon sender channels', () => anonSender.removeAllChannels());
-    const poll = recurse as unknown as Poll;
-    const { url, anonKey } = envPair();
-
-    const eavesdrop = join(anon, `love-notes:${victimId}`, 'new_message', {
-      private: false,
-      ack: true,
-    });
-    const listener = join(victim, `love-notes:${victimId}`, 'new_message', { private: true });
-    const sender = partner.channel(`love-notes:${victimId}`, { config: { private: true } });
-
-    await log.step('The public join is not itself refused on this stack');
-    await poll(async () => settledStatus(eavesdrop), (s: never) => s !== null, {
-      timeout: 20000,
-      interval: 100,
-      log: 'Waiting for the public join to settle',
-    });
-    // Asserted, not merely logged: rollout.md and the story's Operational
-    // Evidence both record this as measured, so a change in it has to fail a
-    // test rather than pass with a different log line.
-    expect(
-      settledStatus(eavesdrop),
-      'the public join to a victim topic no longer reaches SUBSCRIBED'
-    ).toBe('SUBSCRIBED');
-
-    await waitForStatus(poll, listener, 'victim private love-notes', 'subscribed');
 
     await log.step('Reading: a privately-sent broadcast does not reach the public subscriber');
     expect(
@@ -439,12 +464,27 @@ test.describe('Couple broadcast authorization', () => {
     expect(eavesdrop.received, 'a public subscriber received a private broadcast').toEqual([
       notePayload('public-sentinel', 'sentinel'),
     ]);
+  });
 
+  test('[P0] neither public path can inject into a private subscriber', async ({
+    recurse,
+    supabaseAdmin,
+    apiRequest,
+    cleanup,
+  }) => {
     // The other half of CAP-2/CAP-3, and the one that matters more: not just
     // that a stranger cannot READ the couple's traffic, but that a stranger
     // cannot INJECT into it. Both public paths are exercised — the websocket
     // send on the public channel it did manage to join, and a raw POST to the
     // REST broadcast endpoint with nothing but the publishable key.
+    const poll = recurse as unknown as Poll;
+    const { victimId, eavesdrop, listener, sender } = await joinPublicAndPrivate(
+      poll,
+      supabaseAdmin,
+      cleanup
+    );
+    const { url, anonKey } = envPair();
+
     await log.step('Writing: neither public path can inject into the private subscriber');
     const publicSend = await eavesdrop.channel.send({
       type: 'broadcast',
@@ -491,7 +531,7 @@ test.describe('Couple broadcast authorization', () => {
     ).toEqual({ success: true });
     await poll(
       async () => listener.received.length,
-      (n: never) => (n as unknown as number) >= 2,
+      (n: never) => (n as unknown as number) >= 1,
       { timeout: 15000, interval: 100, log: 'Waiting for the private sentinel' }
     );
     // Both public paths report success — 'ok' and 202 — and neither is
@@ -499,7 +539,6 @@ test.describe('Couple broadcast authorization', () => {
     // separate delivery path, not the sender being told "no", which is
     // exactly why this has to be asserted on the RECEIVER.
     expect(listener.received, 'a public sender injected into a private subscriber').toEqual([
-      notePayload('private-1', 'private'),
       notePayload('private-sentinel', 'sentinel'),
     ]);
   });

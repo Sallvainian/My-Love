@@ -86,6 +86,13 @@ function row(text: string) {
   return screen.getByRole('row', { name: new RegExp(text) });
 }
 
+/** The admin list's rows whose message cell reads exactly `text`. */
+function listedRows(text: string) {
+  return within(screen.getByTestId('admin-message-list'))
+    .queryAllByTestId('message-row-text')
+    .filter((cell) => cell.textContent === text);
+}
+
 beforeEach(async () => {
   localStorage.clear();
   useAppStore.setState(useAppStore.getInitialState(), true);
@@ -123,17 +130,19 @@ describe('AdminPanel with the real local copy and store', () => {
   ] as const)('isolates A/B/A lists and removes the outgoing %s preview', async (dialog, previewTestId) => {
     const user = userEvent.setup();
     panel();
-    expect(screen.getAllByText('Account A message')).toHaveLength(1);
+    expect(listedRows('Account A message')).toHaveLength(1);
     await user.click(within(row('Account A message')).getByTestId(`message-row-${dialog}-button`));
     expect(screen.getByTestId(previewTestId)).toBeInTheDocument();
     await switchAccount(B);
-    expect(screen.getByText('Account B message')).toBeInTheDocument();
-    expect(screen.queryByText('Account A message')).toBeNull();
+    expect(listedRows('Account B message')).toHaveLength(1);
+    expect(listedRows('Account A message')).toEqual([]);
+    expect(document.body).not.toHaveTextContent('Account A message');
     expect(screen.queryByTestId('admin-edit-form')).toBeNull();
     expect(screen.queryByTestId('admin-delete-dialog')).toBeNull();
     await switchAccount(A);
     expect(screen.getByTestId('admin-message-list')).toBeInTheDocument();
-    expect(screen.queryByText('Account B message')).toBeNull();
+    expect(listedRows('Account B message')).toEqual([]);
+    expect(document.body).not.toHaveTextContent('Account B message');
   });
 
   it("deletes the outgoing account's saved copy on each switch and keeps the incoming one's", async () => {
@@ -162,7 +171,7 @@ describe('AdminPanel with the real local copy and store', () => {
       await useAppStore.getState().loadMessageDataFromServer();
       await useAppStore.getState().loadCustomMessages();
     });
-    expect(screen.getAllByText('Account A message')).toHaveLength(1);
+    expect(listedRows('Account A message')).toHaveLength(1);
   });
 
   /**
@@ -209,15 +218,25 @@ describe('AdminPanel with the real local copy and store', () => {
     expect(remove).toHaveBeenCalledTimes(1);
   });
 
-  it('closes and removes the row from disk, store and list after the server accepts the delete', async () => {
+  /** Deletes A's row (the current daily message) and lets the server accept it. */
+  async function completeAcceptedDelete() {
     const user = userEvent.setup();
     const { gate } = await openGatedDelete(user);
     await act(async () => { gate.resolve(); });
     await waitFor(() => expect(screen.queryByTestId('admin-delete-dialog')).toBeNull());
+  }
+
+  it('closes and removes the row from disk, store and list after the server accepts the delete', async () => {
+    await completeAcceptedDelete();
     expect(await diskRow(aId)).toBeUndefined();
     expect(useAppStore.getState().customMessages.some((message) => message.id === aId)).toBe(false);
     expect(screen.getByTestId('admin-message-list')).toBeInTheDocument();
-    expect(screen.queryByText('Account A message')).toBeNull();
+    expect(listedRows('Account A message')).toEqual([]);
+    expect(document.body).not.toHaveTextContent('Account A message');
+  });
+
+  it('falls back to a bundled daily message when the deleted row was the current one', async () => {
+    await completeAcceptedDelete();
     expect(useAppStore.getState().currentMessage?.text).toBe('Shared daily');
   });
 
@@ -247,7 +266,7 @@ describe('AdminPanel with the real local copy and store', () => {
     await user.click(screen.getByTestId('admin-delete-dialog-cancel'));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(await diskRow(aId)).toMatchObject({
-      id: 1000, text: 'Account A message', serverId: 'srv-account-a', userId: A, category: 'custom',
+      id: aId, text: 'Account A message', serverId: aServerId, userId: A, category: 'custom',
     });
   });
 

@@ -71,9 +71,12 @@ test.describe('Error Boundary', () => {
     await expect(boundary.getByRole('heading')).toHaveText("Can't load this page offline");
     await expect(page.getByTestId('nav-dock')).toBeVisible();
 
-    // AND: Go Home leaves the failed view for the home view.
+    // AND: Go Home leaves the failed view for the home view. Both witnesses
+    // render without a server answer: the dock marks Home current, and Home's
+    // daily message comes from the bundled rows on the device.
     await page.getByTestId('error-go-home').click();
-    await expect(page.getByTestId('time-together')).toBeVisible();
+    await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('message-text')).toBeVisible();
     await expect(boundary).toHaveCount(0);
   });
 });

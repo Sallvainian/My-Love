@@ -397,9 +397,10 @@ describe('notesSlice removeNote', () => {
     await store.getState().removeNote('note-2');
 
     // Without the refill the thread would render its empty state with two
-    // unread messages still behind it.
-    expect(store.getState().notes.length).toBeGreaterThan(0);
-    expect(store.getState().notes.map((n) => n.id)).not.toContain('note-2');
+    // unread messages still behind it. The refill is a full read, so it brings
+    // back exactly the two older notes, oldest first, and nothing behind them.
+    expect(store.getState().notes.map((n) => n.id)).toEqual(['note-0', 'note-1']);
+    expect(store.getState().notesHasMore).toBe(false);
   });
 
   it('keeps notesHasMore honest when a removal falls inside the page', async () => {

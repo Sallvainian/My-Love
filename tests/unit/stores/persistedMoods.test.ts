@@ -13,6 +13,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PERSISTED_MOOD, persistedBlob, STORAGE_KEY } from '../helpers/persistedBlob';
+import { makeMoodEntry } from './moodSliceFixture';
 
 /** A persisted blob shaped like the real one, including the leaked moods */
 function blobWithMoods(extra: Record<string, unknown> = {}): string {
@@ -54,16 +55,13 @@ describe('persisted moods', () => {
     // app would: put moods in memory (loadMoods does this) and change state.
     useAppStore.setState({
       moods: [
-        {
+        makeMoodEntry({
           id: 2,
           userId: 'user-B',
-          mood: 'happy',
-          moods: ['happy'],
           note: 'mine',
           date: '2026-07-26',
           timestamp: new Date('2026-07-26T07:00:00.000Z'),
-          synced: false,
-        },
+        }),
       ],
       isOnboarded: true,
     });

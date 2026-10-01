@@ -95,6 +95,16 @@ function note(id: string, content: string) {
   };
 }
 
+/** The compressed picture a sent or retried note carries. */
+function pictureBlob(): Blob {
+  return new Blob(['x'], { type: 'image/jpeg' });
+}
+
+/** The picture a note is sent with. */
+function pictureFile(): File {
+  return new File(['x'], 'a.jpg', { type: 'image/jpeg' });
+}
+
 /** Sign out, then straight back in as the same account. */
 function signOutAndBackInAsA(): void {
   useAppStore.getState().clearAuth();
@@ -232,13 +242,13 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
 
     const inFlight = useAppStore
       .getState()
-      .sendNote('with picture', new File(['x'], 'a.jpg', { type: 'image/jpeg' }));
+      .sendNote('with picture', pictureFile());
     // Parked on the held compression.
     await vi.waitFor(() => expect(compressImage).toHaveBeenCalledTimes(1));
     signOutAndBackInAsA();
 
     const writes = countWrites();
-    compressed.settle({ blob: new Blob(['x'], { type: 'image/jpeg' }) });
+    compressed.settle({ blob: pictureBlob() });
     await inFlight;
     writes.stop();
 
@@ -247,13 +257,13 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
   });
 
   it("sendNote's image branch: a stale upload failure does not write", async () => {
-    compressImage.mockResolvedValue({ blob: new Blob(['x'], { type: 'image/jpeg' }) });
+    compressImage.mockResolvedValue({ blob: pictureBlob() });
     const upload = deferred<{ storagePath: string }>();
     uploadCompressedBlob.mockReturnValue(upload.promise);
 
     const inFlight = useAppStore
       .getState()
-      .sendNote('with picture', new File(['x'], 'a.jpg', { type: 'image/jpeg' }));
+      .sendNote('with picture', pictureFile());
     await vi.waitFor(() => expect(uploadCompressedBlob).toHaveBeenCalledTimes(1));
     signOutAndBackInAsA();
 
@@ -266,13 +276,13 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
   });
 
   it("sendNote's image branch: a stale upload success neither inserts nor writes, and discards the image", async () => {
-    compressImage.mockResolvedValue({ blob: new Blob(['x'], { type: 'image/jpeg' }) });
+    compressImage.mockResolvedValue({ blob: pictureBlob() });
     const upload = deferred<{ storagePath: string }>();
     uploadCompressedBlob.mockReturnValue(upload.promise);
 
     const inFlight = useAppStore
       .getState()
-      .sendNote('STALE-PICTURE-NOTE', new File(['x'], 'a.jpg', { type: 'image/jpeg' }));
+      .sendNote('STALE-PICTURE-NOTE', pictureFile());
     await vi.waitFor(() => expect(uploadCompressedBlob).toHaveBeenCalledTimes(1));
     signOutAndBackInAsA();
 
@@ -316,7 +326,7 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
           ...note('temp-1', 'RETRIED'),
           tempId: 'temp-1',
           error: true,
-          imageBlob: new Blob(['x'], { type: 'image/jpeg' }),
+          imageBlob: pictureBlob(),
         },
       ],
     } as unknown as SetStateArg);
@@ -344,7 +354,7 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
           ...note('temp-1', 'RETRIED'),
           tempId: 'temp-1',
           error: true,
-          imageBlob: new Blob(['x'], { type: 'image/jpeg' }),
+          imageBlob: pictureBlob(),
         },
       ],
     } as unknown as SetStateArg);

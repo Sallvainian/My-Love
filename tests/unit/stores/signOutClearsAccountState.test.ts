@@ -46,6 +46,7 @@ import {
   writeLocalCopy,
 } from '../../../src/services/localCopy';
 import { MESSAGE_DATA_COPY_KIND, openMyLoveDB } from '../../../src/services/dbSchema';
+import { makeMoodEntry } from './moodSliceFixture';
 
 const EXPECTED_RESET: Record<string, unknown> = {
   moods: [],
@@ -148,16 +149,15 @@ function accountNote(overrides: Record<string, unknown> = {}) {
 }
 
 function moodEntry(userId: string, note: string) {
-  return {
-    id: 1,
+  return makeMoodEntry({
     userId,
-    mood: 'sad' as const,
-    moods: ['sad' as const],
+    mood: 'sad',
+    moods: ['sad'],
     note,
     date: '2026-08-03',
     timestamp: new Date('2026-08-03T06:00:00.000Z'),
     synced: true,
-  };
+  });
 }
 
 /** Fill every account-scoped corner of the store the way a live session would */

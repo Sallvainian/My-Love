@@ -95,6 +95,15 @@ export function permissionDenied(message = 'permission denied'): FakePostgrestEr
   return { code: '42501', message, details: '', hint: '' };
 }
 
+/**
+ * A mid-flight transport failure as the fetch layer raises it: a `TypeError`
+ * carrying Node's socket code. A new error per call, so each case owns the
+ * instance (and stack) it compares the wrapped cause against.
+ */
+export function networkFailure(): TypeError & { code: string } {
+  return Object.assign(new TypeError('fetch failed'), { code: 'ECONNRESET' });
+}
+
 /** Evaluate the supported PostgREST boolean grammar independently of page logic. */
 function matchesExpression(candidate: EventRow, expression: string): boolean {
   const group = /^(and|or)\((.*)\)$/.exec(expression);

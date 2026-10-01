@@ -510,6 +510,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
         className={`${DIALOG_PANEL} max-w-md`}
+        data-testid="anniversary-form-panel"
       >
         {/* Header */}
         <div className="mb-5 flex items-center justify-between gap-3">

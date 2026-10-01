@@ -15,6 +15,7 @@
  * received.
  */
 import { randomUUID } from 'node:crypto';
+import { createInteractionRecord } from '../../support/factories/interaction-record-ownership';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { INTERACTIONS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -62,14 +63,21 @@ function interactionRows(ownUserId: string) {
   const now = Date.now();
   const at = (hoursAgo: number) => new Date(now - hoursAgo * 3_600_000).toISOString();
   return [
-    { from_user_id: ownUserId, to_user_id: PARTNER_ID, type: 'poke', hoursAgo: 2 },
-    { from_user_id: PARTNER_ID, to_user_id: ownUserId, type: 'kiss', hoursAgo: 30 },
-  ].map(({ hoursAgo, ...row }) => ({
-    id: randomUUID(),
-    ...row,
-    viewed: false,
-    created_at: at(hoursAgo),
-  }));
+    createInteractionRecord({
+      from_user_id: ownUserId,
+      to_user_id: PARTNER_ID,
+      type: 'poke',
+      viewed: false,
+      created_at: at(2),
+    }),
+    createInteractionRecord({
+      from_user_id: PARTNER_ID,
+      to_user_id: ownUserId,
+      type: 'kiss',
+      viewed: false,
+      created_at: at(30),
+    }),
+  ];
 }
 
 /**

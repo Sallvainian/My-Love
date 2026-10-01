@@ -18,6 +18,11 @@ const TARGET_ID = '33333333-3333-4333-8333-333333333333';
 
 type Row = { id: string | null; display_name: string | null; is_taken: boolean };
 
+/** One `find_partner_by_email` row: by default an unlinked account named Jessie. */
+function rpcRow(overrides: Partial<Row> = {}): Row {
+  return { id: TARGET_ID, display_name: 'Jessie', is_taken: false, ...overrides };
+}
+
 /** What the RPC answers with next. */
 let rpcAnswer: { data: Row[] | null; error: { code: string; message: string } | null };
 /** Every request the service sent, in order. */
@@ -71,10 +76,7 @@ describe('partnerService.searchUsers', () => {
   });
 
   it('found: an unlinked account comes back with its id, name and the typed address', async () => {
-    rpcAnswer = {
-      data: [{ id: TARGET_ID, display_name: ' Jessie ', is_taken: false }],
-      error: null,
-    };
+    rpcAnswer = { data: [rpcRow({ display_name: ' Jessie ' })], error: null };
 
     expect(await search(' jessie@example.test ')).toEqual({
       status: 'found',
@@ -89,7 +91,7 @@ describe('partnerService.searchUsers', () => {
     ['nothing', null],
     ['blank', '  '],
   ])('found: a seed name (%s) is not shown as a name', async (_label, seed) => {
-    rpcAnswer = { data: [{ id: TARGET_ID, display_name: seed, is_taken: false }], error: null };
+    rpcAnswer = { data: [rpcRow({ display_name: seed })], error: null };
 
     const result = await search('jessie@example.test');
 
@@ -100,7 +102,7 @@ describe('partnerService.searchUsers', () => {
   });
 
   it('taken: an account that already has a partner is reported as taken, nothing more', async () => {
-    rpcAnswer = { data: [{ id: null, display_name: null, is_taken: true }], error: null };
+    rpcAnswer = { data: [rpcRow({ id: null, display_name: null, is_taken: true })], error: null };
 
     expect(await search('jessie@example.test')).toEqual({ status: 'taken' });
   });
@@ -139,7 +141,7 @@ describe('partnerService.searchUsers', () => {
   });
 
   it('error: an untaken row without an id is refused rather than offered', async () => {
-    rpcAnswer = { data: [{ id: null, display_name: 'Jessie', is_taken: false }], error: null };
+    rpcAnswer = { data: [rpcRow({ id: null })], error: null };
 
     expect(await search('jessie@example.test')).toMatchObject({ status: 'error' });
   });

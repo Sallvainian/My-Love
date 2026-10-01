@@ -92,7 +92,7 @@ describe('moodApi', () => {
       expect(created.created_at).toBe(LOG_TIME);
     });
 
-    it('[A: first sync of a new mood] resolves conflicts on user_id,created_at', async () => {
+    it('[A: first sync of a new mood] writes a re-sent mood with the same owner and timestamp as the same row', async () => {
       await moodApi.create(moodInsert());
 
       expect(backend.operations[0]).toMatchObject({
@@ -174,7 +174,7 @@ describe('moodApi', () => {
       return ids;
     }
 
-    it('[B: tied created_at across a page boundary] orders by created_at then id', async () => {
+    it('[B: tied created_at across a page boundary] pages a created_at tie in a fixed order, newest first', async () => {
       seedTiedHistory();
 
       await moodApi.getMoodHistory(USER_ID, 0, 50);

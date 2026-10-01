@@ -25,7 +25,6 @@ import {
   contents,
   copyIds,
   createTestStore,
-  expectQueueDeliveredOnceInOrder,
   fakeFrom,
   PARTNER,
   queued,
@@ -133,15 +132,49 @@ describe('notesSlice offline send queue', () => {
     expect(await queuedIds()).toEqual(store.getState().notes.map((n) => n.tempId));
   });
 
-  it('reconnect: the queue is sent in order, each once, into state and copy, and each is broadcast', async () => {
+  /** Queues three notes offline, reconnects, and drains the queue once. */
+  async function reconnectAfterThreeOffline() {
     const store = createTestStore();
     await sendThreeOffline(store);
     const keys = store.getState().notes.map((n) => n.tempId);
 
     setOnline(true);
     await store.getState().drainQueuedNotes();
+    return { store, keys };
+  }
 
-    await expectQueueDeliveredOnceInOrder(store, keys);
+  it('reconnect: the queue is sent in order, each once, under its own key', async () => {
+    const { keys } = await reconnectAfterThreeOffline();
+
+    expect(server.rows.map((r) => [r.content, r.idempotency_key])).toEqual([
+      ['one', keys[0]],
+      ['two', keys[1]],
+      ['three', keys[2]],
+    ]);
+    expect(server.upserts).toBe(3);
+  });
+
+  it('reconnect: each sent note replaces its queued entry in state and copy, and leaves the queue', async () => {
+    const { store } = await reconnectAfterThreeOffline();
+
+    expect(store.getState().notes.map((n) => n.id)).toEqual(['server-1', 'server-2', 'server-3']);
+    expect(store.getState().notes.every((n) => !n.queued && !n.sending && !n.error)).toBe(true);
+    // The drain saves the copy without awaiting it.
+    await vi.waitFor(async () => expect(await copyIds()).toEqual(['server-1', 'server-2', 'server-3']));
+    expect(await queuedIds()).toEqual([]);
+  });
+
+  it("reconnect: each sent note is broadcast on the partner's topic, in order", async () => {
+    await reconnectAfterThreeOffline();
+
+    expect(sendEphemeralBroadcast.mock.calls.map(([topic, , payload]) => [
+      topic,
+      (payload as { message: { content: string } }).message.content,
+    ])).toEqual([
+      [`love-notes:${PARTNER}`, 'one'],
+      [`love-notes:${PARTNER}`, 'two'],
+      [`love-notes:${PARTNER}`, 'three'],
+    ]);
   });
 
   it('a queued note is sent with its composition time as written_at, and keeps it in state and copy', async () => {
@@ -411,17 +444,27 @@ describe('notesSlice offline send queue', () => {
     expect(await queuedIds()).toEqual([]);
   });
 
-  it('with no partner loaded, the recipient comes from a linked lookup; unlinked is refused', async () => {
+  it('with no partner loaded, the recipient comes from a linked lookup', async () => {
     const store = createTestStore({ partnerLoaded: false });
+
     await store.getState().sendNote('looked up');
     await store.getState().drainQueuedNotes();
-    expect(server.rows[0]).toMatchObject({ content: 'looked up', to_user_id: PARTNER });
 
+    expect(server.rows[0]).toMatchObject({ content: 'looked up', to_user_id: PARTNER });
+  });
+
+  it('with no partner loaded, an unlinked lookup refuses the note and queues nothing', async () => {
+    const store = createTestStore({ partnerLoaded: false });
+    // A note already on screen, so the refusal is shown to leave it alone.
+    await store.getState().sendNote('already shown');
+    await store.getState().drainQueuedNotes();
     server.lookup = { status: 'unlinked' };
+
     await store.getState().sendNote('nobody');
+
     expect(store.getState().notesError).toBe('Partner not configured');
     expect(await queuedIds()).toEqual([]);
-    expect(contents(store)).toEqual(['looked up']);
+    expect(contents(store)).toEqual(['already shown']);
   });
 
   it('a failed enqueue throws from sendNote and shows nothing', async () => {

@@ -89,6 +89,11 @@ function anniversaries(): Anniversary[] {
 
 const ANNIVERSARY_DATE = '2024-02-14';
 
+/** What the settings form submits to add or edit an anniversary. */
+function anniversaryInput(label = 'First date') {
+  return { date: ANNIVERSARY_DATE, label };
+}
+
 /** A settings-mirror row; `fields` adds a serverId, a description or another date. */
 function anniversary(id: number, label: string, fields: Partial<Anniversary> = {}): Anniversary {
   return { id, date: ANNIVERSARY_DATE, label, ...fields };
@@ -121,11 +126,11 @@ describe('anniversaries: server first, then the settings mirror', () => {
   it('writes the server, then mirrors the row with its server id', async () => {
     server.createAnniversary.mockResolvedValue(created);
 
-    await useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'First date' });
+    await useAppStore.getState().addAnniversary(anniversaryInput());
 
     expect(server.createAnniversary).toHaveBeenCalledWith(
       A,
-      { date: '2024-02-14', label: 'First date' },
+      anniversaryInput(),
       expect.any(String)
     );
     expect(anniversaries()).toEqual([anniversary(1, 'First date', { serverId: 'ann-1' })]);
@@ -135,9 +140,9 @@ describe('anniversaries: server first, then the settings mirror', () => {
     setAnniversaries([anniversary(3, 'First date', { serverId: 'ann-1' })]);
     server.createAnniversary.mockResolvedValue(created);
 
-    await useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'First date' }, 'submit-1');
+    await useAppStore.getState().addAnniversary(anniversaryInput(), 'submit-1');
 
-    expect(server.createAnniversary).toHaveBeenCalledWith(A, { date: '2024-02-14', label: 'First date' }, 'submit-1');
+    expect(server.createAnniversary).toHaveBeenCalledWith(A, anniversaryInput(), 'submit-1');
     expect(anniversaries()).toEqual([anniversary(3, 'First date', { serverId: 'ann-1' })]);
   });
 
@@ -146,14 +151,14 @@ describe('anniversaries: server first, then the settings mirror', () => {
     server.createAnniversary.mockRejectedValue(offline());
 
     await expect(
-      useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'First date' })
+      useAppStore.getState().addAnniversary(anniversaryInput())
     ).rejects.toThrow(/offline/i);
 
     expect(anniversaries()).toEqual([anniversary(3, 'Kept', { date: '2020-01-01', serverId: 's' })]);
   });
 
   it('refuses invalid input before any request', async () => {
-    await expect(useAppStore.getState().addAnniversary({ date: '2024-02-14', label: '' })).rejects.toThrow();
+    await expect(useAppStore.getState().addAnniversary(anniversaryInput(''))).rejects.toThrow();
     expect(server.createAnniversary).not.toHaveBeenCalled();
   });
 
@@ -161,7 +166,7 @@ describe('anniversaries: server first, then the settings mirror', () => {
     const pending = deferred<ServerAnniversary>();
     server.createAnniversary.mockReturnValue(pending.promise);
 
-    const inFlight = useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'First date' });
+    const inFlight = useAppStore.getState().addAnniversary(anniversaryInput());
     useAppStore.setState({ userId: 'USER-C' } as StoreState);
     setAnniversaries([anniversary(9, 'C only', { date: '2021-01-01' })]);
     pending.settle(created);
@@ -174,7 +179,7 @@ describe('anniversaries: server first, then the settings mirror', () => {
     const pending = deferred<ServerAnniversary>();
     server.createAnniversary.mockReturnValue(pending.promise);
 
-    const inFlight = useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'First date' });
+    const inFlight = useAppStore.getState().addAnniversary(anniversaryInput());
     useAppStore.getState().clearAuth();
     useAppStore.getState().setAuthUser(A);
     const before = anniversaries();
@@ -231,7 +236,7 @@ describe('anniversaries: server first, then the settings mirror', () => {
     setAnniversaries([anniversary(5, 'No server id')]);
 
     await expect(
-      useAppStore.getState().updateAnniversary(5, { date: '2024-02-14', label: 'x' })
+      useAppStore.getState().updateAnniversary(5, anniversaryInput('x'))
     ).rejects.toMatchObject({ code: 'not-synced' });
     await expect(useAppStore.getState().removeAnniversary(5)).rejects.toMatchObject({ code: 'not-synced' });
     expect(server.updateAnniversary).not.toHaveBeenCalled();
@@ -351,7 +356,7 @@ describe('anniversaries local copy', () => {
 
     const refresh = useAppStore.getState().loadAnniversariesFromServer();
     server.createAnniversary.mockResolvedValue(serverAnniversary('ann-new', 'Added'));
-    await useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'Added' });
+    await useAppStore.getState().addAnniversary(anniversaryInput('Added'));
     read.settle([anniversary(1, 'Old copy', { serverId: 'ann-old' })]);
     await refresh;
 
@@ -376,13 +381,13 @@ describe('anniversaries local copy', () => {
 
   it('each confirmed write updates the copy', async () => {
     server.createAnniversary.mockResolvedValue(serverAnniversary('ann-1', 'Added'));
-    await useAppStore.getState().addAnniversary({ date: '2024-02-14', label: 'Added' });
+    await useAppStore.getState().addAnniversary(anniversaryInput('Added'));
     expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toEqual([
       anniversary(1, 'Added', { serverId: 'ann-1' }),
     ]);
 
     server.updateAnniversary.mockResolvedValue(serverAnniversary('ann-1', 'Edited'));
-    await useAppStore.getState().updateAnniversary(1, { date: '2024-02-14', label: 'Edited' });
+    await useAppStore.getState().updateAnniversary(1, anniversaryInput('Edited'));
     expect(await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)).toEqual([
       anniversary(1, 'Edited', { serverId: 'ann-1' }),
     ]);

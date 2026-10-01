@@ -43,6 +43,7 @@ import {
   createEventsSlice,
   EVENTS_COPY_KIND,
   type EventsSlice,
+  type NewEventInput,
 } from '../../../src/stores/slices/eventsSlice';
 
 const USER_A = 'USER-A-ID';
@@ -74,6 +75,11 @@ function event(id: string, isoDate: string, overrides: Partial<CoupleEvent> = {}
     icon: 'calendar',
     ...overrides,
   };
+}
+
+/** What the events form submits to `addEvent`. */
+function eventInput(label = 'a', eventDate = '2026-10-01'): NewEventInput {
+  return { label, eventDate, icon: 'calendar' };
 }
 
 /** The saved form: plain strings, exactly what the slice writes. */
@@ -373,7 +379,7 @@ describe('eventsSlice local copy', () => {
       const a = event('a', '2026-10-01');
       createEvent.mockResolvedValue(a);
 
-      await store.getState().addEvent({ label: 'a', eventDate: '2026-10-01', icon: 'calendar' });
+      await store.getState().addEvent(eventInput());
       expect(savedCopies.get(key(USER_A))).toEqual([saved(a)]);
 
       const edited = { ...a, label: 'renamed' };
@@ -391,9 +397,7 @@ describe('eventsSlice local copy', () => {
       createEvent.mockResolvedValue(event('a', '2026-10-01'));
       writeLocalCopy.mockRejectedValue(new Error('quota'));
 
-      const result = await store
-        .getState()
-        .addEvent({ label: 'a', eventDate: '2026-10-01', icon: 'calendar' });
+      const result = await store.getState().addEvent(eventInput());
 
       expect(result).toEqual({ success: true });
       expect(store.getState().events.map((e) => e.id)).toEqual(['a']);
@@ -411,7 +415,7 @@ describe('eventsSlice local copy', () => {
       const load = store.getState().loadEvents();
       const added = event('added', '2026-11-01');
       createEvent.mockResolvedValue(added);
-      await store.getState().addEvent({ label: 'added', eventDate: '2026-11-01', icon: 'calendar' });
+      await store.getState().addEvent(eventInput('added', '2026-11-01'));
 
       // The copy read lands after the confirmed write: the copy is older.
       copyRead.resolve([saved(old)]);
@@ -491,9 +495,7 @@ describe('eventsSlice local copy', () => {
       createEvent.mockReturnValue(created.promise);
       const store = createTestStore();
 
-      const write = store
-        .getState()
-        .addEvent({ label: 'a', eventDate: '2026-10-01', icon: 'calendar' });
+      const write = store.getState().addEvent(eventInput());
       store.setState({ userId: USER_B, authSessionVersion: 2, events: [] });
       created.resolve(event('a', '2026-10-01'));
 

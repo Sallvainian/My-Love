@@ -191,6 +191,23 @@ const OUTSIDER_PARTNER_LABEL = 'Events Wire Outsider Partner Row';
 const TEARDOWN_CREATOR_LABEL = 'Events Wire Teardown Creator Row';
 const TEARDOWN_PARTNER_LABEL = 'Events Wire Teardown Partner Row';
 
+/**
+ * A `POST /rest/v1/events` body with only the three columns a caller must
+ * send. `icon` and `description` are never set, so DE.5-API-004 can measure
+ * their column defaults.
+ */
+function eventPostBody(userId: string, label: string, eventDate: string) {
+  return { user_id: userId, label, event_date: eventDate };
+}
+
+/**
+ * A signed-in caller's write headers. `Prefer: return=representation` is what
+ * supabase-js's `.select()` sends; without it PostgREST answers 204.
+ */
+function representationHeaders(token: string) {
+  return { Authorization: `Bearer ${token}`, Prefer: 'return=representation' };
+}
+
 test.describe('Events wire contract over PostgREST — story 5', () => {
   // Scoped to this worker's own pair, and checked. Runs even when a test throws
   // mid-way, so a failure never leaks rows into the next test's premise.
@@ -259,11 +276,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
       method: 'POST',
       path: '/rest/v1/events',
       headers: { Prefer: 'return=representation' },
-      body: {
-        user_id: userId,
-        label: attemptLabel,
-        event_date: isoDateDaysFromNow(20),
-      },
+      body: eventPostBody(userId, attemptLabel, isoDateDaysFromNow(20)),
     });
 
     // MEASURED: the same 401/42501. The body is well-formed and the user_id is
@@ -334,17 +347,10 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     const { status, body } = await apiRequest<EventRow[]>({
       method: 'POST',
       path: '/rest/v1/events',
-      headers: {
-        Authorization: `Bearer ${creatorToken}`,
-        Prefer: 'return=representation',
-      },
-      body: {
-        user_id: userId,
-        label: DEFAULTS_LABEL,
-        event_date: EXACT_EVENT_DATE,
-        // `description` and `icon` deliberately absent — their defaults are
-        // half of what this test measures.
-      },
+      headers: representationHeaders(creatorToken),
+      // `description` and `icon` deliberately absent — their defaults are
+      // half of what this test measures.
+      body: eventPostBody(userId, DEFAULTS_LABEL, EXACT_EVENT_DATE),
     }).validateSchema<z.infer<typeof EventRowsSchema>>(EventRowsSchema);
 
     // MEASURED: 201, and an ARRAY of one. A bare object would mean the caller
@@ -400,15 +406,8 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     const { status, body } = await apiRequest<EventRow[]>({
       method: 'POST',
       path: '/rest/v1/events',
-      headers: {
-        Authorization: `Bearer ${creatorToken}`,
-        Prefer: 'return=representation',
-      },
-      body: {
-        user_id: userId,
-        label: SCHEMA_PROBE_LABEL,
-        event_date: isoDateDaysFromNow(30),
-      },
+      headers: representationHeaders(creatorToken),
+      body: eventPostBody(userId, SCHEMA_PROBE_LABEL, isoDateDaysFromNow(30)),
     }).validateSchema<z.infer<typeof EventRowsSchema>>(EventRowsSchema);
 
     // Premise: a real row came back to serve as the valid control.
@@ -739,15 +738,8 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     const accepted = await apiRequest<EventRow[]>({
       method: 'POST',
       path: '/rest/v1/events',
-      headers: {
-        Authorization: `Bearer ${creatorToken}`,
-        Prefer: 'return=representation',
-      },
-      body: {
-        user_id: userId,
-        label: MAX_LENGTH_LABEL,
-        event_date: isoDateDaysFromNow(15, anchor),
-      },
+      headers: representationHeaders(creatorToken),
+      body: eventPostBody(userId, MAX_LENGTH_LABEL, isoDateDaysFromNow(15, anchor)),
     }).validateSchema<z.infer<typeof EventRowsSchema>>(EventRowsSchema);
 
     expect(accepted.status).toBe(201);
@@ -760,15 +752,8 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     const refused = await apiRequest<PostgrestErrorBody>({
       method: 'POST',
       path: '/rest/v1/events',
-      headers: {
-        Authorization: `Bearer ${creatorToken}`,
-        Prefer: 'return=representation',
-      },
-      body: {
-        user_id: userId,
-        label: OVER_LENGTH_LABEL,
-        event_date: isoDateDaysFromNow(15, anchor),
-      },
+      headers: representationHeaders(creatorToken),
+      body: eventPostBody(userId, OVER_LENGTH_LABEL, isoDateDaysFromNow(15, anchor)),
     });
 
     // MEASURED: 400 with PostgREST's mapping of SQLSTATE 23514

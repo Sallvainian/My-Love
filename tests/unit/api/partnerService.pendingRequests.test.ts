@@ -13,18 +13,16 @@
  * supabase-js client, the harness of partnerService.sendRequest.test.ts.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPartnerRequestRow } from '../../support/factories/partner-requests';
 
 const ME = '11111111-1111-4111-8111-111111111111';
 const RECIPIENT = '22222222-2222-4222-8222-222222222222';
 const SENDER = '33333333-3333-4333-8333-333333333333';
 
-type Row = {
-  id: string;
-  from_user_id: string;
-  to_user_id: string;
-  created_at: string;
+// The generated return type says `other_display_name: string`, but the RPC
+// answers null for someone who has not chosen a name, which a case below sends.
+type Row = Omit<ReturnType<typeof createPartnerRequestRow>, 'other_display_name'> & {
   other_display_name: string | null;
-  other_email: string | null;
 };
 
 let rpcAnswer: { data: Row[] | null; error: { code: string; message: string } | null };
@@ -66,21 +64,23 @@ describe('partnerService.getPendingRequests', () => {
     requests = [];
     rpcAnswer = {
       data: [
-        {
+        createPartnerRequestRow({
           id: 'received',
           from_user_id: SENDER,
           to_user_id: ME,
           created_at: '2026-09-26T10:00:00Z',
           other_display_name: 'Jessie',
           other_email: 'jessie@example.test',
-        },
+        }),
         {
-          id: 'sent',
-          from_user_id: ME,
-          to_user_id: RECIPIENT,
-          created_at: '2026-09-26T09:00:00Z',
+          ...createPartnerRequestRow({
+            id: 'sent',
+            from_user_id: ME,
+            to_user_id: RECIPIENT,
+            created_at: '2026-09-26T09:00:00Z',
+            other_email: 'harper@example.test',
+          }),
           other_display_name: null,
-          other_email: 'harper@example.test',
         },
       ],
       error: null,

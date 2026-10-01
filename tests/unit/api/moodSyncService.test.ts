@@ -99,17 +99,40 @@ describe('moodSyncService.syncPendingMoods', () => {
     vi.useRealTimers();
   });
 
-  it('uploads recovered values and continues past invalid siblings without sending them', async () => {
-    const invalid = pendingMood({ id: 2, mood: 'unknown', moods: [null] } as unknown as Partial<MoodEntry>);
-    const valid = pendingMood({ mood: 'loved', moods: ['sad', null, 'happy', 'sad'] } as unknown as Partial<MoodEntry>);
-    mockedMoodService.getUnsyncedMoods.mockResolvedValue([invalid, valid]);
-    const result = await runSync();
-    expect(result).toMatchObject({ synced: 1, failed: 1, deferred: 0 });
-    expect(backend.rows).toHaveLength(1);
-    expect(backend.rows[0]).toMatchObject({ mood_type: 'loved', mood_types: ['sad', 'happy', 'sad'] });
-    expect(mockedMoodService.markAsSynced).toHaveBeenCalledTimes(1);
-    expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(1, backend.rows[0].id, moodSyncFingerprint(valid));
-    expect(invalid.mood).toBe('unknown');
+  describe('a batch with one invalid sibling', () => {
+    /**
+     * Syncs one mood with no recognized value next to a valid one that needs
+     * normalizing — the scenario swMoodSync.test.ts splits the same way.
+     */
+    async function syncMixedBatch() {
+      const invalid = pendingMood({ id: 2, mood: 'unknown', moods: [null] } as unknown as Partial<MoodEntry>);
+      const valid = pendingMood({ mood: 'loved', moods: ['sad', null, 'happy', 'sad'] } as unknown as Partial<MoodEntry>);
+      mockedMoodService.getUnsyncedMoods.mockResolvedValue([invalid, valid]);
+      const result = await runSync();
+      return { invalid, valid, result };
+    }
+
+    it('reports one success and one failure, deferring nothing', async () => {
+      const { result } = await syncMixedBatch();
+      expect(result).toMatchObject({ synced: 1, failed: 1, deferred: 0 });
+    });
+
+    it('writes only the valid mood, with normalized values', async () => {
+      await syncMixedBatch();
+      expect(backend.rows).toHaveLength(1);
+      expect(backend.rows[0]).toMatchObject({ mood_type: 'loved', mood_types: ['sad', 'happy', 'sad'] });
+    });
+
+    it('marks only the valid mood synced, under its server row and fingerprint', async () => {
+      const { valid } = await syncMixedBatch();
+      expect(mockedMoodService.markAsSynced).toHaveBeenCalledTimes(1);
+      expect(mockedMoodService.markAsSynced).toHaveBeenCalledWith(1, backend.rows[0].id, moodSyncFingerprint(valid));
+    });
+
+    it('leaves the invalid source row unmodified', async () => {
+      const { invalid } = await syncMixedBatch();
+      expect(invalid.mood).toBe('unknown');
+    });
   });
 
   it('rejects a direct invalid sync before any database write', async () => {

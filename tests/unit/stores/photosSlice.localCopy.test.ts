@@ -54,6 +54,7 @@ import {
   PHOTOS_COPY_KIND,
   type PhotosSlice,
 } from '../../../src/stores/slices/photosSlice';
+import { createPhotoInsert } from '../../support/factories/photos';
 
 const USER_A = 'USER-A-ID';
 const PARTNER = 'PARTNER-ID';
@@ -69,18 +70,16 @@ function createTestStore() {
 
 /** A server row; `n` orders them (a higher n is older). */
 function row(n: number, owner = USER_A): SupabasePhoto {
-  return {
+  // Given `id` and `created_at`, the factory's insert body is the whole row.
+  return createPhotoInsert({
     id: `photo-${n}`,
     user_id: owner,
     storage_path: `${owner}/photo-${n}.jpg`,
-    filename: `photo-${n}.jpg`,
     caption: n % 2 ? null : `caption ${n}`,
     mime_type: 'image/jpeg',
     file_size: 1000 + n,
-    width: 800,
-    height: 600,
     created_at: new Date(Date.UTC(2026, 8, 20) - n * 60_000).toISOString(),
-  };
+  }) as SupabasePhoto;
 }
 
 /** The row as the gallery holds it, and as the copy saves it. */
@@ -89,6 +88,12 @@ function shown(r: SupabasePhoto, userId = USER_A): PhotoWithUrls {
 }
 
 const key = (userId: string) => `${userId}|${PHOTOS_COPY_KIND}`;
+
+/**
+ * More rows than the store once held: it loaded only `photoService.getPhotos()`'s
+ * default 50, so "every photo" is measured past that old cap.
+ */
+const MORE_THAN_THE_OLD_STORE_CAP = 60;
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => {};
@@ -142,7 +147,9 @@ describe('photosSlice local copy', () => {
 
   describe('loadPhotos', () => {
     it('first online start: lists every photo, saves the copy, requests the fill', async () => {
-      const rows = Array.from({ length: 60 }, (_, n) => row(n, n % 3 ? USER_A : PARTNER));
+      const rows = Array.from({ length: MORE_THAN_THE_OLD_STORE_CAP }, (_, n) =>
+        row(n, n % 3 ? USER_A : PARTNER)
+      );
       listAllPhotos.mockResolvedValue(rows);
       const store = createTestStore();
 
@@ -519,19 +526,33 @@ describe('photosSlice local copy', () => {
   });
 
   describe('refresher', () => {
-    it('registers the photos kind, which loads the list when signed in', async () => {
-      const store = createTestStore();
+    /** The refresher the slice registered for the photos kind, if any. */
+    function photosRefresher(): (() => Promise<void>) | undefined {
       const call = registerLocalCopy.mock.calls.find(([kind]) => kind === PHOTOS_COPY_KIND);
-      expect(call).toBeDefined();
-      const refresh = call![1] as () => Promise<void>;
+      return call?.[1] as (() => Promise<void>) | undefined;
+    }
 
+    it('registers the photos kind', () => {
+      createTestStore();
+
+      expect(photosRefresher()).toBeDefined();
+    });
+
+    it('the refresher loads the list when signed in', async () => {
+      const store = createTestStore();
       listAllPhotos.mockResolvedValue([row(0)]);
-      await refresh();
-      expect(store.getState().photos).toEqual([shown(row(0))]);
 
-      listAllPhotos.mockClear();
+      await photosRefresher()!();
+
+      expect(store.getState().photos).toEqual([shown(row(0))]);
+    });
+
+    it('the refresher does nothing when signed out', async () => {
+      const store = createTestStore();
       store.setState({ userId: null });
-      await refresh();
+
+      await photosRefresher()!();
+
       expect(listAllPhotos).not.toHaveBeenCalled();
     });
   });

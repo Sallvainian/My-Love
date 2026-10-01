@@ -11,6 +11,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../support/merged-fixtures';
 import {
+  UNMAPPED_SQLSTATE,
   createDatabaseErrorEnvelope,
   type DatabaseErrorEnvelope,
 } from '../support/factories/database-error-envelope';
@@ -78,7 +79,7 @@ test.describe('DW-39 empty database error fallback through SDK parsing', () => {
     );
     expect(mapped).toMatchObject({
       name: 'SupabaseServiceError',
-      code: 'XX000',
+      code: UNMAPPED_SQLSTATE,
       details: 'Original diagnostic details',
       hint: 'Original diagnostic hint',
       isNetworkError: false,
@@ -95,7 +96,7 @@ test.describe('DW-39 empty database error fallback through SDK parsing', () => {
     expect(mapped.message).toBe('Database error: An unknown database error occurred');
     expect(mapped).toMatchObject({
       name: 'SupabaseServiceError',
-      code: 'XX000',
+      code: UNMAPPED_SQLSTATE,
       details: null,
       hint: null,
       isNetworkError: false,
@@ -126,7 +127,7 @@ test.describe('DW-39 empty database error fallback through SDK parsing', () => {
     expect(mapped.message).toBe(
       '[EventsService.createEvent] Database error:   Injected create failure \n'
     );
-    expect(mapped.code).toBe('XX000');
+    expect(mapped.code).toBe(UNMAPPED_SQLSTATE);
     expect(mapped.isNetworkError).toBe(false);
   });
 
@@ -136,7 +137,7 @@ test.describe('DW-39 empty database error fallback through SDK parsing', () => {
     const mapped = handleSupabaseError(error, 'EventsService.createEvent');
 
     expect(mapped.message).toBe('[EventsService.createEvent] Database error: 42');
-    expect(mapped.code).toBe('XX000');
+    expect(mapped.code).toBe(UNMAPPED_SQLSTATE);
     expect(mapped.isNetworkError).toBe(false);
   });
 });

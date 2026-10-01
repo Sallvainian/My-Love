@@ -10,11 +10,17 @@ export interface DatabaseErrorEnvelope {
   hint: string | null;
 }
 
+/**
+ * Postgres `internal_error` SQLSTATE: the envelope's default code, and one the
+ * `23514` CHECK mapping does not claim, so the generic database fallback runs.
+ */
+export const UNMAPPED_SQLSTATE = 'XX000';
+
 export function createDatabaseErrorEnvelope(
   overrides: Partial<DatabaseErrorEnvelope> = {}
 ): DatabaseErrorEnvelope {
   return {
-    code: 'XX000',
+    code: UNMAPPED_SQLSTATE,
     message: ' \t\n',
     details: null,
     hint: null,

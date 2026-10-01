@@ -153,6 +153,25 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     setUrl(`${APP_ORIGIN}/`);
   });
 
+  /**
+   * Start a Google sign-in on the app's own client at the root URL, so the real
+   * SDK writes this browser's code verifier, without navigating away. The
+   * returning-browser cases build on the storage this leaves behind.
+   */
+  async function startGoogleFlowInThisBrowser(): Promise<void> {
+    setUrl(`${APP_ORIGIN}/`);
+    const starter = await importAppClient();
+    clients.push(starter.supabase);
+    const { error } = await starter.supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+        skipBrowserRedirect: true,
+      },
+    });
+    expect(error, 'the starting browser began the flow').toBeNull();
+  }
+
   it('refuses a foreign implicit token fragment while signed out, and says nothing', async () => {
     setUrl(`${APP_ORIGIN}/${HOSTILE_FRAGMENT}`);
 
@@ -400,16 +419,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     // is why the error case cannot short-circuit: 'code-expired' tells the
     // person to sign in again, and they already are. The docblock's promise
     // that `null` covers "a redeemed callback" is what this pins.
-    setUrl(`${APP_ORIGIN}/`);
-    const starter = await importAppClient();
-    clients.push(starter.supabase);
-    await starter.supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
-        skipBrowserRedirect: true,
-      },
-    });
+    await startGoogleFlowInThisBrowser();
 
     fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
       if (String(input).includes('grant_type=pkce')) {
@@ -495,16 +505,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     // here asserts a refusal, so without this one nothing would notice if the
     // app stopped completing logins at all -- `detectSessionInUrl: false` would
     // leave the whole suite green while Google sign-in silently never finished.
-    setUrl(`${APP_ORIGIN}/`);
-    const starter = await importAppClient();
-    clients.push(starter.supabase);
-    await starter.supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
-        skipBrowserRedirect: true,
-      },
-    });
+    await startGoogleFlowInThisBrowser();
     // The real SDK wrote the verifier; the "returning browser" below is the same
     // storage, which is exactly what ties the code to this browser.
     // The flow index shares the `-code-verifier` suffix
@@ -581,16 +582,7 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     // present and the failed exchange left no session, so the branch below it
     // would tell someone whose code simply expired to go and find a different
     // browser.
-    setUrl(`${APP_ORIGIN}/`);
-    const starter = await importAppClient();
-    clients.push(starter.supabase);
-    await starter.supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
-        skipBrowserRedirect: true,
-      },
-    });
+    await startGoogleFlowInThisBrowser();
     const storedVerifierKey = Object.keys(localStorage).find(
       (key) => key.endsWith('-code-verifier') && !key.endsWith('-flows-code-verifier')
     );

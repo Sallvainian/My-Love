@@ -110,6 +110,9 @@ describe('useRealtimeMessages', () => {
       vi.useRealTimers();
     });
 
+    /** useRealtimeMessages.ts RETRY_CONFIG.baseDelay * 2 ** 1 (module-private). */
+    const SECOND_BACKOFF_MS = 2000;
+
     /**
      * Opens the feed, fails its first join with CHANNEL_ERROR and waits out the
      * 1s backoff, so exactly one retry has joined.
@@ -159,14 +162,28 @@ describe('useRealtimeMessages', () => {
       expect(mocks.order).toEqual(['setAuth', 'subscribe', 'setAuth', 'subscribe']);
     });
 
-    it('hands the status callback to the retried join', async () => {
+    it('keeps reporting channel status after a retried join', async () => {
       const { subscribeCallbacks } = await mountAndRetryOnce();
 
       // The retry must hand the status callback back. Without it the rejoined
       // channel reports nothing, so neither the retry-count reset nor the
       // partner-snapshot refresh ever runs again.
       expect(subscribeCallbacks).toHaveLength(2);
-      expect(subscribeCallbacks[1]).toBeTypeOf('function');
+
+      // Proof the callback IS the hook's status handler, not just a function:
+      // an error reported through it schedules the next retry, at the second
+      // backoff step because the first retry already spent one.
+      await act(async () => {
+        emitStatus(subscribeCallbacks[1], 'CHANNEL_ERROR');
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(SECOND_BACKOFF_MS - 1);
+      });
+      expect(subscribeCallbacks).toHaveLength(2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(subscribeCallbacks).toHaveLength(3);
     });
 
     it('does not look the partner up again before the retried join', async () => {
@@ -379,18 +396,19 @@ describe('useRealtimeMessages', () => {
     describe('when the retry token install rejects', () => {
       // A rejected token install must never escape as an unhandled rejection:
       // nothing in the hook is awaiting the retry, so an uncaught one would
-      // take the page's error handler, not this call stack.
-      let unhandled = vi.fn<(reason: unknown) => void>();
+      // take the page's error handler, not this call stack. No wait in this
+      // file checks for one: Vitest fails the run on any unhandled rejection
+      // that reaches Node's checkpoint (vitest.config.ts does not set
+      // dangerouslyIgnoreUnhandledErrors), so a hook that leaked one would turn
+      // the run red on its own. The logged error below is the positive proof
+      // that the rejection was caught.
       let consoleError: ReturnType<typeof vi.spyOn>;
 
       beforeEach(() => {
-        unhandled = vi.fn<(reason: unknown) => void>();
-        process.on('unhandledRejection', unhandled);
         consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
       });
 
       afterEach(() => {
-        process.off('unhandledRejection', unhandled);
         consoleError.mockRestore();
       });
 
@@ -440,16 +458,6 @@ describe('useRealtimeMessages', () => {
         return { ...joined, tokenFailure };
       }
 
-      async function expectNoUnhandledRejection() {
-        // Let any rejection Node was going to report reach its checkpoint.
-        // Real timers for this last turn: vitest's fake timers stub
-        // setImmediate too, so a faked one would never fire. Nothing is pending
-        // by now — the hook has given up until the next CHANNEL_ERROR.
-        vi.useRealTimers();
-        await new Promise((resolve) => setImmediate(resolve));
-        expect(unhandled).not.toHaveBeenCalled();
-      }
-
       it('attempts no join and releases nothing when the retry token install rejects', async () => {
         const { supabase, mockChannel, emitError } = await mountFirstJoin();
 
@@ -479,7 +487,6 @@ describe('useRealtimeMessages', () => {
           '[useRealtimeMessages] Retry setup failed:',
           tokenFailure
         );
-        await expectNoUnhandledRejection();
       });
 
       it('schedules no further attempt on its own after the token install rejects', async () => {
@@ -516,7 +523,6 @@ describe('useRealtimeMessages', () => {
         expect(supabase.removeChannel).toHaveBeenCalledTimes(1);
         expect(supabase.channel).toHaveBeenCalledTimes(2);
         expect(mockChannel.subscribe).toHaveBeenCalledTimes(2);
-        await expectNoUnhandledRejection();
       });
     });
 

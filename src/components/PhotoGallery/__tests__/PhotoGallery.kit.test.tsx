@@ -86,7 +86,7 @@ describe('PhotoGallery grid', () => {
     expect(upload.textContent).toBe('Upload');
   });
 
-  it('calls onUploadClick once when the header Upload pill is pressed', async () => {
+  it('asks for the upload dialog once when the header Upload pill is pressed', async () => {
     const user = userEvent.setup();
     const onUploadClick = await renderGallery();
 
@@ -217,7 +217,7 @@ describe('PhotoGallery empty', () => {
     expect(button.className).toContain('bg-fill');
   });
 
-  it('calls onUploadClick once when the empty-state Upload button is pressed', async () => {
+  it('asks for the upload dialog once when the empty-state Upload button is pressed', async () => {
     const user = userEvent.setup();
     listPhotos.mockResolvedValue([]);
     const onUploadClick = await renderGallery();

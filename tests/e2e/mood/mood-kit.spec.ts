@@ -14,6 +14,8 @@ import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
+import type { TypedSupabaseClient } from '../../support/factories';
 
 type Scheme = 'light' | 'dark';
 
@@ -55,6 +57,24 @@ async function openMood(page: Page, colorScheme: Scheme) {
   await page.goto('/mood');
   await expect(page.getByTestId('mood-tracker')).toBeVisible();
   await expect(page.getByTestId('mood-button-happy')).toBeVisible();
+}
+
+/**
+ * Open Mood and return once the signed-in start's own mood-history backfill
+ * (`loadMoodHistoryFromServer`, moodSlice.ts) has answered, so the Timeline
+ * and Calendar are read against loaded history rather than a load in flight.
+ * Armed before the navigation, so the read cannot answer first and be missed.
+ */
+async function openMoodAfterHistory(
+  page: Page,
+  colorScheme: Scheme,
+  supabaseAdmin: TypedSupabaseClient,
+  interceptNetworkCall: InterceptNetworkCallFn
+) {
+  const { userId } = await resolveOwnPair(supabaseAdmin);
+  const backfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
+  await openMood(page, colorScheme);
+  expect((await backfill).status).toBe(200);
 }
 
 /** The Mood view's own text with user notes removed. */
@@ -171,10 +191,12 @@ test.describe('Mood on the style kit', () => {
       await expectNoHorizontalOverflow(page);
     });
 
-    test(`[P1] should show the Timeline and Calendar on the kit card in ${colorScheme}`, async ({
+    test(`[P1] should show the Timeline on the kit card in ${colorScheme}`, async ({
       page,
+      supabaseAdmin,
+      interceptNetworkCall,
     }) => {
-      await openMood(page, colorScheme);
+      await openMoodAfterHistory(page, colorScheme, supabaseAdmin, interceptNetworkCall);
 
       await page.getByTestId('mood-tab-timeline').click();
       await expect(page.getByTestId('mood-history-section')).toBeVisible();
@@ -186,6 +208,14 @@ test.describe('Mood on the style kit', () => {
       await expectNoHorizontalOverflow(page);
       await expect(page.getByTestId('loading-spinner')).toHaveCount(0);
       expect(await chromeText(page)).not.toMatch(/\p{Extended_Pictographic}/u);
+    });
+
+    test(`[P1] should show the Calendar on the kit card in ${colorScheme}`, async ({
+      page,
+      supabaseAdmin,
+      interceptNetworkCall,
+    }) => {
+      await openMoodAfterHistory(page, colorScheme, supabaseAdmin, interceptNetworkCall);
 
       await page.getByTestId('mood-tab-history').click();
       await expect(page.getByTestId('mood-calendar')).toBeVisible();

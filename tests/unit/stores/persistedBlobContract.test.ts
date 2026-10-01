@@ -33,6 +33,7 @@ import {
   persistedBlob,
   STORAGE_KEY,
 } from '../helpers/persistedBlob';
+import { makeMoodEntry } from './moodSliceFixture';
 
 /**
  * `currentIndex: 7` (`PERSISTED_MESSAGE_HISTORY` in the helper) is the sentinel
@@ -148,26 +149,13 @@ describe('persisted-blob adapter contract', () => {
       // Non-empty on purpose: a `partialize` that emitted `moods` only when it
       // had entries would slip past a probe run against the empty defaults.
       useAppStore.setState({
-        moods: [
-          {
-            id: 1,
-            userId: 'user-A',
-            mood: 'happy',
-            moods: ['happy'],
-            date: '2026-07-26',
-            timestamp: '2026-07-26T06:00:00.000Z',
-            synced: true,
-          },
-        ],
+        moods: [makeMoodEntry({ userId: 'user-A' })],
+        // The on-disk event with its stamps back in memory as `Date`s.
         events: [
           {
-            id: 'event-1',
-            userId: 'user-A',
-            label: 'Anniversary',
-            date: new Date('2026-09-12T00:00:00.000Z'),
-            createdAt: new Date('2026-01-01T00:00:00.000Z'),
-            description: null,
-            icon: 'plane',
+            ...PERSISTED_EVENT,
+            date: new Date(PERSISTED_EVENT.date),
+            createdAt: new Date(PERSISTED_EVENT.createdAt),
           },
         ],
       } as never);
