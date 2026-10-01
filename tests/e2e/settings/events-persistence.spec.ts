@@ -44,6 +44,7 @@
  *   npx playwright test tests/e2e/settings/events-persistence.spec.ts --project=chromium
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
 // The pair resolution, the scoped teardown and the two date rules live in one
 // module now. They were hand-copied into eight files before it existed, and
@@ -149,10 +150,7 @@ async function submitNewEvent(
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching the Home and Settings specs.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.afterEach(async ({ supabaseAdmin }) => {

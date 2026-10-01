@@ -20,6 +20,7 @@
  * home/routing.spec.ts.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
 
 /** The Photos view's module as the dev server serves it, with or without a query. */
@@ -27,10 +28,7 @@ const PHOTO_GALLERY_MODULE = '**/src/components/PhotoGallery/PhotoGallery.tsx*';
 
 test.describe('Error Boundary', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   test('[P0] shows the view error and keeps the dock when a view throws while loading', async ({ page }) => {

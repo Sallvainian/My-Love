@@ -10,6 +10,7 @@
  * switch under `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import {
@@ -93,10 +94,7 @@ async function openHome(
 
 test.describe('Home on the style kit', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {

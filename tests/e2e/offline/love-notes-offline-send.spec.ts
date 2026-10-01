@@ -20,6 +20,7 @@
  */
 import type { Page, Request } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { partnerRecordRead } from '../../support/helpers/reads';
@@ -109,10 +110,7 @@ async function deleteStampedNotes(
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching love-notes-offline-copy.spec.ts.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.describe('Love-note text sent offline', () => {

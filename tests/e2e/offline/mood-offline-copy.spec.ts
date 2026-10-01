@@ -20,6 +20,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
@@ -112,10 +113,7 @@ async function savedPartnerNotes(page: Page): Promise<string[] | null> {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching events-offline-copy.spec.ts.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.describe('Mood history and partner moods offline', () => {

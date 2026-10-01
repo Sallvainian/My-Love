@@ -10,6 +10,7 @@
  * catches that.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
 
 const DOCK_DESTINATIONS = ['home', 'mood', 'notes', 'photos', 'partner'] as const;
@@ -26,10 +27,7 @@ const PATHS: Record<(typeof ALL_DESTINATIONS)[number], RegExp> = {
 
 test.describe('Bottom Dock', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   test('[P1] should show the dock and the gear without any tap', async ({ page }) => {

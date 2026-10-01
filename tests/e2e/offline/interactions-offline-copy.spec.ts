@@ -19,6 +19,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
@@ -51,10 +52,7 @@ async function seedPartnerPoke(supabaseAdmin: TypedSupabaseClient): Promise<stri
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching events-offline-copy.spec.ts.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.describe('Poke and kiss history from the local copy', () => {

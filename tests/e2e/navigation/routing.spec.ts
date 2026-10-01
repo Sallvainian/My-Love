@@ -8,14 +8,12 @@
  * view, the role the retired bar's container testid played.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
 
 test.describe('URL Routing', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash for all routing tests
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   test('[P0] should load correct view from direct URL', async ({ page }) => {

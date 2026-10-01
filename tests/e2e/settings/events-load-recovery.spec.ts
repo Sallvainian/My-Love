@@ -67,6 +67,7 @@
  * unlinked, no password reset, no shared row nulled.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
   clearOwnPairEvents,
@@ -97,10 +98,7 @@ function rowFor(page: Page, label: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching events-crud.spec.ts:139-144.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.afterEach(async ({ supabaseAdmin }) => {

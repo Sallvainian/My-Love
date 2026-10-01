@@ -62,6 +62,7 @@
  * should stay armed, and a 4xx/5xx during an accessibility run is real signal.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import {
   clearOwnPairEvents,
   clearPairEvents,
@@ -101,10 +102,7 @@ function rowFor(page: Page, label: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching events-crud.spec.ts:139-144.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.afterEach(async ({ supabaseAdmin }) => {

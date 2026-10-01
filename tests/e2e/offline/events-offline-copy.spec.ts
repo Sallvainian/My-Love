@@ -13,6 +13,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import {
@@ -54,10 +55,7 @@ async function expectListedOffline(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching events-crud.spec.ts.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.describe('Events from the local copy', () => {

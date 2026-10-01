@@ -10,6 +10,7 @@
  * `emulateMedia` alone flips them.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash, WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { openSettingsFromHome } from '../../support/helpers/settings-screen';
@@ -36,10 +37,7 @@ async function openSettings(
 
 test.describe('Settings on the style kit', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {
@@ -122,7 +120,7 @@ test.describe('Settings on the style kit', () => {
     interceptNetworkCall,
   }) => {
     await openSettings(page, interceptNetworkCall, 'light');
-    const before = await page.evaluate(() => localStorage.getItem('lastWelcomeView'));
+    const before = await page.evaluate((key) => localStorage.getItem(key), WELCOME_SPLASH_KEY);
 
     await page.getByTestId('settings-replay-welcome').click();
     await expect(page.getByTestId('welcome-splash')).toBeVisible();
@@ -132,7 +130,7 @@ test.describe('Settings on the style kit', () => {
     await expect(page.getByTestId('settings-view')).toBeVisible();
 
     // A manual replay does not reset the automatic splash timer.
-    const after = await page.evaluate(() => localStorage.getItem('lastWelcomeView'));
+    const after = await page.evaluate((key) => localStorage.getItem(key), WELCOME_SPLASH_KEY);
     expect(after).toBe(before);
   });
 });

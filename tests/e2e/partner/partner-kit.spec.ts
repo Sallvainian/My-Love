@@ -19,6 +19,7 @@ import { resolveOwnPair } from '../../support/helpers/events';
 import { INTERACTIONS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { interceptNetworkCall as fulfillOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { Page } from '@playwright/test';
 
@@ -162,10 +163,7 @@ async function openConnectedPartner(page: Page, colorScheme: Scheme, ownUserId: 
 
 test.describe('Partner on the style kit', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   for (const colorScheme of ['light', 'dark'] as const satisfies readonly Scheme[]) {

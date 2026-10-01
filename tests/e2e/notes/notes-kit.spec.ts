@@ -9,6 +9,7 @@
  * under `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { Locator, Page } from '@playwright/test';
 import { deleteSentNote } from '../../support/helpers/love-notes';
 
@@ -55,10 +56,7 @@ const background = (locator: Locator) =>
 
 test.describe('Love Notes on the style kit', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   /**

@@ -19,6 +19,7 @@
  * shared through `tests/support/helpers/events.ts`.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
   clearOwnPairEvents,
@@ -98,10 +99,7 @@ function longForm(isoDate: string): string {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching the Home specs.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.afterEach(async ({ supabaseAdmin }) => {

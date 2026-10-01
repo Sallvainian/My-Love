@@ -26,6 +26,7 @@
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
@@ -96,10 +97,7 @@ test.afterEach(async ({ supabaseAdmin }) => {
 
 test.describe('Home dashboard reads events from the store', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash, matching the other Home specs.
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   test('[P0] shows own and partner future events soonest first, each with its own icon', async ({
@@ -494,9 +492,7 @@ test.describe(
   { annotation: [{ type: 'skipNetworkMonitoring' }] },
   () => {
     test.beforeEach(async ({ page }) => {
-      await page.addInitScript(() => {
-        localStorage.setItem('lastWelcomeView', Date.now().toString());
-      });
+      await dismissWelcomeSplash(page);
     });
 
     test('[P0] renders the load error and recovers on a later successful Home load', async ({

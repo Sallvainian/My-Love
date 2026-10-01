@@ -8,6 +8,7 @@ import type { Page } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import { recurse } from '@seontechnologies/playwright-utils/recurse';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { EventsRefreshControl } from '../../support/fixtures/events-refresh-control';
 import { navigateTo } from '../../support/helpers/navigation';
 
@@ -79,9 +80,7 @@ async function returnToSettings(page: Page, control: EventsRefreshControl) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 test.describe('DW-57 events refresh and retry across Settings unmount', () => {

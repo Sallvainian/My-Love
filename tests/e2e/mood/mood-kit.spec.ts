@@ -12,6 +12,7 @@ import { resolveOwnPair } from '../../support/helpers/events';
 import { ownMoodHistoryRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { Page } from '@playwright/test';
 
 type Scheme = 'light' | 'dark';
@@ -108,10 +109,7 @@ async function expectNoHorizontalOverflow(page: Page) {
 
 test.describe('Mood on the style kit', () => {
   test.beforeEach(async ({ page }) => {
-    // Dismiss welcome splash
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {

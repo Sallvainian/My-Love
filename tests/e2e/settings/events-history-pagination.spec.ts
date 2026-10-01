@@ -2,6 +2,7 @@
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { eventDateFrom, type SeededEvent } from '../../support/factories/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import { EVENTS_WRITE, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
@@ -132,7 +133,7 @@ async function pageThroughTiedHistory(
 
 test.describe('Settings events history pagination', () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('lastWelcomeView', String(Date.now())));
+    await dismissWelcomeSplash(page);
   });
 
   test('[P0] loads and edits omitted history, then finds the saved deep date after reload', async ({

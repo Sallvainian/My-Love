@@ -9,6 +9,7 @@ import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 // `.env.test` points the dev server at http://127.0.0.1:54321, and the SDK
@@ -150,9 +151,7 @@ test.describe('Login Flow', () => {
     const pair = getWorkerPairEmails();
     if (!pair) throw new Error('This test requires its worker-owned account pair');
     const { userId } = await resolveWorkerPairIds(supabaseAdmin);
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    });
+    await dismissWelcomeSplash(page);
 
     await page.goto('/');
     await expect(page.getByTestId('login-screen')).toBeVisible();

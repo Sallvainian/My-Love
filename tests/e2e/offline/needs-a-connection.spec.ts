@@ -40,6 +40,7 @@
 import type { Locator, Page, Request } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
@@ -107,10 +108,7 @@ function watchSupabaseRequests(page: Page, { writesOnly = false } = {}) {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Dismiss the welcome splash, matching photos-offline.spec.ts.
-  await page.addInitScript(() => {
-    localStorage.setItem('lastWelcomeView', Date.now().toString());
-  });
+  await dismissWelcomeSplash(page);
 });
 
 // ---------------------------------------------------------------------------
