@@ -106,14 +106,21 @@ describe('getMessageForDate', () => {
 });
 
 describe('getAvailableHistoryDays', () => {
+  // Every case measures against one pinned instant: the window is a count of
+  // whole days back from now, so a live clock would make each start date a
+  // moving boundary.
+  const NOW = new Date(2026, 8, 22, 12, 0, 0);
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+  });
+
   afterEach(() => {
     vi.useRealTimers();
   });
 
   it('returns whole days since the couple start when less than 30', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 8, 22, 12, 0, 0));
-
     const history: MessageHistory = { maxHistoryDays: 30 } as MessageHistory;
     const start = new Date(2026, 8, 12, 12, 0, 0).toISOString();
 
@@ -121,7 +128,6 @@ describe('getAvailableHistoryDays', () => {
   });
 
   it('counts from the start instant, including its time of day', () => {
-    vi.useFakeTimers();
     // 9 days and 23 hours after an 18:00 start: nine whole days.
     vi.setSystemTime(new Date(2026, 8, 22, 17, 0, 0));
 
@@ -132,36 +138,32 @@ describe('getAvailableHistoryDays', () => {
   });
 
   it('caps at 30 even if configured higher', () => {
-    const twoYearsAgo = new Date();
-    twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-
+    // 31 whole days before NOW: one past the cap.
+    const start = new Date(2026, 7, 22, 12, 0, 0).toISOString();
     const history: MessageHistory = { maxHistoryDays: 100 } as MessageHistory;
 
-    expect(getAvailableHistoryDays(history, twoYearsAgo.toISOString())).toBe(30);
+    expect(getAvailableHistoryDays(history, start)).toBe(30);
   });
 
   it('uses configured max if less than 30 and less than days since start', () => {
-    const twoYearsAgo = new Date();
-    twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-
+    // 15 whole days before NOW: one past the configured 14.
+    const start = new Date(2026, 8, 7, 12, 0, 0).toISOString();
     const history: MessageHistory = { maxHistoryDays: 14 } as MessageHistory;
 
-    expect(getAvailableHistoryDays(history, twoYearsAgo.toISOString())).toBe(14);
+    expect(getAvailableHistoryDays(history, start)).toBe(14);
   });
 
   it('defaults maxHistoryDays to 30 when undefined', () => {
-    const twoYearsAgo = new Date();
-    twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+    // 31 whole days before NOW: one past the default.
+    const start = new Date(2026, 7, 22, 12, 0, 0).toISOString();
 
-    expect(getAvailableHistoryDays({} as MessageHistory, twoYearsAgo.toISOString())).toBe(30);
+    expect(getAvailableHistoryDays({} as MessageHistory, start)).toBe(30);
   });
 
   it('never goes below zero for a start still in the future', () => {
-    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const nextWeek = new Date(2026, 8, 29, 12, 0, 0).toISOString();
 
-    expect(
-      getAvailableHistoryDays({ maxHistoryDays: 30 } as MessageHistory, nextWeek.toISOString())
-    ).toBe(0);
+    expect(getAvailableHistoryDays({ maxHistoryDays: 30 } as MessageHistory, nextWeek)).toBe(0);
   });
 
   // No start date (unlinked, not set yet, not loaded) and an unreadable one
