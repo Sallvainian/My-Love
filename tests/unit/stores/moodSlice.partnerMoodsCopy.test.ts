@@ -82,6 +82,8 @@ describe('moodSlice', () => {
     const USER = 'user-A';
     const PARTNER = 'partner-uuid';
     const copyKey = `${USER}|partner-moods`;
+    /** Partner Mood's row limit (the slice's default); no case depends on its size. */
+    const PARTNER_MOOD_LIMIT = 30;
 
     const savedMood = {
       userId: PARTNER,
@@ -107,7 +109,7 @@ describe('moodSlice', () => {
       savedCopies.set(copyKey, [savedMood]);
 
       const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
 
       expect(mockedGetPartnerId).not.toHaveBeenCalled();
       expect(get().partnerMoods).toHaveLength(1);
@@ -128,7 +130,7 @@ describe('moodSlice', () => {
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
 
       const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
 
       expect(get().partnerMoods).toEqual([]);
       expect(mockedGetPartnerId).not.toHaveBeenCalled();
@@ -141,7 +143,7 @@ describe('moodSlice', () => {
       mockedMoodSyncService.fetchMoods.mockReturnValue(new Promise((resolve) => (settle = resolve)));
 
       const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      const inFlight = get().fetchPartnerMoods(30);
+      const inFlight = get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
       await vi.waitFor(() => expect(mockedMoodSyncService.fetchMoods).toHaveBeenCalled());
       expect(get().partnerMoods.map((m) => m.supabaseId)).toEqual(['saved-1']);
 
@@ -168,7 +170,7 @@ describe('moodSlice', () => {
       mockedMoodSyncService.fetchMoods.mockResolvedValue([]);
 
       const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
 
       expect(get().partnerMoods).toEqual([]);
       expect(savedCopies.get(copyKey)).toEqual([]);
@@ -181,7 +183,7 @@ describe('moodSlice', () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
 
       expect(get().partnerMoods.map((m) => m.supabaseId)).toEqual(['saved-1']);
       expect(mockedWriteLocalCopy).not.toHaveBeenCalled();
@@ -194,7 +196,7 @@ describe('moodSlice', () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
 
       expect(get().partnerMoods.map((m) => m.supabaseId)).toEqual(['saved-1']);
       expect(mockedWriteLocalCopy).not.toHaveBeenCalled();
@@ -210,7 +212,7 @@ describe('moodSlice', () => {
       savedCopies.set(copyKey, copy);
 
       const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
 
       expect(get().partnerMoods).toEqual([]);
     });
@@ -223,13 +225,13 @@ describe('moodSlice', () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
       expect(get().partnerMoods).toEqual([]);
       // The failed save left the old copy in place.
       expect(savedCopies.get(copyKey)).toEqual([savedMood]);
 
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
 
       expect(get().partnerMoods).toEqual([]);
     });
@@ -241,7 +243,7 @@ describe('moodSlice', () => {
 
       const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
       set({ partnerMoods: shown } as Partial<MoodSlice>);
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
 
       expect(get().partnerMoods).toBe(shown);
     });
@@ -254,7 +256,7 @@ describe('moodSlice', () => {
       ]);
 
       const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
 
       expect(get().partnerMoods.map((m) => m.supabaseId)).toEqual(['server-1']);
     });
@@ -264,7 +266,7 @@ describe('moodSlice', () => {
       mockedReadLocalCopy.mockReturnValue(new Promise((resolve) => (settleCopy = resolve)) as never);
 
       const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      const inFlight = get().fetchPartnerMoods(30);
+      const inFlight = get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
       set({ userId: 'user-B', authSessionVersion: 2, partnerMoods: [] } as never);
       settleCopy([savedMood]);
       await inFlight;
@@ -280,7 +282,7 @@ describe('moodSlice', () => {
       mockedMoodSyncService.fetchMoods.mockReturnValue(new Promise((resolve) => (settle = resolve)));
 
       const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      const inFlight = get().fetchPartnerMoods(30);
+      const inFlight = get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
       await vi.waitFor(() => expect(mockedMoodSyncService.fetchMoods).toHaveBeenCalled());
       set({ userId: 'user-B', authSessionVersion: 2, partnerMoods: [] } as never);
       settle([serverRecord]);
@@ -298,9 +300,9 @@ describe('moodSlice', () => {
         .mockResolvedValueOnce([serverRecord]);
 
       const { get } = createTestStore({ userId: USER, authSessionVersion: 1 });
-      const older = get().fetchPartnerMoods(30);
+      const older = get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
       await vi.waitFor(() => expect(mockedMoodSyncService.fetchMoods).toHaveBeenCalledTimes(1));
-      await get().fetchPartnerMoods(30);
+      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
       settleOld([]);
       await older;
 

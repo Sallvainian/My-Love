@@ -52,6 +52,8 @@ import type {
 import { createEventsSlice, type EventsSlice } from '../../../src/stores/slices/eventsSlice';
 
 const USER_ID = 'USER-A-ID';
+/** SQLSTATE 42501 (insufficient_privilege): an RLS refusal, which events report as `transport`. */
+const INSUFFICIENT_PRIVILEGE = '42501';
 
 type TestStore = EventsSlice & { userId: string | null; authSessionVersion: number };
 
@@ -773,7 +775,7 @@ describe('eventsSlice', () => {
           new Error(
             '[EventsService.createEvent] Permission denied - check Row Level Security policies'
           ),
-          { code: '42501' }
+          { code: INSUFFICIENT_PRIVILEGE }
         )
       );
 

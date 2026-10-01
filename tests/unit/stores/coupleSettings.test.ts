@@ -363,9 +363,16 @@ describe('couple settings on the local copy', () => {
 
 // `canNavigateBack` reads `coupleSettings` through the messages slice.
 describe('message history limit from the couple start', () => {
+  /** The `maxHistoryDays` cap each case configures; it applies when there is no start. */
+  const CONFIGURED_CAP_DAYS = 30;
+
   function atIndex(currentIndex: number) {
     useAppStore.setState({
-      messageHistory: { ...state().messageHistory, currentIndex, maxHistoryDays: 30 },
+      messageHistory: {
+        ...state().messageHistory,
+        currentIndex,
+        maxHistoryDays: CONFIGURED_CAP_DAYS,
+      },
     });
   }
 
@@ -416,9 +423,9 @@ describe('message history limit from the couple start', () => {
     ['not known yet', null],
   ])('without a start (%s) the configured cap applies', (_label, coupleSettings) => {
     useAppStore.setState({ coupleSettings });
-    atIndex(29);
+    atIndex(CONFIGURED_CAP_DAYS - 1);
     expect(state().canNavigateBack()).toBe(true);
-    atIndex(30);
+    atIndex(CONFIGURED_CAP_DAYS);
     expect(state().canNavigateBack()).toBe(false);
   });
 });

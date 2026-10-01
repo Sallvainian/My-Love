@@ -17,7 +17,12 @@
  * stripped on load and the blob still parses.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { persistedBlob, SEEDED_SETTINGS, STORAGE_KEY } from '../helpers/persistedBlob';
+import {
+  PERSISTED_MESSAGE_HISTORY,
+  persistedBlob,
+  SEEDED_SETTINGS,
+  STORAGE_KEY,
+} from '../helpers/persistedBlob';
 
 /** Settings as the current build writes them, shaped to pass `SettingsSchema`. */
 const CURRENT_SETTINGS = {
@@ -83,7 +88,9 @@ describe('persisted settings from the removed theme system', () => {
 
     // Stripping inside `settings` must not look like corruption to the adapter.
     expect(useAppStore.getState().isOnboarded).toBe(true);
-    expect(useAppStore.getState().messageHistory.currentIndex).toBe(7);
+    expect(useAppStore.getState().messageHistory.currentIndex).toBe(
+      PERSISTED_MESSAGE_HISTORY.currentIndex
+    );
   });
 
   it('leaves them out of the next write, at the same persist version', async () => {
@@ -108,7 +115,9 @@ describe('persisted settings from the removed theme system', () => {
     expect(settings?.relationship).not.toHaveProperty('startDate');
     expect(settings?.relationship).not.toHaveProperty('partnerName');
     // The blob still parsed: nothing else was reset.
-    expect(useAppStore.getState().messageHistory.currentIndex).toBe(7);
+    expect(useAppStore.getState().messageHistory.currentIndex).toBe(
+      PERSISTED_MESSAGE_HISTORY.currentIndex
+    );
 
     useAppStore.setState({ isOnboarded: true });
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);

@@ -289,7 +289,7 @@ describe('moodSlice', () => {
       expect(get().partnerMoods).toEqual([]);
     });
 
-    it('returns early when no partner ID', async () => {
+    it('fetches no partner moods when there is no partner', async () => {
       mockedGetPartnerId.mockResolvedValue(null);
 
       const { get } = createTestStore();
