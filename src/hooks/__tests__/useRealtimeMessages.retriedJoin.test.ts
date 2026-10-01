@@ -110,6 +110,9 @@ describe('useRealtimeMessages', () => {
       vi.useRealTimers();
     });
 
+    /** useRealtimeMessages.ts RETRY_CONFIG.baseDelay * 2 ** 1 (module-private). */
+    const SECOND_BACKOFF_MS = 2000;
+
     /**
      * Opens the feed, fails its first join with CHANNEL_ERROR and waits out the
      * 1s backoff, so exactly one retry has joined.
@@ -159,14 +162,28 @@ describe('useRealtimeMessages', () => {
       expect(mocks.order).toEqual(['setAuth', 'subscribe', 'setAuth', 'subscribe']);
     });
 
-    it('hands the status callback to the retried join', async () => {
+    it('keeps reporting channel status after a retried join', async () => {
       const { subscribeCallbacks } = await mountAndRetryOnce();
 
       // The retry must hand the status callback back. Without it the rejoined
       // channel reports nothing, so neither the retry-count reset nor the
       // partner-snapshot refresh ever runs again.
       expect(subscribeCallbacks).toHaveLength(2);
-      expect(subscribeCallbacks[1]).toBeTypeOf('function');
+
+      // Proof the callback IS the hook's status handler, not just a function:
+      // an error reported through it schedules the next retry, at the second
+      // backoff step because the first retry already spent one.
+      await act(async () => {
+        emitStatus(subscribeCallbacks[1], 'CHANNEL_ERROR');
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(SECOND_BACKOFF_MS - 1);
+      });
+      expect(subscribeCallbacks).toHaveLength(2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(subscribeCallbacks).toHaveLength(3);
     });
 
     it('does not look the partner up again before the retried join', async () => {
