@@ -22,6 +22,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { createPhotoInsert } from '../../support/factories/photos';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
@@ -114,17 +115,16 @@ async function seedPhotos(
     const caption = `E2E offline ${label} ${stamp} #${i}`;
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .insert({
-        user_id: owner,
-        storage_path: path,
-        filename: `offline-${i}.png`,
-        caption,
-        mime_type: 'image/png',
-        file_size: PNG_BYTES.length,
-        width: 2,
-        height: 2,
-        created_at: new Date(stamp - i * 60_000).toISOString(),
-      })
+      .insert(
+        createPhotoInsert({
+          user_id: owner,
+          storage_path: path,
+          file_size: PNG_BYTES.length,
+          filename: `offline-${i}.png`,
+          caption,
+          created_at: new Date(stamp - i * 60_000).toISOString(),
+        })
+      )
       .select('id')
       .single();
     expect(error).toBeNull();

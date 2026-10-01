@@ -40,6 +40,8 @@
 import type { Locator, Page, Request } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { createPartnerRequestRow } from '../../support/factories/partner-requests';
+import { createPhotoInsert } from '../../support/factories/photos';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
@@ -188,16 +190,15 @@ test.describe('Photos offline', () => {
     expect(uploaded.error).toBeNull();
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .insert({
-        user_id: userId,
-        storage_path: path,
-        filename: 'offline.png',
-        caption,
-        mime_type: 'image/png',
-        file_size: PNG_BYTES.length,
-        width: 2,
-        height: 2,
-      })
+      .insert(
+        createPhotoInsert({
+          user_id: userId,
+          storage_path: path,
+          file_size: PNG_BYTES.length,
+          filename: 'offline.png',
+          caption,
+        })
+      )
       .select('id')
       .single();
     expect(error).toBeNull();
@@ -331,14 +332,12 @@ test.describe('Partner requests offline', () => {
     await page.route('**/rest/v1/rpc/get_my_pending_partner_requests', (route) =>
       route.fulfill({
         json: [
-          {
+          createPartnerRequestRow({
             id: FAKE_REQUEST,
             from_user_id: FAKE_SENDER,
             to_user_id: userId,
-            created_at: '2026-09-01T00:00:00Z',
             other_display_name: 'Offline Sender',
-            other_email: 'sender@example.test',
-          },
+          }),
         ],
       })
     );
