@@ -349,78 +349,44 @@ test.describe('Home dashboard reads events from the store', () => {
 
   test('[P0] caps the events column at six cards, keeping the soonest', async ({
     page,
-    supabaseAdmin,
+    coupleEvents,
     interceptNetworkCall,
   }) => {
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    await clearPairEvents(supabaseAdmin, userId, partnerId);
-
     // Seven upcoming events against a cap of six (DW-22). Without the cap the
     // events grid below Wedding keeps growing, pushing Daily Message further off
     // screen. Seeded out of date order and across both halves of the couple,
     // so the assertion pins "the six SOONEST" rather than "the first six
     // rows the query happened to return".
-    const anchor = new Date();
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Fourth Meetup E2E',
-      eventDate: isoDateDaysFromNow(24, anchor),
-      description: 'Fourth event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId: partnerId,
-      label: 'Second Meetup E2E',
-      eventDate: isoDateDaysFromNow(6, anchor),
-      description: 'Second event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Fifth Meetup E2E',
-      eventDate: isoDateDaysFromNow(31, anchor),
-      description: 'Fifth event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Third Meetup E2E',
-      eventDate: isoDateDaysFromNow(18, anchor),
-      description: 'Third event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId: partnerId,
-      label: 'First Meetup E2E',
-      eventDate: isoDateDaysFromNow(2, anchor),
-      description: 'First event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId: partnerId,
-      label: 'Sixth Meetup E2E',
-      eventDate: isoDateDaysFromNow(38, anchor),
-      description: 'Sixth event description',
-      icon: 'calendar',
-    });
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Seventh Meetup E2E',
-      eventDate: isoDateDaysFromNow(45, anchor),
-      description: 'Seventh event description',
-      icon: 'calendar',
-    });
-    // A past event too: the store holds it (Settings lists past events), so
-    // this is what pins that the cap counts UPCOMING events only. Cap the raw
-    // `events` array instead of the filtered one and this row eats a slot,
-    // leaving 'Third Meetup E2E' off the page.
-    await seedEvent(supabaseAdmin, {
-      userId,
-      label: 'Old Meetup E2E',
-      eventDate: isoDateDaysFromNow(-9, anchor),
-      description: 'Old event description',
-      icon: 'calendar',
-    });
+    //
+    // The last row is a past event: the store holds it (Settings lists past
+    // events), so it is what pins that the cap counts UPCOMING events only.
+    // Cap the raw `events` array instead of the filtered one and this row eats
+    // a slot, leaving 'Third Meetup E2E' off the page.
+    await coupleEvents.seed([
+      { dayOffset: 24, label: 'Fourth Meetup E2E', description: 'Fourth event description' },
+      {
+        dayOffset: 6,
+        label: 'Second Meetup E2E',
+        description: 'Second event description',
+        owner: 'partner',
+      },
+      { dayOffset: 31, label: 'Fifth Meetup E2E', description: 'Fifth event description' },
+      { dayOffset: 18, label: 'Third Meetup E2E', description: 'Third event description' },
+      {
+        dayOffset: 2,
+        label: 'First Meetup E2E',
+        description: 'First event description',
+        owner: 'partner',
+      },
+      {
+        dayOffset: 38,
+        label: 'Sixth Meetup E2E',
+        description: 'Sixth event description',
+        owner: 'partner',
+      },
+      { dayOffset: 45, label: 'Seventh Meetup E2E', description: 'Seventh event description' },
+      { dayOffset: -9, label: 'Old Meetup E2E', description: 'Old event description' },
+    ]);
 
     const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');

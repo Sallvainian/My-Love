@@ -169,7 +169,7 @@ test.describe('Partner on the style kit', () => {
   });
 
   for (const colorScheme of ['light', 'dark'] as const satisfies readonly Scheme[]) {
-    test(`[P1] should render the connected Partner view on the kit in ${colorScheme}`, async ({
+    test(`[P1] should title the view with the partner's name in Playfair Display on the kit page in ${colorScheme}`, async ({
       page,
       supabaseAdmin,
     }) => {
@@ -186,25 +186,60 @@ test.describe('Partner on the style kit', () => {
 
       // Page ground.
       await expect(view).toHaveCSS('background-color', KIT_PAGE[colorScheme]);
+    });
+
+    test(`[P1] should show the current mood and two recent moods in ${colorScheme}`, async ({
+      page,
+      supabaseAdmin,
+    }) => {
+      const { userId } = await resolveOwnPair(supabaseAdmin);
+      await openConnectedPartner(page, colorScheme, userId);
 
       // Three stubbed moods: the current card plus two Recent moods rows.
       await expect(page.getByTestId('partner-mood-card')).toHaveCount(3);
       await expect(
         page.getByTestId('partner-mood-list').getByTestId('partner-mood-card')
       ).toHaveCount(2);
+    });
+
+    test(`[P1] should keep the refresh button a 44px target beside the long name in ${colorScheme}`, async ({
+      page,
+      supabaseAdmin,
+    }) => {
+      const { userId } = await resolveOwnPair(supabaseAdmin);
+      await openConnectedPartner(page, colorScheme, userId);
 
       // The long name wraps inside the row; the refresh button keeps its 44px.
-      const refreshBox = await page.getByTestId('partner-mood-refresh-button').boundingBox();
+      const refresh = page.getByTestId('partner-mood-refresh-button');
+      await expect(refresh).toBeVisible();
+      const refreshBox = await refresh.boundingBox();
       expect(refreshBox).not.toBeNull();
       expect(Math.round(refreshBox!.width)).toBe(44);
       expect(Math.round(refreshBox!.height)).toBe(44);
+    });
 
-      // The three action tiles, with no prior click, on the kit card.
+    test(`[P1] should show the three action tiles on the kit card without a click in ${colorScheme}`, async ({
+      page,
+      supabaseAdmin,
+    }) => {
+      const { userId } = await resolveOwnPair(supabaseAdmin);
+      await openConnectedPartner(page, colorScheme, userId);
+
       for (const id of ['poke-button', 'kiss-button', 'fart-button']) {
         const tile = page.getByTestId(id);
         await expect(tile).toBeVisible();
         await expect(tile).toHaveCSS('background-color', KIT_CARD[colorScheme]);
       }
+    });
+
+    test(`[P1] should not scroll sideways or carry emoji in its own chrome in ${colorScheme}`, async ({
+      page,
+      supabaseAdmin,
+    }) => {
+      const { userId } = await resolveOwnPair(supabaseAdmin);
+      await openConnectedPartner(page, colorScheme, userId);
+      // The stubbed moods are drawn, so their notes are what `chromeText` strips.
+      await expect(page.getByTestId('partner-mood-card')).toHaveCount(3);
 
       await expectNoHorizontalOverflow(page);
       expect(await chromeText(page)).not.toMatch(/\p{Extended_Pictographic}/u);

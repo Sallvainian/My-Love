@@ -115,7 +115,7 @@ test.describe('Mood on the style kit', () => {
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {
-    test(`[P1] should render the Mood title, track and tiles on the kit in ${colorScheme}`, async ({
+    test(`[P1] should set the Mood title in Playfair Display in ${colorScheme}`, async ({
       page,
     }) => {
       await openMood(page, colorScheme);
@@ -134,6 +134,12 @@ test.describe('Mood on the style kit', () => {
         (await document.fonts.load('600 30px "Playfair Display"')).map((face) => face.family)
       );
       expect(playfairFaces.length).toBeGreaterThan(0);
+    });
+
+    test(`[P1] should draw the page, the tab track and an unselected tile on the kit in ${colorScheme}`, async ({
+      page,
+    }) => {
+      await openMood(page, colorScheme);
 
       // Page ground, segmented track, unselected tile.
       await expect(page.getByTestId('mood-tracker')).toHaveCSS(
@@ -144,16 +150,25 @@ test.describe('Mood on the style kit', () => {
         'background-color',
         KIT_CARD2[colorScheme]
       );
-      await expect(page.getByTestId('mood-tab-tracker')).toHaveAttribute('aria-pressed', 'true');
-      await expect(page.getByTestId('mood-tab-timeline')).toHaveAttribute('aria-pressed', 'false');
-
-      // All twelve moods stay selectable.
-      await expect(page.locator('[data-testid^="mood-button-"]')).toHaveCount(12);
 
       // An unselected tile sits on the kit card. Each test starts on an empty
       // mood store, so no tile is pre-selected; the first unpressed one serves.
       const unselected = page.locator('[data-testid^="mood-button-"][aria-pressed="false"]').first();
       await expect(unselected).toHaveCSS('background-color', KIT_CARD[colorScheme]);
+    });
+
+    test(`[P1] should open on the Tracker tab with all twelve moods selectable in ${colorScheme}`, async ({
+      page,
+    }) => {
+      await openMood(page, colorScheme);
+
+      await expect(page.getByTestId('mood-tab-tracker')).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('mood-tab-timeline')).toHaveAttribute('aria-pressed', 'false');
+      await expect(page.locator('[data-testid^="mood-button-"]')).toHaveCount(12);
+    });
+
+    test(`[P1] should not scroll sideways at phone width in ${colorScheme}`, async ({ page }) => {
+      await openMood(page, colorScheme);
 
       await expectNoHorizontalOverflow(page);
     });
