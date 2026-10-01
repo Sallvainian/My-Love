@@ -97,9 +97,7 @@ test.describe('stale persisted events never rehydrate', () => {
     const stale = stalePersistedEvent();
     await seedPersistedBlob(page, { events: [stale] });
 
-    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
-    await page.goto('/');
-    expect((await upcomingRead).status).toBe(200);
+    await gotoHomeAfterReads(page, interceptNetworkCall);
 
     // The real card renders — so the events render path ran to completion.
     const realCard = page.getByTestId(eventCardTestId(real.label));
@@ -130,9 +128,7 @@ test.describe('stale persisted events never rehydrate', () => {
     await coupleEvents.clear();
     await seedPersistedBlob(page, { events: [stalePersistedEvent()] });
 
-    const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
-    await page.goto('/');
-    expect((await upcomingRead).status).toBe(200);
+    await gotoHomeAfterReads(page, interceptNetworkCall);
 
     await expect(page.getByTestId('time-together')).toBeVisible();
 
