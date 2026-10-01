@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import type { AppState } from '../../../src/stores/types';
+import type { TypedSupabaseClient } from '../../support/factories';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
 import { FAVORITES_READ, ownMoodHistoryRead } from '../../support/helpers/reads';
@@ -99,10 +100,11 @@ test.describe('Account data through the real browser and local services', () => 
   test.setTimeout(90_000);
 
   /**
-   * This worker pair's account ids, recorded by the favorites test once it has
-   * resolved them. The test ends with user1's favorite still on the server, so
-   * `test.afterEach` clears the pair's favorites again — here rather than at
-   * the end of the body, so a failure or a timeout mid-test clears them too.
+   * This worker pair's account ids, recorded by `favoriteTodayAsA` once it
+   * has resolved them. Each favorites test ends with user1's favorite still on
+   * the server, so `test.afterEach` clears the pair's favorites again — here
+   * rather than at the end of the body, so a failure or a timeout mid-test
+   * clears them too.
    */
   let favoriteOwners: string[] | null = null;
 
@@ -116,11 +118,18 @@ test.describe('Account data through the real browser and local services', () => 
     expect.soft(error, "Teardown must clear this worker pair's favorites").toBeNull();
   });
 
-  test('[P1] favorites survive reload and stay separate across A/B/A and same-account re-login', async ({
-    page,
-    supabaseAdmin,
-    interceptNetworkCall,
-  }) => {
+  /**
+   * The setup the three favorites tests share: start this worker pair's own
+   * favorites empty, open Home as user1 (A) with the favorites read awaited
+   * and empty, favorite today's message, and wait until both the device copy
+   * and the store hold it. Returns the pair and A's snapshot from before the
+   * click.
+   */
+  async function favoriteTodayAsA(
+    page: Page,
+    supabaseAdmin: TypedSupabaseClient,
+    interceptNetworkCall: InterceptNetworkCallFn
+  ) {
     const pair = getWorkerPairEmails();
     if (!pair) throw new Error('This test requires its worker-owned account pair');
     // Favorites are server rows now and outlive a run: start this worker
@@ -158,6 +167,15 @@ test.describe('Account data through the real browser and local services', () => 
       }
     );
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
+    return { pair, original, favorite };
+  }
+
+  test('[P1] a favorite survives a reload', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { favorite } = await favoriteTodayAsA(page, supabaseAdmin, interceptNetworkCall);
 
     const reloadRead = interceptNetworkCall({ method: 'GET', url: FAVORITES_READ });
     await page.reload();
@@ -171,6 +189,19 @@ test.describe('Account data through the real browser and local services', () => 
         expect(v).toBe(true);
       }
     );
+  });
+
+  test("[P1] favorites stay separate across A/B/A: B sees none of A's, and B's changes leave A's alone", async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { pair, original, favorite } = await favoriteTodayAsA(
+      page,
+      supabaseAdmin,
+      interceptNetworkCall
+    );
+
     await signOut(page);
     // B has no favorites on the server, so anything B's session shows as a
     // favorite could only have leaked from A.
@@ -212,7 +243,26 @@ test.describe('Account data through the real browser and local services', () => 
     await expect(favorite).toHaveAccessibleName('Add to favorites');
     await recurseUntil(() => savedFavoriteIds(page, userB), (v) => { expect(v).toEqual([]); });
 
-    // A's sign-in refreshes the favorite back from the server.
+    // A's sign-in refreshes the favorite back from the server, untouched by
+    // B adding and removing the same message.
+    await signOut(page);
+    await signIn(page, interceptNetworkCall, pair.user1Email);
+    await expect(favorite).toHaveAccessibleName('Remove from favorites');
+  });
+
+  test('[P1] a same-account re-login refreshes the favorite under a new session version', async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }) => {
+    const { pair, original, favorite } = await favoriteTodayAsA(
+      page,
+      supabaseAdmin,
+      interceptNetworkCall
+    );
+
+    // Sign-out deletes A's copy from the device, so the favorite each sign-in
+    // shows comes back from the server.
     await signOut(page);
     await signIn(page, interceptNetworkCall, pair.user1Email);
     await expect(favorite).toHaveAccessibleName('Remove from favorites');
