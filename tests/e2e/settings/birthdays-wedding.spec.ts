@@ -10,9 +10,13 @@
  * instead, since it is about the cards and not the save.
  *
  * Identities are this worker's own pooled pair, linked once by global setup.
- * Nothing here links, unlinks or resets an account; teardown resets only this
- * pair's own `birthday` columns and `wedding_date`.
+ * Nothing here links, unlinks or resets a pool account; teardown resets only
+ * this pair's own `birthday` columns and `wedding_date`. The pool pair's
+ * `couple_settings` row always exists (`resetPair` keeps it), so the save
+ * there takes the update path; the first save that creates a couple's row runs
+ * on a throwaway pair of its own, deleted at teardown.
  */
+import { randomUUID } from 'node:crypto';
 import type { Browser, Page } from '@playwright/test';
 import { log } from '@seontechnologies/playwright-utils';
 import type { AuthOptions } from '@seontechnologies/playwright-utils/auth-session';
@@ -36,6 +40,8 @@ import {
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
+import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 /**
  * Clear both birthdays and the wedding date. Both writes are attempted before
@@ -113,6 +119,45 @@ async function openPartnerSettings(
   await expect(partnerPage.getByTestId('settings-birthday-value')).toHaveText('Not set yet');
   await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
   return partnerPage;
+}
+
+/**
+ * Two new accounts linked to each other, owned by this test alone — never pool
+ * accounts, whose rows belong to other workers. Their deletion is deferred as
+ * they are created; `couple_settings` and `public.users` rows cascade with
+ * them.
+ */
+async function createThrowawayCouple(supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup) {
+  const create = async (name: string) => {
+    const email = `wedding-first-save-${name.toLowerCase()}-${randomUUID()}@test.example.com`;
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: TEST_USER_PASSWORD,
+      email_confirm: true,
+      user_metadata: { display_name: name },
+    });
+    if (error || !data?.user) {
+      throw new Error(`Failed to create ${email}: ${error?.message ?? 'no user'}`);
+    }
+    const userId = data.user.id;
+    cleanup.defer(`delete the throwaway account ${name}`, async () => {
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (deleteError) throw deleteError;
+    });
+    return { email, userId };
+  };
+  const self = await create('Casey');
+  const partner = await create('Jessie');
+  // Service-role setup, as global setup links the pool pairs: the app itself
+  // links only through the accept_partner_request RPC.
+  for (const [id, partnerId] of [
+    [self.userId, partner.userId],
+    [partner.userId, self.userId],
+  ]) {
+    const { error } = await supabaseAdmin.from('users').update({ partner_id: partnerId }).eq('id', id);
+    expect(error).toBeNull();
+  }
+  return { self, partner };
 }
 
 test.describe('Birthdays and wedding date shared by both partners', () => {
@@ -283,6 +328,69 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     await expect(
       page.getByTestId('event-countdown-wedding').getByTestId('countdown-value')
     ).toHaveText('Date TBD');
+  });
+
+  test("[P1] the first wedding date a couple saves creates the couple's settings row", async ({
+    browser,
+    baseURL,
+    supabaseAdmin,
+    cleanup,
+  }) => {
+    const { self, partner } = await createThrowawayCouple(supabaseAdmin, cleanup);
+    const [user_a, user_b] =
+      self.userId < partner.userId ? [self.userId, partner.userId] : [partner.userId, self.userId];
+    const coupleRow = () =>
+      supabaseAdmin
+        .from('couple_settings')
+        .select('wedding_date, relationship_start')
+        .eq('user_a', user_a)
+        .eq('user_b', user_b);
+    // Premise: a new couple has no settings row yet.
+    const before = await coupleRow();
+    expect(before.error).toBeNull();
+    expect(before.data).toEqual([]);
+
+    await log.step('The throwaway account signs in and opens Settings');
+    // A bare context: this account is not the worker's, so no storage state.
+    const context = await browser.newContext({ baseURL });
+    cleanup.defer('close the throwaway context', () => closeContext(context));
+    const selfPage = await context.newPage();
+    await dismissWelcomeSplash(selfPage);
+    await selfPage.goto('/');
+    await selfPage.getByRole('textbox', { name: 'Email' }).fill(self.email);
+    await selfPage.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+    await selfPage.getByTestId('submit-button').click();
+    await expect(selfPage.getByTestId('app-container')).toBeVisible();
+    const settingsRead = observeOn({
+      page: selfPage,
+      method: 'GET',
+      url: COUPLE_SETTINGS_READ,
+      timeout: SECOND_CONTEXT_READ_TIMEOUT,
+    });
+    await selfPage.goto('/settings');
+    const read = await settingsRead;
+    expect(read.status).toBe(200);
+    expect(read.responseJson).toEqual([]);
+    await expect(selfPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
+
+    await log.step('Saving a wedding date creates the row: 201');
+    const wedding = isoDateDaysFromNow(40);
+    await selfPage.getByTestId('settings-wedding-date').fill(wedding);
+    const created = observeOn({
+      page: selfPage,
+      method: 'POST',
+      url: COUPLE_SETTINGS_SAVE,
+      timeout: SECOND_CONTEXT_READ_TIMEOUT,
+    });
+    await selfPage.getByTestId('settings-wedding-save').click();
+    expect((await created).status).toBe(201);
+    await expect(selfPage.getByTestId('settings-wedding-clear')).toBeVisible();
+    await expect(selfPage.getByTestId('settings-wedding-error')).toHaveCount(0);
+
+    // The new row holds the wedding date alone: the start date stays unset.
+    const after = await coupleRow();
+    expect(after.error).toBeNull();
+    expect(after.data).toEqual([{ wedding_date: wedding, relationship_start: null }]);
   });
 
   test('[P1] each countdown card runs a live clock that fits the card at phone width', async ({
