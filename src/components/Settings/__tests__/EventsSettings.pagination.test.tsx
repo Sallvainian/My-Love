@@ -7,9 +7,9 @@ import type { Dispatch, HTMLAttributes, ReactNode, Ref, SetStateAction } from 'r
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState } from '../../../stores/types';
 import { EventsSettings } from '../EventsSettings';
+import { OWN_USER_ID, PARTNER_USER_ID, loadOk, makeEvent, ok } from './eventsSettingsKit';
+import type { CoupleEvent, EventLoadResult } from './eventsSettingsKit';
 
-type CoupleEvent = AppState['events'][number];
-type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
 type Pagination = NonNullable<AppState['eventsPagination']>;
 
 const stateSetterCalls = vi.hoisted(() => vi.fn<(next: unknown) => void>());
@@ -69,20 +69,22 @@ vi.mock('../../../stores/useAppStore', async () => {
   return { useAppStore: Object.assign(useAppStore, { getState: () => store.state }) };
 });
 
-const loadOk: EventLoadResult = { status: 'success' };
 const loadFailed: EventLoadResult = { status: 'failure', error: 'Connection failed' };
 const loadStale: EventLoadResult = { status: 'stale' };
 
-function makeEvent(id = 'mine', userId = 'user-own'): CoupleEvent {
-  return {
+/**
+ * The kit's event as this suite needs it: dated in the past, so every row is
+ * history, labelled `Event <id>` so its Edit control is named after it, and
+ * with a description the edit form must carry through.
+ */
+function historyEvent(id = 'mine', userId = OWN_USER_ID): CoupleEvent {
+  return makeEvent({
     id,
     userId,
     label: `Event ${id}`,
     date: new Date(2020, 0, 1),
-    createdAt: new Date(2026, 0, 1),
     description: `Details ${id}`,
-    icon: 'calendar',
-  };
+  });
 }
 
 function pagination(upcoming = false, past = true): Pagination {
@@ -95,21 +97,21 @@ function pagination(upcoming = false, past = true): Pagination {
 
 function setStore(overrides: Partial<AppState> = {}) {
   store.replace({
-    events: [makeEvent()],
+    events: [historyEvent()],
     eventsIsLoading: false,
     eventsIsLoadingMore: false,
     eventsError: null,
     eventsHistoryError: null,
     eventsPagination: pagination(),
-    userId: 'user-own',
+    userId: OWN_USER_ID,
     authSessionVersion: 1,
     syncStatus: { isOnline: true },
     loadEvents: vi.fn(async () => loadOk),
     loadMoreEvents: vi.fn(async () => loadOk),
     clearEventsError: vi.fn(() => store.patch({ eventsError: null })),
-    addEvent: vi.fn(async () => ({ success: true } as const)),
-    editEvent: vi.fn(async () => ({ success: true } as const)),
-    removeEvent: vi.fn(async () => ({ success: true } as const)),
+    addEvent: vi.fn(async () => ok),
+    editEvent: vi.fn(async () => ok),
+    removeEvent: vi.fn(async () => ok),
     ...overrides,
   });
 }
@@ -167,9 +169,9 @@ async function startHistoryLoad() {
 
 /** Lands the last history page: a deep own row, the own row, and a partner row. */
 async function settleDeepPage(pending: ReturnType<typeof deferredLoad>) {
-  const deep = { ...makeEvent('deep'), date: new Date(1999, 11, 31) };
+  const deep = { ...historyEvent('deep'), date: new Date(1999, 11, 31) };
   await settleHistory(pending, loadOk, {
-    events: [deep, makeEvent(), makeEvent('partner', 'user-partner')],
+    events: [deep, historyEvent(), historyEvent('partner', PARTNER_USER_ID)],
     eventsPagination: pagination(false, false),
   });
 }
@@ -302,7 +304,7 @@ describe('EventsSettings explicit history', () => {
     document.body.focus();
     expect(screen.queryByTestId('events-settings-history-error')).not.toBeInTheDocument();
     await settleHistory(retriedPage, loadOk, {
-      events: [makeEvent('older'), makeEvent()],
+      events: [historyEvent('older'), historyEvent()],
     });
 
     expect(screen.getByTestId('event-row-older')).toBeInTheDocument();
@@ -362,9 +364,9 @@ describe('EventsSettings explicit history', () => {
 
   it('preserves edit mode, draft values, and the save target when a refresh removes the paged row', async () => {
     const user = userEvent.setup();
-    const editEvent = vi.fn(async () => ({ success: true } as const));
-    const addEvent = vi.fn(async () => ({ success: true } as const));
-    setStore({ events: [makeEvent('deep'), makeEvent()], editEvent, addEvent });
+    const editEvent = vi.fn(async () => ok);
+    const addEvent = vi.fn(async () => ok);
+    setStore({ events: [historyEvent('deep'), historyEvent()], editEvent, addEvent });
     await renderSection();
     await user.click(screen.getByTestId('event-edit-deep'));
     await user.clear(screen.getByTestId('events-form-label'));
@@ -376,7 +378,7 @@ describe('EventsSettings explicit history', () => {
       store.patch({ eventsIsLoading: true });
     });
     await act(async () => {
-      store.patch({ eventsIsLoading: false, events: [makeEvent()], eventsPagination: pagination() });
+      store.patch({ eventsIsLoading: false, events: [historyEvent()], eventsPagination: pagination() });
     });
 
     expect(screen.queryByTestId('event-row-deep')).not.toBeInTheDocument();
@@ -451,7 +453,7 @@ describe('EventsSettings history ownership', () => {
     }
   });
 
-  it.each(['user-own', 'user-next'])('does not settle into a newer %s session or release its request', async (userId) => {
+  it.each([OWN_USER_ID, 'user-next'])('does not settle into a newer %s session or release its request', async (userId) => {
     const user = userEvent.setup();
     const oldPage = deferredLoad();
     const currentPage = deferredLoad();
@@ -466,7 +468,7 @@ describe('EventsSettings history ownership', () => {
       store.patch({
         userId,
         authSessionVersion: 2,
-        events: [makeEvent('current', userId)],
+        events: [historyEvent('current', userId)],
         eventsPagination: pagination(),
         eventsIsLoadingMore: false,
         eventsHistoryError: null,

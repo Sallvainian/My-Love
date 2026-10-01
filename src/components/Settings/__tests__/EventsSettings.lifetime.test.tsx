@@ -7,10 +7,8 @@ import type { Dispatch, HTMLAttributes, ReactNode, Ref, SetStateAction } from 'r
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState } from '../../../stores/types';
 import { EventsSettings } from '../EventsSettings';
-
-type CoupleEvent = AppState['events'][number];
-type EventLoadResult = Awaited<ReturnType<AppState['loadEvents']>>;
-type EventWriteResult = Awaited<ReturnType<AppState['editEvent']>>;
+import { OWN_USER_ID, loadOk, makeEvent, ok, writeFailure } from './eventsSettingsKit';
+import type { CoupleEvent, EventLoadResult } from './eventsSettingsKit';
 
 const stateSetterCalls = vi.hoisted(() => vi.fn<(next: unknown) => void>());
 
@@ -70,37 +68,24 @@ vi.mock('../../../stores/useAppStore', async () => {
   return { useAppStore: Object.assign(useAppStore, { getState: () => store.state }) };
 });
 
-const loadOk: EventLoadResult = { status: 'success' };
 const loadFailed: EventLoadResult = { status: 'failure', error: 'Connection failed' };
 const loadStale: EventLoadResult = { status: 'stale' };
-const missing: EventWriteResult = { success: false, code: 'not-found', error: 'Event removed' };
+const missing = writeFailure('not-found', 'Event removed');
 const outcomes = [loadOk, loadFailed, loadStale];
-
-function makeEvent(id = 'mine'): CoupleEvent {
-  return {
-    id,
-    userId: 'user-own',
-    label: `Event ${id}`,
-    date: new Date(2026, 8, 12),
-    createdAt: new Date(2026, 0, 1),
-    description: null,
-    icon: 'calendar',
-  };
-}
 
 function setStore(overrides: Partial<AppState> = {}) {
   store.replace({
     events: [],
     eventsIsLoading: false,
     eventsError: null,
-    userId: 'user-own',
+    userId: OWN_USER_ID,
     authSessionVersion: 1,
     syncStatus: { isOnline: true },
     loadEvents: vi.fn(async () => loadOk),
     clearEventsError: vi.fn(() => store.patch({ eventsError: null })),
     editEvent: vi.fn(async () => missing),
     removeEvent: vi.fn(async () => missing),
-    addEvent: vi.fn(async () => ({ success: true } as const)),
+    addEvent: vi.fn(async () => ok),
     ...overrides,
   });
 }
@@ -185,7 +170,7 @@ describe('EventsSettings manual load lifetime', () => {
       const user = userEvent.setup();
       const pending = deferredLoad();
       const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadOk);
-      setStore({ events: [makeEvent()], loadEvents });
+      setStore({ events: [makeEvent({ id: 'mine' })], loadEvents });
       const view = await renderSection();
       loadEvents.mockImplementationOnce(() => startPendingLoad(pending));
       await refreshStaleRow(user, row);
@@ -235,7 +220,7 @@ describe('EventsSettings mounted recovery after StrictMode effect replay', () =>
   it.each([
     {
       ...STALE_ROW_REFRESHES[0],
-      settledEvents: (): CoupleEvent[] => [makeEvent('current')],
+      settledEvents: (): CoupleEvent[] => [makeEvent({ id: 'current' })],
       expectedTestId: 'event-row-current',
     },
     {
@@ -247,7 +232,7 @@ describe('EventsSettings mounted recovery after StrictMode effect replay', () =>
     const user = userEvent.setup();
     const pending = deferredLoad();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadFailed);
-    setStore({ events: [makeEvent()], loadEvents });
+    setStore({ events: [makeEvent({ id: 'mine' })], loadEvents });
     await renderSection(true);
     expect(loadEvents).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
@@ -324,7 +309,7 @@ describe('EventsSettings mounted recovery after StrictMode effect replay', () =>
     const user = userEvent.setup();
     const pending = deferredLoad();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>(async () => loadFailed);
-    setStore({ events: [makeEvent()], loadEvents });
+    setStore({ events: [makeEvent({ id: 'mine' })], loadEvents });
     await renderSection(true);
     loadEvents.mockImplementationOnce(() => startPendingLoad(pending));
     const retry = screen.getByTestId('events-settings-retry');

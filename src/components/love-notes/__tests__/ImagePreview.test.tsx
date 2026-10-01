@@ -30,6 +30,13 @@ vi.mock('../../../services/imageCompressionService', () => ({
   },
 }));
 
+const MB = 1024 * 1024;
+
+/** A JPEG attachment of `bytes` real bytes, so `file.size` is exactly `bytes`. */
+function imageFile({ bytes = 4, name = 'photo.jpg' }: { bytes?: number; name?: string } = {}) {
+  return new File([new ArrayBuffer(bytes)], name, { type: 'image/jpeg' });
+}
+
 describe('ImagePreview', () => {
   let mockObjectUrl: string;
   let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>;
@@ -48,7 +55,7 @@ describe('ImagePreview', () => {
   });
 
   it('should render image thumbnail with preview URL', async () => {
-    const mockFile = new File(['test-image-data'], 'photo.jpg', { type: 'image/jpeg' });
+    const mockFile = imageFile();
     const onRemove = vi.fn();
 
     render(<ImagePreview file={mockFile} onRemove={onRemove} />);
@@ -61,10 +68,7 @@ describe('ImagePreview', () => {
   });
 
   it('should display original file size', () => {
-    // Create a file that's ~2MB
-    const fileSize = 2 * 1024 * 1024;
-    const mockFile = new File([new ArrayBuffer(fileSize)], 'photo.jpg', { type: 'image/jpeg' });
-    Object.defineProperty(mockFile, 'size', { value: fileSize });
+    const mockFile = imageFile({ bytes: 2 * MB });
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} />);
 
@@ -72,10 +76,7 @@ describe('ImagePreview', () => {
   });
 
   it('should display estimated compressed size', () => {
-    // Create a file that's ~5MB
-    const fileSize = 5 * 1024 * 1024;
-    const mockFile = new File([new ArrayBuffer(fileSize)], 'photo.jpg', { type: 'image/jpeg' });
-    Object.defineProperty(mockFile, 'size', { value: fileSize });
+    const mockFile = imageFile({ bytes: 5 * MB });
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} />);
 
@@ -84,11 +85,7 @@ describe('ImagePreview', () => {
   });
 
   it('should show large file indicator for files over 5MB', () => {
-    const fileSize = 6 * 1024 * 1024;
-    const mockFile = new File([new ArrayBuffer(fileSize)], 'large-photo.jpg', {
-      type: 'image/jpeg',
-    });
-    Object.defineProperty(mockFile, 'size', { value: fileSize });
+    const mockFile = imageFile({ bytes: 6 * MB, name: 'large-photo.jpg' });
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} />);
 
@@ -96,11 +93,7 @@ describe('ImagePreview', () => {
   });
 
   it('should not show large file indicator for files under 5MB', () => {
-    const fileSize = 3 * 1024 * 1024;
-    const mockFile = new File([new ArrayBuffer(fileSize)], 'small-photo.jpg', {
-      type: 'image/jpeg',
-    });
-    Object.defineProperty(mockFile, 'size', { value: fileSize });
+    const mockFile = imageFile({ bytes: 3 * MB, name: 'small-photo.jpg' });
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} />);
 
@@ -110,7 +103,7 @@ describe('ImagePreview', () => {
 
   it('removes the selected picture when Remove is clicked', async () => {
     const user = userEvent.setup();
-    const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+    const mockFile = imageFile();
     const onRemove = vi.fn();
 
     render(<ImagePreview file={mockFile} onRemove={onRemove} />);
@@ -123,7 +116,7 @@ describe('ImagePreview', () => {
 
   it('should disable remove button when compressing', async () => {
     const user = userEvent.setup();
-    const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+    const mockFile = imageFile();
     const onRemove = vi.fn();
 
     render(<ImagePreview file={mockFile} onRemove={onRemove} isCompressing={true} />);
@@ -136,7 +129,7 @@ describe('ImagePreview', () => {
   });
 
   it('shows Compressing... over the picture while it compresses', () => {
-    const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+    const mockFile = imageFile();
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} isCompressing={true} />);
 
@@ -144,7 +137,7 @@ describe('ImagePreview', () => {
   });
 
   it('shows no compressing overlay once compression is done', () => {
-    const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+    const mockFile = imageFile();
 
     render(<ImagePreview file={mockFile} onRemove={vi.fn()} isCompressing={false} />);
 
@@ -153,7 +146,7 @@ describe('ImagePreview', () => {
   });
 
   it('releases the preview image when unmounted', async () => {
-    const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+    const mockFile = imageFile();
 
     const { unmount } = render(<ImagePreview file={mockFile} onRemove={vi.fn()} />);
 
@@ -168,15 +161,13 @@ describe('ImagePreview', () => {
 
   it('shows small sizes in B and larger ones in KB', () => {
     // Test bytes
-    const tinyFile = new File(['x'], 'tiny.jpg', { type: 'image/jpeg' });
-    Object.defineProperty(tinyFile, 'size', { value: 500 });
+    const tinyFile = imageFile({ bytes: 500, name: 'tiny.jpg' });
 
     const { rerender } = render(<ImagePreview file={tinyFile} onRemove={vi.fn()} />);
     expect(screen.getByTestId('image-preview-original-size')).toHaveTextContent(/^500 B$/);
 
     // Test KB
-    const kbFile = new File(['x'], 'kb.jpg', { type: 'image/jpeg' });
-    Object.defineProperty(kbFile, 'size', { value: 50 * 1024 });
+    const kbFile = imageFile({ bytes: 50 * 1024, name: 'kb.jpg' });
 
     rerender(<ImagePreview file={kbFile} onRemove={vi.fn()} />);
     expect(screen.getByTestId('image-preview-original-size')).toHaveTextContent(/^50\.0 KB$/);
