@@ -15,7 +15,7 @@ import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 import { projectMessageFavorites } from '../../../src/services/messageFavorites';
 import type { Message } from '../../../src/types';
 import { getDailyMessage } from '../../../src/utils/messageRotation';
-import { deleteDatabase, legacyMessage, swAuthRow } from './dbSchemaFixtures';
+import { deleteDatabase, legacyCustomMessage, legacyMessage, swAuthRow } from './dbSchemaFixtures';
 
 describe('dbSchema', () => {
   const openDbs: Array<{ close: () => void }> = [];
@@ -94,15 +94,14 @@ describe('dbSchema', () => {
         },
       });
 
-      const createdAt = new Date('2026-01-01T00:00:00.000Z');
       const rows: LegacyRow[] = [
         ...BUNDLED.map((text) => legacyMessage(text)),
-        { text: 'A-ONE', category: 'custom', isCustom: true, userId: A, serverId: 'srv-a1', active: true, createdAt },
-        { text: 'B-ONE', category: 'custom', isCustom: true, userId: B, serverId: 'srv-b1', active: true, createdAt },
-        { text: 'A-TWO', category: 'custom', isCustom: true, userId: A, serverId: 'srv-a2', active: false, createdAt },
-        { text: 'B-TWO', category: 'custom', isCustom: true, userId: B, serverId: 'srv-b2', active: true, createdAt },
-        { text: 'A-THREE', category: 'memory', isCustom: true, userId: A, serverId: 'srv-a3', active: true, createdAt, tags: ['t'] },
-        { text: 'LEGACY-UNOWNED', category: 'custom', isCustom: true, active: true, createdAt },
+        legacyCustomMessage('A-ONE', { userId: A, serverId: 'srv-a1' }),
+        legacyCustomMessage('B-ONE', { userId: B, serverId: 'srv-b1' }),
+        legacyCustomMessage('A-TWO', { userId: A, serverId: 'srv-a2', active: false }),
+        legacyCustomMessage('B-TWO', { userId: B, serverId: 'srv-b2' }),
+        legacyCustomMessage('A-THREE', { userId: A, serverId: 'srv-a3', category: 'memory', tags: ['t'] }),
+        legacyCustomMessage('LEGACY-UNOWNED'),
         ...(options.extraRows ?? []),
       ];
       for (const row of rows) await db.add('messages', row as never);
@@ -192,17 +191,7 @@ describe('dbSchema', () => {
       await seedLegacy({
         version: 8,
         token: A,
-        extraRows: [
-          {
-            text: 'A-LEGACY-FAVORITE',
-            category: 'custom',
-            isCustom: true,
-            userId: A,
-            serverId: 'srv-a4',
-            isFavorite: true,
-            createdAt: new Date('2026-01-01T00:00:00.000Z'),
-          },
-        ],
+        extraRows: [legacyCustomMessage('A-LEGACY-FAVORITE', { userId: A, serverId: 'srv-a4', isFavorite: true })],
       });
       // A bundled row's legacy flag names no account.
       const flagged = await openDB(DB_NAME, 8);

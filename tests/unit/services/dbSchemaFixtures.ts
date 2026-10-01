@@ -27,6 +27,32 @@ export function legacyMessage(text: string) {
   return { text, category: 'reason', isCustom: false, createdAt: new Date('2026-01-01T00:00:00.000Z') };
 }
 
+/**
+ * A custom `messages` row as every pre-v15 version wrote it: active, created on
+ * the same day as the bundled rows, and owned by whoever `fields` names (a row
+ * with no `userId` is the legacy unowned shape).
+ */
+export function legacyCustomMessage(
+  text: string,
+  fields: {
+    userId?: string;
+    serverId?: string;
+    active?: boolean;
+    category?: string;
+    isFavorite?: boolean;
+    tags?: string[];
+  } = {}
+) {
+  return {
+    text,
+    category: 'custom',
+    isCustom: true,
+    active: true,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    ...fields,
+  };
+}
+
 /** A `moods` row as the pre-v12 versions wrote it, stamped at the start of its day. */
 export function legacyMood(note: string, { date = '2026-09-01', synced = true }: { date?: string; synced?: boolean } = {}) {
   return {
