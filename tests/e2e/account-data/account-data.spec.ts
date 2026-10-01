@@ -6,6 +6,7 @@ import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
 import { FAVORITES_READ, ownMoodHistoryRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 // These tests load the actual app with local Supabase auth. Source imports are
@@ -65,26 +66,8 @@ async function localRows(page: Page, store: 'moods') {
  * the account has no copy on this device.
  */
 async function savedFavoriteIds(page: Page, userId: string): Promise<number[] | null> {
-  return page.evaluate(async (owner) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('my-love-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      return await new Promise<number[] | null>((resolve, reject) => {
-        const request = db
-          .transaction('local-copies')
-          .objectStore('local-copies')
-          .get([owner, 'message-data']);
-        request.onsuccess = () =>
-          resolve((request.result?.value as { bundledFavoriteIds: number[] } | undefined)?.bundledFavoriteIds ?? null);
-        request.onerror = () => reject(request.error);
-      });
-    } finally {
-      db.close();
-    }
-  }, userId);
+  const copy = await savedLocalCopy<{ bundledFavoriteIds: number[] }>(page, 'message-data', userId);
+  return copy?.bundledFavoriteIds ?? null;
 }
 
 async function signOut(page: Page) {

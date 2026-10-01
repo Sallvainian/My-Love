@@ -40,6 +40,7 @@
 import type { Locator, Page, Request } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
+import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
@@ -68,11 +69,6 @@ const PNG_BYTES = Buffer.from(
 const PNG_FILE = { name: 'offline.png', mimeType: 'image/png', buffer: PNG_BYTES };
 
 const SUPABASE_PATHS = ['/rest/v1', '/storage/v1', '/auth/v1', '/functions/v1'];
-
-async function goOffline(page: Page, isOffline: boolean) {
-  await page.context().setOffline(isOffline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), isOffline ? 'offline' : 'online');
-}
 
 /** POSTs that only read, so a writes-only watch skips them like a GET. */
 const READ_RPCS = ['/rest/v1/rpc/get_my_pending_partner_requests'];

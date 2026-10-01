@@ -21,6 +21,8 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
+import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { LOVE_NOTES_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -42,30 +44,7 @@ const PNG_BYTES = Buffer.from(
 
 /** Ids in the signed-in account's saved `love-notes` copy, or `null`. */
 async function savedNoteIds(page: Page): Promise<string[] | null> {
-  return page.evaluate(async () => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return null;
-    return new Promise<string[] | null>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve(null);
-      open.onsuccess = () => {
-        const db = open.result;
-        const get = db
-          .transaction('local-copies')
-          .objectStore('local-copies')
-          .get([userId, 'love-notes']);
-        get.onsuccess = () => {
-          db.close();
-          const value = get.result?.value as { id: string }[] | undefined;
-          resolve(value ? value.map((row) => row.id) : null);
-        };
-        get.onerror = () => {
-          db.close();
-          resolve(null);
-        };
-      };
-    });
-  });
+  return (await savedLocalCopy<{ id: string }[]>(page, 'love-notes'))?.map((row) => row.id) ?? null;
 }
 
 /** Whether the signed-in account's image cache holds a Blob for `path`. */
@@ -95,11 +74,6 @@ async function imageCached(page: Page, path: string): Promise<boolean> {
       };
     });
   }, path);
-}
-
-async function goOffline(page: Page, offline: boolean) {
-  await page.context().setOffline(offline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), offline ? 'offline' : 'online');
 }
 
 /** A note from this worker's partner to its user. Returns its id. */

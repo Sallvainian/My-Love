@@ -20,6 +20,7 @@
  */
 import type { Page, Request } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { partnerRecordRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -34,11 +35,6 @@ const isNotesRest = (url: URL) => url.pathname.startsWith('/rest/v1/love_notes')
 /** A note's send: the POST upsert into `love_notes`. */
 const isNoteSend = (request: Request) =>
   request.method() === 'POST' && new URL(request.url()).pathname === '/rest/v1/love_notes';
-
-async function goOffline(page: Page, offline: boolean) {
-  await page.context().setOffline(offline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), offline ? 'offline' : 'online');
-}
 
 function noteBubble(page: Page, content: string) {
   return page.getByTestId('love-note-message').filter({ hasText: content });

@@ -14,6 +14,8 @@
  */
 import type { Page, Request } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
+import { goOffline } from '../../support/helpers/offline';
 import { navigateTo } from '../../support/helpers/navigation';
 import { ANNIVERSARIES_READ, FAVORITES_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -33,65 +35,21 @@ async function signedInUserId(page: Page): Promise<string> {
 
 /** Labels in the signed-in account's saved anniversaries copy. */
 async function savedAnniversaryLabels(page: Page): Promise<string[]> {
-  return page.evaluate(async () => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return [];
-    return new Promise<string[]>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve([]);
-      open.onsuccess = () => {
-        const db = open.result;
-        const get = db
-          .transaction('local-copies')
-          .objectStore('local-copies')
-          .get([userId, 'anniversaries']);
-        get.onsuccess = () => {
-          db.close();
-          const value = get.result?.value as Array<{ label: string }> | undefined;
-          resolve(value ? value.map((a) => a.label) : []);
-        };
-        get.onerror = () => {
-          db.close();
-          resolve([]);
-        };
-      };
-    });
-  });
+  const anniversaries = await savedLocalCopy<Array<{ label: string }>>(page, 'anniversaries');
+  return anniversaries ? anniversaries.map((a) => a.label) : [];
 }
 
 /** Custom texts and bundled favorites in the signed-in account's message-data copy. */
-async function savedMessageData(page: Page): Promise<{ texts: string[]; bundledFavoriteIds: number[] }> {
-  return page.evaluate(async () => {
-    const empty = { texts: [] as string[], bundledFavoriteIds: [] as number[] };
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return empty;
-    return new Promise<typeof empty>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve(empty);
-      open.onsuccess = () => {
-        const db = open.result;
-        const get = db
-          .transaction('local-copies')
-          .objectStore('local-copies')
-          .get([userId, 'message-data']);
-        get.onsuccess = () => {
-          db.close();
-          const value = get.result?.value as
-            | { custom: Array<{ text: string }>; bundledFavoriteIds: number[] }
-            | undefined;
-          resolve(
-            value
-              ? { texts: value.custom.map((row) => row.text), bundledFavoriteIds: value.bundledFavoriteIds }
-              : empty
-          );
-        };
-        get.onerror = () => {
-          db.close();
-          resolve(empty);
-        };
-      };
-    });
-  });
+async function savedMessageData(
+  page: Page
+): Promise<{ texts: string[]; bundledFavoriteIds: number[] }> {
+  const copy = await savedLocalCopy<{
+    custom: Array<{ text: string }>;
+    bundledFavoriteIds: number[];
+  }>(page, 'message-data');
+  return copy
+    ? { texts: copy.custom.map((row) => row.text), bundledFavoriteIds: copy.bundledFavoriteIds }
+    : { texts: [], bundledFavoriteIds: [] };
 }
 
 /** Custom rows left in the shared `messages` store (bundled rows only since v15). */
@@ -115,11 +73,6 @@ async function customRowsInMessagesStore(page: Page): Promise<number> {
         };
       })
   );
-}
-
-async function goOffline(page: Page, offline: boolean) {
-  await page.context().setOffline(offline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), offline ? 'offline' : 'online');
 }
 
 test.describe('Account data from the local copy', () => {

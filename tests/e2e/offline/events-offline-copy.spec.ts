@@ -13,6 +13,8 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { savedLocalCopy } from '../../support/helpers/local-copy';
+import { goOffline } from '../../support/helpers/offline';
 import {
   clearPairEvents,
   isoDateDaysFromNow,
@@ -33,35 +35,7 @@ const HOME_CARD = 'event-countdown-offline-copy-e2e';
 
 /** Labels in the signed-in account's saved `events` copy, or `null`. */
 async function savedEventLabels(page: Page): Promise<string[] | null> {
-  return page.evaluate(async () => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return null;
-    return new Promise<string[] | null>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve(null);
-      open.onsuccess = () => {
-        const db = open.result;
-        const get = db
-          .transaction('local-copies')
-          .objectStore('local-copies')
-          .get([userId, 'events']);
-        get.onsuccess = () => {
-          db.close();
-          const value = get.result?.value as { label: string }[] | undefined;
-          resolve(value ? value.map((event) => event.label) : null);
-        };
-        get.onerror = () => {
-          db.close();
-          resolve(null);
-        };
-      };
-    });
-  });
-}
-
-async function goOffline(page: Page, offline: boolean) {
-  await page.context().setOffline(offline);
-  await page.evaluate((event) => window.dispatchEvent(new Event(event)), offline ? 'offline' : 'online');
+  return (await savedLocalCopy<{ label: string }[]>(page, 'events'))?.map((e) => e.label) ?? null;
 }
 
 function settingsRow(page: Page) {
