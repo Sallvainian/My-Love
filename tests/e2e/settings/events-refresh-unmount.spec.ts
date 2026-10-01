@@ -63,6 +63,21 @@ async function waitForEventsSettlement(page: Page) {
   );
 }
 
+/**
+ * Return to Settings through the dock and wait for the load its own remount
+ * starts: both windows of both StrictMode loads are held until they have all
+ * arrived, then released and awaited, so the settled store read after this
+ * comes from the remount and never from the state before the navigation.
+ */
+async function returnToSettings(page: Page, control: EventsRefreshControl) {
+  const remount = control.holdNextLoad('success');
+  await navigateTo(page, 'settings');
+  await remount.waitForPending(2);
+  remount.release();
+  expect(await remount.waitForCompleted()).toEqual([200, 200, 200, 200]);
+  return waitForEventsSettlement(page);
+}
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('lastWelcomeView', Date.now().toString());
@@ -109,8 +124,7 @@ test.describe('DW-57 events refresh and retry across Settings unmount', () => {
     await expect(page.getByRole('button', { name: 'Happy mood', exact: true })).toBeFocused();
     await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
 
-    await navigateTo(page, 'settings');
-    const recovered = await waitForEventsSettlement(page);
+    const recovered = await returnToSettings(page, eventsRefreshControl);
     expect(recovered).toEqual({ ids: [witness.id], loading: false, error: null, view: 'settings' });
     await expect(page.getByTestId(`event-row-${witness.id}`)).toBeVisible();
     await expect(page.getByTestId(`event-row-${stale.id}`)).toHaveCount(0);
@@ -158,8 +172,7 @@ test.describe('DW-57 events refresh and retry across Settings unmount', () => {
     await expect(page.getByRole('button', { name: 'Happy mood', exact: true })).toBeFocused();
     await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
 
-    await navigateTo(page, 'settings');
-    const recovered = await waitForEventsSettlement(page);
+    const recovered = await returnToSettings(page, eventsRefreshControl);
     expect(recovered).toEqual({ ids: [witness.id], loading: false, error: null, view: 'settings' });
     await expect(page.getByTestId(`event-row-${witness.id}`)).toBeVisible();
     await expect(page.getByTestId(`event-row-${stale.id}`)).toHaveCount(0);
@@ -209,8 +222,7 @@ test.describe('DW-57 events refresh and retry across Settings unmount', () => {
       await expect(page.getByRole('button', { name: 'Happy mood', exact: true })).toBeFocused();
       await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
 
-      await navigateTo(page, 'settings');
-      const recovered = await waitForEventsSettlement(page);
+      const recovered = await returnToSettings(page, eventsRefreshControl);
       expect(recovered).toEqual({ ids: [witness.id], loading: false, error: null, view: 'settings' });
       await expect(page.getByTestId(`event-row-${witness.id}`)).toBeVisible();
       await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
