@@ -293,7 +293,7 @@ describe('getUpcomingEventCards', () => {
     expect(upcomingCount).toBe(2);
   });
 
-  it('renders at most maxCards, and specifically the soonest ones', () => {
+  it('keeps only the soonest upcoming events, up to the card limit', () => {
     const events = [event('a', 1), event('b', 5), event('c', 9), event('d', 20)];
 
     const { visible } = getUpcomingEventCards(events, new Date(), MAX_CARDS);
