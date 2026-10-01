@@ -173,13 +173,22 @@ function serverCloses(topic: string): void {
   for (const socket of FakeWebSocket.instances) socket.onmessage?.({ data: message });
 }
 
-function newClient(): RealtimeClient {
+/**
+ * The longest timer the SDK arms on its own: a push times out after
+ * `DEFAULT_TIMEOUT` (realtime-js lib/constants.js) and the reconnect backoff
+ * tops out at the same 10 s (RealtimeClient.js RECONNECT_INTERVALS). Anything
+ * a frame sets off has fired by then.
+ */
+const SDK_LONGEST_TIMER_MS = 10_000;
+
+function newClient(logger?: (kind: string, msg: string, data?: unknown) => void): RealtimeClient {
   const client = new RealtimeClient('ws://localhost:54321/realtime/v1', {
     params: { apikey: 'test-anon-key' },
     // @ts-expect-error - the SDK types `transport` as the DOM WebSocket ctor.
     transport: FakeWebSocket,
     // Far enough out that no heartbeat fires inside a case.
     heartbeatIntervalMs: 1_000_000,
+    logger,
   });
   // The only stub: a real setAuth would read a Supabase session that does not
   // exist here. Every state machine below is the shipped one.
@@ -209,6 +218,10 @@ async function joinedChannel(
 describe('the SDK leave/close contract the channel registries depend on', () => {
   beforeEach(() => {
     FakeWebSocket.instances.length = 0;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('completes a leave the server never answers, rather than waiting on it', async () => {
@@ -266,7 +279,15 @@ describe('the SDK leave/close contract the channel registries depend on', () => 
   });
 
   it('never consults the server answer to a leave', async () => {
-    const client = newClient();
+    // Faked so the negative assertion below can wait out every timer the SDK
+    // could arm in reaction to the frame, not just one event-loop turn.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+    // The SDK logs every frame it decodes: the positive control that the
+    // 'error' reply below was actually received and dispatched.
+    const received: string[] = [];
+    const client = newClient((kind, msg) => {
+      if (kind === 'receive') received.push(msg);
+    });
     const { channel, statuses } = await joinedChannel(client);
 
     const leave = client.removeChannel(channel);
@@ -291,14 +312,20 @@ describe('the SDK leave/close contract the channel registries depend on', () => 
     // still 'ok', which reads as pinning "no rejection path" but cannot
     // discriminate it — the 'error' branch is unreachable in this scenario, so
     // an SDK that DID reject on it would have left that version green.
+    const sentBeforeAnswer = frames().length;
     answer(leaveFrame as Frame, 'error');
-    // A macrotask, not a count of microtask hops: a negative assertion has to
-    // wait out whatever the frame set off, however many awaits deep.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(received).toContain(
+      `error ${REALTIME_TOPIC} phx_reply (${(leaveFrame as Frame).ref})`
+    );
+    // Past the SDK's longest timer, so a reaction it scheduled on any delay
+    // has landed before the negative assertions run.
+    await vi.advanceTimersByTimeAsync(SDK_LONGEST_TIMER_MS);
 
     await expect(leave).resolves.toBe('ok');
     expect(channel.state).toBe('closed');
     expect(statuses).toEqual(['SUBSCRIBED', 'CLOSED']);
+    // No rejoin or retry went out in reaction to the 'error'.
+    expect(frames()).toHaveLength(sentBeforeAnswer);
   });
 });
 
