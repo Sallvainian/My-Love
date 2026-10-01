@@ -54,6 +54,7 @@ import type {
   InteractionSubscriptionStatus,
   SupabaseInteractionRecord,
 } from '../../../src/api/interactionService';
+import { createInteractionRecord } from '../../support/factories/interaction-record-ownership';
 import { serializeAccountDataWrite } from '../../../src/services/accountDataQueue';
 import { NoPartnerError } from '../../../src/utils/interactionValidation';
 import {
@@ -93,19 +94,18 @@ function createTestStore() {
   return store;
 }
 
+/** A partner's poke to the signed-in user, unless overridden. */
 function interaction(
   id: string,
   overrides: Partial<SupabaseInteractionRecord> = {}
 ): SupabaseInteractionRecord {
-  return {
+  return createInteractionRecord({
     id,
-    type: 'poke',
     from_user_id: OTHER_USER_ID,
     to_user_id: USER_ID,
-    viewed: false,
     created_at: '2026-08-20T12:00:00.000Z',
     ...overrides,
-  };
+  });
 }
 
 describe('interactionsSlice subscription bridge', () => {
