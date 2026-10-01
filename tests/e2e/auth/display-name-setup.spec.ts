@@ -22,6 +22,7 @@
  * starts signed out and signs in as the dedicated account through the real
  * login form.
  */
+import { randomUUID } from 'node:crypto';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
@@ -41,7 +42,7 @@ async function createNamelessAccount(
   supabaseAdmin: TypedSupabaseClient,
   prefix: string
 ): Promise<Dedicated> {
-  const email = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.example.com`;
+  const email = `${prefix}-${randomUUID()}@test.example.com`;
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password: TEST_USER_PASSWORD,
