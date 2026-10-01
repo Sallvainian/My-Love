@@ -191,19 +191,37 @@ describe('eventsSlice', () => {
       expect(store.getState().eventsIsLoadingMore).toBe(false);
     });
 
-    it('blocks repeated activation and does not automatically crawl or load missing metadata', async () => {
+    it('does nothing without pagination metadata', async () => {
       const store = createTestStore();
       expect(await store.getState().loadMoreEvents()).toEqual({ status: 'stale' });
       expect(getEventsPage).not.toHaveBeenCalled();
+    });
+
+    /** Starts a history page that stays in flight until `pending` settles; the page is the last. */
+    function startLastPage() {
+      const store = createTestStore();
       store.setState({ eventsPagination: pagination() });
       const pending = deferred<EventsPage>();
       getEventsPage.mockReturnValueOnce(pending.promise);
       const inFlight = store.getState().loadMoreEvents();
+      const finish = async () => {
+        pending.resolve({ events: [], pagination: pagination(false) });
+        await inFlight;
+      };
+      return { store, finish };
+    }
+
+    it('refuses a second activation while a page is in flight', async () => {
+      const { store, finish } = startLastPage();
       expect(store.getState().eventsIsLoadingMore).toBe(true);
       expect(await store.getState().loadMoreEvents()).toEqual({ status: 'stale' });
       expect(getEventsPage).toHaveBeenCalledTimes(1);
-      pending.resolve({ events: [], pagination: pagination(false) });
-      await inFlight;
+      await finish();
+    });
+
+    it('stops without another request once the last page has loaded', async () => {
+      const { store, finish } = startLastPage();
+      await finish();
       expect(await store.getState().loadMoreEvents()).toEqual({ status: 'success' });
       expect(getEventsPage).toHaveBeenCalledTimes(1);
     });
