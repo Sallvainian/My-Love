@@ -214,12 +214,12 @@ test.describe('An event survives the round trip through the server', () => {
     const card = page.getByTestId(ICON_CARD_TESTID);
     await expect(card).toBeVisible();
 
-    // The card holds exactly one svg — the icon from `iconComponents` in
+    // The card's icon is the one from `iconComponents` in
     // `EventCountdown.tsx`. `ring` selects lucide's `Gem`, which stamps
     // `lucide-gem` on the element. Colour no longer varies by icon (every
     // event tile is the kit tint/accent pair), so the glyph is the whole of
     // the icon's own treatment.
-    const cardIcon = card.locator('svg');
+    const cardIcon = card.getByTestId('countdown-icon');
     await expect(cardIcon).toHaveClass(/lucide-gem/);
   });
 

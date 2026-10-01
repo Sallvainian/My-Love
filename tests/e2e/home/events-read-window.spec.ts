@@ -230,7 +230,7 @@ test.describe('Home under the bounded events read', () => {
     await expect(page.getByTestId('event-countdown-refill-seventh-e2e')).toBeVisible();
     await expect(eventCards).toHaveCount(HOME_MAX_EVENT_CARDS);
 
-    await expect(eventCards.locator('h3')).toHaveText([
+    await expect(eventCards.getByRole('heading', { level: 3 })).toHaveText([
       'Refill Second E2E',
       'Refill Third E2E',
       'Refill Fourth E2E',

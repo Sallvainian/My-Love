@@ -94,7 +94,9 @@ const SIGNED_IN_SCREENS: Screen[] = [
       await expect(page.getByTestId('notes-partner-row')).toBeVisible();
       await expect(page.getByLabel(/love note message input/i)).toBeVisible();
       await expect(
-        page.getByTestId('virtualized-list').or(page.getByText('No messages to show'))
+        page
+          .getByTestId('virtualized-list')
+          .or(page.getByRole('heading', { level: 3, name: 'No messages to show' }))
       ).toBeVisible();
     },
   },

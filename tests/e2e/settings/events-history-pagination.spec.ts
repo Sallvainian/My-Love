@@ -294,7 +294,7 @@ test.describe('Settings events history pagination', () => {
     );
     const cards = page.getByTestId(/^event-countdown-tied-paging-\d+$/);
     await expect(cards).toHaveCount(HOME_MAX_EVENT_CARDS);
-    await expect(cards.locator('h3')).toHaveText(expected.filter((row) =>
+    await expect(cards.getByRole('heading', { level: 3 })).toHaveText(expected.filter((row) =>
       row.eventDate === seeded[windowRows].eventDate
     ).slice(0, HOME_MAX_EVENT_CARDS).map((row) => row.label));
   });

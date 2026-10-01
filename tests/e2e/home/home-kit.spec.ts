@@ -235,23 +235,19 @@ test.describe('Home on the style kit', () => {
       // takes its copy.
       await expect(page.getByTestId('birthday-countdown-self')).toBeVisible();
       await expect(page.getByTestId('birthday-countdown-partner')).toBeVisible();
-      const chromeText = await page.evaluate(() => {
-        const main = document.getElementById('main-content');
-        if (!main) return null;
+      const storedEvent =
+        '[data-testid^="event-countdown-"]:not([data-testid="event-countdown-wedding"])';
+      const userAuthored = [
+        '[data-testid="message-text"]',
+        `${storedEvent} [data-testid="countdown-label"]`,
+        `${storedEvent} [data-testid="countdown-description"]`,
+        '[data-testid="countdown-timer"]',
+      ].join(', ');
+      const chromeText = await page.getByRole('main').evaluate((main, selectors) => {
         const clone = main.cloneNode(true) as HTMLElement;
-        clone
-          .querySelectorAll(
-            [
-              '[data-testid="message-text"]',
-              '[data-testid^="event-countdown-"]:not([data-testid="event-countdown-wedding"]) h3',
-              '[data-testid^="event-countdown-"]:not([data-testid="event-countdown-wedding"]) p',
-              '[data-testid="countdown-timer"]',
-            ].join(', ')
-          )
-          .forEach((el) => el.remove());
+        clone.querySelectorAll(selectors).forEach((el) => el.remove());
         return clone.textContent ?? '';
-      });
-      expect(chromeText).not.toBeNull();
+      }, userAuthored);
       expect(chromeText).not.toMatch(/\p{Extended_Pictographic}/u);
     });
   }

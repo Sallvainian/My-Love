@@ -124,7 +124,7 @@ test.describe('Home dashboard reads events from the store', () => {
     await expect(futureCard.getByText('Future Meetup E2E')).toBeVisible();
     await expect(futureCard.getByText('Future event description')).toBeVisible();
     // The countdown day-count is this component's rendering of "the date".
-    await expect(futureCard.getByText(/\d+\s*days?/i)).toBeVisible();
+    await expect(futureCard.getByTestId('countdown-value')).toHaveText(/^\d+ days?$/);
 
     const partnerCard = page.getByTestId('event-countdown-partner-meetup-e2e');
     await expect(partnerCard).toBeVisible();
@@ -135,14 +135,16 @@ test.describe('Home dashboard reads events from the store', () => {
     // the own row takes the 'calendar' default, so the two must not render the
     // same glyph. Colour no longer varies by icon (it lives only in the tile),
     // so the lucide glyph class each icon stamps is what tells them apart.
-    await expect(partnerCard.locator('svg')).toHaveClass(/lucide-gem/);
-    await expect(futureCard.locator('svg')).toHaveClass(/lucide-calendar/);
+    await expect(partnerCard.getByTestId('countdown-icon')).toHaveClass(/lucide-gem/);
+    await expect(futureCard.getByTestId('countdown-icon')).toHaveClass(/lucide-calendar/);
 
     // Soonest-first, straight from the store: own event is +14d, partner's is
     // +21d. `events` is rendered in store order with no re-sort, so a
     // regression that re-sorts or reverses shows up here.
     await expect(
-      page.getByTestId(/^event-countdown-(future|partner)-meetup-e2e$/).locator('h3')
+      page
+        .getByTestId(/^event-countdown-(future|partner)-meetup-e2e$/)
+        .getByRole('heading', { level: 3 })
     ).toHaveText(['Future Meetup E2E', 'Partner Meetup E2E']);
   });
 
@@ -339,7 +341,7 @@ test.describe('Home dashboard reads events from the store', () => {
     const card = page.getByTestId('event-countdown-today-meetup-e2e');
     await expect(card).toBeVisible();
     await expect(card.getByText('Today Meetup E2E')).toBeVisible();
-    await expect(card.getByText('Today!')).toBeVisible();
+    await expect(card.getByTestId('countdown-value')).toHaveText('Today!');
 
     // No description line is rendered for a null value.
     await expect(card.getByTestId('countdown-description')).toHaveCount(0);
@@ -394,7 +396,9 @@ test.describe('Home dashboard reads events from the store', () => {
 
     await expect(page.getByTestId('event-countdown-first-meetup-e2e')).toBeVisible();
 
-    await expect(page.getByTestId(/^event-countdown-\w+-meetup-e2e$/).locator('h3')).toHaveText([
+    await expect(
+      page.getByTestId(/^event-countdown-\w+-meetup-e2e$/).getByRole('heading', { level: 3 })
+    ).toHaveText([
       'First Meetup E2E',
       'Second Meetup E2E',
       'Third Meetup E2E',

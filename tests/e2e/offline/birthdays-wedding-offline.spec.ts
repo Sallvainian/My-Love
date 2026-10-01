@@ -172,15 +172,15 @@ test.describe('Birthdays and wedding date from the local copy', () => {
 
     // THEN: all three cards count from the saved values: whole days left,
     // one fewer than the calendar days while the clock carries today's rest.
-    await expect(page.getByTestId('birthday-countdown-self').locator('h3')).toHaveText(
-      /turns? 31$/
-    );
+    await expect(
+      page.getByTestId('birthday-countdown-self').getByRole('heading', { level: 3 })
+    ).toHaveText(/turns? 31$/);
     await expect(
       page.getByTestId('birthday-countdown-self').getByTestId('countdown-value')
     ).toHaveText('4 days');
-    await expect(page.getByTestId('birthday-countdown-partner').locator('h3')).toContainText(
-      'turns 30'
-    );
+    await expect(
+      page.getByTestId('birthday-countdown-partner').getByRole('heading', { level: 3 })
+    ).toContainText('turns 30');
     await expect(
       page.getByTestId('birthday-countdown-partner').getByTestId('countdown-value')
     ).toHaveText('9 days');

@@ -93,19 +93,18 @@ test.describe('Love Notes on the style kit', () => {
     }) => {
       await openNotes(page, colorScheme);
 
-      // Page ground: the view container (the partner row's parent) is `page`.
-      const row = page.getByTestId('notes-partner-row');
-      const ground = await row.evaluate(
-        (el) => getComputedStyle(el.parentElement as Element).backgroundColor
+      // Page ground: the view container is `page`.
+      await expect(page.getByTestId('love-notes-view')).toHaveCSS(
+        'background-color',
+        KIT_PAGE[colorScheme]
       );
-      expect(ground).toBe(KIT_PAGE[colorScheme]);
 
       // Composer: transparent over the ground, its controls on kit surfaces.
       const input = page.getByLabel(/love note message input/i);
-      const composer = await input.evaluate(
-        (el) => getComputedStyle(el.parentElement?.parentElement as Element).backgroundColor
+      await expect(page.getByTestId('message-composer')).toHaveCSS(
+        'background-color',
+        TRANSPARENT
       );
-      expect(composer).toBe(TRANSPARENT);
       expect(await background(input)).toBe(KIT_CARD[colorScheme]);
       await expect(input).toHaveCSS('color', KIT_INK[colorScheme]);
       expect(await background(page.getByLabel(/attach image/i))).toBe(KIT_CARD2[colorScheme]);

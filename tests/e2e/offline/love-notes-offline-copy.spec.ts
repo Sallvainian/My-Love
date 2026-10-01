@@ -175,7 +175,7 @@ test.describe('Love notes from the local copy', () => {
       expect.arrayContaining(noteIds.map((id) => expect.objectContaining({ id })))
     );
     await expect(noteBubble(page, textContent)).toBeVisible();
-    await expect(noteBubble(page, imageContent).locator('img')).toBeVisible();
+    await expect(noteBubble(page, imageContent).getByRole('img')).toBeVisible();
     await recurseUntil(
       async () => {
         const ids = (await savedNoteIds(page)) ?? [];
@@ -205,7 +205,7 @@ test.describe('Love notes from the local copy', () => {
 
     // THEN: both saved notes are listed, the image decoded from the cache…
     await expect(noteBubble(page, textContent)).toBeVisible();
-    const image = noteBubble(page, imageContent).locator('img');
+    const image = noteBubble(page, imageContent).getByRole('img');
     await expect(image).toBeVisible();
     await expect(image).toHaveAttribute('src', /^blob:/);
     await recurseUntil(

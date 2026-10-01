@@ -194,7 +194,9 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       () => window.__APP_STORE__?.getState().partner?.displayName
     );
     const partnerCard = page.getByTestId('birthday-countdown-partner');
-    await expect(partnerCard.locator('h3')).toHaveText(`${partnerName} turns 30`);
+    await expect(partnerCard.getByRole('heading', { level: 3 })).toHaveText(
+      `${partnerName} turns 30`
+    );
     // Whole days left plus a live clock to the day's local midnight, so ten
     // calendar days out reads "9 days" and the rest as hours.
     await expect(partnerCard.getByTestId('countdown-value')).toHaveText('9 days');

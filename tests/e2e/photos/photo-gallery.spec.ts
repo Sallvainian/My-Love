@@ -89,7 +89,9 @@ test.describe('Photo Gallery', () => {
     await expect(page.getByTestId('photo-gallery')).toBeVisible();
 
     // WHEN: User clicks a photo
-    const photoItem = page.getByTestId('photo-gallery-grid').locator('img').first();
+    const photoItem = page
+      .getByTestId('photo-gallery-grid')
+      .getByRole('button', { name: 'Test photo', exact: true });
     await photoItem.click();
 
     // THEN: Photo viewer opens
