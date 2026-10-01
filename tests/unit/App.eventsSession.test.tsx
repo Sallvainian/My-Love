@@ -320,10 +320,12 @@ describe('Auth bootstrap notification ownership', () => {
     });
   });
 
-  it.each([
-    ['null', null],
-    ['different-user', session('stale-token', OTHER_USER_ID)],
-  ] as const)('discards a stale %s lookup without disturbing the listener-owned event load', async (_name, snapshot) => {
+  /**
+   * The listener installs the session and starts its own event load, cached
+   * events are on screen, and then the initial lookup settles late with a
+   * stale snapshot. Returns what the cases below assert against.
+   */
+  async function settleStaleLookupAfterListener(snapshot: Session | null) {
     const lookup = deferred<Session | null>();
     const response = deferred<CoupleEvent[]>();
     auth.getSession.mockReturnValueOnce(lookup.promise);
@@ -340,6 +342,17 @@ describe('Auth bootstrap notification ownership', () => {
     expect(eventsService.getEvents).toHaveBeenCalledTimes(1);
 
     await act(async () => lookup.resolve(snapshot));
+    return { response, ownership, cachedEvents, syncPendingMoods };
+  }
+
+  const STALE_LOOKUPS = [
+    ['null', null],
+    ['different-user', session('stale-token', OTHER_USER_ID)],
+  ] as const;
+
+  it.each(STALE_LOOKUPS)('discards a stale %s lookup, keeping the listener’s store auth and events', async (_name, snapshot) => {
+    const { ownership, cachedEvents } = await settleStaleLookupAfterListener(snapshot);
+
     expect(useAppStore.getState()).toMatchObject({
       userId: USER_ID,
       isAuthenticated: true,
@@ -347,12 +360,26 @@ describe('Auth bootstrap notification ownership', () => {
       events: cachedEvents,
       eventsIsLoading: true,
     });
+  });
+
+  it.each(STALE_LOOKUPS)('keeps the signed-in shell and its cached events on screen after a stale %s lookup', async (_name, snapshot) => {
+    await settleStaleLookupAfterListener(snapshot);
+
     expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
     expect(screen.queryByText('Sign in')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Cached current trip' })).toBeInTheDocument();
+  });
+
+  it.each(STALE_LOOKUPS)('neither reloads events nor re-runs the bootstrap after a stale %s lookup', async (_name, snapshot) => {
+    const { syncPendingMoods } = await settleStaleLookupAfterListener(snapshot);
+
     expect(eventsService.getEvents).toHaveBeenCalledTimes(1);
     expect(syncPendingMoods).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(STALE_LOOKUPS)('lets the listener-owned event load settle after a stale %s lookup', async (_name, snapshot) => {
+    const { response } = await settleStaleLookupAfterListener(snapshot);
 
     await act(async () => response.resolve([event('Current trip')]));
     expect(useAppStore.getState().eventsIsLoading).toBe(false);

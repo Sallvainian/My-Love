@@ -144,15 +144,28 @@ describe('saved mood recovery', () => {
     expect((await getPendingMoods(A)).map((row) => row.id)).toEqual([mixed.id, hidden.id]);
   });
 
-  it.each([undefined, '', '   '])('repairs hidden owner/date row while preserving its identity and note (%j)', async (replacement) => {
+  /**
+   * Seeds A's hidden row (no recognized mood, already on the server) beside B's
+   * valid row, then saves A's mood for the same date with `replacement` as note.
+   */
+  async function repairHiddenRow(replacement: string | undefined) {
     const hidden = await seedRaw(raw('bad', [null], { supabaseId: 'existing-server-row' }));
     const other = await seedRaw(raw('sad', ['sad'], { userId: B }));
     const saved = await moodService.saveForDate(A, date, ['happy', 'happy'], replacement);
+    return { hidden, other, saved };
+  }
+
+  it.each([undefined, '', '   '])('repairs hidden owner/date row while preserving its identity and note (%j)', async (replacement) => {
+    const { hidden, saved } = await repairHiddenRow(replacement);
     expect(saved).toEqual({ ...hidden, mood: 'happy', moods: ['happy', 'happy'], synced: false });
-    expect(await moodService.get(other.id!)).toEqual(other);
     expect(await moodService.getAllForUser(A)).toEqual([saved]);
-    expect(await moodService.getAll()).toHaveLength(2);
     expect(await moodService.getUnsyncedMoods(A)).toEqual([saved]);
+  });
+
+  it.each([undefined, '', '   '])("leaves another account's row untouched when repairing a hidden row (%j)", async (replacement) => {
+    const { other } = await repairHiddenRow(replacement);
+    expect(await moodService.get(other.id!)).toEqual(other);
+    expect(await moodService.getAll()).toHaveLength(2);
   });
 
   it('uses nonempty replacement notes for hidden rows and clears notes on normal visible edits', async () => {

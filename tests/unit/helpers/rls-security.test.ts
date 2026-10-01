@@ -38,10 +38,14 @@ describe('createOutsiderClient', () => {
     vi.unstubAllEnvs();
   });
 
-  it('returns the authenticated client and account cleanup without eager deletion', async () => {
+  /** A successful setup under the 'security' prefix at a pinned `Date.now()`. */
+  async function createSecurityOutsider() {
     vi.spyOn(Date, 'now').mockReturnValue(123456789);
+    return createOutsiderClient(supabaseAdmin, 'security');
+  }
 
-    const outsider = await createOutsiderClient(supabaseAdmin, 'security');
+  it('creates and signs in the outsider with the expected credentials', async () => {
+    await createSecurityOutsider();
 
     expect(createUser).toHaveBeenCalledExactlyOnceWith({
       email: 'security-123456789@test.example.com',
@@ -57,11 +61,20 @@ describe('createOutsiderClient', () => {
       email: user.email,
       password: TEST_USER_PASSWORD,
     });
+  });
+
+  it('returns the authenticated client, the user id and a cleanup function', async () => {
+    const outsider = await createSecurityOutsider();
+
     expect(outsider.client).toBe(userClient);
     expect(outsider.userId).toBe(userId);
     expect(outsider.cleanup).toBeTypeOf('function');
-    expect(deleteUser).not.toHaveBeenCalled();
+  });
 
+  it('defers account deletion until cleanup is called, then deletes that account once', async () => {
+    const outsider = await createSecurityOutsider();
+
+    expect(deleteUser).not.toHaveBeenCalled();
     await expect(outsider.cleanup()).resolves.toBe(cleanupResponse);
     expect(deleteUser).toHaveBeenCalledExactlyOnceWith(userId);
   });

@@ -293,17 +293,23 @@ describe('eventsService', () => {
       vi.useRealTimers();
     });
 
-    it('returns the couple’s events soonest-first, each date at local midnight', async () => {
+    /** Reads one event of each partner's, the partner's later one stored first. */
+    async function readCoupleEvents() {
       backend.rows = [
         row({ id: 'later', user_id: PARTNER_ID, event_date: '2026-12-25', label: 'Christmas' }),
         row({ id: 'sooner', event_date: '2026-09-12', label: 'Anniversary' }),
       ];
+      return eventsService.getEvents();
+    }
 
-      const events = await eventsService.getEvents();
+    it('returns the couple’s events soonest-first', async () => {
+      const events = await readCoupleEvents();
 
-      // No user_id filter is applied: the events_select policy already scopes
-      // the read to the caller and their partner.
       expect(events.map((e) => e.id)).toEqual(['sooner', 'later']);
+    });
+
+    it('reads exactly two windows cut at today, each capped at one page and tie-broken by created_at', async () => {
+      await readCoupleEvents();
 
       // Two windows, cut at today, each capped at the default 50 rows. The
       // upcoming side reads ascending so the SOONEST events survive the cap;
@@ -332,13 +338,23 @@ describe('eventsService', () => {
       // undoing the one thing DW-9 asked for.
       expect(backend.queries).toHaveLength(2);
       expect(backend.fromCalls).toBe(2);
+    });
+
+    it('applies no user_id filter, so the partner’s events stay in the read', async () => {
+      await readCoupleEvents();
+
+      // No user_id filter is applied: the events_select policy already scopes
+      // the read to the caller and their partner.
       // Load-bearing: adding `.eq('user_id', ...)` here would drop the partner's
       // half of the couple's list — the whole point of the events_select policy
       // — and every other assertion in this file would still pass. Date bounds
       // are recorded in `queries`, so this stays a pure equality-filter log.
       expect(backend.filters).toEqual([]);
+    });
 
-      const [sooner] = events;
+    it('maps each row with its date at local midnight', async () => {
+      const [sooner] = await readCoupleEvents();
+
       expect(sooner.date.getFullYear()).toBe(2026);
       expect(sooner.date.getMonth()).toBe(8);
       expect(sooner.date.getDate()).toBe(12);

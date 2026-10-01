@@ -180,33 +180,45 @@ describe('scripts/provision-claude-bot.mjs', () => {
     expect(stub.seen.map((r) => r.method)).toEqual(['GET']);
   });
 
-  it('finds the user, sets the password, signs in, signs out globally, and prints no secret', async () => {
+  /**
+   * The happy path: the bot exists, every GoTrue call succeeds, and the URL
+   * comes from the `VITE_SUPABASE_URL` fallback with a trailing slash.
+   */
+  async function provisionSuccessfully() {
     stub = await startStub();
-    const { status, output } = await runScript({
+    return runScript({
       VITE_SUPABASE_URL: `${stub.url}/`,
       SUPABASE_SERVICE_KEY: SERVICE_KEY,
       CLAUDE_BOT_PASSWORD: FAKE_PASSWORD,
     });
+  }
+
+  it('finds the user, sets the password, signs in and signs out globally, in order with the right auth', async () => {
+    const { status } = await provisionSuccessfully();
     expect(status).toBe(0);
+
+    expect(stub!.seen.map((r) => `${r.method} ${r.url}`)).toEqual([
+      'GET /auth/v1/admin/users?page=1&per_page=100',
+      `PUT /auth/v1/admin/users/${BOT_ID}`,
+      'POST /auth/v1/token?grant_type=password',
+      'POST /auth/v1/logout?scope=global',
+    ]);
+    const [list, update, signIn, signOut] = stub!.seen;
+    expect(list.authorization).toBe(`Bearer ${SERVICE_KEY}`);
+    expect(JSON.parse(update.body)).toEqual({ password: FAKE_PASSWORD });
+    expect(JSON.parse(signIn.body)).toEqual({ email: BOT_EMAIL, password: FAKE_PASSWORD });
+    expect(signOut.authorization).toBe('Bearer unit-test-access-token');
+    expect(signOut.apikey).toBe(SERVICE_KEY);
+  });
+
+  it('prints each step’s progress and neither the password nor the access token', async () => {
+    const { output } = await provisionSuccessfully();
     expect(output).not.toContain(FAKE_PASSWORD);
     expect(output).not.toContain('unit-test-access-token');
     expect(output).toContain(`found user ${BOT_EMAIL} (${BOT_ID})`);
     expect(output).toContain('update-password ok (HTTP 200)');
     expect(output).toContain('sign-in with new password ok (HTTP 200)');
     expect(output).toContain('sign-out-global ok (HTTP 204)');
-
-    expect(stub.seen.map((r) => `${r.method} ${r.url}`)).toEqual([
-      'GET /auth/v1/admin/users?page=1&per_page=100',
-      `PUT /auth/v1/admin/users/${BOT_ID}`,
-      'POST /auth/v1/token?grant_type=password',
-      'POST /auth/v1/logout?scope=global',
-    ]);
-    const [list, update, signIn, signOut] = stub.seen;
-    expect(list.authorization).toBe(`Bearer ${SERVICE_KEY}`);
-    expect(JSON.parse(update.body)).toEqual({ password: FAKE_PASSWORD });
-    expect(JSON.parse(signIn.body)).toEqual({ email: BOT_EMAIL, password: FAKE_PASSWORD });
-    expect(signOut.authorization).toBe('Bearer unit-test-access-token');
-    expect(signOut.apikey).toBe(SERVICE_KEY);
   });
 
   it('exits 1 for an empty CLAUDE_BOT_PASSWORD instead of reporting a skip', async () => {

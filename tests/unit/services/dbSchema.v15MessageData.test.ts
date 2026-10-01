@@ -120,7 +120,8 @@ describe('dbSchema', () => {
         | undefined;
     }
 
-    it('moves the signed-in account’s rows (same ids) and favorites into its copy, then drops every custom row and the legacy stores', async () => {
+    /** A v14 profile signed in as A, with favorites of both accounts, upgraded. */
+    async function migrateSignedInProfile() {
       await seedLegacy({
         version: 14,
         token: A,
@@ -131,8 +132,11 @@ describe('dbSchema', () => {
           { messageId: 7, userId: B }, // B-ONE
         ],
       });
+      return openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+    }
 
-      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+    it('moves the signed-in account’s rows (same ids) and favorites into its copy', async () => {
+      const db = await migrateSignedInProfile();
 
       const copy = await readCopy(db, A);
       expect(copy?.custom.map((row) => [row.id, row.text, row.serverId, row.isFavorite])).toEqual([
@@ -145,11 +149,19 @@ describe('dbSchema', () => {
       expect(copy?.bundledFavoriteIds).toEqual([2]);
       // Above every id the store ever held, so no deleted row's id comes back.
       expect(copy?.nextCustomId).toBe(12);
+    });
 
-      // Only the bundled rows remain, unchanged.
+    it('leaves only the bundled rows in the messages store, unchanged', async () => {
+      const db = await migrateSignedInProfile();
+
       expect((await db.getAll('messages')).map((row) => [row.id, row.text])).toEqual(
         BUNDLED.map((text, index) => [index + 1, text])
       );
+    });
+
+    it('drops the messages by-user index and the legacy favorites store', async () => {
+      const db = await migrateSignedInProfile();
+
       const messages = db.transaction('messages', 'readonly').objectStore('messages');
       expect((messages.indexNames as DOMStringList).contains('by-user')).toBe(false);
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
@@ -187,7 +199,11 @@ describe('dbSchema', () => {
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
     });
 
-    it('from v8, keeps only an owned custom row’s legacy isFavorite flag', async () => {
+    /**
+     * A v8 profile signed in as A, relying on the legacy `isFavorite` flag: one
+     * flagged custom row of A's and one flagged bundled row, upgraded.
+     */
+    async function migrateV8WithLegacyFlags() {
       await seedLegacy({
         version: 8,
         token: A,
@@ -199,7 +215,11 @@ describe('dbSchema', () => {
       await flagged.put('messages', { ...bundledRow, isFavorite: true } as never);
       flagged.close();
 
-      const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+      return openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+    }
+
+    it('from v8, keeps only an owned custom row’s legacy isFavorite flag', async () => {
+      const db = await migrateV8WithLegacyFlags();
 
       const copy = await readCopy(db, A);
       expect(copy?.custom.map((row) => [row.id, row.text, row.isFavorite])).toEqual([
@@ -210,6 +230,11 @@ describe('dbSchema', () => {
       ]);
       expect(copy?.bundledFavoriteIds).toEqual([]);
       expect(copy?.nextCustomId).toBe(13);
+    });
+
+    it('from v8, drops the favorites and photos stores and purges every custom row', async () => {
+      const db = await migrateV8WithLegacyFlags();
+
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('photos');
       expect((await db.getAll('messages')).every((row) => !row.isCustom)).toBe(true);

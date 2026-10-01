@@ -209,15 +209,24 @@ describe('AdminPanel with the real local copy and store', () => {
     expect(remove).toHaveBeenCalledTimes(1);
   });
 
-  it('closes and removes the row from disk, store and list after the server accepts the delete', async () => {
+  /** Deletes A's row (the current daily message) and lets the server accept it. */
+  async function completeAcceptedDelete() {
     const user = userEvent.setup();
     const { gate } = await openGatedDelete(user);
     await act(async () => { gate.resolve(); });
     await waitFor(() => expect(screen.queryByTestId('admin-delete-dialog')).toBeNull());
+  }
+
+  it('closes and removes the row from disk, store and list after the server accepts the delete', async () => {
+    await completeAcceptedDelete();
     expect(await diskRow(aId)).toBeUndefined();
     expect(useAppStore.getState().customMessages.some((message) => message.id === aId)).toBe(false);
     expect(screen.getByTestId('admin-message-list')).toBeInTheDocument();
     expect(screen.queryByText('Account A message')).toBeNull();
+  });
+
+  it('falls back to a bundled daily message when the deleted row was the current one', async () => {
+    await completeAcceptedDelete();
     expect(useAppStore.getState().currentMessage?.text).toBe('Shared daily');
   });
 
