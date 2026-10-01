@@ -101,6 +101,18 @@ function renderOfflineWithPendingRead() {
   return () => finishRead();
 }
 
+/** Render offline with three saved partner moods already in the store. */
+function renderOfflineWithSavedMoods() {
+  state = makeState({ syncStatus: { isOnline: false }, partnerMoods: SEVERAL });
+  render(<PartnerMoodView />);
+}
+
+/** Both offline screens: nothing listed yet, and a saved copy listed. */
+const OFFLINE_RENDERS = [
+  { screen: 'no moods, saved copy still being read', renderOffline: renderOfflineWithPendingRead },
+  { screen: 'saved moods listed', renderOffline: renderOfflineWithSavedMoods },
+];
+
 describe('PartnerMoodView on the kit', () => {
   beforeEach(() => {
     cleanup();
@@ -179,14 +191,14 @@ describe('PartnerMoodView on the kit', () => {
     expect(screen.queryByTestId('partner-mood-list')).not.toBeInTheDocument();
   });
 
-  it('reads Offline in the status line when offline', () => {
-    renderOfflineWithPendingRead();
+  it.each(OFFLINE_RENDERS)('reads Offline in the status line when offline: $screen', ({ renderOffline }) => {
+    renderOffline();
 
     expect(screen.getByTestId('realtime-connection-status')).toHaveTextContent(/^Offline$/);
   });
 
-  it('disables refresh when offline', () => {
-    renderOfflineWithPendingRead();
+  it.each(OFFLINE_RENDERS)('disables refresh when offline: $screen', ({ renderOffline }) => {
+    renderOffline();
 
     expect(screen.getByTestId('partner-mood-refresh-button')).toBeDisabled();
   });
@@ -205,15 +217,12 @@ describe('PartnerMoodView on the kit', () => {
   });
 
   it('offline with saved moods lists them without the offline notice or empty state', async () => {
-    state = makeState({ syncStatus: { isOnline: false }, partnerMoods: SEVERAL });
-    render(<PartnerMoodView />);
+    renderOfflineWithSavedMoods();
 
     // The saved copy is read offline too.
     await waitFor(() =>
       expect(state.fetchPartnerMoods).toHaveBeenCalledWith(PARTNER_MOOD_LIMIT)
     );
-    expect(screen.getByTestId('realtime-connection-status')).toHaveTextContent(/^Offline$/);
-    expect(screen.getByTestId('partner-mood-refresh-button')).toBeDisabled();
     expect(screen.getAllByTestId('partner-mood-card').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('partner-mood-offline-notice')).not.toBeInTheDocument();
     expect(screen.queryByTestId('partner-mood-empty-state')).not.toBeInTheDocument();

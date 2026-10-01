@@ -52,6 +52,11 @@ async function startPendingSignIn(user: UserEvent) {
   return { container, settle };
 }
 
+/** The sign-in screen after a cancelled OAuth callback, which shows its notice. */
+function renderWithCallbackNotice() {
+  return render(<LoginScreen callbackOutcome="cancelled" />);
+}
+
 describe('LoginScreen on the kit', () => {
   it('paints the page and the wordmark heading on the kit', () => {
     render(<LoginScreen />);
@@ -209,9 +214,8 @@ describe('LoginScreen on the kit', () => {
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument();
   });
 
-  it('shows the callback notice on card2 in ink with an icon, and retires it on the next attempt', async () => {
-    const user = userEvent.setup();
-    const { container } = render(<LoginScreen callbackOutcome="cancelled" />);
+  it('shows the callback notice on card2 in ink with an icon', () => {
+    const { container } = renderWithCallbackNotice();
 
     const notice = screen.getByTestId('login-notice');
     expect(notice).toHaveAttribute('role', 'status');
@@ -219,6 +223,12 @@ describe('LoginScreen on the kit', () => {
     expect(within(notice).getByTestId('login-notice-icon')).toBeInTheDocument();
     expect(screen.getByTestId('login-card')).toContainElement(notice);
     expectOnKit(container.innerHTML);
+  });
+
+  it('retires the callback notice on the next sign-in attempt, even one that fails validation', async () => {
+    const user = userEvent.setup();
+    renderWithCallbackNotice();
+    expect(screen.getByTestId('login-notice')).toBeInTheDocument();
 
     // Natively a valid email, but the component's own check wants a dotted
     // domain: the attempt fails validation and still retires the notice.

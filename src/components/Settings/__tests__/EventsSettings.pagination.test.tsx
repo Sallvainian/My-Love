@@ -176,6 +176,45 @@ async function settleDeepPage(pending: ReturnType<typeof deferredLoad>) {
   });
 }
 
+/**
+ * Renders the section, asks for a history page and fails it. The next request
+ * is held in `retriedPage` until `retryHistoryPage` lands it.
+ */
+async function failFirstHistoryPage() {
+  const user = userEvent.setup();
+  const failedPage = deferredLoad();
+  const retriedPage = deferredLoad();
+  const loadEvents = vi.fn(async () => loadOk);
+  const loadMoreEvents = vi.fn(() => startPendingHistory(failedPage))
+    .mockImplementationOnce(() => startPendingHistory(failedPage))
+    .mockImplementationOnce(() => startPendingHistory(retriedPage));
+  setStore({ loadEvents, loadMoreEvents });
+  await renderSection();
+  await activateHistory(user);
+  // happy-dom refuses to blur disabled controls; reproduce Chromium's body
+  // focus explicitly after the focused history control becomes disabled.
+  document.body.focus();
+  await settleHistory(failedPage, loadFailed);
+  return { user, retriedPage, loadEvents, loadMoreEvents };
+}
+
+/**
+ * Presses Retry and lands the retried page with one older row. `whileInFlight`
+ * runs with the Retry control after the request starts and before it lands.
+ */
+async function retryHistoryPage(
+  user: UserEvent,
+  retriedPage: ReturnType<typeof deferredLoad>,
+  whileInFlight: (retry: HTMLElement) => void = () => {}
+) {
+  const retry = await activateHistory(user);
+  document.body.focus();
+  whileInFlight(retry);
+  await settleHistory(retriedPage, loadOk, {
+    events: [historyEvent('older'), historyEvent()],
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   setStore();
@@ -278,43 +317,37 @@ describe('EventsSettings explicit history', () => {
   });
 
   it('keeps the same page retryable after failure without refreshing or hiding rows', async () => {
-    const user = userEvent.setup();
-    const failedPage = deferredLoad();
-    const retriedPage = deferredLoad();
-    const loadEvents = vi.fn(async () => loadOk);
-    const loadMoreEvents = vi.fn(() => startPendingHistory(failedPage))
-      .mockImplementationOnce(() => startPendingHistory(failedPage))
-      .mockImplementationOnce(() => startPendingHistory(retriedPage));
-    setStore({ loadEvents, loadMoreEvents });
-    await renderSection();
-    await activateHistory(user);
-    document.body.focus();
-    await settleHistory(failedPage, loadFailed);
+    const { user, retriedPage, loadEvents, loadMoreEvents } = await failFirstHistoryPage();
 
     expect(screen.getByTestId('event-row-mine')).toBeInTheDocument();
     expect(screen.getByTestId('events-settings-history-error')).toHaveTextContent(
       /couldn't load more history/
     );
     expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry loading history' })).toHaveFocus();
-    expect(screen.getByTestId('events-settings-history-status')).toBeEmptyDOMElement();
 
-    const retry = await activateHistory(user);
-    expect(retry).toBeDisabled();
-    document.body.focus();
-    expect(screen.queryByTestId('events-settings-history-error')).not.toBeInTheDocument();
-    await settleHistory(retriedPage, loadOk, {
-      events: [historyEvent('older'), historyEvent()],
+    await retryHistoryPage(user, retriedPage, (retry) => {
+      expect(retry).toBeDisabled();
+      expect(screen.queryByTestId('events-settings-history-error')).not.toBeInTheDocument();
     });
 
     expect(screen.getByTestId('event-row-older')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Load more history' })).toBeEnabled();
+    expect(loadMoreEvents).toHaveBeenCalledTimes(2);
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it('focuses Retry after a failed page and Load more after the retried page, announcing only the landing', async () => {
+    const { user, retriedPage } = await failFirstHistoryPage();
+
+    expect(screen.getByRole('button', { name: 'Retry loading history' })).toHaveFocus();
+    expect(screen.getByTestId('events-settings-history-status')).toBeEmptyDOMElement();
+
+    await retryHistoryPage(user, retriedPage);
+
     expect(screen.getByTestId('events-settings-load-more')).toHaveFocus();
     expect(screen.getByTestId('events-settings-history-status')).toHaveTextContent(
       '2 events loaded. More history is available.'
     );
-    expect(loadMoreEvents).toHaveBeenCalledTimes(2);
-    expect(loadEvents).toHaveBeenCalledTimes(1);
   });
 
   it('disables history while a full refresh is in flight', async () => {
