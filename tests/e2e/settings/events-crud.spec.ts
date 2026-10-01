@@ -57,6 +57,9 @@ function rowFor(page: Page, label: string) {
   return page.locator('[data-testid^="event-row-"]').filter({ hasText: label });
 }
 
+/** One calendar day in milliseconds. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Assert a Home card is counting down to the date it was created with.
  *
@@ -72,20 +75,18 @@ function rowFor(page: Page, label: string) {
 async function expectCardCountsDownTo(card: Locator, isoDate: string): Promise<void> {
   await recurseUntil(
     () =>
-      card.evaluate((element, iso) => {
+      card.evaluate((element, { iso, dayMs }) => {
         const [year, month, day] = iso.split('-').map(Number);
         const now = new Date();
         const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const target = new Date(year, month - 1, day);
-        const calendarDays = Math.round(
-          (target.getTime() - todayMidnight.getTime()) / 86400000
-        );
+        const calendarDays = Math.round((target.getTime() - todayMidnight.getTime()) / dayMs);
         // Whole days left: the part of today already gone moves to the clock.
         const intoToday = now.getTime() > todayMidnight.getTime() ? 1 : 0;
         const days = calendarDays - intoToday;
         const expected = `${days} ${days === 1 ? 'day' : 'days'}`;
         return (element.textContent ?? '').includes(expected);
-      }, isoDate),
+      }, { iso: isoDate, dayMs: DAY_MS }),
     (v) => {
       expect(v, `Home card should be counting down to ${isoDate}`).toBe(true);
     }

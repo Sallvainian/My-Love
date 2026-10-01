@@ -37,6 +37,9 @@ const KIT_INK = {
 /** `fill` is the same pink in both themes. */
 const KIT_FILL = 'rgb(219, 39, 119)'; // #db2777
 
+/** Text on the `fill` pink: white in both themes. */
+const KIT_ON_FILL = 'rgb(255, 255, 255)'; // #ffffff
+
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 
 async function openNotes(page: Page, colorScheme: Scheme) {
@@ -194,7 +197,7 @@ test.describe('Love Notes on the style kit', () => {
       const sendFill = await background(page.getByLabel(/send message/i));
       expect(bubbleFill).toBe(KIT_FILL);
       expect(sendFill).toBe(bubbleFill);
-      await expect(bubble).toHaveCSS('color', 'rgb(255, 255, 255)');
+      await expect(bubble).toHaveCSS('color', KIT_ON_FILL);
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollHeight - window.innerHeight
