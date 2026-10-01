@@ -192,8 +192,8 @@ function coupleEvent(
  * C's event as a deliberately partial stub: the cases using it only check that
  * C's list is kept or replaced, and nothing sorts it.
  */
-function cEventStub() {
-  return { id: 'c-event', label: 'C-OWN-EVENT-LABEL' };
+function cEventStub(id = 'c-event') {
+  return { id, label: 'C-OWN-EVENT-LABEL' };
 }
 
 describe('loader identity guards', () => {
@@ -407,7 +407,7 @@ describe('loader identity guards', () => {
       const inFlight = useAppStore.getState().loadEvents();
       switchToUserC({ events: [cEventStub()] });
 
-      pending.settle([{ id: 'a-event', label: 'A-PRIVATE-EVENT-LABEL' }]);
+      pending.settle([coupleEvent()]);
       await inFlight;
 
       expect(useAppStore.getState().events).toEqual([cEventStub()]);
@@ -499,16 +499,14 @@ describe('loader identity guards', () => {
       updateEvent.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().editEvent('a-event', { label: 'renamed' });
-      switchToUserC({ events: [{ id: 'a-event', label: 'C-OWN-EVENT-LABEL' }] });
+      switchToUserC({ events: [cEventStub('a-event')] });
 
       pending.settle(coupleEvent());
       await inFlight;
 
       // Same id in both accounts: without the guard the map() would overwrite
       // C's row with A's, which is the leak in its most direct form.
-      expect(useAppStore.getState().events).toEqual([
-        { id: 'a-event', label: 'C-OWN-EVENT-LABEL' },
-      ]);
+      expect(useAppStore.getState().events).toEqual([cEventStub('a-event')]);
       expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-EVENT-LABEL');
     });
 
@@ -532,16 +530,14 @@ describe('loader identity guards', () => {
       deleteEvent.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().removeEvent('shared-id');
-      switchToUserC({ events: [{ id: 'shared-id', label: 'C-OWN-EVENT-LABEL' }] });
+      switchToUserC({ events: [cEventStub('shared-id')] });
 
       pending.settle(undefined);
       await inFlight;
 
       // The filter is by id alone, so an unguarded write would take C's row out
       // of C's list on A's behalf.
-      expect(useAppStore.getState().events).toEqual([
-        { id: 'shared-id', label: 'C-OWN-EVENT-LABEL' },
-      ]);
+      expect(useAppStore.getState().events).toEqual([cEventStub('shared-id')]);
     });
 
     it('does not paint the previous account\'s failure onto the new one', async () => {
@@ -564,11 +560,11 @@ describe('loader identity guards', () => {
 
   describe('when the identity has not changed', () => {
     it("an events load shows the account's events and stops loading", async () => {
-      getEvents.mockResolvedValue([{ id: 'a-event', label: 'A-EVENT' }]);
+      getEvents.mockResolvedValue([coupleEvent()]);
 
       await useAppStore.getState().loadEvents();
 
-      expect(useAppStore.getState().events).toEqual([{ id: 'a-event', label: 'A-EVENT' }]);
+      expect(useAppStore.getState().events).toEqual([coupleEvent()]);
       expect(useAppStore.getState().eventsIsLoading).toBe(false);
     });
   });

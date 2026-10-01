@@ -75,6 +75,11 @@ function event(id: string, isoDate: string, overrides: Partial<CoupleEvent> = {}
   };
 }
 
+/** What the events form submits to `addEvent`; the defaults serve a case that needs any input. */
+function eventInput(label = 'x', eventDate = '2026-10-31') {
+  return { label, eventDate };
+}
+
 function pagination(hasMore = true): EventsPagination {
   return {
     todayISO: '2026-09-12',
@@ -469,9 +474,7 @@ describe('eventsSlice', () => {
       createEvent.mockReturnValue(pendingAdd.promise);
       const store = createTestStore();
 
-      const accountAAdd = store
-        .getState()
-        .addEvent({ label: 'account-a', eventDate: '2026-10-31' });
+      const accountAAdd = store.getState().addEvent(eventInput('account-a'));
 
       const pendingAccountBLoad = deferred<CoupleEvent[]>();
       store.setState({
@@ -535,9 +538,7 @@ describe('eventsSlice', () => {
 
       const first = store.getState().loadEvents();
       const second = store.getState().loadEvents();
-      await store
-        .getState()
-        .addEvent({ label: 'added-after-second-started', eventDate: '2026-10-31' });
+      await store.getState().addEvent(eventInput('added-after-second-started'));
 
       firstLoad.resolve([event('superseded', '2026-09-12')]);
       expect(await first).toEqual({ status: 'stale' });
@@ -557,7 +558,7 @@ describe('eventsSlice', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadEvents();
-      await store.getState().addEvent({ label: 'added', eventDate: '2026-10-31' });
+      await store.getState().addEvent(eventInput('added'));
       pendingLoad.resolve([]);
 
       expect(await inFlight).toEqual({ status: 'success' });
@@ -573,9 +574,7 @@ describe('eventsSlice', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadEvents();
-      const add = store
-        .getState()
-        .addEvent({ label: 'already-observed', eventDate: '2026-10-31' });
+      const add = store.getState().addEvent(eventInput('already-observed'));
       pendingLoad.resolve([created]);
       expect(await inFlight).toEqual({ status: 'success' });
       pendingCreate.resolve(created);
@@ -616,7 +615,7 @@ describe('eventsSlice', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadEvents();
-      await store.getState().addEvent({ label: 'transient', eventDate: '2026-10-31' });
+      await store.getState().addEvent(eventInput('transient'));
       await store.getState().removeEvent('transient');
       // The request captured the row after its add but before its delete. Only
       // ordered replay of the delete tombstone can remove it from this stale
@@ -671,9 +670,10 @@ describe('eventsSlice', () => {
       const store = createTestStore();
 
       const inFlight = store.getState().loadEvents();
-      expect(
-        await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' })
-      ).toMatchObject({ success: false, error: 'add failed' });
+      expect(await store.getState().addEvent(eventInput())).toMatchObject({
+        success: false,
+        error: 'add failed',
+      });
       expect(await store.getState().editEvent('x', { label: 'changed' })).toMatchObject({
         success: false,
         error: 'edit failed',
@@ -728,7 +728,7 @@ describe('eventsSlice', () => {
         event('second-of-day', '2026-10-31', { createdAt: new Date(2026, 0, 2) })
       );
 
-      await store.getState().addEvent({ label: 'second-of-day', eventDate: '2026-10-31' });
+      await store.getState().addEvent(eventInput('second-of-day'));
 
       expect(store.getState().events.map((e) => e.id)).toEqual(['first-of-day', 'second-of-day']);
     });
@@ -737,7 +737,7 @@ describe('eventsSlice', () => {
       const store = createTestStore();
       createEvent.mockResolvedValue(event('new', '2026-10-31'));
 
-      await store.getState().addEvent({ label: 'new', eventDate: '2026-10-31' });
+      await store.getState().addEvent(eventInput('new'));
 
       expect(createEvent).toHaveBeenCalledWith({
         userId: USER_ID,
@@ -759,7 +759,7 @@ describe('eventsSlice', () => {
         )
       );
 
-      const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
+      const result = await store.getState().addEvent(eventInput());
 
       expect(result.success).toBe(false);
       expect(result).toEqual({
@@ -786,7 +786,7 @@ describe('eventsSlice', () => {
       const store = createTestStore();
       createEvent.mockRejectedValue(codedWriteError('offline', OFFLINE_MESSAGE));
 
-      const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
+      const result = await store.getState().addEvent(eventInput());
 
       expect(result).toEqual({ success: false, code: 'offline', error: OFFLINE_MESSAGE });
       expect(store.getState().eventsError).toBeNull();
@@ -801,10 +801,7 @@ describe('eventsSlice', () => {
         store.setState({ events: existing });
         createEvent.mockRejectedValue(codedWriteError(code, 'The returned message'));
 
-        const result = await store.getState().addEvent({
-          label: 'x',
-          eventDate: '2026-10-31',
-        });
+        const result = await store.getState().addEvent(eventInput());
 
         expect(result).toEqual({ success: false, code, error: 'The returned message' });
         expect(store.getState().events).toEqual(existing);
@@ -815,7 +812,7 @@ describe('eventsSlice', () => {
       const store = createTestStore();
       store.setState({ userId: null });
 
-      const result = await store.getState().addEvent({ label: 'x', eventDate: '2026-10-31' });
+      const result = await store.getState().addEvent(eventInput());
 
       expect(result).toEqual({
         success: false,

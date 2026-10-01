@@ -172,6 +172,7 @@ import {
   storageQuota,
   switchToUserC,
 } from './loaderIdentityGuardsFixture';
+import { createPhotoInsert } from '../../support/factories/photos';
 
 /** The minimum a PhotoUploadInput needs; nothing here reaches a real service. */
 function uploadInput(): PhotoUploadInput {
@@ -184,38 +185,43 @@ function uploadInput(): PhotoUploadInput {
   };
 }
 
+/** The fields a photos row needs that the insert type leaves optional or unset. */
+type PhotoRowFields = Pick<
+  SupabasePhoto,
+  'id' | 'user_id' | 'storage_path' | 'caption' | 'mime_type' | 'created_at'
+>;
+
+/**
+ * A whole photos row as the gallery's read returns it, built on the shared
+ * factory and checked against `SupabasePhoto`.
+ */
+function photoRow(fields: PhotoRowFields): SupabasePhoto {
+  return { ...createPhotoInsert({ ...fields, file_size: 1 }), ...fields };
+}
+
 /** A's photo row, carrying a string that must never appear in C's store. */
 function aPhoto(): SupabasePhoto {
-  return {
+  return photoRow({
     id: 'a-photo-1',
     user_id: A,
     storage_path: `${A}/a-photo-1.jpeg`,
-    filename: 'a.jpg',
     caption: 'A-PRIVATE-PHOTO',
     mime_type: 'image/jpeg',
-    file_size: 1,
-    width: 10,
-    height: 10,
     created_at: '2026-09-01T00:00:00.000Z',
-  };
+  });
 }
 
 /** What C already had on screen. */
 function cPhoto(): PhotoWithUrls {
-  return {
+  const row = photoRow({
     id: 'c-photo',
     user_id: C,
     storage_path: `${C}/c-photo.jpeg`,
-    filename: 'c.jpg',
     caption: 'C-OWN-CAPTION',
     mime_type: 'image/jpeg',
-    file_size: 1,
-    width: 10,
-    height: 10,
     created_at: '2026-09-02T00:00:00.000Z',
-    signedUrl: null,
-    isOwn: true,
-  };
+  });
+  return { ...row, signedUrl: null, isOwn: true };
 }
 
 /**

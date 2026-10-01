@@ -162,6 +162,7 @@ import {
   storageQuota,
   switchToUserC,
 } from './loaderIdentityGuardsFixture';
+import { makeMoodEntry } from './moodSliceFixture';
 
 describe('loader identity guards', () => {
   beforeEach(async () => {
@@ -196,8 +197,7 @@ describe('loader identity guards', () => {
       switchToUserC({ moods: [] });
 
       pending.settle([
-        {
-          id: 1,
+        makeMoodEntry({
           userId: A,
           mood: 'sad',
           moods: ['sad'],
@@ -205,7 +205,7 @@ describe('loader identity guards', () => {
           date: '2026-08-03',
           timestamp: new Date('2026-08-03T06:00:00.000Z'),
           synced: true,
-        },
+        }),
       ]);
       await inFlight;
 

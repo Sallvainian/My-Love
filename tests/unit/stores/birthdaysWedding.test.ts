@@ -61,6 +61,9 @@ const SAVED_COUPLE = {
   weddingDate: '2027-06-19',
 } as const;
 
+/** `lookupPartnerId`'s answer for a linked account. */
+const LINKED_LOOKUP = { status: 'linked', partnerId: P } as const;
+
 function setOnline(value: boolean): void {
   Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
@@ -267,7 +270,7 @@ describe('wedding date on the couple-settings copy', () => {
   // Matrix: "Wedding set/cleared" — the other phone after start/reconnect.
   it('online: the server wedding date replaces the copy', async () => {
     await writeLocalCopy(A, COUPLE_SETTINGS_COPY_KIND, SAVED_COUPLE);
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     fetchCoupleSettings.mockResolvedValue({ relationshipStart: START, weddingDate: null });
 
     await state().loadCoupleSettings();
@@ -283,7 +286,7 @@ describe('wedding date on the couple-settings copy', () => {
   ])('a confirmed save %s the wedding date in state and copy', async (_label, value) => {
     await writeLocalCopy(A, COUPLE_SETTINGS_COPY_KIND, SAVED_COUPLE);
     useAppStore.setState({ coupleSettings: SAVED_COUPLE });
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     saveWeddingDate.mockResolvedValue({ relationshipStart: START, weddingDate: value });
 
     await state().setWeddingDate(value);
@@ -297,7 +300,7 @@ describe('wedding date on the couple-settings copy', () => {
   it('a failed wedding save throws and leaves state and copy unchanged', async () => {
     await writeLocalCopy(A, COUPLE_SETTINGS_COPY_KIND, SAVED_COUPLE);
     useAppStore.setState({ coupleSettings: SAVED_COUPLE });
-    lookupPartnerId.mockResolvedValue({ status: 'linked', partnerId: P });
+    lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);
     saveWeddingDate.mockRejectedValue(new AccountDataError('transport', 'save failed'));
 
     await expect(state().setWeddingDate(null)).rejects.toThrow('save failed');

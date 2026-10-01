@@ -215,6 +215,11 @@ describe('loader identity guards', () => {
     };
   }
 
+  /** What A submits to `createCustomMessage`. */
+  function aCustomInput() {
+    return { text: 'A-PRIVATE-CUSTOM-MESSAGE', category: 'custom' as const };
+  }
+
   /** Answer message-data reads from `copies` by account; every other kind is empty. */
   function savedMessageData(copies: Record<string, unknown>) {
     readLocalCopy.mockImplementation(async (userId: string, kind: string) =>
@@ -302,10 +307,7 @@ describe('loader identity guards', () => {
       const pending = deferred<unknown>();
       customCreate.mockReturnValue(pending.promise);
 
-      const inFlight = useAppStore.getState().createCustomMessage({
-        text: 'A-PRIVATE-CUSTOM-MESSAGE',
-        category: 'custom',
-      });
+      const inFlight = useAppStore.getState().createCustomMessage(aCustomInput());
       switchToUserC({ customMessages: cCustomList() });
 
       pending.settle(aRemote());
@@ -328,9 +330,7 @@ describe('loader identity guards', () => {
       const pending = deferred<unknown>();
       customCreate.mockReturnValue(pending.promise);
 
-      const inFlight = useAppStore
-        .getState()
-        .createCustomMessage({ text: 'A-PRIVATE-CUSTOM-MESSAGE', category: 'custom' });
+      const inFlight = useAppStore.getState().createCustomMessage(aCustomInput());
       await vi.waitFor(() => expect(customCreate).toHaveBeenCalled());
       switchToUserC({ messages: cRotationPool() });
       getAllStoredMessages.mockClear();
@@ -351,9 +351,7 @@ describe('loader identity guards', () => {
       const pending = deferred<unknown>();
       customCreate.mockReturnValue(pending.promise);
 
-      const inFlight = useAppStore
-        .getState()
-        .createCustomMessage({ text: 'A-PRIVATE-CUSTOM-MESSAGE', category: 'custom' });
+      const inFlight = useAppStore.getState().createCustomMessage(aCustomInput());
 
       useAppStore.getState().clearAuth();
       useAppStore.getState().setAuthUser(A);
@@ -541,9 +539,7 @@ describe('loader identity guards', () => {
     it("a created custom message is listed, saved to the account's copy, and the rotation pool re-read", async () => {
       customCreate.mockResolvedValue(aRemote());
 
-      await useAppStore
-        .getState()
-        .createCustomMessage({ text: 'A-PRIVATE-CUSTOM-MESSAGE', category: 'custom' });
+      await useAppStore.getState().createCustomMessage(aCustomInput());
 
       expect(useAppStore.getState().customMessages).toEqual([
         expect.objectContaining({ text: 'A-PRIVATE-CUSTOM-MESSAGE' }),
