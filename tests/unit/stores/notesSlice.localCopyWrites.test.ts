@@ -159,17 +159,19 @@ describe('notesSlice love-notes local copy', () => {
 
     it('a confirmed image send saves the storage path, never the blob or preview', async () => {
       const store = createTestStore();
-      const createObjectURL = vi.fn(() => 'blob:preview');
-      const revokeObjectURL = vi.fn();
-      vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL }));
+      // Spies, not a patched URL: restoreMocks puts the real methods back even
+      // when an assertion below fails.
+      const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview');
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 
       await store.getState().sendNote('pic', new File(['x'], 'p.jpg', { type: 'image/jpeg' }));
 
+      // The preview existed while sending, so its absence below is a real exclusion.
+      expect(createObjectURL).toHaveBeenCalled();
       const saved = savedCopies.get(key(USER_A)) as Record<string, unknown>[];
       expect(saved).toHaveLength(1);
       expect(saved[0].image_url).toBe(`${USER_A}/uploaded.jpg`);
       expect(JSON.stringify(saved)).not.toContain('blob:');
-      vi.unstubAllGlobals();
     });
 
     it('a failed send is not saved; the copy holds confirmed rows only', async () => {
