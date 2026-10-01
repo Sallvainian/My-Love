@@ -44,6 +44,8 @@ const FRESH = { ...SAVED, displayName: 'FRESH-NAME' };
 
 /** The partner envelope for a linked account: the copy's value and getPartner's answer. */
 const linked = <P>(partner: P) => ({ status: 'linked' as const, partner });
+/** The envelope getPartner answers when the read fails. */
+const READ_FAILED = { status: 'error' as const, reason: 'network' };
 
 function deferred<T>() {
   let settle: (value: T) => void = () => {};
@@ -122,7 +124,7 @@ describe('partner profile on the local copy', () => {
 
   it('read fails with a copy: keeps the saved partner and leaves the copy untouched', async () => {
     await writeLocalCopy(A, PARTNER_COPY_KIND, linked(SAVED));
-    getPartner.mockResolvedValue({ status: 'error', reason: 'network' });
+    getPartner.mockResolvedValue(READ_FAILED);
 
     await state().loadPartner();
 
@@ -132,7 +134,7 @@ describe('partner profile on the local copy', () => {
   });
 
   it('read fails with no copy: a load error, not "unlinked", and nothing saved', async () => {
-    getPartner.mockResolvedValue({ status: 'error', reason: 'network' });
+    getPartner.mockResolvedValue(READ_FAILED);
 
     await state().loadPartner();
 
@@ -309,7 +311,7 @@ describe('partner profile on the local copy', () => {
       useAppStore.setState({ coupleSettings: { status: 'unlinked' } } as unknown as Parameters<
         typeof useAppStore.setState
       >[0]);
-      getPartner.mockResolvedValue({ status: 'error', reason: 'network' });
+      getPartner.mockResolvedValue(READ_FAILED);
 
       await state().loadPartner();
 

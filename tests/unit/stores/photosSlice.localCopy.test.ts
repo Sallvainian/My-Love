@@ -54,6 +54,7 @@ import {
   PHOTOS_COPY_KIND,
   type PhotosSlice,
 } from '../../../src/stores/slices/photosSlice';
+import { createPhotoInsert } from '../../support/factories/photos';
 
 const USER_A = 'USER-A-ID';
 const PARTNER = 'PARTNER-ID';
@@ -69,18 +70,16 @@ function createTestStore() {
 
 /** A server row; `n` orders them (a higher n is older). */
 function row(n: number, owner = USER_A): SupabasePhoto {
-  return {
+  // Given `id` and `created_at`, the factory's insert body is the whole row.
+  return createPhotoInsert({
     id: `photo-${n}`,
     user_id: owner,
     storage_path: `${owner}/photo-${n}.jpg`,
-    filename: `photo-${n}.jpg`,
     caption: n % 2 ? null : `caption ${n}`,
     mime_type: 'image/jpeg',
     file_size: 1000 + n,
-    width: 800,
-    height: 600,
     created_at: new Date(Date.UTC(2026, 8, 20) - n * 60_000).toISOString(),
-  };
+  }) as SupabasePhoto;
 }
 
 /** The row as the gallery holds it, and as the copy saves it. */
