@@ -86,7 +86,7 @@ vi.mock('../../src/components/RelationshipTimers/TimeTogether', () => ({
   TimeTogether: () => null,
 }));
 vi.mock('../../src/components/LoginScreen', () => ({
-  LoginScreen: () => <p>Sign in</p>,
+  LoginScreen: () => <p data-testid="login-screen">Sign in</p>,
 }));
 // A button, not a <p>: the setup gate's `onComplete` has to be reachable so a
 // test can prove a read raised before the save does not re-open the modal.
@@ -310,7 +310,7 @@ describe('Auth bootstrap notification ownership', () => {
 
     await act(async () => lookup.resolve(null));
     expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
-    expect(screen.getByText('Sign in')).toBeInTheDocument();
+    expect(screen.getByTestId('login-screen')).toBeInTheDocument();
     expect(useAppStore.getState()).toMatchObject({
       userId: null,
       userEmail: null,
@@ -367,7 +367,7 @@ describe('Auth bootstrap notification ownership', () => {
 
     expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
-    expect(screen.queryByText('Sign in')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('login-screen')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Cached current trip' })).toBeInTheDocument();
   });
 
@@ -405,7 +405,7 @@ describe('Auth bootstrap notification ownership', () => {
       isAuthenticated: false,
       authSessionVersion: ownership,
     });
-    expect(screen.getByText('Sign in')).toBeInTheDocument();
+    expect(screen.getByTestId('login-screen')).toBeInTheDocument();
     expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
     expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
     expect(loadEvents).not.toHaveBeenCalled();
@@ -430,11 +430,11 @@ describe('Auth bootstrap notification ownership', () => {
       events: [],
     });
     expect(screen.queryByTestId('auth-loading-screen')).not.toBeInTheDocument();
-    expect(screen.getByText('Sign in')).toBeInTheDocument();
+    expect(screen.getByTestId('login-screen')).toBeInTheDocument();
     expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
     expect(loadEvents).toHaveBeenCalledTimes(1);
     await act(async () => requests[0].resolve(success));
-    expect(screen.getByText('Sign in')).toBeInTheDocument();
+    expect(screen.getByTestId('login-screen')).toBeInTheDocument();
   });
 
   // The session metadata is deliberately the OPPOSITE of what the profile says,
@@ -474,17 +474,17 @@ describe('Auth bootstrap notification ownership', () => {
   it('preserves same-user updates and display-name handling (has name: true)', async () => {
     const { requests } = await sameUserUpdate({}, { status: 'chosen', displayName: 'Updated Name' });
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
-    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set your display name' })).not.toBeInTheDocument();
     await act(async () => requests[0].resolve(success));
     expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
   });
 
   it('preserves same-user updates and display-name handling (has name: false)', async () => {
     const { requests } = await sameUserUpdate({ display_name: 'Metadata Name' }, { status: 'unset' });
-    expect(screen.getByText('Set your display name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Set your display name' })).toBeInTheDocument();
     expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
     await act(async () => requests[0].resolve(success));
-    expect(screen.getByText('Set your display name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Set your display name' })).toBeInTheDocument();
     expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
     expect(screen.queryByTestId('events-empty-placeholder')).not.toBeInTheDocument();
   });
@@ -516,7 +516,7 @@ describe('Auth bootstrap notification ownership', () => {
   it('finishes a rejected lookup while preserving listener state (notified: false)', async () => {
     const { ownership } = await rejectedLookup(async () => {});
     expect(useAppStore.getState()).toMatchObject({ userId: null, authSessionVersion: ownership });
-    expect(screen.getByText('Sign in')).toBeInTheDocument();
+    expect(screen.getByTestId('login-screen')).toBeInTheDocument();
   });
 
   it.each(['null', 'different-user', 'rejection'] as const)('ignores a cleaned-up effect when its lookup settles with %s', async (outcome) => {
@@ -660,8 +660,12 @@ describe('Home event-load session ownership', () => {
     await act(async () => {
       useAppStore.setState((state) => ({ syncStatus: { ...state.syncStatus, isOnline: true } }));
     });
-    expect(loadEvents).toHaveBeenCalledTimes(4);
-    await act(async () => requests[3].resolve(success));
+    // One load per run of Home's load effect: mount, the reauthentication, then
+    // going offline and coming back online (isOnline is one of its deps).
+    const LOADS_AFTER_RECONNECT = 4;
+    expect(loadEvents).toHaveBeenCalledTimes(LOADS_AFTER_RECONNECT);
+    // The reconnect's load is the last one issued.
+    await act(async () => requests[LOADS_AFTER_RECONNECT - 1].resolve(success));
     expect(screen.getByTestId('events-empty-placeholder')).toBeInTheDocument();
     expect(screen.queryByTestId('events-load-error')).not.toBeInTheDocument();
   });
@@ -704,7 +708,7 @@ describe('Home event-load session ownership', () => {
 
     // A's answer must not decide anything about B.
     await act(async () => staleRead.resolve({ status: 'unset' }));
-    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set your display name' })).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
   });
 
@@ -727,7 +731,7 @@ describe('Home event-load session ownership', () => {
     expect(useAppStore.getState().authSessionVersion).not.toBe(firstLifetime);
 
     await act(async () => staleRead.resolve({ status: 'unset' }));
-    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set your display name' })).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
   });
 
@@ -771,7 +775,7 @@ describe('Home event-load session ownership', () => {
 
     await act(async () => auth.listener!(session()));
     // Fail open on display: a 5xx is not evidence that the user has no name.
-    expect(screen.queryByText('Set your display name')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set your display name' })).not.toBeInTheDocument();
     expect(screen.getByTestId('app-container')).toBeInTheDocument();
     expect(reportError).toHaveBeenCalledWith(
       '[App] Could not read the profile display name:',

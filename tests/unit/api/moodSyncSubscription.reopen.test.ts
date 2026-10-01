@@ -113,7 +113,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
         expect.any(Error)
       );
 
-      await fireReopen(2000);
+      await fireReopen(MOOD_REOPEN_DELAYS_MS[1]);
 
       expect(constructedChannels).toHaveLength(2);
       emitMood(constructedChannels[1], 'after-setAuth-reject');

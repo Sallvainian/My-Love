@@ -80,7 +80,9 @@ describe('isoDateDaysFromNow', () => {
     const parentOffset = new Date().getTimezoneOffset();
 
     // Load the actual exports in a child so Vitest keeps its New York timezone.
-    execFileSync(
+    // The child only computes and prints; every check is an `expect` below, so a
+    // failure shows a diff rather than an opaque non-zero exit.
+    const stdout = execFileSync(
       process.execPath,
       [
         '--import',
@@ -88,27 +90,31 @@ describe('isoDateDaysFromNow', () => {
         '--input-type=module',
         '--eval',
         `
-          import assert from 'node:assert/strict';
           import { eventDateFrom } from './tests/support/factories/events.ts';
           import { isoDateDaysFromNow } from './tests/support/helpers/events.ts';
 
           const anchor = new Date(2026, 2, 27, 23, 30);
           const anchorTimestamp = anchor.getTime();
-          assert.equal(process.env.TZ, 'America/Nuuk');
-          assert.equal(anchor.toISOString(), '2026-03-28T01:30:00.000Z');
-
+          const anchorISO = anchor.toISOString();
           // The following evening's 23:30 is skipped to March 29 at 00:30.
           const skippedHour = new Date(2026, 2, 28, 23, 30);
-          assert.deepEqual(
-            [skippedHour.getDate(), skippedHour.getHours(), skippedHour.getMinutes()],
-            [29, 0, 30]
-          );
-          assert.equal(skippedHour.getTimezoneOffset(), 60);
 
-          assert.equal(eventDateFrom(anchor, ${dayOffset}), ${JSON.stringify(expected)});
-          assert.equal(anchor.getTime(), anchorTimestamp);
-          assert.equal(isoDateDaysFromNow(${dayOffset}, anchor), ${JSON.stringify(expected)});
-          assert.equal(anchor.getTime(), anchorTimestamp);
+          const eventDate = eventDateFrom(anchor, ${dayOffset});
+          const anchorAfterEventDateFrom = anchor.getTime();
+          const isoDate = isoDateDaysFromNow(${dayOffset}, anchor);
+          const anchorAfterIsoDate = anchor.getTime();
+
+          console.log(JSON.stringify({
+            tz: process.env.TZ,
+            anchorISO,
+            anchorTimestamp,
+            skippedHour: [skippedHour.getDate(), skippedHour.getHours(), skippedHour.getMinutes()],
+            skippedHourOffset: skippedHour.getTimezoneOffset(),
+            eventDate,
+            anchorAfterEventDateFrom,
+            isoDate,
+            anchorAfterIsoDate,
+          }));
         `,
       ],
       {
@@ -118,6 +124,26 @@ describe('isoDateDaysFromNow', () => {
         timeout: 10_000,
       }
     );
+    const child = JSON.parse(stdout.trim().split('\n').at(-1)!) as {
+      tz: string;
+      anchorISO: string;
+      anchorTimestamp: number;
+      skippedHour: number[];
+      skippedHourOffset: number;
+      eventDate: string;
+      anchorAfterEventDateFrom: number;
+      isoDate: string;
+      anchorAfterIsoDate: number;
+    };
+
+    expect(child.tz).toBe('America/Nuuk');
+    expect(child.anchorISO).toBe('2026-03-28T01:30:00.000Z');
+    expect(child.skippedHour).toEqual([29, 0, 30]);
+    expect(child.skippedHourOffset).toBe(60);
+    expect(child.eventDate).toBe(expected);
+    expect(child.anchorAfterEventDateFrom).toBe(child.anchorTimestamp);
+    expect(child.isoDate).toBe(expected);
+    expect(child.anchorAfterIsoDate).toBe(child.anchorTimestamp);
 
     expect(process.env.TZ).toBe(parentTimezone);
     expect(new Date().getTimezoneOffset()).toBe(parentOffset);

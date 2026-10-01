@@ -62,6 +62,10 @@ async function clickAction(user: ReturnType<typeof userEvent.setup>, button: str
   }
   await user.click(screen.getByRole('button', { name: button }));
 }
+/** Wait until the view's request error banner reads exactly `text`. */
+async function expectConnectionError(text: string) {
+  await vi.waitFor(() => expect(screen.getByTestId('partner-connection-error').textContent).toBe(text));
+}
 const raw = { code: '23514', message: 'raw constraint with incidental duplicate unique words', details: 'diagnostics', hint: 'hint' };
 
 describe('partner request CHECK presentation', () => {
@@ -112,7 +116,7 @@ describe('partner request CHECK presentation', () => {
     const user = userEvent.setup();
     render(<PartnerMoodView />);
     await clickAction(user, button);
-    await vi.waitFor(() => expect(screen.getByText(friendly)).toBeDefined());
+    await expectConnectionError(friendly);
     expect(screen.queryByText(/raw constraint/)).toBeNull();
   });
 
@@ -121,7 +125,7 @@ describe('partner request CHECK presentation', () => {
     const user = userEvent.setup();
     render(<PartnerMoodView />);
     await clickAction(user, button);
-    await vi.waitFor(() => expect(screen.getByText(`Failed to ${verb} partner request`)).toBeDefined());
+    await expectConnectionError(`Failed to ${verb} partner request`);
     expect((backend.error as { message: string }).message).toBe('original database message');
   });
 
@@ -130,10 +134,10 @@ describe('partner request CHECK presentation', () => {
     const user = userEvent.setup();
     render(<PartnerMoodView />);
     await clickAction(user, button);
-    await vi.waitFor(() => expect(screen.getByText('original error')).toBeDefined());
+    await expectConnectionError('original error');
   });
 
-  it('retains duplicate request special handling', async () => {
+  it('rejects a duplicate request with "You already have a pending request to this user"', async () => {
     const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
     backend.error = { ...raw, code: '23505' };
     await expect(partnerService.sendPartnerRequest('target')).rejects.toThrow('You already have a pending request to this user');

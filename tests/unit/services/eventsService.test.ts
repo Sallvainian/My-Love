@@ -182,7 +182,9 @@ describe('eventsService', () => {
       ['2026-09-11', 'past', 'upcoming'],
       ['2026-09-12', 'upcoming', 'past'],
     ] as const)('preserves microseconds and ID ties across the %s boundary', async (eventDate, window, otherWindow) => {
-      backend.rows = Array.from({ length: 103 }, (_, index) => row({
+      // Three pages in one window, the last partial, so two page edges fall on a tie.
+      const ROWS = 2 * PAGE_SIZE + 3;
+      backend.rows = Array.from({ length: ROWS }, (_, index) => row({
         id: `event-${String(index).padStart(3, '0')}`,
         event_date: eventDate,
         // Deliberately repeat instants, while all rows share one JS millisecond.
@@ -196,8 +198,8 @@ describe('eventsService', () => {
       const second = await eventsService.getEventsPage(first.pagination);
       const third = await eventsService.getEventsPage(second.pagination);
       const ids = [...first.events, ...second.events, ...third.events].map((event) => event.id);
-      expect(ids).toHaveLength(103);
-      expect(new Set(ids).size).toBe(103);
+      expect(ids).toHaveLength(ROWS);
+      expect(new Set(ids).size).toBe(ROWS);
       expect(backend.queries[2].or).toContain(`created_at.eq.${cursor.created_at},id.`);
     });
 

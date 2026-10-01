@@ -143,6 +143,11 @@ function seed(count: number): Row[] {
 
 const ids = (rows: Row[]) => rows.map((r) => r.id);
 
+/** src/services/photoService.ts LIST_PAGE_SIZE (module-private): the rows per page read. */
+const PAGE = 500;
+/** Two full pages and a short third, so the read crosses two page boundaries. */
+const THREE_PAGES = 2 * PAGE + 3;
+
 beforeEach(() => {
   backend.table = [];
   backend.afterPage = () => {};
@@ -156,12 +161,12 @@ beforeEach(() => {
 
 describe('photoService.listAllPhotos', () => {
   it('pages 500 rows at a time until a short page and returns every row', async () => {
-    const rows = seed(1003);
+    const rows = seed(THREE_PAGES);
 
     const all = await photoService.listAllPhotos();
 
     expect(ids(all)).toEqual(ids(rows));
-    expect(backend.requests.map((r) => r.limit)).toEqual([500, 500, 500]);
+    expect(backend.requests.map((r) => r.limit)).toEqual([PAGE, PAGE, PAGE]);
   });
 
   it('orders newest created_at first, ties by id', async () => {
@@ -174,15 +179,15 @@ describe('photoService.listAllPhotos', () => {
   });
 
   it('keys each page on the last row of the previous one, with quoted values', async () => {
-    const rows = seed(1003);
+    const rows = seed(THREE_PAGES);
 
     await photoService.listAllPhotos();
 
     expect(backend.requests.map((r) => r.range)).toEqual([null, null, null]);
     expect(backend.requests[0].or).toBeNull();
     for (const [page, lastRow] of [
-      [1, rows[499]],
-      [2, rows[999]],
+      [1, rows[PAGE - 1]],
+      [2, rows[2 * PAGE - 1]],
     ] as const) {
       expect(backend.requests[page].or).toBe(
         `created_at.lt."${lastRow.created_at}",` +
@@ -192,7 +197,7 @@ describe('photoService.listAllPhotos', () => {
   });
 
   it('skips no photo when a photo is deleted between two page reads', async () => {
-    const rows = seed(1003);
+    const rows = seed(THREE_PAGES);
     const deleted = rows[10];
     backend.afterPage = (page) => {
       if (page === 0) backend.table = backend.table.filter((r) => r.id !== deleted.id);
@@ -201,12 +206,12 @@ describe('photoService.listAllPhotos', () => {
     const all = await photoService.listAllPhotos();
 
     // The deleted photo was read before its delete; every other row is here,
-    // once, in order. Offset paging lost rows[500] here.
+    // once, in order. Offset paging lost rows[PAGE] here.
     expect(ids(all)).toEqual(ids(rows));
   });
 
   it('repeats no photo when a photo is added between two page reads', async () => {
-    const rows = seed(1003);
+    const rows = seed(THREE_PAGES);
     backend.afterPage = (page) => {
       if (page === 0) {
         backend.table.push({ id: 'photo-new', created_at: '2026-09-24T11:00:00+00:00' });
@@ -222,8 +227,8 @@ describe('photoService.listAllPhotos', () => {
   });
 
   it('asks for one more page after an exactly full one, and stops on the empty page', async () => {
-    seed(500);
-    await expect(photoService.listAllPhotos()).resolves.toHaveLength(500);
+    seed(PAGE);
+    await expect(photoService.listAllPhotos()).resolves.toHaveLength(PAGE);
     expect(backend.requests).toHaveLength(2);
   });
 
@@ -238,7 +243,7 @@ describe('photoService.listAllPhotos', () => {
   });
 
   it('rejects when any page fails, never answering a partial list', async () => {
-    seed(1003);
+    seed(THREE_PAGES);
     backend.failPage = { page: 1, error: { message: 'network down' } };
     await expect(photoService.listAllPhotos()).rejects.toThrow('network down');
   });
