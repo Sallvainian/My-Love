@@ -27,6 +27,7 @@ import type { AppState } from '../../../src/stores/types';
 import { test, expect } from '../../support/merged-fixtures';
 import { closeContext } from '../../support/fixtures/cleanup';
 import type { TypedSupabaseClient } from '../../support/factories';
+import { clockAnchor } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
   LOVE_NOTE_SEND,
@@ -34,6 +35,7 @@ import {
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
 import { createOutsiderClient, deleteOutsider } from '../../support/helpers/rls-security';
+import { dismissWelcomeSplash, WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 const PARTNER_SEARCH = '**/rest/v1/rpc/find_partner_by_email';
@@ -100,21 +102,31 @@ async function linkThroughRequest(from: Throwaway, to: Throwaway): Promise<void>
   if (acceptError) throw new Error(`Failed to accept the seed request: ${acceptError.message}`);
 }
 
-/** A context with no session: only the welcome-splash stamp, so Home renders at once. */
-async function newBareContext(browser: Browser, testInfo: TestInfo): Promise<BrowserContext> {
+/**
+ * A context with no session: only the welcome-splash stamp, so Home renders at
+ * once. It runs on a clock pinned to `anchor` and the stamp is that same
+ * instant, so the splash's 60-minute window starts at a fixed time.
+ */
+async function newBareContext(
+  browser: Browser,
+  testInfo: TestInfo,
+  anchor: Date
+): Promise<BrowserContext> {
   const baseURL = testInfo.project.use.baseURL ?? 'http://localhost:5173';
-  return browser.newContext({
+  const context = await browser.newContext({
     baseURL,
     storageState: {
       cookies: [],
       origins: [
         {
           origin: new URL(baseURL).origin,
-          localStorage: [{ name: 'lastWelcomeView', value: String(Date.now()) }],
+          localStorage: [{ name: WELCOME_SPLASH_KEY, value: String(anchor.getTime()) }],
         },
       ],
     },
   });
+  await context.clock.install({ time: anchor });
+  return context;
 }
 
 /** Sign in through the real login form and open the Partner tab. */
@@ -198,10 +210,13 @@ test.describe('Connecting with a partner', () => {
     await linkThroughRequest(c, d);
     expect(await partnerIdOf(supabaseAdmin, d.userId)).toBe(c.userId);
 
+    // Both browsers run on one pinned clock, and both splash stamps are that
+    // same instant.
+    const anchor = clockAnchor();
+
     // ---- A: signed in, unlinked, on the Connect screen ----
-    await page.addInitScript(() => {
-      localStorage.setItem('lastWelcomeView', String(Date.now()));
-    });
+    await page.clock.install({ time: anchor });
+    await dismissWelcomeSplash(page, anchor.getTime());
     await signInToPartnerTab(page, a);
     await expect(
       page.getByRole('heading', { level: 1, name: 'Connect with Your Partner' })
@@ -286,7 +301,7 @@ test.describe('Connecting with a partner', () => {
     await expect(page.getByTestId('notes-error-banner')).toHaveText('Partner not configured');
 
     // ---- B, in a second browser, accepts ----
-    const second = await newBareContext(browser, testInfo);
+    const second = await newBareContext(browser, testInfo, anchor);
     cleanup.defer('close the second context', () => closeContext(second));
     const bPage = await second.newPage();
     const receivedList = observeOn({
