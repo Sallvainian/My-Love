@@ -10,6 +10,18 @@
 import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
+import type { Page } from '@playwright/test';
+
+/**
+ * Home is the current view and rendered. Neither witness waits on a server
+ * answer: the dock's `aria-current` follows `currentView`, and the daily
+ * message comes from the bundled rows on the device. (The TimeTogether card
+ * shows only once the couple-settings read reports a linked couple.)
+ */
+async function expectHome(page: Page) {
+  await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('message-text')).toBeVisible();
+}
 
 test.describe('URL Routing', () => {
   test.beforeEach(async ({ page }) => {
@@ -57,7 +69,7 @@ test.describe('URL Routing', () => {
 
     // THEN: Home view is displayed (app falls back to home)
     await expect(page.getByTestId('nav-dock')).toBeVisible();
-    await expect(page.getByTestId('time-together')).toBeVisible();
+    await expectHome(page);
   });
 
   test('[P0] should show home and no scripture view on a direct /scripture load', async ({
@@ -66,8 +78,7 @@ test.describe('URL Routing', () => {
     await page.goto('/scripture');
 
     await expect(page.getByTestId('nav-dock')).toBeVisible();
-    await expect(page.getByTestId('time-together')).toBeVisible();
-    await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
+    await expectHome(page);
     await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
   });
 
@@ -75,15 +86,14 @@ test.describe('URL Routing', () => {
     page,
   }) => {
     await page.goto('/scripture');
-    await expect(page.getByTestId('time-together')).toBeVisible();
+    await expectHome(page);
 
     await navigateTo(page, 'mood');
     await page.waitForURL('**/mood');
 
     await page.goBack();
 
-    await expect(page.getByTestId('time-together')).toBeVisible();
-    await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
+    await expectHome(page);
     await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
   });
 });

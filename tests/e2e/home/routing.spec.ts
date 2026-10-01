@@ -42,8 +42,11 @@ test.describe('Navigation Routing', () => {
     // WHEN: User navigates back to home via the dock
     await navigateTo(page, 'home');
 
-    // THEN: Home view loads and navigation remains functional
+    // THEN: Home view loads and navigation remains functional. Both Home
+    // witnesses render without a server answer: the dock marks Home current,
+    // and the daily message comes from the bundled rows on the device.
     await expect(page.getByTestId('nav-dock')).toBeVisible();
-    await expect(page.getByTestId('time-together')).toBeVisible();
+    await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('message-text')).toBeVisible();
   });
 });

@@ -348,8 +348,12 @@ test.describe('Display Name Edit', () => {
 
     // AND the chat puts it on a note. This is the gap DW-107 names: coverage
     // used to stop at the app container and never reach love notes, where the
-    // name is actually rendered.
+    // name is actually rendered. The thread's mount read is awaited before
+    // the send, so it cannot land after it and replace the list the note is
+    // looked for in.
+    const mountRead = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
     await navigateTo(page, 'notes');
+    expect((await mountRead).status).toBe(200);
 
     const uniqueMessage = `Display name edit E2E ${Date.now()}`;
     await page.getByLabel(/love note message input/i).fill(uniqueMessage);

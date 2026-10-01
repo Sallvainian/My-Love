@@ -13,6 +13,7 @@ import type { Page, Route } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { createAuthBootstrapEvent } from '../../support/factories/auth-bootstrap-notification-order';
 import { navigateTo } from '../../support/helpers/navigation';
+import { LOVE_NOTES_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 
 /**
@@ -126,8 +127,16 @@ test.describe('Logout Flow', () => {
     // makes this test capable of failing: without it every collection is
     // already empty and the assertion below passes even when the reset is
     // removed entirely. These are the shapes the loaders themselves produce.
+    //
+    // The seed goes in only once Home's events load and the signed-in start's
+    // notes load have answered: either, landing later, would replace the seeded
+    // collection and turn the all-zero assertion below back into a vacuous pass.
+    const startReads = [UPCOMING_EVENTS_READ, LOVE_NOTES_READ].map((url) =>
+      interceptNetworkCall({ method: 'GET', url })
+    );
     await page.goto('/');
     await expect(page.getByTestId('nav-dock')).toBeVisible();
+    for (const { status } of await Promise.all(startReads)) expect(status).toBe(200);
 
     const seededEvent = createAuthBootstrapEvent({
       id: 'seed-event',
@@ -165,6 +174,14 @@ test.describe('Logout Flow', () => {
     // nav-level one was retired
     await navigateTo(page, 'settings');
     await expect(page.getByTestId('settings-view')).toBeVisible();
+    // Settings loads the events again on its own, which may replace the seeded
+    // event; nothing on it reloads the notes. So the seeded note is what has to
+    // be in the store when sign-out runs, or the reset has nothing to empty.
+    expect(
+      await page.evaluate(
+        () => window.__APP_STORE__?.getState().notes.some((note) => note.id === 'seed-note') ?? false
+      )
+    ).toBe(true);
     await page.getByTestId('settings-sign-out').click();
     await signOutCall;
     await expect(page.getByTestId('login-screen')).toBeVisible({ timeout: 5000 });

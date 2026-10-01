@@ -47,9 +47,12 @@
  * consistent wait uses `recurse` rather than a bare `expect.poll` or a
  * `waitForTimeout`. `interceptNetworkCall` observes Home's upcoming events read,
  * armed before each `goto` and awaited before the first assertion, so every
- * card and absence below is read against a load that has answered. Nothing is
- * stubbed.
+ * card and absence below is read against a load that has answered. The cases
+ * that use the TimeTogether card as their "Home rendered" witness also await
+ * the couple-settings read that card waits on. Nothing is stubbed.
  */
+import type { Page } from '@playwright/test';
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
@@ -61,7 +64,21 @@ import {
   stalePersistedMood,
 } from '../../support/helpers/persisted-blob';
 import { clockAnchor } from '../../support/helpers/events';
-import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { COUPLE_SETTINGS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+
+/**
+ * One `goto('/')`, returning once the two reads Home's witnesses wait on have
+ * answered: the couple-settings read behind the TimeTogether card and the
+ * upcoming events read behind the events column. Both are armed before the
+ * navigation, so neither can answer first and be missed.
+ */
+async function gotoHomeAfterReads(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
+  const reads = [COUPLE_SETTINGS_READ, UPCOMING_EVENTS_READ].map((url) =>
+    interceptNetworkCall({ method: 'GET', url })
+  );
+  await page.goto('/');
+  for (const { status } of await Promise.all(reads)) expect(status).toBe(200);
+}
 
 test.describe('stale persisted events never rehydrate', () => {
   test('[P0] a device carrying a previous couple\'s events blob shows none of it, and Home still renders', async ({
@@ -149,6 +166,7 @@ test.describe('stale persisted events never rehydrate', () => {
   test('[P1] a blob carrying both stale keys leaks neither the events nor the moods', async ({
     page,
     coupleEvents,
+    interceptNetworkCall,
   }) => {
     await coupleEvents.clear();
 
@@ -165,7 +183,7 @@ test.describe('stale persisted events never rehydrate', () => {
     await seedPersistedBlob(page, { events: [staleEvent], moods: [staleMood] });
 
     await page.clock.install({ time: anchor });
-    await page.goto('/');
+    await gotoHomeAfterReads(page, interceptNetworkCall);
 
     await expect(page.getByTestId('time-together')).toBeVisible();
     await expect(page.getByRole('main')).not.toContainText(staleEvent.label, { ignoreCase: true });
@@ -192,6 +210,7 @@ test.describe('stale persisted events never rehydrate', () => {
     page,
     coupleEvents,
     recurse,
+    interceptNetworkCall,
   }) => {
     await coupleEvents.clear();
     await seedPersistedBlob(page, {
@@ -203,7 +222,7 @@ test.describe('stale persisted events never rehydrate', () => {
     // `addInitScript`, which re-runs on every navigation — a second `goto` or
     // a `reload` would put the stale keys straight back and this assertion
     // would be measuring the re-seed.
-    await page.goto('/');
+    await gotoHomeAfterReads(page, interceptNetworkCall);
     await expect(page.getByTestId('time-together')).toBeVisible();
 
     // Zustand re-persists the `partialize` allowlist on the first state change
