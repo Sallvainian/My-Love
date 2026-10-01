@@ -85,6 +85,18 @@ async function seedMeetup(
   });
 }
 
+/**
+ * Pin the page clock to `anchor` and stamp the welcome splash from it, before
+ * the first navigation. Every date a test seeds is built from the returned
+ * anchor, so Node and the browser agree on what today is, and the splash's
+ * 60-minute window starts at that same instant, however long the run takes.
+ */
+async function pinClock(page: Page, anchor: Date = clockAnchor()): Promise<Date> {
+  await page.clock.install({ time: anchor });
+  await dismissWelcomeSplash(page, anchor.getTime());
+  return anchor;
+}
+
 async function openHome(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
   const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
   await page.goto('/');
@@ -96,10 +108,6 @@ test.afterEach(async ({ supabaseAdmin }) => {
 });
 
 test.describe('Home dashboard reads events from the store', () => {
-  test.beforeEach(async ({ page }) => {
-    await dismissWelcomeSplash(page);
-  });
-
   test('[P0] shows own and partner future events soonest first, each with its own icon', async ({
     page,
     supabaseAdmin,
@@ -111,7 +119,7 @@ test.describe('Home dashboard reads events from the store', () => {
     // either half of the couple — Home's SELECT reads own + partner.
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const anchor = new Date();
+    const anchor = await pinClock(page);
     await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, anchor);
     await seedMeetup(supabaseAdmin, partnerId, PARTNER_MEETUP, anchor);
 
@@ -154,7 +162,7 @@ test.describe('Home dashboard reads events from the store', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const anchor = new Date();
+    const anchor = await pinClock(page);
     await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, anchor);
     await seedMeetup(supabaseAdmin, userId, PAST_MEETUP, anchor);
 
@@ -183,7 +191,8 @@ test.describe('Home dashboard reads events from the store', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, new Date());
+    const anchor = await pinClock(page);
+    await seedMeetup(supabaseAdmin, userId, FUTURE_MEETUP, anchor);
 
     await openHome(page, interceptNetworkCall);
 
@@ -208,6 +217,7 @@ test.describe('Home dashboard reads events from the store', () => {
     // either half of the couple — this test's own premise is zero events
     // visible to the account, and Home's SELECT reads own + partner.
     await clearPairEvents(supabaseAdmin, userId, partnerId);
+    await pinClock(page);
 
     const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
@@ -223,10 +233,11 @@ test.describe('Home dashboard reads events from the store', () => {
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
+    const anchor = await pinClock(page);
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Flash Meetup E2E',
-      eventDate: isoDateDaysFromNow(12),
+      eventDate: isoDateDaysFromNow(12, anchor),
       description: 'Flash event description',
       icon: 'calendar',
     });
@@ -276,7 +287,7 @@ test.describe('Home dashboard reads events from the store', () => {
     // filter: delete it (`upcomingEvents = events`) and the slot computes
     // 'list', renders two components that each return null, and shows neither
     // cards nor the placeholder — the unexplained gap CAP-10 forbids.
-    const anchor = new Date();
+    const anchor = await pinClock(page);
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Old Meetup E2E',
@@ -322,7 +333,7 @@ test.describe('Home dashboard reads events from the store', () => {
     // string, so this is the only test that carries a null through.
     // The page clock is pinned to the anchor the date is built from, so the
     // event is "today" to the app even if the run crosses real midnight.
-    const anchor = clockAnchor();
+    const anchor = await pinClock(page);
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Today Meetup E2E',
@@ -331,7 +342,6 @@ test.describe('Home dashboard reads events from the store', () => {
       icon: 'calendar',
     });
 
-    await page.clock.install({ time: anchor });
     const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
     expect((await upcomingRead).status).toBe(200);
@@ -362,6 +372,8 @@ test.describe('Home dashboard reads events from the store', () => {
     // events), so it is what pins that the cap counts UPCOMING events only.
     // Cap the raw `events` array instead of the filtered one and this row eats
     // a slot, leaving 'Third Meetup E2E' off the page.
+    // The page runs on the fixture's own seeding anchor.
+    await pinClock(page, coupleEvents.anchor);
     await coupleEvents.seed([
       { dayOffset: 24, label: 'Fourth Meetup E2E', description: 'Fourth event description' },
       {
@@ -426,10 +438,11 @@ test.describe('Home dashboard reads events from the store', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
+    const anchor = await pinClock(page);
     await seedEvent(supabaseAdmin, {
       userId,
       label: 'Reload Meetup E2E',
-      eventDate: isoDateDaysFromNow(10),
+      eventDate: isoDateDaysFromNow(10, anchor),
       description: 'Reload event description',
       icon: 'calendar',
     });
