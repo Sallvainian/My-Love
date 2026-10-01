@@ -9,7 +9,8 @@ export type PhotoInsertInput = Pick<PhotoInsert, 'user_id' | 'storage_path' | 'f
 /**
  * A `photos` insert body for a small PNG the spec has already uploaded to
  * `storage_path`. `file_size` is the uploaded byte count, so the row always
- * describes the object it points at.
+ * describes the object it points at. Given `id` and `created_at` too, it is a
+ * whole row as the gallery's read returns it, for a spec that fakes that read.
  */
 export function createPhotoInsert(input: PhotoInsertInput): PhotoInsert {
   return {
