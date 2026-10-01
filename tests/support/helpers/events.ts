@@ -225,6 +225,20 @@ export function clockAnchorAvoidingLeapDay(dayOffsets: number[], now: Date = new
 }
 
 /**
+ * `clockAnchor(now)`, stepped back a day when it falls on the 1st of a month —
+ * for fixtures that need an earlier day inside the anchor's own month, such as
+ * a mood the calendar must show without a month change. Every run then seeds
+ * the same arrangement (the day before the anchor, in the anchor's month)
+ * instead of switching to a different one on the 1st. It only ever moves back,
+ * so it stays behind real time.
+ */
+export function clockAnchorAvoidingFirstOfMonth(now: Date = new Date()): Date {
+  const anchor = clockAnchor(now);
+  if (anchor.getDate() === 1) anchor.setDate(anchor.getDate() - 1);
+  return anchor;
+}
+
+/**
  * A birthday: the `"YYYY-MM-DD"` `dayOffset` days from the anchor's local day,
  * `yearsBack` years earlier — so its next occurrence is exactly `dayOffset`
  * days away and the person turns `yearsBack` on it. Throws on 29 February;

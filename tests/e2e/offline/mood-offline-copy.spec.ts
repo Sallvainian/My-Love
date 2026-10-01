@@ -23,7 +23,7 @@ import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
-import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
+import { clockAnchorAvoidingFirstOfMonth, resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import { ownMoodHistoryRead, partnerMoodListRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -42,16 +42,14 @@ function localISO(date: Date): string {
 
 /**
  * An earlier moment inside the anchor's month, so the calendar shows it without
- * a month change: the day before at noon, or just after midnight on the 1st.
- * The caller installs `anchor` as the page clock, so the page's "this month" is
- * the anchor's. Browser and runner share the machine's timezone (no
+ * a month change: the day before at noon. The anchor comes from
+ * `clockAnchorAvoidingFirstOfMonth`, so the day before is always in the same
+ * month. The caller installs `anchor` as the page clock, so the page's "this
+ * month" is the anchor's. Browser and runner share the machine's timezone (no
  * `timezoneId` is set).
  */
-function earlierThisMonth(now: Date): Date {
-  if (now.getDate() > 1) {
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12, 0, 0);
-  }
-  return new Date(now.getFullYear(), now.getMonth(), 1, 0, 1, 0);
+function dayBeforeAtNoon(anchor: Date): Date {
+  return new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - 1, 12, 0, 0);
 }
 
 /** Every row in the page's `moods` store for the signed-in user. */
@@ -124,8 +122,8 @@ test.describe('Mood history and partner moods offline', () => {
     cleanup,
   }) => {
     const { userId } = await resolveOwnPair(supabaseAdmin);
-    const anchor = clockAnchor();
-    const loggedAt = earlierThisMonth(anchor);
+    const anchor = clockAnchorAvoidingFirstOfMonth();
+    const loggedAt = dayBeforeAtNoon(anchor);
     const dateKey = localISO(loggedAt);
     const note = `backfill-e2e-${randomUUID()}`;
 
