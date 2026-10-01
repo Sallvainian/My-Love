@@ -37,7 +37,15 @@ import {
 } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 
-/** Both writes are attempted before either failure is reported. */
+/**
+ * Clear both birthdays and the wedding date. Both writes are attempted before
+ * either failure is reported.
+ *
+ * The couple write is an upsert that sends only `wedding_date`, so the pair's
+ * `couple_settings` row always exists afterwards and its start date is left
+ * alone: every save below takes the update path of the app's upsert, never
+ * the insert, whatever earlier runs left behind.
+ */
 async function resetPair(
   supabaseAdmin: TypedSupabaseClient,
   userId: string,
@@ -52,29 +60,11 @@ async function resetPair(
     : { user_a: partnerId, user_b: userId };
   const couple = await supabaseAdmin
     .from('couple_settings')
-    .update({ wedding_date: null })
-    .eq('user_a', pair.user_a)
-    .eq('user_b', pair.user_b);
+    .upsert({ ...pair, wedding_date: null }, { onConflict: 'user_a,user_b' });
   expect([users.error, couple.error], 'resetting the birthdays and wedding date').toEqual([
     null,
     null,
   ]);
-}
-
-/** Whether the pair's couple_settings row exists: `resetPair` keeps one it finds. */
-async function pairRowExists(
-  supabaseAdmin: TypedSupabaseClient,
-  userId: string,
-  partnerId: string
-): Promise<boolean> {
-  const [user_a, user_b] = userId < partnerId ? [userId, partnerId] : [partnerId, userId];
-  const { data, error } = await supabaseAdmin
-    .from('couple_settings')
-    .select('user_a')
-    .eq('user_a', user_a)
-    .eq('user_b', user_b);
-  expect(error).toBeNull();
-  return (data ?? []).length > 0;
 }
 
 /**
@@ -250,8 +240,6 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
 
     const wedding = isoDateDaysFromNow(40, anchor);
     await partnerPage.getByTestId('settings-wedding-date').fill(wedding);
-    // The upsert answers 201 when it creates the pair's row, 200 when it updates it.
-    const weddingStatus = (await pairRowExists(supabaseAdmin, userId, partnerId)) ? 200 : 201;
     const weddingSaved = observeOn({
       page: partnerPage,
       method: 'POST',
@@ -259,7 +247,9 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
     await partnerPage.getByTestId('settings-wedding-save').click();
-    expect((await weddingSaved).status).toBe(weddingStatus);
+    // `resetPair` left the pair's row in place, so the upsert updates it: 200,
+    // where creating the row would answer 201.
+    expect((await weddingSaved).status).toBe(200);
     await expect(partnerPage.getByTestId('settings-wedding-clear')).toBeVisible();
     await expect(partnerPage.getByTestId('settings-wedding-error')).toHaveCount(0);
 
