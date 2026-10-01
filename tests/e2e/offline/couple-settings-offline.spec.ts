@@ -14,7 +14,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
-import { resolveOwnPair } from '../../support/helpers/events';
+import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import { COUPLE_SETTINGS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -80,8 +80,11 @@ test.describe('Couple start date from the local copy', () => {
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const pair = orderedPair(userId, partnerId);
-    // Ten days and an hour ago: Home reads "10 days" whatever the clock says.
-    const start = new Date(Date.now() - 10 * DAY_MS - 60 * 60 * 1000);
+    // Ten days and an hour before the page's pinned clock, so Home reads
+    // "10 days" whenever the run happens. The clock survives the reload below.
+    const anchor = clockAnchor();
+    await page.clock.install({ time: anchor });
+    const start = new Date(anchor.getTime() - 10 * DAY_MS - 60 * 60 * 1000);
     start.setSeconds(0, 0);
     const startIso = start.toISOString();
     cleanup.defer("delete the pair's couple settings", () => clearPair(supabaseAdmin, pair));
