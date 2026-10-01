@@ -518,19 +518,33 @@ describe('photosSlice local copy', () => {
   });
 
   describe('refresher', () => {
-    it('registers the photos kind, which loads the list when signed in', async () => {
-      const store = createTestStore();
+    /** The refresher the slice registered for the photos kind, if any. */
+    function photosRefresher(): (() => Promise<void>) | undefined {
       const call = registerLocalCopy.mock.calls.find(([kind]) => kind === PHOTOS_COPY_KIND);
-      expect(call).toBeDefined();
-      const refresh = call![1] as () => Promise<void>;
+      return call?.[1] as (() => Promise<void>) | undefined;
+    }
 
+    it('registers the photos kind', () => {
+      createTestStore();
+
+      expect(photosRefresher()).toBeDefined();
+    });
+
+    it('the refresher loads the list when signed in', async () => {
+      const store = createTestStore();
       listAllPhotos.mockResolvedValue([row(0)]);
-      await refresh();
-      expect(store.getState().photos).toEqual([shown(row(0))]);
 
-      listAllPhotos.mockClear();
+      await photosRefresher()!();
+
+      expect(store.getState().photos).toEqual([shown(row(0))]);
+    });
+
+    it('the refresher does nothing when signed out', async () => {
+      const store = createTestStore();
       store.setState({ userId: null });
-      await refresh();
+
+      await photosRefresher()!();
+
       expect(listAllPhotos).not.toHaveBeenCalled();
     });
   });

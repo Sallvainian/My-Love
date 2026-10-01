@@ -139,8 +139,11 @@ describe('notesSlice offline send queue', () => {
       expect(vi.getTimerCount()).toBe(0);
     });
 
-    it('backs off 5, 10, 20, 40, then every 60 s, and resets after a completed pass', async () => {
-      const store = createTestStore();
+    /**
+     * Seven transient failures, retried through the whole backoff until the
+     * eighth attempt lands and the pass completes.
+     */
+    async function backOffThroughSevenFailures(store: Store) {
       await failOnce(store, 7);
 
       // [delay before this attempt, upserts after it, timers left behind]: the
@@ -160,10 +163,21 @@ describe('notesSlice offline send queue', () => {
       }
       await until(() => store.getState().notes[0]?.id === 'server-1');
       await until(() => vi.getTimerCount() === 0);
+    }
 
-      // The next transient failure starts from 5 s again.
+    it('backs off 5, 10, 20, 40, then every 60 s', async () => {
+      const store = createTestStore();
+
+      await backOffThroughSevenFailures(store);
+    });
+
+    it('after a completed pass, the next transient failure retries after 5 s again', async () => {
+      const store = createTestStore();
+      await backOffThroughSevenFailures(store);
+
       server.upserts = 0;
       await failOnce(store, 1);
+
       await expectRetryAfter(5_000, 2);
     });
 

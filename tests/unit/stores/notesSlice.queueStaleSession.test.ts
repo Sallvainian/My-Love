@@ -107,7 +107,8 @@ describe('notesSlice offline send queue', () => {
   });
 
   describe('accounts and stale sessions', () => {
-    it("account switch: B never sees or sends A's rows; they send when A signs back in", async () => {
+    /** A queues three notes offline, signs out, and B signs in online, loads and drains. */
+    async function switchToBOverAsQueue() {
       const store = createTestStore();
       await sendThreeOffline(store);
 
@@ -116,10 +117,19 @@ describe('notesSlice offline send queue', () => {
       setOnline(true);
       await store.getState().fetchNotes();
       await store.getState().drainQueuedNotes();
+      return store;
+    }
+
+    it("account switch: B never sees or sends A's queued rows", async () => {
+      const store = await switchToBOverAsQueue();
 
       expect(contents(store)).toEqual([]);
       expect(server.upserts).toBe(0);
       expect(await queuedIds(A)).toHaveLength(3);
+    });
+
+    it("account switch: A's queued rows send when A signs back in", async () => {
+      const store = await switchToBOverAsQueue();
 
       store.setState({ userId: A, authSessionVersion: 3, notes: [] });
       await store.getState().drainQueuedNotes();

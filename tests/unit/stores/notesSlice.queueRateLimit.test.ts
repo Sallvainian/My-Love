@@ -193,16 +193,22 @@ describe('notesSlice offline send queue', () => {
       expect(store.getState().notesError).toBeNull();
     });
 
-    it('online, a text note is counted, and at the limit it is refused as before', async () => {
+    it('online, a sent text note is counted', async () => {
       const store = createTestStore();
 
       await store.getState().sendNote('counted');
       await store.getState().drainQueuedNotes();
-      expect(store.getState().sentMessageTimestamps).toHaveLength(1);
 
+      expect(store.getState().sentMessageTimestamps).toHaveLength(1);
+    });
+
+    it('online at the limit, a text note is refused and nothing is shown or queued', async () => {
+      const store = createTestStore();
       store.setState({ sentMessageTimestamps: atLimit() });
+
       await expect(store.getState().sendNote('one too many')).rejects.toThrow(RATE_LIMIT);
-      expect(contents(store)).toEqual(['counted']);
+
+      expect(contents(store)).toEqual([]);
       expect(await queuedIds()).toEqual([]);
     });
 

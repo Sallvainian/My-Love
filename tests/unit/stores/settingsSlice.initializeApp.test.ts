@@ -330,7 +330,12 @@ describe('createSettingsSlice initializeApp', () => {
     expect(mockStorageService.getAllMessages).not.toHaveBeenCalled();
   });
 
-  it('still seeds the shared defaults, withholds the re-read, and hands off when the empty-DB branch is stale', async () => {
+  /**
+   * Starts initialization on an empty database and switches to C while the
+   * re-read after seeding is held. Stops at `await inFlight`, with the handoff
+   * read under C still pending.
+   */
+  async function switchToCDuringEmptyDbInit() {
     const secondRead = deferred<Message[]>();
     const handoffRead = deferred<Message[]>();
     mockStorageService.init.mockResolvedValue(undefined);
@@ -348,7 +353,6 @@ describe('createSettingsSlice initializeApp', () => {
     // First read returned `[]`, so the seeding branch is in flight on the
     // re-read. Switching now is what makes a deleted guard on THAT `set()` fail.
     await vi.waitFor(() => expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(2));
-    expect(mockStorageService.addMessages).toHaveBeenCalledTimes(1);
 
     store.setState({
       userId: USER_C,
@@ -356,12 +360,33 @@ describe('createSettingsSlice initializeApp', () => {
     });
     secondRead.settle(aOutgoingPool());
     await inFlight;
+    return { store, updateCurrentMessage, loadMessagesRequestedBy, lastLoadSettled, handoffRead };
+  }
+
+  it('still seeds the shared defaults when the account changes mid-flight (empty DB)', async () => {
+    await switchToCDuringEmptyDbInit();
+
+    expect(mockStorageService.addMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('withholds the stale re-read when the account changes mid-flight (empty DB)', async () => {
+    const { store, updateCurrentMessage } = await switchToCDuringEmptyDbInit();
 
     expect(store.getState().messages).toEqual([]);
     expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).not.toHaveBeenCalled();
     expect(store.getState().isLoading).toBe(false);
+  });
+
+  it('hands off a re-read under C when the account changes mid-flight (empty DB)', async () => {
+    const { loadMessagesRequestedBy } = await switchToCDuringEmptyDbInit();
+
     expect(loadMessagesRequestedBy).toEqual([USER_C]);
+  });
+
+  it("publishes C's pool once the handoff read lands (empty DB)", async () => {
+    const { store, updateCurrentMessage, lastLoadSettled, handoffRead } =
+      await switchToCDuringEmptyDbInit();
 
     const incoming = cIncomingPool();
     handoffRead.settle(incoming);
@@ -372,7 +397,11 @@ describe('createSettingsSlice initializeApp', () => {
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });
 
-  it('hands off a shared-daily pool when sign-out lands mid-flight', async () => {
+  /**
+   * Starts initialization on a seeded database and signs out while the first
+   * read is held. Stops at `await inFlight`, with the handoff read still pending.
+   */
+  async function signOutDuringInit() {
     const initRead = deferred<Message[]>();
     const handoffRead = deferred<Message[]>();
     mockStorageService.init.mockResolvedValue(undefined);
@@ -392,15 +421,29 @@ describe('createSettingsSlice initializeApp', () => {
     });
     initRead.settle(aOutgoingPool());
     await inFlight;
+    return { store, updateCurrentMessage, loadMessagesRequestedBy, lastLoadSettled, handoffRead };
+  }
+
+  it('withholds the stale pool when sign-out lands mid-flight', async () => {
+    const { store, updateCurrentMessage } = await signOutDuringInit();
 
     expect(store.getState().messages).toEqual([]);
     expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).not.toHaveBeenCalled();
     expect(store.getState().isLoading).toBe(false);
+  });
+
+  it("hands off a re-read that reads no account's copy when sign-out lands mid-flight", async () => {
+    const { loadMessagesRequestedBy } = await signOutDuringInit();
+
     expect(loadMessagesRequestedBy).toEqual([null]);
     expect(mockStorageService.getAllMessages).toHaveBeenNthCalledWith(2);
     // Signed out, the handoff reads no account's copy at all.
     expect(mockReadMessageData).not.toHaveBeenCalled();
+  });
+
+  it('publishes the shared-daily pool once the handoff read lands after sign-out', async () => {
+    const { store, updateCurrentMessage, lastLoadSettled, handoffRead } = await signOutDuringInit();
 
     const shared = sharedDailyPool();
     handoffRead.settle(shared);
@@ -411,6 +454,7 @@ describe('createSettingsSlice initializeApp', () => {
     expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });
+
   it('rejects a version-only stale initialization and hands off to the new session', async () => {
     const pending = deferred<Message[]>();
     mockStorageService.init.mockResolvedValue(undefined);
