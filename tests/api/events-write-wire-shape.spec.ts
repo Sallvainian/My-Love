@@ -59,6 +59,8 @@
  * password, or touches a row owned by another worker.
  */
 import { test, expect } from '../support/merged-fixtures';
+import type { Cleanup } from '../support/fixtures/cleanup';
+import type { TypedSupabaseClient } from '../support/factories';
 // The `log` VALUE, not the destructured fixture. The `log` fixture that
 // merged-fixtures.ts merges in as `logFixture` is `(params: LogParams) => Promise<void>`
 // (node_modules/@seontechnologies/playwright-utils/dist/esm/log/log-fixture.d.ts);
@@ -102,6 +104,35 @@ const SEEDED_LABEL = 'Events API Seeded Trip';
 const PARTNER_ATTEMPT_LABEL = 'Events API Partner Overwrite';
 const CREATOR_EDIT_LABEL = 'Events API Creator Voyage';
 
+/**
+ * The preamble every test here shares: resolve this worker's own pair, clear
+ * its events (and defer clearing them again), then seed one creator-owned
+ * event `dayOffset` days out. Only the date differs between tests.
+ */
+async function seedCreatorEvent(
+  supabaseAdmin: TypedSupabaseClient,
+  cleanup: Cleanup,
+  dayOffset: number
+): Promise<{ userId: string; partnerId: string; eventId: string; seededDate: string }> {
+  await log.step('Resolve this worker\'s own pair and clear its events');
+  const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+  await clearPairEvents(supabaseAdmin, userId, partnerId);
+  cleanup.defer('clear the pair events', () =>
+    clearPairEvents(supabaseAdmin, userId, partnerId)
+  );
+
+  await log.step('Seed one event owned by the creator');
+  const seededDate = isoDateDaysFromNow(dayOffset);
+  const eventId = await seedEvent(supabaseAdmin, {
+    userId,
+    label: SEEDED_LABEL,
+    eventDate: seededDate,
+    description: 'Seeded by the events write wire-shape test',
+    icon: 'calendar',
+  });
+  return { userId, partnerId, eventId, seededDate };
+}
+
 test.describe('Events write wire shape over PostgREST — story 5', () => {
   // ==========================================================================
   // DE.5-API-001
@@ -113,22 +144,7 @@ test.describe('Events write wire shape over PostgREST — story 5', () => {
     apiRequest,
     cleanup,
   }) => {
-    await log.step('Resolve this worker\'s own pair and clear its events');
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    await clearPairEvents(supabaseAdmin, userId, partnerId);
-    cleanup.defer('clear the pair events', () =>
-      clearPairEvents(supabaseAdmin, userId, partnerId)
-    );
-
-    await log.step('Seed one event owned by the creator');
-    const seededDate = isoDateDaysFromNow(30);
-    const eventId = await seedEvent(supabaseAdmin, {
-      userId,
-      label: SEEDED_LABEL,
-      eventDate: seededDate,
-      description: 'Seeded by the events write wire-shape test',
-      icon: 'calendar',
-    });
+    const { partnerId, eventId, seededDate } = await seedCreatorEvent(supabaseAdmin, cleanup, 30);
 
     await log.step('Sign in as the PARTNER and PATCH the creator\'s row');
     const partnerToken = await getUserAccessToken(supabaseAdmin, partnerId);
@@ -177,22 +193,7 @@ test.describe('Events write wire shape over PostgREST — story 5', () => {
     apiRequest,
     cleanup,
   }) => {
-    await log.step('Resolve this worker\'s own pair and clear its events');
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    await clearPairEvents(supabaseAdmin, userId, partnerId);
-    cleanup.defer('clear the pair events', () =>
-      clearPairEvents(supabaseAdmin, userId, partnerId)
-    );
-
-    await log.step('Seed one event owned by the creator');
-    const seededDate = isoDateDaysFromNow(45);
-    const eventId = await seedEvent(supabaseAdmin, {
-      userId,
-      label: SEEDED_LABEL,
-      eventDate: seededDate,
-      description: 'Seeded by the events write wire-shape test',
-      icon: 'calendar',
-    });
+    const { partnerId, eventId } = await seedCreatorEvent(supabaseAdmin, cleanup, 45);
 
     await log.step('Sign in as the PARTNER and DELETE the creator\'s row');
     const partnerToken = await getUserAccessToken(supabaseAdmin, partnerId);
@@ -233,22 +234,7 @@ test.describe('Events write wire shape over PostgREST — story 5', () => {
     apiRequest,
     cleanup,
   }) => {
-    await log.step('Resolve this worker\'s own pair and clear its events');
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    await clearPairEvents(supabaseAdmin, userId, partnerId);
-    cleanup.defer('clear the pair events', () =>
-      clearPairEvents(supabaseAdmin, userId, partnerId)
-    );
-
-    await log.step('Seed one event owned by the creator');
-    const seededDate = isoDateDaysFromNow(60);
-    const eventId = await seedEvent(supabaseAdmin, {
-      userId,
-      label: SEEDED_LABEL,
-      eventDate: seededDate,
-      description: 'Seeded by the events write wire-shape test',
-      icon: 'calendar',
-    });
+    const { userId, eventId, seededDate } = await seedCreatorEvent(supabaseAdmin, cleanup, 60);
 
     await log.step('Sign in as the CREATOR and PATCH their own row');
     const creatorToken = await getUserAccessToken(supabaseAdmin, userId);

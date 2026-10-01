@@ -15,7 +15,7 @@
 import { log } from '@seontechnologies/playwright-utils';
 import { z } from 'zod';
 import type { SupabaseInteractionRecord } from '../../src/api/interactionService';
-import { createInteractionRecord } from '../support/factories/interaction-record-ownership';
+import { createInteractionInsert } from '../support/factories/interaction-record-ownership';
 import { resolveOwnPair } from '../support/helpers/events';
 import { test, expect } from '../support/merged-fixtures';
 
@@ -41,25 +41,18 @@ test.describe('Interaction record contract', () => {
   }) => {
     // Given this worker's linked sender and receiver.
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    const record = createInteractionRecord({
+    const insert = createInteractionInsert({
       from_user_id: userId,
       to_user_id: partnerId,
       type: 'kiss',
       viewed: false,
     });
-    const insert = {
-      id: record.id,
-      type: record.type,
-      from_user_id: record.from_user_id,
-      to_user_id: record.to_user_id,
-      viewed: record.viewed,
-    };
     // Deferred before the INSERT: the row is deleted even if the request
     // committed but its response or a contract assertion failed.
     cleanup.defer('delete the interaction row', async () => {
       const { status } = await apiRequest({
         method: 'DELETE',
-        path: '/rest/v1/interactions?id=eq.' + record.id,
+        path: '/rest/v1/interactions?id=eq.' + insert.id,
         headers: { Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY },
       });
       expect(status).toBe(204);
@@ -90,7 +83,7 @@ test.describe('Interaction record contract', () => {
     await log.step('Read that exact record using the receiving partner token');
     const { status: readStatus, body: received } = await apiRequest<SupabaseInteractionRecord[]>({
       method: 'GET',
-      path: '/rest/v1/interactions?id=eq.' + record.id + '&select=*',
+      path: '/rest/v1/interactions?id=eq.' + insert.id + '&select=*',
       headers: { Authorization: 'Bearer ' + partnerAuthToken },
     }).validateSchema<z.infer<typeof IncomingRecordsSchema>>(IncomingRecordsSchema);
 

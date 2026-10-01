@@ -45,6 +45,7 @@ import { resolveOwnPair } from '../support/helpers/events';
 import { getUserAccessToken } from '../support/helpers/supabase';
 import type { TypedSupabaseClient } from '../support/factories';
 import { createCheckWritePayload } from '../support/factories/check-write-payloads';
+import { createInteractionInsert } from '../support/factories/interaction-record-ownership';
 import {
   CHECK_VIOLATION_CODE,
   CHECK_VIOLATION_HTTP_STATUS,
@@ -74,6 +75,9 @@ const DISALLOWED_MIME = 'image/gif';
 
 /** `partner_requests_status_check` admits pending|accepted|declined. */
 const DISALLOWED_REQUEST_STATUS = 'rejected';
+
+/** `interactions_type_check` admits poke|kiss. */
+const DISALLOWED_INTERACTION_TYPE = 'hug';
 
 /** Any valid `event_date`; no case here exercises the date. */
 const FAR_FUTURE_EVENT_DATE = '2030-01-01';
@@ -180,12 +184,12 @@ test.describe('CHECK-constraint rejections over the wire', () => {
       constraint: 'interactions_type_check',
       context: 'InteractionService.sendInteraction',
       priority: 'P1',
-      body: (userId: string, partnerId: string) => ({
-        id: randomUUID(),
-        type: 'hug',
-        from_user_id: userId,
-        to_user_id: partnerId,
-      }),
+      body: (userId: string, partnerId: string) =>
+        createInteractionInsert({
+          type: DISALLOWED_INTERACTION_TYPE,
+          from_user_id: userId,
+          to_user_id: partnerId,
+        }),
     },
     {
       table: 'moods',
