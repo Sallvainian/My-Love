@@ -73,6 +73,26 @@ vi.mock('../../api/supabaseClient', () => ({
   },
 }));
 
+/**
+ * Mirrors `RETRY_CONFIG` in src/hooks/useRealtimeMessages.ts (module-private):
+ * retry `n` (0-based) waits `min(BASE_BACKOFF_MS * 2 ** n, BACKOFF_CAP_MS)`, and
+ * after `MAX_RETRIES` retries the next failure gives up.
+ */
+const BASE_BACKOFF_MS = 1000;
+/** The longest retry delay: any scheduled rejoin has fired once this has passed. */
+const BACKOFF_CAP_MS = 30_000;
+const MAX_RETRIES = 5;
+/** Past the scheduled delay, so the rejoin timer has certainly fired. */
+const TIMER_SLACK_MS = 100;
+
+/** How long retry `attempt` (0-based) waits before it rejoins. */
+function backoffMs(attempt: number): number {
+  return Math.min(BASE_BACKOFF_MS * 2 ** attempt, BACKOFF_CAP_MS);
+}
+
+/** Just past the first retry's 1 s backoff. */
+const PAST_FIRST_BACKOFF_MS = backoffMs(0) + TIMER_SLACK_MS;
+
 // Mock app store
 const mockStoreState: Record<string, unknown> = {
   addNote: vi.fn(),
@@ -140,7 +160,7 @@ describe('useRealtimeMessages', () => {
         report('CLOSED');
       });
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(1100);
+        await vi.advanceTimersByTimeAsync(PAST_FIRST_BACKOFF_MS);
       });
 
       expect(second.subscribe).toHaveBeenCalled();
@@ -180,7 +200,7 @@ describe('useRealtimeMessages', () => {
       // verification.md rather than counted among the mutation results.
       await act(async () => {
         report('CLOSED');
-        await vi.advanceTimersByTimeAsync(30000);
+        await vi.advanceTimersByTimeAsync(BACKOFF_CAP_MS);
       });
 
       expect(supabase.channel).toHaveBeenCalledTimes(1);
@@ -207,7 +227,7 @@ describe('useRealtimeMessages', () => {
         reporterFor(first)('CHANNEL_ERROR', new Error('boom'));
       });
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(1100);
+        await vi.advanceTimersByTimeAsync(PAST_FIRST_BACKOFF_MS);
       });
       expect(second.subscribe).toHaveBeenCalled();
 
@@ -216,7 +236,7 @@ describe('useRealtimeMessages', () => {
       // acting on it would tear down the healthy replacement that just joined.
       await act(async () => {
         reporterFor(first)('CLOSED');
-        await vi.advanceTimersByTimeAsync(30000);
+        await vi.advanceTimersByTimeAsync(BACKOFF_CAP_MS);
       });
 
       expect(supabase.channel).toHaveBeenCalledTimes(2);
@@ -239,7 +259,8 @@ describe('useRealtimeMessages', () => {
       let authCalls = 0;
       mocks.setAuth.mockImplementation(async () => {
         authCalls += 1;
-        if (authCalls === 6) {
+        // 1 initial open + MAX_RETRIES retries: this is the last retry's.
+        if (authCalls === MAX_RETRIES + 1) {
           await new Promise<void>((resolve) => {
             releaseAuth = resolve;
           });
@@ -253,12 +274,12 @@ describe('useRealtimeMessages', () => {
       });
 
       // Four completed retries: 1 initial channel + 4 replacements.
-      for (let attempt = 0; attempt < 4; attempt++) {
+      for (let attempt = 0; attempt < MAX_RETRIES - 1; attempt++) {
         await act(async () => {
           reporterFor(channels[attempt])('CHANNEL_ERROR', new Error('boom'));
         });
         await act(async () => {
-          await vi.advanceTimersByTimeAsync(Math.min(1000 * 2 ** attempt, 30000) + 100);
+          await vi.advanceTimersByTimeAsync(backoffMs(attempt) + TIMER_SLACK_MS);
         });
       }
       expect(supabase.channel).toHaveBeenCalledTimes(5);
@@ -268,9 +289,9 @@ describe('useRealtimeMessages', () => {
         reporterFor(channels[4])('CHANNEL_ERROR', new Error('boom'));
       });
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(30000);
+        await vi.advanceTimersByTimeAsync(BACKOFF_CAP_MS);
       });
-      expect(authCalls).toBe(6);
+      expect(authCalls).toBe(MAX_RETRIES + 1);
       expect(supabase.channel).toHaveBeenCalledTimes(5);
 
       // The still-current old channel fails again from inside that window. The
@@ -286,7 +307,7 @@ describe('useRealtimeMessages', () => {
       // so it has to be.
       await act(async () => {
         releaseAuth();
-        await vi.advanceTimersByTimeAsync(30000);
+        await vi.advanceTimersByTimeAsync(BACKOFF_CAP_MS);
       });
 
       expect(supabase.channel).toHaveBeenCalledTimes(5);
@@ -317,9 +338,9 @@ describe('useRealtimeMessages', () => {
       // Exhaust the ceiling. The terminal state is the whole point: the hook
       // stops trying here and nothing else in the app re-arms it, so a consumer
       // that cannot read this has no way to tell a working feed from a dead one.
-      for (let attempt = 1; attempt <= 5; attempt++) {
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         await act(async () => {
-          await vi.advanceTimersByTimeAsync(Math.min(1000 * 2 ** attempt, 30000) + 100);
+          await vi.advanceTimersByTimeAsync(backoffMs(attempt) + TIMER_SLACK_MS);
         });
         await act(async () => {
           reporterFor(channel)('CHANNEL_ERROR', new Error('boom'));

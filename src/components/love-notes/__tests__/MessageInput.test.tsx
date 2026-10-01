@@ -55,6 +55,9 @@ vi.stubGlobal('URL', {
   revokeObjectURL: vi.fn(),
 });
 
+/** The error haptic's buzz-pause-buzz, as MessageInput passes it to `vibrate`. */
+const ERROR_HAPTIC = [100, 50, 100];
+
 /** The picture a user attaches in every image test. */
 const jpegFile = () => new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
 
@@ -174,7 +177,7 @@ describe('MessageInput', () => {
       });
 
       // Should trigger error haptic
-      expect(mockVibrate).toHaveBeenCalledWith([100, 50, 100]);
+      expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC);
     });
 
     it('should trigger selection haptic when valid image selected', async () => {
@@ -439,7 +442,7 @@ describe('MessageInput', () => {
       await user.click(sendButton);
 
       await waitFor(() => {
-        expect(mockVibrate).toHaveBeenCalledWith([100, 50, 100]);
+        expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC);
       });
     });
   });
@@ -468,7 +471,7 @@ describe('MessageInput', () => {
       await sendPictureNote(user);
 
       await waitFor(() => expect(mockSendNote).toHaveBeenCalledTimes(1));
-      await waitFor(() => expect(mockVibrate).toHaveBeenCalledWith([100, 50, 100]));
+      await waitFor(() => expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC));
       expect(screen.queryByText('Failed to send. Try again.')).not.toBeInTheDocument();
       expect(screen.getByRole('textbox')).toHaveValue('Look!');
       expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
