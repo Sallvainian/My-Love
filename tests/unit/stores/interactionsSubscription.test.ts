@@ -10,9 +10,16 @@ const sendKiss = vi.hoisted(() => vi.fn());
  * Every partner lookup the slice started, as the promise it was handed, so a
  * test can confirm a re-join started its own lookup. Awaiting one is not a
  * wait for the slice: its handler may take further awaits, and the test would
- * then resume first. `flushMacrotask` waits for all of it.
+ * then resume first. `lookupHandled` is the wait for that.
  */
 const partnerLookups = vi.hoisted((): Array<Promise<unknown>> => []);
+/**
+ * The promise each `lookup.then(handler)` call returned: it settles only once
+ * the slice's handler has returned (and, were the handler async, once its own
+ * awaits have finished). The re-join is the slice's only `.then` on a lookup;
+ * the pre-subscribe read is an `await`, which never calls an own `then`.
+ */
+const lookupHandled = vi.hoisted((): Array<Promise<unknown>> => []);
 
 vi.mock('../../../src/api/interactionService', () => ({
   InteractionService: class {
@@ -31,6 +38,11 @@ vi.mock('../../../src/api/interactionService', () => ({
         }
       })();
       partnerLookups.push(lookup);
+      lookup.then = ((onFulfilled, onRejected) => {
+        const handled = Promise.prototype.then.call(lookup, onFulfilled, onRejected);
+        lookupHandled.push(handled);
+        return handled;
+      }) as typeof lookup.then;
       return lookup;
     };
     sendPoke = sendPoke;
@@ -69,11 +81,6 @@ interface CapturedSubscription {
 
 const subscriptions: CapturedSubscription[] = [];
 
-/** Every pending microtask, however many awaits deep, runs before a macrotask. */
-function flushMacrotask(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 function createTestStore() {
   const createSlices: AppStateCreator<TestStore> = (...args) => ({
     ...createAuthSlice(...args),
@@ -107,6 +114,7 @@ describe('interactionsSlice subscription bridge', () => {
     localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
     subscriptions.length = 0;
     partnerLookups.length = 0;
+    lookupHandled.length = 0;
     resolvePartnerId.mockResolvedValue(OTHER_USER_ID);
     subscribeInteractions.mockImplementation(
       (
@@ -426,8 +434,10 @@ describe('interactionsSlice subscription bridge', () => {
     subscription.reportStatus('SUBSCRIBED');
     // The subscribe's lookup, then this re-join's.
     expect(partnerLookups).toHaveLength(2);
-    await flushMacrotask();
+    expect(lookupHandled).toHaveLength(1);
+    await lookupHandled[0];
 
+    expect(store.getState().interactionPartnerId).toBe(OTHER_USER_ID);
     subscription.reportInteraction(interaction('after-the-blip'));
     expect(store.getState().interactions.map(({ id }) => id)).toEqual([
       'after-the-blip',
@@ -473,8 +483,10 @@ describe('interactionsSlice subscription bridge', () => {
     subscription.reportStatus('SUBSCRIBED');
     // The subscribe's lookup, then this re-join's.
     expect(partnerLookups).toHaveLength(2);
-    await flushMacrotask();
+    expect(lookupHandled).toHaveLength(1);
+    await lookupHandled[0];
 
+    expect(store.getState().interactionPartnerId).toBeNull();
     subscription.reportInteraction(interaction('after-the-unlink'));
     expect(store.getState().interactions.map(({ id }) => id)).toEqual(['while-linked']);
   });
@@ -538,7 +550,8 @@ describe('interactionsSlice subscription bridge', () => {
     releaseRefresh!(OTHER_USER_ID);
     // The subscribe's lookup, then this re-join's.
     expect(partnerLookups).toHaveLength(2);
-    await flushMacrotask();
+    expect(lookupHandled).toHaveLength(1);
+    await lookupHandled[0];
 
     // Restoring it here would re-arm addIncomingInteraction for the couple that
     // just signed out.
