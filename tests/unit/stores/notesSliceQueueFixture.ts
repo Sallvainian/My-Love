@@ -252,30 +252,3 @@ export async function sendThreeOffline(store: Store) {
   await store.getState().sendNote('three');
   await store.getState().drainQueuedNotes();
 }
-
-/**
- * The three notes of `sendThreeOffline` were delivered: each sent once, in
- * order, under its own key, then shown, saved to the copy, removed from the
- * queue and broadcast.
- */
-export async function expectQueueDeliveredOnceInOrder(store: Store, keys: (string | undefined)[]) {
-  expect(server.rows.map((r) => [r.content, r.idempotency_key])).toEqual([
-    ['one', keys[0]],
-    ['two', keys[1]],
-    ['three', keys[2]],
-  ]);
-  expect(server.upserts).toBe(3);
-  expect(store.getState().notes.map((n) => n.id)).toEqual(['server-1', 'server-2', 'server-3']);
-  expect(store.getState().notes.every((n) => !n.queued && !n.sending && !n.error)).toBe(true);
-  // The drain saves the copy without awaiting it.
-  await vi.waitFor(async () => expect(await copyIds()).toEqual(['server-1', 'server-2', 'server-3']));
-  expect(await queuedIds()).toEqual([]);
-  expect(sendEphemeralBroadcast.mock.calls.map(([topic, , payload]) => [
-    topic,
-    (payload as { message: Row }).message.content,
-  ])).toEqual([
-    [`love-notes:${PARTNER}`, 'one'],
-    [`love-notes:${PARTNER}`, 'two'],
-    [`love-notes:${PARTNER}`, 'three'],
-  ]);
-}
