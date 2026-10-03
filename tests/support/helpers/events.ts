@@ -117,8 +117,10 @@ export interface SeedEventOverrides {
   userId: string;
   label: string;
   /** A bare `"YYYY-MM-DD"`. `event_date` is a Postgres `date`, not a
-   * timestamptz. Defaults to 30 days out. */
-  eventDate?: string;
+   * timestamptz. Required: a default would have to read the live clock, so
+   * build it with `isoDateDaysFromNow(dayOffset, anchor)` from the test's own
+   * anchor. */
+  eventDate: string;
   description?: string | null;
   icon?: EventIcon;
 }
@@ -140,7 +142,7 @@ export async function seedEvent(
   supabaseAdmin: TypedSupabaseClient,
   overrides: SeedEventOverrides
 ): Promise<string> {
-  const { userId, label, eventDate = isoDateDaysFromNow(30), description, icon } = overrides;
+  const { userId, label, eventDate, description, icon } = overrides;
 
   const { data, error } = await supabaseAdmin
     .from('events')
@@ -163,8 +165,10 @@ export async function seedEvent(
 
 /**
  * A `"YYYY-MM-DD"` calendar date `dayOffset` days from the anchor's LOCAL day.
- * Defaults to today for single-row callers. For a batch, capture one
- * `const anchor = new Date()` and pass it to every related call so a midnight
+ * The anchor is required, so no fixture date is read off Node's clock behind
+ * the test's back. Where the test pins a page clock, pass the instant it
+ * installed (`clockAnchor()` and its variants below); otherwise capture one
+ * `const anchor = new Date()` and pass it to every related call, so a midnight
  * crossing cannot shift later rows. The supplied anchor is never mutated.
  *
  * Delegates to the production `formatDateISO` rather than re-padding by hand.
@@ -176,7 +180,7 @@ export async function seedEvent(
  * feature exists to avoid (`src/utils/dateUtils.ts:126-128`,
  * `AnniversarySettings.tsx:103`).
  */
-export function isoDateDaysFromNow(dayOffset: number, anchor: Date = new Date()): string {
+export function isoDateDaysFromNow(dayOffset: number, anchor: Date): string {
   // Carry only calendar components: the anchor's time can fall in a DST gap
   // on the target day and normalize into the following date.
   const date = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + dayOffset);

@@ -374,7 +374,8 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     await expect(selfPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
 
     await log.step('Saving a wedding date creates the row: 201');
-    const wedding = isoDateDaysFromNow(40);
+    const anchor = new Date();
+    const wedding = isoDateDaysFromNow(40, anchor);
     await selfPage.getByTestId('settings-wedding-date').fill(wedding);
     const created = observeOn({
       page: selfPage,

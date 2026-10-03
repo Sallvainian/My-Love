@@ -87,10 +87,11 @@ const A11Y_LABEL = 'Settings A11y E2E';
  * iconed, so every field of the row and of the edit form is populated.
  */
 async function seedA11yEvent(supabaseAdmin: TypedSupabaseClient, userId: string) {
+  const anchor = new Date();
   await seedEvent(supabaseAdmin, {
     userId,
     label: A11Y_LABEL,
-    eventDate: isoDateDaysFromNow(30),
+    eventDate: isoDateDaysFromNow(30, anchor),
     description: 'Seeded by the accessibility test',
     icon: 'calendar',
   });

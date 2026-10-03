@@ -122,7 +122,8 @@ async function seedCreatorEvent(
   );
 
   await log.step('Seed one event owned by the creator');
-  const seededDate = isoDateDaysFromNow(dayOffset);
+  const anchor = new Date();
+  const seededDate = isoDateDaysFromNow(dayOffset, anchor);
   const eventId = await seedEvent(supabaseAdmin, {
     userId,
     label: SEEDED_LABEL,

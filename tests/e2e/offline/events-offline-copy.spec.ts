@@ -67,10 +67,11 @@ test.describe('Events from the local copy', () => {
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
+    const anchor = new Date();
     const eventId = await seedEvent(supabaseAdmin, {
       userId,
       label: LABEL,
-      eventDate: isoDateDaysFromNow(14),
+      eventDate: isoDateDaysFromNow(14, anchor),
       icon: 'plane',
     });
     cleanup.defer('delete the seeded event', () => deleteRowById(supabaseAdmin, 'events', eventId));

@@ -229,6 +229,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const attemptLabel = `${ANON_ATTEMPT_LABEL} ${randomUUID()}`;
     const priorAttemptLabel = `${ANON_ATTEMPT_LABEL} ${randomUUID()}`;
+    const anchor = new Date();
 
     // Abandoned attempts must not look like this POST succeeded. Keep both the
     // historical fixed label and a prior unique label on the creator, plus a
@@ -236,9 +237,9 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     await log.step('Seed abandoned attempts and a same-label partner witness');
     const witnessRows = [];
     for (const witness of [
-      { userId, label: ANON_ATTEMPT_LABEL },
-      { userId, label: priorAttemptLabel },
-      { userId: partnerId, label: attemptLabel },
+      { userId, label: ANON_ATTEMPT_LABEL, eventDate: isoDateDaysFromNow(30, anchor) },
+      { userId, label: priorAttemptLabel, eventDate: isoDateDaysFromNow(30, anchor) },
+      { userId: partnerId, label: attemptLabel, eventDate: isoDateDaysFromNow(30, anchor) },
     ]) {
       const id = await seedEvent(supabaseAdmin, witness);
       witnessRows.push({ id, user_id: witness.userId, label: witness.label });
@@ -276,7 +277,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
       method: 'POST',
       path: '/rest/v1/events',
       headers: { Prefer: 'return=representation' },
-      body: eventPostBody(userId, attemptLabel, isoDateDaysFromNow(20)),
+      body: eventPostBody(userId, attemptLabel, isoDateDaysFromNow(20, anchor)),
     });
 
     // MEASURED: the same 401/42501. The body is well-formed and the user_id is
@@ -299,6 +300,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     const positiveControlId = await seedEvent(supabaseAdmin, {
       userId,
       label: attemptLabel,
+      eventDate: isoDateDaysFromNow(30, anchor),
     });
     const { data: detected, error: detectionError } = await findCurrentAttempt();
 
@@ -401,13 +403,14 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
+    const anchor = new Date();
     await log.step('Sign in as the creator and POST an event with return=representation');
     const creatorToken = await getUserAccessToken(supabaseAdmin, userId);
     const { status, body } = await apiRequest<EventRow[]>({
       method: 'POST',
       path: '/rest/v1/events',
       headers: representationHeaders(creatorToken),
-      body: eventPostBody(userId, SCHEMA_PROBE_LABEL, isoDateDaysFromNow(30)),
+      body: eventPostBody(userId, SCHEMA_PROBE_LABEL, isoDateDaysFromNow(30, anchor)),
     }).validateSchema<z.infer<typeof EventRowsSchema>>(EventRowsSchema);
 
     // Premise: a real row came back to serve as the valid control.

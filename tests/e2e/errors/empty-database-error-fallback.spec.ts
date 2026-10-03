@@ -13,7 +13,8 @@ test.describe('DW-39 empty database error fallback', () => {
     async ({ page, authToken, interceptNetworkCall, recurse }) => {
       expect(authToken).not.toBe('');
       const label = `DW39 event ${faker.string.uuid()}`;
-      const eventDate = isoDateDaysFromNow(10);
+      const anchor = new Date();
+      const eventDate = isoDateDaysFromNow(10, anchor);
       const errorEnvelope = createDatabaseErrorEnvelope();
       const expectedMessage =
         '[EventsService.createEvent] Database error: An unknown database error occurred';

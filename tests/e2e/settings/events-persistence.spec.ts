@@ -168,7 +168,8 @@ test.describe('An event survives the round trip through the server', () => {
     // half of the couple — the SELECT policy returns own + partner.
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const isoDate = isoDateDaysFromNow(30);
+    const anchor = new Date();
+    const isoDate = isoDateDaysFromNow(30, anchor);
 
     // GIVEN / WHEN: an event created through the Settings form with icon `ring`
     await openSettingsFromHome(page, interceptNetworkCall);
@@ -281,7 +282,8 @@ test.describe('Clearing an optional field', () => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-    const isoDate = isoDateDaysFromNow(18);
+    const anchor = new Date();
+    const isoDate = isoDateDaysFromNow(18, anchor);
 
     await openSettingsFromHome(page, interceptNetworkCall);
     await openAddEventForm(page, { label: DESCRIPTION_LABEL, isoDate });
