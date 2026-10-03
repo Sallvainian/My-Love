@@ -19,7 +19,7 @@
  * shared through `tests/support/helpers/events.ts`.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { dismissWelcomeSplashAt } from '../../support/helpers/welcome-splash';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
   clearOwnPairEvents,
@@ -65,7 +65,8 @@ const VOYAGE_DAYS_AHEAD = 45;
 
 /**
  * Pin the page clock to `anchor` (noon of its local day, from `clockAnchor`)
- * and stamp the welcome splash from it, before the first navigation. Every
+ * and keep the welcome splash off, its stamp read from that clock, before the
+ * first navigation. Every
  * date a test builds comes from the returned anchor, so the browser's today
  * is the anchor's day however long the run takes. At noon a date N calendar
  * days ahead reads as N - 1 whole days on a countdown card — the half day left
@@ -75,7 +76,7 @@ const VOYAGE_DAYS_AHEAD = 45;
 async function pinClock(page: Page): Promise<Date> {
   const anchor = clockAnchor();
   await page.clock.install({ time: anchor });
-  await dismissWelcomeSplashAt(page, anchor.getTime());
+  await dismissWelcomeSplash(page);
   return anchor;
 }
 

@@ -64,7 +64,6 @@ import {
   stalePersistedMood,
 } from '../../support/helpers/persisted-blob';
 import { clockAnchor } from '../../support/helpers/events';
-import { dismissWelcomeSplashAt } from '../../support/helpers/welcome-splash';
 import { COUPLE_SETTINGS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 
 /**
@@ -180,7 +179,6 @@ test.describe('stale persisted events never rehydrate', () => {
     await seedPersistedBlob(page, { events: [staleEvent], moods: [staleMood] });
 
     await page.clock.install({ time: anchor });
-    await dismissWelcomeSplashAt(page, anchor.getTime());
     await gotoHomeAfterReads(page, interceptNetworkCall);
 
     await expect(page.getByTestId('time-together')).toBeVisible();

@@ -42,7 +42,7 @@ import {
 } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { createOutsiderClient, deleteOutsider } from '../../support/helpers/rls-security';
-import { dismissWelcomeSplashAt, WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
+import { dismissWelcomeSplash, WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 const PARTNER_SEARCH = '**/rest/v1/rpc/find_partner_by_email';
@@ -145,13 +145,13 @@ async function newBareContext(
 }
 
 /**
- * Put the first browser on the pinned clock and stamp its welcome splash from
- * the same instant, before its first navigation. Both browsers of a test run
+ * Put the first browser on the pinned clock and keep its welcome splash off,
+ * its stamp read from that clock, before its first navigation. Both browsers of a test run
  * on this one anchor (see `openSecondBrowser`).
  */
 async function pinFirstBrowser(page: Page, anchor: Date): Promise<void> {
   await page.clock.install({ time: anchor });
-  await dismissWelcomeSplashAt(page, anchor.getTime());
+  await dismissWelcomeSplash(page);
 }
 
 /** A second browser on the same pinned clock, closed at teardown. */
@@ -340,8 +340,8 @@ test.describe('Connecting with a partner', () => {
   }, testInfo) => {
     const a = await createThrowaway(supabaseAdmin, cleanup, 'a');
     const b = await createThrowaway(supabaseAdmin, cleanup, 'b');
-    // Both browsers run on one pinned clock, and both splash stamps are that
-    // same instant.
+    // Both browsers run on one pinned clock, and both splash stamps come from
+    // it.
     const anchor = clockAnchor();
 
     // ---- A: signed in, unlinked, finds B ----

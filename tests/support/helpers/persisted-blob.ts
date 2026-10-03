@@ -221,10 +221,6 @@ export function makePersistedBlob(extra: Record<string, unknown> = {}): string {
  * provider already writes it into storage state
  * (`tests/support/auth/supabase-auth-provider.ts:154`), and setting it here too
  * keeps the seeding self-contained for a spec that runs without that provider.
- * That stamp is `dismissWelcomeSplash`'s page-clock one, so a test that also
- * installs a page clock calls `dismissWelcomeSplashAt` with the clock's instant
- * after this: registered later, its stamp overwrites this one on every
- * navigation.
  *
  * Note this re-runs on EVERY navigation in the test, re-seeding the stale key
  * each time. A test asserting the blob has been cleaned ON DISK must therefore

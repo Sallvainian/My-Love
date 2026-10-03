@@ -67,7 +67,7 @@
  * before and after every test, so nothing seeded here outlives its test.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { dismissWelcomeSplashAt } from '../../support/helpers/welcome-splash';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { PAST_EVENTS_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 
 /** Home renders at most this many event cards (`HOME_MAX_EVENT_CARDS`, `src/App.tsx`). */
@@ -123,7 +123,7 @@ test.describe('Home under the bounded events read', () => {
       { dayOffset: 7, label: 'Window Survivor E2E', description: 'Still ahead' },
     ]);
 
-    await dismissWelcomeSplashAt(page, coupleEvents.anchor.getTime());
+    await dismissWelcomeSplash(page);
 
     const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     const pastRead = interceptNetworkCall({ method: 'GET', url: PAST_EVENTS_READ });
@@ -200,7 +200,7 @@ test.describe('Home under the bounded events read', () => {
     // runs normally, so the page loads, authenticates and animates as it would
     // without it — the jump below is the only discontinuity.
     await page.clock.install({ time: beforeMidnight });
-    await dismissWelcomeSplashAt(page, beforeMidnight.getTime());
+    await dismissWelcomeSplash(page);
 
     const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');

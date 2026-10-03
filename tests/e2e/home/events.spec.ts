@@ -26,7 +26,7 @@
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
-import { dismissWelcomeSplash, dismissWelcomeSplashAt } from '../../support/helpers/welcome-splash';
+import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
@@ -92,14 +92,14 @@ async function seedMeetup(
 }
 
 /**
- * Pin the page clock to `anchor` and stamp the welcome splash from it, before
- * the first navigation. Every date a test seeds is built from the returned
- * anchor, so Node and the browser agree on what today is, and the splash's
- * 60-minute window starts at that same instant, however long the run takes.
+ * Pin the page clock to `anchor` and keep the welcome splash off, its stamp
+ * read from that clock, before the first navigation. Every date a test seeds
+ * is built from the returned anchor, so Node and the browser agree on what
+ * today is, however long the run takes.
  */
 async function pinClock(page: Page, anchor: Date = clockAnchor()): Promise<Date> {
   await page.clock.install({ time: anchor });
-  await dismissWelcomeSplashAt(page, anchor.getTime());
+  await dismissWelcomeSplash(page);
   return anchor;
 }
 
