@@ -26,7 +26,7 @@
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
-import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
+import { dismissWelcomeSplash, dismissWelcomeSplashAt } from '../../support/helpers/welcome-splash';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
@@ -99,7 +99,7 @@ async function seedMeetup(
  */
 async function pinClock(page: Page, anchor: Date = clockAnchor()): Promise<Date> {
   await page.clock.install({ time: anchor });
-  await dismissWelcomeSplash(page, anchor.getTime());
+  await dismissWelcomeSplashAt(page, anchor.getTime());
   return anchor;
 }
 

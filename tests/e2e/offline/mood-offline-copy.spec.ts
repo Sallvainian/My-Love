@@ -20,7 +20,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
-import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
+import { dismissWelcomeSplash, dismissWelcomeSplashAt } from '../../support/helpers/welcome-splash';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import { clockAnchorAvoidingFirstOfMonth, resolveOwnPair } from '../../support/helpers/events';
@@ -110,10 +110,6 @@ async function savedPartnerNotes(page: Page): Promise<string[] | null> {
   return moods ? moods.map((mood) => mood.note ?? '') : null;
 }
 
-test.beforeEach(async ({ page }) => {
-  await dismissWelcomeSplash(page);
-});
-
 test.describe('Mood history and partner moods offline', () => {
   test('[P1] a device with an empty moods store shows earlier server moods in the calendar', async ({
     page,
@@ -145,6 +141,7 @@ test.describe('Mood history and partner moods offline', () => {
     // GIVEN: signed in, then the moods store is emptied — a fresh device.
     // The clock survives the reload below, so both loads share one month.
     await page.clock.install({ time: anchor });
+    await dismissWelcomeSplashAt(page, anchor.getTime());
     const startBackfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
     await page.goto('/');
     const started = await startBackfill;
@@ -203,6 +200,7 @@ test.describe('Mood history and partner moods offline', () => {
     interceptNetworkCall,
     cleanup,
   }) => {
+    await dismissWelcomeSplash(page);
     const { partnerId } = await resolveOwnPair(supabaseAdmin);
     const note = `partner-copy-e2e-${randomUUID()}`;
 

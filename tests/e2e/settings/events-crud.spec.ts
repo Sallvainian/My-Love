@@ -19,7 +19,7 @@
  * shared through `tests/support/helpers/events.ts`.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
+import { dismissWelcomeSplashAt } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
   clearOwnPairEvents,
@@ -75,7 +75,7 @@ const VOYAGE_DAYS_AHEAD = 45;
 async function pinClock(page: Page): Promise<Date> {
   const anchor = clockAnchor();
   await page.clock.install({ time: anchor });
-  await dismissWelcomeSplash(page, anchor.getTime());
+  await dismissWelcomeSplashAt(page, anchor.getTime());
   return anchor;
 }
 

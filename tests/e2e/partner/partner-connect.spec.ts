@@ -42,7 +42,7 @@ import {
 } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { createOutsiderClient, deleteOutsider } from '../../support/helpers/rls-security';
-import { dismissWelcomeSplash, WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
+import { dismissWelcomeSplashAt, WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 const PARTNER_SEARCH = '**/rest/v1/rpc/find_partner_by_email';
@@ -151,7 +151,7 @@ async function newBareContext(
  */
 async function pinFirstBrowser(page: Page, anchor: Date): Promise<void> {
   await page.clock.install({ time: anchor });
-  await dismissWelcomeSplash(page, anchor.getTime());
+  await dismissWelcomeSplashAt(page, anchor.getTime());
 }
 
 /** A second browser on the same pinned clock, closed at teardown. */
