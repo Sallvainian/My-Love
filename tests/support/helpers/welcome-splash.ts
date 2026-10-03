@@ -35,12 +35,17 @@ export const WELCOME_SPLASH_KEY = 'lastWelcomeView';
  *
  * Only that first read is answered: later reads, such as a spec checking that
  * a manual replay left the stored stamp alone, see the stored value. App's own
- * write on dismissing the splash goes through untouched.
+ * write on dismissing the splash goes through untouched. Calling this twice
+ * for one page arms it once.
  */
 export async function dismissWelcomeSplash(page: Page): Promise<void> {
   await page.addInitScript((key) => {
-    const realGetItem = Storage.prototype.getItem;
-    Storage.prototype.getItem = function (this: Storage, name: string): string | null {
+    type GetItem = Storage['getItem'] & { stampsWelcomeSplash?: true };
+    const realGetItem: GetItem = Storage.prototype.getItem;
+    // Registered twice on one page (a spec plus `seedPersistedBlob`, say), a
+    // second wrapper would take the first for the real getItem and stamp again.
+    if (realGetItem.stampsWelcomeSplash) return;
+    const stampAtRead: GetItem = function (this: Storage, name: string): string | null {
       if (this !== window.localStorage || name !== key) {
         return realGetItem.call(this, name);
       }
@@ -50,5 +55,7 @@ export async function dismissWelcomeSplash(page: Page): Promise<void> {
       this.setItem(key, stamp);
       return stamp;
     };
+    stampAtRead.stampsWelcomeSplash = true;
+    Storage.prototype.getItem = stampAtRead;
   }, WELCOME_SPLASH_KEY);
 }
