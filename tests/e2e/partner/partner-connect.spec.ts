@@ -145,13 +145,13 @@ async function newBareContext(
 }
 
 /**
- * Put the first browser on the pinned clock and stamp its welcome splash from
- * the same instant, before its first navigation. Both browsers of a test run
+ * Put the first browser on the pinned clock and keep its welcome splash off,
+ * its stamp read from that clock, before its first navigation. Both browsers of a test run
  * on this one anchor (see `openSecondBrowser`).
  */
 async function pinFirstBrowser(page: Page, anchor: Date): Promise<void> {
   await page.clock.install({ time: anchor });
-  await dismissWelcomeSplash(page, anchor.getTime());
+  await dismissWelcomeSplash(page);
 }
 
 /** A second browser on the same pinned clock, closed at teardown. */
@@ -340,8 +340,8 @@ test.describe('Connecting with a partner', () => {
   }, testInfo) => {
     const a = await createThrowaway(supabaseAdmin, cleanup, 'a');
     const b = await createThrowaway(supabaseAdmin, cleanup, 'b');
-    // Both browsers run on one pinned clock, and both splash stamps are that
-    // same instant.
+    // Both browsers run on one pinned clock, and both splash stamps come from
+    // it.
     const anchor = clockAnchor();
 
     // ---- A: signed in, unlinked, finds B ----

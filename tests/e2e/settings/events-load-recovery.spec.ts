@@ -141,10 +141,11 @@ test.describe('A failed Settings events load recovers on reconnect (DE.5-COMP-00
       await expect(page.getByTestId('mood-tracker')).toBeVisible();
 
       await log.step('Seed a row the client cannot know about yet');
+      const anchor = new Date();
       await seedEvent(supabaseAdmin, {
         userId,
         label: RECOVERY_LABEL,
-        eventDate: isoDateDaysFromNow(21),
+        eventDate: isoDateDaysFromNow(21, anchor),
         description: 'Seeded by the load-recovery test',
         icon: 'calendar',
       });

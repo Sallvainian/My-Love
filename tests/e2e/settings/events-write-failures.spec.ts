@@ -105,10 +105,11 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
     async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
+      const anchor = new Date();
       await seedEvent(supabaseAdmin, {
         userId,
         label: EDIT_LABEL,
-        eventDate: isoDateDaysFromNow(30),
+        eventDate: isoDateDaysFromNow(30, anchor),
         description: 'Seeded by the write-failure test',
         icon: 'calendar',
       });
@@ -162,10 +163,11 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
     async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
+      const anchor = new Date();
       await seedEvent(supabaseAdmin, {
         userId,
         label: DELETE_LABEL,
-        eventDate: isoDateDaysFromNow(30),
+        eventDate: isoDateDaysFromNow(30, anchor),
         description: 'Seeded by the write-failure test',
         icon: 'calendar',
       });
@@ -228,7 +230,8 @@ test.describe('Saving an event while offline (DE.5-E2E-003)', () => {
       await page.getByTestId('events-settings-empty-add').click();
       await expect(page.getByTestId('events-form')).toBeVisible();
       await page.getByTestId('events-form-label').fill(OFFLINE_LABEL);
-      await page.getByTestId('events-form-date').fill(isoDateDaysFromNow(12));
+      const anchor = new Date();
+      await page.getByTestId('events-form-date').fill(isoDateDaysFromNow(12, anchor));
 
       await log.step('Drop the connection, then save');
       // `isOnline()` reads `navigator.onLine` (src/api/errorHandlers.ts:44), and

@@ -359,8 +359,19 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     await selfPage.goto('/');
     await selfPage.getByRole('textbox', { name: 'Email' }).fill(self.email);
     await selfPage.getByTestId('password-input').fill(TEST_USER_PASSWORD);
+    // Signing in starts its own couple_settings read (refreshLocalCopies,
+    // App.tsx). Consume it here, or the observer below can match it and lose
+    // it when goto('/settings') replaces the page. Signed out, the read is
+    // never sent, so arming before the click cannot match anything earlier.
+    const signInRead = observeOn({
+      page: selfPage,
+      method: 'GET',
+      url: COUPLE_SETTINGS_READ,
+      timeout: SECOND_CONTEXT_READ_TIMEOUT,
+    });
     await selfPage.getByTestId('submit-button').click();
     await expect(selfPage.getByTestId('app-container')).toBeVisible();
+    expect((await signInRead).status).toBe(200);
     const settingsRead = observeOn({
       page: selfPage,
       method: 'GET',
@@ -374,7 +385,8 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     await expect(selfPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
 
     await log.step('Saving a wedding date creates the row: 201');
-    const wedding = isoDateDaysFromNow(40);
+    const anchor = new Date();
+    const wedding = isoDateDaysFromNow(40, anchor);
     await selfPage.getByTestId('settings-wedding-date').fill(wedding);
     const created = observeOn({
       page: selfPage,

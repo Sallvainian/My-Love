@@ -37,18 +37,9 @@ describe('isoDateDaysFromNow', () => {
     expect(anchor.getTime()).toBe(anchorTimestamp);
   });
 
-  it('keeps one-argument calls relative to the current local day', () => {
-    vi.setSystemTime(new Date('2026-08-19T23:59:59-04:00'));
-
-    expect(isoDateDaysFromNow(-1)).toBe('2026-08-18');
-    expect(isoDateDaysFromNow(0)).toBe('2026-08-19');
-    expect(isoDateDaysFromNow(1)).toBe('2026-08-20');
-
-    vi.setSystemTime(new Date('2026-08-20T00:00:01-04:00'));
-
-    expect(isoDateDaysFromNow(-1)).toBe('2026-08-19');
-    expect(isoDateDaysFromNow(0)).toBe('2026-08-20');
-    expect(isoDateDaysFromNow(1)).toBe('2026-08-21');
+  it('has no live-clock fallback: a call without an anchor fails instead of reading today', () => {
+    // @ts-expect-error -- the anchor is required; tsc -b fails if it becomes optional again
+    expect(() => isoDateDaysFromNow(0)).toThrow(TypeError);
   });
 
   it.each([
@@ -64,7 +55,6 @@ describe('isoDateDaysFromNow', () => {
     expect(anchor.getUTCDate()).toBe(20);
 
     expect(isoDateDaysFromNow(dayOffset, anchor)).toBe(expected);
-    expect(isoDateDaysFromNow(dayOffset)).toBe(expected);
     expect(eventDateFrom(anchor, dayOffset)).toBe(expected);
     expect(anchor.getTime()).toBe(anchorTimestamp);
   });

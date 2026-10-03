@@ -7,7 +7,7 @@
  * old (`WELCOME_DISPLAY_INTERVAL` in `src/App.tsx`). The auth provider writes
  * the key into storage state when a worker signs in, but that stamp can be
  * more than an hour old by the time a later test runs, so each test that must
- * not see the splash stamps it again, before every navigation.
+ * not see the splash stamps it again on every navigation, when App reads it.
  */
 import type { Page } from '@playwright/test';
 
@@ -15,17 +15,47 @@ import type { Page } from '@playwright/test';
 export const WELCOME_SPLASH_KEY = 'lastWelcomeView';
 
 /**
- * Mark the splash as just seen, before the app boots, for every navigation in
- * the test. `at` is the stamp in epoch milliseconds; pass the installed
- * `page.clock` time when the page runs on a pinned clock, so "an hour ago"
- * is measured against the same clock. Left out, the stamp is taken in the
- * page at each navigation.
+ * Keep the splash from showing, for every navigation in the test.
+ *
+ * The stamp is taken when App reads it, not when the page starts. App reads
+ * the key once at boot (`shouldShowWelcome` in `src/App.tsx`) and compares it
+ * with `Date.now()`, so the init script replaces `localStorage.getItem` until
+ * that first read of the key, answers it with `Date.now()` from the same call,
+ * stores that value and puts the real `getItem` back. Elapsed time is then
+ * zero on whatever clock the page runs.
+ *
+ * Why not stamp in the init script itself: Chromium runs new-document scripts
+ * in the order they were registered, and `page.clock.install` registers one,
+ * so a clock installed after this helper is not in place yet when an init
+ * script reads `Date.now()`. Measured on 2026-10-03 with Playwright 1.63: with
+ * a clock installed 2 h ahead after the helper, an init-script stamp was real
+ * time and App, on the fake clock, read it as 2 h old and showed the splash.
+ * At App's read the clock is installed whichever order the test used, so this
+ * is the page's clock, not a live-clock fallback.
+ *
+ * Only that first read is answered: later reads, such as a spec checking that
+ * a manual replay left the stored stamp alone, see the stored value. App's own
+ * write on dismissing the splash goes through untouched. Calling this twice
+ * for one page arms it once.
  */
-export async function dismissWelcomeSplash(page: Page, at?: number): Promise<void> {
-  await page.addInitScript(
-    ({ key, stamp }) => {
-      localStorage.setItem(key, String(stamp ?? Date.now()));
-    },
-    { key: WELCOME_SPLASH_KEY, stamp: at ?? null }
-  );
+export async function dismissWelcomeSplash(page: Page): Promise<void> {
+  await page.addInitScript((key) => {
+    type GetItem = Storage['getItem'] & { stampsWelcomeSplash?: true };
+    const realGetItem: GetItem = Storage.prototype.getItem;
+    // Registered twice on one page (a spec plus `seedPersistedBlob`, say), a
+    // second wrapper would take the first for the real getItem and stamp again.
+    if (realGetItem.stampsWelcomeSplash) return;
+    const stampAtRead: GetItem = function (this: Storage, name: string): string | null {
+      if (this !== window.localStorage || name !== key) {
+        return realGetItem.call(this, name);
+      }
+      Storage.prototype.getItem = realGetItem;
+      // Read now, on the page's clock: fake when the test installed one.
+      const stamp = String(Date.now());
+      this.setItem(key, stamp);
+      return stamp;
+    };
+    stampAtRead.stampsWelcomeSplash = true;
+    Storage.prototype.getItem = stampAtRead;
+  }, WELCOME_SPLASH_KEY);
 }

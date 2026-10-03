@@ -123,7 +123,7 @@ test.describe('Home under the bounded events read', () => {
       { dayOffset: 7, label: 'Window Survivor E2E', description: 'Still ahead' },
     ]);
 
-    await dismissWelcomeSplash(page, coupleEvents.anchor.getTime());
+    await dismissWelcomeSplash(page);
 
     const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     const pastRead = interceptNetworkCall({ method: 'GET', url: PAST_EVENTS_READ });
@@ -200,7 +200,7 @@ test.describe('Home under the bounded events read', () => {
     // runs normally, so the page loads, authenticates and animates as it would
     // without it — the jump below is the only discontinuity.
     await page.clock.install({ time: beforeMidnight });
-    await dismissWelcomeSplash(page, beforeMidnight.getTime());
+    await dismissWelcomeSplash(page);
 
     const upcomingRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await page.goto('/');
