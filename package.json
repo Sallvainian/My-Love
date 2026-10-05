@@ -35,11 +35,11 @@
     "deadcode": "bash scripts/deadcode.sh"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.1",
+    "@supabase/supabase-js": "^2.117.2",
     "dompurify": "^3.4.16",
     "idb": "^8.0.3",
-    "lucide-react": "^1.48.0",
-    "motion": "^13.4.3",
+    "lucide-react": "^1.49.0",
+    "motion": "^13.5.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-window": "^2.3.3",
