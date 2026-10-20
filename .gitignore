@@ -166,3 +166,4 @@ _bmad/custom/*.user.toml
 # skills from .agents/skills; never add a .grok/skills copy, which grok would
 # read first and so shadow the installed skills.
 .grok/
+_bmad/render/
