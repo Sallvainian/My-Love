@@ -10,11 +10,11 @@ companions:
   - ../../../.claude/skills/bmad-testarch-test-review/steps-c/criteria-registry.md
   - ../../../AGENTS.md
 sources:
-  - ../../test-artifacts/test-review/test-review-target-tests.md
-  - ../../test-artifacts/test-review/test-review-target-tests-e2e.md
-  - ../../test-artifacts/test-review/test-review-target-tests-unit.md
-  - ../../test-artifacts/test-review/test-review-target-src.md
-  - ../../test-artifacts/test-review/test-review-system.md
+  - ../../test-artifacts/test-reviews/test-review-target-tests.md
+  - ../../test-artifacts/test-reviews/test-review-target-tests-e2e.md
+  - ../../test-artifacts/test-reviews/test-review-target-tests-unit.md
+  - ../../test-artifacts/test-reviews/test-review-target-src.md
+  - ../../test-artifacts/test-reviews/test-review-system.md
 ---
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability — consult them only if you need narrative rationale or prose color this contract intentionally omits.
