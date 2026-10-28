@@ -9,8 +9,8 @@ review_loop_iteration: 0
 followup_review_recommended: false
 context:
   - '{project-root}/AGENTS.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/SPEC.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/corrections.md'
+  - '{project-root}/_bmad-output/initiative-my-love/archive-v6/spec-test-review-remediation/SPEC.md'
+  - '{project-root}/_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md'
   - '{project-root}/.claude/skills/bmad-testarch-test-review/resources/knowledge/playwright-utils-mandate.md'
 warnings: ['oversized']
 deferred:

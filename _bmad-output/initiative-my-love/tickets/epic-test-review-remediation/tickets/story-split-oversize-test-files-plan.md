@@ -8,7 +8,7 @@ baseline_revision: '116b0cc77bf0de9787d415971c49016b0dee496b'
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/corrections.md'
+  - '{project-root}/_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md'
 warnings: ['oversized']
 deferred:
   - summary: >-
@@ -267,7 +267,7 @@ Status: done
 - `tests/unit/api/moodSyncSubscription{,.identity,.reopen}.test.ts` and `fakeMoodRealtime.ts`.
 - `tests/unit/stores/accountDataSlices{,.anniversaries}.test.ts` and `accountDataFixtures.ts`.
 - Comment pointers only: `signOutClearsAccountState.test.ts`, `EventsSettings.errorIsolation.test.tsx`, `LoveNotes.realtimeStatus.test.tsx`, `moodArrayGuards.test.tsx`, `checkConstraintMapping.test.ts`, `eventsValidationMirrors.test.ts`, `coupleSettings.test.ts`, `tests/e2e/settings/events-check-constraint.spec.ts`, `tests/e2e/offline/needs-a-connection.spec.ts` and `tests/api/events-read-window.spec.ts`.
-- `_bmad-output/implementation-artifacts/deferred-work.md` (gitignored): the `location:` lines of DW-252, DW-255, DW-256, DW-259 and DW-276.
+- `_bmad-output/initiative-my-love/deferred-work.md` (gitignored): the `location:` lines of DW-252, DW-255, DW-256, DW-259 and DW-276.
 
 **Commits:**
 - One per file: ab268166, 6e36939b, 4e837aac, f42498fa, 04a1c246, 2e9a6a16, ade40e22, 50fb187a, f9ac9245 and f5528551.

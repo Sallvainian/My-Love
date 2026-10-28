@@ -9,8 +9,8 @@ review_loop_iteration: 0
 followup_review_recommended: false
 context:
   - '{project-root}/AGENTS.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/SPEC.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/corrections.md'
+  - '{project-root}/_bmad-output/initiative-my-love/archive-v6/spec-test-review-remediation/SPEC.md'
+  - '{project-root}/_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md'
 warnings: ['oversized']
 deferred:
   - summary: >-
@@ -192,7 +192,7 @@ Rows: `services/accountDataCreateRetry` ~161; `stores/eventsSlice.localCopy` ~12
 - G7 unit files -- pinned clock + boundary cases -- H2 + corrections `updateCurrentMessageStaleCache`.
 - G8 unit files -- quiescence signals -- H1 + corrections 50 ms sleep.
 - G9 unit files -- awaited signals -- normalization H1 rows + advisories.
-- `_bmad-output/specs/spec-test-review-remediation/stories/2-remove-clock-timing-and-async-nondeterminism.md` frontmatter `deferred` -- the Deferred items.
+- `_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/tickets/story-remove-clock-timing-and-async-nondeterminism-plan.md` frontmatter `deferred` -- the Deferred items.
 
 **Acceptance Criteria:**
 - Given the changed test files, when grepping them for `setTimeout(` / `setImmediate` used to wait in a test body or helper (timers inside fakes that model the SUT, and bounded positive polls, excepted), then none remain; and no `interceptNetworkCall(` or `log.*(` call in `tests/e2e`/`tests/api` is unawaited and unstored.
