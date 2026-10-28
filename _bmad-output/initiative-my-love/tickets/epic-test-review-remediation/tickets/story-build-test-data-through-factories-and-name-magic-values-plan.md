@@ -1,4 +1,5 @@
 ---
+ticket: 7
 title: 'Build test data through factories and name magic values'
 type: 'refactor'
 created: '2026-09-25'
@@ -7,7 +8,7 @@ baseline_revision: 'ae2b37b432bfb19b293b868d79473f325df36bf3'
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/corrections.md'
+  - '{project-root}/_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md'
   - '{project-root}/.claude/skills/bmad-testarch-test-review/steps-c/criteria-registry.md'
 warnings: ['oversized']
 deferred:

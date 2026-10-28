@@ -1,4 +1,5 @@
 ---
+ticket: 8
 title: 'Fix names, selectors, markers and test structure'
 type: 'refactor'
 created: '2026-09-25'
@@ -7,7 +8,7 @@ baseline_revision: '744ef0f798b5a5fec1241f24081568602ae4e210'
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/corrections.md'
+  - '{project-root}/_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md'
   - '{project-root}/.claude/skills/bmad-testarch-test-review/steps-c/criteria-registry.md'
 warnings: ['oversized']
 deferred:
@@ -186,7 +187,7 @@ App code changed only by adding `data-testid` attributes, plus one existing `tes
 - `tests/api/**` (2): M3 splits in events-wire-contract (004b, 008b) and interaction-authorization (4 tests), with file-local cleanup helpers.
 - `supabase/functions/upload-love-note-image/handler.test.ts`: 4 `Deno.test` groups with `t.step`, and the success case split three ways.
 - `tests/unit/**` (27): locators, renames, M3 splits, and the two false-positive changes.
-- `_bmad-output/specs/spec-test-review-remediation/worklists/story-8/*.md`: the planning worklists, which serve as this spec's Code Map.
+- `_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/worklists/story-8/*.md`: the planning worklists, which serve as this spec's Code Map.
 
 **Commits:**
 - Hooks: d99a2951

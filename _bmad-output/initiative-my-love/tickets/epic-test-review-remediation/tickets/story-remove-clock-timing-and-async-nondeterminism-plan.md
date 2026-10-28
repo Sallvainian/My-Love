@@ -1,4 +1,5 @@
 ---
+ticket: 2
 title: 'Remove clock, timing and async nondeterminism'
 type: 'chore'
 created: '2026-09-25'
@@ -8,8 +9,8 @@ review_loop_iteration: 0
 followup_review_recommended: false
 context:
   - '{project-root}/AGENTS.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/SPEC.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/corrections.md'
+  - '{project-root}/_bmad-output/initiative-my-love/archive-v6/spec-test-review-remediation/SPEC.md'
+  - '{project-root}/_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md'
 warnings: ['oversized']
 deferred:
   - summary: >-
@@ -142,7 +143,7 @@ Pin with `vi.setSystemTime` (or `useFakeTimers({ toFake: ['Date'] })`, as `src/c
 - `MoodTracker/__tests__/MoodHistoryTimeline.test.tsx` ~52-74: pin 2026-09-25 21:00; fixtures 08:30/20:15/12:00 that day; one 'Today' header; add 2026-09-24 22:00 → 'Yesterday'.
 - `PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx` ~53-57, ~189-194: pin 2026-09-25 12:00; '2026-09-25' 09:15 → `/Today · 9:15 AM/`; add '2026-09-24' → Yesterday, '2026-09-23' → `Wednesday 23 September`.
 - `PokeKissInterface/__tests__/PokeKissInterface.test.tsx` ~394-403 (`RATE_LIMIT_MS` 30 min, `PokeKissInterface.tsx` ~37, 1 s interval ~106-113): `toFake: ['Date','setInterval','clearInterval']`, T=2026-09-25 12:00:00, `lastPokeTime=T-60_000` → `poke-cooldown` exactly '29:00'; after `act(() => vi.advanceTimersByTime(1000))` '28:59'; add `T-1_800_000` → enabled, no cooldown; `T-1_799_000` → '0:01', disabled.
-- `Settings/__tests__/Settings.birthdayWedding.test.tsx` ~89-103: pin 2026-09-25 12:00 before render; '2026-09-25' → `/in the past/i`, no save; add '2026-09-24' → `save('2026-09-24')` and input `max='2026-09-24'`. Wedding date ~165 → '2027-06-12'.
+- `Settings/__tests__/Settings.birthdayWedding.test.tsx` ~89-103: pin 2026-09-25 12:00 before render; '2026-09-25' → `/in the past/i`, no save; add '2026-09-24' → `save('2026-09-24')` and input `max='2026-09-24'`. Wedding date ~165 → '2027-06-19'.
 - `Settings/__tests__/Settings.togetherSince.test.tsx` ~125-143 (`Settings.tsx` ~145: `value > Date.now()`): pin 2026-09-25 12:00:00.000; '2026-09-25'+'12:01' refused; '12:00' accepted → `save('2026-09-25T16:00:00.000Z')`; '2026-09-26' no time refused; '2026-09-25' no time → `save('2026-09-25T04:00:00.000Z')`.
 - `utils/__tests__/dateUtils.test.ts` isJustNow ~52-62 (`diffMs < 300000`): pin 2026-03-15 12:00; T-299_000 true, T-300_000 false, T-301_000 false. `formatRelativeDate` 'today' ~69-75: fixed `new Date(2026, 2, 15, 12)` / `(2026, 2, 15, 1)`.
 - `utils/__tests__/moodGrouping.test.ts` ~7-104 (`Date.now() - n*86400000`; corrections DST item): pin 2026-09-25 12:00; `(2026,8,25,9)` → 'Today', `(2026,8,24,21)` → 'Yesterday', `(2026,8,22,12)` → exactly 'Sep 22'. DST cases (fail on current code, pass after G6): now 2026-03-09 00:30 — Mar 8 12:00 → 'Yesterday', Mar 7 12:00 → 'Mar 7'; now 2026-11-01 23:30 — Nov 1 00:30 → 'Today', Oct 31 12:00 → 'Yesterday'.
@@ -191,7 +192,7 @@ Rows: `services/accountDataCreateRetry` ~161; `stores/eventsSlice.localCopy` ~12
 - G7 unit files -- pinned clock + boundary cases -- H2 + corrections `updateCurrentMessageStaleCache`.
 - G8 unit files -- quiescence signals -- H1 + corrections 50 ms sleep.
 - G9 unit files -- awaited signals -- normalization H1 rows + advisories.
-- `_bmad-output/specs/spec-test-review-remediation/stories/2-remove-clock-timing-and-async-nondeterminism.md` frontmatter `deferred` -- the Deferred items.
+- `_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/tickets/story-remove-clock-timing-and-async-nondeterminism-plan.md` frontmatter `deferred` -- the Deferred items.
 
 **Acceptance Criteria:**
 - Given the changed test files, when grepping them for `setTimeout(` / `setImmediate` used to wait in a test body or helper (timers inside fakes that model the SUT, and bounded positive polls, excepted), then none remain; and no `interceptNetworkCall(` or `log.*(` call in `tests/e2e`/`tests/api` is unawaited and unstored.

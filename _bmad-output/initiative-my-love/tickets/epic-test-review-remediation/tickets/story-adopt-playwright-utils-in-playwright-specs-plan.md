@@ -1,4 +1,5 @@
 ---
+ticket: 6
 title: 'Adopt playwright-utils in Playwright specs'
 type: 'chore'
 created: '2026-09-25'
@@ -8,8 +9,8 @@ review_loop_iteration: 0
 followup_review_recommended: false
 context:
   - '{project-root}/AGENTS.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/SPEC.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/corrections.md'
+  - '{project-root}/_bmad-output/initiative-my-love/archive-v6/spec-test-review-remediation/SPEC.md'
+  - '{project-root}/_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md'
   - '{project-root}/.claude/skills/bmad-testarch-test-review/resources/knowledge/playwright-utils-mandate.md'
 warnings: ['oversized']
 deferred:
@@ -23,7 +24,7 @@ deferred:
   - summary: >-
       No fresh TEA re-review has confirmed the M9 fixes: recurseUntil call sites never name recurse, the deviation comments sit on the line above, and one reason repeats about 30 times.
     evidence: |-
-      The registry row says the comment must be "on the line"; the mandate's Deviation Protocol says "a one-line comment above the code", and the diff follows the mandate. CAP-5's gate is a fresh bmad-testarch-test-review run on tests/e2e and tests/api reporting zero M9 and L9 rows. Running it settles this.
+      The registry row says the comment must be "on the line"; the mandate's Deviation Protocol says "a one-line comment above the code", and the diff follows the mandate. R5's gate is a fresh bmad-testarch-test-review run on tests/e2e and tests/api reporting zero M9 and L9 rows. Running it settles this.
     location: >-
       tests/support/helpers/recurse.ts; tests/e2e/; tests/api/
     severity: medium (unverified)
@@ -37,7 +38,7 @@ deferred:
   - summary: >-
       Hand-rolled page.on request/response listeners and a page.waitForEvent('requestfailed') have no deviation comment, and the acceptance grep does not look for them.
     evidence: |-
-      These are pre-existing and none of the 50 M9 rows names them, but a fresh bmad-testarch-test-review might flag them as M9. Sites: display-name-setup ~173, partner-mood-realtime ~152-159, love-notes-realtime ~144-151, needs-a-connection ~95, account-data-offline-copy ~312, photos-offline ~328, and events-history-pagination ~241 (waitForEvent). The mandate lists page.on('response') under the network-error-monitor row. To settle it, run the CAP-5 re-review and check whether it reports any of these sites.
+      These are pre-existing and none of the 50 M9 rows names them, but a fresh bmad-testarch-test-review might flag them as M9. Sites: display-name-setup ~173, partner-mood-realtime ~152-159, love-notes-realtime ~144-151, needs-a-connection ~95, account-data-offline-copy ~312, photos-offline ~328, and events-history-pagination ~241 (waitForEvent). The mandate lists page.on('response') under the network-error-monitor row. To settle it, run the R5 re-review and check whether it reports any of these sites.
     location: >-
       tests/e2e/ (page.on('request'|'response'|'requestfinished'|'requestfailed') sites); tests/e2e/settings/events-history-pagination.spec.ts:241
     severity: medium (unverified)
@@ -323,6 +324,6 @@ This was a follow-up review pass. It found nothing high or medium and made five 
   - no spec imports `test` from `@playwright/test` (only the fixture files under `tests/support` do).
 
 **Residual risks:**
-- The CAP-5 gate still rests on a fresh `bmad-testarch-test-review` of `tests/e2e` and `tests/api` (deferred).
+- The R5 gate still rests on a fresh `bmad-testarch-test-review` of `tests/e2e` and `tests/api` (deferred).
 - The observe waits at the offline reconnect reads and the account-data-offline-copy favorites reads are unverified against a failed or cancelled read in their arm windows (deferred).
 - `tests/e2e/auth/token-persistence-overlap.spec.ts` was not run. It reads `<worktree>/node_modules/@playwright/test/package.json` when it loads, and this worktree has none.

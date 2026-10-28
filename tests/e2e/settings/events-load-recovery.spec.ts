@@ -21,7 +21,7 @@
  *
  * This was not an unverified guess before it was run. The deferred-work ledger
  * recorded the original gap at
- * `_bmad-output/implementation-artifacts/deferred-work.md:244-250`:
+ * `_bmad-output/initiative-my-love/deferred-work.md:244-250`:
  *
  *   "DW-27: Once the Settings events load fails, nothing re-fires it: the
  *    notice and the empty list persist until the user reloads the page."

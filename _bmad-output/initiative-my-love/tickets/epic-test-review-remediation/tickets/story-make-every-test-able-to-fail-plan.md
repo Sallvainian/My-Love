@@ -1,4 +1,5 @@
 ---
+ticket: 1
 title: 'Make every test able to fail'
 type: 'chore'
 created: '2026-09-25'
@@ -8,8 +9,8 @@ review_loop_iteration: 0
 followup_review_recommended: false
 context:
   - '{project-root}/AGENTS.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/SPEC.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/corrections.md'
+  - '{project-root}/_bmad-output/initiative-my-love/archive-v6/spec-test-review-remediation/SPEC.md'
+  - '{project-root}/_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md'
 warnings: ['oversized']
 deferred:
   - summary: >-
@@ -172,7 +173,7 @@ Move each ternary/if into table columns or split; assert unconditionally.
 
 **Execution:**
 - G1–G13 in order, one commit per group, each file edited per the Code Map above.
-- `_bmad-output/specs/spec-test-review-remediation/stories/1-make-every-test-able-to-fail.md` -- append `## Critical Break Evidence` for G1–G4 -- proves each CRITICAL fix can fail.
+- `_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/tickets/story-make-every-test-able-to-fail-plan.md` -- append `## Critical Break Evidence` for G1–G4 -- proves each CRITICAL fix can fail.
 
 **Acceptance Criteria:**
 - Given any fixed C3 test, when its named source line is broken as the Code Map says, then that test fails; restored, it passes.

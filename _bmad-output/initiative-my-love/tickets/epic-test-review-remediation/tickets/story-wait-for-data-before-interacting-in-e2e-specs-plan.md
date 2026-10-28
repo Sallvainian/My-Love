@@ -1,4 +1,5 @@
 ---
+ticket: 3
 title: 'Wait for data before interacting in e2e specs'
 type: 'chore'
 created: '2026-09-25'
@@ -8,8 +9,8 @@ review_loop_iteration: 0
 followup_review_recommended: false
 context:
   - '{project-root}/AGENTS.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/SPEC.md'
-  - '{project-root}/_bmad-output/specs/spec-test-review-remediation/corrections.md'
+  - '{project-root}/_bmad-output/initiative-my-love/archive-v6/spec-test-review-remediation/SPEC.md'
+  - '{project-root}/_bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md'
 warnings: ['oversized']
 deferred:
   - summary: >-
@@ -165,7 +166,7 @@ Arm before the ONLINE goto only; keep every copy poll (copies are written after 
   - `[low]` `[reject]` Intent: no demonstration that the new gates reject a not-ready screen — the gates now accept only loaded-state testids plus an error-banner absence; a local break demonstration is not a code defect and the story's AC required glob breaks, which were recorded.
   - `[false]` `[reject]` Intent: events.spec past-only arm comment "both past rows reached the store" — the placeholder (rendered only after the load settles, one store update per load) is asserted before the absences.
   - `[maybe-false]` `[defer]` Intent: ~25 navigating specs with no M1 row were not audited — settle with a fresh tests/e2e re-review; recorded as medium (unverified).
-  - `[false]` `[reject]` Intent: adjacent corrections items (events-persistence stale deviation comment, token-persistence loop count) untouched — they belong to M9 (story 6) and CAP-1 (story 1), not this story's rule ids.
+  - `[false]` `[reject]` Intent: adjacent corrections items (events-persistence stale deviation comment, token-persistence loop count) untouched — they belong to M9 (story 6) and R1 (story 1), not this story's rule ids.
   - `[false]` `[reject]` Intent: verification not shown — lint, typecheck, unit (2796/2796) and all 31 changed specs (101/101 after patches) were run.
   - `[false]` `[reject]` Intent: networkidle and unlisted skeleton-gate fixes go beyond the rows — no bad outcome; story 2 deferred networkidle to this story and the skeleton gate is the same corrections defect.
 
