@@ -1,7 +1,7 @@
 ---
 type: migration
 title: "BMad v6 to v7 migration of My-Love's _bmad-output"
-status: draft
+status: done
 created: 2026-10-28
 ---
 
@@ -197,6 +197,36 @@ The v6 loop CLI (fork at `~/Projects/BMAD-METHOD/bmad-loop`) requires `implement
 
 2026-10-28: the owner approved this plan as written, including the epic's Done when.
 
+## Run
+
+| Step | Result | Commit |
+|---|---|---|
+| Before step 6 | this plan | `41e34159` |
+| 6 Workspace | skipped: answer No | none |
+| 7 Initiative and documents | envelope, `backlog/.gitkeep`, `archive/.gitkeep`; no documents to move | `2dee7ee7` |
+| 8 Ticket tree from `epics.md` | nothing: no `epics.md` or `sprint-status.yaml` | none |
+| 9 Spec folder with `stories.yaml` | epic, both `tickets.toml`, nine plans | `a3add3a0` |
+| 10 Pre-release folds | `migrate_v6.py --fold-specs`: `folded: []`, `problems: []` | none |
+| 11 Loose implementation files | ledger and archive moved and tracked | `ee4f6e17` |
+| 12 What stays in place | `test-artifacts/`, as listed above | none |
+| 13 Path rewrites | 19 lines in the nine plans | `08209bc7` |
+| 14 Configuration and cleanup | `_bmad/custom/config.user.toml` written (gitignored); empty `specs/` and `implementation-artifacts/` removed | none |
+| 15 Checklist | item 8 fix and these results | this commit |
+
+One change beyond the plan, made to pass checklist item 8: the spec's own `CAP-1`…`CAP-6` became `R1`…`R6` in the nine entry descriptions in the epic's `tickets.toml` and in four lines of two plans (story 3 line 169; story 6 lines 27, 41 and 327). The descriptions are otherwise verbatim.
+
 ## Checklist
 
-Results are recorded here after the run.
+1. **Pass.** All 37 source files are accounted for: 24 under `initiative-my-love/` (`archive-v6/` included) and 13 left in place under `test-artifacts/`, as listed. The five files moved unchanged are byte-identical to the backup.
+2. **Pass.** No document folders moved (none existed). `initiative-my-love/` (28 files), `backlog/` and `archive/` exist; `backlog/` and `archive/` each hold only `.gitkeep`.
+3. **Pass (nothing to check).** No dated or numbered document versions were in the source folders.
+4. **Pass.** `tickets.py status initiative-my-love` exits 0: 9 tickets, 9 done, no problems, epic `done`. `stories.yaml` lists 9 stories; backlog holds 0.
+5. **Pass.** Nine spec stories, nine entries, nine plans, one per story; `tickets.py find 1.1` … `1.9` each exit 0 and return the expected plan. No leaf story files were written.
+6. **Pass.** Every plan has `ticket` and a build `type` (six `chore`, three `refactor`), `status: done` kept, `baseline_revision` kept; none missing. All nine baselines exist locally; eight are not reachable from `origin/main` (squash-merged loop commits). No retrospective exists.
+7. **Pass.** The epic's `covers` is empty and the initiative has no Requirements. Entry `covers` are R1 (1), R2 (2), R3 (1), R4 (1), R5 (1), R6 (3), each an epic Requirements line, and every R line has an entry. No PRD coverage map exists.
+8. **Pass with two reported exceptions.** No `spec-<slug>/spec-<slug>.md` folder remains, and no fold ran. Two `CAP-5` mentions stay in `initiative-my-love/deferred-work.md` (the reason lines of DW-279 and DW-281), because the guide moves the ledger unchanged and test comments cite its line numbers. One `CAP-7` stays in `findings-unit.md:243`, a TEA finding quoting another spec's id from a test file. This spec has no `CAP-7`.
+9. **Pass.** 1,579 path mentions in live store files resolve and none was broken by the migration. 63 were already dead in v6 and are left as written: removed `spec-unified-data-storage` and `implementation-artifacts/spec-*.md` records, TEA files (TEA is not installed), and code paths in the catalogs that have since moved or been truncated.
+10. **Pass.** `resolve_config.py --key core.active_initiative` returns `initiative-my-love`; `core.output_folder` returns `{project-root}/_bmad-output`.
+11. **Pass.** The store stays in the project repository, as answered. No nested repository or submodule exists. 31 store files are tracked, and none is untracked-but-visible or ignored outside `test-artifacts/`. No workspace was created.
+12. **Pass.** The backup holds 37 output files and 40 `_bmad/` files. The 22 files tracked at `65456714` match their backup copies byte for byte. No commit touches the backup, and it is ignored.
+13. **Pass.** This plan records every question with its answer and reason, the backup path, the files left in place, the references outside the store, and each item's result.
