@@ -1,4 +1,5 @@
 ---
+ticket: 4
 title: 'Isolate tests and make cleanup failure-proof'
 type: 'chore'
 created: '2026-09-25'

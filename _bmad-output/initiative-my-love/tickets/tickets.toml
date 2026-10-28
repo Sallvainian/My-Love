@@ -1,0 +1,8 @@
+# The initiative's epics in build order. Migrated from v6 by `bmad migrate`.
+
+[[epic]]
+id = 1
+slug = "epic-test-review-remediation"
+title = "Test Review Remediation"
+description = "Every finding from the 2026-09-25 TEA test reviews is fixed, so a green suite means the behaviour works and a fresh review of each test folder comes back clean."
+covers = []

@@ -1,4 +1,5 @@
 ---
+ticket: 5
 title: 'Drive component tests through user-event'
 type: 'chore'
 created: '2026-09-25'

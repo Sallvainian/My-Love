@@ -1,4 +1,5 @@
 ---
+ticket: 6
 title: 'Adopt playwright-utils in Playwright specs'
 type: 'chore'
 created: '2026-09-25'

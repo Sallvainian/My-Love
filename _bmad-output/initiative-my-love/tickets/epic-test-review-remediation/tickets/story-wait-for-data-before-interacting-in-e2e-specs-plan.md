@@ -1,4 +1,5 @@
 ---
+ticket: 3
 title: 'Wait for data before interacting in e2e specs'
 type: 'chore'
 created: '2026-09-25'

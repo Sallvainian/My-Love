@@ -1,4 +1,5 @@
 ---
+ticket: 8
 title: 'Fix names, selectors, markers and test structure'
 type: 'refactor'
 created: '2026-09-25'

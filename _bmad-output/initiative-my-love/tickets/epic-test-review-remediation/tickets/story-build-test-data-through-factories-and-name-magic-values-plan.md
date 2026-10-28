@@ -1,4 +1,5 @@
 ---
+ticket: 7
 title: 'Build test data through factories and name magic values'
 type: 'refactor'
 created: '2026-09-25'

@@ -1,4 +1,5 @@
 ---
+ticket: 1
 title: 'Make every test able to fail'
 type: 'chore'
 created: '2026-09-25'

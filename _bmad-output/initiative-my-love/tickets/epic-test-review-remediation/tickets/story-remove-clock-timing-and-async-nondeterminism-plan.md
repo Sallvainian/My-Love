@@ -1,4 +1,5 @@
 ---
+ticket: 2
 title: 'Remove clock, timing and async nondeterminism'
 type: 'chore'
 created: '2026-09-25'
