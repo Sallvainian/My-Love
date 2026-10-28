@@ -103,6 +103,24 @@
       "skillPath": "skills/bmad-forge-idea/SKILL.md",
       "computedHash": "131a644dab2b9d7756d0c9e0b511c433647901ce7ca83a980a0f1db0cfa9ef65"
     },
+    "bmad-loop-resolve": {
+      "source": "bmad-code-org/bmad-loop",
+      "sourceType": "github",
+      "skillPath": "skills/bmad-loop-resolve/SKILL.md",
+      "computedHash": "2c1d79d0df125d2a148390bbc9f4a65fb64f593493606609cfaf30fae0e3f685"
+    },
+    "bmad-loop-setup": {
+      "source": "bmad-code-org/bmad-loop",
+      "sourceType": "github",
+      "skillPath": "skills/bmad-loop-setup/SKILL.md",
+      "computedHash": "a7770c10f90c3efb570f758b76f44634416c105ab85efa3459f629526fa657cd"
+    },
+    "bmad-loop-sweep": {
+      "source": "bmad-code-org/bmad-loop",
+      "sourceType": "github",
+      "skillPath": "skills/bmad-loop-sweep/SKILL.md",
+      "computedHash": "23cafd4468561ef65b2161f6d34833ecd5f4e98abca787010f151a4708791a6a"
+    },
     "bmad-party-mode": {
       "source": "bmad-code-org/BMAD-METHOD",
       "sourceType": "github",
@@ -162,6 +180,12 @@
       "sourceType": "github",
       "skillPath": "skills/bmad-walkthrough/SKILL.md",
       "computedHash": "289ddacc4d3061837d86211cd40c9cad967167e4fa608906bd31219afd4cbeb5"
+    },
+    "bmod-bmad-loop": {
+      "source": "bmad-code-org/bmad-loop",
+      "sourceType": "github",
+      "skillPath": "skills/bmod-bmad-loop/SKILL.md",
+      "computedHash": "eee7cbed546f56bcdf67b7054830074f9da41a5daab054bc84030675dee7e266"
     },
     "bmod-core-tools": {
       "source": "bmad-code-org/BMAD-METHOD",
