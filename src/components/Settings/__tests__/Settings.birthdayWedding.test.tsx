@@ -192,10 +192,10 @@ describe('Settings — Wedding', () => {
     useAppStore.setState({ setWeddingDate: save });
     render(<Settings />);
 
-    await user.type(screen.getByTestId('settings-wedding-date'), '2027-06-12');
+    await user.type(screen.getByTestId('settings-wedding-date'), '2027-06-19');
     await user.click(screen.getByTestId('settings-wedding-save'));
 
-    await waitFor(() => expect(save).toHaveBeenCalledWith('2027-06-12'));
+    await waitFor(() => expect(save).toHaveBeenCalledWith('2027-06-19'));
   });
 
   it('clears a saved wedding date', async () => {
