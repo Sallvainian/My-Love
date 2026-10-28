@@ -2506,7 +2506,8 @@ location: src/api/partnerService.ts searchUsers (~:152-194); users SELECT policy
 source_spec: n/a
 severity: high
 reason: searchUsers queries users directly with email/display_name ilike, and its comment says "RLS policy allows authenticated users to search", but the only SELECT policy (local and hosted, read from pg_policies 2026-09-26) is id = auth.uid() OR id = get_my_partner_id() OR partner_id = auth.uid(). An unlinked user's search therefore returns nothing, so a new couple cannot connect through the app. E2E specs stub the search response, which is why nothing caught it. The fix is a SECURITY DEFINER search RPC (a migration), which needs a product decision on what a search may reveal about other accounts (exact-email match only vs substring on email/name).
-status: open
+status: done 2026-09-26
+resolution: fixed in PR #379 (squash 35cbd323): searchUsers calls the new SECURITY DEFINER find_partner_by_email, which matches the exact sign-in email only (case-insensitive, trimmed) and returns no row, an unlinked account's id and name, or is_taken with no id or name. The unstubbed E2E tests/e2e/partner/partner-connect.spec.ts covers found, taken, missing and self.
 
 ### DW-295: A partner request to someone already partnered is accepted at insert and stays pending forever.
 origin: orchestrator review 2026-09-26
@@ -2514,4 +2515,5 @@ location: supabase partner_requests INSERT policy; src/api/partnerService.ts sen
 source_spec: n/a
 severity: low
 reason: The partner_requests INSERT policy checks only the sender (WITH CHECK auth.uid() = from_user_id), and the client cannot see the target's partner_id (DW-292), so the request is inserted. The recipient never sees it (the connect UI is hidden once linked) and the sender sees it pending indefinitely; accept_partner_request would refuse it. Refusing at insert needs a migration (a check on the target's partner_id inside a SECURITY DEFINER function or trigger).
-status: open
+status: done 2026-09-26
+resolution: fixed in the app by PR #379 (squash 35cbd323), not at insert: find_partner_by_email returns no id for an account that already has a partner, so the Connect screen can no longer send it a request, and accept_partner_request already declines every other pending request of both users when a couple links, so a request sent before its target linked elsewhere does not stay pending either. The INSERT policy is unchanged, so only a request inserted outside the app, with a partnered user's id, still stays pending, in the sender's own list.
