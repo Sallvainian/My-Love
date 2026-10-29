@@ -3,8 +3,8 @@ title: 'Pin the real contract in four e2e/api assertions'
 type: 'chore'
 ticket: ''
 created: '2026-10-29'
-status: 'blocked'
-baseline_revision: 'd4b9ba4acfda25dda38b4e2d1cd866460cd731c7'
+status: ready-for-dev
+baseline_revision: 3e547a40c30d40f6ca995dae444307c617cf4d98
 route: 'oneshot'
 route_source: 'auto'
 risk: 'low'
@@ -64,13 +64,3 @@ The failing DW-303 attempt was reverted, and its diff was saved outside the repo
 - DW-312: `tests/e2e/auth/bootstrap-notification-order.spec.ts` lines 45, 188 and 218 now use `toHaveCount(0)`. Line 45 is the same contract, so it was included. `App.tsx` renders `LoginScreen` only when `!session`.
 - DW-317: the `clockAnchor` JSDoc in `tests/support/helpers/events.ts` gains the reason a fixed calendar date was rejected. AGENTS.md is unchanged; its `clockAnchor()` pitfall line already states the rule.
 
-## Auto Run Result
-
-Status: blocked
-Blocking condition: intent gap. DW-303's prescribed assertion (the remaining count falls by exactly one across two uploads) is false over the wire, because the function's rate-limit counter lives in each isolate's memory and consecutive requests reach different isolates (it failed 9 of 9 serial runs). The choice is between (a) a unit-level decrement test plus a corrected spec comment, or (b) treating the per-isolate limiter as a product defect. See the Implementation Notes.
-
-**Verification of the three completed items (DW-307, DW-312, DW-317):**
-- `npx tsc -p tsconfig.test.json --noEmit`: no errors.
-- `npx eslint` on the touched files: clean.
-- `npx playwright test --project=chromium tests/e2e/home/events.spec.ts tests/e2e/auth/bootstrap-notification-order.spec.ts tests/e2e/auth/login.spec.ts`: 21 passed.
-- Not reviewed: step-04 did not run because the workflow halted.
