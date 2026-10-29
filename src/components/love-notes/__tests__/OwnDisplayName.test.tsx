@@ -78,6 +78,19 @@ vi.mock('motion/react', () => ({
 
 import { LoveNotes } from '../LoveNotes';
 
+/**
+ * Wait until the mount effect's name lookups have answered and their state is
+ * applied. The fallbacks equal LoveNotes' initial state, so a fallback asserted
+ * any earlier passes before the behaviour has run. `getPartnerDisplayName` is
+ * asked only after the own-name branch, so its answer settles both.
+ */
+async function settleNameLookups(): Promise<void> {
+  await waitFor(() => expect(api.getPartnerDisplayName).toHaveBeenCalled());
+  await act(async () => {
+    await Promise.all(api.getPartnerDisplayName.mock.results.map((result) => result.value));
+  });
+}
+
 /** Mount the chat and wait for the name effect to settle on `expected`. */
 async function expectOwnName(expected: string): Promise<void> {
   render(<LoveNotes />);
@@ -87,6 +100,12 @@ async function expectOwnName(expected: string): Promise<void> {
     expect(screen.getByTestId('own-name').textContent).toBe(expected);
   });
 }
+
+// File-level: a test that links a partner must not leave the next one, in
+// either describe and in any shuffled order, mounting already linked.
+beforeEach(() => {
+  storeState.partner = null;
+});
 
 describe('own display name in the chat', () => {
   afterEach(() => {
@@ -120,7 +139,9 @@ describe('own display name in the chat', () => {
   it('keeps the default when there is no name and no email to fall back to', async () => {
     api.getOwnDisplayName.mockResolvedValue(null);
     api.getUser.mockResolvedValue({ id: 'user-a', email: null });
-    await expectOwnName('You');
+    render(<LoveNotes />);
+    await settleNameLookups();
+    expect(screen.getByTestId('own-name').textContent).toBe('You');
   });
 
   it('never reads the name off auth user_metadata', async () => {
@@ -167,10 +188,9 @@ describe('own display name in the chat', () => {
       api.getPartnerDisplayName.mockResolvedValue(null);
 
       render(<LoveNotes />);
+      await settleNameLookups();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('partner-name').textContent).toBe('Partner');
-      });
+      expect(screen.getByTestId('partner-name').textContent).toBe('Partner');
       // The user-visible shape of the bug, asserted directly: whatever the
       // fallback is, it must not be an address or a fragment of one.
       const rendered = screen.getByTestId('partner-name').textContent ?? '';
@@ -188,7 +208,8 @@ describe('own display name in the chat', () => {
 
       render(<LoveNotes />);
 
-      await waitFor(() => expect(screen.getByTestId('own-name').textContent).toBe('person'));
+      await settleNameLookups();
+      expect(screen.getByTestId('own-name').textContent).toBe('person');
       expect(screen.getByTestId('partner-name').textContent).toBe('Partner');
     });
   });
@@ -201,7 +222,6 @@ describe('partner name after a link made while the chat is open', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    storeState.partner = null;
     api.getOwnDisplayName.mockResolvedValue('Jessie');
     api.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
   });

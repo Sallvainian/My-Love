@@ -267,8 +267,13 @@ describe('AdminPanel with the real local copy and store', () => {
 
   it('keeps the row on disk and in the store after a failed delete', async () => {
     await failFirstDelete(userEvent.setup());
-    expect(await diskRow(aId)).toBeDefined();
-    expect(useAppStore.getState().customMessages.some((message) => message.id === aId)).toBe(true);
+    expect(await diskRow(aId)).toMatchObject({
+      id: aId, text: 'Account A message', serverId: aServerId, userId: A, category: 'custom',
+    });
+    // The store's CustomMessage carries no serverId; the disk row above pins it.
+    expect(useAppStore.getState().customMessages.find((message) => message.id === aId)).toMatchObject({
+      id: aId, text: 'Account A message', category: 'custom', isCustom: true, active: true,
+    });
   });
 
   it('retries a real delete when confirm is pressed again after a failure', async () => {

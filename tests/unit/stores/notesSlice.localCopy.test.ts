@@ -171,7 +171,7 @@ describe('notesSlice love-notes local copy', () => {
       await store.getState().fetchNotes();
 
       expect(store.getState().notes).toEqual([]);
-      expect(store.getState().notesError).toBeTruthy();
+      expect(store.getState().notesError).toBe('TypeError: Failed to fetch');
       expect(writeLocalCopy).not.toHaveBeenCalled();
     });
 

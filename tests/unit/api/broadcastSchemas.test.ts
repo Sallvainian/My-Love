@@ -101,9 +101,13 @@ describe('parseLoveNoteBroadcast', () => {
     // LoveNoteMessage.tsx:126-128 prefers imagePreviewUrl over the signed
     // Storage URL and lands it in an <img src>, so surviving the wire means the
     // victim's browser fetches the attacker's host.
-    expect(parsed).not.toBeNull();
-    expect(parsed).not.toHaveProperty('imagePreviewUrl');
-    expect(Object.keys(parsed!)).not.toContain('imagePreviewUrl');
+    expect(parsed).toEqual({
+      id: NOTE_ID,
+      from_user_id: PARTNER,
+      to_user_id: ME,
+      content: 'thinking of you',
+      created_at: '2026-09-12T10:00:00.000Z',
+    });
   });
 
   it('strips every other client-only optimistic-update field', () => {

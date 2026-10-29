@@ -401,6 +401,7 @@ describe('notesSlice offline send queue', () => {
     expect(server.rows.map((r) => [r.content, r.idempotency_key])).toContainEqual(['one', failedKey]);
     expect(server.rows).toHaveLength(3);
     expect(store.getState().notesError).toBeNull();
+    expect(contents(store)).toEqual(['one', 'two', 'three']);
     expect(store.getState().notes.every((n) => !n.error && !n.queued)).toBe(true);
     expect(await queuedIds()).toEqual([]);
   });

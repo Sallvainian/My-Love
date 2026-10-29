@@ -90,10 +90,27 @@ describe('getDailyMessage', () => {
     expect(results.size).toBeGreaterThan(1);
   });
 
-  it('defaults to today when no date provided', () => {
-    const messages = createMessages(5);
-    const result = getDailyMessage(messages);
-    expect(messages).toContain(result);
+  describe('with no date', () => {
+    const NOW = new Date(2026, 8, 22, 12, 0, 0);
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('defaults to today when no date provided', () => {
+      const messages = createMessages(5);
+      // NOW's message differs from the day before's, so a default other than
+      // today can fail the assertion below.
+      expect(getDailyMessage(messages, NOW)).not.toBe(
+        getDailyMessage(messages, new Date(2026, 8, 21, 12, 0, 0))
+      );
+      expect(getDailyMessage(messages)).toBe(getDailyMessage(messages, NOW));
+    });
   });
 });
 

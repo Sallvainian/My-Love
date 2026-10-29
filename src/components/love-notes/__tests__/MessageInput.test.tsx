@@ -515,8 +515,9 @@ describe('MessageInput', () => {
       await user.keyboard('{Enter}');
 
       await waitFor(() => {
-        expect(mockSendNote).toHaveBeenCalled();
+        expect(mockSendNote).toHaveBeenCalledWith('Hello', undefined);
       });
+      expect(mockSendNote).toHaveBeenCalledTimes(1);
     });
 
     it('should add newline on Shift+Enter', async () => {

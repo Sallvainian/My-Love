@@ -484,12 +484,15 @@ describe('loader identity guards', () => {
         label: 'x',
         eventDate: '2026-10-31',
       });
-      switchToUserC({ events: [], eventsError: null });
+      switchToUserC({ events: [], eventsError: 'C-OWN-LOAD-ERROR' });
 
       pending.fail(new Error('A-REQUEST-FAILURE'));
       await inFlight;
 
-      expect(useAppStore.getState().eventsError).toBeNull();
+      // A sentinel, not null: a write that cleared the banner would also pass a
+      // check that it stayed null.
+      expect(useAppStore.getState().eventsError).toBe('C-OWN-LOAD-ERROR');
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-REQUEST-FAILURE');
     });
   });
 
@@ -515,12 +518,15 @@ describe('loader identity guards', () => {
       updateEvent.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().editEvent('a-event', { label: 'x' });
-      switchToUserC({ events: [], eventsError: null });
+      switchToUserC({ events: [], eventsError: 'C-OWN-LOAD-ERROR' });
 
       pending.fail(new Error('A-REQUEST-FAILURE'));
       await inFlight;
 
-      expect(useAppStore.getState().eventsError).toBeNull();
+      // A sentinel, not null: a write that cleared the banner would also pass a
+      // check that it stayed null.
+      expect(useAppStore.getState().eventsError).toBe('C-OWN-LOAD-ERROR');
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-REQUEST-FAILURE');
     });
   });
 
@@ -545,12 +551,15 @@ describe('loader identity guards', () => {
       deleteEvent.mockReturnValue(pending.promise);
 
       const inFlight = useAppStore.getState().removeEvent('a-event');
-      switchToUserC({ events: [], eventsError: null });
+      switchToUserC({ events: [], eventsError: 'C-OWN-LOAD-ERROR' });
 
       pending.fail(new Error('A-REQUEST-FAILURE'));
       await inFlight;
 
-      expect(useAppStore.getState().eventsError).toBeNull();
+      // A sentinel, not null: a write that cleared the banner would also pass a
+      // check that it stayed null.
+      expect(useAppStore.getState().eventsError).toBe('C-OWN-LOAD-ERROR');
+      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-REQUEST-FAILURE');
     });
   });
 

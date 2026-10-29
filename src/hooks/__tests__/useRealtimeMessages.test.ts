@@ -382,9 +382,11 @@ describe('useRealtimeMessages', () => {
       expect(supabase.channel).toHaveBeenCalled();
     });
 
+    const channel = vi.mocked(supabase.channel).mock.results[0].value;
+
     unmount();
 
-    expect(supabase.removeChannel).toHaveBeenCalled();
+    expect(supabase.removeChannel).toHaveBeenCalledWith(channel);
   });
 
   // Both gates are synchronous, so fake timers run every pending step of the

@@ -1,7 +1,28 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Dispatch, SetStateAction } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InteractionSubscriptionStatus } from '../../../api/interactionService';
+
+const stateSetterCalls = vi.hoisted(() => vi.fn<(next: unknown) => void>());
+
+vi.mock('react', async () => {
+  const actual = await vi.importActual<typeof import('react')>('react');
+  return {
+    ...actual,
+    // React 19 silently ignores unmounted updates, so nothing on screen can
+    // show a late one. Observe the dispatch itself, forwarding to real state
+    // and preserving setter identity across renders.
+    useState<T,>(initial: T | (() => T)) {
+      const [value, setValue] = actual.useState(initial);
+      const observedSetter = actual.useCallback<Dispatch<SetStateAction<T>>>((next) => {
+        stateSetterCalls(next);
+        setValue(next);
+      }, [setValue]);
+      return [value, observedSetter];
+    },
+  };
+});
 
 const storeMocks = vi.hoisted(() => ({
   sendPoke: vi.fn(),
@@ -126,8 +147,10 @@ describe('PokeKissInterface interaction subscription', () => {
     await waitFor(() => expect(reportStatus).toBeDefined());
     unmount();
 
+    // Only a dispatch made for the late status counts.
+    stateSetterCalls.mockClear();
     act(() => reportStatus?.('CHANNEL_ERROR'));
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(stateSetterCalls).not.toHaveBeenCalled();
 
     await act(async () => {
       resolveSubscription?.(unsubscribe);

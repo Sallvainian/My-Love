@@ -88,7 +88,7 @@ describe('moodSlice', () => {
       await get().syncPendingMoods();
 
       expect(get().syncStatus.isSyncing).toBe(false);
-      expect(get().syncStatus.lastSyncAt).toBeInstanceOf(Date);
+      expect(get().syncStatus.lastSyncAt).toEqual(NOW);
     });
 
     it('returns synced/failed counts', async () => {
@@ -196,10 +196,18 @@ describe('moodSlice', () => {
       });
 
       it('does not reload moods or overwrite the pending count', async () => {
-        const { get } = createTestStore();
+        // Both loaders no-op without a userId, so a reload is only observable
+        // for a signed-in store. An empty unsynced list makes an overwrite
+        // visible as 0 against the seeded 7.
+        mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
+        const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
+        set((state) => ({ syncStatus: { ...state.syncStatus, pendingMoods: 7 } }));
+
         await get().syncPendingMoods();
 
-        expect(mockedMoodService.getAll).not.toHaveBeenCalled();
+        expect(mockedMoodService.getAllForUser).not.toHaveBeenCalled();
+        expect(mockedMoodService.getUnsyncedMoods).not.toHaveBeenCalled();
+        expect(get().syncStatus.pendingMoods).toBe(7);
       });
     });
 
@@ -350,7 +358,7 @@ describe('moodSlice', () => {
         await get().syncPendingMoods();
 
         expect(get().syncStatus.isSyncing).toBe(false);
-        expect(get().syncStatus.lastSyncAt).toBeInstanceOf(Date);
+        expect(get().syncStatus.lastSyncAt).toEqual(NOW);
         expect(mockedMoodService.getAllForUser).toHaveBeenCalledWith('USER-A');
       });
     });
