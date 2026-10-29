@@ -2677,3 +2677,11 @@ source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-
 severity: medium
 reason: R3's success clause "a full e2e run leaves behind no rows it created" was verified only for three love_notes content prefixes across the specs story 1.4 changed (plan 1.4 Verification). PR #377 moved cleanup into fixture teardown, but no full run has been audited across tables. Fix: a post-run check that counts the rows the worker-pool accounts own in each seeded table before and after a full run.
 status: open
+
+### DW-315: A history read that started before a poke was marked as seen can undo the mark when it answers, so the badge comes back.
+origin: investigation of the partner-connect poke flake 2026-10-29
+location: src/stores/slices/interactionsSlice.ts (markInteractionViewed; loadInteractionHistory)
+source_spec: n/a
+severity: low
+reason: markInteractionViewed sets viewed: true only after the server confirms, but loadInteractionHistory replaces the whole list with its answer, so an answer read before the mark carries viewed: false and puts the poke back in the unviewed count until the next read. Reads run on signed-in start, on reconnect, when History opens and, since the poke catch-up fix, each time the Partner tab's subscription is confirmed; the mark is written when the poke animation completes (PokeKissInterface.tsx:289). Read from the code, not reproduced. Fix: note the ids marked viewed while a read is in flight, as readsInFlight does for accepted rows, and keep viewed: true for them when the answer lands.
+status: open
