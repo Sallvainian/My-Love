@@ -2545,7 +2545,9 @@ location: src/hooks/usePartnerLinkListener.ts:30-37 (gate) and :49-58 (subscribe
 source_spec: n/a
 severity: medium
 reason: The partner_linked broadcast is ephemeral and never replayed, and three paths leave the listener's channel unjoined when it arrives. (1) It joins only after loadPartner answers unlinked, and subscribeMoodUpdates awaits the session, the partner lookup, setAuth and the socket first. (2) Every loadPartner sets isLoadingPartner, which turns settledUnlinked false and releases the subscriber, so on Home and Love Notes the channel is torn down and re-joined on every start, reconnect and Partner-tab mount, while the Partner tab's own subscriber passes no onPartnerLinked. (3) It passes no onStatusChange, so a Realtime reconnect never re-reads the partner. Fix: on each SUBSCRIBED call lookupPartnerId() and loadPartner() only when it answers linked (calling loadPartner directly loops through the gate), and gate on partner === null && !partnerLoadError once the first load has settled.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-partner-link-listener-rearm
+resolution-undo: 557e899a12936f0cb7f42633f9a2e20bad2908fd238445bf694e1a34e5e9c84b 2026-10-29 7374617475733a206f70656e
 
 ### DW-299: get_my_pending_partner_requests returns the name and email of the other side even when that account already has a partner.
 origin: security review of PR #379 2026-09-26, recorded 2026-10-28
