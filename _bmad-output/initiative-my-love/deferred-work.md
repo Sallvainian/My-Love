@@ -2685,3 +2685,19 @@ source_spec: n/a
 severity: low
 reason: markInteractionViewed sets viewed: true only after the server confirms, but loadInteractionHistory replaces the whole list with its answer, so an answer read before the mark carries viewed: false and puts the poke back in the unviewed count until the next read. Reads run on signed-in start, on reconnect, when History opens and, since the poke catch-up fix, each time the Partner tab's subscription is confirmed; the mark is written when the poke animation completes (PokeKissInterface.tsx:289). Read from the code, not reproduced. Fix: note the ids marked viewed while a read is in flight, as readsInFlight does for accepted rows, and keep viewed: true for them when the answer lands.
 status: open
+
+### DW-316: About ten corrections.md items were never re-checked against the code, so Done when 2 is unproven for them.
+origin: epic-test-review-remediation retrospective 2026-10-29 (S2)
+location: _bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: The retrospective checked about 30 of the file's roughly 40 items against HEAD and found every one resolved, but it does not list which ones it checked. It names the items it did not re-check one by one: the four false positives (notesSlice.offlineQueue.test.ts:312 M3, coupleSettingsService.test.ts:157 L7, DisplayNameSetup.test.tsx:183 L5, MoodHistoryTimeline.test.tsx:68 L3), EventsSettings.test.tsx:1493, EventsSettings.focus.test.tsx:363 and useNetworkStatus.test.ts:321-341. Settle by checking every item in corrections.md against HEAD, locating each by content because its line numbers predate the epic, and recording each as resolved or still open with its location. Fix what is still open under the epic's Constraints: a fix keeps or strengthens what the test proves, and a verified false positive gets a harmless change so the rule stops firing.
+status: open
+
+### DW-317: Decision record D1 (e2e page clocks anchor at the live day, never a fixed date) is only half written down where agents read it.
+origin: epic-test-review-remediation retrospective 2026-10-29 (S6, D1)
+location: tests/support/helpers/events.ts:190-205 (clockAnchor)
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: clockAnchor's JSDoc already records that the anchor is the latest local noon at or before now, so it sits behind real time and never ahead, because a page clock ahead of the session's mint time makes supabase-js refresh the token. It does not record why a fixed calendar date was rejected: plan 1.2's Review Triage Log (story-remove-clock-timing-and-async-nondeterminism-plan.md:235) says a fixed date "would put the page clock arbitrarily far behind server timestamps" and collide unique created_at rows across reruns. The retrospective proposed a separate adr-e2e-page-clock-anchors-at-the-live-day.md beside the helper, but AGENTS.md keeps durable agent-facing prose in AGENTS.md and forbids generated documentation files. So add the missing reason to clockAnchor's JSDoc, and, if every e2e spec that seeds calendar-day rows must use clockAnchor, say so in one AGENTS.md line, rather than adding a new file.
+status: open
