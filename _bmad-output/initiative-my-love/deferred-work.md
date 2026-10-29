@@ -2686,7 +2686,9 @@ location: src/stores/slices/interactionsSlice.ts (markInteractionViewed; loadInt
 source_spec: n/a
 severity: low
 reason: markInteractionViewed sets viewed: true only after the server confirms, but loadInteractionHistory replaces the whole list with its answer, so an answer read before the mark carries viewed: false and puts the poke back in the unviewed count until the next read. Reads run on signed-in start, on reconnect, when History opens and, since the poke catch-up fix, each time the Partner tab's subscription is confirmed; the mark is written when the poke animation completes (PokeKissInterface.tsx:289). Read from the code, not reproduced. Fix: note the ids marked viewed while a read is in flight, as readsInFlight does for accepted rows, and keep viewed: true for them when the answer lands.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-interaction-viewed-read-race
+resolution-undo: 72a6b01666ede192297badccb8fbc90e19ec25f8443762e8246c2745fddcfa79 2026-10-29 7374617475733a206f70656e
 
 ### DW-316: About ten corrections.md items were never re-checked against the code, so Done when 2 is unproven for them.
 origin: epic-test-review-remediation retrospective 2026-10-29 (S2)
