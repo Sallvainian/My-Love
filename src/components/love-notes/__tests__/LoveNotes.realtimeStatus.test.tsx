@@ -12,9 +12,10 @@
  * `useLoveNotes` is mocked rather than driven, because what is under test is
  * what `LoveNotes` does with a status, not how the status is produced.
  */
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { settleNameLookups } from './loveNotesTestKit';
 import type { NoteFeedStatus } from '../../../hooks/useRealtimeMessages';
 
 const api = vi.hoisted(() => ({
@@ -85,33 +86,6 @@ async function renderWith(status: NoteFeedStatus) {
   return render(<LoveNotes />);
 }
 
-/**
- * Wait until the mount effect's name lookups have answered and their state is
- * applied. The fallbacks equal LoveNotes' initial state, so a fallback asserted
- * any earlier passes before the behaviour has run. The own-name branch
- * (`getOwnDisplayName` with `getUser`) settles first; `getPartnerDisplayName`
- * is asked only when both of those fulfilled, so a rejected own-name read
- * settles the effect without it rather than timing out on the partner lookup.
- */
-async function settleNameLookups(): Promise<void> {
-  const settle = (lookups: Array<{ mock: { results: Array<{ value: unknown }> } }>) =>
-    act(async () =>
-      Promise.allSettled(
-        lookups.flatMap((lookup) => lookup.mock.results.map((result) => result.value))
-      )
-    );
-
-  await waitFor(() => {
-    expect(api.getOwnDisplayName).toHaveBeenCalled();
-    expect(api.getUser).toHaveBeenCalled();
-  });
-  const ownName = await settle([api.getOwnDisplayName, api.getUser]);
-  if (ownName.some((result) => result.status === 'rejected')) return;
-
-  await waitFor(() => expect(api.getPartnerDisplayName).toHaveBeenCalled());
-  await settle([api.getPartnerDisplayName]);
-}
-
 describe('LoveNotes realtime notice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -137,7 +111,7 @@ describe('LoveNotes realtime notice', () => {
 
     it.each(['connecting', 'idle'] as const)('shows the name alone for %s', async (status) => {
       await renderWith(status);
-      await settleNameLookups();
+      await settleNameLookups(api);
 
       const row = screen.getByTestId(ROW);
       expect(row).toHaveTextContent(/^PPartner$/);
@@ -163,7 +137,7 @@ describe('LoveNotes realtime notice', () => {
 
     it('falls back to "Partner" and a "P" initial when the name is unknown', async () => {
       await renderWith('connected');
-      await settleNameLookups();
+      await settleNameLookups(api);
 
       const row = screen.getByTestId(ROW);
       const name = within(row).getByTestId('notes-partner-name');

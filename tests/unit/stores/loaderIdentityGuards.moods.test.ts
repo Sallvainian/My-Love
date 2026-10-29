@@ -160,6 +160,7 @@ import {
   A,
   deferred,
   resetStoreSignedInAsA,
+  serializedStore,
   storageQuota,
   switchToUserC,
 } from './loaderIdentityGuardsFixture';
@@ -211,7 +212,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().moods).toEqual([]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-OWN-MOOD-NOTE');
+      expect(serializedStore()).not.toContain('A-OWN-MOOD-NOTE');
     });
   });
 
@@ -239,7 +240,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().partnerMoods).toEqual([]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('PARTNERS-PRIVATE-NOTE');
+      expect(serializedStore()).not.toContain('PARTNERS-PRIVATE-NOTE');
     });
   });
 

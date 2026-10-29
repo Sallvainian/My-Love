@@ -9,8 +9,9 @@
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Dispatch, HTMLAttributes, ReactNode, SetStateAction } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stateSetterCalls } from '../../../../tests/support/react-state-spy';
 import { IMAGE_STORAGE } from '../../../config/images';
 import type { LoveNote } from '../../../types/models';
 import { formatFullTimestamp } from '../../../utils/dateUtils';
@@ -18,24 +19,9 @@ import { LoveNoteMessage } from '../LoveNoteMessage';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
-const stateSetterCalls = vi.hoisted(() => vi.fn<(next: unknown) => void>());
-
-vi.mock('react', async () => {
-  const actual = await vi.importActual<typeof import('react')>('react');
-  return {
-    ...actual,
-    // React 19 silently ignores unmounted updates. Observe the dispatch itself,
-    // forwarding to real state and preserving setter identity across renders.
-    useState<T,>(initial: T | (() => T)) {
-      const [value, setValue] = actual.useState(initial);
-      const observedSetter = actual.useCallback<Dispatch<SetStateAction<T>>>((next) => {
-        stateSetterCalls(next);
-        setValue(next);
-      }, [setValue]);
-      return [value, observedSetter];
-    },
-  };
-});
+vi.mock('react', async () =>
+  (await import('../../../../tests/support/react-state-spy')).reactWithStateSpy()
+);
 
 interface FullScreenImageViewerMockProps {
   imageUrl: string | null | undefined;

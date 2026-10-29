@@ -16,6 +16,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { create, type StateCreator } from 'zustand';
+import { CHECK_VIOLATION_CODE, NOT_NULL_VIOLATION } from '../../support/sqlstate';
 
 interface FakeRow {
   id: string;
@@ -29,9 +30,6 @@ interface FakeRow {
 
 const PARTNER_ID = '00000000-0000-4000-8000-0000000000b0';
 const USER_ID = '00000000-0000-4000-8000-0000000000a0';
-
-/** Postgres SQLSTATE not_null_violation: a write failure that is not a CHECK violation. */
-const NOT_NULL_VIOLATION = '23502';
 
 /** Rows the "server" holds, plus a switch to drop the next response */
 const backend = {
@@ -226,7 +224,7 @@ describe('notesSlice send idempotency', () => {
   });
 
   const friendly = 'Some values are not allowed - check length and format limits';
-  const checkError = { code: '23514', message: 'new row violates love_notes constraint', details: 'raw table', hint: '' };
+  const checkError = { code: CHECK_VIOLATION_CODE, message: 'new row violates love_notes constraint', details: 'raw table', hint: '' };
 
   /** Sends a note with `image` whose row the server refuses with CHECK; returns the failed note. */
   async function failCheckSend(

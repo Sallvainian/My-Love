@@ -15,6 +15,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { createOutsiderClient, deleteOutsider } from '../../support/helpers/rls-security';
+import { readStore } from '../../support/helpers/indexed-db';
 import type { Cleanup } from '../../support/fixtures/cleanup';
 
 // `.env.test` points the dev server at http://127.0.0.1:54321, and the SDK
@@ -84,39 +85,16 @@ async function storedSessionKeys(page: Page): Promise<string[]> {
 
 /**
  * The user id bound into the Background Sync record the service worker reads.
- * Opened without a version so this read never triggers an upgrade; a database
- * or store that does not exist yet simply has no record.
+ * A database or store that does not exist yet simply has no record.
  */
 async function backgroundSyncUserId(page: Page, dbName: string, store: string) {
-  return await page.evaluate(
-    ([name, storeName]) =>
-      new Promise<string | null>((resolve, reject) => {
-        const request = window.indexedDB.open(name);
-        request.onerror = () => reject(request.error);
-        // Without this the promise never settles when another connection holds a
-        // pending versionchange, and the test hangs to its own timeout instead.
-        request.onblocked = () => resolve(null);
-        request.onsuccess = () => {
-          const db = request.result;
-          if (!db.objectStoreNames.contains(storeName)) {
-            db.close();
-            resolve(null);
-            return;
-          }
-          const read = db.transaction(storeName, 'readonly').objectStore(storeName).get('current');
-          read.onerror = () => {
-            db.close();
-            reject(read.error);
-          };
-          read.onsuccess = () => {
-            const token = read.result as { userId?: string } | undefined;
-            db.close();
-            resolve(token?.userId ?? null);
-          };
-        };
-      }),
-    [dbName, store] as const
+  const token = await readStore<{ userId?: string }>(
+    page,
+    store,
+    { op: 'get', key: 'current' },
+    dbName
   );
+  return token?.userId ?? null;
 }
 
 test.describe('Foreign implicit fragment — signed out', () => {

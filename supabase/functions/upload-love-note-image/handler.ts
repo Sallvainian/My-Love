@@ -11,7 +11,7 @@
  * for the unused multipart branch) and only then compared the resulting length
  * against `CONFIG.MAX_FILE_SIZE_BYTES`. Any authenticated caller could therefore
  * make the worker materialise an arbitrarily large body in memory before it was
- * rejected — the rate limiter bounds the *number* of such requests per isolate,
+ * rejected — the rate limiter bounds the *number* of such requests per user,
  * not the size of any one of them (CAP-10 / F10).
  *
  * The order here is: declared length first, then a counted stream.
@@ -58,6 +58,19 @@
  * The rate-limit-before-body ordering predates this change and is unchanged by
  * it; the limiter is out of contract here, and bounding retained memory (which
  * this path already does, since it retains nothing) is what this module is for.
+ *
+ * ## Why the limiter is a database call
+ *
+ * The count used to live in a module-level `Map`, and every edge-runtime
+ * isolate has its own copy of module state, so once one user's requests spread
+ * across isolates each counted separately and the limit was not enforced
+ * (DW-322). It is now `public.claim_love_note_upload()`
+ * (`supabase/migrations/20261029000000_love_note_upload_counts.sql`), called
+ * with the caller's JWT, which counts the upload in one shared row per user
+ * and answers `allowed` and `remaining`. If that call fails, or answers
+ * anything but a boolean `allowed` and a numeric `remaining`, the upload is
+ * refused with 500 before the body is read: there is no in-memory fallback,
+ * because a fallback is the per-isolate count this replaced.
  */
 
 /** Configuration — `MAX_DISCARD_BYTES` aside, unchanged from before the split. */
@@ -72,6 +85,12 @@ export const CONFIG = {
    * clean answer.
    */
   MAX_DISCARD_BYTES: 25 * 1024 * 1024,
+  /**
+   * Mirrors of the limit and window hard-coded in `claim_love_note_upload()`
+   * (`supabase/migrations/20261029000000_love_note_upload_counts.sql`), which
+   * is what enforces them. Kept here for `Retry-After` and the tests; changing
+   * either value here changes nothing about what is admitted.
+   */
   RATE_LIMIT_MAX_UPLOADS: 10,
   RATE_LIMIT_WINDOW_MS: 60 * 1000, // 1 minute
   BUCKET_NAME: 'love-notes-images',
@@ -103,16 +122,17 @@ export interface UploadSupabaseClient {
   storage: {
     from(bucket: string): UploadStorageBucket;
   };
+  /** Counts this upload against the caller's shared per-user limit. */
+  rpc(fn: 'claim_love_note_upload'): PromiseLike<{
+    data: Array<{ allowed: boolean; remaining: number }> | null;
+    error: { message: string } | null;
+  }>;
 }
 
 export interface UploadDeps {
   /** Build a Supabase client that speaks as the caller's JWT. */
   createClient(authHeader: string): UploadSupabaseClient;
 }
-
-// In-memory rate limit store (resets on cold start, acceptable for this use case)
-// For production at scale, use Redis or database
-const rateLimitStore = new Map<string, number[]>();
 
 /** A canonical non-negative integer. Rejects `-1`, `1.5`, `abc`, `+5`, `0x10`, ``. */
 const CONTENT_LENGTH_PATTERN = /^\d+$/;
@@ -160,28 +180,37 @@ export function detectMimeType(buffer: Uint8Array): string | null {
 }
 
 /**
- * Check rate limit for user
- * Returns true if within limit, false if exceeded
+ * Count this upload against the caller's shared limit.
+ *
+ * `null` means the check itself failed — an error, a rejected call, or a reply
+ * without a boolean `allowed` and a numeric `remaining` — and the caller must
+ * refuse the upload: the limiter fails closed.
  */
-export function checkRateLimit(userId: string): { allowed: boolean; remaining: number } {
-  const now = Date.now();
-  const timestamps = rateLimitStore.get(userId) || [];
-
-  // Filter to only timestamps within the window
-  const recentTimestamps = timestamps.filter((ts) => now - ts < CONFIG.RATE_LIMIT_WINDOW_MS);
-
-  if (recentTimestamps.length >= CONFIG.RATE_LIMIT_MAX_UPLOADS) {
-    return { allowed: false, remaining: 0 };
+async function claimUpload(
+  supabase: UploadSupabaseClient
+): Promise<{ allowed: boolean; remaining: number } | null> {
+  try {
+    const { data, error } = await supabase.rpc('claim_love_note_upload');
+    if (error) {
+      console.error('Rate limit check failed:', error.message);
+      return null;
+    }
+    const row: unknown = Array.isArray(data) ? data[0] : undefined;
+    if (
+      typeof row !== 'object' ||
+      row === null ||
+      typeof (row as { allowed?: unknown }).allowed !== 'boolean' ||
+      typeof (row as { remaining?: unknown }).remaining !== 'number'
+    ) {
+      console.error('Rate limit check failed: unexpected reply', JSON.stringify(data));
+      return null;
+    }
+    const { allowed, remaining } = row as { allowed: boolean; remaining: number };
+    return { allowed, remaining };
+  } catch (rpcError) {
+    console.error('Rate limit check failed:', rpcError);
+    return null;
   }
-
-  // Add current timestamp and update store
-  recentTimestamps.push(now);
-  rateLimitStore.set(userId, recentTimestamps);
-
-  return {
-    allowed: true,
-    remaining: CONFIG.RATE_LIMIT_MAX_UPLOADS - recentTimestamps.length,
-  };
 }
 
 /**
@@ -369,8 +398,11 @@ export async function handleUpload(req: Request, deps: UploadDeps): Promise<Resp
       return json({ error: 'Unauthorized' }, 401);
     }
 
-    // Check rate limit
-    const rateLimit = checkRateLimit(user.id);
+    // Check rate limit — shared across isolates, see the module header
+    const rateLimit = await claimUpload(supabase);
+    if (!rateLimit) {
+      return json({ error: 'Rate limit check failed' }, 500);
+    }
     if (!rateLimit.allowed) {
       return json(
         {

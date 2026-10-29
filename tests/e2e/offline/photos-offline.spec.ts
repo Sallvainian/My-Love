@@ -27,6 +27,7 @@ import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { imageCached } from '../../support/helpers/indexed-db';
 import { PHOTOS_LIST_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
@@ -50,35 +51,6 @@ interface SeededPhoto {
   id: string;
   path: string;
   caption: string;
-}
-
-/** Whether the signed-in account's image cache holds a Blob for `path`. */
-async function imageCached(page: Page, path: string): Promise<boolean> {
-  return page.evaluate(async (wanted) => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return false;
-    return new Promise<boolean>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve(false);
-      open.onsuccess = () => {
-        const db = open.result;
-        if (!db.objectStoreNames.contains('image-cache')) {
-          db.close();
-          resolve(false);
-          return;
-        }
-        const get = db.transaction('image-cache').objectStore('image-cache').get([userId, wanted]);
-        get.onsuccess = () => {
-          db.close();
-          resolve(get.result?.blob instanceof Blob && get.result.blob.size > 0);
-        };
-        get.onerror = () => {
-          db.close();
-          resolve(false);
-        };
-      };
-    });
-  }, path);
 }
 
 /** Ids in the signed-in account's saved `photos` copy, or `null`. */

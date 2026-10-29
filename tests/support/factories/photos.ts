@@ -1,3 +1,4 @@
+import type { PhotoWithUrls, SupabasePhoto } from '../../../src/services/photoService';
 import type { Database } from '../../../src/types/database.types';
 
 type PhotoInsert = Database['public']['Tables']['photos']['Insert'];
@@ -21,4 +22,33 @@ export function createPhotoInsert(input: PhotoInsertInput): PhotoInsert {
     height: 2,
     ...input,
   };
+}
+
+/** What a whole photos row must name; everything else has a default. */
+export type PhotoRowInput = Pick<
+  SupabasePhoto,
+  'id' | 'user_id' | 'storage_path' | 'caption' | 'mime_type' | 'created_at'
+> &
+  Partial<SupabasePhoto>;
+
+/**
+ * The `file_size` of a row that names none. The gallery never reads
+ * `file_size`, so the value carries no meaning beyond being a byte count; 68
+ * is simply the number the component tests each pasted before this existed.
+ */
+export const DEFAULT_PHOTO_FILE_SIZE = 68;
+
+/**
+ * A whole photos row as the gallery's read returns it, built on
+ * `createPhotoInsert` and checked against `SupabasePhoto`, for a unit test that
+ * fakes that read.
+ */
+export function createPhotoRow(input: PhotoRowInput): SupabasePhoto {
+  const row = { ...input, file_size: input.file_size ?? DEFAULT_PHOTO_FILE_SIZE };
+  return { ...createPhotoInsert(row), ...row };
+}
+
+/** A photos row as the gallery holds it: `createPhotoRow` plus the two client fields. */
+export function createPhotoWithUrls(input: PhotoRowInput, isOwn = true): PhotoWithUrls {
+  return { ...createPhotoRow(input), signedUrl: null, isOwn };
 }

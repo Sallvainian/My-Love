@@ -2694,7 +2694,9 @@ location: see reason
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: (1) Three photo-row builder patterns: six src files spread createPhotoInsert with an unexplained file_size: 68, photosSlice.localCopy.test.ts casts as SupabasePhoto, loaderIdentityGuards.photos uses a third. (2) Four copies of the hoisted vi.mock('react') useState observer (EventsSettings.pagination, EventsSettings.lifetime, PokeKissInterface, LoveNoteMessage). (3) SQLSTATE constants declared per file (CHECK_VIOLATION_CODE, NOT_NULL_VIOLATION, INSUFFICIENT_PRIVILEGE, CONNECTION_FAILURE), with '23514' and '08006' still literal in places. (4) loadFailure() adopted in three EventsSettings files; five siblings build { status: 'failure', error } by hand. (5) settleNameLookups pasted into OwnDisplayName.test.tsx and LoveNotes.realtimeStatus.test.tsx. (6) dbSchema.v15MessageData.test.ts hard-codes the store list storageSchema.test.ts holds as ALL_STORES. (7) Ten hand-rolled IndexedDB opens across nine e2e specs read stores savedLocalCopy cannot; logout.spec.ts:28, love-notes-offline-send.spec.ts:52 and photos-offline.spec.ts:61 skip the indexedDB.databases() guard. (8) stalePersistedMood() still defaults anchor to new Date() (tests/support/helpers/persisted-blob.ts:180), relied on by persisted-events-strip.spec.ts:214. Fix as one story: shared photo-row factories, a react-state-spy module, a SQLSTATE constants module, loadFailure everywhere, a love-notes test kit, one ALL_STORES, a guarded generic IndexedDB store reader, and a required anchor.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-shared-test-fixture-consolidation
+resolution-undo: 22822117b68bd746577b22173040aca409577ba4671f1daaa8fc98c208919c3b 2026-10-29 7374617475733a206f70656e
 
 ### DW-314: No audit checks that a full e2e run leaves behind no rows it created.
 origin: epic-test-review-remediation retrospective 2026-10-29 (S4, A8)
@@ -2751,7 +2753,9 @@ location: src/sw-db.ts:97 (markMoodSynced); src/stores/slices/authSlice.ts (dele
 source_spec: `plan-dw-synced-moods-signout-delete.md`
 severity: low
 reason: sw-db.ts markMoodSynced has no session check, and discardAccountState clears the my-love-account-owner marker on sign-out, so when another account signs in next, nothing deletes the row. Reads stay scoped by userId, so the row is never shown to that account. The intent accepted "the row is left for the next deletion"; recording it so a sweep sees it.
-status: open
+status: done 2026-10-29
+resolution: closed by human decision: Accepted residual: the row is never read by another account and is deleted at its owner's next sign-out on the device.
+decision: 2026-10-29 Close: accept the residual row as the approved intent did — Accepted residual: the row is never read by another account and is deleted at its owner's next sign-out on the device.
 
 ### DW-320: The same JSON.stringify(state) leak check, blind to Error/Map/Set, is used outside the events file.
 origin: spec-deferred b8c7828c1182
@@ -2768,7 +2772,9 @@ location: tests/unit/stores/loaderIdentityGuards.customMessages.test.ts:284
 source_spec: `plan-dw-store-service-test-determinism.md`
 severity: low
 reason: These are blind to an Error, Map or Set, as DW-306 was. Found with `grep -rn "JSON.stringify(" tests/unit` on 2026-10-29. On useAppStore, so they can adopt serializedStore() from loaderIdentityGuardsFixture.ts: - loaderIdentityGuards.moods.test.ts:214,242 - loaderIdentityGuards.partner.test.ts:225,251,322,395 - loaderIdentityGuards.customMessages.test.ts:284,326,395 - loaderIdentityGuards.notes.test.ts:232,271 - loaderIdentityGuards.photos.test.ts:277,341,472 - loaderIdentityGuards.messages.test.ts:251,559 - signOutClearsAccountState.test.ts:340,479,555,563,646 On a local store or a slice of state, so they need the replacer to take a value: - interactionsSubscription.test.ts:634,656 - notesSlice.localCopy.test.ts:517 - partnerSlice.localCopy.test.ts:213 - notesSlice.sessionGuard.test.ts:216 - settingsSlice.initializeApp.test.ts:307,392,447,470 - notesSlice.localCopyWrites.test.ts:174
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-leak-check-serialized-store
+resolution-undo: 80c135a45c09b0270df5e1f44af4223ebd5ce9cde626d4c69b7c9b5915e434ba 2026-10-29 7374617475733a206f70656e
 
 ### DW-322: upload-love-note-image's 10-per-minute-per-user rate limit is kept in isolate memory, so it is not enforced once one user's requests spread across isolates.
 origin: spec-deferred cdcdf5b24fcb
@@ -2776,5 +2782,7 @@ location: supabase/functions/upload-love-note-image/handler.ts:113-115
 source_spec: `plan-dw-e2e-assertion-precision.md`
 severity: medium
 reason: rateLimitStore is a module-level Map; two consecutive uploads over the wire failed a decrement assertion 9 of 9 serial runs locally (edge-runtime 1.77.8, policy = "per_worker"). Whether hosted functions spread one user's requests the same way is UNVERIFIED. Fix needs an owner decision on a shared store (DB table or RPC).
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-love-note-upload-shared-rate-limit
+resolution-undo: 45d6f6c51380300a04d0a207ec090ed080e768bd967ac55b5520acba78842457 2026-10-29 7374617475733a206f70656e
 decision: 2026-10-29 build: shared database counter — keep each user's upload count in a database table, checked and incremented atomically by one RPC the function calls, so every isolate enforces the same 10-per-minute limit.

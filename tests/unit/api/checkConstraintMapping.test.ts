@@ -51,6 +51,7 @@ import {
   checkViolation,
   type PostgrestErrorEnvelope,
 } from '../../support/check-constraint-envelopes';
+import { CHECK_VIOLATION_CODE } from '../../support/sqlstate';
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
@@ -203,7 +204,7 @@ const ADOPTERS = [
     envelope: AUTHENTICATED_INTERACTIONS_TYPE_CHECK,
     wrapped: false,
     outerName: 'SupabaseServiceError',
-    outerCode: '23514',
+    outerCode: CHECK_VIOLATION_CODE,
     write: () => interactionService.sendPoke(USER_ID),
   },
   {
@@ -213,7 +214,7 @@ const ADOPTERS = [
     envelope: AUTHENTICATED_MOODS_NOTE_CHECK,
     wrapped: false,
     outerName: 'SupabaseServiceError',
-    outerCode: '23514',
+    outerCode: CHECK_VIOLATION_CODE,
     write: () => moodApi.create(moodInsert()),
   },
 ] as const;
@@ -302,7 +303,7 @@ describe('a 23514 reaching the caller that issued the write', () => {
         'wrapped adopters reject with an outer error carrying the mapped error as cause; direct adopters reject with the mapped error itself'
       ).toBe(!wrapped);
 
-      expect(mappedError.code).toBe('23514');
+      expect(mappedError.code).toBe(CHECK_VIOLATION_CODE);
       // Both null on the wire for an authenticated caller, and both must
       // arrive that way rather than as '' — an empty string would read as
       // "the server sent nothing here", which is a different claim.

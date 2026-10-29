@@ -36,6 +36,9 @@ const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 /** Mirrors `CONFIG.RATE_LIMIT_MAX_UPLOADS` in the function. */
 const RATE_LIMIT_MAX_UPLOADS = 10;
 
+/** Mirrors `CONFIG.RATE_LIMIT_WINDOW_MS / 1000` in the function. */
+const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
+
 /** The function's JSON answer: the stored object on success, `error` on a refusal. */
 type UploadReply = { storagePath?: string; size?: number; error?: string; maxSize?: number };
 
@@ -90,6 +93,21 @@ async function removeObjects(
   if (error) throw new Error(`Failed to clean up ${paths.join(', ')}`, { cause: error });
 }
 
+/**
+ * Teardown and setup for the shared rate limit: delete this account's own row
+ * in `love_note_upload_counts`, so its next upload opens a fresh window.
+ */
+async function resetUploadCount(
+  supabaseAdmin: TypedSupabaseClient,
+  userId: string
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('love_note_upload_counts')
+    .delete()
+    .eq('user_id', userId);
+  if (error) throw new Error(`Failed to reset the upload count of ${userId}`, { cause: error });
+}
+
 test.describe('Love note image upload limits', () => {
   test('[P0] a supported octet-stream upload is accepted under the uploader prefix', async ({
     request,
@@ -125,12 +143,11 @@ test.describe('Love note image upload limits', () => {
       body.storagePath.startsWith(`${userId}/`),
       `storagePath ${body.storagePath} must be under the uploader's own prefix`
     ).toBe(true);
-    // The count is kept per edge-runtime isolate (a module-level Map in
-    // handler.ts), and consecutive requests can reach different isolates, so
-    // no wire test can predict the value or assert that it falls by one; the
-    // decrement is pinned in handler.test.ts. An accepted upload has used one
-    // slot of its isolate's window, so the header is a whole number below the
-    // limit, and it reports the same count as the body.
+    // This account's other uploads in the last minute share the count, so the
+    // exact value is not predictable here; the case that resets the count and
+    // asserts 9..0 in order is "ten uploads share one count" below. An
+    // accepted upload has used one slot of the window, so the header is a
+    // whole number below the limit, and it reports the same count as the body.
     const remaining = response.headers()['x-ratelimit-remaining'];
     expect(remaining).toMatch(/^\d+$/);
     expect(Number(remaining)).toBeLessThan(RATE_LIMIT_MAX_UPLOADS);
@@ -139,6 +156,69 @@ test.describe('Love note image upload limits', () => {
     const after = await listOwnPrefix(supabaseAdmin, userId);
     expect(after.length, 'exactly one object was written').toBe(before.length + 1);
     expect(after).toContain(body.storagePath.slice(`${userId}/`.length));
+  });
+
+  /**
+   * DW-322: the count used to be a module-level Map per edge-runtime isolate,
+   * so under `policy = "per_worker"` requests that reached different isolates
+   * were counted apart. Ten back-to-back uploads must read 9..0 in order and
+   * the eleventh must be refused, whichever isolates serve them — which only
+   * holds if every isolate reads the one database row.
+   */
+  test('[P0] ten uploads share one count across isolates and the eleventh is refused', async ({
+    request,
+    authToken,
+    supabaseAdmin,
+    cleanup,
+  }) => {
+    const { userId } = await resolveOwnPair(supabaseAdmin);
+    await resetUploadCount(supabaseAdmin, userId);
+    const before = await listOwnPrefix(supabaseAdmin, userId);
+    const created: string[] = [];
+    cleanup.defer('remove the uploaded objects and reset the upload count', async () => {
+      await removeObjects(supabaseAdmin, created);
+      await resetUploadCount(supabaseAdmin, userId);
+    });
+
+    const upload = () =>
+      // playwright-utils deviation: apiRequest returns no response headers, and this case asserts x-ratelimit-remaining and retry-after.
+      request.post(FUNCTION_PATH, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/octet-stream',
+        },
+        data: pngBody(1024),
+      });
+
+    const remainingSeen: string[] = [];
+    for (let attempt = 0; attempt < RATE_LIMIT_MAX_UPLOADS; attempt++) {
+      const response = await upload();
+      const body = await response.json();
+      // Recorded for cleanup before any assertion can throw.
+      if (body.storagePath) created.push(body.storagePath);
+
+      expect(response.status(), `upload ${attempt + 1} is under the limit`).toBe(200);
+      remainingSeen.push(response.headers()['x-ratelimit-remaining']);
+    }
+
+    expect(remainingSeen, 'one shared count falls by exactly one per upload').toEqual(
+      Array.from({ length: RATE_LIMIT_MAX_UPLOADS }, (_, index) =>
+        String(RATE_LIMIT_MAX_UPLOADS - 1 - index)
+      )
+    );
+
+    const refused = await upload();
+    const refusedBody = await refused.json();
+    if (refusedBody.storagePath) created.push(refusedBody.storagePath);
+
+    expect(refused.status(), 'the eleventh upload in the window is refused').toBe(429);
+    expect(refused.headers()['retry-after']).toBe(String(RATE_LIMIT_RETRY_AFTER_SECONDS));
+    expect(refusedBody.error).toBe('Rate limit exceeded');
+
+    const after = await listOwnPrefix(supabaseAdmin, userId);
+    expect(after.length, 'exactly the ten accepted uploads were written').toBe(
+      before.length + RATE_LIMIT_MAX_UPLOADS
+    );
   });
 
   test('[P0] a body at exactly the cap is accepted', async ({

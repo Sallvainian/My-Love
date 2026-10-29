@@ -46,8 +46,8 @@ import { getUserAccessToken } from '../support/helpers/supabase';
 import type { TypedSupabaseClient } from '../support/factories';
 import { createCheckWritePayload } from '../support/factories/check-write-payloads';
 import { createInteractionInsert } from '../support/factories/interaction-record-ownership';
+import { CHECK_VIOLATION_CODE } from '../support/sqlstate';
 import {
-  CHECK_VIOLATION_CODE,
   CHECK_VIOLATION_HTTP_STATUS,
   CHECK_VIOLATION_MESSAGE,
   LEAK_MARKERS,

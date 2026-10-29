@@ -165,6 +165,7 @@ import {
   A,
   deferred,
   resetStoreSignedInAsA,
+  serializedStore,
   storageQuota,
   switchToUserC,
 } from './loaderIdentityGuardsFixture';
@@ -229,7 +230,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().notes).toEqual([note('c1', 'C-OWN-CHAT-BODY')]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CHAT-BODY');
+      expect(serializedStore()).not.toContain('A-PRIVATE-CHAT-BODY');
     });
 
     it('still releases the spinner when it discards', async () => {
@@ -268,7 +269,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().notes).toEqual([note('c1', 'C-OWN-CHAT-BODY')]);
-      const remaining = JSON.stringify(useAppStore.getState());
+      const remaining = serializedStore();
       expect(remaining, 'the fetched page came back').not.toContain('A-OLDER-CHAT-BODY');
       expect(remaining, 'the pre-switch conversation came back').not.toContain(
         'A-ONSCREEN-CHAT-BODY'

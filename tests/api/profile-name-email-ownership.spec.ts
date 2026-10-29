@@ -31,10 +31,10 @@
 import { log } from '@seontechnologies/playwright-utils';
 import { createOutsiderClient, deleteOutsider } from '../support/helpers/rls-security';
 import { test, expect } from '../support/merged-fixtures';
+import { INSUFFICIENT_PRIVILEGE } from '../support/sqlstate';
 
 /** PostgREST maps SQLSTATE 42501 -- RLS denial and privilege denial alike -- to 403. */
 const DENIED_HTTP_STATUS = 403;
-const DENIED_CODE = '42501';
 
 type ErrorEnvelope = { code?: string; message?: string };
 type ProfileRow = { display_name: string | null; email: string | null };
@@ -101,7 +101,7 @@ test.describe('Profile name and email ownership', () => {
     await log.step('The owner cannot rewrite its own email mirror');
     const refusedEmail = await patch({ email: 'hijacked@evil.example' });
     expect(refusedEmail.status).toBe(DENIED_HTTP_STATUS);
-    expect(refusedEmail.body.code).toBe(DENIED_CODE);
+    expect(refusedEmail.body.code).toBe(INSUFFICIENT_PRIVILEGE);
 
     const afterEmail = await readBack();
     expect(
@@ -118,7 +118,7 @@ test.describe('Profile name and email ownership', () => {
       email: 'hijacked@evil.example',
     });
     expect(refusedBoth.status).toBe(DENIED_HTTP_STATUS);
-    expect(refusedBoth.body.code).toBe(DENIED_CODE);
+    expect(refusedBoth.body.code).toBe(INSUFFICIENT_PRIVILEGE);
 
     const afterBoth = await readBack();
     expect(

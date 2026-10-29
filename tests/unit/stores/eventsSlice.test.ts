@@ -50,10 +50,9 @@ import type {
   EventWriteErrorCode,
 } from '../../../src/services/eventsService';
 import { createEventsSlice, type EventsSlice } from '../../../src/stores/slices/eventsSlice';
+import { INSUFFICIENT_PRIVILEGE } from '../../support/sqlstate';
 
 const USER_ID = 'USER-A-ID';
-/** SQLSTATE 42501 (insufficient_privilege): an RLS refusal, which events report as `transport`. */
-const INSUFFICIENT_PRIVILEGE = '42501';
 
 type TestStore = EventsSlice & { userId: string | null; authSessionVersion: number };
 

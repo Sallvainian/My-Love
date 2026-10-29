@@ -67,6 +67,7 @@ import {
   type InteractionsSlice,
 } from '../../../src/stores/slices/interactionsSlice';
 import type { AppState, AppStateCreator } from '../../../src/stores/types';
+import { serialized } from './serializedState';
 
 const USER_ID = 'USER-A-ID';
 const OTHER_USER_ID = 'USER-B-ID';
@@ -631,7 +632,7 @@ describe('interactionsSlice subscription bridge', () => {
     // The caller still learns the true outcome; the next account's feed does not.
     await expect(pending).resolves.toBe(record);
     expect(store.getState().interactions).toEqual([]);
-    expect(JSON.stringify(store.getState())).not.toContain('late-poke');
+    expect(serialized(store.getState())).not.toContain('late-poke');
   });
 
   it('keeps a late KISS out of the new account feed too', async () => {
@@ -653,7 +654,7 @@ describe('interactionsSlice subscription bridge', () => {
 
     await expect(pending).resolves.toBe(record);
     expect(store.getState().interactions).toEqual([]);
-    expect(JSON.stringify(store.getState())).not.toContain('late-kiss');
+    expect(serialized(store.getState())).not.toContain('late-kiss');
   });
 
   it('refuses the snapshot when the SAME account signs out and back in mid-lookup', async () => {

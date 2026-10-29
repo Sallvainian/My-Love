@@ -1,11 +1,22 @@
 /**
- * Shared fixtures for the dbSchema unit tests (`dbSchema.*.test.ts`): the
- * database reset, the legacy row shapes the upgrade seeds write, and a hang
- * guard for opens that must settle.
+ * Shared fixtures for the dbSchema unit tests (`dbSchema.*.test.ts`,
+ * `storageSchema.test.ts`): the current store list, the database reset, the
+ * legacy row shapes the upgrade seeds write, and a hang guard for opens that
+ * must settle.
  *
  * @see src/services/dbSchema.ts
  */
 import { DB_NAME } from '../../../src/services/dbSchema';
+
+/** Every object store the current `DB_VERSION` holds, in creation order. */
+export const ALL_STORES = [
+  'messages',
+  'moods',
+  'sw-auth',
+  'local-copies',
+  'image-cache',
+  'note-queue',
+] as const;
 
 /**
  * Delete the database and wait for it — deleteDatabase is a request, not a call.

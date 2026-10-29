@@ -26,7 +26,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(20);
+select plan(21);
 
 create or replace function tests.create_test_user(test_email text default 'test@example.com')
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -111,7 +111,7 @@ select is(
       and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
       and has_function_privilege('authenticated', p.oid, 'EXECUTE')
   ),
-  'accept_partner_request, decline_partner_request, find_partner_by_email, get_my_partner_id, get_my_pending_partner_requests',
+  'accept_partner_request, claim_love_note_upload, decline_partner_request, find_partner_by_email, get_my_partner_id, get_my_pending_partner_requests',
   'FN-GRANT-008: authenticated holds EXECUTE on exactly the app RPCs'
 );
 
@@ -144,6 +144,13 @@ select ok(
 select ok(
   has_function_privilege('authenticated', 'public.get_my_pending_partner_requests()', 'EXECUTE'),
   'FN-GRANT-011: get_my_pending_partner_requests is executable by authenticated'
+);
+
+-- 20261029000000, same shape: upload-love-note-image's rate limit rides on it,
+-- called with the uploader's JWT, so without it every upload answers 500.
+select ok(
+  has_function_privilege('authenticated', 'public.claim_love_note_upload()', 'EXECUTE'),
+  'FN-GRANT-012: claim_love_note_upload is executable by authenticated'
 );
 
 -- ============================================

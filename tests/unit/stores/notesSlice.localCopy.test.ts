@@ -64,6 +64,7 @@ import {
   readsHeld,
   goOffline,
 } from './notesSliceCopyFixture';
+import { serialized } from './serializedState';
 
 /** A note held on this device under its `tempId`, not yet confirmed by the server. */
 function pendingNote(tempId: string, overrides: Partial<LoveNote> = {}): LoveNote {
@@ -514,7 +515,7 @@ describe('notesSlice love-notes local copy', () => {
       copyRead.resolve([row('1', { content: 'A-PRIVATE' })]);
       await inFlight;
 
-      expect(JSON.stringify(store.getState())).not.toContain('A-PRIVATE');
+      expect(serialized(store.getState())).not.toContain('A-PRIVATE');
       expect(writeLocalCopy).not.toHaveBeenCalled();
     });
 

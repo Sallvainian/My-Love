@@ -29,6 +29,7 @@ import {
 } from '../../../src/services/localCopy';
 import { PARTNER_COPY_KIND } from '../../../src/stores/slices/partnerSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
+import { serialized } from './serializedState';
 
 const A = 'USER-A-ID';
 const B = 'USER-B-ID';
@@ -210,7 +211,7 @@ describe('partner profile on the local copy', () => {
     await state().loadPartner();
 
     expect(state().partner).toBeNull();
-    expect(JSON.stringify(state())).not.toContain('SAVED-NAME');
+    expect(serialized(state())).not.toContain('SAVED-NAME');
     await vi.waitFor(async () => {
       expect(await readLocalCopy(A, PARTNER_COPY_KIND)).toBeNull();
     });

@@ -54,6 +54,8 @@ import { serializeAccountDataWrite } from '../../../src/services/accountDataQueu
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { listQueuedNotes } from '../../../src/services/noteQueue';
 import { useAppStore } from '../../../src/stores/useAppStore';
+import { CHECK_VIOLATION_CODE } from '../../support/sqlstate';
+import { serialized } from './serializedState';
 
 const A = 'USER-A-ID';
 const PARTNER = 'USER-B-ID';
@@ -213,7 +215,7 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     await inFlight;
     await useAppStore.getState().drainQueuedNotes();
 
-    expect(JSON.stringify(useAppStore.getState().notes)).not.toContain('STALE-DRAFT');
+    expect(serialized(useAppStore.getState().notes)).not.toContain('STALE-DRAFT');
     expect(await listQueuedNotes(A)).toEqual([]);
     expect(loveNotesQuery).not.toHaveBeenCalled();
   });
@@ -229,7 +231,7 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
 
     pending.settle({
       data: null,
-      error: { code: '23514', message: 'check violation', details: '', hint: '' },
+      error: { code: CHECK_VIOLATION_CODE, message: 'check violation', details: '', hint: '' },
     });
     await useAppStore.getState().drainQueuedNotes();
 

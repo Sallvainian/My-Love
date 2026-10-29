@@ -170,10 +170,11 @@ import {
   C,
   deferred,
   resetStoreSignedInAsA,
+  serializedStore,
   storageQuota,
   switchToUserC,
 } from './loaderIdentityGuardsFixture';
-import { createPhotoInsert } from '../../support/factories/photos';
+import { createPhotoRow, createPhotoWithUrls } from '../../support/factories/photos';
 
 /** The minimum a PhotoUploadInput needs; nothing here reaches a real service. */
 function uploadInput(): PhotoUploadInput {
@@ -186,43 +187,30 @@ function uploadInput(): PhotoUploadInput {
   };
 }
 
-/** The fields a photos row needs that the insert type leaves optional or unset. */
-type PhotoRowFields = Pick<
-  SupabasePhoto,
-  'id' | 'user_id' | 'storage_path' | 'caption' | 'mime_type' | 'created_at'
->;
-
-/**
- * A whole photos row as the gallery's read returns it, built on the shared
- * factory and checked against `SupabasePhoto`.
- */
-function photoRow(fields: PhotoRowFields): SupabasePhoto {
-  return { ...createPhotoInsert({ ...fields, file_size: 1 }), ...fields };
-}
-
 /** A's photo row, carrying a string that must never appear in C's store. */
 function aPhoto(): SupabasePhoto {
-  return photoRow({
+  return createPhotoRow({
     id: 'a-photo-1',
     user_id: A,
     storage_path: `${A}/a-photo-1.jpeg`,
     caption: 'A-PRIVATE-PHOTO',
     mime_type: 'image/jpeg',
     created_at: '2026-09-01T00:00:00.000Z',
+    file_size: 1,
   });
 }
 
 /** What C already had on screen. */
 function cPhoto(): PhotoWithUrls {
-  const row = photoRow({
+  return createPhotoWithUrls({
     id: 'c-photo',
     user_id: C,
     storage_path: `${C}/c-photo.jpeg`,
     caption: 'C-OWN-CAPTION',
     mime_type: 'image/jpeg',
     created_at: '2026-09-02T00:00:00.000Z',
+    file_size: 1,
   });
-  return { ...row, signedUrl: null, isOwn: true };
 }
 
 /**
@@ -235,7 +223,7 @@ function cPhoto(): PhotoWithUrls {
  * continuation lands, and it is what that continuation would really corrupt.
  */
 function aGalleryRow(): PhotoWithUrls {
-  return { ...aPhoto(), signedUrl: null, isOwn: true };
+  return createPhotoWithUrls(aPhoto());
 }
 
 describe('loader identity guards', () => {
@@ -274,7 +262,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().photos).toEqual([cPhoto()]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PHOTO-CAPTION');
+      expect(serializedStore()).not.toContain('A-PHOTO-CAPTION');
       // Nor is A's list saved as anyone's copy.
       expect(writeLocalCopy).not.toHaveBeenCalled();
     });
@@ -338,7 +326,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().photos).toEqual([cPhoto()]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-PHOTO');
+      expect(serializedStore()).not.toContain('A-PRIVATE-PHOTO');
       // Nor is it saved into anyone's `photos` copy.
       expect(writeLocalCopy).not.toHaveBeenCalled();
     });
@@ -469,7 +457,7 @@ describe('loader identity guards', () => {
       // discriminates: an id-only compare would insert A's photo into it.
       expect(useAppStore.getState().userId).toBe(A);
       expect(useAppStore.getState().photos).toEqual([]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-PHOTO');
+      expect(serializedStore()).not.toContain('A-PRIVATE-PHOTO');
     });
   });
 

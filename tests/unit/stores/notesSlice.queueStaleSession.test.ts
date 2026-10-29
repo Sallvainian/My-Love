@@ -15,7 +15,7 @@ import type { LoveNote } from '../../../src/types/models';
 import { writeLocalCopy } from '../../../src/services/localCopy';
 import { enqueueNote, listQueuedNotes } from '../../../src/services/noteQueue';
 import { LOVE_NOTES_COPY_KIND } from '../../../src/stores/slices/notesSlice';
-import { CHECK_VIOLATION_CODE } from '../../support/check-constraint-envelopes';
+import { CHECK_VIOLATION_CODE } from '../../support/sqlstate';
 import {
   A,
   B,

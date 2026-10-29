@@ -4,6 +4,7 @@ import type { AppState } from '../../../src/stores/types';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { clockAnchor, resolveOwnPair } from '../../support/helpers/events';
+import { readStore } from '../../support/helpers/indexed-db';
 import { FAVORITES_READ, ownMoodHistoryRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
@@ -44,22 +45,9 @@ async function navigate(page: Page, view: 'home' | 'mood' | 'settings') {
 }
 
 async function localRows(page: Page, store: 'moods') {
-  return page.evaluate(async (storeName) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('my-love-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      return await new Promise<Array<Record<string, unknown>>>((resolve, reject) => {
-        const request = db.transaction(storeName).objectStore(storeName).getAll();
-        request.onsuccess = () => resolve(JSON.parse(JSON.stringify(request.result)));
-        request.onerror = () => reject(request.error);
-      });
-    } finally {
-      db.close();
-    }
-  }, store);
+  const rows = await readStore<Array<Record<string, unknown>>>(page, store, { op: 'getAll' });
+  if (!rows) throw new Error(`could not read the ${store} store`);
+  return rows;
 }
 
 /**

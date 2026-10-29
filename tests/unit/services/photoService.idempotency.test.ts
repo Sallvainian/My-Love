@@ -17,7 +17,7 @@
 import { create, type StateCreator } from 'zustand';
 import { createPhotosSlice, type PhotosSlice } from '@/stores/slices/photosSlice';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CHECK_VIOLATION_CODE } from '../../support/check-constraint-envelopes';
+import { CHECK_VIOLATION_CODE, NOT_NULL_VIOLATION } from '../../support/sqlstate';
 
 interface PhotoRow {
   id: string;
@@ -34,8 +34,6 @@ interface PhotoRow {
 const USER_ID = '00000000-0000-4000-8000-0000000000c0';
 // The 1GB free tier: src/services/photoService.ts STORAGE_QUOTA (module-private).
 const STORAGE_QUOTA_BYTES = 1024 * 1024 * 1024;
-// The other SQLSTATE the photos insert can fail with; check_violation is CHECK_VIOLATION_CODE.
-const NOT_NULL_VIOLATION = '23502'; // not_null_violation
 
 const backend = {
   errorCode: '',
