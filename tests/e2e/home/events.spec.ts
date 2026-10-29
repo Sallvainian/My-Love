@@ -137,9 +137,12 @@ test.describe('Home dashboard reads events from the store', () => {
     await expect(futureCard.getByText('Future event description')).toBeVisible();
     // The countdown day-count is this component's rendering of "the date":
     // whole days left on the pinned clock, so a date FUTURE_MEETUP.daysFromNow
-    // calendar days after the noon anchor shows one fewer.
+    // calendar days after the noon anchor shows one fewer. The singular rule
+    // is mirrored from formatDayCount rather than imported, so a broken
+    // formatter still fails here.
+    const daysLeft = FUTURE_MEETUP.daysFromNow - 1;
     await expect(futureCard.getByTestId('countdown-value')).toHaveText(
-      `${FUTURE_MEETUP.daysFromNow - 1} days`
+      `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`
     );
 
     const partnerCard = page.getByTestId('event-countdown-partner-meetup-e2e');

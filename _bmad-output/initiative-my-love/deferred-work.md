@@ -2594,7 +2594,9 @@ location: tests/api/upload-love-note-image-limits.spec.ts:134
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: medium
 reason: After one accepted upload the case asserts Number(remaining) < RATE_LIMIT_MAX_UPLOADS and that the header equals the body's count, because other cases in the worker share the minute window. A counter that never decrements still passes. Fix: read the count before and after a second upload in the same case and assert it fell by exactly one.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-assertion-precision
+resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
 
 ### DW-304: LoveNoteMessage's retry test cannot see the forceRefresh argument.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4); plan 1.13 Residual risks (A6)
@@ -2632,7 +2634,9 @@ location: tests/e2e/home/events.spec.ts:142-144
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The expected text is `${FUTURE_MEETUP.daysFromNow - 1} days`, while eventCountdownHelpers.ts:60 writes "1 day" for one, so setting daysFromNow to 2 fails against correct output. Fix: build the expected text with the same singular rule.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-assertion-precision
+resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
 
 ### DW-308: notesSlice.idempotency takes a note's tempId before the queue drain settles.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
@@ -2680,7 +2684,9 @@ location: tests/e2e/auth/login.spec.ts:135; tests/e2e/auth/bootstrap-notificatio
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: login.spec asserts toHaveCount(0) on the login-screen test id, while bootstrap-notification-order asserts not.toBeVisible(), which also passes when the screen is still mounted but hidden. Fix: use one form for the one contract in both specs.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-assertion-precision
+resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
 
 ### DW-313: Shared test fixtures and constants were invented file by file during the epic; one refactor story should consolidate them.
 origin: epic-test-review-remediation retrospective 2026-10-29 (D-dup1 to D-dup7, P-div1, A5)
@@ -2722,7 +2728,9 @@ location: tests/support/helpers/events.ts:190-205 (clockAnchor)
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: clockAnchor's JSDoc already records that the anchor is the latest local noon at or before now, so it sits behind real time and never ahead, because a page clock ahead of the session's mint time makes supabase-js refresh the token. It does not record why a fixed calendar date was rejected: plan 1.2's Review Triage Log (story-remove-clock-timing-and-async-nondeterminism-plan.md:235) says a fixed date "would put the page clock arbitrarily far behind server timestamps" and collide unique created_at rows across reruns. The retrospective proposed a separate adr-e2e-page-clock-anchors-at-the-live-day.md beside the helper, but AGENTS.md keeps durable agent-facing prose in AGENTS.md and forbids generated documentation files. So add the missing reason to clockAnchor's JSDoc, and, if every e2e spec that seeds calendar-day rows must use clockAnchor, say so in one AGENTS.md line, rather than adding a new file.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-assertion-precision
+resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
 
 ### DW-318: Sign-out leaves the outgoing account's synced mood rows on the device.
 origin: AGENTS.md context refresh 2026-10-29
@@ -2756,4 +2764,12 @@ location: tests/unit/stores/loaderIdentityGuards.customMessages.test.ts:284
 source_spec: `plan-dw-store-service-test-determinism.md`
 severity: low
 reason: These are blind to an Error, Map or Set, as DW-306 was. Found with `grep -rn "JSON.stringify(" tests/unit` on 2026-10-29. On useAppStore, so they can adopt serializedStore() from loaderIdentityGuardsFixture.ts: - loaderIdentityGuards.moods.test.ts:214,242 - loaderIdentityGuards.partner.test.ts:225,251,322,395 - loaderIdentityGuards.customMessages.test.ts:284,326,395 - loaderIdentityGuards.notes.test.ts:232,271 - loaderIdentityGuards.photos.test.ts:277,341,472 - loaderIdentityGuards.messages.test.ts:251,559 - signOutClearsAccountState.test.ts:340,479,555,563,646 On a local store or a slice of state, so they need the replacer to take a value: - interactionsSubscription.test.ts:634,656 - notesSlice.localCopy.test.ts:517 - partnerSlice.localCopy.test.ts:213 - notesSlice.sessionGuard.test.ts:216 - settingsSlice.initializeApp.test.ts:307,392,447,470 - notesSlice.localCopyWrites.test.ts:174
+status: open
+
+### DW-322: upload-love-note-image's 10-per-minute-per-user rate limit is kept in isolate memory, so it is not enforced once one user's requests spread across isolates.
+origin: spec-deferred cdcdf5b24fcb
+location: supabase/functions/upload-love-note-image/handler.ts:113-115
+source_spec: `plan-dw-e2e-assertion-precision.md`
+severity: medium
+reason: rateLimitStore is a module-level Map; two consecutive uploads over the wire failed a decrement assertion 9 of 9 serial runs locally (edge-runtime 1.77.8, policy = "per_worker"). Whether hosted functions spread one user's requests the same way is UNVERIFIED. Fix needs an owner decision on a shared store (DB table or RPC).
 status: open

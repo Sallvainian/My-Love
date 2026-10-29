@@ -586,6 +586,24 @@ Deno.test('format and content', async (t) => {
     );
   });
 
+  await t.step('each accepted upload by one user lowers the remaining allowance by exactly one', async () => {
+    // A fresh id, so no other step shares this user's window.
+    const client = fakeClient({ userId: crypto.randomUUID() });
+    const bytes = pngBytes(512);
+
+    for (const expected of [CONFIG.RATE_LIMIT_MAX_UPLOADS - 1, CONFIG.RATE_LIMIT_MAX_UPLOADS - 2]) {
+      const response = await handleUpload(
+        uploadRequest({ body: bytes, contentLength: String(bytes.byteLength) }),
+        client.deps
+      );
+
+      assertEquals(response.status, 200);
+      assertEquals((await response.json()).rateLimitRemaining, expected);
+      assertEquals(response.headers.get('X-RateLimit-Remaining'), String(expected));
+    }
+    assertEquals(client.uploadCalls.length, 2);
+  });
+
   await t.step('a successful upload carries the CORS allow-origin header', async () => {
     const { response } = await uploadPng();
 

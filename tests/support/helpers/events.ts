@@ -197,6 +197,10 @@ export function isoDateDaysFromNow(dayOffset: number, anchor: Date): string {
  * session's mint time makes supabase-js refresh the token, and that refresh
  * re-renders the app on its own (`tests/e2e/home/events-read-window.spec.ts`
  * header). Built from calendar components, never parsed from a string.
+ *
+ * Derived from the live day rather than pinned to a fixed calendar date: a
+ * fixed date would collide unique `created_at` rows across reruns and put the
+ * page clock arbitrarily far behind server timestamps.
  */
 export function clockAnchor(now: Date = new Date()): Date {
   const anchor = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
