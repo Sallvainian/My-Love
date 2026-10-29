@@ -797,36 +797,43 @@ Deno.test('the shared rate limiter', async (t) => {
     assertEquals(client.rpcCalls, ['claim_love_note_upload']);
   });
 
-  await t.step('the limiter is not called for a 401, a 405 or a CORS preflight', async () => {
-    const missingAuth = fakeClient();
-    const noAuth = await handleUpload(
-      uploadRequest({ body: pngBytes(1024), contentLength: '1024', authorization: null }),
-      missingAuth.deps
-    );
-    assertEquals(noAuth.status, 401);
-    assertEquals(missingAuth.rpcCalls, []);
+  // One step per refusal, so the first failure does not hide the others.
+  for (const { label, authFails, status, request } of [
+    {
+      label: 'a 401 for a missing Authorization header',
+      authFails: false,
+      status: 401,
+      request: () => uploadRequest({ body: pngBytes(1024), contentLength: '1024', authorization: null }),
+    },
+    {
+      label: 'a 401 for a rejected bearer token',
+      authFails: true,
+      status: 401,
+      request: () =>
+        uploadRequest({ body: pngBytes(1024), contentLength: '1024', authorization: 'Bearer nope' }),
+    },
+    {
+      label: 'a 405',
+      authFails: false,
+      status: 405,
+      request: () => new Request(ENDPOINT, { method: 'GET' }),
+    },
+    {
+      label: 'a CORS preflight',
+      authFails: false,
+      status: 200,
+      request: () => new Request(ENDPOINT, { method: 'OPTIONS' }),
+    },
+  ]) {
+    await t.step(`the limiter is not called for ${label}`, async () => {
+      const client = fakeClient({ authFails });
 
-    const rejectedToken = fakeClient({ authFails: true });
-    const badToken = await handleUpload(
-      uploadRequest({ body: pngBytes(1024), contentLength: '1024', authorization: 'Bearer nope' }),
-      rejectedToken.deps
-    );
-    assertEquals(badToken.status, 401);
-    assertEquals(rejectedToken.rpcCalls, []);
+      const response = await handleUpload(request(), client.deps);
 
-    const wrongMethod = fakeClient();
-    const get = await handleUpload(new Request(ENDPOINT, { method: 'GET' }), wrongMethod.deps);
-    assertEquals(get.status, 405);
-    assertEquals(wrongMethod.rpcCalls, []);
-
-    const preflight = fakeClient();
-    const options = await handleUpload(
-      new Request(ENDPOINT, { method: 'OPTIONS' }),
-      preflight.deps
-    );
-    assertEquals(options.status, 200);
-    assertEquals(preflight.rpcCalls, []);
-  });
+      assertEquals(response.status, status);
+      assertEquals(client.rpcCalls, []);
+    });
+  }
 
   await t.step('the remaining allowance is the one the RPC reported', async () => {
     // Not derived from CONFIG: a value the handler could only have read off the
