@@ -10,7 +10,8 @@
  *   so an oversized body is refused without ever being buffered
  * - File size validation (max 5MB compressed)
  * - MIME type validation via magic bytes
- * - Rate limiting (10 uploads per minute per user)
+ * - Rate limiting (10 uploads per minute per user), shared and database-backed
+ *   through `claim_love_note_upload()`
  * - Uploads to love-notes-images bucket
  *
  * The request lifecycle lives in `handler.ts` so it can be tested with

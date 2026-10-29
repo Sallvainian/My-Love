@@ -271,6 +271,24 @@ export type Database = {
           },
         ]
       }
+      love_note_upload_counts: {
+        Row: {
+          upload_count: number
+          user_id: string
+          window_started_at: string
+        }
+        Insert: {
+          upload_count?: number
+          user_id: string
+          window_started_at?: string
+        }
+        Update: {
+          upload_count?: number
+          user_id?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       love_notes: {
         Row: {
           content: string
@@ -526,6 +544,13 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: undefined
       }
+      claim_love_note_upload: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          allowed: boolean
+          remaining: number
+        }[]
+      }
       decline_partner_request: {
         Args: { p_request_id: string }
         Returns: undefined
@@ -538,9 +563,9 @@ export type Database = {
           is_taken: boolean
         }[]
       }
-      get_my_partner_id: { Args: never; Returns: string }
+      get_my_partner_id: { Args: Record<PropertyKey, never>; Returns: string }
       get_my_pending_partner_requests: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           created_at: string
           from_user_id: string
@@ -685,4 +710,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

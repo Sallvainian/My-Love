@@ -2778,5 +2778,7 @@ location: supabase/functions/upload-love-note-image/handler.ts:113-115
 source_spec: `plan-dw-e2e-assertion-precision.md`
 severity: medium
 reason: rateLimitStore is a module-level Map; two consecutive uploads over the wire failed a decrement assertion 9 of 9 serial runs locally (edge-runtime 1.77.8, policy = "per_worker"). Whether hosted functions spread one user's requests the same way is UNVERIFIED. Fix needs an owner decision on a shared store (DB table or RPC).
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-love-note-upload-shared-rate-limit
+resolution-undo: 45d6f6c51380300a04d0a207ec090ed080e768bd967ac55b5520acba78842457 2026-10-29 7374617475733a206f70656e
 decision: 2026-10-29 build: shared database counter — keep each user's upload count in a database table, checked and incremented atomically by one RPC the function calls, so every isolate enforces the same 10-per-minute limit.

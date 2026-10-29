@@ -20,6 +20,10 @@
  *   retained buffer could surface, since the handler keeps no other handle on
  *   the bytes it read.
  *
+ * The rate limit is `claim_love_note_upload()` in the database; the fake's
+ * `rpc` mirrors its SQL with one counter per fake client, so each `fakeClient()`
+ * is one user whose count every request through it shares.
+ *
  * The Supabase client is injected as a fake, so nothing here touches the
  * network: `handler.ts` deliberately imports no remote module.
  */
@@ -51,15 +55,29 @@ interface FakeClient {
   uploadCalls: Array<{ bucket: string; path: string; size: number; contentType: string }>;
   /** Authorization headers the factory was handed. */
   authHeaders: string[];
+  /** Every `rpc(fn)` call, by function name, in order. */
+  rpcCalls: string[];
   userId: string;
 }
 
 function fakeClient(
-  options: { userId?: string; authFails?: boolean; uploadError?: string } = {}
+  options: {
+    userId?: string;
+    authFails?: boolean;
+    uploadError?: string;
+    /** Make the limiter RPC answer `{ data: null, error: { message } }`. */
+    rpcError?: string;
+    /** Make the limiter RPC answer this as `data`, with no error. */
+    rpcData?: unknown;
+  } = {}
 ): FakeClient {
   const userId = options.userId ?? crypto.randomUUID();
   const uploadCalls: FakeClient['uploadCalls'] = [];
   const authHeaders: string[] = [];
+  const rpcCalls: string[] = [];
+  // The fixed window of claim_love_note_upload(), without the clock: a test
+  // never runs long enough for its window to expire.
+  let uploadCount = 0;
 
   const deps: UploadDeps = {
     createClient(authHeader) {
@@ -90,11 +108,30 @@ function fakeClient(
             };
           },
         },
+        rpc(fn) {
+          rpcCalls.push(fn);
+          if (options.rpcError !== undefined) {
+            return Promise.resolve({ data: null, error: { message: options.rpcError } });
+          }
+          if ('rpcData' in options) {
+            // Deliberately unchecked: this is how a malformed reply is injected.
+            return Promise.resolve({ data: options.rpcData as never, error: null });
+          }
+          // A refused claim leaves the count where it was, as the SQL does.
+          if (uploadCount >= CONFIG.RATE_LIMIT_MAX_UPLOADS) {
+            return Promise.resolve({ data: [{ allowed: false, remaining: 0 }], error: null });
+          }
+          uploadCount++;
+          return Promise.resolve({
+            data: [{ allowed: true, remaining: CONFIG.RATE_LIMIT_MAX_UPLOADS - uploadCount }],
+            error: null,
+          });
+        },
       };
     },
   };
 
-  return { deps, uploadCalls, authHeaders, userId };
+  return { deps, uploadCalls, authHeaders, rpcCalls, userId };
 }
 
 interface CountedStream {
@@ -587,7 +624,7 @@ Deno.test('format and content', async (t) => {
   });
 
   await t.step('each accepted upload by one user lowers the remaining allowance by exactly one', async () => {
-    // A fresh id, so no other step shares this user's window.
+    // This step's own fake client, so its rate-limit count is shared with no other step.
     const client = fakeClient({ userId: crypto.randomUUID() });
     const bytes = pngBytes(512);
 
@@ -729,5 +766,157 @@ Deno.test('unchanged paths', async (t) => {
     assertEquals(body.error, 'Upload failed');
     assertEquals(body.message, 'bucket unavailable');
     assertEquals(client.uploadCalls.length, 1);
+  });
+});
+
+Deno.test('the shared rate limiter', async (t) => {
+  await t.step('each authenticated POST claims exactly once, by name', async () => {
+    const client = fakeClient();
+    const bytes = pngBytes(512);
+
+    const response = await handleUpload(
+      uploadRequest({ body: bytes, contentLength: String(bytes.byteLength) }),
+      client.deps
+    );
+
+    assertEquals(response.status, 200);
+    assertEquals(client.rpcCalls, ['claim_love_note_upload']);
+  });
+
+  await t.step('a refusal decided from headers still claims, because the limiter runs first', async () => {
+    const client = fakeClient();
+    const { stream, counts } = countedStream([pngBytes(1024)]);
+
+    const response = await handleUpload(
+      uploadRequest({ body: stream, contentLength: null }),
+      client.deps
+    );
+
+    assertEquals(response.status, 411);
+    assertEquals(counts.pulls, 0);
+    assertEquals(client.rpcCalls, ['claim_love_note_upload']);
+  });
+
+  await t.step('the limiter is not called for a 401, a 405 or a CORS preflight', async () => {
+    const missingAuth = fakeClient();
+    const noAuth = await handleUpload(
+      uploadRequest({ body: pngBytes(1024), contentLength: '1024', authorization: null }),
+      missingAuth.deps
+    );
+    assertEquals(noAuth.status, 401);
+    assertEquals(missingAuth.rpcCalls, []);
+
+    const rejectedToken = fakeClient({ authFails: true });
+    const badToken = await handleUpload(
+      uploadRequest({ body: pngBytes(1024), contentLength: '1024', authorization: 'Bearer nope' }),
+      rejectedToken.deps
+    );
+    assertEquals(badToken.status, 401);
+    assertEquals(rejectedToken.rpcCalls, []);
+
+    const wrongMethod = fakeClient();
+    const get = await handleUpload(new Request(ENDPOINT, { method: 'GET' }), wrongMethod.deps);
+    assertEquals(get.status, 405);
+    assertEquals(wrongMethod.rpcCalls, []);
+
+    const preflight = fakeClient();
+    const options = await handleUpload(
+      new Request(ENDPOINT, { method: 'OPTIONS' }),
+      preflight.deps
+    );
+    assertEquals(options.status, 200);
+    assertEquals(preflight.rpcCalls, []);
+  });
+
+  await t.step('the remaining allowance is the one the RPC reported', async () => {
+    // Not derived from CONFIG: a value the handler could only have read off the
+    // reply, so a handler that counted for itself would fail here.
+    const client = fakeClient({ rpcData: [{ allowed: true, remaining: 3 }] });
+    const bytes = pngBytes(512);
+
+    const response = await handleUpload(
+      uploadRequest({ body: bytes, contentLength: String(bytes.byteLength) }),
+      client.deps
+    );
+
+    assertEquals(response.status, 200);
+    assertEquals((await response.json()).rateLimitRemaining, 3);
+    assertEquals(response.headers.get('X-RateLimit-Remaining'), '3');
+  });
+
+  await t.step('an RPC refusal is a 429 that reads no body', async () => {
+    const client = fakeClient({ rpcData: [{ allowed: false, remaining: 0 }] });
+    const { stream, counts } = countedStream([pngBytes(512)]);
+
+    const response = await handleUpload(
+      uploadRequest({ body: stream, contentLength: '512' }),
+      client.deps
+    );
+
+    assertEquals(response.status, 429);
+    assertEquals(response.headers.get('Retry-After'), String(CONFIG.RATE_LIMIT_WINDOW_MS / 1000));
+    assertEquals((await response.json()).error, 'Rate limit exceeded');
+    assertEquals(counts.pulls, 0);
+    assertEquals(client.uploadCalls.length, 0);
+  });
+
+  await t.step('an RPC error fails closed with 500, reads no body and stores nothing', async () => {
+    const client = fakeClient({ rpcError: 'connection refused' });
+    const { stream, counts } = countedStream([pngBytes(512)]);
+
+    const { result: response, logs } = await withCapturedErrors(() =>
+      handleUpload(uploadRequest({ body: stream, contentLength: '512' }), client.deps)
+    );
+
+    assertEquals(response.status, 500);
+    assertEquals(await response.json(), { error: 'Rate limit check failed' });
+    assertEquals(counts.pulls, 0, 'a failed limiter must not read the body');
+    assertEquals(client.uploadCalls.length, 0);
+    assertEquals(logs.length, 1, `expected exactly one log line, got ${JSON.stringify(logs)}`);
+    assertStringIncludes(logs[0], 'connection refused');
+  });
+
+  for (const [label, data] of [
+    ['an empty reply', []],
+    ['a null reply', null],
+    ['a row without allowed', [{ remaining: 9 }]],
+    ['a string allowed', [{ allowed: 'true', remaining: 9 }]],
+    ['a row without remaining', [{ allowed: true }]],
+  ] as const) {
+    await t.step(`${label} fails closed with 500, reads no body and stores nothing`, async () => {
+      const client = fakeClient({ rpcData: data });
+      const { stream, counts } = countedStream([pngBytes(512)]);
+
+      const { result: response } = await withCapturedErrors(() =>
+        handleUpload(uploadRequest({ body: stream, contentLength: '512' }), client.deps)
+      );
+
+      assertEquals(response.status, 500);
+      assertEquals(await response.json(), { error: 'Rate limit check failed' });
+      assertEquals(counts.pulls, 0);
+      assertEquals(client.uploadCalls.length, 0);
+    });
+  }
+
+  await t.step('a rejected RPC promise fails closed the same way', async () => {
+    const client = fakeClient();
+    const deps: UploadDeps = {
+      createClient(authHeader) {
+        return {
+          ...client.deps.createClient(authHeader),
+          rpc: () => Promise.reject(new Error('fetch failed')),
+        };
+      },
+    };
+    const { stream, counts } = countedStream([pngBytes(512)]);
+
+    const { result: response } = await withCapturedErrors(() =>
+      handleUpload(uploadRequest({ body: stream, contentLength: '512' }), deps)
+    );
+
+    assertEquals(response.status, 500);
+    assertEquals(await response.json(), { error: 'Rate limit check failed' });
+    assertEquals(counts.pulls, 0);
+    assertEquals(client.uploadCalls.length, 0);
   });
 });
