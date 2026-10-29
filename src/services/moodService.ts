@@ -365,7 +365,6 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
       cursor = await cursor.continue();
     }
     await tx.done;
-    logger.debug(`[MoodService] Deleted ${deleted} synced mood entries for a signed-out user`);
     return deleted;
   }
 
