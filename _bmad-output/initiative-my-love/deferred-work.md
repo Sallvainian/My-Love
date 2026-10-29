@@ -2568,4 +2568,5 @@ location: tests/unit/utils/offlineErrorHandler.test.ts:15
 source_spec: `tickets/epic-test-review-remediation/tickets/story-fix-the-2026-10-03-tests-unit-findings-plan.md`
 severity: low
 reason: At the baseline both tests already asserted name, isRetryable and the default message (per-field toBe at :17-20, toMatchObject at :32-37); only the operation string differs, and only the second adds toBeInstanceOf(Error). The L7 conversion made the overlap visible but did not create it.
-status: open
+status: done 2026-10-28
+resolution: fixed 2026-10-28: "is an instance of Error" now asserts only toBeInstanceOf(Error), and "creates an error with default message" keeps the name, operation, isRetryable and default-message checks; removing `extends Error` from OfflineError fails only the instanceof test.
