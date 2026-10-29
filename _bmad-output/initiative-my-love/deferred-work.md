@@ -2759,7 +2759,8 @@ location: tests/unit/stores/loaderIdentityGuards.moods.test.ts:214
 source_spec: `plan-dw-store-service-test-determinism.md`
 severity: low
 reason: grep finds it at tests/unit/stores/loaderIdentityGuards.moods.test.ts:214,242, loaderIdentityGuards.partner.test.ts:225,251,322,395 and signOutClearsAccountState.test.ts:340,479,555,563; DW-306 names only the events file. They can adopt serializedStore() from loaderIdentityGuardsFixture.ts.
-status: open
+status: done 2026-10-29
+resolution: duplicate of DW-321, which lists every location here and more; tracked there.
 
 ### DW-321: Complete list of the leak checks outside the events file that still use plain JSON.stringify on store state (it supersedes the incomplete item above).
 origin: spec-deferred a4946ac45884
@@ -2776,3 +2777,4 @@ source_spec: `plan-dw-e2e-assertion-precision.md`
 severity: medium
 reason: rateLimitStore is a module-level Map; two consecutive uploads over the wire failed a decrement assertion 9 of 9 serial runs locally (edge-runtime 1.77.8, policy = "per_worker"). Whether hosted functions spread one user's requests the same way is UNVERIFIED. Fix needs an owner decision on a shared store (DB table or RPC).
 status: open
+decision: 2026-10-29 build: shared database counter — keep each user's upload count in a database table, checked and incremented atomically by one RPC the function calls, so every isolate enforces the same 10-per-minute limit.
