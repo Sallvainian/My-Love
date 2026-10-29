@@ -105,7 +105,7 @@ test.describe('Poke and kiss history from the local copy', () => {
     const sheet = page.getByTestId('interaction-history-modal');
     await expect(sheet).toBeVisible();
     await expect(sheet.getByTestId(`interaction-${pokeId}`)).toBeVisible();
-    await expect(sheet.getByText('No interactions yet')).toHaveCount(0);
+    await expect(sheet.getByTestId('interaction-history-empty')).toHaveCount(0);
   });
 
   test('[P1] a poke sent while offline appears after reconnect without a reload', async ({

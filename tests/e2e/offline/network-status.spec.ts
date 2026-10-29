@@ -22,14 +22,14 @@ test.describe('Network Status', () => {
     await expect(page.getByTestId('mood-tracker')).toBeVisible();
 
     // Verify initially shows "Online" in the sync status area
-    await expect(page.getByTestId('mood-tracker').getByText('Online')).toBeVisible();
+    await expect(page.getByTestId('mood-sync-status')).toHaveText('Online');
 
     // WHEN: Network connection is lost
     await context.setOffline(true);
     await page.evaluate(() => window.dispatchEvent(new Event('offline')));
 
     // THEN: Offline indicator is visible within the mood tracker sync status
-    await expect(page.getByTestId('mood-tracker').getByText('Offline')).toBeVisible();
+    await expect(page.getByTestId('mood-sync-status')).toHaveText('Offline');
 
     // Cleanup
     await context.setOffline(false);
@@ -42,18 +42,18 @@ test.describe('Network Status', () => {
     // GIVEN: User is on mood tracker
     await page.goto('/mood');
     await expect(page.getByTestId('mood-tracker')).toBeVisible();
-    await expect(page.getByTestId('mood-tracker').getByText('Online')).toBeVisible();
+    await expect(page.getByTestId('mood-sync-status')).toHaveText('Online');
 
     // Go offline
     await context.setOffline(true);
     await page.evaluate(() => window.dispatchEvent(new Event('offline')));
-    await expect(page.getByTestId('mood-tracker').getByText('Offline')).toBeVisible();
+    await expect(page.getByTestId('mood-sync-status')).toHaveText('Offline');
 
     // WHEN: Network reconnects
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
 
     // THEN: Online indicator shows again
-    await expect(page.getByTestId('mood-tracker').getByText('Online')).toBeVisible();
+    await expect(page.getByTestId('mood-sync-status')).toHaveText('Online');
   });
 });

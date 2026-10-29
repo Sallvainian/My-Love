@@ -97,7 +97,10 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
             data-testid="app-wordmark"
           >
             <Heart className="h-3.5 w-3.5 shrink-0 fill-current text-accent" strokeWidth={0} />
-            <span className="truncate font-lora text-[19px] font-semibold text-ink italic">
+            <span
+              className="truncate font-lora text-[19px] font-semibold text-ink italic"
+              data-testid="app-wordmark-text"
+            >
               My Love
             </span>
           </span>

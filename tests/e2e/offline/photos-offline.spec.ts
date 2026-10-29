@@ -277,7 +277,7 @@ test.describe('Photos offline', () => {
       }
     );
     await expect(viewer.getByTestId('photo-viewer-not-saved')).toHaveCount(0);
-    await expect(viewer.getByText('Failed to load photo')).toHaveCount(0);
+    await expect(viewer.getByTestId('photo-viewer-load-error')).toHaveCount(0);
   });
 
   test('[P1] with storage refused, the oldest image is left out and shows a placeholder offline', async ({

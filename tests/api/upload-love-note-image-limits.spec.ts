@@ -33,6 +33,9 @@ const BUCKET = 'love-notes-images';
 /** Mirrors `CONFIG.MAX_FILE_SIZE_BYTES` in the function. */
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
+/** Mirrors `CONFIG.RATE_LIMIT_MAX_UPLOADS` in the function. */
+const RATE_LIMIT_MAX_UPLOADS = 10;
+
 /** The function's JSON answer: the stored object on success, `error` on a refusal. */
 type UploadReply = { storagePath?: string; size?: number; error?: string; maxSize?: number };
 
@@ -122,7 +125,14 @@ test.describe('Love note image upload limits', () => {
       body.storagePath.startsWith(`${userId}/`),
       `storagePath ${body.storagePath} must be under the uploader's own prefix`
     ).toBe(true);
-    expect(response.headers()['x-ratelimit-remaining']).toBeDefined();
+    // Other cases in this worker can share the minute window, and the count
+    // lives in the function's memory, so the exact value is not predictable.
+    // An accepted upload has used one slot, so the header is a whole number
+    // below the limit, and it reports the same count as the body.
+    const remaining = response.headers()['x-ratelimit-remaining'];
+    expect(remaining).toMatch(/^\d+$/);
+    expect(Number(remaining)).toBeLessThan(RATE_LIMIT_MAX_UPLOADS);
+    expect(remaining).toBe(String(body.rateLimitRemaining));
 
     const after = await listOwnPrefix(supabaseAdmin, userId);
     expect(after.length, 'exactly one object was written').toBe(before.length + 1);

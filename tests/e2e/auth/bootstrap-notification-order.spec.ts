@@ -150,7 +150,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
     await expect(page.getByTestId('display-name-setup')).toBeVisible();
   });
 
-  test('[P1] DW-81-E2E-005 retains the listener session when the SDK bootstrap rejects', async ({
+  test('[P1] DW-81-E2E-005 stays signed in on Home when the initial session lookup fails after a sign-in arrived', async ({
     page,
     authBootstrap,
     recurse,
@@ -188,7 +188,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
     await expect(page.getByTestId('login-screen')).not.toBeVisible();
   });
 
-  test('[P1] DW-81-E2E-006 installs an authenticated bootstrap without a notification', async ({
+  test('[P1] DW-81-E2E-006 opens the app signed in from a stored session when no auth event arrives', async ({
     page,
     authBootstrap,
     recurse,
@@ -218,7 +218,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
     await expect(page.getByTestId('login-screen')).not.toBeVisible();
   });
 
-  test('[P1] DW-81-E2E-007 clears old store auth for null bootstrap without a notification', async ({
+  test('[P1] DW-81-E2E-007 shows Login with no trace of the previous account when no session is stored', async ({
     page,
     authBootstrap,
   }) => {

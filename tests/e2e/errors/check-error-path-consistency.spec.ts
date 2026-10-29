@@ -4,7 +4,10 @@ import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/
 import { test, expect } from '../../support/merged-fixtures';
 import { createPartnerRequestRow } from '../../support/factories/partner-requests';
 import type { Database } from '../../../src/types/database.types';
-import { createCheckErrorPathData } from '../../support/factories/check-error-path-data';
+import {
+  CHECK_ERROR_LEAK_FRAGMENTS,
+  createCheckErrorPathData,
+} from '../../support/factories/check-error-path-data';
 
 test.describe('DW-38 CHECK error presentation', () => {
   test(
@@ -222,6 +225,7 @@ function interceptPartnerReads(
 async function expectPlainCheckBanner(page: Page, friendlyCheck: string) {
   const banner = page.getByTestId('partner-connection-error');
   await expect(banner).toHaveText(friendlyCheck);
-  await expect(banner).not.toContainText('dw38_unique_length_check');
-  await expect(banner).not.toContainText('new row');
+  for (const fragment of CHECK_ERROR_LEAK_FRAGMENTS) {
+    await expect(banner).not.toContainText(fragment);
+  }
 }
