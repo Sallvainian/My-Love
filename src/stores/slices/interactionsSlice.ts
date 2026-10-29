@@ -22,7 +22,10 @@
  *   subscriptions and identity guards
  * - authSlice.authSessionVersion: captured at subscription creation and
  *   checked for incoming records to enforce session ownership; the status
- *   callback checks only user identity and subscription activity. authSlice
+ *   callback checks only user identity and subscription activity. The
+ *   confirmation callback (the server's postgres_changes confirmation, which
+ *   can come after SUBSCRIBED) checks subscription activity, user identity and
+ *   this version before it starts the catch-up history read. authSlice
  *   advances the version on sign-out or identity change and retains it on
  *   same-user refresh
  *
@@ -33,11 +36,15 @@
  *   through a shape guard; a copy that fails the guard is ignored whole.
  * - `loadInteractionHistory` applies the saved copy first (only into an empty
  *   list, and only until this session has a server answer or a confirmed
- *   change), then replaces state and copy with the server's list. A failed
- *   read changes nothing; an empty answer is saved as `[]`. The badge count is
- *   recomputed from the list whenever the list comes from the copy or server.
+ *   change), then replaces state and copy with the server's list, keeping any
+ *   row accepted while the read was out (from Realtime or a confirmed send)
+ *   that the list lacks. A failed read changes nothing; an empty answer is
+ *   saved as `[]`. The badge count is recomputed from the list whenever the
+ *   list comes from the copy or server.
  * - It is also the kind's refresher, so the history loads on signed-in start
- *   and on reconnect, not only when the history sheet opens.
+ *   and on reconnect, not only when the history sheet opens. It loads again
+ *   each time the server confirms the subscription's postgres_changes binding,
+ *   which can come after SUBSCRIBED.
  * - Every confirmed change to the list — an accepted Realtime row, a confirmed
  *   send, a server-confirmed mark-as-viewed — rewrites the copy from the whole
  *   current list. Sending still needs a connection; nothing queues.
@@ -180,6 +187,25 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
     get().userId === userId && get().authSessionVersion === authSessionVersion;
 
   /**
+   * One set per history read in flight, holding the ids of the rows accepted
+   * while it was out, from Realtime or a confirmed send. Its answer may have
+   * been read before those rows were inserted, so they are kept rather than
+   * replaced by it.
+   */
+  const readsInFlight = new Set<Set<string>>();
+  const noteAccepted = (id: string) => {
+    for (const acceptedDuringRead of readsInFlight) acceptedDuringRead.add(id);
+  };
+
+  /**
+   * Reads are numbered as they start. The answer of a read that started before
+   * one whose answer is already applied is dropped, so it cannot remove a row
+   * the later read brought, such as one that missed live delivery.
+   */
+  let readsStarted = 0;
+  let newestReadApplied = 0;
+
+  /**
    * After a server answer or confirmed change for `userId` in
    * `authSessionVersion` has been set into state: mark the session fresh and
    * save the whole shown list as the copy, under the captured `userId`.
@@ -236,6 +262,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         set((state) => ({
           interactions: [localInteraction, ...state.interactions],
         }));
+        noteAccepted(pokeRecord.id);
         await saveInteractionsCopy(currentUserId, sentInSession);
 
         logger.debug('[InteractionsSlice] Poke sent:', pokeRecord.id);
@@ -266,6 +293,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         set((state) => ({
           interactions: [localInteraction, ...state.interactions],
         }));
+        noteAccepted(kissRecord.id);
         await saveInteractionsCopy(currentUserId, sentInSession);
 
         logger.debug('[InteractionsSlice] Kiss sent:', kissRecord.id);
@@ -326,6 +354,12 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         throw new Error('Cannot load interaction history: User not authenticated');
       }
 
+      // Registered before the request goes out, so every row accepted after it
+      // is noted (see readsInFlight).
+      const acceptedDuringRead = new Set<string>();
+      readsInFlight.add(acceptedDuringRead);
+      const readNumber = ++readsStarted;
+
       try {
         // The server request goes out at once, alongside the copy read below, so
         // the copy adds no latency. It is marked handled now: it may reject while
@@ -356,15 +390,28 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
         // 2. The server's list replaces state and copy. Fetched Interaction[]
         // (already converted by the service).
-        const interactions = await historyRequest;
+        const fetched = await historyRequest;
 
         // Identity guard: the request goes out with a still-valid token, so it
         // can succeed after clearAuth — or after a same-account re-login — and
         // must not put the previous session's data back.
         if (!ownsSession(currentUserId, requestedInSession)) return;
+        // A newer read has already answered (see readsStarted).
+        if (readNumber < newestReadApplied) return;
 
+        // Except a row accepted while this read was out, from Realtime or a
+        // confirmed send, that its answer lacks: that row stays, ahead of it.
+        const answered = new Set(fetched.map((interaction) => interaction.id));
+        const interactions = [
+          ...get().interactions.filter(
+            (interaction) =>
+              acceptedDuringRead.has(interaction.id) && !answered.has(interaction.id)
+          ),
+          ...fetched,
+        ];
         const unviewedCount = countUnviewed(interactions, currentUserId);
         set({ interactions, unviewedCount });
+        newestReadApplied = readNumber;
         await saveInteractionsCopy(currentUserId, requestedInSession);
 
         logger.debug(
@@ -377,6 +424,8 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
       } catch (error) {
         // A failed read changes nothing: state and copy stay as they were.
         console.error('[InteractionsSlice] Error loading interaction history:', error);
+      } finally {
+        readsInFlight.delete(acceptedDuringRead);
       }
     },
 
@@ -452,6 +501,13 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
               });
             }
             onStatusChange(status);
+          },
+          () => {
+            if (!active || !ownsSession(currentUserId, subscribedInSession)) return;
+            // A row inserted before this confirmation can miss live delivery
+            // (seen in an E2E trace), and a row inserted while no screen was
+            // subscribed never had it. Both reach the list through this read.
+            void get().loadInteractionHistory(HISTORY_LIMIT);
           }
         );
 
@@ -509,6 +565,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         interactions: [localInteraction, ...state.interactions],
         unviewedCount: !localInteraction.viewed ? state.unviewedCount + 1 : state.unviewedCount,
       }));
+      noteAccepted(record.id);
 
       // Rewrite the copy from the whole list. Validation above established that
       // `currentUserId` is signed in; the session is captured now, synchronously.

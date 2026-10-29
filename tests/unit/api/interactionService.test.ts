@@ -15,6 +15,7 @@
  * exercised rather than asserted on. Same idiom as
  * `tests/unit/services/eventsService.test.ts` and `./moodApi.test.ts`.
  */
+import type { RealtimeSystemPayload } from '@supabase/supabase-js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import {
@@ -39,17 +40,14 @@ type RealtimeStatus = 'SUBSCRIBED' | 'CHANNEL_ERROR' | 'TIMED_OUT';
 type RealtimePayload = { new: Record<string, unknown> };
 
 const realtime = vi.hoisted(() => {
-  let recordCallback: ((payload: RealtimePayload) => void) | null = null;
+  // One listener per event type, as the service registers them.
+  const listeners = new Map<string, (payload: never) => void>();
   let statusCallback: ((status: RealtimeStatus) => void) | null = null;
 
   const channel = {
     on: vi.fn(
-      (
-        _event: string,
-        _filter: Record<string, string>,
-        callback: (payload: RealtimePayload) => void
-      ) => {
-        recordCallback = callback;
+      (event: string, _filter: Record<string, string>, callback: (payload: never) => void) => {
+        listeners.set(event, callback);
         return channel;
       }
     ),
@@ -59,14 +57,18 @@ const realtime = vi.hoisted(() => {
     }),
   };
 
+  const emit = (event: string, payload: unknown) =>
+    (listeners.get(event) as ((payload: unknown) => void) | undefined)?.(payload);
+
   return {
     channel,
     channelFactory: vi.fn(() => channel),
     removeChannel: vi.fn(),
-    emitRecord: (payload: RealtimePayload) => recordCallback?.(payload),
+    emitRecord: (payload: RealtimePayload) => emit('postgres_changes', payload),
+    emitSystem: (payload: RealtimeSystemPayload) => emit('system', payload),
     emitStatus: (status: RealtimeStatus) => statusCallback?.(status),
     reset: () => {
-      recordCallback = null;
+      listeners.clear();
       statusCallback = null;
       channel.on.mockClear();
       channel.subscribe.mockClear();
@@ -175,6 +177,37 @@ describe('interactionService', () => {
       realtime.emitRecord({ new: incomingRecord });
 
       expect(onInteraction).toHaveBeenCalledWith(incomingRecord);
+    });
+
+    it("reports the server's postgres_changes confirmation, and no other system message", async () => {
+      const onDeliveryArmed = vi.fn();
+      const topic = `incoming-interactions:${USER_ID}`;
+
+      await interactionService.subscribeInteractions(USER_ID, vi.fn(), vi.fn(), onDeliveryArmed);
+      realtime.emitStatus('SUBSCRIBED');
+      realtime.emitSystem({
+        extension: 'postgres_changes',
+        status: 'error',
+        message: 'Unable to subscribe to changes',
+        channel: topic,
+      });
+      realtime.emitSystem({
+        extension: 'system',
+        status: 'ok',
+        message: 'Replication connection established',
+        channel: topic,
+      });
+      // SUBSCRIBED alone is not the confirmation.
+      expect(onDeliveryArmed).not.toHaveBeenCalled();
+
+      realtime.emitSystem({
+        extension: 'postgres_changes',
+        status: 'ok',
+        message: 'Subscribed to PostgreSQL',
+        channel: topic,
+      });
+
+      expect(onDeliveryArmed).toHaveBeenCalledTimes(1);
     });
 
     it('removes the channel only once when teardown is repeated', async () => {
