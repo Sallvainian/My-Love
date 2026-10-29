@@ -3,7 +3,7 @@ title: 'Harden five component tests whose assertions are weaker than their names
 type: 'chore'
 ticket: ''
 created: '2026-10-29'
-status: 'built'
+status: 'done'
 baseline_revision: '210b3a2899d31126886243451dc113327be817b0'
 route: 'oneshot'
 route_source: 'auto'

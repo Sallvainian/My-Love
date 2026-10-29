@@ -3,7 +3,7 @@ title: 'Pin the real contract in four e2e/api assertions'
 type: 'chore'
 ticket: ''
 created: '2026-10-29'
-status: built
+status: done
 baseline_revision: 3e547a40c30d40f6ca995dae444307c617cf4d98
 route: 'oneshot'
 route_source: 'auto'

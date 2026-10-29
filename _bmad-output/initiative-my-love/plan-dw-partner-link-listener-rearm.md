@@ -3,7 +3,7 @@ title: 'DW-298: re-arm the partner-link listener so a missed accept broadcast is
 type: 'bugfix'
 ticket: ''
 created: '2026-10-29'
-status: 'built'
+status: 'done'
 baseline_revision: '7c218e3a0dd3158e6e8b4583a2e21fea8e532bfb'
 route: 'oneshot'
 route_source: 'auto'

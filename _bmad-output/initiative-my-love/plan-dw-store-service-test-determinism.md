@@ -3,7 +3,7 @@ title: 'Remove hidden order and implementation dependencies from four store/serv
 type: 'chore'
 ticket: ''
 created: '2026-10-29'
-status: 'built'
+status: 'done'
 baseline_revision: 'ebf65ee9f54843eeeffd1c9be301d301a9f44f3b'
 route: 'oneshot'
 route_source: 'auto'

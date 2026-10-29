@@ -3,7 +3,7 @@ title: 'DW-315: keep a confirmed mark-viewed through a history read that was alr
 type: 'bugfix'
 ticket: ''
 created: '2026-10-29'
-status: 'built'
+status: 'done'
 baseline_revision: '6cd235cd2444c2148d64b9a9cbb292f2f8e34c02'
 route: 'oneshot'
 route_source: 'auto'
