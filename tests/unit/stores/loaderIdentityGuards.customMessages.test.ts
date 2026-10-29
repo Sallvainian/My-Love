@@ -536,19 +536,34 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().customMessagesLoaded).toBe(true);
     });
 
-    it("a created custom message is listed, saved to the account's copy, and the rotation pool re-read", async () => {
+    /** A creates a custom message and the server confirms it. */
+    async function createACustomMessage() {
       customCreate.mockResolvedValue(aRemote());
 
       await useAppStore.getState().createCustomMessage(aCustomInput());
+    }
+
+    it('a created custom message is listed', async () => {
+      await createACustomMessage();
 
       expect(useAppStore.getState().customMessages).toEqual([
         expect.objectContaining({ text: 'A-PRIVATE-CUSTOM-MESSAGE' }),
       ]);
-      // The confirmed row is saved in A's copy…
+    });
+
+    it("a created custom message is saved to the account's copy", async () => {
+      await createACustomMessage();
+
+      // The confirmed row is saved in A's copy.
       expect(messageDataWrites()).toEqual([
         [A, 'message-data', expect.objectContaining({ custom: [expect.objectContaining({ serverId: 'srv-a-7' })] })],
       ]);
-      // …and it still refreshes the rotation pool afterwards.
+    });
+
+    it("a created custom message re-reads the account's rotation pool", async () => {
+      await createACustomMessage();
+
+      // It still refreshes the rotation pool after saving the copy.
       expect(readLocalCopy).toHaveBeenLastCalledWith(A, 'message-data');
     });
 
@@ -598,16 +613,30 @@ describe('loader identity guards', () => {
       }
     });
 
-    it("an import reports one imported row, saves it to the account's copy and re-reads the rotation pool", async () => {
+    /** A imports a backup holding one new message, and the server confirms it. */
+    function importOneMessage() {
       customCreate.mockResolvedValue({ ...aRemote('A-IMPORTED-MESSAGE'), serverId: 'srv-imported' });
 
-      await expect(
-        useAppStore
-          .getState()
-          .importCustomMessages(importFile(Promise.resolve(JSON.stringify(exportFile()))))
-      ).resolves.toEqual({ imported: 1, skipped: 0 });
+      return useAppStore
+        .getState()
+        .importCustomMessages(importFile(Promise.resolve(JSON.stringify(exportFile()))));
+    }
 
-      expect(messageDataWrites()).toHaveLength(1);
+    it('an import reports one imported row', async () => {
+      await expect(importOneMessage()).resolves.toEqual({ imported: 1, skipped: 0 });
+    });
+
+    it("an import saves the imported row to the account's copy", async () => {
+      await importOneMessage();
+
+      expect(messageDataWrites()).toEqual([
+        [A, 'message-data', expect.objectContaining({ custom: [expect.objectContaining({ serverId: 'srv-imported' })] })],
+      ]);
+    });
+
+    it("an import re-reads the account's rotation pool", async () => {
+      await importOneMessage();
+
       expect(readLocalCopy).toHaveBeenLastCalledWith(A, 'message-data');
     });
   });

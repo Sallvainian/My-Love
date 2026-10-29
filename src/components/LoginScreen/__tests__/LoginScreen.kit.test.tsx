@@ -112,7 +112,9 @@ describe('LoginScreen on the kit', () => {
   it('renders the OR divider and the Contact admin footer link', () => {
     render(<LoginScreen />);
 
-    expect(screen.getByText('OR')).toHaveClass('text-muted', 'text-xs', 'font-semibold');
+    const divider = screen.getByTestId('login-divider');
+    expect(divider).toHaveTextContent(/^OR$/);
+    expect(divider).toHaveClass('text-muted', 'text-xs', 'font-semibold');
     const contact = screen.getByRole('button', { name: 'Contact admin' });
     expect(contact).toHaveClass('text-accent', 'font-semibold');
     const footer = screen.getByTestId('login-footer');

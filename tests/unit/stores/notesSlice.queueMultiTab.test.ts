@@ -11,6 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { enqueueNote, listQueuedNotes, removeQueuedNote } from '../../../src/services/noteQueue';
+import { CHECK_VIOLATION_CODE } from '../../support/check-constraint-envelopes';
 import {
   A,
   clearStores,
@@ -180,54 +181,18 @@ describe('notesSlice offline send queue', () => {
     expect(await queuedIds()).toEqual([]);
   });
 
-  it('another tab sends this tab\'s waiting note: this tab confirms it once that drain ends', async () => {
+  /**
+   * Tab 2's note waits behind tab 1's held insert; tab 1 then sends it from the
+   * shared queue, and the server answers it with `tab2sOutcome` (accepted when
+   * empty). Returns once tab 1's drain ends.
+   */
+  async function tab1SendsTab2sNote(tab2sOutcome: typeof server.outcomes = []) {
     stubWebLocks();
     const tab1 = createTestStore();
     const tab2 = createTestStore();
     // Tab 1 holds the lock mid-insert of its own note.
     const reply = deferred();
-    server.outcomes = [{ hold: reply.promise }];
-    await tab1.getState().sendNote('from tab1');
-    await vi.waitFor(() => expect(server.upserts).toBe(1));
-
-    // Tab 2's drain loses the lock, so its note waits.
-    await tab2.getState().sendNote('from tab2');
-    await vi.waitFor(() =>
-      expect(tab2.getState().notes[0]).toMatchObject({ content: 'from tab2', queued: true, sending: false })
-    );
-
-    // Tab 1 re-reads the shared queue, sends tab 2's note and deletes its row.
-    reply.resolve();
-    await tab1.getState().drainQueuedNotes();
-    expect(server.rows.map((r) => r.content)).toEqual(['from tab1', 'from tab2']);
-    expect(await queuedIds()).toEqual([]);
-    expect(server.upserts).toBe(2);
-
-    // No further trigger: tab 2 learns of it when tab 1's drain lets go.
-    await vi.waitFor(() =>
-      expect(tab2.getState().notes).toEqual([
-        expect.objectContaining({ id: 'server-2', content: 'from tab2', sending: false, error: false }),
-      ])
-    );
-    expect(tab2.getState().notes[0].queued).toBeUndefined();
-    await tab2.getState().drainQueuedNotes();
-    // Confirmed from the stored row, not sent a second time or broadcast by tab 2.
-    expect(server.upserts).toBe(2);
-    expect(sendEphemeralBroadcast).toHaveBeenCalledTimes(2);
-    await vi.waitFor(async () => expect(await copyIds()).toContain('server-2'));
-  });
-
-  /**
-   * Tab 2's note waits behind tab 1's held insert; tab 1 then sends it from the
-   * shared queue and the server rejects it. Returns once tab 1's drain ends.
-   */
-  async function tab1SendsTab2sNoteAndItIsRejected() {
-    stubWebLocks();
-    const tab1 = createTestStore();
-    const tab2 = createTestStore();
-    // Tab 1 holds the lock mid-insert of its own note; tab 2's note is refused.
-    const reply = deferred();
-    server.outcomes = [{ hold: reply.promise }, { reject: '23514' }];
+    server.outcomes = [{ hold: reply.promise }, ...tab2sOutcome];
     await tab1.getState().sendNote('from tab1');
     await vi.waitFor(() => expect(server.upserts).toBe(1));
 
@@ -238,10 +203,59 @@ describe('notesSlice offline send queue', () => {
     );
     const key = tab2.getState().notes[0].tempId!;
 
-    // Tab 1 re-reads the shared queue, sends tab 2's note, and it is rejected.
+    // Tab 1 re-reads the shared queue and sends tab 2's note.
     reply.resolve();
     await tab1.getState().drainQueuedNotes();
     return { tab2, key };
+  }
+
+  /** No further trigger: waits until tab 2 learns of its note when tab 1's drain lets go. */
+  async function untilTab2ConfirmsIt(tab2: ReturnType<typeof createTestStore>) {
+    await vi.waitFor(() => expect(tab2.getState().notes[0]?.id).toBe('server-2'));
+  }
+
+  describe("another tab sends this tab's waiting note", () => {
+    it('the lock holder inserts both notes and empties the shared queue', async () => {
+      await tab1SendsTab2sNote();
+      expect(server.rows.map((r) => r.content)).toEqual(['from tab1', 'from tab2']);
+      expect(await queuedIds()).toEqual([]);
+    });
+
+    it('this tab confirms it from the stored row once that drain ends', async () => {
+      const { tab2 } = await tab1SendsTab2sNote();
+      // No further trigger: tab 2 learns of it when tab 1's drain lets go.
+      await vi.waitFor(() =>
+        expect(tab2.getState().notes).toEqual([
+          expect.objectContaining({ id: 'server-2', content: 'from tab2', sending: false, error: false }),
+        ])
+      );
+      expect(tab2.getState().notes[0].queued).toBeUndefined();
+    });
+
+    it('this tab neither sends it a second time nor broadcasts it', async () => {
+      const { tab2 } = await tab1SendsTab2sNote();
+      expect(server.upserts).toBe(2);
+      await untilTab2ConfirmsIt(tab2);
+      await tab2.getState().drainQueuedNotes();
+      // Confirmed from the stored row, not sent a second time or broadcast by tab 2.
+      expect(server.upserts).toBe(2);
+      expect(sendEphemeralBroadcast).toHaveBeenCalledTimes(2);
+    });
+
+    it('the confirmed note is saved in the local copy', async () => {
+      const { tab2 } = await tab1SendsTab2sNote();
+      await untilTab2ConfirmsIt(tab2);
+      await tab2.getState().drainQueuedNotes();
+      await vi.waitFor(async () => expect(await copyIds()).toContain('server-2'));
+    });
+  });
+
+  /**
+   * Tab 2's note waits behind tab 1's held insert; tab 1 then sends it from the
+   * shared queue and the server rejects it. Returns once tab 1's drain ends.
+   */
+  function tab1SendsTab2sNoteAndItIsRejected() {
+    return tab1SendsTab2sNote([{ reject: CHECK_VIOLATION_CODE }]);
   }
 
   /** No further trigger: tab 2 shows the note failed once tab 1's drain lets go. */

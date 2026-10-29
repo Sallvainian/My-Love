@@ -68,6 +68,11 @@ function sortByDate(events: CoupleEvent[]): CoupleEvent[] {
 export const ok: EventWriteResult = { success: true };
 export const loadOk: EventLoadResult = { status: 'success' };
 
+/** A failed load, as the slice resolves it. */
+export function loadFailure(error: string): EventLoadResult {
+  return { status: 'failure', error };
+}
+
 type EventWriteFailure = Extract<EventWriteResult, { success: false }>;
 
 /** A refused write, as the slice resolves it. */
@@ -290,6 +295,6 @@ export function expectUnsettledSession() {
 }
 
 export const oldOutcomes: EventLoadResult[] = [
-  { status: 'success' },
-  { status: 'failure', error: 'Previous session failed' },
+  loadOk,
+  loadFailure('Previous session failed'),
 ];

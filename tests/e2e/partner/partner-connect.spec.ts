@@ -316,7 +316,7 @@ test.describe('Connecting with a partner', () => {
     await expect(page.getByTestId('partner-search-taken')).toHaveText(TAKEN);
     await expect(page.getByRole('button', { name: /send request/i })).toHaveCount(0);
     await expect(page.getByTestId('partner-search-card')).not.toContainText(d.name);
-    await expect(page.getByText(MISSING)).toHaveCount(0);
+    await expect(page.getByTestId('partner-search-empty')).toHaveCount(0);
 
     // A part of B's address finds nobody: the match is exact. Still
     // email-shaped, so Find is enabled and the question reaches the server.
@@ -379,7 +379,7 @@ test.describe('Connecting with a partner', () => {
         ]);
       }
     );
-    await expect(page.getByText('Unknown User')).toHaveCount(0);
+    await expect(page.getByTestId('sent-requests-list')).not.toContainText('Unknown User');
     await expect(results).toHaveCount(0);
 
     const { data: request, error: requestError } = await supabaseAdmin
@@ -417,7 +417,7 @@ test.describe('Connecting with a partner', () => {
     ]);
     // B's received list names A.
     await expect(bPage.getByTestId('received-requests-list')).toContainText(a.name);
-    await expect(bPage.getByText('Unknown User')).toHaveCount(0);
+    await expect(bPage.getByTestId('received-requests-list')).not.toContainText('Unknown User');
 
     // A's thread load once A learns of the link.
     const aThreadAfterLink = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });

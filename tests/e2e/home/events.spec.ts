@@ -135,8 +135,12 @@ test.describe('Home dashboard reads events from the store', () => {
     await expect(futureCard).toBeVisible();
     await expect(futureCard.getByText('Future Meetup E2E')).toBeVisible();
     await expect(futureCard.getByText('Future event description')).toBeVisible();
-    // The countdown day-count is this component's rendering of "the date".
-    await expect(futureCard.getByTestId('countdown-value')).toHaveText(/^\d+ days?$/);
+    // The countdown day-count is this component's rendering of "the date":
+    // whole days left on the pinned clock, so a date FUTURE_MEETUP.daysFromNow
+    // calendar days after the noon anchor shows one fewer.
+    await expect(futureCard.getByTestId('countdown-value')).toHaveText(
+      `${FUTURE_MEETUP.daysFromNow - 1} days`
+    );
 
     const partnerCard = page.getByTestId('event-countdown-partner-meetup-e2e');
     await expect(partnerCard).toBeVisible();

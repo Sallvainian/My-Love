@@ -36,7 +36,7 @@ describe('formatDateISO', () => {
     expect(formatDateISO(new Date(2025, 2, 9))).toBe('2025-03-09');
   });
 
-  it('handles December 31st', () => {
+  it('formats the last day of the year without rolling into the next', () => {
     expect(formatDateISO(new Date(2025, 11, 31))).toBe('2025-12-31');
   });
 });

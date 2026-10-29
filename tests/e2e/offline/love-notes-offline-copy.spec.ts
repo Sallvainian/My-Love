@@ -186,7 +186,7 @@ test.describe('Love notes from the local copy', () => {
         expect(v).toBe(true);
       }
     );
-    await expect(noteBubble(page, imageContent).getByText('Failed to load image')).toHaveCount(0);
+    await expect(noteBubble(page, imageContent).getByTestId('love-note-image-error')).toHaveCount(0);
     // …and no error banner covers the saved thread.
     await expect(page.getByRole('button', { name: 'Dismiss' })).toHaveCount(0);
   });

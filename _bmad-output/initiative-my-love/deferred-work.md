@@ -2561,3 +2561,11 @@ severity: low
 reason: A documented design choice in #379, not a defect: find_partner_by_email answers is_taken to any authenticated caller, and PostgREST does not rate-limit the call, so with open signup anyone can bulk-check addresses for an account and a relationship. Needs an owner decision: rate-limit the call, or report a taken account the same way as a missing one.
 status: done 2026-10-28
 resolution: won't fix -- accepted 2026-10-28 by the owner: the owner and their partner are the app's only users and are already linked to each other, and the search is kept as #379 designed it, because its "already connected with a partner" answer is the one that would reveal an unexpected link. Reopen if other couples are ever invited to use the app.
+
+### DW-301: Two OfflineError tests in offlineErrorHandler.test.ts assert the same default fields, so "creates an error with default message" proves nothing that "is an instance of Error" does not.
+origin: spec-deferred b4fe790b514f
+location: tests/unit/utils/offlineErrorHandler.test.ts:15
+source_spec: `tickets/epic-test-review-remediation/tickets/story-fix-the-2026-10-03-tests-unit-findings-plan.md`
+severity: low
+reason: At the baseline both tests already asserted name, isRetryable and the default message (per-field toBe at :17-20, toMatchObject at :32-37); only the operation string differs, and only the second adds toBeInstanceOf(Error). The L7 conversion made the overlap visible but did not create it.
+status: open

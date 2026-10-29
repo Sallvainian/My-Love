@@ -49,7 +49,7 @@ import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventsSettings } from '../EventsSettings';
-import { loadOk, makeEvent, ok, OWN_USER_ID, type EventWriteResult } from './eventsSettingsKit';
+import { loadFailure, loadOk, makeEvent, ok, OWN_USER_ID, writeFailure } from './eventsSettingsKit';
 
 type DivProps = HTMLAttributes<HTMLDivElement> & {
   children?: ReactNode;
@@ -153,7 +153,7 @@ describe('DE.5-COMP-002: a failed save cannot forge a failed load (DW-26)', () =
       }),
       addEvent: vi.fn(async () => {
         store.patch({ eventsError: saveMessage });
-        return { success: false, code: 'offline', error: saveMessage } as EventWriteResult;
+        return writeFailure('offline', saveMessage);
       }),
     });
 
@@ -187,7 +187,7 @@ describe('DE.5-COMP-003: a failed load re-fires on reconnect (DW-27)', () => {
     const loadEvents = vi.fn(async () => {
       if (loadEvents.mock.calls.length === 1) {
         store.patch({ eventsError: 'Network error' });
-        return { status: 'failure', error: 'Network error' } as const;
+        return loadFailure('Network error');
       }
       store.patch({
         eventsError: null,

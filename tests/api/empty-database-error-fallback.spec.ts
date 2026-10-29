@@ -15,6 +15,7 @@ import {
   createDatabaseErrorEnvelope,
   type DatabaseErrorEnvelope,
 } from '../support/factories/database-error-envelope';
+import { CHECK_VIOLATION_CODE } from '../support/check-constraint-envelopes';
 import { handleSupabaseError, isPostgrestError } from '../../src/api/errorHandlers';
 import type { Database } from '../../src/types/database.types';
 
@@ -105,7 +106,7 @@ test.describe('DW-39 empty database error fallback through SDK parsing', () => {
 
   test('[P2] DW39-API-003 CHECK mapping takes precedence over an empty SDK message', async () => {
     const error = await parseRejectedInsert(
-      createDatabaseErrorEnvelope({ code: '23514', message: '' })
+      createDatabaseErrorEnvelope({ code: CHECK_VIOLATION_CODE, message: '' })
     );
 
     const mapped = handleSupabaseError(error, 'EventsService.createEvent');
@@ -113,7 +114,7 @@ test.describe('DW-39 empty database error fallback through SDK parsing', () => {
     expect(mapped.message).toBe(
       '[EventsService.createEvent] Some values are not allowed - check length and format limits'
     );
-    expect(mapped.code).toBe('23514');
+    expect(mapped.code).toBe(CHECK_VIOLATION_CODE);
     expect(mapped.isNetworkError).toBe(false);
   });
 

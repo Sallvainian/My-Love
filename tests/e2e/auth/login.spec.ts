@@ -131,8 +131,8 @@ test.describe('Login Flow', () => {
 
     await authCall;
 
-    // THEN: Login screen is no longer visible (user redirected to app)
-    await expect(page.getByTestId('login-screen')).not.toBeVisible({ timeout: 5000 });
+    // THEN: The login screen is gone (the app unmounts it once signed in)
+    await expect(page.getByTestId('login-screen')).toHaveCount(0);
   });
 
   test('[P0] should persist session across page reloads', async ({ page, supabaseAdmin }) => {

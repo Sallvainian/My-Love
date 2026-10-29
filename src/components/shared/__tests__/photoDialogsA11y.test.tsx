@@ -62,19 +62,31 @@ vi.mock('../../../services/imageCompressionService', () => ({
   },
 }));
 
+import { createPhotoInsert } from '../../../../tests/support/factories/photos';
 import type { PhotoWithUrls } from '../../../services/photoService';
 import { PhotoGridItem } from '../../PhotoGallery/PhotoGridItem';
 import { PhotoViewer } from '../../PhotoGallery/PhotoViewer';
 import { PhotoUpload } from '../../PhotoUpload/PhotoUpload';
 
-const photo = {
+// The columns the insert type leaves optional, restated after the factory's
+// body so the row is whole.
+const PHOTO_ROW = {
   id: 'photo-1',
   caption: 'Beach day',
-  storage_path: 'me/photo-1.jpg',
+  mime_type: 'image/jpeg',
+  created_at: '2026-08-17T10:00:00.000Z',
+};
+const photo: PhotoWithUrls = {
+  ...createPhotoInsert({
+    ...PHOTO_ROW,
+    user_id: 'me',
+    storage_path: 'me/photo-1.jpg',
+    file_size: 68,
+  }),
+  ...PHOTO_ROW,
   signedUrl: null,
   isOwn: true,
-  created_at: '2026-08-17T10:00:00.000Z',
-} as unknown as PhotoWithUrls;
+};
 
 /** An Image whose load always succeeds, so handleUpload reaches the store. */
 class LoadingImage {

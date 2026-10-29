@@ -52,6 +52,8 @@ type Expected = {
 
 type OverlapExpected = Expected & {
   scenario: Exclude<PersistenceScenario, 'sequential'>;
+  /** The guarantee this scenario's trace proves, as the test names it. */
+  behaviour: string;
   /** The action whose writes queue behind the blocker. */
   older: string;
   /** The notification that arrives while the older write is held. */
@@ -87,6 +89,7 @@ const sequential: Expected = {
 const overlapping: OverlapExpected[] = [
   {
     scenario: 'local-actions',
+    behaviour: "signing in as B while A's sign-out write is queued leaves B's token stored",
     dispatches: [
       ['seed-A', 'put'], ['before-overlap', 'get'], ['sign-out-listener', 'delete'], ['sign-out', 'delete'],
       ['sign-in-B', 'put'], ['sign-in-B-listener', 'put'], ['final', 'get'],
@@ -112,6 +115,7 @@ const overlapping: OverlapExpected[] = [
   },
   {
     scenario: 'stale-clear',
+    behaviour: "an older sign-out's queued delete does not erase a newer account's token",
     dispatches: [
       ['seed-A', 'put'], ['before-overlap', 'get'], ['sign-out-listener', 'delete'], ['sign-out', 'delete'],
       ['independent-B', 'put'], ['final', 'get'],
@@ -136,6 +140,7 @@ const overlapping: OverlapExpected[] = [
   },
   {
     scenario: 'stale-overwrite',
+    behaviour: "an older sign-in's queued write does not overwrite a newer account's token",
     dispatches: [['sign-in-A-listener', 'put'], ['sign-in-A', 'put'], ['independent-B', 'put'], ['final', 'get']],
     transactionsCreated: 5,
     actionsStarted: ['sign-in-A'],
@@ -153,6 +158,7 @@ const overlapping: OverlapExpected[] = [
   },
   {
     scenario: 'stale-resurrection',
+    behaviour: "an older sign-in's queued write does not restore a token a newer sign-out removed",
     dispatches: [
       ['sign-in-A-listener', 'put'], ['sign-in-A', 'put'], ['independent-sign-out', 'delete'], ['final', 'get'],
     ],
@@ -172,6 +178,7 @@ const overlapping: OverlapExpected[] = [
   },
   {
     scenario: 'same-owner-refresh',
+    behaviour: "an older sign-in's queued write does not replace the same account's refreshed token",
     dispatches: [['sign-in-A-listener', 'put'], ['sign-in-A', 'put'], ['refresh-A-v2', 'put'], ['final', 'get']],
     transactionsCreated: 5,
     actionsStarted: ['sign-in-A'],
@@ -334,13 +341,13 @@ async function runScenario(
 }
 
 test.describe('Native auth token persistence', () => {
-  test('[P2] characterizes native auth token persistence: sequential', async ({ page, browser, baseURL }, testInfo) => {
+  test('[P2] stores the signed-in token and removes it on sign-out (sequential)', async ({ page, browser, baseURL }, testInfo) => {
     await runScenario({ page, browser, baseURL }, testInfo, 'sequential', sequential);
   });
 
   for (const expected of overlapping) {
-    const { scenario, older, newer } = expected;
-    test('[P2] characterizes native auth token persistence: ' + scenario, async ({ page, browser, baseURL }, testInfo) => {
+    const { scenario, behaviour, older, newer } = expected;
+    test('[P2] ' + behaviour + ' (' + scenario + ')', async ({ page, browser, baseURL }, testInfo) => {
       const { trace } = await runScenario({ page, browser, baseURL }, testInfo, scenario, expected);
 
       const blocker = entry(trace, 'blocker', 'transaction-created');

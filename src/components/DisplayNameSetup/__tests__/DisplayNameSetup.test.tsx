@@ -333,9 +333,10 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
     it('wears edit copy rather than the first-run welcome', async () => {
       renderEdit('Jessie');
 
-      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Change your name');
+      const heading = screen.getByRole('heading', { level: 2 });
+      expect(heading).toHaveTextContent('Change your name');
       expect(screen.getByTestId('display-name-submit')).toHaveTextContent('Save name');
-      expect(screen.queryByText(/Welcome!/)).not.toBeInTheDocument();
+      expect(document.body).not.toHaveTextContent('Welcome!');
     });
 
     it('Cancel closes the form without writing anything', async () => {

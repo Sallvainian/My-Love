@@ -165,7 +165,12 @@ describe('messages: favorites, custom messages and the message-data copy', () =>
     };
   }
 
-  it('replaces the owner’s copy with the server’s rows and favorites, and nobody else’s', async () => {
+  /**
+   * A's copy holds a server-matched row and a never-synced one, another account
+   * has its own copy, and the server answers with one updated and one new row
+   * plus a bundled favorite. Refreshes A's message data from the server.
+   */
+  async function refreshOwnerFromServer() {
     const bundledText = `DAILY-${A}`;
     const [bundledId] = await seedBundled([bundledText]);
     await putCopy(A, {
@@ -185,6 +190,11 @@ describe('messages: favorites, custom messages and the message-data copy', () =>
     server.fetchFavoriteKeys.mockResolvedValue([await bundledMessageKey(bundledText)]);
 
     await useAppStore.getState().loadMessageDataFromServer();
+    return { bundledId, other };
+  }
+
+  it('replaces the owner’s copy with the server’s rows and favorites, and nobody else’s', async () => {
+    const { bundledId, other } = await refreshOwnerFromServer();
 
     const copy = await copyOf(A);
     // The matched row kept its local id; the new one took the next id, never
@@ -197,7 +207,11 @@ describe('messages: favorites, custom messages and the message-data copy', () =>
     expect(copy?.nextCustomId).toBe(BASE + 3);
     // Another account's copy is untouched.
     expect((await copyOf(other))?.custom.map((row) => row.text)).toEqual(['OTHER-PRIVATE']);
-    // And the store now shows them.
+  });
+
+  it('shows the refreshed rows and favorites in the store', async () => {
+    const { bundledId } = await refreshOwnerFromServer();
+
     const state = useAppStore.getState();
     expect(state.messageHistory.favoriteIds).toEqual(expect.arrayContaining([bundledId, BASE]));
     expect(state.messages.filter((m) => m.isCustom).map((m) => m.text)).toEqual([

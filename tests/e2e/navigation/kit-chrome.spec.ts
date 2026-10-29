@@ -51,8 +51,8 @@ test.describe('Style kit chrome', () => {
 
       const wordmark = page.getByTestId('app-wordmark');
       await expect(wordmark).toBeVisible();
-      const wordmarkText = wordmark.getByText('My Love', { exact: true });
-      await expect(wordmarkText).toBeVisible();
+      const wordmarkText = wordmark.getByTestId('app-wordmark-text');
+      await expect(wordmarkText).toHaveText('My Love');
 
       const type = await wordmarkText.evaluate((el) => {
         const style = getComputedStyle(el);

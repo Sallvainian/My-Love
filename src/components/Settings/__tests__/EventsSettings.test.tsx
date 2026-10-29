@@ -25,6 +25,7 @@ import { EventsSettings } from '../EventsSettings';
 import {
   createEventsStoreKit,
   fillForm,
+  loadFailure,
   loadOk,
   makeEvent,
   openAddForm,
@@ -216,7 +217,7 @@ describe('EventsSettings list states', () => {
         // Deliberately disagree with the result: reading shared state would
         // incorrectly render the empty placeholder.
         store.patch({ eventsError: null });
-        return { status: 'failure', error: 'Network error' } as const;
+        return loadFailure('Network error');
       }),
     });
 
@@ -236,7 +237,7 @@ describe('EventsSettings list states', () => {
       events: [makeEvent({ id: 'stale', label: 'Still here' })] as AppState['events'],
       loadEvents: vi.fn(async () => {
         store.patch({ eventsError: null });
-        return { status: 'failure', error: 'Network error' } as const;
+        return loadFailure('Network error');
       }),
     });
 
@@ -264,7 +265,7 @@ describe('EventsSettings list states', () => {
           new Promise<EventLoadResult>((resolve) => {
             finishLoad = () => {
               store.patch({ eventsIsLoading: false });
-              resolve({ status: 'success' });
+              resolve(loadOk);
             };
           })
       ),
@@ -327,7 +328,7 @@ describe('EventsSettings list states', () => {
       // the caller contract so a future regression cannot infer this load's
       // outcome from unrelated shared state again.
       store.patch({ eventsError: 'An unrelated stored error' });
-      finishLoad({ status: 'success' });
+      finishLoad(loadOk);
     });
 
     expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
@@ -338,10 +339,7 @@ describe('EventsSettings list states', () => {
     const reconnectedEvent = makeEvent({ id: 'reconnected', label: 'Back online' });
     const loadEvents = vi
       .fn<() => Promise<EventLoadResult>>()
-      .mockImplementationOnce(async () => ({
-        status: 'failure',
-        error: 'Network error',
-      }))
+      .mockImplementationOnce(async () => loadFailure('Network error'))
       .mockImplementationOnce(async () => {
         store.patch({
           events: [reconnectedEvent],
@@ -390,7 +388,7 @@ describe('EventsSettings list states', () => {
       .fn<() => Promise<EventLoadResult>>()
       .mockImplementationOnce(async () => {
         store.patch({ eventsError: 'Network error' });
-        return { status: 'failure', error: 'Network error' };
+        return loadFailure('Network error');
       })
       .mockImplementationOnce(() => {
         store.patch({ eventsError: null, eventsIsLoading: true });
@@ -461,16 +459,13 @@ describe('EventsSettings list states', () => {
     let finishRetry: () => void = () => {};
     const loadEvents = vi
       .fn<() => Promise<EventLoadResult>>()
-      .mockImplementationOnce(async () => ({
-        status: 'failure',
-        error: 'Initial failure',
-      }))
+      .mockImplementationOnce(async () => loadFailure('Initial failure'))
       .mockImplementationOnce(() => {
         store.patch({ eventsError: null, eventsIsLoading: true });
         return new Promise<EventLoadResult>((resolve) => {
           finishRetry = () => {
             store.patch({ eventsError: 'Retry failed', eventsIsLoading: false });
-            resolve({ status: 'failure', error: 'Retry failed' });
+            resolve(loadFailure('Retry failed'));
           };
         });
       });
@@ -499,16 +494,13 @@ describe('EventsSettings list states', () => {
     let finishRetry: () => void = () => {};
     const loadEvents = vi
       .fn<() => Promise<EventLoadResult>>()
-      .mockImplementationOnce(async () => ({
-        status: 'failure',
-        error: 'Initial failure',
-      }))
+      .mockImplementationOnce(async () => loadFailure('Initial failure'))
       .mockImplementationOnce(() => {
         store.patch({ eventsError: null, eventsIsLoading: true });
         return new Promise<EventLoadResult>((resolve) => {
           finishRetry = () => {
             store.patch({ eventsError: 'Retry failed', eventsIsLoading: false });
-            resolve({ status: 'failure', error: 'Retry failed' });
+            resolve(loadFailure('Retry failed'));
           };
         });
       });

@@ -248,8 +248,7 @@ describe('moodSyncService.syncPendingMoods', () => {
 
     const result = await runSync();
 
-    expect(result.synced).toBe(0);
-    expect(result.failed).toBe(0);
+    expect(result).toMatchObject({ synced: 0, failed: 0 });
     expect(result.errors).toContain('Device is offline - cannot sync moods');
     expect(backend.rows).toHaveLength(0);
     expect(backend.operations).toHaveLength(0);

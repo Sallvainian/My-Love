@@ -3,14 +3,15 @@ import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
-import { isoDateDaysFromNow } from '../../support/helpers/events';
+import { isoDateDaysFromNow, resolveOwnPair } from '../../support/helpers/events';
+import { openSettingsFromHome } from '../../support/helpers/settings-screen';
 
 test.describe('DW-39 empty database error fallback', () => {
   test(
     '[P1] DW39-E2E-001 a blank database error leaves the event form ready to retry',
     // This test deliberately injects the 400 that the form must explain.
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
-    async ({ page, authToken, interceptNetworkCall, recurse }) => {
+    async ({ page, authToken, interceptNetworkCall, supabaseAdmin }) => {
       expect(authToken).not.toBe('');
       const label = `DW39 event ${faker.string.uuid()}`;
       const anchor = new Date();
@@ -29,12 +30,11 @@ test.describe('DW-39 empty database error fallback', () => {
       });
 
       await log.step('Given an event form with a valid label and future date');
-      await page.goto('/settings');
-      const userId = await recurse(
-        () => page.evaluate(() => window.__APP_STORE__?.getState().userId),
-        (id) => typeof id === 'string' && id.length > 0,
-        { timeout: 10000 }
-      );
+      // Settings' own events load has settled, so the store and list checks
+      // below read loaded state rather than a list that has not arrived yet.
+      await openSettingsFromHome(page, interceptNetworkCall);
+      const { userId } = await resolveOwnPair(supabaseAdmin);
+      expect(await page.evaluate(() => window.__APP_STORE__?.getState().userId)).toBe(userId);
       await page.getByTestId('events-settings-add').click();
       const form = page.getByTestId('events-form');
       const labelInput = page.getByTestId('events-form-label');

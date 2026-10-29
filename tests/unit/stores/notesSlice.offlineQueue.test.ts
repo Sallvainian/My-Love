@@ -19,6 +19,7 @@ import {
   NoteRefusedOfflineError,
   type NotesSlice,
 } from '../../../src/stores/slices/notesSlice';
+import { CHECK_VIOLATION_CODE } from '../../support/check-constraint-envelopes';
 import {
   A,
   clearStores,
@@ -154,13 +155,23 @@ describe('notesSlice offline send queue', () => {
     expect(server.upserts).toBe(3);
   });
 
-  it('reconnect: each sent note replaces its queued entry in state and copy, and leaves the queue', async () => {
+  it('reconnect: each sent note replaces its queued entry in state', async () => {
     const { store } = await reconnectAfterThreeOffline();
 
     expect(store.getState().notes.map((n) => n.id)).toEqual(['server-1', 'server-2', 'server-3']);
     expect(store.getState().notes.every((n) => !n.queued && !n.sending && !n.error)).toBe(true);
+  });
+
+  it('reconnect: each sent note is saved in the copy', async () => {
+    await reconnectAfterThreeOffline();
+
     // The drain saves the copy without awaiting it.
     await vi.waitFor(async () => expect(await copyIds()).toEqual(['server-1', 'server-2', 'server-3']));
+  });
+
+  it('reconnect: each sent note leaves the queue', async () => {
+    await reconnectAfterThreeOffline();
+
     expect(await queuedIds()).toEqual([]);
   });
 
@@ -177,34 +188,65 @@ describe('notesSlice offline send queue', () => {
     ]);
   });
 
-  it('a queued note is sent with its composition time as written_at, and keeps it in state and copy', async () => {
+  /** Queues one note offline; returns the store and the note's composition time. */
+  async function queueOneOffline() {
     const store = createTestStore();
     setOnline(false);
     await store.getState().sendNote('written offline');
     const composedAt = (await listQueuedNotes(A))[0].createdAt;
-    expect(store.getState().notes[0].created_at).toBe(composedAt);
+    return { store, composedAt };
+  }
 
+  /** Queues one note offline, reconnects, and drains the queue once. */
+  async function queueOneOfflineAndDrain() {
+    const { store, composedAt } = await queueOneOffline();
     setOnline(true);
     await store.getState().drainQueuedNotes();
+    return { store, composedAt };
+  }
 
-    expect(server.rows).toEqual([expect.objectContaining({ content: 'written offline', written_at: composedAt })]);
-    // created_at stays the server's delivery time.
-    expect(store.getState().notes[0]).toMatchObject({
-      id: 'server-1',
-      created_at: server.rows[0].created_at,
-      written_at: composedAt,
-    });
-    // The drain saves the copy without awaiting it.
-    await vi.waitFor(async () => {
-      const copy = await readLocalCopy<Array<{ id: string; written_at?: string | null }>>(A, LOVE_NOTES_COPY_KIND);
-      expect(copy).toEqual([expect.objectContaining({ id: 'server-1', written_at: composedAt })]);
+  describe('a queued note keeps its composition time', () => {
+    it('shows its composition time while it waits', async () => {
+      const { store, composedAt } = await queueOneOffline();
+
+      expect(store.getState().notes[0].created_at).toBe(composedAt);
     });
 
-    // A reload reads it back from the copy.
-    const reloaded = createTestStore();
-    server.lookup = { status: 'error', reason: 'TypeError: Failed to fetch' };
-    await reloaded.getState().fetchNotes();
-    expect(reloaded.getState().notes[0]).toMatchObject({ id: 'server-1', written_at: composedAt });
+    it('is sent with its composition time as written_at', async () => {
+      const { composedAt } = await queueOneOfflineAndDrain();
+
+      expect(server.rows).toEqual([expect.objectContaining({ content: 'written offline', written_at: composedAt })]);
+    });
+
+    it("keeps written_at in state once sent, with created_at the server's delivery time", async () => {
+      const { store, composedAt } = await queueOneOfflineAndDrain();
+
+      expect(store.getState().notes[0]).toMatchObject({
+        id: 'server-1',
+        created_at: server.rows[0].created_at,
+        written_at: composedAt,
+      });
+    });
+
+    it('keeps written_at in the copy once sent', async () => {
+      const { composedAt } = await queueOneOfflineAndDrain();
+
+      // The drain saves the copy without awaiting it.
+      await vi.waitFor(async () => {
+        const copy = await readLocalCopy<Array<{ id: string; written_at?: string | null }>>(A, LOVE_NOTES_COPY_KIND);
+        expect(copy).toEqual([expect.objectContaining({ id: 'server-1', written_at: composedAt })]);
+      });
+    });
+
+    it('a reload reads written_at back from the copy', async () => {
+      const { composedAt } = await queueOneOfflineAndDrain();
+      await copyWritesSettled();
+
+      const reloaded = createTestStore();
+      server.lookup = { status: 'error', reason: 'TypeError: Failed to fetch' };
+      await reloaded.getState().fetchNotes();
+      expect(reloaded.getState().notes[0]).toMatchObject({ id: 'server-1', written_at: composedAt });
+    });
   });
 
   it('reconnect: a network failure stops the run and leaves the rest pending', async () => {
@@ -324,7 +366,7 @@ describe('notesSlice offline send queue', () => {
     await sendThreeOffline(store);
     const failedKey = store.getState().notes[0].tempId!;
     setOnline(true);
-    server.outcomes = [{ reject: '23514' }];
+    server.outcomes = [{ reject: CHECK_VIOLATION_CODE }];
 
     await store.getState().drainQueuedNotes();
     return { store, failedKey };
@@ -400,7 +442,7 @@ describe('notesSlice offline send queue', () => {
 
   it('retry of a rejected queued note whose row is gone queues it again under the same key', async () => {
     const store = createTestStore();
-    server.outcomes = [{ reject: '23514' }];
+    server.outcomes = [{ reject: CHECK_VIOLATION_CODE }];
     setOnline(false);
     await store.getState().sendNote('row removed');
     setOnline(true);
@@ -510,7 +552,7 @@ describe('notesSlice offline send queue', () => {
       vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview');
       vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
       uploadCompressedBlob.mockResolvedValue({ storagePath: `${A}/pic.jpg`, compressedSize: 3 });
-      server.outcomes = [{ reject: '23514' }];
+      server.outcomes = [{ reject: CHECK_VIOLATION_CODE }];
       await store.getState().sendNote('pic', new File(['x'], 'p.jpg', { type: 'image/jpeg' }));
       const note = store.getState().notes[0];
       expect(note).toMatchObject({ error: true });

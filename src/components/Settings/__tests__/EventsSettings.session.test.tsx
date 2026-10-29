@@ -16,6 +16,7 @@ import {
   createEventsStoreKit,
   deferredLoad,
   expectUnsettledSession,
+  loadFailure,
   loadOk,
   makeEvent,
   oldOutcomes,
@@ -128,7 +129,7 @@ describe('EventsSettings authentication session ownership', () => {
     await act(async () => { reauthenticate(); });
     expect(loadEvents).toHaveBeenCalledTimes(2);
     expectUnsettledSession();
-    await act(async () => { current.resolve({ status: 'failure', error: 'Current failure' }); });
+    await act(async () => { current.resolve(loadFailure('Current failure')); });
     expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
     await act(async () => { previous.resolve(outcome); });
     expect(screen.getByTestId('events-settings-load-error')).toBeInTheDocument();
@@ -171,7 +172,7 @@ describe('EventsSettings authentication session ownership', () => {
     const reconnect = deferredLoad(() => { deliveredAtLoadCount ??= loadEvents.mock.calls.length; });
     const current = deferredLoad();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>()
-      .mockResolvedValueOnce({ status: 'failure', error: 'Offline' })
+      .mockResolvedValueOnce(loadFailure('Offline'))
       .mockReturnValueOnce(reconnect.promise)
       .mockReturnValueOnce(current.promise);
     setStore({ loadEvents, syncStatus: { isOnline: false, isSyncing: false, pendingMoods: 0 } });
@@ -219,7 +220,7 @@ describe('EventsSettings authentication session ownership', () => {
     expectUnsettledSession();
     await act(async () => { current.resolve(loadOk); });
     expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
-    await act(async () => { refresh.resolve({ status: 'failure', error: 'Old refresh failed' }); });
+    await act(async () => { refresh.resolve(loadFailure('Old refresh failed')); });
     expect(screen.getByTestId('events-settings-empty')).toBeInTheDocument();
     expect(screen.queryByTestId('events-settings-load-error')).not.toBeInTheDocument();
   });
@@ -229,9 +230,9 @@ describe('EventsSettings authentication session ownership', () => {
     const oldRetry = deferredLoad();
     const newRetry = deferredLoad();
     const loadEvents = vi.fn<() => Promise<EventLoadResult>>()
-      .mockResolvedValueOnce({ status: 'failure', error: 'Initial failure' })
+      .mockResolvedValueOnce(loadFailure('Initial failure'))
       .mockReturnValueOnce(oldRetry.promise)
-      .mockResolvedValueOnce({ status: 'failure', error: 'Current initial failure' })
+      .mockResolvedValueOnce(loadFailure('Current initial failure'))
       .mockReturnValueOnce(newRetry.promise);
     setStore({ loadEvents });
     await renderSection();

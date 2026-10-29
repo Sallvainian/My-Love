@@ -57,7 +57,7 @@ describe('haptics utility', () => {
   });
 
   describe('triggerMoodSaveHaptic', () => {
-    it('calls navigator.vibrate with 50ms when supported', () => {
+    it('vibrates once for 50ms on a mood save', () => {
       triggerMoodSaveHaptic();
 
       expect(vibrateMock).toHaveBeenCalledTimes(1);
@@ -85,7 +85,7 @@ describe('haptics utility', () => {
   });
 
   describe('triggerErrorHaptic', () => {
-    it('calls navigator.vibrate with error pattern [100, 50, 100]', () => {
+    it('vibrates twice for 100ms, 50ms apart, on an error', () => {
       triggerErrorHaptic();
 
       expect(vibrateMock).toHaveBeenCalledTimes(1);
@@ -111,7 +111,7 @@ describe('haptics utility', () => {
   });
 
   describe('triggerSelectionHaptic', () => {
-    it('calls navigator.vibrate with 15ms for quick selection feedback', () => {
+    it('vibrates once for 15ms on a selection', () => {
       triggerSelectionHaptic();
 
       expect(vibrateMock).toHaveBeenCalledTimes(1);

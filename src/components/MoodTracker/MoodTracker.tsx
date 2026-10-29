@@ -443,12 +443,12 @@ export function MoodTracker() {
                     {syncStatus.isOnline ? (
                       <>
                         <Cloud className="h-4 w-4 text-good" aria-hidden="true" />
-                        <span>Online</span>
+                        <span data-testid="mood-sync-status">Online</span>
                       </>
                     ) : (
                       <>
                         <CloudOff className="h-4 w-4" aria-hidden="true" />
-                        <span>Offline</span>
+                        <span data-testid="mood-sync-status">Offline</span>
                       </>
                     )}
                     {syncStatus.pendingMoods > 0 && (

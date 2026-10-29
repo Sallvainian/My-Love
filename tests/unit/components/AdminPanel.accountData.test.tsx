@@ -226,10 +226,19 @@ describe('AdminPanel with the real local copy and store', () => {
     await waitFor(() => expect(screen.queryByTestId('admin-delete-dialog')).toBeNull());
   }
 
-  it('closes and removes the row from disk, store and list after the server accepts the delete', async () => {
+  it('removes the row from the saved copy after the server accepts the delete', async () => {
     await completeAcceptedDelete();
     expect(await diskRow(aId)).toBeUndefined();
+  });
+
+  it('removes the row from the store after the server accepts the delete', async () => {
+    await completeAcceptedDelete();
     expect(useAppStore.getState().customMessages.some((message) => message.id === aId)).toBe(false);
+  });
+
+  it('closes and drops the row from the rendered list after the server accepts the delete', async () => {
+    await completeAcceptedDelete();
+    expect(screen.queryByTestId('admin-delete-dialog')).toBeNull();
     expect(screen.getByTestId('admin-message-list')).toBeInTheDocument();
     expect(listedRows('Account A message')).toEqual([]);
     expect(document.body).not.toHaveTextContent('Account A message');
@@ -240,16 +249,31 @@ describe('AdminPanel with the real local copy and store', () => {
     expect(useAppStore.getState().currentMessage?.text).toBe('Shared daily');
   });
 
-  it('reports failure accessibly, permits cancel, and retries a real delete', async () => {
-    const user = userEvent.setup();
+  /** Confirms A's delete once and lets the server reject it; returns once the failure shows. */
+  async function failFirstDelete(user: ReturnType<typeof userEvent.setup>) {
     panel();
     const remove = vi.spyOn(customMessageService, 'deleteRemote').mockRejectedValueOnce(new Error('disk unavailable'));
     await user.click(within(row('Account A message')).getByTestId('message-row-delete-button'));
     await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
     await screen.findByRole('alert');
+    return { remove };
+  }
+
+  it('reports a failed delete accessibly and leaves cancel enabled', async () => {
+    await failFirstDelete(userEvent.setup());
+    expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByTestId('admin-delete-dialog-cancel')).toBeEnabled();
+  });
+
+  it('keeps the row on disk and in the store after a failed delete', async () => {
+    await failFirstDelete(userEvent.setup());
     expect(await diskRow(aId)).toBeDefined();
     expect(useAppStore.getState().customMessages.some((message) => message.id === aId)).toBe(true);
+  });
+
+  it('retries a real delete when confirm is pressed again after a failure', async () => {
+    const user = userEvent.setup();
+    const { remove } = await failFirstDelete(user);
     await user.click(screen.getByTestId('admin-delete-dialog-confirm'));
     await waitFor(() => expect(screen.queryByTestId('admin-delete-dialog')).toBeNull());
     expect(remove).toHaveBeenCalledTimes(2);

@@ -10,6 +10,9 @@ import { test, expect } from '../../support/merged-fixtures';
 import { createInteractionRecord } from '../../support/factories/interaction-record-ownership';
 import type { SupabaseInteractionRecord } from '../../../src/api/interactionService';
 
+/** The badge's settled height: `h-5` on `notification-badge` in PokeKissInterface.tsx. */
+const BADGE_FULL_SIZE_PX = 20;
+
 /**
  * A delivered record as the store keeps it: interactionService maps each
  * snake_case column to its camelCase field, and a missing `viewed` becomes
@@ -253,7 +256,7 @@ test.describe('Interaction record ownership', () => {
       await recurseUntil(
         async () => (await badge.boundingBox())?.height,
         (v) => {
-          expect(v).toBe(20);
+          expect(v).toBe(BADGE_FULL_SIZE_PX);
         }
       );
       const box = (await badge.boundingBox())!;

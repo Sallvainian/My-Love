@@ -165,7 +165,7 @@ describe('moodService', () => {
     it('returns newly created moods (unsynced by default)', async () => {
       await moodService.create(userId, ['happy']);
       const unsynced = await moodService.getUnsyncedMoods(userId);
-      expect(unsynced.length).toBe(1);
+      expect(unsynced).toHaveLength(1);
       expect(unsynced[0].synced).toBe(false);
     });
 
@@ -406,7 +406,7 @@ describe('moodService', () => {
     it('returns all mood entries', async () => {
       await moodService.create(userId, ['happy']);
       const all = await moodService.getAll();
-      expect(all.length).toBe(1);
+      expect(all).toHaveLength(1);
       expect(all[0].mood).toBe('happy');
     });
   });

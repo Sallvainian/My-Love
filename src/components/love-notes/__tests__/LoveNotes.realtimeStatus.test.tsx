@@ -12,7 +12,7 @@
  * `useLoveNotes` is mocked rather than driven, because what is under test is
  * what `LoveNotes` does with a status, not how the status is produced.
  */
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NoteFeedStatus } from '../../../hooks/useRealtimeMessages';
@@ -122,7 +122,8 @@ describe('LoveNotes realtime notice', () => {
       await renderWith('connected');
 
       const row = screen.getByTestId(ROW);
-      const line = within(row).getByText('Connected');
+      const line = within(row).getByTestId('notes-partner-connected');
+      expect(line).toHaveTextContent(/^Connected$/);
       expect(line).toHaveClass('text-muted');
       expect(within(line).getByTestId('realtime-connection-status-dot')).toHaveClass('bg-good');
       // The feed status, not presence: there is no presence feature.
@@ -136,8 +137,11 @@ describe('LoveNotes realtime notice', () => {
       await renderWith('connected');
 
       const row = screen.getByTestId(ROW);
-      expect(within(row).getByText('Partner')).toHaveClass('text-ink');
-      const avatar = within(row).getByText('P');
+      const name = within(row).getByTestId('notes-partner-name');
+      expect(name).toHaveTextContent(/^Partner$/);
+      expect(name).toHaveClass('text-ink');
+      const avatar = within(row).getByTestId('notes-partner-avatar');
+      expect(avatar).toHaveTextContent(/^P$/);
       expect(avatar).toHaveClass('bg-partner', 'text-card');
     });
 
@@ -146,8 +150,12 @@ describe('LoveNotes realtime notice', () => {
       await renderWith('connected');
 
       const row = screen.getByTestId(ROW);
-      expect(await within(row).findByText('harper')).toBeVisible();
-      expect(within(row).getByText('H')).toHaveClass('bg-partner');
+      const name = within(row).getByTestId('notes-partner-name');
+      await waitFor(() => expect(name).toHaveTextContent(/^harper$/));
+      expect(name).toBeVisible();
+      const avatar = within(row).getByTestId('notes-partner-avatar');
+      expect(avatar).toHaveTextContent(/^H$/);
+      expect(avatar).toHaveClass('bg-partner');
     });
 
     it('keeps a level-1 "Love Notes" heading, visually hidden, and no back control', async () => {

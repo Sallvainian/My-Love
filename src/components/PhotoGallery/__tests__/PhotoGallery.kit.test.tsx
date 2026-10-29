@@ -11,6 +11,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPhotoInsert } from '../../../../tests/support/factories/photos';
 import type { PhotoWithUrls } from '../../../services/photoService';
 
 const names = vi.hoisted(() => ({
@@ -33,15 +34,26 @@ import { PhotoGallery } from '../PhotoGallery';
 import { listPhotos, resetFakePhotoStore } from './fakePhotoStore';
 
 function photo(index: number, isOwn = true): PhotoWithUrls {
-  return {
+  const owner = isOwn ? 'me' : 'partner';
+  // The columns the insert type leaves optional, restated after the factory's
+  // body so the row is whole.
+  const row = {
     id: `photo-${index}`,
-    user_id: isOwn ? 'me' : 'partner',
-    storage_path: `${isOwn ? 'me' : 'partner'}/${index}.jpg`,
     caption: null,
+    mime_type: 'image/jpeg',
+    created_at: '2026-09-01T10:00:00.000Z',
+  };
+  return {
+    ...createPhotoInsert({
+      ...row,
+      user_id: owner,
+      storage_path: `${owner}/${index}.jpg`,
+      file_size: 68,
+    }),
+    ...row,
     signedUrl: null,
     isOwn,
-    created_at: '2026-09-01T10:00:00.000Z',
-  } as unknown as PhotoWithUrls;
+  };
 }
 
 function page(count: number, ownEvery = true): PhotoWithUrls[] {
@@ -82,7 +94,7 @@ describe('PhotoGallery grid', () => {
 
     const upload = screen.getByTestId('photo-gallery-upload-fab');
     expect(upload.getAttribute('aria-label')).toBe('Upload photo');
-    expect(upload.className).not.toMatch(/\bfixed\b/);
+    expect(upload).not.toHaveClass(/\bfixed\b/);
     expect(upload.textContent).toBe('Upload');
   });
 
@@ -99,9 +111,8 @@ describe('PhotoGallery grid', () => {
     await renderGallery();
 
     const grid = screen.getByTestId('photo-gallery-grid');
-    expect(grid.className).toContain('grid-cols-3');
-    expect(grid.className).toContain('gap-1.5');
-    expect(grid.className).not.toMatch(/(sm|md|lg):grid-cols/);
+    expect(grid).toHaveClass('grid-cols-3', 'gap-1.5');
+    expect(grid).not.toHaveClass(/(sm|md|lg):grid-cols/);
   });
 
   it('gives the upload dialog the header Upload button to return focus to', async () => {
@@ -161,20 +172,14 @@ describe('PhotoGallery owner badge', () => {
 
     const [own, partner] = screen.getAllByTestId('photo-grid-item-owner-badge');
 
-    expect(own.className).toContain('bg-fill');
-    expect(own.className).toContain('text-white');
-    expect(own.className).toContain('h-5');
-    expect(own.className).toContain('w-5');
-    expect(own.className).toContain('left-1.5');
-    expect(own.className).toContain('bottom-1.5');
+    expect(own).toHaveClass('bg-fill', 'text-white', 'h-5', 'w-5', 'left-1.5', 'bottom-1.5');
     expect(within(own).getByTestId('photo-grid-item-owner-initial').textContent).toBe('J');
     const ownText = within(own).getByTestId('photo-grid-item-owner-text');
     expect(ownText.textContent).toBe('Uploaded by you');
     expect(ownText).toHaveClass('sr-only');
 
-    expect(partner.className).toContain('bg-partner');
-    expect(partner.className).toContain('text-card');
-    expect(partner.className).not.toContain('text-white');
+    expect(partner).toHaveClass('bg-partner', 'text-card');
+    expect(partner).not.toHaveClass(/text-white/);
     expect(within(partner).getByTestId('photo-grid-item-owner-initial').textContent).toBe('H');
     const partnerText = within(partner).getByTestId('photo-grid-item-owner-text');
     expect(partnerText.textContent).toBe('Uploaded by Harper');
@@ -214,7 +219,7 @@ describe('PhotoGallery empty', () => {
 
     const button = within(empty).getByTestId('photo-gallery-empty-upload-button');
     expect(button.textContent).toBe('Upload a photo');
-    expect(button.className).toContain('bg-fill');
+    expect(button).toHaveClass('bg-fill');
   });
 
   it('asks for the upload dialog once when the empty-state Upload button is pressed', async () => {
@@ -245,16 +250,14 @@ describe('PhotoGallery loading', () => {
 
     const skeletonGrid = screen.getByTestId('photo-gallery-skeleton-grid');
     const [tile] = screen.getAllByTestId('photo-grid-skeleton');
-    expect(tile.className).toContain('rounded-[14px]');
-    expect(tile.className).toContain('bg-card2');
-    expect(tile.className).toContain('animate-pulse');
+    expect(tile).toHaveClass('rounded-[14px]', 'bg-card2', 'animate-pulse');
 
     await act(async () => resolve(page(4)));
 
     const grid = screen.getByTestId('photo-gallery-grid');
-    expect(grid.className).toBe(skeletonGrid.className);
+    expect(grid).toHaveClass(skeletonGrid.className, { exact: true });
     const [item] = screen.getAllByTestId('photo-grid-item');
-    expect(item.className).toContain('rounded-[14px]');
+    expect(item).toHaveClass('rounded-[14px]');
   });
 });
 
@@ -268,8 +271,7 @@ describe('PhotoGallery load error', () => {
     expect(within(errorState).getByRole('heading', { level: 1, name: 'Photos' })).toBeTruthy();
     const alert = within(errorState).getByRole('alert');
     expect(alert.textContent).toBe('Network down');
-    expect(alert.className).toContain('bg-dtint');
-    expect(alert.className).toContain('text-danger');
+    expect(alert).toHaveClass('bg-dtint', 'text-danger');
     expect(screen.queryByTestId('photo-gallery-upload-fab')).toBeNull();
 
     await user.click(within(errorState).getByTestId('photo-gallery-error-retry-button'));

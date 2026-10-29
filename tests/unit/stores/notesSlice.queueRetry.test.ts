@@ -97,6 +97,7 @@ describe('notesSlice offline send queue', () => {
   describe('retry after a transient failure while online', () => {
     /** Twice the 60 s backoff cap: long enough that any scheduled retry would have fired. */
     const BEYOND_MAX_BACKOFF_MS = 2 * 60_000;
+    const CONNECTION_FAILURE = '08006'; // SQLSTATE connection_failure
 
     /** Yields to IndexedDB (setImmediate, not faked) until `cond` holds. */
     async function until(cond: () => boolean) {
@@ -197,7 +198,7 @@ describe('notesSlice offline send queue', () => {
     it('does not schedule a retry when the device is known offline as the pass ends', async () => {
       const store = createTestStore();
       const reply = deferred();
-      server.outcomes = [{ reject: '08006', hold: reply.promise }];
+      server.outcomes = [{ reject: CONNECTION_FAILURE, hold: reply.promise }];
       setOnline(false);
       await store.getState().sendNote('dropped connection');
       setOnline(true);

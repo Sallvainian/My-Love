@@ -7,6 +7,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPhotoInsert } from '../../../../tests/support/factories/photos';
 import type { PhotoImage, UsePhotoImageOptions } from '../../../hooks/usePhotoImage';
 import type { PhotoWithUrls } from '../../../services/photoService';
 
@@ -38,15 +39,20 @@ import { PhotoGridItem } from '../PhotoGridItem';
 import { PhotoViewer } from '../PhotoViewer';
 
 function photo(index: number): PhotoWithUrls {
-  return {
+  // The columns the insert type leaves optional, restated after the factory's
+  // body so the row is whole.
+  const row = {
     id: `photo-${index}`,
-    user_id: 'me',
-    storage_path: `me/${index}.jpg`,
     caption: `cap-${index}`,
+    mime_type: 'image/jpeg',
+    created_at: '2026-09-01T10:00:00.000Z',
+  };
+  return {
+    ...createPhotoInsert({ ...row, user_id: 'me', storage_path: `me/${index}.jpg`, file_size: 68 }),
+    ...row,
     signedUrl: null,
     isOwn: true,
-    created_at: '2026-09-01T10:00:00.000Z',
-  } as unknown as PhotoWithUrls;
+  };
 }
 
 const ready = (path: string | null | undefined): PhotoImage =>

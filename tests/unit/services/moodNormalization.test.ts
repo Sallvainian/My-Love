@@ -9,7 +9,6 @@ import { createMoodSlice, type MoodSlice } from '../../../src/stores/slices/mood
 import { getPendingMoods, markMoodSynced } from '../../../src/sw-db';
 import type { MoodEntry } from '../../../src/types';
 import { MOOD_TYPES, normalizeMoodEntry, normalizeMoodValues } from '../../../src/types/moods';
-import { isValidationError } from '../../../src/validation/errorMessages';
 
 const A = '00000000-0000-4000-8000-000000000001';
 const B = '00000000-0000-4000-8000-000000000002';
@@ -188,11 +187,17 @@ describe('saved mood recovery', () => {
   });
 
   it('refuses an empty mood list with a UI validation error', async () => {
-    await expect(moodService.saveForDate(A, date, [], undefined)).rejects.toSatisfy(isValidationError);
+    await expect(moodService.saveForDate(A, date, [], undefined)).rejects.toMatchObject({
+      name: 'ValidationError',
+      fieldErrors: new Map([
+        ['mood', 'Invalid mood. Please select a valid option.'],
+        ['moods', 'moods cannot be empty'],
+      ]),
+    });
   });
 
   it('refuses a save with no owner', async () => {
-    await expect(moodService.saveForDate('', date, ['happy'])).rejects.toThrow();
+    await expect(moodService.saveForDate('', date, ['happy'])).rejects.toThrow('User not authenticated');
   });
 
   it("refuses B's edit of a date only A has saved", async () => {

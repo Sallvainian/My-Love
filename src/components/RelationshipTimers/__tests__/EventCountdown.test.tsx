@@ -120,7 +120,7 @@ describe('EventCountdown — "Event passed" is never rendered', () => {
     );
 
     expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByText('Old Event')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('countdown-label')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/-?\d+\s*days?/i);
     expect(document.body.textContent).not.toMatch(/Event passed/i);
   });
@@ -135,7 +135,7 @@ describe('EventCountdown — "Event passed" is never rendered', () => {
       <EventCountdown label="Rollover Event" icon="calendar" date={today} />
     );
 
-    expect(screen.getByText('Today!')).toBeInTheDocument();
+    expect(screen.getByTestId('countdown-value').textContent).toBe('Today!');
 
     // Cross local midnight, then let the component's setInterval fire.
     vi.setSystemTime(new Date(2026, 0, 16, 0, 0, 1));
@@ -196,8 +196,8 @@ describe('EventCountdown — "Event passed" is never rendered', () => {
       />
     );
 
-    expect(screen.getByText('Trip to Boston')).toBeInTheDocument();
-    expect(screen.getByText('Weekend visit')).toBeInTheDocument();
+    expect(screen.getByTestId('countdown-label').textContent).toBe('Trip to Boston');
+    expect(screen.getByTestId('countdown-description').textContent).toBe('Weekend visit');
     // Tomorrow's midnight is under a day away: whole days 0, plus the clock.
     expect(document.body.textContent).toMatch(/0 days\d{2}h \d{2}m \d{2}s/);
   });
@@ -207,7 +207,7 @@ describe('EventCountdown — "Event passed" is never rendered', () => {
 
     render(<EventCountdown label="Anniversary" icon="calendar" date={today} />);
 
-    expect(screen.getByText('Today!')).toBeInTheDocument();
+    expect(screen.getByTestId('countdown-value').textContent).toBe('Today!');
     expect(document.body.textContent).not.toMatch(/Event passed/i);
   });
 });

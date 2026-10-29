@@ -259,7 +259,8 @@ describe('loader identity guards', () => {
       };
     }
 
-    it('names the account that raised the favorite, and saves its confirmed copy', async () => {
+    /** A favorites its own custom row, unfavorited on screen, and the server confirms it. */
+    async function favoriteOwnRow() {
       savedMessageData({ [A]: aCopy() });
       toggleStoredFavorite.mockResolvedValueOnce(toggled(true));
       const own = aCustomMessage();
@@ -268,6 +269,11 @@ describe('loader identity guards', () => {
       >[0]);
 
       await useAppStore.getState().toggleFavorite(own.id);
+      return own;
+    }
+
+    it('names the account that raised the favorite, and saves its confirmed copy', async () => {
+      const own = await favoriteOwnRow();
 
       // The favorite is A's, read from A's copy and saved back into it.
       expect(toggleStoredFavorite).toHaveBeenCalledWith(
@@ -276,6 +282,11 @@ describe('loader identity guards', () => {
         aCopy()
       );
       expect(writeLocalCopy).toHaveBeenCalledWith(A, 'message-data', toggled(true).copy);
+    });
+
+    it('a confirmed favorite flips the row and records it', async () => {
+      const own = await favoriteOwnRow();
+
       // The seeded row is read back: the optimistic flip and the favourite
       // list are the rest of this action, and without these the whole `set()`
       // could be deleted with the case still green.

@@ -110,8 +110,13 @@ describe('SyncToast on the kit', () => {
     );
 
     const toast = await screen.findByTestId('sync-toast');
-    expect(toast).toHaveClass('bg-card', 'border-line', 'shadow-float', 'rounded-[20px]');
-    expect(toast.className).toContain('top-[calc(5rem+env(safe-area-inset-top))]');
+    expect(toast).toHaveClass(
+      'bg-card',
+      'border-line',
+      'shadow-float',
+      'rounded-[20px]',
+      'top-[calc(5rem+env(safe-area-inset-top))]'
+    );
     expect(within(toast).getByTestId('sync-toast-icon')).toHaveClass(iconColor);
     const text = screen.getByTestId('sync-toast-message');
     expect(text.textContent).toBe(message);
