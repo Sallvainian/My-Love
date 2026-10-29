@@ -116,3 +116,41 @@ hitl = false
 risk = "low"
 v6_key = "9-split-oversize-test-files"
 notes = ["v6 invoke_dev_with: Read corrections.md first, then work every row for this story's rule ids across all five findings-*.md files. Locate rows by content, not line number. One commit per finding group. Run lint, typecheck and the affected suites before finishing."]
+
+# Added 2026-10-28 after the 2026-10-03 re-runs (see the epic's Notes). One story per folder; the three touch disjoint test and app files.
+
+[[entry]]
+id = 10
+type = "story"
+title = "Fix the 2026-10-03 tests/unit findings"
+description = "R1, R6: fix every row in findings-2026-10-03-unit.md (H10, M3, L5, L6, L7) and the two tests/unit H10 rows in findings-2026-10-03-suite-high.md (moodNormalization.test.ts)."
+verify = "None of those 30 rows remains, and a fresh bmad-tea-test-review run on tests/unit/ reports no Critical or High."
+covers = ["R1", "R6"]
+after = []
+hitl = false
+risk = "low"
+notes = ["Read corrections.md first, then work every row in the findings files named in the description. Locate rows by content, not line number. One commit per finding group. Run lint, typecheck and the affected suites before finishing."]
+
+[[entry]]
+id = 11
+type = "story"
+title = "Fix the 2026-10-03 tests/e2e and tests/api findings"
+description = "R1, R2, R6: fix every row in findings-2026-10-03-e2e.md (M1, L1, L3, L5, L6, L7) and findings-2026-10-03-api-integration.md (L6), and the tests/e2e and tests/api H10 rows in findings-2026-10-03-suite-high.md (events.spec.ts, upload-love-note-image-limits.spec.ts)."
+verify = "None of those 22 rows remains, and fresh bmad-tea-test-review runs on tests/e2e/ and on tests/api/ + tests/integration/ report no Critical or High."
+covers = ["R1", "R2", "R6"]
+after = []
+hitl = false
+risk = "low"
+notes = ["Read corrections.md first, then work every row in the findings files named in the description. Locate rows by content, not line number. One commit per finding group. Run lint, typecheck and the affected suites before finishing."]
+
+[[entry]]
+id = 12
+type = "story"
+title = "Fix the 2026-10-03 src findings"
+description = "R6: fix every row in findings-2026-10-03-src.md (M2, L1, L3, L5, L7)."
+verify = "None of those 21 rows remains, and a fresh bmad-tea-test-review run on src/ reports no Critical or High."
+covers = ["R6"]
+after = []
+hitl = false
+risk = "low"
+notes = ["Read corrections.md first, then work every row in the findings files named in the description. Locate rows by content, not line number. One commit per finding group. Run lint, typecheck and the affected suites before finishing."]

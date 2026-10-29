@@ -4,5 +4,5 @@
 id = 1
 slug = "epic-test-review-remediation"
 title = "Test Review Remediation"
-description = "Every finding from the 2026-09-25 TEA test reviews is fixed, so a green suite means the behaviour works and a fresh review of each test folder comes back clean."
+description = "Every finding from the 2026-09-25 and 2026-10-03 TEA test reviews is fixed, so a green suite means the behaviour works and a fresh review of each test folder reports no Critical or High."
 covers = []
