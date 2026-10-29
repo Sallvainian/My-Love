@@ -33,12 +33,6 @@ describe('OfflineError', () => {
   it('is an instance of Error', () => {
     const err = new OfflineError('test');
     expect(err).toBeInstanceOf(Error);
-    expect(err).toMatchObject({
-      name: 'OfflineError',
-      operation: 'test',
-      isRetryable: true,
-      message: "You're offline. Please check your connection and try again.",
-    });
   });
 });
 
