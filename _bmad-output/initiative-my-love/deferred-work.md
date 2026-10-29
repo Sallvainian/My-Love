@@ -2524,7 +2524,8 @@ location: src/components/PartnerMoodView/PartnerMoodView.tsx:586 (name) and :595
 source_spec: n/a
 severity: medium
 reason: The card renders `other_display_name ?? other_email`, so once a sender sets a display name their email is never shown, and Accept calls acceptPartnerRequest with no confirmation. The link cannot be undone: the client cannot update partner_id and there is no unlink RPC. Since #379 any signed-in account that knows the recipient's email can send a request, so a stranger who names themselves after the partner gets the couple's notes, moods and photos after one tap. Fix: always show other_email on received (and sent) requests, and confirm before Accept, naming that email.
-status: open
+status: done 2026-10-28
+resolution: won't fix -- accepted 2026-10-28 by the owner: the owner and their partner are the app's only users and are already linked to each other, and a received request is shown and accepted only while the recipient has no partner (accept_partner_request refuses a link to anyone who already has one), so no stranger can reach either account. Reopen if other couples are ever invited to use the app.
 
 ### DW-297: Partner search matches an email address nobody proved they own, so an account registered with the partner's address before they sign up is offered as the partner.
 origin: security review of PR #379 2026-09-26, recorded 2026-10-28
@@ -2532,7 +2533,8 @@ location: supabase/migrations/20260926000000_find_partner_by_email.sql (the user
 source_spec: n/a
 severity: medium
 reason: find_partner_by_email matches public.users.email with no check of auth.users.email_confirmed_at. Local supabase/config.toml has enable_confirmations = false; the hosted setting is UNVERIFIED, though the hosted auth users' aggregate fits auto-confirm. The fix has two parts in order: the owner turns on email confirmations for the hosted project in the Supabase dashboard, then a migration filters on email_confirmed_at IS NOT NULL (under auto-confirm the filter alone changes nothing).
-status: open
+status: done 2026-10-28
+resolution: won't fix -- accepted 2026-10-28 by the owner: the owner and their partner are the app's only users and are already linked to each other, and the partner already has an account under their own address, so it can no longer be claimed first; the hosted email-confirmation setting stays as it is. Reopen if other couples are ever invited to use the app.
 
 ### DW-298: The "request accepted" broadcast can be missed, and the sender then sees the link only after a reload.
 origin: security review of PR #379 2026-09-26, recorded 2026-10-28
@@ -2548,7 +2550,8 @@ location: supabase/migrations/20260926010000_my_pending_partner_requests.sql (th
 source_spec: n/a
 severity: low
 reason: The reviewer's rolled-back probe inserted a pending request to a linked user's id (the INSERT policy checks only auth.uid() = from_user_id, the gap DW-295 leaves at the database), and the RPC then returned that user's name and email, undoing the is_taken redaction in find_partner_by_email. The linked target never sees the request, so the sender can keep it pending and keep reading the target's current name. Fix: null both columns when the other side has partner_id IS NOT NULL, or refuse at insert a request to a partnered account or from a partnered caller, through a SECURITY DEFINER helper.
-status: open
+status: done 2026-10-28
+resolution: won't fix -- accepted 2026-10-28 by the owner: the owner and their partner are the app's only users and are already linked to each other, and find_partner_by_email never returns the id of an account that already has a partner, so reading either one's name and email this way needs their internal id from elsewhere. Reopen if other couples are ever invited to use the app.
 
 ### DW-300: Partner search tells any signed-in caller whether an email has an account and whether its owner has a partner, with no rate limit.
 origin: security review of PR #379 2026-09-26, recorded 2026-10-28
@@ -2556,4 +2559,5 @@ location: supabase/migrations/20260926000000_find_partner_by_email.sql (is_taken
 source_spec: n/a
 severity: low
 reason: A documented design choice in #379, not a defect: find_partner_by_email answers is_taken to any authenticated caller, and PostgREST does not rate-limit the call, so with open signup anyone can bulk-check addresses for an account and a relationship. Needs an owner decision: rate-limit the call, or report a taken account the same way as a missing one.
-status: open
+status: done 2026-10-28
+resolution: won't fix -- accepted 2026-10-28 by the owner: the owner and their partner are the app's only users and are already linked to each other, and the search is kept as #379 designed it, because its "already connected with a partner" answer is the one that would reveal an unexpected link. Reopen if other couples are ever invited to use the app.
