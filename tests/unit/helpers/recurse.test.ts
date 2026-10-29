@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import { expect as playwrightExpect } from '@playwright/test';
 import { RecurseTimeoutError } from '@seontechnologies/playwright-utils/recurse';
 import { describe, expect, it } from 'vitest';
@@ -34,9 +35,12 @@ describe('recurseUntil', () => {
 
     expect(failure).toBeInstanceOf(Error);
     expect(failure).not.toBeInstanceOf(RecurseTimeoutError);
-    expect((failure as Error).message).toContain('the reading settles on 3');
-    expect((failure as Error).message).toContain('Expected: 3');
-    expect((failure as Error).message).toContain('Received: 7');
+    // With FORCE_COLOR set, Playwright wraps the expected and received values
+    // in colour codes, so read the message without them.
+    const message = stripVTControlCharacters((failure as Error).message);
+    expect(message).toContain('the reading settles on 3');
+    expect(message).toContain('Expected: 3');
+    expect(message).toContain('Received: 7');
   });
 
   it('refuses a check that returns a boolean', async () => {
