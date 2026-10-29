@@ -2353,7 +2353,9 @@ origin: spec-deferred 2b1d4cbb8c95
 location: src/components/DisplayNameSetup/__tests__/DisplayNameSetup.test.tsx:90; src/components/shared/__tests__/kitSurfaces.test.tsx:409
 source_spec: `5-drive-component-tests-through-user-event.md`
 reason: The registry's M5 rule (criteria-registry.md:169) has no exemption mechanism. The folder-run workers did not score fireEvent.submit past native validation, click-without-focus cases, img error or window online (test-review-target-src.md:398), which covers most kept lines, but the same-batch refresh.click() pairs in EventsSettings.test.tsx were scored (folder row at :1422 at 92f1c517). Settle by running bmad-testarch-test-review on src/ and tests/unit/ and reading the M5 rows. Rescoped 2026-10-29 (epic retrospective A6): the fresh src run scores exactly two M5 rows, both `fireEvent.submit` calls that get past native `minLength` so the component's own length rule runs; tests/unit has none. Both are Medium, outside the epic's Boundaries. The reviewer's fix for each: prefill or type a name that passes native `minLength={3}` but fails the component's trimmed 3-30 rule (for example `'ab '`), then submit with `user.click`.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-component-test-assertion-hardening
+resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
 
 ### DW-277: AGENTS.md does not record that user-event hangs under Vitest fake setTimeout without both advanceTimers and a jest-global shim.
 origin: spec-deferred 4656b1984f27
@@ -2582,7 +2584,9 @@ location: tests/unit/components/AdminPanel.accountData.test.tsx:264
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: 'reports a failed delete accessibly and leaves cancel enabled' asserts only getByRole('alert') toBeInTheDocument, so an empty alert or one with the wrong message passes. Fix: assert the alert's text.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-component-test-assertion-hardening
+resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
 
 ### DW-303: upload-love-note-image-limits checks x-ratelimit-remaining only against the limit, which holds by construction.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
@@ -2598,7 +2602,9 @@ location: src/components/love-notes/__tests__/LoveNoteMessage.test.tsx (the imag
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The file's mock of the image service forwards only the path, so a retry that reused the cached signed URL instead of passing forceRefresh = true would pass. Fix: let the mock record its second argument and assert true on the retry.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-component-test-assertion-hardening
+resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
 
 ### DW-305: PokeKissInterface's useState setter spy has no positive control while the component is mounted.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
@@ -2606,7 +2612,9 @@ location: src/components/PokeKissInterface/__tests__/PokeKissInterface.test.tsx:
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: stateSetterCalls observes every useState setter so the unmount cases can assert no late update. No case shows the spy records a set while mounted, so a spy that recorded nothing would pass the same negative checks. Fix: assert at least one recorded set before unmount.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-component-test-assertion-hardening
+resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
 
 ### DW-306: The loaderIdentityGuards.events leak checks use JSON.stringify(state), which cannot see inside an Error, Map or Set.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
@@ -2654,7 +2662,9 @@ location: src/components/love-notes/__tests__/OwnDisplayName.test.tsx:87; src/co
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The helper waits for getPartnerDisplayName, which LoveNotes asks only after the own-name branch, so a case whose own-name lookup rejects fails on a waitFor timeout that names the wrong lookup. The helper is also pasted into both files (DW-313). Fix: wait on both lookups' settled results.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-component-test-assertion-hardening
+resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
 
 ### DW-312: Two auth specs pin "the login screen is gone" in two different ways.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R5, A4)

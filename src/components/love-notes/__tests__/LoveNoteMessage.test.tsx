@@ -55,7 +55,8 @@ vi.mock('motion/react', () => ({
 const mockGetSignedImageUrl = vi.fn();
 const mockDownloadLoveNoteImage = vi.fn();
 vi.mock('../../../services/loveNoteImageService', () => ({
-  getSignedImageUrl: (path: string) => mockGetSignedImageUrl(path),
+  // Forwards every argument, so a retry that dropped `forceRefresh` is visible.
+  getSignedImageUrl: (...args: unknown[]) => mockGetSignedImageUrl(...args),
   downloadLoveNoteImage: (path: string) => mockDownloadLoveNoteImage(path),
 }));
 
@@ -805,7 +806,8 @@ describe('LoveNoteMessage', () => {
       // The retry request is in flight; without it the late-result check
       // below would pass with the retry deleted.
       expect(mockGetSignedImageUrl).toHaveBeenCalledTimes(2);
-      expect(mockGetSignedImageUrl).toHaveBeenLastCalledWith(messageWithImage.image_url);
+      // forceRefresh: the cached URL is the one that just failed to load.
+      expect(mockGetSignedImageUrl).toHaveBeenLastCalledWith(messageWithImage.image_url, true);
 
       // The error handler bumps the retry count synchronously; only setter
       // calls after unmount count

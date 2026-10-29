@@ -88,14 +88,28 @@ async function renderWith(status: NoteFeedStatus) {
 /**
  * Wait until the mount effect's name lookups have answered and their state is
  * applied. The fallbacks equal LoveNotes' initial state, so a fallback asserted
- * any earlier passes before the behaviour has run. `getPartnerDisplayName` is
- * asked only after the own-name branch, so its answer settles both.
+ * any earlier passes before the behaviour has run. The own-name branch
+ * (`getOwnDisplayName` with `getUser`) settles first; `getPartnerDisplayName`
+ * is asked only when both of those fulfilled, so a rejected own-name read
+ * settles the effect without it rather than timing out on the partner lookup.
  */
 async function settleNameLookups(): Promise<void> {
-  await waitFor(() => expect(api.getPartnerDisplayName).toHaveBeenCalled());
-  await act(async () => {
-    await Promise.all(api.getPartnerDisplayName.mock.results.map((result) => result.value));
+  const settle = (lookups: Array<{ mock: { results: Array<{ value: unknown }> } }>) =>
+    act(async () =>
+      Promise.allSettled(
+        lookups.flatMap((lookup) => lookup.mock.results.map((result) => result.value))
+      )
+    );
+
+  await waitFor(() => {
+    expect(api.getOwnDisplayName).toHaveBeenCalled();
+    expect(api.getUser).toHaveBeenCalled();
   });
+  const ownName = await settle([api.getOwnDisplayName, api.getUser]);
+  if (ownName.some((result) => result.status === 'rejected')) return;
+
+  await waitFor(() => expect(api.getPartnerDisplayName).toHaveBeenCalled());
+  await settle([api.getPartnerDisplayName]);
 }
 
 describe('LoveNotes realtime notice', () => {
