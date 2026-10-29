@@ -16,6 +16,11 @@ const downloadPhoto = vi.hoisted(() => vi.fn<(path: string) => Promise<Blob>>())
 const cachePhotoImage = vi.hoisted(() => vi.fn());
 /** The real module's "image cached" notice, as a registry the tests fire. */
 const cachedListeners = vi.hoisted(() => new Set<(userId: string, path: string) => void>());
+/** The one photo the store holds; hoisted so the store mock below can use it. */
+const { PATH, PHOTO } = vi.hoisted(() => {
+  const PATH = 'owner/p0.jpg';
+  return { PATH, PHOTO: { id: 'p0', storage_path: PATH } };
+});
 
 vi.mock('@/services/imageCache', () => ({
   readCachedImage: (userId: string, path: string) => readCachedImage(userId, path),
@@ -38,7 +43,7 @@ vi.mock('@/stores/useAppStore', async () => {
     useAppStore: create(() => ({
       userId: 'USER-A' as string | null,
       authSessionVersion: 1,
-      photos: [{ id: 'p0', storage_path: 'owner/p0.jpg' }],
+      photos: [PHOTO],
     })),
   };
 });
@@ -46,8 +51,6 @@ vi.mock('@/stores/useAppStore', async () => {
 import { ERROR_RETRY_DELAYS_MS, usePhotoImage } from '@/hooks/usePhotoImage';
 import type { PhotoCacheSession } from '@/services/photoImageCache';
 import { useAppStore } from '@/stores/useAppStore';
-
-const PATH = 'owner/p0.jpg';
 
 /**
  * Twenty times the whole automatic-retry schedule (840 s today, never less
@@ -79,7 +82,7 @@ beforeEach(() => {
   useAppStore.setState({
     userId: 'USER-A',
     authSessionVersion: 1,
-    photos: [{ id: 'p0', storage_path: PATH }],
+    photos: [PHOTO],
   } as unknown as Parameters<typeof useAppStore.setState>[0]);
   readCachedImage.mockResolvedValue(null);
   downloadPhoto.mockResolvedValue(new Blob(['DOWNLOADED']));
@@ -136,7 +139,7 @@ describe('usePhotoImage', () => {
     const [session, path, blob] = cachePhotoImage.mock.calls[0] as [PhotoCacheSession, string, Blob];
     expect(session.userId).toBe('USER-A');
     expect(session.isCurrent()).toBe(true);
-    expect(session.photos()).toEqual([{ id: 'p0', storage_path: PATH }]);
+    expect(session.photos()).toEqual([PHOTO]);
     expect(path).toBe(PATH);
     expect(await blob.text()).toBe('DOWNLOADED');
   });

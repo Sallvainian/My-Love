@@ -30,6 +30,9 @@ interface FakeRow {
 const PARTNER_ID = '00000000-0000-4000-8000-0000000000b0';
 const USER_ID = '00000000-0000-4000-8000-0000000000a0';
 
+/** Postgres SQLSTATE not_null_violation: a write failure that is not a CHECK violation. */
+const NOT_NULL_VIOLATION = '23502';
+
 /** Rows the "server" holds, plus a switch to drop the next response */
 const backend = {
   writeError: null as { code: string; message: string; details: string; hint: string } | null,
@@ -350,7 +353,7 @@ describe('notesSlice send idempotency', () => {
   it('retains non-CHECK failure presentation on send and retry', async () => {
     const store = createTestStore();
     store.setState({ notesError: 'existing error' });
-    backend.writeError = { ...checkError, code: '23502' };
+    backend.writeError = { ...checkError, code: NOT_NULL_VIOLATION };
     backend.failNextWrite = true;
     await sendText(store, 'first');
     backend.failNextWrite = true;

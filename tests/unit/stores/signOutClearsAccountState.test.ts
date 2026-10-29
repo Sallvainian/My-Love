@@ -47,6 +47,7 @@ import {
 } from '../../../src/services/localCopy';
 import { MESSAGE_DATA_COPY_KIND, openMyLoveDB } from '../../../src/services/dbSchema';
 import { makeMoodEntry } from './moodSliceFixture';
+import { STORAGE_KEY } from '../helpers/persistedBlob';
 
 const EXPECTED_RESET: Record<string, unknown> = {
   moods: [],
@@ -282,7 +283,7 @@ describe('clearAuth on sign-out', () => {
 
   it('starts with an unpersisted ownership version', () => {
     expect(useAppStore.getInitialState().authSessionVersion).toBe(0);
-    const persisted = JSON.parse(localStorage.getItem('my-love-storage')!);
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
     expect(persisted.state).not.toHaveProperty('authSessionVersion');
   });
 
